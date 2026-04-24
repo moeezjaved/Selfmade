@@ -1,41 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { encryptToken } from '@/lib/meta/client'
+import { createAdminClient } from '@/lib/supabase/server'
 
 const META_APP_ID = process.env.META_APP_ID!
 const META_APP_SECRET = process.env.META_APP_SECRET!
 const META_API_VERSION = process.env.META_API_VERSION || 'v20.0'
+const APP_URL = 'https://www.tryselfmade.ai'
+const REDIRECT_URI = `${APP_URL}/api/auth/callback`
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const error = searchParams.get('error')
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin
 
   if (error) {
-    return NextResponse.redirect(
-      `${appUrl}/connect-meta?error=${encodeURIComponent(searchParams.get('error_description') || error)}`
-    )
+    return NextResponse.redirect(`${APP_URL}/connect-meta?error=${encodeURIComponent(searchParams.get('error_description') || error)}`)
   }
 
   if (!code) {
-    return NextResponse.redirect(`${appUrl}/connect-meta?error=no_code`)
+    return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_code`)
   }
 
   try {
-    // Use the same origin as the request for redirect_uri
-    const redirectUri = `${appUrl}/api/auth/callback`
-
+    // Exchange code for token
     const tokenRes = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/oauth/access_token?` +
-      new URLSearchParams({
-        client_id: META_APP_ID,
-        client_secret: META_APP_SECRET,
-        redirect_uri: redirectUri,
-        code,
-      })
+      new URLSearchParams({ client_id: META_APP_ID, client_secret: META_APP_SECRET, redirect_uri: REDIRECT_URI, code })
     )
-
     const tokenData = await tokenRes.json()
     if (!tokenData.access_token) {
       throw new Error(tokenData.error?.message || 'Failed to get access token')
@@ -44,42 +34,47 @@ export async function GET(request: NextRequest) {
     // Get long-lived token
     const llRes = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/oauth/access_token?` +
-      new URLSearchParams({
-        grant_type: 'fb_exchange_token',
-        client_id: META_APP_ID,
-        client_secret: META_APP_SECRET,
-        fb_exchange_token: tokenData.access_token,
-      })
+      new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: META_APP_ID, client_secret: META_APP_SECRET, fb_exchange_token: tokenData.access_token })
     )
     const llData = await llRes.json()
     const longLivedToken = llData.access_token || tokenData.access_token
 
+    // Get Facebook user ID to find our user
+    const meRes = await fetch(
+      `https://graph.facebook.com/${META_API_VERSION}/me?access_token=${longLivedToken}`
+    )
+    const meData = await meRes.json()
+
     // Get ad accounts
     const accountsRes = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts?` +
-      new URLSearchParams({
-        fields: 'id,account_id,name,currency,timezone_name,account_status',
-        access_token: longLivedToken,
-      })
+      new URLSearchParams({ fields: 'id,account_id,name,currency,timezone_name,account_status', access_token: longLivedToken })
     )
     const accountsData = await accountsRes.json()
     const accounts = accountsData.data || []
 
     if (!accounts.length) {
-      return NextResponse.redirect(`${appUrl}/connect-meta?error=no_accounts`)
+      return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_ad_accounts_found`)
     }
 
+    // Use admin client - get user from cookie
+    const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.redirect(`${appUrl}/login`)
 
-    const { encryptToken: encrypt } = await import('@/lib/meta/client')
-    const encryptedToken = encrypt(longLivedToken)
+    if (!user) {
+      // Store token temporarily and redirect to login
+      return NextResponse.redirect(`${APP_URL}/login?meta_connected=true`)
+    }
+
+    const { encryptToken } = await import('@/lib/meta/client')
+    const encryptedToken = encryptToken(longLivedToken)
     const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
 
+    const admin = createAdminClient()
     for (let i = 0; i < accounts.length; i++) {
       const account = accounts[i]
-      await supabase.from('meta_accounts').upsert({
+      await admin.from('meta_accounts').upsert({
         user_id: user.id,
         account_id: account.account_id || account.id.replace('act_', ''),
         account_name: account.name,
@@ -92,7 +87,7 @@ export async function GET(request: NextRequest) {
       }, { onConflict: 'user_id,account_id' })
     }
 
-    await supabase.from('activity_logs').insert({
+    await admin.from('activity_logs').insert({
       user_id: user.id,
       action_type: 'META_CONNECTED',
       entity_type: 'system',
@@ -100,12 +95,10 @@ export async function GET(request: NextRequest) {
       performed_by: 'user',
     })
 
-    return NextResponse.redirect(`${appUrl}/connect-meta?success=true`)
+    return NextResponse.redirect(`${APP_URL}/connect-meta?success=true`)
   } catch (err) {
     console.error('Meta OAuth error:', err)
     const message = err instanceof Error ? err.message : 'Connection failed'
-    return NextResponse.redirect(
-      `${appUrl}/connect-meta?error=${encodeURIComponent(message)}`
-    )
+    return NextResponse.redirect(`${APP_URL}/connect-meta?error=${encodeURIComponent(message)}`)
   }
 }
