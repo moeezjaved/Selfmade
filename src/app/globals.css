@@ -86,7 +86,7 @@
            transition-all duration-200 placeholder:text-white/30;
   }
   .input:focus {
-    @apply border-lime/40 bg-white/7;
+    @apply border-lime/40 bg-white/5;
     box-shadow: 0 0 0 3px rgba(223,254,149,0.08);
   }
 
