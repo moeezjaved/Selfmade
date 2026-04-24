@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { encryptToken } from '@/lib/meta/client'
-import { MetaClient } from '@/lib/meta/client'
 
 const META_APP_ID = process.env.META_APP_ID!
 const META_APP_SECRET = process.env.META_APP_SECRET!
 const META_API_VERSION = process.env.META_API_VERSION || 'v20.0'
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
+  const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const state = searchParams.get('state')
   const error = searchParams.get('error')
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL!
-
-  // Handle OAuth errors
   if (error) {
     return NextResponse.redirect(
       `${appUrl}/connect-meta?error=${encodeURIComponent(searchParams.get('error_description') || error)}`
@@ -27,13 +23,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Exchange code for access token
+    // Use the same origin as the request for redirect_uri
+    const redirectUri = `${appUrl}/api/auth/callback`
+
     const tokenRes = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/oauth/access_token?` +
       new URLSearchParams({
         client_id: META_APP_ID,
         client_secret: META_APP_SECRET,
-        redirect_uri: `${appUrl}/api/auth/callback`,
+        redirect_uri: redirectUri,
         code,
       })
     )
@@ -43,7 +41,7 @@ export async function GET(request: NextRequest) {
       throw new Error(tokenData.error?.message || 'Failed to get access token')
     }
 
-    // Get long-lived token (60 days)
+    // Get long-lived token
     const llRes = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/oauth/access_token?` +
       new URLSearchParams({
@@ -57,13 +55,10 @@ export async function GET(request: NextRequest) {
     const longLivedToken = llData.access_token || tokenData.access_token
 
     // Get ad accounts
-    const metaClient = new MetaClient(longLivedToken, 'me')
-
-    // We need to use the me/adaccounts endpoint directly
     const accountsRes = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts?` +
       new URLSearchParams({
-        fields: 'id,account_id,name,currency,timezone_name,account_status,amount_spent',
+        fields: 'id,account_id,name,currency,timezone_name,account_status',
         access_token: longLivedToken,
       })
     )
@@ -74,16 +69,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${appUrl}/connect-meta?error=no_accounts`)
     }
 
-    // Get current user
     const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      return NextResponse.redirect(`${appUrl}/login`)
-    }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.redirect(`${appUrl}/login`)
 
-    // Encrypt and store each ad account
-    const encryptedToken = encryptToken(longLivedToken)
-    const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000) // 60 days
+    const { encryptToken: encrypt } = await import('@/lib/meta/client')
+    const encryptedToken = encrypt(longLivedToken)
+    const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
 
     for (let i = 0; i < accounts.length; i++) {
       const account = accounts[i]
@@ -100,7 +92,6 @@ export async function GET(request: NextRequest) {
       }, { onConflict: 'user_id,account_id' })
     }
 
-    // Log activity
     await supabase.from('activity_logs').insert({
       user_id: user.id,
       action_type: 'META_CONNECTED',
@@ -108,13 +99,6 @@ export async function GET(request: NextRequest) {
       description: `Connected ${accounts.length} Meta ad account(s)`,
       performed_by: 'user',
     })
-
-    // Trigger initial sync (fire and forget)
-    fetch(`${appUrl}/api/meta/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id }),
-    }).catch(console.error)
 
     return NextResponse.redirect(`${appUrl}/connect-meta?success=true`)
   } catch (err) {
