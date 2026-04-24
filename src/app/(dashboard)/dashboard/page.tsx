@@ -98,7 +98,7 @@ export default function DashboardPage() {
     setSyncing(true)
     const toastId = toast.loading('Syncing your Meta account…')
     try {
-      const res = await fetch('/api/meta/sync', { method: 'POST' })
+      const res = await fetch('/api/meta/sync', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ account_id: accountId || null }) })
       if (res.ok) {
         toast.success('Sync complete!', { id: toastId })
         loadData()
