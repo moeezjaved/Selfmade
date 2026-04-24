@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   response.cookies.set('meta_connect_user_id', user.id, {
     httpOnly: true,
     secure: true,
-    sameSite: 'lax',
+    sameSite: 'none',
     maxAge: 600,
     path: '/',
   })
