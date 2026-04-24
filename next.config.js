@@ -1,11 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
+  images: {
+    domains: ['graph.facebook.com', 'scontent.example.com'],
   },
-  typescript: {
-    ignoreBuildErrors: false,
-  },
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig
