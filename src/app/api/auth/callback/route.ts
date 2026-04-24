@@ -14,27 +14,50 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get('state')
   const error = searchParams.get('error')
 
+  console.log('CALLBACK - code:', !!code, 'state:', !!state, 'error:', error)
+
   if (error) {
     return NextResponse.redirect(`${APP_URL}/connect-meta?error=${encodeURIComponent(searchParams.get('error_description') || error)}`)
   }
+  if (!code) return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_code`)
 
-  if (!code) {
-    return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_code`)
-  }
-
+  const admin = createAdminClient()
   let userId: string | null = null
+
+  // Try state param
   if (state) {
     try {
       const decoded = JSON.parse(atob(decodeURIComponent(state)))
       userId = decoded.user_id
-    } catch {}
+      console.log('USER FROM STATE:', userId)
+    } catch (e) {
+      console.log('State parse error:', e)
+    }
   }
-  if (!userId) {
-    userId = request.cookies.get('meta_connect_user_id')?.value || null
+
+  // Fallback: look up from activity_logs using nonce
+  if (!userId && state) {
+    try {
+      const decoded = JSON.parse(atob(decodeURIComponent(state)))
+      const nonce = decoded.nonce
+      if (nonce) {
+        const { data } = await admin.from('activity_logs')
+          .select('description')
+          .eq('action_type', 'META_OAUTH_STARTED')
+          .eq('entity_type', nonce)
+          .single()
+        if (data) {
+          userId = data.description
+          console.log('USER FROM DB LOOKUP:', userId)
+        }
+      }
+    } catch (e) {
+      console.log('DB lookup error:', e)
+    }
   }
-  if (!userId) {
-    return NextResponse.redirect(`${APP_URL}/connect-meta?error=session_lost`)
-  }
+
+  console.log('FINAL USER ID:', userId)
+  if (!userId) return NextResponse.redirect(`${APP_URL}/connect-meta?error=session_lost`)
 
   try {
     const tokenRes = await fetch(
@@ -42,7 +65,8 @@ export async function GET(request: NextRequest) {
       new URLSearchParams({ client_id: META_APP_ID, client_secret: META_APP_SECRET, redirect_uri: REDIRECT_URI, code })
     )
     const tokenData = await tokenRes.json()
-    if (!tokenData.access_token) throw new Error(tokenData.error?.message || 'Failed to get access token')
+    console.log('TOKEN:', tokenData.access_token ? 'OK' : tokenData.error?.message)
+    if (!tokenData.access_token) throw new Error(tokenData.error?.message || 'No access token')
 
     const llRes = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/oauth/access_token?` +
@@ -56,17 +80,17 @@ export async function GET(request: NextRequest) {
       new URLSearchParams({ fields: 'id,account_id,name,currency,timezone_name', access_token: longLivedToken })
     )
     const accountsData = await accountsRes.json()
+    console.log('ACCOUNTS:', JSON.stringify(accountsData).slice(0, 300))
     const accounts = accountsData.data || []
 
     if (!accounts.length) return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_ad_accounts_found`)
 
-    const admin = createAdminClient()
     const encryptedToken = encryptToken(longLivedToken)
     const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
 
     for (let i = 0; i < accounts.length; i++) {
       const account = accounts[i]
-      await admin.from('meta_accounts').upsert({
+      const { error: upsertError } = await admin.from('meta_accounts').upsert({
         user_id: userId,
         account_id: account.account_id || account.id.replace('act_', ''),
         account_name: account.name,
@@ -77,12 +101,12 @@ export async function GET(request: NextRequest) {
         status: 'active',
         is_primary: i === 0,
       }, { onConflict: 'user_id,account_id' })
+      console.log('UPSERT:', upsertError ? JSON.stringify(upsertError) : 'SUCCESS')
     }
 
-    const response = NextResponse.redirect(`${APP_URL}/connect-meta?success=true`)
-    response.cookies.delete('meta_connect_user_id')
-    return response
+    return NextResponse.redirect(`${APP_URL}/connect-meta?success=true`)
   } catch (err) {
+    console.error('ERROR:', err)
     const message = err instanceof Error ? err.message : 'Connection failed'
     return NextResponse.redirect(`${APP_URL}/connect-meta?error=${encodeURIComponent(message)}`)
   }
