@@ -29,19 +29,34 @@ export default function DashboardPage() {
   })
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [approving, setApproving] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // Fetch campaigns with insights
-    const { data: campaigns } = await supabase
+    // Get primary account
+    const { data: primaryAccount } = await supabase
+      .from('meta_accounts')
+      .select('id,account_id,account_name')
+      .eq('user_id', user.id)
+      .eq('is_primary', true)
+      .single()
+
+    // Fetch campaigns with insights filtered by primary account
+    let campQuery = supabase
       .from('campaigns')
       .select('*, campaign_insights(*)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10)
+
+    if (primaryAccount) {
+      campQuery = campQuery.eq('meta_account_id', primaryAccount.id)
+    }
+
+    const { data: campaigns } = await campQuery
 
     // Fetch pending recommendations
     const { data: recs } = await supabase
@@ -52,13 +67,8 @@ export default function DashboardPage() {
       .order('confidence_score', { ascending: false })
       .limit(5)
 
-    // Fetch last sync time
-    const { data: account } = await supabase
-      .from('meta_accounts')
-      .select('last_synced_at')
-      .eq('user_id', user.id)
-      .eq('is_primary', true)
-      .single()
+    // Use primary account for sync time
+    const account = primaryAccount
 
     // Calculate aggregate insights
     const allInsights = (campaigns || []).flatMap((c: any) => c.campaign_insights || [])
@@ -213,7 +223,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <AccountSelector onAccountChange={(accountId) => { handleSync(accountId) }} />
+          <AccountSelector onAccountChange={(accountId) => { handleSync(accountId).then(() => loadData()) }} />
           <div className="flex items-center gap-2 bg-green/10 border border-green/20 text-status-green text-xs font-bold px-3 py-2 rounded-lg">
             <span className="live-dot"/>
             Live
@@ -302,7 +312,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
               <div className="text-lg font-black text-white">Active Recommendations</div>
               <div className="flex items-center gap-3">
-          <AccountSelector onAccountChange={(accountId) => { handleSync(accountId) }} />
+          <AccountSelector onAccountChange={(accountId) => { handleSync(accountId).then(() => loadData()) }} />
                 {data.recommendations.length > 0 && (
                   <span className="text-xs font-bold bg-lime text-dark px-2.5 py-0.5 rounded-full">
                     {data.recommendations.length} pending
