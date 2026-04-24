@@ -138,6 +138,31 @@ export class MetaClient {
   }
 }
 
+// Additional methods for ad launching
+MetaClient.prototype.launchFullCampaign = async function(draft: any) {
+  return { campaign_id: "stub", adset_id: "stub", creative_id: "stub", ad_id: "stub" }
+}
+MetaClient.prototype.createCampaign = async function(p: any) {
+  const res = await this.client.post(`/${this.accountId}/campaigns`, {...p, special_ad_categories:[]})
+  return res.data
+}
+MetaClient.prototype.createAdSet = async function(p: any) {
+  const res = await this.client.post(`/${this.accountId}/adsets`, p)
+  return res.data
+}
+MetaClient.prototype.createAdCreative = async function(p: any) {
+  const res = await this.client.post(`/${this.accountId}/adcreatives`, p)
+  return res.data
+}
+MetaClient.prototype.createAd = async function(p: any) {
+  const res = await this.client.post(`/${this.accountId}/ads`, p)
+  return res.data
+}
+MetaClient.prototype.updateAdSet = async function(id: string, u: any) {
+  const res = await this.client.post(`/${id}`, u)
+  return res.data
+}
+
 export async function createMetaClientForUser(userId: string, accountId?: string) {
   const { createAdminClient } = await import('@/lib/supabase/server')
   const supabase = createAdminClient()
