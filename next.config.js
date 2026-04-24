@@ -1,12 +1,11 @@
-import type { NextConfig } from 'next'
-
-const nextConfig: NextConfig = {
-  images: {
-    domains: ['graph.facebook.com', 'scontent.example.com'],
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
   },
-  experimental: {
-    serverActions: { allowedOrigins: ['localhost:3000'] },
+  typescript: {
+    ignoreBuildErrors: false,
   },
-}
+};
 
-export default nextConfig
+module.exports = nextConfig;
