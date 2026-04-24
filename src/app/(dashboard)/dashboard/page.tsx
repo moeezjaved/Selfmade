@@ -8,6 +8,7 @@ import { formatCurrency, formatROAS, formatPercent, formatNumber, timeAgo, cn } 
 import type { Campaign, CampaignInsights, Recommendation } from '@/types'
 import { RefreshCw, TrendingUp, TrendingDown, CheckCircle, XCircle, ChevronRight, Zap, Sparkles } from 'lucide-react'
 import Link from 'next/link'
+import AccountSelector from '@/components/AccountSelector'
 
 interface DashboardData {
   campaigns: (Campaign & { insights: CampaignInsights[] })[]
@@ -93,7 +94,7 @@ export default function DashboardPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const handleSync = async () => {
+  const handleSync = async (accountId?: string) => {
     setSyncing(true)
     const toastId = toast.loading('Syncing your Meta account…')
     try {
@@ -212,6 +213,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <AccountSelector onAccountChange={(accountId) => { handleSync(accountId) }} />
           <div className="flex items-center gap-2 bg-green/10 border border-green/20 text-status-green text-xs font-bold px-3 py-2 rounded-lg">
             <span className="live-dot"/>
             Live
@@ -219,7 +221,7 @@ export default function DashboardPage() {
           <button
             onClick={handleSync}
             disabled={syncing}
-            className="flex items-center gap-2 bg-lime text-dark text-sm font-bold px-4 py-2 rounded-lg transition-all hover:bg-lime2 disabled:opacity-50"
+            className="flex items-center gap-2 bg-lime text-dark text-sm font-bold px-4 py-2 rounded-lg transition-all hover:bg-lime2 disabled:opacity-50" id="sync-btn"
           >
             <RefreshCw size={14} className={syncing ? 'animate-spin' : ''}/>
             {syncing ? 'Syncing…' : 'Sync'}
@@ -300,6 +302,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
               <div className="text-lg font-black text-white">Active Recommendations</div>
               <div className="flex items-center gap-3">
+          <AccountSelector onAccountChange={(accountId) => { handleSync(accountId) }} />
                 {data.recommendations.length > 0 && (
                   <span className="text-xs font-bold bg-lime text-dark px-2.5 py-0.5 rounded-full">
                     {data.recommendations.length} pending
