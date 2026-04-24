@@ -219,7 +219,7 @@ export default function DashboardPage() {
             Live
           </div>
           <button
-            onClick={handleSync}
+            onClick={() => handleSync()}
             disabled={syncing}
             className="flex items-center gap-2 bg-lime text-dark text-sm font-bold px-4 py-2 rounded-lg transition-all hover:bg-lime2 disabled:opacity-50" id="sync-btn"
           >
@@ -317,7 +317,7 @@ export default function DashboardPage() {
             {data.recommendations.length === 0 ? (
               <div className="px-6 py-10 text-center text-white/40 text-sm">
                 No pending recommendations.{' '}
-                <button onClick={handleSync} className="text-lime font-semibold hover:underline">
+                <button onClick={() => handleSync()} className="text-lime font-semibold hover:underline">
                   Sync now
                 </button>
                 {' '}to analyse your account.
