@@ -16,3 +16,19 @@ export async function GET() {
 
   return NextResponse.json({ accounts: data || [] })
 }
+
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { account_id } = await request.json()
+  const admin = createAdminClient()
+
+  // Set all to not primary
+  await admin.from('meta_accounts').update({ is_primary: false }).eq('user_id', user.id)
+  // Set selected as primary
+  await admin.from('meta_accounts').update({ is_primary: true }).eq('user_id', user.id).eq('account_id', account_id)
+
+  return NextResponse.json({ success: true })
+}
