@@ -125,6 +125,13 @@ export class MetaClient {
     return res.data
   }
 
+  async uploadAdImage(imageUrl: string) {
+    try {
+      const res = await this.client.post(`/${this.accountId}/adimages`, { url: imageUrl })
+      return res.data
+    } catch { return {} }
+  }
+
   async pauseAdSet(adSetId: string) {
     const res = await this.client.post(`/${adSetId}`, { status: 'PAUSED' })
     return res.data
