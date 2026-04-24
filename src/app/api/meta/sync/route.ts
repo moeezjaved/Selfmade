@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { createClient } from '@/lib/supabase/server'
-import { MetaClient, decryptToken } from '@/lib/meta/client'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { decryptToken } from '@/lib/meta/client'
+
+const META_API_VERSION = process.env.META_API_VERSION || 'v20.0'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,137 +12,69 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient()
 
-    // Get all active Meta accounts for user
-    const { data: accounts } = await admin
+    // Get connected Meta accounts
+    const { data: metaAccounts } = await admin
       .from('meta_accounts')
       .select('*')
       .eq('user_id', user.id)
       .eq('status', 'active')
 
-    if (!accounts?.length) {
+    if (!metaAccounts?.length) {
       return NextResponse.json({ error: 'No Meta accounts connected' }, { status: 400 })
     }
 
-    const syncResults = []
+    let totalCampaigns = 0
 
-    for (const account of accounts) {
-      try {
-        const token = decryptToken(account.access_token)
-        const client = new MetaClient(token, account.account_id)
+    for (const metaAccount of metaAccounts) {
+      const token = decryptToken(metaAccount.access_token)
+      const accountId = `act_${metaAccount.account_id}`
 
-        // 1. Sync campaigns
-        const campaigns = await client.getCampaigns()
-        
-        for (const campaign of campaigns) {
-          const { data: campaignRow } = await admin
-            .from('campaigns')
-            .upsert({
-              user_id: user.id,
-              meta_account_id: account.id,
-              meta_campaign_id: campaign.id,
-              name: campaign.name,
-              objective: campaign.objective,
-              status: campaign.status,
-              daily_budget: campaign.daily_budget ? parseInt(campaign.daily_budget) / 100 : null,
-              lifetime_budget: campaign.lifetime_budget ? parseInt(campaign.lifetime_budget) / 100 : null,
-              start_time: campaign.start_time,
-              stop_time: campaign.stop_time,
-            }, { onConflict: 'meta_account_id,meta_campaign_id' })
-            .select('id')
-            .single()
-
-          if (!campaignRow) continue
-
-          // 2. Sync insights for each campaign
-          try {
-            const insights = await client.getCampaignInsights(campaign.id, 'last_30d')
-            for (const insight of insights) {
-              await admin.from('campaign_insights').upsert({
-                campaign_id: campaignRow.id,
-                date_start: insight.date_start,
-                date_stop: insight.date_stop,
-                spend: insight.spend,
-                impressions: insight.impressions,
-                clicks: insight.clicks,
-                ctr: insight.ctr,
-                cpm: insight.cpm,
-                cpc: insight.cpc,
-                conversions: insight.conversions,
-                conversion_value: insight.conversion_value,
-                roas: insight.roas,
-                cpa: insight.cpa,
-                reach: insight.reach,
-              }, { onConflict: 'campaign_id,date_start,date_stop' })
-            }
-          } catch (insightErr) {
-            console.warn(`Failed to sync insights for campaign ${campaign.id}:`, insightErr)
-          }
-
-          // 3. Sync ad sets
-          try {
-            const adSets = await client.getAdSets(campaign.id)
-            for (const adSet of adSets) {
-              await admin.from('ad_sets').upsert({
-                campaign_id: campaignRow.id,
-                meta_adset_id: adSet.id,
-                name: adSet.name,
-                status: adSet.status,
-                daily_budget: adSet.daily_budget ? parseInt(adSet.daily_budget) / 100 : null,
-                targeting: adSet.targeting || {},
-                optimization_goal: adSet.optimization_goal,
-                billing_event: adSet.billing_event,
-              }, { onConflict: 'campaign_id,meta_adset_id' })
-            }
-          } catch (adSetErr) {
-            console.warn(`Failed to sync ad sets for campaign ${campaign.id}:`, adSetErr)
-          }
-        }
-
-        // Update last synced
-        await admin
-          .from('meta_accounts')
-          .update({ last_synced_at: new Date().toISOString() })
-          .eq('id', account.id)
-
-        syncResults.push({
-          account_id: account.account_id,
-          account_name: account.account_name,
-          campaigns_synced: campaigns.length,
-          status: 'success',
+      // Fetch campaigns from Meta
+      const campsRes = await fetch(
+        `https://graph.facebook.com/${META_API_VERSION}/${accountId}/campaigns?` +
+        new URLSearchParams({
+          fields: 'id,name,objective,status,daily_budget,lifetime_budget,start_time,stop_time,created_time',
+          limit: '100',
+          access_token: token,
         })
+      )
+      const campsData = await campsRes.json()
+      const campaigns = campsData.data || []
+      totalCampaigns += campaigns.length
 
-      } catch (accountErr) {
-        console.error(`Failed to sync account ${account.account_id}:`, accountErr)
-        syncResults.push({
-          account_id: account.account_id,
-          account_name: account.account_name,
-          status: 'error',
-          error: accountErr instanceof Error ? accountErr.message : 'Unknown error',
-        })
-
-        // Mark account as error if token is invalid
-        if ((accountErr as Error).message?.includes('token')) {
-          await admin
-            .from('meta_accounts')
-            .update({ status: 'error' })
-            .eq('id', account.id)
-        }
+      for (const camp of campaigns) {
+        await admin.from('campaigns').upsert({
+          user_id: user.id,
+          meta_account_id: metaAccount.id,
+          meta_campaign_id: camp.id,
+          name: camp.name,
+          objective: camp.objective,
+          status: camp.status,
+          daily_budget: camp.daily_budget ? Number(camp.daily_budget) / 100 : null,
+          lifetime_budget: camp.lifetime_budget ? Number(camp.lifetime_budget) / 100 : null,
+          start_time: camp.start_time || null,
+          stop_time: camp.stop_time || null,
+        }, { onConflict: 'meta_account_id,meta_campaign_id' })
       }
+
+      // Update last synced
+      await admin.from('meta_accounts')
+        .update({ last_synced_at: new Date().toISOString() })
+        .eq('id', metaAccount.id)
     }
 
-    // Log sync activity
+    // Log activity
     await admin.from('activity_logs').insert({
       user_id: user.id,
       action_type: 'SYNC_COMPLETED',
       entity_type: 'system',
-      description: `Synced ${syncResults.filter(r => r.status === 'success').length} account(s) successfully`,
+      description: `Synced ${totalCampaigns} campaigns from Meta`,
       performed_by: 'system',
     })
 
-    return NextResponse.json({ success: true, results: syncResults })
-
+    return NextResponse.json({ success: true, campaigns: totalCampaigns })
   } catch (err) {
     console.error('Sync error:', err)
-    return NextResponse.json({ error: 'Sync failed' }, { status: 500 })
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Sync failed' }, { status: 500 })
   }
 }
