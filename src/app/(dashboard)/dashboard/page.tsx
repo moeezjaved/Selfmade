@@ -39,7 +39,7 @@ export default function DashboardPage() {
     // Get primary account
     const { data: primaryAccount } = await supabase
       .from('meta_accounts')
-      .select('id,account_id,account_name')
+      .select('id,account_id,account_name,last_synced_at')
       .eq('user_id', user.id)
       .eq('is_primary', true)
       .single()
