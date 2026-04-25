@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
         }
         broadCount++
       } catch(e: any) {
-        console.log('Broad adset error:', e.message)
+        console.log('Broad adset FULL error:', e.message)
         errors.push(`Broad "${c.name}": ${e.message}`)
       }
     }
