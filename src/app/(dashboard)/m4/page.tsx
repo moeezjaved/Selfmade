@@ -330,6 +330,49 @@ export default function M4Page() {
               <div style={{fontSize:13,fontWeight:700,color:'#93c5fd',marginBottom:4}}>Interest Campaign</div>
               <div style={{fontSize:13,color:'rgba(255,255,255,0.5)',lineHeight:1.65}}>Your interest campaign will automatically use the same creatives. In the next step you will choose which interests to test — one per ad set.</div>
             </div>
+
+            {/* Ad Copy */}
+            <div style={{marginTop:16,background:'rgba(255,255,255,0.02)',borderRadius:14,border:'1px solid rgba(255,255,255,0.07)',padding:18}}>
+              <div style={{fontSize:13,fontWeight:800,color:'white',marginBottom:4}}>Ad Copy</div>
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginBottom:14}}>This text appears on every ad in your campaign.</div>
+              <div style={{marginBottom:12}}>
+                <label style={{display:'block',fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.4)',marginBottom:5,textTransform:'uppercase' as const,letterSpacing:'.06em'}}>Primary Text (ad copy)</label>
+                <textarea value={adCopy.primaryText} onChange={e=>setAdCopy(p=>({...p,primaryText:e.target.value}))} placeholder="e.g. Tired of hair fall? Our serum works in 4 weeks. 30-day guarantee." style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)',color:'white',fontSize:13,fontFamily:'inherit',outline:'none',resize:'vertical' as const,minHeight:80,lineHeight:1.6}}/>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+                <div>
+                  <label style={{display:'block',fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.4)',marginBottom:5,textTransform:'uppercase' as const,letterSpacing:'.06em'}}>Headline</label>
+                  <input value={adCopy.headline} onChange={e=>setAdCopy(p=>({...p,headline:e.target.value}))} placeholder="e.g. Stop Hair Fall in 4 Weeks" style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)',color:'white',fontSize:13,fontFamily:'inherit',outline:'none'}}/>
+                </div>
+                <div>
+                  <label style={{display:'block',fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.4)',marginBottom:5,textTransform:'uppercase' as const,letterSpacing:'.06em'}}>Call to Action</label>
+                  <select value={adCopy.cta} onChange={e=>setAdCopy(p=>({...p,cta:e.target.value}))} style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'#152928',color:'white',fontSize:13,fontFamily:'inherit',outline:'none'}}>
+                    {['SHOP_NOW','LEARN_MORE','GET_OFFER','SIGN_UP','CONTACT_US','ORDER_NOW','GET_QUOTE','SUBSCRIBE','DOWNLOAD','BOOK_NOW'].map(c=><option key={c} value={c}>{c.replace(/_/g,' ')}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.4)',marginBottom:5,textTransform:'uppercase' as const,letterSpacing:'.06em'}}>Destination URL</label>
+                <input value={adCopy.destinationUrl} onChange={e=>setAdCopy(p=>({...p,destinationUrl:e.target.value}))} placeholder="https://yourwebsite.com/product" style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)',color:'white',fontSize:13,fontFamily:'inherit',outline:'none'}}/>
+              </div>
+            </div>
+
+            {/* Facebook Page */}
+            <div style={{marginTop:14,background:'rgba(255,255,255,0.02)',borderRadius:14,border:'1px solid rgba(255,255,255,0.07)',padding:16}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:800,color:'white'}}>Facebook Page</div>
+                  <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginTop:2}}>Required — ads run from your Facebook Page</div>
+                </div>
+                {pages.length===0&&<button onClick={fetchPages} style={{background:'rgba(147,197,253,0.1)',border:'1px solid rgba(147,197,253,0.2)',color:'#93c5fd',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Load My Pages</button>}
+              </div>
+              {pages.length>0&&(
+                <select value={selectedPageId} onChange={e=>setSelectedPageId(e.target.value)} style={{width:'100%',padding:'9px 12px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'#152928',color:'white',fontSize:13,fontFamily:'inherit',outline:'none'}}>
+                  {pages.map(p=><option key={p.id} value={p.id}>{p.name} — {p.category}</option>)}
+                </select>
+              )}
+            </div>
+            </div>
           </div>
           <div style={foot}>
             <button onClick={()=>setStep('pixel')} style={backBtn}>← Back</button>
