@@ -14,6 +14,7 @@ export default function M4Page() {
   const [interests, setInterests] = useState<Interest[]>([])
   const [customInterest, setCustomInterest] = useState('')
   const [applying, setApplying] = useState<string|null>(null)
+  const [creatives, setCreatives] = useState<Creative[]>([])
   const [pixelChoice, setPixelChoice] = useState<'existing'|'new'|null>(null)
   const [pages, setPages] = useState<{id:string,name:string,category:string}[]>([])
   const [selectedPageId, setSelectedPageId] = useState('')
@@ -57,7 +58,6 @@ export default function M4Page() {
     } catch {}
     setCreatingAudiences(false)
   }
-  const [creatives, setCreatives] = useState<Creative[]>([])
 
   const [form, setForm] = useState({
     product:'', description:'', competitors:'', targetCustomer:'',
