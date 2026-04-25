@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
-const V = process.env.META_API_VERSION || 'v20.0'
+const V = process.env.META_API_VERSION || 'v18.0'
 
 export async function POST(request: NextRequest) {
   try {
@@ -97,12 +97,28 @@ export async function POST(request: NextRequest) {
     let intCount = 0
 
     // ── CAMPAIGN 1: Broad ─────────────────────────────────────
+    // Legacy objective mapping
+    const objectiveMap: Record<string,string> = {
+      OUTCOME_SALES: 'CONVERSIONS',
+      OUTCOME_LEADS: 'LEAD_GENERATION',
+      OUTCOME_TRAFFIC: 'LINK_CLICKS',
+      OUTCOME_AWARENESS: 'BRAND_AWARENESS',
+    }
+    const apiObjective = objectiveMap[objective] || 'LINK_CLICKS'
+    const optMap: Record<string,{optimization_goal:string,billing_event:string}> = {
+      OUTCOME_SALES:    { optimization_goal: 'OFFSITE_CONVERSIONS', billing_event: 'IMPRESSIONS' },
+      OUTCOME_LEADS:    { optimization_goal: 'LEAD_GENERATION',     billing_event: 'IMPRESSIONS' },
+      OUTCOME_TRAFFIC:  { optimization_goal: 'LINK_CLICKS',         billing_event: 'IMPRESSIONS' },
+      OUTCOME_AWARENESS:{ optimization_goal: 'REACH',               billing_event: 'IMPRESSIONS' },
+    }
+    const opt = optMap[objective] || optMap.OUTCOME_TRAFFIC
+
     console.log('Token length:', token?.length, 'AccountId:', adAccountId, 'PageId:', pageId, 'Creatives:', creatives?.length, 'Interests:', interests?.length)
     console.log('Budget:', dailyBudget, 'Objective:', objective)
     
     const broadCamp = await post(`${adAccountId}/campaigns`, {
       name: `${campaignName} — M4 Broad`,
-      objective,
+      objective: apiObjective,
       status: 'PAUSED',
       special_ad_categories: [],
     })
@@ -144,7 +160,7 @@ export async function POST(request: NextRequest) {
     // ── CAMPAIGN 2: Interests ─────────────────────────────────
     const intCamp = await post(`${adAccountId}/campaigns`, {
       name: `${campaignName} — M4 Interests`,
-      objective,
+      objective: apiObjective,
       status: 'PAUSED',
       special_ad_categories: [],
     })
