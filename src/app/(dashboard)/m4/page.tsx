@@ -35,6 +35,8 @@ export default function M4Page() {
   const [loadingPixels, setLoadingPixels] = useState(false)
   const [audiences, setAudiences] = useState<{key:string,id:string,name:string}[]>([])
   const [creatingAudiences, setCreatingAudiences] = useState(false)
+  const [accountCurrency, setAccountCurrency] = useState('USD')
+
   const [form, setForm] = useState({
     product:'', description:'', competitors:'', targetCustomer:'',
     location:'', ageMin:'18', ageMax:'65', gender:'ALL',
@@ -58,6 +60,13 @@ export default function M4Page() {
     })
     e.target.value = ''
   }
+
+  React.useEffect(() => {
+    fetch('/api/meta/accounts').then(r=>r.json()).then(d => {
+      const primary = d.accounts?.find((a:any)=>a.is_primary)
+      if (primary?.currency) setAccountCurrency(primary.currency)
+    }).catch(()=>{})
+  }, [])
 
   const fetchPixels = async () => {
     setLoadingPixels(true)
@@ -358,7 +367,7 @@ export default function M4Page() {
               </div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
-              <div><label style={S.label}>Daily Budget per Campaign (USD)</label>
+              <div><label style={S.label}>Daily Budget per Campaign ({accountCurrency})</label>
                 <div style={{position:'relative'}}><span style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',color:'rgba(255,255,255,0.5)'}}>$</span><input type="number" value={form.budget} onChange={e=>set('budget',e.target.value)} style={{...S.input,paddingLeft:28}}/></div>
                 <div style={{fontSize:11,color:'rgba(255,255,255,0.3)',marginTop:4}}>Min $10/day recommended. Both campaigns share this budget.</div>
               </div>
@@ -371,7 +380,7 @@ export default function M4Page() {
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:16}}>
               <div><label style={S.label}>Min Age</label><input type="number" value={form.ageMin} onChange={e=>set('ageMin',e.target.value)} style={S.input}/></div>
               <div><label style={S.label}>Max Age</label><input type="number" value={form.ageMax} onChange={e=>set('ageMax',e.target.value)} style={S.input}/></div>
-              <div><label style={S.label}>Location</label><input value={form.location} onChange={e=>set('location',e.target.value)} placeholder="e.g. PK, Lahore" style={S.input}/></div>
+              <div><label style={S.label}>Location</label><input value={form.location} onChange={e=>set('location',e.target.value)} placeholder="e.g. PK, Lahore, US" style={S.input}/></div>
             </div>
             <div style={{background:'rgba(147,197,253,0.05)',borderRadius:12,border:'1px solid rgba(147,197,253,0.15)',padding:'12px 16px',display:'flex',gap:12}}>
               <span style={{fontSize:20,flexShrink:0}}>🛡️</span>
