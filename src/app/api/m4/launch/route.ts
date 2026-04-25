@@ -81,25 +81,6 @@ export async function POST(request: NextRequest) {
       return d
     }
 
-    // Upload image to Meta and get hash
-    const uploadImage = async (base64: string, mimeType: string): Promise<string|null> => {
-      try {
-        const r = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/adimages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            bytes: base64,
-            access_token: token,
-          })
-        })
-        const d = await r.json()
-        if (d.error) { console.log('Image upload error:', d.error.message); return null }
-        const images = d.images
-        const firstKey = Object.keys(images)[0]
-        return images[firstKey]?.hash || null
-      } catch(e) { return null }
-    }
-
     // Create ad creative with image hash
     const createCreative = async (name: string, imageHash: string|null) => {
       const linkData: Record<string,unknown> = {
@@ -151,10 +132,10 @@ export async function POST(request: NextRequest) {
           ...promotedObject,
         })
 
-        // Upload image and create ad
+        // Create ad using pre-uploaded image hash
         if (pageId && websiteUrl) {
           try {
-            const imageHash = (c.base64 && c.mimeType) ? await uploadImage(c.base64, c.mimeType) : null
+            const imageHash = c.hash || null
             const creative = await createCreative(`Creative — ${c.name}`, imageHash)
             await post(`${adAccountId}/ads`, {
               name: `Ad — ${c.name}`,
@@ -210,7 +191,7 @@ export async function POST(request: NextRequest) {
         if (pageId && websiteUrl) {
           try {
             const firstCreative = (creatives as any[])[0]
-            const imageHash = (firstCreative?.base64 && firstCreative?.mimeType) ? await uploadImage(firstCreative.base64, firstCreative.mimeType) : null
+            const imageHash = firstCreative?.hash || null
             const creative = await createCreative(`Creative — ${interest.name}`, imageHash)
             await post(`${adAccountId}/ads`, {
               name: `Ad — ${interest.name}`,
