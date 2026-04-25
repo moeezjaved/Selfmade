@@ -465,10 +465,33 @@ export default function M4Page() {
 
             <button onClick={async()=>{
               setLoading(true)
-              await new Promise(r=>setTimeout(r,2500))
+              try {
+                const res = await fetch('/api/m4/launch', {
+                  method: 'POST',
+                  headers: {'Content-Type':'application/json'},
+                  body: JSON.stringify({
+                    campaignName: form.campaignName||'M4 Campaign',
+                    creatives,
+                    interests: selectedInterests,
+                    budget: form.budget,
+                    location: form.location,
+                    ageMin: form.ageMin,
+                    ageMax: form.ageMax,
+                    gender: form.gender,
+                    pixelId,
+                  })
+                })
+                const data = await res.json()
+                if (data.error) {
+                  alert('Launch failed: ' + data.error)
+                } else {
+                  alert('✅ M4 Campaigns created in ' + data.account + '!\n\n📦 Broad: ' + data.broad_adsets + ' ad sets\n🎯 Interests: ' + data.interest_adsets + ' ad sets\n🛡️ Exclusions: ' + data.exclusion_audiences + '\n\nAll PAUSED — activate in Meta Ads Manager when ready.' + (data.errors?.length ? '\n\n⚠️ ' + data.errors.slice(0,3).join('\n') : ''))
+                  setStep('grades')
+                }
+              } catch(e:any) {
+                alert('Error: ' + e.message)
+              }
               setLoading(false)
-              alert('Both M4 campaigns created in Meta Ads Manager!\n\nCampaign 1: ' + (form.campaignName||'M4 Broad Prospecting') + '\nCampaign 2: ' + (form.campaignName||'M4 Interest Testing') + ' — Interests\n\nBoth are PAUSED. Review in Ads Manager then activate.')
-              setStep('grades')
             }} disabled={loading} style={{width:'100%',background:loading?'rgba(223,254,149,0.5)':'#dffe95',color:'#10211f',border:'none',padding:15,borderRadius:14,fontSize:16,fontWeight:800,fontFamily:'inherit',cursor:loading?'not-allowed' as const:'pointer' as const}}>
               {loading?'🚀 Creating campaigns in Meta Ads Manager…':'🚀 Launch Both M4 Campaigns (PAUSED for review)'}
             </button>
