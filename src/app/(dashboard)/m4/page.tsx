@@ -2,7 +2,7 @@
 import { useState } from 'react'
 
 type Step = 'welcome' | 'pixel' | 'creatives' | 'interests' | 'budget' | 'review' | 'grades'
-interface Creative { id: string; name: string; pack: number; type?: string; base64?: string; mimeType?: string }
+interface Creative { id: string; name: string; pack: number; type?: string; base64?: string; mimeType?: string; hash?: string; uploading?: boolean; uploaded?: boolean }
 interface Interest { name: string; category: string; why: string; size: string; confidence: number; selected: boolean; custom?: boolean }
 interface Grade { campaign_name: string; grade: string; emoji: string; label: string; why: string; action: string; action_reason: string; applied?: boolean }
 
@@ -60,9 +60,28 @@ export default function M4Page() {
       const id = Date.now().toString() + Math.random()
       const type = file.type.startsWith('video') ? 'video' : 'image'
       const mimeType = file.type
-      reader.onload = (ev) => {
+      const name = file.name.replace(/\.[^.]+$/, '')
+
+      reader.onload = async (ev) => {
         const base64 = (ev.target?.result as string)?.split(',')[1]
-        setCreatives(prev => [...prev, {id, name:file.name.replace(/\.[^.]+$/,''), pack:1, type, base64, mimeType}])
+        // Add creative immediately showing uploading state
+        setCreatives(prev => [...prev, {id, name, pack:1, type, base64, mimeType, uploading:true}])
+        // Upload to Meta immediately
+        try {
+          const res = await fetch('/api/m4/upload-image', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({base64, mimeType, name})
+          })
+          const data = await res.json()
+          if (data.hash) {
+            setCreatives(prev => prev.map(c => c.id === id ? {...c, hash:data.hash, uploading:false, uploaded:true, base64:undefined} : c))
+          } else {
+            setCreatives(prev => prev.map(c => c.id === id ? {...c, uploading:false, base64:undefined} : c))
+          }
+        } catch {
+          setCreatives(prev => prev.map(c => c.id === id ? {...c, uploading:false} : c))
+        }
       }
       reader.readAsDataURL(file)
     })
@@ -261,7 +280,9 @@ export default function M4Page() {
                     <div key={c.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderRadius:10,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)'}}>
                       <div style={{width:28,height:28,borderRadius:7,background:'rgba(223,254,149,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#dffe95',flexShrink:0}}>A{i+1}</div>
                       <input value={c.name} onChange={e=>setCreatives(prev=>prev.map(x=>x.id===c.id?{...x,name:e.target.value}:x))} style={{flex:1,background:'none',border:'none',color:'white',fontSize:14,fontWeight:600,fontFamily:'inherit',outline:'none'}}/>
-                      <span style={{fontSize:11,color:'rgba(255,255,255,0.35)'}}>{c.type==='video'?'🎬 Video':'🖼 Image'}</span>
+                      <span style={{fontSize:11,color:c.uploaded?'#86efac':c.uploading?'#fbbf24':'rgba(255,255,255,0.35)'}}>
+                        {c.uploading?'⏳ Uploading to Meta…':c.uploaded?'✅ Uploaded to Meta':c.type==='video'?'🎬 Video':'🖼 Image'}
+                      </span>
                       <button onClick={()=>setCreatives(prev=>prev.filter(x=>x.id!==c.id))} style={{background:'none',border:'none',color:'rgba(255,255,255,0.3)',cursor:'pointer',fontSize:18,padding:0}}>×</button>
                     </div>
                   ))}
