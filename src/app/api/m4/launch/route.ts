@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     // Create Broad Campaign
     const broadCamp = await post(`${adAccountId}/campaigns`, {
       name: `${campaignName} — M4 Broad`,
-      objective: 'OUTCOME_SALES',
+      objective: 'OUTCOME_TRAFFIC',
       status: 'PAUSED',
       special_ad_categories: [],
       daily_budget: dailyBudget,
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
           status: 'PAUSED',
           daily_budget: Math.max(100, Math.round(dailyBudget / Math.max(creatives.length, 1))),
           billing_event: 'IMPRESSIONS',
-          optimization_goal: 'OFFSITE_CONVERSIONS',
+          optimization_goal: 'LINK_CLICKS',
           targeting,
         })
         broadCount++
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     // Create Interest Campaign
     const intCamp = await post(`${adAccountId}/campaigns`, {
       name: `${campaignName} — M4 Interests`,
-      objective: 'OUTCOME_SALES',
+      objective: 'OUTCOME_TRAFFIC',
       status: 'PAUSED',
       special_ad_categories: [],
       daily_budget: dailyBudget,
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
           status: 'PAUSED',
           daily_budget: Math.max(100, Math.round(dailyBudget / Math.max(interests.length, 1))),
           billing_event: 'IMPRESSIONS',
-          optimization_goal: 'OFFSITE_CONVERSIONS',
+          optimization_goal: 'LINK_CLICKS',
           targeting: intTargeting,
         })
         intCount++
