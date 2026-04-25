@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
       objective: 'OUTCOME_TRAFFIC',
       status: 'PAUSED',
       special_ad_categories: [],
-      daily_budget: dailyBudget,
     })
 
     // Create broad ad sets
@@ -81,7 +80,6 @@ export async function POST(request: NextRequest) {
       objective: 'OUTCOME_TRAFFIC',
       status: 'PAUSED',
       special_ad_categories: [],
-      daily_budget: dailyBudget,
     })
 
     // Create interest ad sets
