@@ -68,7 +68,11 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ ...params, access_token: token }),
       })
       const d = await r.json()
-      if (d.error) throw new Error(`${d.error.message} [${d.error.error_subcode||d.error.code}]`)
+      if (d.error) {
+        console.error('Meta API error full:', JSON.stringify(d.error))
+        console.error('Params sent:', JSON.stringify({...params, access_token: 'REDACTED'}))
+        throw new Error(`${d.error.message} [${d.error.error_subcode||d.error.code}] user_msg: ${d.error.error_user_msg||'none'}`)
+      }
       return d
     }
 
