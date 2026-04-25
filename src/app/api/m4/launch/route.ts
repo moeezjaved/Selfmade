@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
-const V = 'v18.0'
+const V = 'v20.0'
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,14 +39,7 @@ export async function POST(request: NextRequest) {
     const adAccountId = `act_${metaAccount.account_id}`
     const dailyBudget = Math.max(576, Math.round(parseFloat(budget) * 100))
 
-    // Legacy objective names (work with v18)
-    const legacyObjective: Record<string,string> = {
-      OUTCOME_SALES: 'CONVERSIONS',
-      OUTCOME_LEADS: 'LEAD_GENERATION',
-      OUTCOME_TRAFFIC: 'LINK_CLICKS',
-      OUTCOME_AWARENESS: 'BRAND_AWARENESS',
-    }
-    const apiObjective = legacyObjective[objective] || 'LINK_CLICKS'
+    const apiObjective = ['OUTCOME_SALES','OUTCOME_LEADS','OUTCOME_TRAFFIC','OUTCOME_AWARENESS','OUTCOME_ENGAGEMENT'].includes(objective) ? objective : 'OUTCOME_TRAFFIC'
 
     // Optimization settings per objective
     const optimizationMap: Record<string,{optimization_goal:string,billing_event:string}> = {
