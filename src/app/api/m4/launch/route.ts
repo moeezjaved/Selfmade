@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     })
     console.log('Broad campaign created:', broadCamp.id)
 
-    const adsetBudget = Math.max(576, Math.round(dailyBudget / Math.max(creatives.length, 1)))
+    const adsetBudget = Math.max(minBudget, safeBudget)
 
     for (const c of (creatives as any[]).slice(0, 5)) {
       try {
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     })
     console.log('Interest campaign created:', intCamp.id)
 
-    const intBudget = Math.max(576, Math.round(dailyBudget / Math.max(interests.length, 1)))
+    const intBudget = Math.max(minBudget, safeBudget)
 
     for (const interest of (interests as any[]).slice(0, 6)) {
       try {
