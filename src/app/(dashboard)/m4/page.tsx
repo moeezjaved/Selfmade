@@ -132,7 +132,7 @@ export default function M4Page() {
   const note = (icon:string,color:string,title:string,text:string) => (
     <div style={{margin:'20px 24px 0',background:`${color}08`,border:`1px solid ${color}22`,borderRadius:12,padding:'12px 16px',display:'flex',gap:12}}>
       <span style={{fontSize:20,flexShrink:0}}>{icon}</span>
-      <div style={{fontSize:13,color:'rgba(255,255,255,0.65)',lineHeight:1.7}}><strong style={{color}}>{title}</strong> {text}</div>
+      <div style={{fontSize:13,color:'rgba(255,255,255,0.65)',lineHeight:1.7}}><strong style={{color:color}}>{title}</strong> {text}</div>
     </div>
   )
   const inp = (label:string,k:string,ph:string,ta?:boolean) => (
