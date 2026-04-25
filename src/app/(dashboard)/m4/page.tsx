@@ -3,7 +3,7 @@ import { useState } from 'react'
 
 type Step = 'welcome' | 'pixel' | 'creatives' | 'interests' | 'budget' | 'review' | 'grades'
 
-interface Creative { id: string; name: string; pack: number }
+interface Creative { id: string; name: string; pack: number; type?: string; file?: File }
 interface Interest { name: string; category: string; why: string; size: string; confidence: number; selected: boolean; custom?: boolean }
 interface Grade { campaign_name: string; grade: string; emoji: string; label: string; why: string; action: string; action_reason: string; applied?: boolean }
 
@@ -284,9 +284,20 @@ export default function M4Page() {
                   ))}
                 </div>
               )}
-              <button onClick={()=>setCreatives(prev=>[...prev,{id:Date.now().toString(),name:`Creative ${prev.length+1}`,pack:1}])} style={{background:'rgba(223,254,149,0.1)',border:'1px solid rgba(223,254,149,0.2)',color:'#dffe95',padding:'10px 20px',borderRadius:100,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
-                + Add Creative
-              </button>
+              <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                <label style={{background:'rgba(223,254,149,0.1)',border:'1px solid rgba(223,254,149,0.2)',color:'#dffe95',padding:'10px 20px',borderRadius:100,fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
+                  📁 Upload from Computer
+                  <input type="file" accept="image/*,video/*" multiple onChange={handleFileUpload} style={{display:'none'}}/>
+                </label>
+                <button onClick={()=>addCreative()} style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.5)',padding:'10px 20px',borderRadius:100,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                  + Add Name Only
+                </button>
+                <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 16px',borderRadius:100,background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.15)'}}>
+                  <span style={{fontSize:13}}>✨</span>
+                  <span style={{fontSize:13,fontWeight:700,color:'#93c5fd'}}>AI Creative Studio</span>
+                  <span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:100,background:'rgba(147,197,253,0.15)',color:'#93c5fd',letterSpacing:'.06em'}}>COMING SOON</span>
+                </div>
+              </div>
             </div>
 
             <div style={{background:'rgba(147,197,253,0.05)',borderRadius:12,border:'1px solid rgba(147,197,253,0.15)',padding:16}}>
