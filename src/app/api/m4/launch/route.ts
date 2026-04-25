@@ -126,8 +126,9 @@ export async function POST(request: NextRequest) {
           campaign_id: broadCamp.id,
           status: 'PAUSED',
           daily_budget: adsetBudget,
-          targeting: baseTargeting,
+          targeting: {...baseTargeting, targeting_automation:{advantage_audience:1}},
           bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+          destination_type: 'WEBSITE',
           ...optSettings,
           ...promotedObject,
         })
@@ -182,8 +183,9 @@ export async function POST(request: NextRequest) {
           campaign_id: intCamp.id,
           status: 'PAUSED',
           daily_budget: intBudget,
-          targeting: intTargeting,
+          targeting: {...intTargeting, targeting_automation:{advantage_audience:0}},
           bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+          destination_type: 'WEBSITE',
           ...optSettings,
           ...promotedObject,
         })
