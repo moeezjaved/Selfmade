@@ -56,17 +56,17 @@ export default function M4Page() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     Array.from(e.target.files||[]).forEach(file => {
-      const reader = new FileReader()
       const id = Date.now().toString() + Math.random()
       const type = file.type.startsWith('video') ? 'video' : 'image'
       const mimeType = file.type
       const name = file.name.replace(/\.[^.]+$/, '')
 
+      // Add creative immediately with uploading state
+      setCreatives(prev => [...prev, {id, name, pack:1, type, mimeType, uploading:true}])
+
+      const reader = new FileReader()
       reader.onload = async (ev) => {
         const base64 = (ev.target?.result as string)?.split(',')[1]
-        // Add creative immediately showing uploading state
-        setCreatives(prev => [...prev, {id, name, pack:1, type, base64, mimeType, uploading:true}])
-        // Upload to Meta immediately
         try {
           const res = await fetch('/api/m4/upload-image', {
             method: 'POST',
@@ -75,9 +75,9 @@ export default function M4Page() {
           })
           const data = await res.json()
           if (data.hash) {
-            setCreatives(prev => prev.map(c => c.id === id ? {...c, hash:data.hash, uploading:false, uploaded:true, base64:undefined} : c))
+            setCreatives(prev => prev.map(c => c.id === id ? {...c, hash:data.hash, uploading:false, uploaded:true} : c))
           } else {
-            setCreatives(prev => prev.map(c => c.id === id ? {...c, uploading:false, base64:undefined} : c))
+            setCreatives(prev => prev.map(c => c.id === id ? {...c, uploading:false} : c))
           }
         } catch {
           setCreatives(prev => prev.map(c => c.id === id ? {...c, uploading:false} : c))
