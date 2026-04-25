@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
-const V = process.env.META_API_VERSION || 'v18.0'
+const V = 'v18.0'
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       ageMax = '65',
       gender = 'ALL',
       pixelId = '',
-      objective = 'OUTCOME_SALES',
+      objective = 'OUTCOME_TRAFFIC',
       pageId = '',
       primaryText = '',
       headline = '',
@@ -33,14 +33,40 @@ export async function POST(request: NextRequest) {
       .from('meta_accounts').select('*')
       .eq('user_id', user.id).eq('is_primary', true).single()
 
-    console.log('MetaAccount:', metaAccount?.account_name, metaAccount?.account_id)
     if (!metaAccount) return NextResponse.json({ error: 'No primary Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = `act_${metaAccount.account_id}`
     const dailyBudget = Math.max(576, Math.round(parseFloat(budget) * 100))
 
-    console.log('M4 Launch:', metaAccount.account_name, adAccountId, objective)
+    // Legacy objective names (work with v18)
+    const legacyObjective: Record<string,string> = {
+      OUTCOME_SALES: 'CONVERSIONS',
+      OUTCOME_LEADS: 'LEAD_GENERATION',
+      OUTCOME_TRAFFIC: 'LINK_CLICKS',
+      OUTCOME_AWARENESS: 'BRAND_AWARENESS',
+    }
+    const apiObjective = legacyObjective[objective] || 'LINK_CLICKS'
+
+    // Optimization settings per objective
+    const optimizationMap: Record<string,{optimization_goal:string,billing_event:string}> = {
+      OUTCOME_SALES: { optimization_goal: 'OFFSITE_CONVERSIONS', billing_event: 'IMPRESSIONS' },
+      OUTCOME_LEADS: { optimization_goal: 'LEAD_GENERATION', billing_event: 'IMPRESSIONS' },
+      OUTCOME_TRAFFIC: { optimization_goal: 'LINK_CLICKS', billing_event: 'IMPRESSIONS' },
+      OUTCOME_AWARENESS: { optimization_goal: 'REACH', billing_event: 'IMPRESSIONS' },
+    }
+    const optSettings = optimizationMap[objective] || optimizationMap.OUTCOME_TRAFFIC
+
+    const promotedObject = (pixelId && objective === 'OUTCOME_SALES')
+      ? { promoted_object: { pixel_id: pixelId, custom_event_type: 'PURCHASE' } }
+      : {}
+
+    const baseTargeting = {
+      age_min: parseInt(ageMin) || 18,
+      age_max: parseInt(ageMax) || 65,
+      geo_locations: { countries: ['PK'] },
+      ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
+    }
 
     const post = async (path: string, params: Record<string,unknown>) => {
       const r = await fetch(`https://graph.facebook.com/${V}/${path}`, {
@@ -53,107 +79,38 @@ export async function POST(request: NextRequest) {
       return d
     }
 
-    // Optimization based on objective
-    const optMap: Record<string,{optimization_goal:string,billing_event:string}> = {
-      OUTCOME_SALES:    { optimization_goal: 'OFFSITE_CONVERSIONS', billing_event: 'IMPRESSIONS' },
-      OUTCOME_LEADS:    { optimization_goal: 'LEAD_GENERATION',     billing_event: 'IMPRESSIONS' },
-      OUTCOME_TRAFFIC:  { optimization_goal: 'LINK_CLICKS',         billing_event: 'IMPRESSIONS' },
-      OUTCOME_AWARENESS:{ optimization_goal: 'REACH',               billing_event: 'IMPRESSIONS' },
-    }
-    const opt = optMap[objective] || optMap.OUTCOME_TRAFFIC
-
-    const promotedObject = pixelId && (objective === 'OUTCOME_SALES' || objective === 'OUTCOME_LEADS')
-      ? { promoted_object: { pixel_id: pixelId, custom_event_type: objective === 'OUTCOME_SALES' ? 'PURCHASE' : 'LEAD' } }
-      : {}
-
-    const baseTargeting = {
-      age_min: parseInt(ageMin) || 18,
-      age_max: parseInt(ageMax) || 65,
-      geo_locations: { countries: ['PK'] },
-      ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
-    }
-
-    // Create ad creative helper
-    const createAdCreative = async (name: string, imageUrl?: string) => {
-      const linkData: Record<string,unknown> = {
-        message: primaryText || 'Check out our products',
-        link: websiteUrl || 'https://facebook.com',
-        name: headline || campaignName,
-        call_to_action: { type: cta || 'LEARN_MORE', value: { link: websiteUrl || 'https://facebook.com' } },
-      }
-      if (imageUrl) linkData.picture = imageUrl
-
-      return post(`${adAccountId}/adcreatives`, {
-        name,
-        object_story_spec: {
-          page_id: pageId,
-          link_data: linkData,
-        },
-      })
-    }
+    console.log('M4 Launch:', metaAccount.account_name, adAccountId, apiObjective)
 
     const errors: string[] = []
     let broadCount = 0
     let intCount = 0
 
     // ── CAMPAIGN 1: Broad ─────────────────────────────────────
-    // Legacy objective mapping
-    const objectiveMap: Record<string,string> = {
-      OUTCOME_SALES: 'CONVERSIONS',
-      OUTCOME_LEADS: 'LEAD_GENERATION',
-      OUTCOME_TRAFFIC: 'LINK_CLICKS',
-      OUTCOME_AWARENESS: 'BRAND_AWARENESS',
-    }
-    const apiObjective = objectiveMap[objective] || 'LINK_CLICKS'
-    const optMap: Record<string,{optimization_goal:string,billing_event:string}> = {
-      OUTCOME_SALES:    { optimization_goal: 'OFFSITE_CONVERSIONS', billing_event: 'IMPRESSIONS' },
-      OUTCOME_LEADS:    { optimization_goal: 'LEAD_GENERATION',     billing_event: 'IMPRESSIONS' },
-      OUTCOME_TRAFFIC:  { optimization_goal: 'LINK_CLICKS',         billing_event: 'IMPRESSIONS' },
-      OUTCOME_AWARENESS:{ optimization_goal: 'REACH',               billing_event: 'IMPRESSIONS' },
-    }
-    const opt = optMap[objective] || optMap.OUTCOME_TRAFFIC
-
-    console.log('Token length:', token?.length, 'AccountId:', adAccountId, 'PageId:', pageId, 'Creatives:', creatives?.length, 'Interests:', interests?.length)
-    console.log('Budget:', dailyBudget, 'Objective:', objective)
-    
     const broadCamp = await post(`${adAccountId}/campaigns`, {
       name: `${campaignName} — M4 Broad`,
       objective: apiObjective,
       status: 'PAUSED',
       special_ad_categories: [],
     })
+    console.log('Broad campaign created:', broadCamp.id)
 
     const adsetBudget = Math.max(576, Math.round(dailyBudget / Math.max(creatives.length, 1)))
 
-    for (const c of creatives.slice(0, 5)) {
+    for (const c of (creatives as any[]).slice(0, 5)) {
       try {
-        const adset = await post(`${adAccountId}/adsets`, {
+        await post(`${adAccountId}/adsets`, {
           name: `${campaignName} — Broad — ${c.name}`,
           campaign_id: broadCamp.id,
           status: 'PAUSED',
           daily_budget: adsetBudget,
           targeting: baseTargeting,
-          ...opt,
+          ...optSettings,
           ...promotedObject,
         })
-
-        // Create creative and ad only if we have a page
-        if (pageId) {
-          try {
-            const creative = await createAdCreative(`Creative — ${c.name}`)
-            await post(`${adAccountId}/ads`, {
-              name: `Ad — ${c.name}`,
-              adset_id: adset.id,
-              creative: { creative_id: creative.id },
-              status: 'PAUSED',
-            })
-          } catch(e: any) {
-            errors.push(`Ad creative "${c.name}": ${e.message}`)
-          }
-        }
         broadCount++
       } catch(e: any) {
-        errors.push(`Broad adset "${c.name}": ${e.message}`)
+        console.log('Broad adset error:', e.message)
+        errors.push(`Broad "${c.name}": ${e.message}`)
       }
     }
 
@@ -164,12 +121,12 @@ export async function POST(request: NextRequest) {
       status: 'PAUSED',
       special_ad_categories: [],
     })
+    console.log('Interest campaign created:', intCamp.id)
 
     const intBudget = Math.max(576, Math.round(dailyBudget / Math.max(interests.length, 1)))
 
-    for (const interest of interests.slice(0, 6)) {
+    for (const interest of (interests as any[]).slice(0, 6)) {
       try {
-        // Search Meta for interest ID
         const sr = await fetch(`https://graph.facebook.com/${V}/search?` + new URLSearchParams({ type: 'adinterest', q: interest.name, limit: '1', access_token: token }))
         const sd = await sr.json()
         const mi = sd.data?.[0]
@@ -179,32 +136,19 @@ export async function POST(request: NextRequest) {
           ...(mi ? { flexible_spec: [{ interests: [{ id: mi.id, name: mi.name }] }] } : {}),
         }
 
-        const adset = await post(`${adAccountId}/adsets`, {
+        await post(`${adAccountId}/adsets`, {
           name: `${campaignName} — Interest — ${interest.name}`,
           campaign_id: intCamp.id,
           status: 'PAUSED',
           daily_budget: intBudget,
           targeting: intTargeting,
-          ...opt,
+          ...optSettings,
           ...promotedObject,
         })
-
-        if (pageId && creatives.length > 0) {
-          try {
-            const creative = await createAdCreative(`Creative — Interest — ${interest.name}`)
-            await post(`${adAccountId}/ads`, {
-              name: `Ad — ${interest.name}`,
-              adset_id: adset.id,
-              creative: { creative_id: creative.id },
-              status: 'PAUSED',
-            })
-          } catch(e: any) {
-            errors.push(`Ad creative "${interest.name}": ${e.message}`)
-          }
-        }
         intCount++
       } catch(e: any) {
-        errors.push(`Interest adset "${interest.name}": ${e.message}`)
+        console.log('Interest adset error:', e.message)
+        errors.push(`Interest "${interest.name}": ${e.message}`)
       }
     }
 
@@ -212,7 +156,7 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       action_type: 'M4_LAUNCHED',
       entity_type: 'campaign',
-      description: `M4 launched: ${broadCamp.id}, ${intCamp.id} in ${metaAccount.account_name}`,
+      description: `M4 launched in ${metaAccount.account_name}: Broad ${broadCamp.id}, Interests ${intCamp.id}`,
       performed_by: 'user',
     }).catch(() => {})
 
