@@ -21,6 +21,7 @@ const NAV = [
       { href: '/recommendations',  icon: Target,          label: 'Recommendations',  badge: '5'  },
       { href: '/campaigns',        icon: Megaphone,       label: 'Campaigns',        badge: null },
       { href: '/ad-engine',        icon: Zap,             label: 'Ad Engine',        badge: 'New'},
+      { href: '/m4',               icon: TrendingUp,      label: 'M4 Method',        badge: 'AI'},
       { href: '/creative-studio',  icon: Sparkles,        label: 'Creative Studio',  badge: null },
     ],
   },
