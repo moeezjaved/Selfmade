@@ -4,6 +4,10 @@ import { decryptToken } from '@/lib/meta/client'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { base64, mimeType, name } = await request.json()
