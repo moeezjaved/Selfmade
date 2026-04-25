@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     for (const c of (creatives as any[]).slice(0, 5)) {
       try {
-        await post(`${adAccountId}/adsets`, {
+        const broadAdset = await post(`${adAccountId}/adsets`, {
           name: `${campaignName} — Broad — ${c.name}`,
           campaign_id: broadCamp.id,
           status: 'PAUSED',
@@ -111,6 +111,32 @@ export async function POST(request: NextRequest) {
           ...optSettings,
           ...promotedObject,
         })
+
+        // Create ad creative + ad if page and URL provided
+        if (pageId && websiteUrl) {
+          try {
+            const creative = await post(`${adAccountId}/adcreatives`, {
+              name: `Creative — ${c.name}`,
+              object_story_spec: {
+                page_id: pageId,
+                link_data: {
+                  message: primaryText || 'Check out our products',
+                  link: websiteUrl,
+                  name: headline || campaignName,
+                  call_to_action: { type: cta || 'LEARN_MORE', value: { link: websiteUrl } },
+                },
+              },
+            })
+            await post(`${adAccountId}/ads`, {
+              name: `Ad — ${c.name}`,
+              adset_id: broadAdset.id,
+              creative: { creative_id: creative.id },
+              status: 'PAUSED',
+            })
+          } catch(e: any) {
+            errors.push(`Creative "${c.name}": ${e.message}`)
+          }
+        }
         broadCount++
       } catch(e: any) {
         console.log('Broad adset error:', e.message)
@@ -141,7 +167,7 @@ export async function POST(request: NextRequest) {
           ...(mi ? { flexible_spec: [{ interests: [{ id: mi.id, name: mi.name }] }] } : {}),
         }
 
-        await post(`${adAccountId}/adsets`, {
+        const intAdset = await post(`${adAccountId}/adsets`, {
           name: `${campaignName} — Interest — ${interest.name}`,
           campaign_id: intCamp.id,
           status: 'PAUSED',
@@ -151,6 +177,31 @@ export async function POST(request: NextRequest) {
           ...optSettings,
           ...promotedObject,
         })
+
+        if (pageId && websiteUrl) {
+          try {
+            const creative = await post(`${adAccountId}/adcreatives`, {
+              name: `Creative — Interest — ${interest.name}`,
+              object_story_spec: {
+                page_id: pageId,
+                link_data: {
+                  message: primaryText || 'Check out our products',
+                  link: websiteUrl,
+                  name: headline || campaignName,
+                  call_to_action: { type: cta || 'LEARN_MORE', value: { link: websiteUrl } },
+                },
+              },
+            })
+            await post(`${adAccountId}/ads`, {
+              name: `Ad — ${interest.name}`,
+              adset_id: intAdset.id,
+              creative: { creative_id: creative.id },
+              status: 'PAUSED',
+            })
+          } catch(e: any) {
+            errors.push(`Creative interest "${interest.name}": ${e.message}`)
+          }
+        }
         intCount++
       } catch(e: any) {
         console.log('Interest adset error:', e.message)
