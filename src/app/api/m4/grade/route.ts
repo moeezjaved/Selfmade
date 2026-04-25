@@ -7,10 +7,19 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
+  // Get primary account first
+  const { data: primaryAccount } = await admin
+    .from('meta_accounts')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('is_primary', true)
+    .single()
+
   const { data: campaigns } = await admin
     .from('campaigns')
     .select('*, campaign_insights(*)')
     .eq('user_id', user.id)
+    .eq('meta_account_id', primaryAccount?.id || '')
 
   if (!campaigns?.length) return NextResponse.json({ grades: [] })
 
