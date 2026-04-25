@@ -16,6 +16,35 @@ export default function M4Page() {
   const [applying, setApplying] = useState<string|null>(null)
   const [pixelChoice, setPixelChoice] = useState<'existing'|'new'|null>(null)
   const [pixelId, setPixelId] = useState('')
+  const [pixels, setPixels] = useState<{id:string,name:string,active:boolean}[]>([])
+  const [loadingPixels, setLoadingPixels] = useState(false)
+  const [audiences, setAudiences] = useState<{key:string,id:string,name:string,description:string}[]>([])
+  const [creatingAudiences, setCreatingAudiences] = useState(false)
+
+  const fetchPixels = async () => {
+    setLoadingPixels(true)
+    try {
+      const res = await fetch('/api/m4/pixels')
+      const data = await res.json()
+      setPixels(data.pixels || [])
+    } catch {}
+    setLoadingPixels(false)
+  }
+
+  const createAudiences = async () => {
+    if (!pixelId || !form.campaignName) return
+    setCreatingAudiences(true)
+    try {
+      const res = await fetch('/api/m4/audiences', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ pixelId, campaignName: form.campaignName || 'M4 Campaign' })
+      })
+      const data = await res.json()
+      setAudiences(data.created || [])
+    } catch {}
+    setCreatingAudiences(false)
+  }
   const [creatives, setCreatives] = useState<Creative[]>([])
 
   const [form, setForm] = useState({
@@ -155,7 +184,7 @@ export default function M4Page() {
             <div style={{marginTop:8}}>
               <label style={{display:'block',fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:10,textTransform:'uppercase' as const,letterSpacing:'.06em'}}>Do you have a Meta Pixel on your website?</label>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                <div onClick={()=>setPixelChoice('existing')} style={{padding:16,borderRadius:14,border:`2px solid ${pixelChoice==='existing'?'#dffe95':'rgba(255,255,255,0.08)'}`,background:pixelChoice==='existing'?'rgba(223,254,149,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer'}}>
+                <div onClick={()=>{setPixelChoice('existing');if(pixels.length===0)fetchPixels()}} style={{padding:16,borderRadius:14,border:`2px solid ${pixelChoice==='existing'?'#dffe95':'rgba(255,255,255,0.08)'}`,background:pixelChoice==='existing'?'rgba(223,254,149,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer'}}>
                   <div style={{fontSize:24,marginBottom:8}}>✅</div>
                   <div style={{fontSize:14,fontWeight:700,color:'white',marginBottom:4}}>Yes, I have a pixel</div>
                   <div style={{fontSize:12,color:'rgba(255,255,255,0.4)'}}>I will enter my Pixel ID</div>
@@ -171,8 +200,32 @@ export default function M4Page() {
             {pixelChoice==='existing'&&(
               <div style={{marginTop:14}}>
                 <label style={{display:'block',fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:6,textTransform:'uppercase' as const,letterSpacing:'.06em'}}>Your Pixel ID</label>
-                <input value={pixelId} onChange={e=>setPixelId(e.target.value)} placeholder="e.g. 1234567890123456" style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)',color:'white',fontSize:14,fontFamily:'inherit',outline:'none'}}/>
+                {loadingPixels ? (
+                  <div style={{fontSize:13,color:'rgba(255,255,255,0.4)',padding:'10px 0'}}>Loading your pixels from Meta…</div>
+                ) : pixels.length > 0 ? (
+                  <select value={pixelId} onChange={e=>setPixelId(e.target.value)} style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'#152928',color:'white',fontSize:14,fontFamily:'inherit',outline:'none'}}>
+                    <option value="">Select a pixel…</option>
+                    {pixels.map(p=>(
+                      <option key={p.id} value={p.id}>{p.name} — {p.id} {p.active?'✓ Active':'(inactive)'}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input value={pixelId} onChange={e=>setPixelId(e.target.value)} placeholder="e.g. 1234567890123456" style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)',color:'white',fontSize:14,fontFamily:'inherit',outline:'none'}}/>
+                )}
                 <div style={{fontSize:12,color:'rgba(255,255,255,0.35)',marginTop:4}}>Find this in Meta Events Manager → your pixel → Settings</div>
+                {pixelId && audiences.length === 0 && (
+                  <button onClick={createAudiences} disabled={creatingAudiences} style={{marginTop:10,background:'rgba(223,254,149,0.1)',border:'1px solid rgba(223,254,149,0.2)',color:'#dffe95',padding:'9px 18px',borderRadius:100,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer',opacity:creatingAudiences?.6:1}}>
+                    {creatingAudiences?'Creating exclusion audiences in Meta…':'🛡️ Create Exclusion Audiences Automatically'}
+                  </button>
+                )}
+                {audiences.length > 0 && (
+                  <div style={{marginTop:10,background:'rgba(134,239,172,0.05)',border:'1px solid rgba(134,239,172,0.15)',borderRadius:10,padding:12}}>
+                    <div style={{fontSize:12,fontWeight:700,color:'#86efac',marginBottom:8}}>✓ {audiences.length} exclusion audiences created in Meta</div>
+                    {audiences.map(a=>(
+                      <div key={a.key} style={{fontSize:12,color:'rgba(255,255,255,0.5)',padding:'3px 0'}}>• {a.name}</div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
