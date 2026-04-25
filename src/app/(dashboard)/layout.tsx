@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import type { UserProfile } from '@/types'
 import {
-  LayoutDashboard, Target, Megaphone, Sparkles,
+  LayoutDashboard, Target, Megaphone, Sparkles, TrendingUp,
   Zap, ClipboardList, Settings, CreditCard,
   Bell, ChevronDown, RefreshCw, LogOut,
 } from 'lucide-react'
