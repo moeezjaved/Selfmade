@@ -37,7 +37,12 @@ export async function POST(request: NextRequest) {
 
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = `act_${metaAccount.account_id}`
-    const dailyBudget = Math.max(576, Math.round(parseFloat(budget) * 100))
+    const currency = metaAccount.currency || 'USD'
+    const budgetAmount = parseFloat(budget) || 50
+    const budgetCents = Math.round(budgetAmount * 100)
+    const currencyMinimums: Record<string,number> = { USD:100, PKR:28100, GBP:100, EUR:100, AED:400, SAR:400, INR:8000 }
+    const minBudget = currencyMinimums[currency] || 100
+    const safeBudget = Math.max(minBudget, budgetCents)
 
     const apiObjective = ['OUTCOME_SALES','OUTCOME_LEADS','OUTCOME_TRAFFIC','OUTCOME_AWARENESS','OUTCOME_ENGAGEMENT'].includes(objective) ? objective : 'OUTCOME_TRAFFIC'
 
