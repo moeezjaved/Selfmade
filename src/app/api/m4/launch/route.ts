@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
           status: 'PAUSED',
           daily_budget: adsetBudget,
           targeting: baseTargeting,
+          bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
           ...optSettings,
           ...promotedObject,
         })
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest) {
           status: 'PAUSED',
           daily_budget: intBudget,
           targeting: intTargeting,
+          bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
           ...optSettings,
           ...promotedObject,
         })
