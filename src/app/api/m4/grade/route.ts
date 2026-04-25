@@ -50,7 +50,7 @@ Account average ROAS: ${accountAvgRoas.toFixed(2)}x
 Account: ${primaryAccount?.account_name}
 
 CAMPAIGNS:
-${campaignData.map(c => `"${c.name}" | Spend: ${c.spend} | ROAS: ${c.roas}x | CTR: ${c.ctr}% | CPA: ${c.cpa} | Conv: ${c.conversions}`).join('\n')}
+${campaignData.map((c: any) => `"${c.name}" | Spend: ${c.spend} | ROAS: ${c.roas}x | CTR: ${c.ctr}% | CPA: ${c.cpa} | Conv: ${c.conversions}`).join('\n')}
 
 M4 GRADING RULES:
 - GRADUATE = ROAS clearly above account average with good spend. Winner - duplicate to scale.
