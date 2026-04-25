@@ -15,6 +15,9 @@ export default function M4Page() {
   const [customInterest, setCustomInterest] = useState('')
   const [applying, setApplying] = useState<string|null>(null)
   const [pixelChoice, setPixelChoice] = useState<'existing'|'new'|null>(null)
+  const [pages, setPages] = useState<{id:string,name:string,category:string}[]>([])
+  const [selectedPageId, setSelectedPageId] = useState('')
+  const [adCopy, setAdCopy] = useState({ primaryText:'', headline:'', cta:'SHOP_NOW', destinationUrl:'' })
   const [pixelId, setPixelId] = useState('')
   const [pixels, setPixels] = useState<{id:string,name:string,active:boolean}[]>([])
   const [loadingPixels, setLoadingPixels] = useState(false)
@@ -29,6 +32,15 @@ export default function M4Page() {
       setPixels(data.pixels || [])
     } catch {}
     setLoadingPixels(false)
+  }
+
+  const fetchPages = async () => {
+    try {
+      const res = await fetch('/api/m4/pages')
+      const data = await res.json()
+      setPages(data.pages || [])
+      if (data.pages?.length > 0) setSelectedPageId(data.pages[0].id)
+    } catch {}
   }
 
   const createAudiences = async () => {
@@ -479,6 +491,12 @@ export default function M4Page() {
                     ageMax: form.ageMax,
                     gender: form.gender,
                     pixelId,
+                    objective: form.objective||'OUTCOME_SALES',
+                    websiteUrl: adCopy.destinationUrl||form.websiteUrl,
+                    pageId: selectedPageId,
+                    primaryText: adCopy.primaryText,
+                    headline: adCopy.headline,
+                    cta: adCopy.cta,
                   })
                 })
                 const text = await res.text()
