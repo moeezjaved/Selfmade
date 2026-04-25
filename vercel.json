@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/m4/launch/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/meta/sync/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
