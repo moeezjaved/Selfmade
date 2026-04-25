@@ -112,32 +112,6 @@ export async function POST(request: NextRequest) {
           ...promotedObject,
         })
 
-        // Create ad creative + ad if page and URL provided
-        if (pageId && websiteUrl) {
-          try {
-            const creative = await post(`${adAccountId}/adcreatives`, {
-              name: `Creative — ${c.name}`,
-              object_story_spec: {
-                page_id: pageId,
-                link_data: {
-                  message: primaryText || 'Check out our products',
-                  link: websiteUrl,
-                  name: headline || campaignName,
-                  description: '',
-                  call_to_action: { type: cta || 'LEARN_MORE', value: { link: websiteUrl } },
-                },
-              },
-            })
-            await post(`${adAccountId}/ads`, {
-              name: `Ad — ${c.name}`,
-              adset_id: broadAdset.id,
-              creative: { creative_id: creative.id },
-              status: 'PAUSED',
-            })
-          } catch(e: any) {
-            errors.push(`Creative "${c.name}": ${e.message}`)
-          }
-        }
         broadCount++
       } catch(e: any) {
         console.log('Broad adset error:', e.message)
@@ -179,31 +153,6 @@ export async function POST(request: NextRequest) {
           ...promotedObject,
         })
 
-        if (pageId && websiteUrl) {
-          try {
-            const creative = await post(`${adAccountId}/adcreatives`, {
-              name: `Creative — Interest — ${interest.name}`,
-              object_story_spec: {
-                page_id: pageId,
-                link_data: {
-                  message: primaryText || 'Check out our products',
-                  link: websiteUrl,
-                  name: headline || campaignName,
-                  description: '',
-                  call_to_action: { type: cta || 'LEARN_MORE', value: { link: websiteUrl } },
-                },
-              },
-            })
-            await post(`${adAccountId}/ads`, {
-              name: `Ad — ${interest.name}`,
-              adset_id: intAdset.id,
-              creative: { creative_id: creative.id },
-              status: 'PAUSED',
-            })
-          } catch(e: any) {
-            errors.push(`Creative interest "${interest.name}": ${e.message}`)
-          }
-        }
         intCount++
       } catch(e: any) {
         console.log('Interest adset error:', e.message)
