@@ -129,12 +129,6 @@ export default function M4Page() {
   const foot = {padding:'16px 24px',borderTop:'1px solid rgba(255,255,255,0.04)',display:'flex' as const,justifyContent:'space-between' as const}
   const backBtn = {background:'none',border:'1.5px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.4)',padding:'10px 22px',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer' as const}
   const nextBtn = (disabled?:boolean) => ({background:disabled?'rgba(223,254,149,0.2)':'#dffe95',color:disabled?'rgba(255,255,255,0.3)':'#10211f',border:'none',padding:'10px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:disabled?'not-allowed' as const:'pointer' as const})
-  const note = (icon:string,color:string,title:string,text:string) => (
-    <div style={{margin:'20px 24px 0',background:`${color}08`,border:`1px solid ${color}22`,borderRadius:12,padding:'12px 16px',display:'flex',gap:12}}>
-      <span style={{fontSize:20,flexShrink:0}}>{icon}</span>
-      <div style={{fontSize:13,color:'rgba(255,255,255,0.65)',lineHeight:1.7}}><strong style={{color:color}}>{title}</strong> {text}</div>
-    </div>
-  )
   const inp = (label:string,k:string,ph:string,ta?:boolean) => (
     <div style={{marginBottom:14}}>
       <label style={{display:'block',fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:6,textTransform:'uppercase' as const,letterSpacing:'.06em'}}>{label}</label>
@@ -199,7 +193,7 @@ export default function M4Page() {
       {step==='pixel'&&(
         <div style={card}>
           <div style={head}><div style={{fontSize:15,fontWeight:800,color:'white'}}>Step 1 — Meta Pixel Setup</div><div style={{fontSize:13,color:'rgba(255,255,255,0.4)',marginTop:3}}>The pixel lets us exclude existing visitors and purchasers from your prospecting campaigns.</div></div>
-          {note('🎯','#dffe95','Why do we need a pixel?','Without a pixel, your ads will show to people who already bought from you — wasting budget. The pixel tracks who visited your site and who purchased, so we can exclude them from all prospecting. Your money only reaches brand new audiences.')}
+          <div style={{margin:"20px 24px 0",background:"rgba(223,254,149,0.05)",border:"1px solid rgba(223,254,149,0.15)",borderRadius:12,padding:"12px 16px",display:"flex",gap:12}}><span style={{fontSize:20,flexShrink:0}}>🎯</span><div style={{fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.7}}><strong style={{color:"#dffe95"}}>Why do we need a pixel?</strong> Without a pixel, your ads will show to people who already bought from you — wasting budget. The pixel tracks who visited your site and who purchased, so we can exclude them from all prospecting. Your money only reaches brand new audiences.</div></div>
           <div style={{padding:24}}>
             {inp('Your product / website name','product','e.g. HairFallSolution.com')}
             {inp('What do you sell?','description','e.g. Hair loss treatment serum for men and women',true)}
@@ -284,7 +278,7 @@ export default function M4Page() {
       {step==='creatives'&&(
         <div style={card}>
           <div style={head}><div style={{fontSize:15,fontWeight:800,color:'white'}}>Step 2 — Upload Your Creatives</div><div style={{fontSize:13,color:'rgba(255,255,255,0.4)',marginTop:3}}>Each creative = one ad set in your Broad Campaign. Add 3-8 creatives to test.</div></div>
-          {note('🖼️','#86efac','One creative per ad set.','This is the key rule of M4. If you put multiple creatives in one ad set, you will not know which one caused the results. One creative per ad set = clear winner identification. Add as many as you want to test — we recommend starting with 3-5.')}
+          <div style={{margin:"0 0 16px 0",background:"rgba(134,239,172,0.05)",border:"1px solid rgba(134,239,172,0.15)",borderRadius:12,padding:"12px 16px",display:"flex",gap:12}}><span style={{fontSize:20,flexShrink:0}}>🖼️</span><div style={{fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.7}}><strong style={{color:"#86efac"}}>One creative per ad set.</strong> This is the key rule of M4. If you put multiple creatives in one ad set, you will not know which one caused the results. One creative per ad set = clear winner identification. Add as many as you want to test — we recommend starting with 3-5.</div></div>
           <div style={{padding:24}}>
             <div style={{marginBottom:16}}>
               <div style={{fontSize:13,fontWeight:700,color:'white',marginBottom:10}}>Your creatives for the Broad Campaign:</div>
@@ -387,7 +381,7 @@ export default function M4Page() {
       {step==='interests'&&(
         <div style={card}>
           <div style={head}><div style={{fontSize:15,fontWeight:800,color:'white'}}>Step 3 — Select Interests for Campaign 2</div><div style={{fontSize:13,color:'rgba(255,255,255,0.4)',marginTop:3}}>Each interest = one ad set. Claude suggested these based on your product. Pick at least 2.</div></div>
-          {note('🎯','#93c5fd','Why one interest per ad set?','Mixing interests hides what is working. If you put "Gym" and "Skincare" in one ad set, you will never know which audience converted. One interest per ad set = you know exactly who buys from you.')}
+          <div style={{margin:"0 0 16px 0",background:"rgba(147,197,253,0.05)",border:"1px solid rgba(147,197,253,0.15)",borderRadius:12,padding:"12px 16px",display:"flex",gap:12}}><span style={{fontSize:20,flexShrink:0}}>🎯</span><div style={{fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.7}}><strong style={{color:"#93c5fd"}}>Why one interest per ad set?</strong> Mixing interests hides what is working. If you put "Gym" and "Skincare" in one ad set, you will never know which audience converted. One interest per ad set = you know exactly who buys from you.</div></div>
           <div style={{padding:24}}>
             {interests.length===0?(
               <div style={{textAlign:'center',padding:32}}>
