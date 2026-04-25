@@ -481,7 +481,9 @@ export default function M4Page() {
                     pixelId,
                   })
                 })
-                const data = await res.json()
+                const text = await res.text()
+                console.log('Launch response:', text)
+                const data = text ? JSON.parse(text) : {}
                 if (data.error) {
                   alert('Launch failed: ' + data.error)
                 } else {
