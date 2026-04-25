@@ -151,13 +151,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await admin.from('activity_logs').insert({
-      user_id: user.id,
-      action_type: 'M4_LAUNCHED',
-      entity_type: 'campaign',
-      description: `M4 launched in ${metaAccount.account_name}: Broad ${broadCamp.id}, Interests ${intCamp.id}`,
-      performed_by: 'user',
-    }).catch(() => {})
+    try {
+      await admin.from('activity_logs').insert({
+        user_id: user.id,
+        action_type: 'M4_LAUNCHED',
+        entity_type: 'campaign',
+        description: `M4 launched in ${metaAccount.account_name}: Broad ${broadCamp.id}, Interests ${intCamp.id}`,
+        performed_by: 'user',
+      })
+    } catch(e) { console.log('Activity log error:', e) }
 
     return NextResponse.json({
       success: true,
