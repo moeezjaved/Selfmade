@@ -55,6 +55,20 @@ export default function M4Page() {
   const set = (k:string,v:string) => setForm(p=>({...p,[k]:v}))
   const selectedInterests = interests.filter(i=>i.selected)
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    files.forEach(file => {
+      const id = Date.now().toString() + String(Math.random())
+      const type = file.type.startsWith('video') ? 'video' : 'image'
+      setCreatives(prev => [...prev, { id, name: file.name.replace(/\.[^.]+$/, ''), pack: 1, type, file }])
+    })
+    e.target.value = ''
+  }
+
+  const addCreative = () => {
+    setCreatives(prev => [...prev, { id: Date.now().toString(), name: `Creative ${prev.length + 1}`, pack: 1 }])
+  }
+
   const generateInterests = async () => {
     setLoading(true)
     try {
