@@ -2,7 +2,7 @@
 import { useState } from 'react'
 
 type Step = 'welcome' | 'pixel' | 'creatives' | 'interests' | 'budget' | 'review' | 'grades'
-interface Creative { id: string; name: string; pack: number; type?: string }
+interface Creative { id: string; name: string; pack: number; type?: string; base64?: string; mimeType?: string }
 interface Interest { name: string; category: string; why: string; size: string; confidence: number; selected: boolean; custom?: boolean }
 interface Grade { campaign_name: string; grade: string; emoji: string; label: string; why: string; action: string; action_reason: string; applied?: boolean }
 
@@ -56,7 +56,15 @@ export default function M4Page() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     Array.from(e.target.files||[]).forEach(file => {
-      setCreatives(prev => [...prev, {id:Date.now().toString()+Math.random(), name:file.name.replace(/\.[^.]+$/,''), pack:1, type:file.type.startsWith('video')?'video':'image'}])
+      const reader = new FileReader()
+      const id = Date.now().toString() + Math.random()
+      const type = file.type.startsWith('video') ? 'video' : 'image'
+      const mimeType = file.type
+      reader.onload = (ev) => {
+        const base64 = (ev.target?.result as string)?.split(',')[1]
+        setCreatives(prev => [...prev, {id, name:file.name.replace(/\.[^.]+$/,''), pack:1, type, base64, mimeType}])
+      }
+      reader.readAsDataURL(file)
     })
     e.target.value = ''
   }
