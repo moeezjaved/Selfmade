@@ -96,6 +96,9 @@ export async function POST(request: NextRequest) {
     let intCount = 0
 
     // ── CAMPAIGN 1: Broad ─────────────────────────────────────
+    console.log('Token length:', token?.length, 'AccountId:', adAccountId)
+    console.log('Budget:', dailyBudget, 'Objective:', objective)
+    
     const broadCamp = await post(`${adAccountId}/campaigns`, {
       name: `${campaignName} — M4 Broad`,
       objective,
