@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
       objective: apiObjective,
       status: 'PAUSED',
       special_ad_categories: [],
+      is_adset_budget_sharing_enabled: false,
     })
     console.log('Broad campaign created:', broadCamp.id)
 
@@ -117,6 +118,7 @@ export async function POST(request: NextRequest) {
       objective: apiObjective,
       status: 'PAUSED',
       special_ad_categories: [],
+      is_adset_budget_sharing_enabled: false,
     })
     console.log('Interest campaign created:', intCamp.id)
 
