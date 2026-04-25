@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       .from('meta_accounts').select('*')
       .eq('user_id', user.id).eq('is_primary', true).single()
 
+    console.log('MetaAccount:', metaAccount?.account_name, metaAccount?.account_id)
     if (!metaAccount) return NextResponse.json({ error: 'No primary Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
     let intCount = 0
 
     // ── CAMPAIGN 1: Broad ─────────────────────────────────────
-    console.log('Token length:', token?.length, 'AccountId:', adAccountId)
+    console.log('Token length:', token?.length, 'AccountId:', adAccountId, 'PageId:', pageId, 'Creatives:', creatives?.length, 'Interests:', interests?.length)
     console.log('Budget:', dailyBudget, 'Objective:', objective)
     
     const broadCamp = await post(`${adAccountId}/campaigns`, {
