@@ -95,10 +95,14 @@ export async function POST(request: NextRequest) {
         }
         if (imageHash) linkData.image_hash = imageHash
 
-        const creative = await post(`${adAccountId}/adcreatives`, {
+        const creativeSpec: Record<string,unknown> = {
           name,
           object_story_spec: { page_id: pageId, link_data: linkData },
-        })
+        }
+        // Add Instagram actor if available
+        if (instagramActorId) creativeSpec.instagram_actor_id = instagramActorId
+
+        const creative = await post(`${adAccountId}/adcreatives`, creativeSpec)
         return creative.id
       } catch(e: any) {
         console.log('Creative error:', e.message)
@@ -131,6 +135,7 @@ export async function POST(request: NextRequest) {
             geo_locations: { countries: ['PK'] },
             ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
             targeting_automation: { advantage_audience: 1 },
+            ...exclusions,
           },
           bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
           destination_type: 'WEBSITE',
@@ -177,7 +182,7 @@ export async function POST(request: NextRequest) {
         const intTargeting: Record<string,unknown> = {
           age_min: parseInt(ageMin) || 18,
           age_max: parseInt(ageMax) || 65,
-          geo_locations: { countries: ['PK'] },
+          geo_locations: geoLocations,
           ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
           targeting_automation: { advantage_audience: 0 },
         }
