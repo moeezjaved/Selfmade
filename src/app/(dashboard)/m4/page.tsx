@@ -29,6 +29,7 @@ export default function M4Page() {
   const [pixelChoice, setPixelChoice] = useState<'existing'|'new'|null>(null)
   const [pages, setPages] = useState<{id:string,name:string,category:string,instagram?:{id:string,username:string}|null}[]>([])
   const [selectedPageId, setSelectedPageId] = useState('')
+  const [selectedInstagramId, setSelectedInstagramId] = useState('')
   const [adCopy, setAdCopy] = useState({primaryText:'',headline:'',cta:'SHOP_NOW',destinationUrl:''})
   const [pixelId, setPixelId] = useState('')
   const [pixels, setPixels] = useState<{id:string,name:string,active:boolean}[]>([])
@@ -97,7 +98,10 @@ export default function M4Page() {
     // Pre-load Facebook pages
     fetch('/api/m4/pages').then(r=>r.json()).then(d => {
       setPages(d.pages||[])
-      if (d.pages?.[0]) setSelectedPageId(d.pages[0].id)
+      if (d.pages?.[0]) {
+        setSelectedPageId(d.pages[0].id)
+        if (d.pages[0].instagram?.id) setSelectedInstagramId(d.pages[0].instagram.id)
+      }
     }).catch(()=>{})
   }, [])
 
@@ -150,6 +154,7 @@ export default function M4Page() {
         ageMin:form.ageMin, ageMax:form.ageMax, gender:form.gender,
         pixelId, objective:form.objective,
         pageId:selectedPageId,
+                    instagramActorId:selectedInstagramId,
         primaryText:adCopy.primaryText,
         headline:adCopy.headline,
         cta:adCopy.cta,
@@ -339,7 +344,29 @@ export default function M4Page() {
                 <div><div style={{fontSize:13,fontWeight:800,color:'white'}}>Facebook Page</div><div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginTop:2}}>Required — all ads run from your Facebook Page</div></div>
                 {pages.length===0 && <button onClick={fetchPages} disabled={true} style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.1)',color:'rgba(147,197,253,0.4)',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'not-allowed'}}>Loading…</button>}
               </div>
-              {pages.length>0 && <select value={selectedPageId} onChange={e=>setSelectedPageId(e.target.value)} style={{...S.input,background:'#152928'}}>{pages.map(p=><option key={p.id} value={p.id}>{p.name}{p.instagram?' + @'+p.instagram.username:''}</option>)}</select>}
+              {pages.length>0 && (
+              <div>
+                <select value={selectedPageId} onChange={e=>{
+                  setSelectedPageId(e.target.value)
+                  const pg = pages.find(p=>p.id===e.target.value)
+                  setSelectedInstagramId(pg?.instagram?.id||'')
+                }} style={{...S.input,background:'#152928',marginBottom:8}}>
+                  {pages.map(p=><option key={p.id} value={p.id}>{p.name} ({p.category})</option>)}
+                </select>
+                {pages.find(p=>p.id===selectedPageId)?.instagram ? (
+                  <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)'}}>
+                    <span style={{fontSize:18}}>📸</span>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'.06em'}}>Instagram Connected</div>
+                      <div style={{fontSize:13,color:'white',fontWeight:600}}>@{pages.find(p=>p.id===selectedPageId)?.instagram?.username}</div>
+                    </div>
+                    <span style={{marginLeft:'auto',fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:100,background:'rgba(134,239,172,0.1)',color:'#86efac',border:'1px solid rgba(134,239,172,0.2)'}}>✓ Auto-selected</span>
+                  </div>
+                ) : (
+                  <div style={{fontSize:12,color:'rgba(255,255,255,0.35)',padding:'6px 0'}}>No Instagram account connected to this page</div>
+                )}
+              </div>
+            )}
               {pages.length===0 && <div style={{fontSize:12,color:'rgba(255,255,255,0.35)',marginTop:6}}>Click "Load My Pages" to see your connected Facebook pages</div>}
             </div>
           </div>
