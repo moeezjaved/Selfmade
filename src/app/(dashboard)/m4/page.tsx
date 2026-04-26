@@ -158,7 +158,17 @@ export default function M4Page() {
       const text = await res.text()
       const data = text ? JSON.parse(text) : {}
       if (data.error) { alert('Launch failed: '+data.error) }
-      else { alert('✅ Campaigns created in '+data.account+'!\n\n📦 Broad: '+data.broad_adsets+' ad sets\n🎯 Interests: '+data.interest_adsets+' ad sets\n\nAll PAUSED — activate in Meta Ads Manager.'+(data.errors?.length?'\n\n⚠️ '+data.errors.slice(0,2).join('\n'):'')); setStep('grades') }
+      else { alert('🚀 M4 LAUNCHED in ' + data.account + '!\n\n' +
+  '━━━━━━━━━━━━━━━━━━━━━━━\n' +
+  '📦 Broad Campaign: ' + data.broad_adsets + ' ad sets created\n' +
+  '🎯 Interest Campaign: ' + data.interest_adsets + ' ad sets created\n' +
+  '━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+  '✅ All campaigns are PAUSED\n' +
+  '👉 Go to Meta Ads Manager\n' +
+  '👉 Review your campaigns\n' +
+  '👉 Activate when ready\n\n' +
+  '⏰ Come back in 7 days to grade your results!' +
+  (data.errors?.length ? '\n\n⚠️ Some issues:\n' + data.errors.slice(0,2).join('\n') : '')); setStep('grades') }
     } catch(e:any) { alert('Error: '+e.message) }
     setLoading(false)
   }
