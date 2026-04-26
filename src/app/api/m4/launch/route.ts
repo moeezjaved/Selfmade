@@ -136,7 +136,6 @@ export async function POST(request: NextRequest) {
             geo_locations: { countries: ['PK'] },
             ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
             targeting_automation: { advantage_audience: 1 },
-            ...exclusions,
           },
           bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
           destination_type: 'WEBSITE',
