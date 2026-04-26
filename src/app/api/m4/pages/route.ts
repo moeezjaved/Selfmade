@@ -19,29 +19,62 @@ export async function GET() {
   const token = decryptToken(metaAccount.access_token)
 
   try {
+    // First get pages with their access tokens
     const res = await fetch(
       `https://graph.facebook.com/${V}/me/accounts?` +
       new URLSearchParams({ 
-        fields: 'id,name,category,fan_count,instagram_business_account{id,name,username,profile_picture_url}',
-        access_token: token 
+        fields: 'id,name,category,fan_count,access_token,instagram_business_account',
+        access_token: token,
+        limit: '20',
       })
     )
     const data = await res.json()
     if (data.error) throw new Error(data.error.message)
-    
-    return NextResponse.json({ 
-      pages: (data.data || []).map((p: any) => ({
+
+    // For each page, get Instagram account using page access token
+    const pages = await Promise.all((data.data || []).map(async (p: any) => {
+      let instagram = null
+      
+      // Try with instagram_business_account first
+      if (p.instagram_business_account?.id) {
+        try {
+          const igRes = await fetch(
+            `https://graph.facebook.com/${V}/${p.instagram_business_account.id}?` +
+            new URLSearchParams({ fields: 'id,name,username', access_token: p.access_token || token })
+          )
+          const igData = await igRes.json()
+          if (!igData.error) instagram = { id: igData.id, name: igData.name, username: igData.username }
+        } catch {}
+      }
+
+      // Fallback: try getting instagram via page token
+      if (!instagram && p.access_token) {
+        try {
+          const igRes2 = await fetch(
+            `https://graph.facebook.com/${V}/${p.id}?` +
+            new URLSearchParams({ fields: 'instagram_business_account{id,name,username}', access_token: p.access_token })
+          )
+          const igData2 = await igRes2.json()
+          if (igData2.instagram_business_account) {
+            instagram = {
+              id: igData2.instagram_business_account.id,
+              name: igData2.instagram_business_account.name,
+              username: igData2.instagram_business_account.username,
+            }
+          }
+        } catch {}
+      }
+
+      return {
         id: p.id,
         name: p.name,
         category: p.category,
         fan_count: p.fan_count,
-        instagram: p.instagram_business_account ? {
-          id: p.instagram_business_account.id,
-          name: p.instagram_business_account.name,
-          username: p.instagram_business_account.username,
-        } : null
-      }))
-    })
+        instagram,
+      }
+    }))
+    
+    return NextResponse.json({ pages })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
