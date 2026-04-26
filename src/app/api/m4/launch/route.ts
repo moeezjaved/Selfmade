@@ -83,7 +83,8 @@ export async function POST(request: NextRequest) {
 
     // Create ad creative with image hash
     const createAdCreative = async (name: string, imageHash: string | null) => {
-      if (!pageId || !websiteUrl) return null
+      console.log('Creating creative:', name, 'pageId:', pageId, 'websiteUrl:', websiteUrl, 'hash:', imageHash)
+      if (!pageId || !websiteUrl) { console.log('Skipping creative - no pageId or websiteUrl'); return null }
       try {
         const linkData: Record<string,unknown> = {
           message: primaryText || 'Check out our products',
