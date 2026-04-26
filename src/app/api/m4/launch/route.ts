@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
         const intTargeting: Record<string,unknown> = {
           age_min: parseInt(ageMin) || 18,
           age_max: parseInt(ageMax) || 65,
-          geo_locations: geoLocations,
+          geo_locations: { countries: ['PK'] },
           ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
           targeting_automation: { advantage_audience: 0 },
         }
