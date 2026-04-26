@@ -27,7 +27,7 @@ export default function M4Page() {
   const [applying, setApplying] = useState<string|null>(null)
   const [creatives, setCreatives] = useState<Creative[]>([])
   const [pixelChoice, setPixelChoice] = useState<'existing'|'new'|null>(null)
-  const [pages, setPages] = useState<{id:string,name:string,category:string}[]>([])
+  const [pages, setPages] = useState<{id:string,name:string,category:string,instagram?:{id:string,username:string}|null}[]>([])
   const [selectedPageId, setSelectedPageId] = useState('')
   const [adCopy, setAdCopy] = useState({primaryText:'',headline:'',cta:'SHOP_NOW',destinationUrl:''})
   const [pixelId, setPixelId] = useState('')
@@ -56,7 +56,7 @@ export default function M4Page() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     Array.from(e.target.files||[]).forEach(file => {
-      const id = Date.now().toString() + Math.random()
+      const id = `${Date.now()}-${Math.random().toString(36).substr(2,9)}`
       const type = file.type.startsWith('video') ? 'video' : 'image'
       const mimeType = file.type
       const name = file.name.replace(/\.[^.]+$/, '')
@@ -89,9 +89,15 @@ export default function M4Page() {
   }
 
   React.useEffect(() => {
+    // Load account currency
     fetch('/api/meta/accounts').then(r=>r.json()).then(d => {
       const primary = d.accounts?.find((a:any)=>a.is_primary)
       if (primary?.currency) setAccountCurrency(primary.currency)
+    }).catch(()=>{})
+    // Pre-load Facebook pages
+    fetch('/api/m4/pages').then(r=>r.json()).then(d => {
+      setPages(d.pages||[])
+      if (d.pages?.[0]) setSelectedPageId(d.pages[0].id)
     }).catch(()=>{})
   }, [])
 
@@ -321,9 +327,9 @@ export default function M4Page() {
             <div style={{background:'rgba(255,255,255,0.02)',borderRadius:14,border:'1px solid rgba(255,255,255,0.07)',padding:16}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                 <div><div style={{fontSize:13,fontWeight:800,color:'white'}}>Facebook Page</div><div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginTop:2}}>Required — all ads run from your Facebook Page</div></div>
-                {pages.length===0 && <button onClick={fetchPages} style={{background:'rgba(147,197,253,0.1)',border:'1px solid rgba(147,197,253,0.2)',color:'#93c5fd',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Load My Pages</button>}
+                {pages.length===0 && <button onClick={fetchPages} disabled={true} style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.1)',color:'rgba(147,197,253,0.4)',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'not-allowed'}}>Loading…</button>}
               </div>
-              {pages.length>0 && <select value={selectedPageId} onChange={e=>setSelectedPageId(e.target.value)} style={{...S.input,background:'#152928'}}>{pages.map(p=><option key={p.id} value={p.id}>{p.name} — {p.category}</option>)}</select>}
+              {pages.length>0 && <select value={selectedPageId} onChange={e=>setSelectedPageId(e.target.value)} style={{...S.input,background:'#152928'}}>{pages.map(p=><option key={p.id} value={p.id}>{p.name}{p.instagram?' + @'+p.instagram.username:''}</option>)}</select>}
               {pages.length===0 && <div style={{fontSize:12,color:'rgba(255,255,255,0.35)',marginTop:6}}>Click "Load My Pages" to see your connected Facebook pages</div>}
             </div>
           </div>
