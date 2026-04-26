@@ -31,56 +31,30 @@ export async function GET() {
     const data = await res.json()
     if (data.error) throw new Error(data.error.message)
 
-    // For each page, get Instagram account using page access token
+    // For each page fetch Instagram using page token
     const pages = await Promise.all((data.data || []).map(async (p: any) => {
       let instagram = null
-      
-      // Try with instagram_business_account first
-      if (p.instagram_business_account?.id) {
-        try {
-          const igRes = await fetch(
-            `https://graph.facebook.com/${V}/${p.instagram_business_account.id}?` +
-            new URLSearchParams({ fields: 'id,name,username', access_token: p.access_token || token })
-          )
-          const igData = await igRes.json()
-          if (!igData.error) instagram = { id: igData.id, name: igData.name, username: igData.username }
-        } catch {}
-      }
+      const pageToken = p.access_token || token
 
-      // Fallback: try connected_instagram_account
-      if (!instagram && p.connected_instagram_account?.id) {
-        instagram = {
-          id: p.connected_instagram_account.id,
-          name: p.connected_instagram_account.name || 'Instagram',
-          username: p.connected_instagram_account.username || 'instagram',
+      // Try all known Instagram fields
+      try {
+        const igRes = await fetch(
+          `https://graph.facebook.com/${V}/${p.id}?` +
+          new URLSearchParams({
+            fields: 'instagram_business_account{id,username,name},connected_instagram_account{id,username,name}',
+            access_token: pageToken,
+          })
+        )
+        const igData = await igRes.json()
+        console.log('IG data for', p.name, ':', JSON.stringify(igData))
+        
+        const ig = igData.instagram_business_account || igData.connected_instagram_account
+        if (ig?.id) {
+          instagram = { id: ig.id, username: ig.username || 'instagram', name: ig.name || ig.username }
         }
-      }
+      } catch(e: any) { console.log('IG fetch error:', e.message) }
 
-      // Fallback: try getting instagram via page token
-      if (!instagram && p.access_token) {
-        try {
-          const igRes2 = await fetch(
-            `https://graph.facebook.com/${V}/${p.id}?` +
-            new URLSearchParams({ fields: 'instagram_business_account{id,name,username}', access_token: p.access_token })
-          )
-          const igData2 = await igRes2.json()
-          if (igData2.instagram_business_account) {
-            instagram = {
-              id: igData2.instagram_business_account.id,
-              name: igData2.instagram_business_account.name,
-              username: igData2.instagram_business_account.username,
-            }
-          }
-        } catch {}
-      }
-
-      return {
-        id: p.id,
-        name: p.name,
-        category: p.category,
-        fan_count: p.fan_count,
-        instagram,
-      }
+      return { id: p.id, name: p.name, category: p.category, fan_count: p.fan_count, instagram }
     }))
     
     return NextResponse.json({ pages })
