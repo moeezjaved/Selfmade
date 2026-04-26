@@ -18,7 +18,7 @@ function ConnectMetaContent() {
     setState('connecting')
     const appId = process.env.NEXT_PUBLIC_META_APP_ID
     const redirectUri = "https://www.tryselfmade.ai/api/auth/callback"
-    const scopes = 'ads_management,ads_read,business_management,pages_read_engagement'
+    const scopes = 'ads_management,ads_read,business_management,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish'
     const url = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code`
     window.location.href = '/api/meta/init'
   }
