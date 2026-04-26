@@ -98,9 +98,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="px-5 py-5 border-b border-white/10">
           <Link href="/dashboard">
             {/* Logo image — replace src with actual logo */}
-            <div className="text-lime font-black text-2xl tracking-tight font-serif italic">
-              Selfmade
-            </div>
+            <div className="text-lime font-black text-2xl tracking-tight font-serif italic"><img src="/logo.png" alt="Selfmade" style={{height:32,width:"auto",display:"block"}}/></div>
           </Link>
         </div>
 
