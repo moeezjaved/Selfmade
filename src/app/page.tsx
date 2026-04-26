@@ -15,7 +15,7 @@ export default async function HomePage() {
       {/* NAV */}
       <nav style={{background:'#152928',borderBottom:'1px solid rgba(223,254,149,0.13)',position:'sticky',top:0,zIndex:50}}>
         <div style={{maxWidth:1280,margin:'0 auto',padding:'0 32px',height:68,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <span style={{fontSize:26,fontWeight:900,color:'#dffe95',fontFamily:'serif',fontStyle:'italic'}}><img src='/logo.png' alt='Selfmade' style={{height:36,width:'auto',display:'block'}}/></span>
+          <span style={{fontSize:26,fontWeight:900,color:'#dffe95',fontFamily:'serif',fontStyle:'italic'}}><img src='/logo.png' alt='Selfmade' style={{height:48,width:'auto',display:'block'}}/></span>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
             <Link href="/login" style={{color:'rgba(255,255,255,0.6)',fontSize:14,fontWeight:600,textDecoration:'none',padding:'8px 18px',borderRadius:100,border:'1.5px solid rgba(255,255,255,0.12)'}}>Log In</Link>
             <Link href="/signup" style={{background:'#dffe95',color:'#10211f',fontSize:14,fontWeight:800,textDecoration:'none',padding:'10px 22px',borderRadius:100}}>Start Free Trial</Link>
