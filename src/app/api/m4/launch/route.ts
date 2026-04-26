@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       pixelId = '',
       objective = 'OUTCOME_SALES',
       pageId = '',
+      instagramActorId = '',
       primaryText = '',
       headline = '',
       cta = 'LEARN_MORE',

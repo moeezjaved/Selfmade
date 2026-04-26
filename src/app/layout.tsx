@@ -5,7 +5,7 @@ import './globals.css'
 export const metadata: Metadata = {
   title: { default: 'Selfmade', template: '%s — Selfmade' },
   description: 'AI-powered Meta ads platform. Stop guessing. Start winning.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://selfmade.ai'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai'), icons: { icon: '/favicon.png', shortcut: '/favicon.png', apple: '/favicon.png' },
   openGraph: {
     title: 'Selfmade — AI Meta Ads Platform',
     description: 'Stop guessing. Start winning. AI-powered Meta ads co-pilot.',
