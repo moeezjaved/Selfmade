@@ -23,7 +23,7 @@ export async function GET() {
     const res = await fetch(
       `https://graph.facebook.com/${V}/me/accounts?` +
       new URLSearchParams({ 
-        fields: 'id,name,category,fan_count,access_token,instagram_business_account',
+        fields: 'id,name,category,fan_count,access_token,instagram_business_account,connected_instagram_account',
         access_token: token,
         limit: '20',
       })
@@ -45,6 +45,15 @@ export async function GET() {
           const igData = await igRes.json()
           if (!igData.error) instagram = { id: igData.id, name: igData.name, username: igData.username }
         } catch {}
+      }
+
+      // Fallback: try connected_instagram_account
+      if (!instagram && p.connected_instagram_account?.id) {
+        instagram = {
+          id: p.connected_instagram_account.id,
+          name: p.connected_instagram_account.name || 'Instagram',
+          username: p.connected_instagram_account.username || 'instagram',
+        }
       }
 
       // Fallback: try getting instagram via page token
