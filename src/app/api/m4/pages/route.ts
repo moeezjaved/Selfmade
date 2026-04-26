@@ -21,11 +21,27 @@ export async function GET() {
   try {
     const res = await fetch(
       `https://graph.facebook.com/${V}/me/accounts?` +
-      new URLSearchParams({ fields: 'id,name,category,fan_count', access_token: token })
+      new URLSearchParams({ 
+        fields: 'id,name,category,fan_count,instagram_business_account{id,name,username,profile_picture_url}',
+        access_token: token 
+      })
     )
     const data = await res.json()
     if (data.error) throw new Error(data.error.message)
-    return NextResponse.json({ pages: data.data || [] })
+    
+    return NextResponse.json({ 
+      pages: (data.data || []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        fan_count: p.fan_count,
+        instagram: p.instagram_business_account ? {
+          id: p.instagram_business_account.id,
+          name: p.instagram_business_account.name,
+          username: p.instagram_business_account.username,
+        } : null
+      }))
+    })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
