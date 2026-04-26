@@ -512,7 +512,7 @@ export default function M4Page() {
           </div>
           {loading ? (
             <div style={{...S.card,padding:48,textAlign:'center'}}>
-              <div style={{width:44,height:44,border:'3px solid rgba(223,254,149,0.2)',borderTopColor:'#dffe95',borderRadius:'50%',animation:'spin 1s linear infinite',margin:'0 auto 16px'}}/>
+              <img src='/favicon.png' alt='' style={{width:44,height:44,borderRadius:11,animation:'spin 1s linear infinite',margin:'0 auto 16px',display:'block'}}/>
               <div style={{fontSize:15,fontWeight:700,color:'white'}}>Analysing campaigns…</div>
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>

@@ -23,7 +23,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@300;400;500;600;700;800;900&display=swap"
           rel="stylesheet"
         />
-      </head>
+        <style>{`
+      @keyframes spin { to { transform: rotate(360deg) } }
+      .selfmade-loading {
+        display: inline-block;
+        width: 32px; height: 32px;
+        background: url('/favicon.png') center/contain no-repeat;
+        animation: spin 1s linear infinite;
+        border-radius: 8px;
+      }
+    `}</style>
+  </head>
       <body className="bg-dark text-white antialiased font-sans">
         {children}
         <Toaster
