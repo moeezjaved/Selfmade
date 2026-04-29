@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
         // Create retargeting audience
         const rtAud = await post(`${adAccountId}/customaudiences`, {
           name: `${campaignName} — Retargeting 60d`,
-          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 5184000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } } }),
+          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 5184000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }),
           prefill: true,
         }).catch(() => null)
 
@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
       try {
         const rnAud = await post(`${adAccountId}/customaudiences`, {
           name: `${campaignName} — Purchasers 180d`,
-          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'Purchase' }] } }] } } }),
+          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'Purchase' }] } }] } }),
           prefill: true,
         }).catch(() => null)
 
