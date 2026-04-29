@@ -8,11 +8,49 @@ export async function POST(request: NextRequest) {
 
   const { product, description, competitors, targetCustomer, competitorDomains, competitorFBPages, competitorIGHandles } = await request.json()
 
+  // Extract brand names from domains and handles
+  const extractBrands = (input: string) => {
+    if (!input) return []
+    return input.split(',').map((s: string) => s.trim()
+      .replace(/https?:\/\//g,'').replace(/www\./g,'')
+      .replace(/facebook\.com\//g,'').replace(/instagram\.com\//g,'')
+      .replace(/\.[a-z]{2,4}$/g,'').replace(/@/g,'').trim()
+    ).filter(Boolean)
+  }
+  const allBrands = [...new Set([
+    ...extractBrands(competitorDomains||''),
+    ...extractBrands(competitorFBPages||''),
+    ...extractBrands(competitorIGHandles||''),
+    ...extractBrands(competitors||''),
+  ])]
+
+  const foundInterests: string[] = []
+  const notFoundBrands: string[] = []
+
+  try {
+    const { createAdminClient } = await import('@/lib/supabase/server')
+    const { decryptToken } = await import('@/lib/meta/client')
+    const admin = createAdminClient()
+    const { data: ma } = await admin.from('meta_accounts').select('*').eq('user_id',user.id).eq('is_primary',true).single()
+    if (ma && allBrands.length > 0) {
+      const tok = decryptToken(ma.access_token)
+      for (const brand of allBrands.slice(0,8)) {
+        try {
+          const r = await fetch('https://graph.facebook.com/v20.0/search?'+new URLSearchParams({type:'adinterest',q:brand,limit:'3',access_token:tok}))
+          const d = await r.json()
+          const match = d.data?.find((i: any) => i.name.toLowerCase().includes(brand.toLowerCase())||brand.toLowerCase().includes(i.name.toLowerCase()))
+          if (match) foundInterests.push(match.name)
+          else notFoundBrands.push(brand)
+        } catch { notFoundBrands.push(brand) }
+      }
+    }
+  } catch {}
+
   const compCtx = [
-    competitors ? "Known competitors: " + competitors : "",
-    competitorDomains ? "Competitor websites: " + competitorDomains : "",
-    competitorFBPages ? "Competitor Facebook pages: " + competitorFBPages : "",
-    competitorIGHandles ? "Competitor Instagram: " + competitorIGHandles : "",
+    foundInterests.length>0 ? "CONFIRMED in Meta Ads (use exact): "+foundInterests.join(', ') : "",
+    notFoundBrands.length>0 ? "Small brands not in Meta (find similar audiences): "+notFoundBrands.join(', ') : "",
+    competitors ? "Other competitors: "+competitors : "",
+    competitorDomains ? "Websites: "+competitorDomains : "",
   ].filter(Boolean).join("\n")
 
   const prompt = "You are an expert Facebook/Meta ads media buyer.\n\nProduct: " + product + "\nDescription: " + description + "\nTarget Customer: " + (targetCustomer || "General") + "\n" + (compCtx ? "\nCompetitor Intelligence:\n" + compCtx : "") + "\n\nSuggest 8 highly targeted Meta Ads interests. Use competitor data to find competitor brand interests, publications, influencers, activities.\n\nExtract brand names from domains/handles. Use EXACT names as in Meta Ads Manager.\n\nRespond ONLY with valid JSON:\n{\"interests\":[{\"name\":\"exact Meta interest name\",\"category\":\"Competitor|Publication|Influencer|Activity|Lifestyle\",\"why\":\"one sentence\",\"size\":\"Small|Medium|Large\",\"confidence\":85}]}"
