@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create ad creative with image hash and optional custom copy
-    const createAdCreative = async (name: string, imageHash: string | null, customCopy?: any) => {
+    const createAdCreative = async (name: string, imageHash: string | null, customCopy?: any, isVideo = false) => {
       const cp = customCopy || {}
       const msg = cp.primaryText || primaryText || 'Check out our products'
       const lnk = cp.destinationUrl || websiteUrl
@@ -100,7 +100,11 @@ export async function POST(request: NextRequest) {
           message: msg, link: lnk, name: hd, description: '',
           call_to_action: { type: ct, value: { link: lnk } },
         }
-        if (imageHash) linkData.image_hash = imageHash
+        if (isVideo && imageHash) {
+          linkData.video_id = imageHash
+        } else if (imageHash) {
+          linkData.image_hash = imageHash
+        }
 
         const creativeSpec: Record<string,unknown> = {
           name,
@@ -150,7 +154,7 @@ export async function POST(request: NextRequest) {
         })
 
         // Create ad with creative
-        const creativeId = await createAdCreative(`Creative — ${c.name}`, c.hash || null)
+        const creativeId = await createAdCreative(`Creative — ${c.name}`, c.hash || null, undefined, c.type === 'video')
         if (creativeId) {
           await post(`${adAccountId}/ads`, {
             name: `Ad — ${c.name}`,
@@ -208,7 +212,7 @@ export async function POST(request: NextRequest) {
           ...promotedObject,
         })
 
-        const creativeId = await createAdCreative(`Creative — ${interest.name}`, firstHash)
+        const creativeId = await createAdCreative(`Creative — ${interest.name}`, firstHash, undefined, firstCreative?.type === 'video')
         if (creativeId) {
           await post(`${adAccountId}/ads`, {
             name: `Ad — ${interest.name}`,
@@ -269,7 +273,7 @@ export async function POST(request: NextRequest) {
             })
 
             if (pageId && (retargetingCopy as any).websiteUrl) {
-              const rtCreative = await createAdCreative(`RT Creative — ${c.name}`, c.hash || null, retargetingCopy)
+              const rtCreative = await createAdCreative(`RT Creative — ${c.name}`, c.hash || null, retargetingCopy, c.type === 'video')
               if (rtCreative) {
                 await post(`${adAccountId}/ads`, {
                   name: `RT Ad — ${c.name}`,

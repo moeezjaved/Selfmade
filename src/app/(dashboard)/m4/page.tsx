@@ -228,11 +228,11 @@ export default function M4Page() {
             <div style={{marginBottom:20}}><label style={S.label}>Target Customer</label><input value={form.targetCustomer} onChange={e=>set('targetCustomer',e.target.value)} placeholder="e.g. Men and women 25-45 with hair loss" style={S.input}/></div>
             <div style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.15)',borderRadius:14,padding:18,marginBottom:20}}>
               <div style={{fontSize:13,fontWeight:800,color:'#93c5fd',marginBottom:4}}>Competitor Intelligence</div>
-              <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginBottom:14}}>Claude uses this to find audiences already buying from your competitors.</div>
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginBottom:14}}>Selfmade uses this to find audiences already buying from your competitors. The more accurate details you provide, the better your targeting will be — this directly impacts your ad performance.</div>
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                <div><label style={S.label}>Competitor Websites</label><input value={form.competitorDomains} onChange={e=>set('competitorDomains',e.target.value)} placeholder="minoxidil.com, regaine.com, foligain.com" style={S.input}/></div>
-                <div><label style={S.label}>Competitor Facebook Pages</label><input value={form.competitorFBPages} onChange={e=>set('competitorFBPages',e.target.value)} placeholder="facebook.com/Regaine, facebook.com/Minoxidil" style={S.input}/></div>
-                <div><label style={S.label}>Competitor Instagram Handles</label><input value={form.competitorIGHandles} onChange={e=>set('competitorIGHandles',e.target.value)} placeholder="@regaine_uk, @minoxidilfor.men" style={S.input}/></div>
+                <div><label style={S.label}>Competitor Websites</label><input value={form.competitorDomains} onChange={e=>set('competitorDomains',e.target.value)} placeholder="minoxidil.com, regaine.com, foligain.com (separate with commas)" style={S.input}/></div>
+                <div><label style={S.label}>Competitor Facebook Pages</label><input value={form.competitorFBPages} onChange={e=>set('competitorFBPages',e.target.value)} placeholder="facebook.com/Regaine, facebook.com/Minoxidil (separate with commas)" style={S.input}/></div>
+                <div><label style={S.label}>Competitor Instagram Handles</label><input value={form.competitorIGHandles} onChange={e=>set('competitorIGHandles',e.target.value)} placeholder="@regaine_uk, @minoxidilfor.men (separate with commas)" style={S.input}/></div>
               </div>
             </div>
             <div style={{marginBottom:8}}><label style={S.label}>Meta Pixel</label></div>
