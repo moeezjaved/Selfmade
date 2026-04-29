@@ -28,6 +28,7 @@ const NAV = [
   {
     label: 'Insights',
     items: [
+      { href: '/insights',         icon: TrendingUp,      label: 'Scale & Insights', badge: 'NEW'},
       { href: '/activity',         icon: ClipboardList,   label: 'Activity Log',     badge: null },
     ],
   },
