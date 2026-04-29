@@ -42,6 +42,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ hash: videoData.id, url: null, isVideo: true, name })
     }
 
+    // Handle video vs image upload
+    const isVideo = mimeType?.startsWith('video/')
+
+    if (isVideo) {
+      // Upload video to Meta
+      const videoRes = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/advideos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_url: `data:${mimeType};base64,${base64}`, access_token: token, title: name || 'Ad Video' })
+      })
+      const videoData = await videoRes.json()
+      if (videoData.error) {
+        // Fallback: try uploading as form data approach - return placeholder
+        console.log('Video upload error:', videoData.error.message)
+        return NextResponse.json({ hash: null, url: null, error: videoData.error.message, isVideo: true })
+      }
+      return NextResponse.json({ hash: videoData.id, url: null, isVideo: true, name })
+    }
+
     const res = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/adimages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
