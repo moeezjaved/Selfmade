@@ -23,6 +23,11 @@ export async function POST(request: NextRequest) {
       objective = 'OUTCOME_SALES',
       pageId = '',
       instagramActorId = '',
+      retargetingCreatives = [] as any[],
+      retainerCreatives = [] as any[],
+      retargetingCopy = {} as any,
+      retainerCopy = {} as any,
+      includeRetainer = false,
       primaryText = '',
       headline = '',
       cta = 'LEARN_MORE',
@@ -82,17 +87,18 @@ export async function POST(request: NextRequest) {
       } catch { return null }
     }
 
-    // Create ad creative with image hash
-    const createAdCreative = async (name: string, imageHash: string | null) => {
-      console.log('Creating creative:', name, 'pageId:', pageId, 'websiteUrl:', websiteUrl, 'hash:', imageHash)
-      if (!pageId || !websiteUrl) { console.log('Skipping creative - no pageId or websiteUrl'); return null }
+    // Create ad creative with image hash and optional custom copy
+    const createAdCreative = async (name: string, imageHash: string | null, customCopy?: any) => {
+      const cp = customCopy || {}
+      const msg = cp.primaryText || primaryText || 'Check out our products'
+      const lnk = cp.destinationUrl || websiteUrl
+      const hd = cp.headline || headline || campaignName
+      const ct = cp.cta || cta || 'LEARN_MORE'
+      if (!pageId || !lnk) return null
       try {
         const linkData: Record<string,unknown> = {
-          message: primaryText || 'Check out our products',
-          link: websiteUrl,
-          name: headline || campaignName,
-          description: '',
-          call_to_action: { type: cta || 'LEARN_MORE', value: { link: websiteUrl } },
+          message: msg, link: lnk, name: hd, description: '',
+          call_to_action: { type: ct, value: { link: lnk } },
         }
         if (imageHash) linkData.image_hash = imageHash
 
@@ -218,6 +224,124 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── CAMPAIGN 3: Retargeting (website visitors 60 days) ──────
+    let retargetingCount = 0
+    let retainerCount = 0
+
+    if (pixelId && (retargetingCreatives as any[]).length > 0) {
+      try {
+        // Create retargeting audience
+        const rtAud = await post(`${adAccountId}/customaudiences`, {
+          name: `${campaignName} — Retargeting 60d`,
+          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 5184000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } } }),
+          prefill: true,
+        }).catch(() => null)
+
+        const rtBudget = Math.max(minBudget, Math.round(safeBudget * 0.4))
+        const rtCamp = await post(`${adAccountId}/campaigns`, {
+          name: `${campaignName} — M4 Retargeting`,
+          objective: apiObjective,
+          status: 'PAUSED',
+          special_ad_categories: [],
+          is_adset_budget_sharing_enabled: false,
+        })
+
+        for (const c of (retargetingCreatives as any[]).slice(0, 3)) {
+          try {
+            const rtTargeting: Record<string,unknown> = {
+              age_min: parseInt(ageMin) || 18,
+              age_max: parseInt(ageMax) || 65,
+              geo_locations: { countries: ['PK'] },
+              targeting_automation: { advantage_audience: 0 },
+            }
+            if (rtAud?.id) rtTargeting.custom_audiences = [{ id: rtAud.id }]
+
+            const rtAdset = await post(`${adAccountId}/adsets`, {
+              name: `${campaignName} — Retargeting — ${c.name}`,
+              campaign_id: rtCamp.id,
+              status: 'PAUSED',
+              daily_budget: rtBudget,
+              targeting: rtTargeting,
+              bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+              destination_type: 'WEBSITE',
+              ...optSettings,
+              ...promotedObject,
+            })
+
+            if (pageId && (retargetingCopy as any).websiteUrl) {
+              const rtCreative = await createAdCreative(`RT Creative — ${c.name}`, c.hash || null, retargetingCopy)
+              if (rtCreative) {
+                await post(`${adAccountId}/ads`, {
+                  name: `RT Ad — ${c.name}`,
+                  adset_id: rtAdset.id,
+                  creative: { creative_id: rtCreative },
+                  status: 'PAUSED',
+                })
+              }
+            }
+            retargetingCount++
+          } catch(e: any) { errors.push(`Retargeting "${c.name}": ${e.message}`) }
+        }
+      } catch(e: any) { errors.push(`Retargeting campaign: ${e.message}`) }
+    }
+
+    // ── CAMPAIGN 4: Retainer (past purchasers) ────────────────
+    if (includeRetainer && pixelId && (retainerCreatives as any[]).length > 0) {
+      try {
+        const rnAud = await post(`${adAccountId}/customaudiences`, {
+          name: `${campaignName} — Purchasers 180d`,
+          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'Purchase' }] } }] } } }),
+          prefill: true,
+        }).catch(() => null)
+
+        const rnBudget = Math.max(minBudget, Math.round(safeBudget * 0.2))
+        const rnCamp = await post(`${adAccountId}/campaigns`, {
+          name: `${campaignName} — M4 Retainer`,
+          objective: apiObjective,
+          status: 'PAUSED',
+          special_ad_categories: [],
+          is_adset_budget_sharing_enabled: false,
+        })
+
+        for (const c of (retainerCreatives as any[]).slice(0, 3)) {
+          try {
+            const rnTargeting: Record<string,unknown> = {
+              age_min: parseInt(ageMin) || 18,
+              age_max: parseInt(ageMax) || 65,
+              geo_locations: { countries: ['PK'] },
+              targeting_automation: { advantage_audience: 0 },
+            }
+            if (rnAud?.id) rnTargeting.custom_audiences = [{ id: rnAud.id }]
+
+            const rnAdset = await post(`${adAccountId}/adsets`, {
+              name: `${campaignName} — Retainer — ${c.name}`,
+              campaign_id: rnCamp.id,
+              status: 'PAUSED',
+              daily_budget: rnBudget,
+              targeting: rnTargeting,
+              bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+              destination_type: 'WEBSITE',
+              ...optSettings,
+              ...promotedObject,
+            })
+
+            if (pageId && (retainerCopy as any).websiteUrl) {
+              const rnCreative = await createAdCreative(`RN Creative — ${c.name}`, c.hash || null, retainerCopy)
+              if (rnCreative) {
+                await post(`${adAccountId}/ads`, {
+                  name: `RN Ad — ${c.name}`,
+                  adset_id: rnAdset.id,
+                  creative: { creative_id: rnCreative },
+                  status: 'PAUSED',
+                })
+              }
+            }
+            retainerCount++
+          } catch(e: any) { errors.push(`Retainer "${c.name}": ${e.message}`) }
+        }
+      } catch(e: any) { errors.push(`Retainer campaign: ${e.message}`) }
+    }
+
     try {
       await admin.from('activity_logs').insert({
         user_id: user.id,
@@ -235,6 +359,8 @@ export async function POST(request: NextRequest) {
       interest_campaign_id: intCamp.id,
       broad_adsets: broadCount,
       interest_adsets: intCount,
+      retargeting_adsets: retargetingCount,
+      retainer_adsets: retainerCount,
       exclusion_audiences: 0,
       errors: errors.length > 0 ? errors : undefined,
     })
