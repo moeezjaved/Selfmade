@@ -17,12 +17,12 @@ export async function POST(request: NextRequest) {
       .replace(/\.[a-z]{2,4}$/g,'').replace(/@/g,'').trim()
     ).filter(Boolean)
   }
-  const allBrands = [...new Set([
+  const allBrands = Array.from(new Set([
     ...extractBrands(competitorDomains||''),
     ...extractBrands(competitorFBPages||''),
     ...extractBrands(competitorIGHandles||''),
     ...extractBrands(competitors||''),
-  ])]
+  )))
 
   const foundInterests: string[] = []
   const notFoundBrands: string[] = []
