@@ -132,6 +132,7 @@ export async function POST(request: NextRequest) {
       status: 'PAUSED',
       special_ad_categories: [],
       daily_budget: Math.max(minBudget, Math.round(safeBudget * 0.3)),
+      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
       is_adset_budget_sharing_enabled: false,
     })
 
