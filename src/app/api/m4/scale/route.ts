@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
-import Anthropic from '@anthropic-ai/sdk'
 
 const V = process.env.META_API_VERSION || 'v20.0'
-const claude = new Anthropic()
+const minBudget = 100
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,258 +11,138 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { campaignName, product, description, competitorDomains, budgetMultiplier = 2, isBudgetIncrease = false, selectedInterests = [], adsetId, adsetName, testBudget = 500 } = await request.json()
+    const {
+      campaignName, budgetMultiplier = 2, isBudgetIncrease = false,
+      selectedInterests = [], adsetId, adsetName, testBudget = 500,
+      product = '', description = '', competitorDomains = ''
+    } = await request.json()
 
     const admin = createAdminClient()
     const { data: metaAccount } = await admin
       .from('meta_accounts').select('*')
       .eq('user_id', user.id).eq('is_primary', true).single()
-
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)
-    const adAccountId = `act_${metaAccount.account_id}`
-    const currency = metaAccount.currency || 'USD'
-    const minBudgets: Record<string,number> = { USD:100, PKR:28100, GBP:100, EUR:100, AED:400 }
-    const minBudget = minBudgets[currency] || 100
+    const adAccountId = "act_" + metaAccount.account_id
 
-    const get = async (path: string, params?: Record<string,string>) => {
-      const url = new URL(`https://graph.facebook.com/${V}/${path}`)
-      url.searchParams.set('access_token', token)
-      if (params) Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v))
-      return (await fetch(url.toString())).json()
-    }
-
-    const post = async (path: string, params: Record<string,unknown>) => {
-      const r = await fetch(`https://graph.facebook.com/${V}/${path}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...params, access_token: token }),
+    const post = async (path: string, body: Record<string, unknown>) => {
+      const url = "https://graph.facebook.com/" + V + "/" + path
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, access_token: token })
       })
-      const d = await r.json()
-      if (d.error) throw new Error(d.error.message)
-      return d
+      const data = await res.json()
+      if (data.error) throw new Error(data.error.message)
+      return data
     }
 
-    // Find winning campaign
-    const campaigns = await get(`${adAccountId}/campaigns`, {
-      fields: 'id,name,daily_budget,objective,status', limit: '100',
-    })
-    const winning = campaigns.data?.find((c: any) =>
-      c.name.toLowerCase().includes(campaignName.toLowerCase().slice(0, 20))
+    // Find the winning campaign by name
+    const campRes = await fetch(
+      "https://graph.facebook.com/" + V + "/" + adAccountId + "/campaigns?" +
+      new URLSearchParams({ fields: "id,name,status,objective,daily_budget", limit: "50", access_token: token })
     )
-    if (!winning) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    const campData = await campRes.json()
+    const winning = campData.data?.find((c: any) =>
+      c.name === campaignName || c.name.includes(campaignName.split(' — ')[0])
+    )
+    if (!winning) return NextResponse.json({ error: 'Campaign not found: ' + campaignName }, { status: 404 })
 
-    const currentBudget = parseInt(winning.daily_budget || String(minBudget * 2))
-    const scaledBudget = isBudgetIncrease ? Math.round(currentBudget * (1 + (budgetMultiplier / 100))) : Math.round(currentBudget * budgetMultiplier)
+    const currentBudget = parseInt(winning.daily_budget || '0') / 100
+    const scaledBudget = isBudgetIncrease
+      ? Math.round(currentBudget * (1 + budgetMultiplier / 100) * 100)
+      : Math.round(currentBudget * budgetMultiplier * 100)
 
-    // If budget increase only - update existing campaign
+    // BUDGET INCREASE ONLY - update existing campaign
     if (isBudgetIncrease) {
-      await post(`${winning.id}`, { daily_budget: Math.max(minBudget, scaledBudget) })
+      await post(winning.id, { daily_budget: Math.max(minBudget * 100, scaledBudget) })
       return NextResponse.json({
-        success: true,
-        action: 'budget_increased',
-        new_budget: scaledBudget,
-        increase_pct: budgetMultiplier,
-        new_interests: 0,
+        success: true, action: 'budget_increased',
+        new_budget: scaledBudget / 100, increase_pct: budgetMultiplier,
       })
     }
 
-    // Create new test ad sets per selected interest (keep original untouched)
-    const newAdsets: string[] = []
-    if (selectedInterests.length > 0 && !isBudgetIncrease) {
-      for (const interestName of (selectedInterests as string[])) {
-        try {
-          const intRes = await fetch("https://graph.facebook.com/" + V + "/" + adAccountId + "/search?" + new URLSearchParams({type:"adinterest",q:interestName,limit:"3",access_token:token}))
-          const intData = await intRes.json()
-          const match = intData.data?.[0]
-          if (match) {
-            await post(adAccountId + "/adsets", {
-              name: campaignName + " — Test — " + match.name,
-              campaign_id: winning.id,
-              status: "PAUSED",
-              daily_budget: Math.max(100, testBudget * 100),
-              targeting: {
-                age_min: 18,
-                geo_locations: { countries: ["PK"] },
-                flexible_spec: [{ interests: [{ id: match.id, name: match.name }] }],
-              },
-              destination_type: "WEBSITE",
-              optimization_goal: "OFFSITE_CONVERSIONS",
-              billing_event: "IMPRESSIONS",
-            })
-            newAdsets.push(match.name)
-          }
-        } catch(e: any) { console.log("Test adset error:", e.message) }
-      }
-    }
-
-        // Duplicate the WINNING AD SET (not the whole campaign)
+    // DUPLICATE THE WINNING AD SET
     let duplicateAdsetId = null
-    if (!isBudgetIncrease) {
-      try {
-        // Get adsets of the winning campaign to find the right one
-        const adsetsRes = await fetch("https://graph.facebook.com/" + V + "/" + winning.id + "/adsets?" + new URLSearchParams({
-          fields: "id,name,targeting,optimization_goal,billing_event,destination_type,status",
-          access_token: token,
-          limit: "20"
-        }))
-        const adsetsData = await adsetsRes.json()
-        
-        // Find the specific adset by ID or name
-        let targetAdset = adsetsData.data?.find((a: any) => a.id === adsetId)
-        if (!targetAdset) targetAdset = adsetsData.data?.[0]
-        
-        if (targetAdset) {
-          // Duplicate the ad set with scaled budget in same campaign
-          const newAdset = await post(adAccountId + "/adsets", {
-            name: (adsetName || targetAdset.name) + " — Scale " + budgetMultiplier + "x",
-            campaign_id: winning.id,
-            status: "ACTIVE",
-            daily_budget: Math.round(scaledBudget),
-            targeting: targetAdset.targeting,
-            optimization_goal: targetAdset.optimization_goal,
-            billing_event: targetAdset.billing_event,
-            destination_type: targetAdset.destination_type,
-          })
-          duplicateAdsetId = newAdset?.id
+    try {
+      const adsetsRes = await fetch(
+        "https://graph.facebook.com/" + V + "/" + winning.id + "/adsets?" +
+        new URLSearchParams({ fields: "id,name,targeting,optimization_goal,billing_event,destination_type,promoted_object", access_token: token, limit: "20" })
+      )
+      const adsetsData = await adsetsRes.json()
+      let targetAdset = adsetsData.data?.find((a: any) => a.id === adsetId)
+      if (!targetAdset) targetAdset = adsetsData.data?.[0]
 
-          // Copy ads from original adset to new adset
-          if (newAdset?.id) {
-            const adsRes = await fetch("https://graph.facebook.com/" + V + "/" + targetAdset.id + "/ads?" + new URLSearchParams({
-              fields: "id,name,creative",
-              access_token: token,
-            }))
-            const adsData = await adsRes.json()
-            for (const ad of (adsData.data || []).slice(0, 3)) {
-              await post(adAccountId + "/ads", {
-                name: ad.name + " — Scale",
-                adset_id: newAdset.id,
-                creative: { creative_id: ad.creative?.id },
-                status: "ACTIVE",
-              }).catch(() => null)
-            }
-          }
-        }
-      } catch(e: any) { console.log("Adset duplicate error:", e.message) }
-    } else {
-      // Budget increase on existing campaign
-      await post(winning.id, { daily_budget: Math.max(minBudget, scaledBudget) })
-    }
-
-        return NextResponse.json({
-        success: true,
-        action: 'budget_increased',
-        new_budget: scaledBudget,
-        increase_pct: budgetMultiplier,
-        new_interests: 0,
-      })
-    }
-
-    // Create new test ad sets per selected interest (keep original untouched)
-    const newAdsets: string[] = []
-    if (selectedInterests.length > 0 && !isBudgetIncrease) {
-      for (const interestName of (selectedInterests as string[])) {
-        try {
-          const intRes = await fetch("https://graph.facebook.com/" + V + "/" + adAccountId + "/search?" + new URLSearchParams({type:"adinterest",q:interestName,limit:"3",access_token:token}))
-          const intData = await intRes.json()
-          const match = intData.data?.[0]
-          if (match) {
-            await post(adAccountId + "/adsets", {
-              name: campaignName + " — Test — " + match.name,
-              campaign_id: winning.id,
-              status: "PAUSED",
-              daily_budget: Math.max(100, testBudget * 100),
-              targeting: {
-                age_min: 18,
-                geo_locations: { countries: ["PK"] },
-                flexible_spec: [{ interests: [{ id: match.id, name: match.name }] }],
-              },
-              destination_type: "WEBSITE",
-              optimization_goal: "OFFSITE_CONVERSIONS",
-              billing_event: "IMPRESSIONS",
-            })
-            newAdsets.push(match.name)
-          }
-        } catch(e: any) { console.log("Test adset error:", e.message) }
-      }
-    }
-
-        // Duplicate campaign with scaled budget
-    const duplicate = await post(`${adAccountId}/campaigns`, {
-      name: `${winning.name} — Scale ${budgetMultiplier}x`,
-      objective: winning.objective,
-      status: 'PAUSED',
-      special_ad_categories: [],
-      is_adset_budget_sharing_enabled: false,
-    })
-
-    // Copy ad sets to duplicate
-    const adsets = await get(`${winning.id}/adsets`, {
-      fields: 'id,name,targeting,optimization_goal,billing_event,bid_strategy,destination_type',
-      limit: '20',
-    })
-
-    let copiedAdsets = 0
-    for (const adset of (adsets.data || [])) {
-      try {
-        await post(`${adAccountId}/adsets`, {
-          name: adset.name + ' SCALED',
-          campaign_id: duplicate.id,
-          status: 'PAUSED',
-          daily_budget: Math.max(minBudget, scaledBudget),
-          targeting: adset.targeting,
-          optimization_goal: adset.optimization_goal,
-          billing_event: adset.billing_event || 'IMPRESSIONS',
-          bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
-          destination_type: adset.destination_type || 'WEBSITE',
-        })
-        copiedAdsets++
-      } catch(e: any) { console.log('Adset copy error:', e.message) }
-    }
-
-    // Generate NEW interests via Claude for the ORIGINAL campaign
-    const msg = await claude.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 500,
-      messages: [{ role: 'user', content: `Generate 6 NEW niche Facebook interest targeting suggestions for: ${product}. Description: ${description}. Competitors: ${competitorDomains}. Find high-intent niche audiences different from obvious ones. Respond ONLY with JSON array: [{"name": "Interest Name", "why": "one line reason"}]` }],
-    })
-
-    const text = msg.content[0].type === 'text' ? msg.content[0].text : '[]'
-    const newInterests = JSON.parse(text.replace(/```json|```/g, '').trim())
-
-    // Add new interest ad sets to ORIGINAL campaign
-    let newInterestCount = 0
-    for (const interest of newInterests.slice(0, 6)) {
-      try {
-        const sr = await fetch(`https://graph.facebook.com/${V}/search?` + new URLSearchParams({ type: 'adinterest', q: interest.name, limit: '1', access_token: token }))
-        const sd = await sr.json()
-        const mi = sd.data?.[0]
-        const targeting: Record<string,unknown> = {
-          age_min: 18, age_max: 65,
-          geo_locations: { countries: ['PK'] },
-          targeting_automation: { advantage_audience: 0 },
-        }
-        if (mi) targeting.flexible_spec = [{ interests: [{ id: mi.id, name: mi.name }] }]
-        await post(`${adAccountId}/adsets`, {
-          name: `${winning.name} NEW ${interest.name}`,
+      if (targetAdset) {
+        const newAdset = await post(adAccountId + "/adsets", {
+          name: (adsetName || targetAdset.name) + " — Scale " + budgetMultiplier + "x",
           campaign_id: winning.id,
-          status: 'PAUSED',
-          daily_budget: Math.max(minBudget, currentBudget),
-          targeting,
-          optimization_goal: 'LINK_CLICKS',
-          billing_event: 'IMPRESSIONS',
-          bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
-          destination_type: 'WEBSITE',
+          status: "ACTIVE",
+          daily_budget: Math.max(minBudget * 100, scaledBudget),
+          targeting: targetAdset.targeting,
+          optimization_goal: targetAdset.optimization_goal,
+          billing_event: targetAdset.billing_event,
+          destination_type: targetAdset.destination_type || "WEBSITE",
+          ...(targetAdset.promoted_object ? { promoted_object: targetAdset.promoted_object } : {}),
         })
-        newInterestCount++
-      } catch(e: any) { console.log('New interest error:', e.message) }
+        duplicateAdsetId = newAdset?.id
+
+        // Copy ads to new adset
+        if (newAdset?.id) {
+          const adsRes = await fetch(
+            "https://graph.facebook.com/" + V + "/" + targetAdset.id + "/ads?" +
+            new URLSearchParams({ fields: "id,name,creative", access_token: token })
+          )
+          const adsData = await adsRes.json()
+          for (const ad of (adsData.data || []).slice(0, 3)) {
+            await post(adAccountId + "/ads", {
+              name: ad.name + " — Scale",
+              adset_id: newAdset.id,
+              creative: { creative_id: ad.creative?.id },
+              status: "ACTIVE",
+            }).catch(() => null)
+          }
+        }
+      }
+    } catch(e: any) { console.log("Adset duplicate error:", e.message) }
+
+    // CREATE TEST AD SETS per selected interest
+    const newAdsets: string[] = []
+    for (const interestName of (selectedInterests as string[])) {
+      try {
+        const intRes = await fetch(
+          "https://graph.facebook.com/" + V + "/" + adAccountId + "/search?" +
+          new URLSearchParams({ type: "adinterest", q: interestName, limit: "3", access_token: token })
+        )
+        const intData = await intRes.json()
+        const match = intData.data?.[0]
+        if (match) {
+          await post(adAccountId + "/adsets", {
+            name: campaignName + " — Test — " + match.name,
+            campaign_id: winning.id,
+            status: "PAUSED",
+            daily_budget: Math.max(minBudget * 100, testBudget * 100),
+            targeting: {
+              age_min: 18,
+              geo_locations: { countries: ["PK"] },
+              flexible_spec: [{ interests: [{ id: match.id, name: match.name }] }],
+            },
+            destination_type: "WEBSITE",
+            optimization_goal: "OFFSITE_CONVERSIONS",
+            billing_event: "IMPRESSIONS",
+          })
+          newAdsets.push(match.name)
+        }
+      } catch(e: any) { console.log("Test adset error:", e.message) }
     }
 
     return NextResponse.json({
       success: true,
-      duplicate_campaign_id: duplicate.id,
-      copied_adsets: copiedAdsets,
-      new_interests: newInterestCount,
+      action: 'scaled',
+      duplicate_adset_id: duplicateAdsetId,
+      new_test_adsets: newAdsets,
+      new_interests: newAdsets.length,
     })
 
   } catch (err: any) {
