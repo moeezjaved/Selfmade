@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Find the winning campaign
     const campData = await get(adAccountId + "/campaigns", {
-      fields: "id,name,status,objective,daily_budget,budget_rebalance_flag",
+      fields: "id,name,status,objective,daily_budget",
       limit: "200"
     })
     const winning = campData.data?.find((c: any) =>
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, action: 'budget_increased' })
     }
 
-    // FIND OR CREATE SCALING CAMPAIGN (CBO - budget at campaign level)
+    // FIND OR CREATE SCALING CAMPAIGN
     const scalingCampaignName = "M4 | Scaling | " + winning.name
     let scalingCampaign = campData.data?.find((c: any) => c.name === scalingCampaignName)
 
@@ -75,8 +75,7 @@ export async function POST(request: NextRequest) {
         objective: winning.objective || "OUTCOME_SALES",
         status: "PAUSED",
         special_ad_categories: [],
-        daily_budget: Math.max(minBudget * 100, scaledBudget), // CBO: budget on campaign
-
+        daily_budget: Math.max(minBudget * 100, scaledBudget),
       })
       console.log("Created Scaling campaign:", scalingCampaign.id)
     } else {
@@ -106,7 +105,8 @@ export async function POST(request: NextRequest) {
     if (t.exclusions) cleanT.exclusions = t.exclusions
     if (t.targeting_automation) cleanT.targeting_automation = t.targeting_automation
 
-    // BUILD SCALED ADSET — no daily_budget (CBO handles it at campaign level)
+    // BUILD SCALED ADSET
+    // No bid_strategy, no bid_amount — open bid, let Meta optimize freely
     const adsetBody: Record<string, unknown> = {
       name: (adsetName || targetAdset.name) + " — Scale " + budgetMultiplier + "x",
       campaign_id: scalingCampaign.id,
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
       targeting: cleanT,
       optimization_goal: targetAdset.optimization_goal || "OFFSITE_CONVERSIONS",
       billing_event: targetAdset.billing_event || "IMPRESSIONS",
-      is_adset_budget_sharing_enabled: true,  // CBO: adset shares campaign budget
+      is_adset_budget_sharing_enabled: true,
     }
     if (targetAdset.destination_type) adsetBody.destination_type = targetAdset.destination_type
     if (targetAdset.promoted_object) adsetBody.promoted_object = targetAdset.promoted_object
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     // ORIGINAL ADSET STAYS UNTOUCHED
 
-    // TEST INTEREST ADSETS (in prospecting campaign — also CBO)
+    // TEST INTEREST ADSETS
     const newAdsets: string[] = []
     for (const interestName of (selectedInterests as string[])) {
       try {
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
             },
             optimization_goal: targetAdset.optimization_goal || "OFFSITE_CONVERSIONS",
             billing_event: targetAdset.billing_event || "IMPRESSIONS",
-            is_adset_budget_sharing_enabled: true,  // CBO
+            is_adset_budget_sharing_enabled: true,
           }
           if (targetAdset.destination_type) testAdsetBody.destination_type = targetAdset.destination_type
           if (targetAdset.promoted_object) testAdsetBody.promoted_object = targetAdset.promoted_object
