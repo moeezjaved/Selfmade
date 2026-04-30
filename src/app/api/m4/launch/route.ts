@@ -141,7 +141,6 @@ export async function POST(request: NextRequest) {
           name: `${campaignName} — Broad — ${c.name}`,
           campaign_id: broadCamp.id,
           status: 'PAUSED',
-          daily_budget: safeBudget,
           targeting: {
             age_min: parseInt(ageMin) || 18,
             geo_locations: { countries: ['PK'] },
@@ -206,7 +205,6 @@ export async function POST(request: NextRequest) {
           name: `${campaignName} — Interest — ${interest.name}`,
           campaign_id: intCamp.id,
           status: 'PAUSED',
-          daily_budget: safeBudget,
           targeting: intTargeting,
           bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
           destination_type: 'WEBSITE',
