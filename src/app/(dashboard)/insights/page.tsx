@@ -200,8 +200,8 @@ export default function InsightsPage() {
               <div style={{fontSize:12,fontWeight:700,color:'#86efac',marginBottom:10,textTransform:'uppercase',letterSpacing:'.06em'}}>What Scale Does</div>
               <div style={{display:'flex',flexDirection:'column',gap:8,fontSize:13,color:'rgba(255,255,255,0.7)'}}>
                 <div>✅ <strong style={{color:'white'}}>Duplicate this campaign</strong> — exact copy with increased budget</div>
-                <div>✅ <strong style={{color:'white'}}>Add new interests</strong> — Claude finds 6 fresh audiences for the original</div>
-                <div>✅ <strong style={{color:'white'}}>Both paused</strong> — you review and activate in Meta Ads Manager</div>
+                <div>✅ <strong style={{color:'white'}}>Add new interests</strong> — Selfmade finds 6 fresh audiences for the original</div>
+                <div>✅ <strong style={{color:'white'}}>Duplicate goes ACTIVE</strong> — original keeps running, no learning reset</div>
               </div>
             </div>
 
@@ -223,8 +223,8 @@ export default function InsightsPage() {
               <div style={{marginBottom:20}}>
                 <label style={{display:'block',fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'}}>Budget Increase %</label>
                 <div style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:10,padding:12,marginBottom:10}}>
-                  <div style={{fontSize:12,fontWeight:700,color:'#fbbf24',marginBottom:4}}>Max 15% to protect learning phase</div>
-                  <div style={{fontSize:12,color:'rgba(255,255,255,0.5)'}}>Increasing budget by more than 20% resets Meta campaign learning. Stay under 15% to keep performance stable.</div>
+                  <div style={{fontSize:12,fontWeight:700,color:'#fbbf24',marginBottom:4}}>Max 15% — Protects Learning Phase</div>
+                  <div style={{fontSize:12,color:'rgba(255,255,255,0.5)'}}>This increases budget on your EXISTING campaign. Meta resets learning if you go above 20% at once. Stay under 15% to keep conversions stable.</div>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
                   {['5','10','15'].map(x=>(
