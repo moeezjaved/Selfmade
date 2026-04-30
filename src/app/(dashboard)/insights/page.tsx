@@ -11,6 +11,7 @@ interface AdsetInsight {
 interface CampaignInsight {
   id: string; name: string; status: string; objective: string
   currency: string; budget: number; adsets: AdsetInsight[]
+  launchData?: {product:string,description:string,target_customer:string,competitor_domains:string}|null
 }
 
 export default function InsightsPage() {
@@ -182,7 +183,7 @@ export default function InsightsPage() {
                           {recEmoji[adset.rec_type]} {recLabel[adset.rec_type]}
                         </div>
                         {adset.rec_type==='scale' && (
-                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false);setSuggestedInterests([]);setLoadingInterests(true);fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:campaign.name.replace(/— M4.*|— Scale.*/g,'').trim(),description:'We need fresh Meta interest audiences for this campaign. Find competitors and relevant interests.',targetCustomer:'',competitorDomains:''})}).then(r=>r.json()).then(d=>setSuggestedInterests((d.interests||[]).slice(0,6).map((i:any)=>({name:i.name,why:i.why,selected:false})))).catch(()=>{}).finally(()=>setLoadingInterests(false))}} disabled={!!isActing} style={{background:'#86efac',color:'#10211f',border:'none',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false);setSuggestedInterests([]);setLoadingInterests(true);fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:campaign.launchData?.product||campaign.name.replace(/— M4.*|— Scale.*/g,'').trim(),description:campaign.launchData?.description||'',targetCustomer:campaign.launchData?.target_customer||'',competitorDomains:campaign.launchData?.competitor_domains||''})}).then(r=>r.json()).then(d=>setSuggestedInterests((d.interests||[]).slice(0,6).map((i:any)=>({name:i.name,why:i.why,selected:false})))).catch(()=>{}).finally(()=>setLoadingInterests(false))}} disabled={!!isActing} style={{background:'#86efac',color:'#10211f',border:'none',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                             {isActing?'Scaling...':'Scale Now'}
                           </button>
                         )}
