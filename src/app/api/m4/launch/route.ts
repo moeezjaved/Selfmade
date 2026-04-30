@@ -121,6 +121,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let exclusionAudienceId: string | null = null
     const errors: string[] = []
     let broadCount = 0
     let intCount = 0
