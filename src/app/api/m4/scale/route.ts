@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       fields: "id,name,status,objective,daily_budget",
       limit: "200"
     })
-    const winning = campData.data?.find((c: any) => c.id === campaignId || c.name === campaignName
+    const winning = campData.data?.find((c: any) => c.id === campaignId
     )
     if (!winning) return NextResponse.json({ error: 'Campaign not found: ' + campaignName }, { status: 404 })
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     // FIND OR CREATE SCALING CAMPAIGN
-    const scalingCampaignName = "M4 | Scaling | " + winning.name
+    const scalingCampaignName = "M4 | Scaling | " + winning.name + " | " + Date.now()
     let scalingCampaign = campData.data?.find((c: any) => c.name === scalingCampaignName)
 
     if (!scalingCampaign) {
