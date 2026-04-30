@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
               ...promotedObject,
             })
 
-            if (pageId && (retargetingCopy as any).websiteUrl) {
+            if (pageId && (retargetingCopy as any).websiteUrl || (retargetingCopy as any).destinationUrl) {
               const rtCreative = await createAdCreative(`RT Creative — ${c.name}`, c.hash || null, retargetingCopy, c.type === 'video')
               if (rtCreative) {
                 await post(`${adAccountId}/ads`, {
@@ -330,7 +330,7 @@ export async function POST(request: NextRequest) {
               ...promotedObject,
             })
 
-            if (pageId && (retainerCopy as any).websiteUrl) {
+            if (pageId && (retainerCopy as any).websiteUrl || (retainerCopy as any).destinationUrl) {
               const rnCreative = await createAdCreative(`RN Creative — ${c.name}`, c.hash || null, retainerCopy)
               if (rnCreative) {
                 await post(`${adAccountId}/ads`, {
