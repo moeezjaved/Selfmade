@@ -240,15 +240,74 @@ export default function InsightsPage() {
               </div>
             </div>
 
-            <div style={{display:'flex',gap:10,marginBottom:16}}>
-              <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.1)'),background:!isBudgetIncrease?'rgba(223,254,149,0.1)':'transparent',color:!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
-                Duplicate + Scale
-              </button>
-              <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.1)'),background:isBudgetIncrease?'rgba(251,191,36,0.1)':'transparent',color:isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
-                Increase Budget Only
-              </button>
-            </div>
+            {/* Only show budget increase for already-scaled campaigns */}
+            {scaleModal && (scaleModal.adset.name.includes('Scale') || scaleModal.adset.name.includes('Duplic')) ? (
+              <div style={{display:'flex',gap:10,marginBottom:16}}>
+                <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.1)'),background:!isBudgetIncrease?'rgba(223,254,149,0.1)':'transparent',color:!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                  Duplicate Again
+                </button>
+                <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.1)'),background:isBudgetIncrease?'rgba(251,191,36,0.1)':'transparent',color:isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                  Increase Budget (max 15%)
+                </button>
+              </div>
+            ) : (
+              <div style={{marginBottom:16,padding:'8px 12px',background:'rgba(223,254,149,0.05)',border:'1px solid rgba(223,254,149,0.1)',borderRadius:10,fontSize:12,color:'rgba(255,255,255,0.5)'}}>
+                Duplicating for the first time — we will scale the budget and keep the original untouched.
+              </div>
+            )}
 
+            {/* Interest Selector - show when duplicating */}
+            {!isBudgetIncrease && (
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'}}>
+                  Test New Audiences (Optional) — Pick interests to test
+                </div>
+                <div style={{fontSize:11,color:'rgba(255,255,255,0.3)',marginBottom:8}}>Each selected interest creates a new test ad set with the same creative</div>
+                {!scaleModal.campaign.launchData && suggestedInterests.length === 0 && (
+                  <div style={{display:'flex',gap:8,marginBottom:8}}>
+                    <input
+                      value={productContext}
+                      onChange={e=>setProductContext(e.target.value)}
+                      placeholder="What do you sell? e.g. Hair loss treatment for men"
+                      style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1.5px solid rgba(255,255,255,0.1)',borderRadius:10,padding:'8px 12px',color:'white',fontSize:12,fontFamily:'inherit',outline:'none'}}
+                    />
+                    <button
+                      onClick={()=>{
+                        const prod = scaleModal.campaign.launchData?.product || productContext
+                        if (prod.length > 3) {
+                          setLoadingInterests(true)
+                          fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:prod,description:scaleModal.campaign.launchData?.description||prod,targetCustomer:scaleModal.campaign.launchData?.target_customer||'',competitorDomains:scaleModal.campaign.launchData?.competitor_domains||''})})
+                            .then(r=>r.json()).then(d=>setSuggestedInterests((d.interests||[]).slice(0,8).map((i:any)=>({name:i.name,why:i.why,selected:false})))).catch(()=>{}).finally(()=>setLoadingInterests(false))
+                        }
+                      }}
+                      style={{background:'#dffe95',color:'#10211f',border:'none',padding:'8px 16px',borderRadius:10,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer',flexShrink:0}}
+                    >Find</button>
+                  </div>
+                )}
+                {scaleModal.campaign.launchData && suggestedInterests.length === 0 && (
+                  <button
+                    onClick={()=>{
+                      setLoadingInterests(true)
+                      const ld = scaleModal.campaign.launchData
+                      fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:ld?.product||'',description:ld?.description||'',targetCustomer:ld?.target_customer||'',competitorDomains:ld?.competitor_domains||''})})
+                        .then(r=>r.json()).then(d=>setSuggestedInterests((d.interests||[]).slice(0,8).map((i:any)=>({name:i.name,why:i.why,selected:false})))).catch(()=>{}).finally(()=>setLoadingInterests(false))
+                    }}
+                    style={{background:'rgba(223,254,149,0.1)',border:'1px solid rgba(223,254,149,0.2)',color:'#dffe95',padding:'8px 16px',borderRadius:10,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer',marginBottom:8}}
+                  >{loadingInterests ? 'Finding...' : 'Generate Interest Suggestions'}</button>
+                )}
+                {loadingInterests && <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',padding:8}}>Finding best audiences...</div>}
+                {suggestedInterests.length > 0 && (
+                  <div style={{display:'flex',flexDirection:'column',gap:5,maxHeight:180,overflowY:'auto'}}>
+                    {suggestedInterests.map((interest,i) => (
+                      <div key={i} onClick={()=>setSuggestedInterests(prev=>prev.map((x,j)=>j===i?{...x,selected:!x.selected}:x))} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',borderRadius:8,border:'1.5px solid '+(interest.selected?'rgba(223,254,149,0.4)':'rgba(255,255,255,0.08)'),background:interest.selected?'rgba(223,254,149,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer'}}>
+                        <div style={{width:14,height:14,borderRadius:3,border:'2px solid '+(interest.selected?'#dffe95':'rgba(255,255,255,0.2)'),background:interest.selected?'#dffe95':'transparent',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#10211f',fontWeight:900}}>{interest.selected?'v':''}</div>
+                        <div><div style={{fontSize:12,fontWeight:600,color:'white'}}>{interest.name}</div><div style={{fontSize:10,color:'rgba(255,255,255,0.35)'}}>{interest.why}</div></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {!isBudgetIncrease ? (
               <div style={{marginBottom:20}}>
                 <label style={{display:'block',fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:10,textTransform:'uppercase',letterSpacing:'.06em'}}>Budget Multiplier for Duplicate</label>
