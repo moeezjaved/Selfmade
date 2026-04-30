@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, action: 'budget_increased' })
     }
 
-    // FIND OR CREATE SCALING CAMPAIGN using /copies
+    // FIND OR CREATE SCALING CAMPAIGN
     const scalingCampaignName = "M4 | Scaling | " + winning.name
     const existingScaling = campData.data?.find((c: any) => c.name === scalingCampaignName)
     let scalingCampaignId: string
@@ -71,37 +71,43 @@ export async function POST(request: NextRequest) {
       scalingCampaignId = existingScaling.id
       console.log("Reusing Scaling campaign:", scalingCampaignId)
     } else {
-      // Copy campaign — preserves bid strategy, objective, all settings
       const copied = await post(winning.id + "/copies", {
         deep_copy: false,
         status_override: "PAUSED",
         rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
       })
       scalingCampaignId = copied.copied_campaign_id
-
-      // Rename it to our standard name
       await post(scalingCampaignId, { name: scalingCampaignName })
       console.log("Created Scaling campaign:", scalingCampaignId)
     }
 
-    // COPY WINNING ADSET into Scaling campaign using /copies
-    // This preserves ALL settings — bid strategy, targeting, creatives
+    // COPY WINNING ADSET (no deep copy — we copy ads separately)
     const copiedAdset = await post(adsetId + "/copies", {
       campaign_id: scalingCampaignId,
       deep_copy: false,
       status_override: "PAUSED",
       rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
     })
-
-    // Rename the copied adset
     const newAdsetId = copiedAdset.copied_adset_id
-    if (newAdsetId) {
-      await post(newAdsetId, {
-        name: (adsetName || "Winner") + " — Scale " + budgetMultiplier + "x"
-      }).catch(() => null)
+    if (!newAdsetId) throw new Error("Failed to copy adset")
+
+    // Rename adset
+    await post(newAdsetId, {
+      name: (adsetName || "Winner") + " — Scale " + budgetMultiplier + "x"
+    }).catch(() => null)
+
+    // COPY EACH AD using /copies — this is the correct way to duplicate ads
+    // Meta handles all creative fields correctly when using ad /copies
+    const adsData = await get(adsetId + "/ads", { fields: "id,name" })
+    for (const ad of (adsData.data || []).slice(0, 5)) {
+      await post(ad.id + "/copies", {
+        adset_id: newAdsetId,
+        status_override: "PAUSED",
+        rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
+      }).catch((e: any) => console.log("Ad copy error:", e.message))
     }
 
-    console.log("Copied adset:", newAdsetId)
+    console.log("Scale complete. New adset:", newAdsetId)
 
     return NextResponse.json({
       success: true,
