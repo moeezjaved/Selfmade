@@ -65,19 +65,20 @@ export default function M4Page() {
   const uploadFile = async (file: File, setter: React.Dispatch<React.SetStateAction<Creative[]>>) => {
     const id = Date.now().toString() + Math.random().toString(36).substr(2,9)
     const isVid = file.type.startsWith('video/')
-    if (isVid && file.size > 5*1024*1024) {
-      alert('Video too large (max 5MB). Add larger videos directly in Meta Ads Manager.')
+    setter(prev=>[...prev,{id,name:file.name.replace(/\.[^.]+$/,''),pack:1,type:isVid?'video':'image',mimeType:file.type,uploading:true}])
+    if (isVid && file.size > 5242880) {
+      alert('Video too large — max 5MB. For larger videos, add directly in Meta Ads Manager.')
+      setter(prev=>prev.filter(x=>x.id!==id))
       return
     }
-    setter(prev=>[...prev,{id,name:file.name.replace(/\.[^.]+$/,''),pack:1,type:isVid?'video':'image',mimeType:file.type,uploading:true}])
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const base64 = (ev.target?.result as string)?.split(',')[1]
       try {
         const res = await fetch('/api/m4/upload-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64,mimeType:file.type,name:file.name,isVideo:isVid})})
         const data = await res.json()
-        setter(prev=>prev.map(c=>c.id===id?{...c,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:c))
-      } catch { setter(prev=>prev.map(c=>c.id===id?{...c,uploading:false}:c)) }
+        setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:x))
+      } catch { setter(prev=>prev.map(x=>x.id===id?{...x,uploading:false}:x)) }
     }
     reader.readAsDataURL(file)
   }
