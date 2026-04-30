@@ -237,14 +237,19 @@ export default function InsightsPage() {
               </div>
             </div>
 
-            <div style={{display:'flex',gap:10,marginBottom:16}}>
-              <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.1)'),background:!isBudgetIncrease?'rgba(223,254,149,0.1)':'transparent',color:!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
-                Duplicate + Scale
-              </button>
-              <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.1)'),background:isBudgetIncrease?'rgba(251,191,36,0.1)':'transparent',color:isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
-                Increase Budget Only
-              </button>
-            </div>
+            {/* Show tabs: if already scaled show budget increase option too */}
+            {scaleModal.adset.name.includes('Scale') || scaleModal.campaign.name.includes('Scale') ? (
+              <div style={{display:'flex',gap:10,marginBottom:16}}>
+                <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.1)'),background:!isBudgetIncrease?'rgba(223,254,149,0.1)':'transparent',color:!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                  Duplicate Again
+                </button>
+                <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.1)'),background:isBudgetIncrease?'rgba(251,191,36,0.1)':'transparent',color:isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                  Increase Budget Only
+                </button>
+              </div>
+            ) : (
+              <div style={{marginBottom:16,fontSize:12,color:'rgba(255,255,255,0.35)',textAlign:'center'}}>First time scaling — duplicate is recommended</div>
+            )}
 
             {!isBudgetIncrease ? (
               <div style={{marginBottom:20}}>

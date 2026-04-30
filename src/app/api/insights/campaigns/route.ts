@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Sort adsets: scale first
-      const order: Record<string,number> = { scale: 0, retarget: 1, hold: 2, pause: 3 }
+      const order: Record<string,number> = { scale: 0, hold: 1, retarget: 2, pause: 3 }
       adsets.sort((a, b) => order[a.rec_type] - order[b.rec_type])
 
       if (adsets.length > 0) {
