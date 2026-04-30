@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
             geo_locations: { countries: ['PK'] },
             ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
             targeting_automation: { advantage_audience: 1 },
+            ...(exclusionAudienceId ? { exclusions: { custom_audiences: [{ id: exclusionAudienceId }] } } : {}),
           },
           destination_type: 'WEBSITE',
           ...optSettings,
@@ -231,6 +232,20 @@ export async function POST(request: NextRequest) {
     // ── CAMPAIGN 3: Retargeting (website visitors 60 days) ──────
     let retargetingCount = 0
     let retainerCount = 0
+
+    // Create exclusion audience (website visitors 60 days) for prospecting campaigns
+    let exclusionAudienceId: string | null = null
+    if (pixelId) {
+      try {
+        const excAud = await post(`${adAccountId}/customaudiences`, {
+          name: `${campaignName} — Exclusion Visitors 60d`,
+          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 5184000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } } }),
+          prefill: true,
+        })
+        exclusionAudienceId = excAud.id
+        console.log('Exclusion audience created:', exclusionAudienceId)
+      } catch(e: any) { console.log('Exclusion audience error:', e.message) }
+    }
 
     console.log('Retargeting check - pixelId:', pixelId, 'retargetingCreatives:', (retargetingCreatives as any[]).length)
     if (pixelId && (retargetingCreatives as any[]).length > 0) {
