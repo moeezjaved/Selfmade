@@ -131,7 +131,8 @@ export async function POST(request: NextRequest) {
       objective: apiObjective,
       status: 'PAUSED',
       special_ad_categories: [],
-      is_adset_budget_sharing_enabled: false,
+      daily_budget: Math.max(minBudget, Math.round(safeBudget * 0.3)),
+      is_adset_budget_sharing_enabled: true,
     })
 
     for (const c of (creatives as any[]).slice(0, 5)) {
@@ -176,7 +177,8 @@ export async function POST(request: NextRequest) {
       objective: apiObjective,
       status: 'PAUSED',
       special_ad_categories: [],
-      is_adset_budget_sharing_enabled: false,
+      daily_budget: Math.max(minBudget, Math.round(safeBudget * 0.3)),
+      is_adset_budget_sharing_enabled: true,
     })
 
     // Use first creative's hash for interest ads
@@ -241,13 +243,15 @@ export async function POST(request: NextRequest) {
           prefill: true,
         }).catch(() => null)
 
-        const rtBudget = Math.max(minBudget, Math.round(safeBudget * 0.4))
+        const rtPct = includeRetainer ? 0.2 : 0.4
+        const rtBudget = Math.max(minBudget, Math.round(safeBudget * rtPct))
         const rtCamp = await post(`${adAccountId}/campaigns`, {
           name: `${campaignName} — M4 Retargeting`,
           objective: apiObjective,
           status: 'PAUSED',
           special_ad_categories: [],
-          is_adset_budget_sharing_enabled: false,
+          daily_budget: rtBudget,
+          is_adset_budget_sharing_enabled: true,
         })
 
         for (const c of (retargetingCreatives as any[]).slice(0, 3)) {
@@ -264,7 +268,6 @@ export async function POST(request: NextRequest) {
               name: `${campaignName} — Retargeting — ${c.name}`,
               campaign_id: rtCamp.id,
               status: 'PAUSED',
-              daily_budget: rtBudget,
               targeting: rtTargeting,
               bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
               destination_type: 'WEBSITE',
@@ -304,7 +307,8 @@ export async function POST(request: NextRequest) {
           objective: apiObjective,
           status: 'PAUSED',
           special_ad_categories: [],
-          is_adset_budget_sharing_enabled: false,
+          daily_budget: Math.max(minBudget, Math.round(safeBudget * 0.2)),
+          is_adset_budget_sharing_enabled: true,
         })
 
         for (const c of (retainerCreatives as any[]).slice(0, 3)) {
@@ -321,7 +325,6 @@ export async function POST(request: NextRequest) {
               name: `${campaignName} — Retainer — ${c.name}`,
               campaign_id: rnCamp.id,
               status: 'PAUSED',
-              daily_budget: rnBudget,
               targeting: rnTargeting,
               bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
               destination_type: 'WEBSITE',
