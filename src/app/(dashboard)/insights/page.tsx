@@ -64,7 +64,9 @@ export default function InsightsPage() {
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
           campaignName: campaign.name,
+          campaignId: campaign.id,
           adsetId: adset.id,
+          campaignId: campaign.id,
           adsetName: adset.name,
           budgetMultiplier: parseFloat(scaleFactor),
           isBudgetIncrease,
