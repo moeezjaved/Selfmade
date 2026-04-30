@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+route = """import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
@@ -78,3 +78,6 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+"""
+open('src/app/api/m4/upload-image/route.ts', 'w').write(route)
+print('Done:', 'upload_phase' in route)
