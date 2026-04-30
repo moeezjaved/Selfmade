@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
     const {
       campaignName, campaignId, budgetMultiplier = 2, isBudgetIncrease = false,
-      selectedInterests = [], adsetId, adsetName, testBudget = 500,
+      adsetId, adsetName,
     } = await request.json()
 
     const admin = createAdminClient()
@@ -62,52 +62,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, action: 'budget_increased' })
     }
 
-    // FIND EXISTING SCALING CAMPAIGN (match by original campaign ID in name)
+    // FIND OR CREATE SCALING CAMPAIGN using /copies
     const scalingCampaignName = "M4 | Scaling | " + winning.name
     const existingScaling = campData.data?.find((c: any) => c.name === scalingCampaignName)
-
     let scalingCampaignId: string
 
     if (existingScaling) {
-      // Reuse existing scaling campaign
       scalingCampaignId = existingScaling.id
       console.log("Reusing Scaling campaign:", scalingCampaignId)
     } else {
-      // COPY the winning campaign — Meta preserves ALL settings including bid strategy
+      // Copy campaign — preserves bid strategy, objective, all settings
       const copied = await post(winning.id + "/copies", {
-        deep_copy: false,         // don't copy adsets — we'll handle that separately
+        deep_copy: false,
         status_override: "PAUSED",
-        rename_options: {
-          rename_strategy: "CUSTOM_STRING",
-          custom_string: scalingCampaignName,
-        }
+        rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
       })
       scalingCampaignId = copied.copied_campaign_id
-      console.log("Copied Scaling campaign:", scalingCampaignId)
+
+      // Rename it to our standard name
+      await post(scalingCampaignId, { name: scalingCampaignName })
+      console.log("Created Scaling campaign:", scalingCampaignId)
     }
 
-    // COPY THE WINNING ADSET into the Scaling campaign
-    // Use /copies on the adset — preserves ALL settings including bid strategy
+    // COPY WINNING ADSET into Scaling campaign using /copies
+    // This preserves ALL settings — bid strategy, targeting, creatives
     const copiedAdset = await post(adsetId + "/copies", {
       campaign_id: scalingCampaignId,
-      deep_copy: true,              // copies ads/creatives too
+      deep_copy: true,
       status_override: "PAUSED",
-      rename_options: {
-        rename_strategy: "CUSTOM_STRING", 
-        custom_string: (adsetName || "Winner") + " — Scale " + budgetMultiplier + "x",
-      }
+      rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
     })
 
-    console.log("Copied adset:", copiedAdset)
+    // Rename the copied adset
+    const newAdsetId = copiedAdset.copied_adset_id
+    if (newAdsetId) {
+      await post(newAdsetId, {
+        name: (adsetName || "Winner") + " — Scale " + budgetMultiplier + "x"
+      }).catch(() => null)
+    }
 
-    // ORIGINAL ADSET STAYS UNTOUCHED
+    console.log("Copied adset:", newAdsetId)
 
     return NextResponse.json({
       success: true,
       action: 'scaled',
       scaling_campaign_id: scalingCampaignId,
       scaling_campaign_name: scalingCampaignName,
-      copied_adset: copiedAdset,
+      duplicate_adset_id: newAdsetId,
     })
 
   } catch (err: any) {
