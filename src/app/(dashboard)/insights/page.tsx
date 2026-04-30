@@ -12,6 +12,9 @@ export default function InsightsPage() {
   const [insights, setInsights] = useState<CampaignInsight[]>([])
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string|null>(null)
+  const [scaleModal, setScaleModal] = useState<CampaignInsight|null>(null)
+  const [scaleFactor, setScaleFactor] = useState('2')
+  const [isBudgetIncrease, setIsBudgetIncrease] = useState(false)
   const [accountName, setAccountName] = useState('')
   const [totals, setTotals] = useState({spend:0,revenue:0,roas:0,conversions:0})
   const [dateRange, setDateRange] = useState('last_7d')
@@ -32,27 +35,38 @@ export default function InsightsPage() {
   }
 
   const takeAction = async (campaign: CampaignInsight, action: string) => {
+    if (action === 'scale') { setScaleModal(campaign); setScaleFactor('2'); setIsBudgetIncrease(false); return }
     setActing(campaign.id)
     try {
-      if (action === 'scale') {
-        const res = await fetch('/api/m4/scale', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({campaignName: campaign.name, product: '', description: '', competitorDomains: ''})
-        })
-        const data = await res.json()
-        if (data.error) alert('Scale failed: ' + data.error)
-        else alert('Scaled! Duplicate campaign created with 2x budget. ' + (data.new_interests || 0) + ' new interests added to original.')
-      } else if (action === 'pause') {
-        await fetch('/api/insights/action', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({campaignId: campaign.id, action: 'pause'})
-        })
-        alert('Campaign paused.')
+      if (action === 'pause') {
+        await fetch('/api/insights/action', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({campaignId: campaign.id, action: 'pause'})})
+        alert('Campaign paused successfully.')
       } else if (action === 'hold') {
-        alert('Got it. Check back in 3-7 days for more data before deciding.')
+        alert('Noted. Check back in 3-7 days once the campaign has more data.')
       }
+      await loadInsights()
+    } catch(e: any) { alert('Error: ' + e.message) }
+    setActing(null)
+  }
+
+  const executeScale = async () => {
+    if (!scaleModal) return
+    setActing(scaleModal.id)
+    setScaleModal(null)
+    try {
+      const res = await fetch('/api/m4/scale', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          campaignName: scaleModal.name,
+          budgetMultiplier: parseFloat(scaleFactor),
+          isBudgetIncrease,
+          product: '', description: '', competitorDomains: ''
+        })
+      })
+      const data = await res.json()
+      if (data.error) alert('Scale failed: ' + data.error)
+      else alert('Scaled successfully!\n\nDuplicate campaign created with ' + scaleFactor + 'x budget.\n' + (data.new_interests||0) + ' new interests added to original.\n\nCheck Meta Ads Manager to activate.')
       await loadInsights()
     } catch(e: any) { alert('Error: ' + e.message) }
     setActing(null)
@@ -171,6 +185,73 @@ export default function InsightsPage() {
               </div>
             )
           })}
+        </div>
+      )}
+      {/* Scale Modal */}
+      {scaleModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:24}}>
+          <div style={{background:'#152928',border:'1px solid rgba(223,254,149,0.2)',borderRadius:20,padding:32,maxWidth:500,width:'100%'}}>
+            <div style={{fontSize:18,fontWeight:900,color:'white',marginBottom:6}}>Scale This Winner</div>
+            <div style={{fontSize:13,color:'rgba(255,255,255,0.5)',marginBottom:24,lineHeight:1.7}}>
+              <strong style={{color:'#dffe95'}}>{scaleModal.name}</strong> is performing above your account average. Here is what will happen:
+            </div>
+
+            <div style={{background:'rgba(134,239,172,0.06)',border:'1px solid rgba(134,239,172,0.15)',borderRadius:12,padding:16,marginBottom:20}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#86efac',marginBottom:10,textTransform:'uppercase',letterSpacing:'.06em'}}>What Scale Does</div>
+              <div style={{display:'flex',flexDirection:'column',gap:8,fontSize:13,color:'rgba(255,255,255,0.7)'}}>
+                <div>✅ <strong style={{color:'white'}}>Duplicate this campaign</strong> — exact copy with increased budget</div>
+                <div>✅ <strong style={{color:'white'}}>Add new interests</strong> — Claude finds 6 fresh audiences for the original</div>
+                <div>✅ <strong style={{color:'white'}}>Both paused</strong> — you review and activate in Meta Ads Manager</div>
+              </div>
+            </div>
+
+            {!isBudgetIncrease ? (
+              <div style={{marginBottom:20}}>
+                <label style={{display:'block',fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:10,textTransform:'uppercase',letterSpacing:'.06em'}}>Budget Multiplier for Duplicate</label>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:10}}>
+                  {['1.5','2','3','5'].map(x=>(
+                    <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:`2px solid ${scaleFactor===x?'#dffe95':'rgba(255,255,255,0.1)'}`,background:scaleFactor===x?'rgba(223,254,149,0.1)':'rgba(255,255,255,0.02)',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#dffe95':'rgba(255,255,255,0.5)'}}>
+                      {x}x
+                    </div>
+                  ))}
+                </div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,0.4)'}}>
+                  Current budget: {fmt(scaleModal.budget, scaleModal.currency)}/day → Duplicate gets: {fmt(scaleModal.budget * parseFloat(scaleFactor||'2'), scaleModal.currency)}/day
+                </div>
+              </div>
+            ) : (
+              <div style={{marginBottom:20}}>
+                <label style={{display:'block',fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'}}>Budget Increase %</label>
+                <div style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:10,padding:12,marginBottom:10}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'#fbbf24',marginBottom:4}}>Max 15% to protect learning phase</div>
+                  <div style={{fontSize:12,color:'rgba(255,255,255,0.5)'}}>Increasing budget by more than 20% resets Meta campaign learning. Stay under 15% to keep performance stable.</div>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+                  {['5','10','15'].map(x=>(
+                    <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:`2px solid ${scaleFactor===x?'#fbbf24':'rgba(255,255,255,0.1)'}`,background:scaleFactor===x?'rgba(251,191,36,0.1)':'rgba(255,255,255,0.02)',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#fbbf24':'rgba(255,255,255,0.5)'}}>
+                      +{x}%
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{display:'flex',gap:10,marginBottom:20}}>
+              <button onClick={()=>setIsBudgetIncrease(false)} style={{flex:1,padding:'8px 0',borderRadius:10,border:`2px solid ${!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.1)'}`,background:!isBudgetIncrease?'rgba(223,254,149,0.1)':'transparent',color:!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                Duplicate + Scale
+              </button>
+              <button onClick={()=>setIsBudgetIncrease(true)} style={{flex:1,padding:'8px 0',borderRadius:10,border:`2px solid ${isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.1)'}`,background:isBudgetIncrease?'rgba(251,191,36,0.1)':'transparent',color:isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                Increase Budget Only
+              </button>
+            </div>
+
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={()=>setScaleModal(null)} style={{flex:1,background:'none',border:'1.5px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.4)',padding:'11px 0',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'}}>Cancel</button>
+              <button onClick={executeScale} style={{flex:2,background:'#dffe95',color:'#10211f',border:'none',padding:'11px 0',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+                {isBudgetIncrease ? `Increase Budget +${scaleFactor}%` : `Scale ${scaleFactor}x — Duplicate Now`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
