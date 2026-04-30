@@ -27,6 +27,7 @@ export default function InsightsPage() {
   const [isBudgetIncrease, setIsBudgetIncrease] = useState(false)
   const [suggestedInterests, setSuggestedInterests] = useState<{name:string,why:string,selected:boolean}[]>([])
   const [loadingInterests, setLoadingInterests] = useState(false)
+  const [productContext, setProductContext] = useState('')
   const [expanded, setExpanded] = useState<Record<string,boolean>>({})
 
   useEffect(() => { loadInsights() }, [dateRange])
@@ -183,7 +184,7 @@ export default function InsightsPage() {
                           {recEmoji[adset.rec_type]} {recLabel[adset.rec_type]}
                         </div>
                         {adset.rec_type==='scale' && (
-                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false);setSuggestedInterests([]);setLoadingInterests(true);fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:campaign.launchData?.product||campaign.name.replace(/— M4.*|— Scale.*/g,'').trim(),description:campaign.launchData?.description||'',targetCustomer:campaign.launchData?.target_customer||'',competitorDomains:campaign.launchData?.competitor_domains||''})}).then(r=>r.json()).then(d=>setSuggestedInterests((d.interests||[]).slice(0,6).map((i:any)=>({name:i.name,why:i.why,selected:false})))).catch(()=>{}).finally(()=>setLoadingInterests(false))}} disabled={!!isActing} style={{background:'#86efac',color:'#10211f',border:'none',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false);setSuggestedInterests([]);setLoadingInterests(true);fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:campaign.launchData?.product||productContext||campaign.name.replace(/— M4.*|— Scale.*/g,'').trim(),description:campaign.launchData?.description||productContext||'',targetCustomer:campaign.launchData?.target_customer||'',competitorDomains:campaign.launchData?.competitor_domains||''})}).then(r=>r.json()).then(d=>setSuggestedInterests((d.interests||[]).slice(0,6).map((i:any)=>({name:i.name,why:i.why,selected:false})))).catch(()=>{}).finally(()=>setLoadingInterests(false))}} disabled={!!isActing} style={{background:'#86efac',color:'#10211f',border:'none',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                             {isActing?'Scaling...':'Scale Now'}
                           </button>
                         )}
@@ -240,6 +241,12 @@ export default function InsightsPage() {
             </div>
 
             {/* Show tabs: if already scaled show budget increase option too */}
+            {!scaleModal.campaign.launchData && (
+              <div style={{marginBottom:12}}>
+                <label style={{display:'block',fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'}}>What do you sell? (helps find better interests)</label>
+                <input value={productContext} onChange={e=>setProductContext(e.target.value)} onBlur={()=>{if(productContext.length>3){setLoadingInterests(true);fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:productContext,description:productContext,targetCustomer:'',competitorDomains:''})}).then(r=>r.json()).then(d=>setSuggestedInterests((d.interests||[]).slice(0,6).map((i:any)=>({name:i.name,why:i.why,selected:false})))).catch(()=>{}).finally(()=>setLoadingInterests(false))}}} placeholder="e.g. Hair loss treatment for men 25-45" style={{width:'100%',background:'rgba(255,255,255,0.05)',border:'1.5px solid rgba(255,255,255,0.1)',borderRadius:10,padding:'10px 14px',color:'white',fontSize:13,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}/>
+              </div>
+            )}
             <div style={{marginBottom:16}}>
               <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:8,textTransform:'uppercase',letterSpacing:'.06em'}}>Pick 1 Interest to Add to Original Campaign</div>
               {loadingInterests ? (
