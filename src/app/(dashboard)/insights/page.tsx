@@ -24,6 +24,8 @@ export default function InsightsPage() {
   const [scaleModal, setScaleModal] = useState<{campaign: CampaignInsight, adset: AdsetInsight}|null>(null)
   const [scaleFactor, setScaleFactor] = useState('2')
   const [isBudgetIncrease, setIsBudgetIncrease] = useState(false)
+  const [suggestedInterests, setSuggestedInterests] = useState<{name:string,why:string,selected:boolean}[]>([])
+  const [loadingInterests, setLoadingInterests] = useState(false)
   const [expanded, setExpanded] = useState<Record<string,boolean>>({})
 
   useEffect(() => { loadInsights() }, [dateRange])
@@ -63,7 +65,8 @@ export default function InsightsPage() {
           adsetName: adset.name,
           budgetMultiplier: parseFloat(scaleFactor),
           isBudgetIncrease,
-          product: '', description: '', competitorDomains: ''
+          product: '', description: '', competitorDomains: '',
+          selectedInterests: suggestedInterests.filter(i=>i.selected).map(i=>i.name)
         })
       })
       const data = await res.json()
@@ -181,7 +184,7 @@ export default function InsightsPage() {
                           {recEmoji[adset.rec_type]} {recLabel[adset.rec_type]}
                         </div>
                         {adset.rec_type==='scale' && (
-                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false)}} disabled={!!isActing} style={{background:'#86efac',color:'#10211f',border:'none',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false);setSuggestedInterests([]);setLoadingInterests(true);fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:campaign.name,description:'',targetCustomer:'',competitorDomains:''})}).then(r=>r.json()).then(d=>setSuggestedInterests((d.interests||[]).slice(0,6).map((i:any)=>({name:i.name,why:i.why,selected:false})))).catch(()=>{}).finally(()=>setLoadingInterests(false))}} disabled={!!isActing} style={{background:'#86efac',color:'#10211f',border:'none',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                             {isActing?'Scaling...':'Scale Now'}
                           </button>
                         )}
