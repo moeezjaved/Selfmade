@@ -36,6 +36,17 @@ export async function POST(request: NextRequest) {
       return data
     }
 
+    // postRaw — same as post but never throws, returns raw response
+    const postRaw = async (path: string, body: Record<string, unknown>) => {
+      const url = "https://graph.facebook.com/" + V + "/" + path
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, access_token: token })
+      })
+      return res.json()
+    }
+
     const get = async (path: string, params: Record<string, string>) => {
       const url = "https://graph.facebook.com/" + V + "/" + path + "?" +
         new URLSearchParams({ ...params, access_token: token })
@@ -71,7 +82,6 @@ export async function POST(request: NextRequest) {
       scalingCampaignId = existingScaling.id
       console.log("Reusing Scaling campaign:", scalingCampaignId)
     } else {
-      // Copy campaign structure only (no adsets)
       const copied = await post(winning.id + "/copies", {
         deep_copy: false,
         status_override: "PAUSED",
@@ -82,7 +92,7 @@ export async function POST(request: NextRequest) {
       console.log("Created Scaling campaign:", scalingCampaignId)
     }
 
-    // STEP 2: COPY ADSET (no deep copy — just structure)
+    // STEP 2: COPY ADSET (structure only, no ads)
     const copiedAdset = await post(adsetId + "/copies", {
       campaign_id: scalingCampaignId,
       deep_copy: false,
@@ -101,18 +111,22 @@ export async function POST(request: NextRequest) {
     const ads = adsData.data || []
     console.log("Found ads to copy:", ads.length)
 
-    // STEP 4: COPY EACH AD using /{ad-id}/copies into new adset
-    // This is the correct Meta-approved way to duplicate ads including Advantage+ creatives
+    // STEP 4: COPY EACH AD
+    // error_subcode 3858504 = deprecated standard_enhancements warning
+    // Meta still creates the copy successfully despite this error
     for (const ad of ads.slice(0, 5)) {
-      try {
-        await post(ad.id + "/copies", {
-          adset_id: newAdsetId,
-          status_override: "PAUSED",
-          rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
-        })
-        console.log("Copied ad:", ad.id)
-      } catch(e: any) {
-        console.log("Ad copy error:", e.message)
+      const result = await postRaw(ad.id + "/copies", {
+        adset_id: newAdsetId,
+        status_override: "PAUSED",
+        rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
+      })
+      if (result.error && result.error.error_subcode === 3858504) {
+        console.log("Ad copied with deprecation warning (expected):", ad.id)
+        // Meta still creates the copy — this is a warning not a failure
+      } else if (result.error) {
+        console.log("Ad copy failed:", result.error.message)
+      } else {
+        console.log("Ad copied successfully:", ad.id, "->", result)
       }
     }
 
