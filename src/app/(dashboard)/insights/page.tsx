@@ -235,7 +235,7 @@ export default function InsightsPage() {
               <div style={{fontSize:12,fontWeight:700,color:'#86efac',marginBottom:10,textTransform:'uppercase',letterSpacing:'.06em'}}>What Scale Does</div>
               <div style={{display:'flex',flexDirection:'column',gap:8,fontSize:13,color:'rgba(255,255,255,0.7)'}}>
                 <div>✅ <strong style={{color:'white'}}>Duplicate this ad set</strong> — same creative + audience, higher budget</div>
-                <div>✅ <strong style={{color:'white'}}>Duplicate goes ACTIVE</strong> — original gets new interest to test more audiences</div>
+                <div>✅ <strong style={{color:'white'}}>Duplicate goes ACTIVE</strong> — original stays untouched as your control</div>
                 <div>✅ <strong style={{color:'white'}}>Select 1 interest below</strong> — added to original campaign to test new audiences</div>
               </div>
             </div>
@@ -260,7 +260,7 @@ export default function InsightsPage() {
                   ))}
                 </div>
                 <div style={{fontSize:12,color:'rgba(255,255,255,0.4)'}}>
-                  Current: {fmt(scaleModal.adset.budget, scaleModal.adset.currency)}/day → Duplicate gets: {fmt(scaleModal.adset.budget * parseFloat(scaleFactor||'2'), scaleModal.adset.currency)}/day
+                  Current: {fmt(scaleModal.campaign.budget||scaleModal.adset.budget, scaleModal.adset.currency)}/day → Duplicate gets: {fmt((scaleModal.campaign.budget||scaleModal.adset.budget) * parseFloat(scaleFactor||'2'), scaleModal.adset.currency)}/day
                 </div>
               </div>
             ) : (
