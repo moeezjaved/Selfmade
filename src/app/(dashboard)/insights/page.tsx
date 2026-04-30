@@ -40,11 +40,9 @@ export default function InsightsPage() {
       setAccountName(data.account || '')
       setTotals(data.totals || {spend:0,revenue:0,roas:0,conversions:0})
       setAccountROAS(data.accountROAS || 0)
-      // Auto-expand campaigns with scale recommendations
+      // Auto-expand ALL campaigns
       const exp: Record<string,boolean> = {}
-      ;(data.campaigns || []).forEach((c: CampaignInsight) => {
-        if (c.adsets?.some(a => a.rec_type === 'scale')) exp[c.id] = true
-      })
+      ;(data.campaigns || []).forEach((c: CampaignInsight) => { exp[c.id] = true })
       setExpanded(exp)
     } catch {}
     setLoading(false)
