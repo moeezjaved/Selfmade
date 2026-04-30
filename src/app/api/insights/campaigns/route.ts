@@ -138,6 +138,7 @@ export async function GET(request: NextRequest) {
       return aHasScale - bHasScale
     })
 
+    campaigns.sort((a:any,b:any)=>(a.adsets.some((x:any)=>x.rec_type==='scale')?0:1)-(b.adsets.some((x:any)=>x.rec_type==='scale')?0:1))
     return NextResponse.json({
       campaigns,
       account: metaAccount.account_name,
@@ -151,13 +152,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (err: any) {
     console.error("Insights error:", err.message)
-    // Sort campaigns - those with scale winners first
-    campaigns.sort((a, b) => {
-      const aHasScale = a.adsets.some((x: any) => x.rec_type === 'scale') ? 0 : 1
-      const bHasScale = b.adsets.some((x: any) => x.rec_type === 'scale') ? 0 : 1
-      return aHasScale - bHasScale
-    })
-
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
