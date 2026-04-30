@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     // This preserves ALL settings — bid strategy, targeting, creatives
     const copiedAdset = await post(adsetId + "/copies", {
       campaign_id: scalingCampaignId,
-      deep_copy: true,
+      deep_copy: false,
       status_override: "PAUSED",
       rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
     })
