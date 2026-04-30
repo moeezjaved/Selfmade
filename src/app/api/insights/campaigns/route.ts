@@ -25,6 +25,18 @@ export async function GET(request: NextRequest) {
     const adAccountId = "act_" + metaAccount.account_id
     const currency = metaAccount.currency || 'USD'
 
+    // Fetch latest launch data for this user (for interest suggestions)
+    const { data: launches } = await admin
+      .from('m4_launches').select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    const launchMap: Record<string,any> = {}
+    for (const l of (launches || [])) {
+      const key = l.campaign_name?.toLowerCase().replace(/— m4.*|— scale.*/gi,'').trim()
+      if (key) launchMap[key] = l
+    }
+
     const since = new Date(Date.now() - days * 86400000).toISOString().split('T')[0]
     const until = new Date().toISOString().split('T')[0]
     const timeRange = JSON.stringify({ since, until })
