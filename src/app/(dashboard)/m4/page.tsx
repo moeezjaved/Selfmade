@@ -276,7 +276,11 @@ export default function M4Page() {
                       <span>Instagram Connected</span><span style={{color:'#86efac',fontWeight:700}}>@{pages.find(p=>p.id===selectedPageId)?.instagram?.username}</span>
                     </div>
                   ):(
-                    <input value={selectedInstagramId} onChange={e=>setSelectedInstagramId(e.target.value)} placeholder="Instagram Account ID (optional)" style={{...S.input,fontSize:12}}/>
+                    <div style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:10,padding:14,marginTop:4}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#fbbf24',marginBottom:6}}>Instagram Not Connected</div>
+                      <div style={{fontSize:12,color:'rgba(255,255,255,0.5)',marginBottom:10,lineHeight:1.6}}>Your ads run on both Facebook and Instagram. To auto-connect: go to Meta Business Suite → Instagram Accounts → connect your Instagram to this Facebook page, then <a href="/connect-meta" style={{color:'#dffe95',fontWeight:700}}>reconnect Selfmade here</a>.</div>
+                      <input value={selectedInstagramId} onChange={e=>setSelectedInstagramId(e.target.value)} placeholder="Or paste Instagram Account ID manually (find in Meta Business Suite)" style={{...S.input,fontSize:12}}/>
+                    </div>
                   )}
                 </div>
               ):<div style={{fontSize:13,color:'rgba(255,255,255,0.3)'}}>Loading pages…</div>}
