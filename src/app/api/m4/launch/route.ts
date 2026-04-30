@@ -232,6 +232,7 @@ export async function POST(request: NextRequest) {
     let retargetingCount = 0
     let retainerCount = 0
 
+    console.log('Retargeting check - pixelId:', pixelId, 'retargetingCreatives:', (retargetingCreatives as any[]).length)
     if (pixelId && (retargetingCreatives as any[]).length > 0) {
       try {
         // Create retargeting audience
