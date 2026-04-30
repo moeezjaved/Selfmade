@@ -241,6 +241,23 @@ export default function InsightsPage() {
             </div>
 
             {/* Show tabs: if already scaled show budget increase option too */}
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:8,textTransform:'uppercase',letterSpacing:'.06em'}}>Pick 1 Interest to Add to Original Campaign</div>
+              {loadingInterests ? (
+                <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',padding:8}}>Finding best audiences...</div>
+              ) : suggestedInterests.length === 0 ? (
+                <div style={{fontSize:12,color:'rgba(255,255,255,0.3)',padding:8}}>No suggestions available</div>
+              ) : (
+                <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:200,overflowY:'auto'}}>
+                  {suggestedInterests.map((interest,i) => (
+                    <div key={i} onClick={()=>setSuggestedInterests(prev=>prev.map((x,j)=>({...x,selected:j===i&&!x.selected})))} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:10,border:'1.5px solid '+(interest.selected?'rgba(223,254,149,0.4)':'rgba(255,255,255,0.08)'),background:interest.selected?'rgba(223,254,149,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer'}}>
+                      <div style={{width:16,height:16,borderRadius:4,border:'2px solid '+(interest.selected?'#dffe95':'rgba(255,255,255,0.2)'),background:interest.selected?'#dffe95':'transparent',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'#10211f',fontWeight:900}}>{interest.selected?'v':''}</div>
+                      <div><div style={{fontSize:12,fontWeight:700,color:'white'}}>{interest.name}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.4)'}}>{interest.why}</div></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {scaleModal.adset.name.includes('Scale') || scaleModal.campaign.name.includes('Scale') ? (
               <div style={{display:'flex',gap:10,marginBottom:16}}>
                 <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.1)'),background:!isBudgetIncrease?'rgba(223,254,149,0.1)':'transparent',color:!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
