@@ -71,7 +71,7 @@ export default function M4Page() {
       try {
         const res = await fetch('/api/m4/upload-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64,mimeType:file.type,name:file.name})})
         const data = await res.json()
-        setter(prev=>prev.map(c=>c.id===id?{...c,hash:data.hash||undefined,uploading:false,uploaded:!!data.hash||!!data.isVideo}:c))
+        setter(prev=>prev.map(c=>c.id===id?{...c,hash:data.hash||undefined,uploading:false,uploaded:!!data.hash||data.isVideo===true||data.isVideo==="true"}:c))
       } catch { setter(prev=>prev.map(c=>c.id===id?{...c,uploading:false}:c)) }
     }
     reader.readAsDataURL(file)
