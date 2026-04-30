@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     ...extractBrands(competitorFBPages||''),
     ...extractBrands(competitorIGHandles||''),
     ...extractBrands(competitors||''),
-  )))
+  ]))
 
   const foundInterests: string[] = []
   const notFoundBrands: string[] = []
