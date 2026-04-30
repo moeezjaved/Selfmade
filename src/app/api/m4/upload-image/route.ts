@@ -27,19 +27,26 @@ export async function POST(request: NextRequest) {
     const isVideo = mimeType?.startsWith('video/')
 
     if (isVideo) {
-      // Upload video to Meta
+      // Upload video to Meta using multipart form data (required for videos)
+      const videoBytes = Buffer.from(base64, 'base64')
+      const formData = new FormData()
+      const blob = new Blob([videoBytes], { type: mimeType })
+      formData.append('source', blob, (name || 'video') + '.mp4')
+      formData.append('title', name || 'Ad Video')
+      formData.append('access_token', token)
+
       const videoRes = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/advideos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_url: `data:${mimeType};base64,${base64}`, access_token: token, title: name || 'Ad Video' })
+        body: formData,
       })
       const videoData = await videoRes.json()
+      console.log('Video upload response:', JSON.stringify(videoData))
       if (videoData.error) {
-        // Fallback: try uploading as form data approach - return placeholder
         console.log('Video upload error:', videoData.error.message)
         return NextResponse.json({ hash: null, url: null, error: videoData.error.message, isVideo: true })
       }
-      return NextResponse.json({ hash: videoData.id, url: null, isVideo: true, name })
+      // Return video_id as hash so we can use it in creative
+      return NextResponse.json({ hash: videoData.id, url: null, isVideo: true, videoId: videoData.id, name })
     }
 
     const res = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/adimages`, {
