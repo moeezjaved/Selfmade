@@ -38,12 +38,18 @@ export async function POST(request: NextRequest) {
       return data
     }
 
+    const get = async (path: string, params: Record<string, string>) => {
+      const url = "https://graph.facebook.com/" + V + "/" + path + "?" +
+        new URLSearchParams({ ...params, access_token: token })
+      const res = await fetch(url)
+      return res.json()
+    }
+
     // Find the winning campaign by name
-    const campRes = await fetch(
-      "https://graph.facebook.com/" + V + "/" + adAccountId + "/campaigns?" +
-      new URLSearchParams({ fields: "id,name,status,objective,daily_budget", limit: "50", access_token: token })
-    )
-    const campData = await campRes.json()
+    const campData = await get(adAccountId + "/campaigns", {
+      fields: "id,name,status,objective,daily_budget",
+      limit: "50"
+    })
     const winning = campData.data?.find((c: any) =>
       c.name === campaignName || c.name.includes(campaignName.split(' — ')[0])
     )
@@ -63,20 +69,56 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // DUPLICATE THE WINNING AD SET
+    // ─── FIND OR CREATE SCALING CAMPAIGN ───────────────────────────────────
+    // Name format: "M4 | Scaling | <original campaign name>"
+    const scalingCampaignName = "M4 | Scaling | " + winning.name
+
+    let allCampaigns = campData.data || []
+    let scalingCampaign = allCampaigns.find((c: any) => c.name === scalingCampaignName)
+
+    if (!scalingCampaign) {
+      // Fetch more campaigns if needed (paginate once)
+      if (campData.paging?.next) {
+        const moreCamps = await get(adAccountId + "/campaigns", {
+          fields: "id,name,status,objective",
+          limit: "200"
+        })
+        scalingCampaign = moreCamps.data?.find((c: any) => c.name === scalingCampaignName)
+      }
+    }
+
+    if (!scalingCampaign) {
+      // Create the Scaling campaign — PAUSED so user activates manually in Ads Manager
+      scalingCampaign = await post(adAccountId + "/campaigns", {
+        name: scalingCampaignName,
+        objective: winning.objective || "OUTCOME_SALES",
+        status: "PAUSED",
+        special_ad_categories: [],
+      })
+      console.log("Created new Scaling campaign:", scalingCampaign.id)
+    } else {
+      console.log("Reusing existing Scaling campaign:", scalingCampaign.id)
+    }
+    // ───────────────────────────────────────────────────────────────────────
+
+    // DUPLICATE WINNING AD SET → into Scaling campaign
     let duplicateAdsetId = null
     try {
-      const adsetsRes = await fetch(
-        "https://graph.facebook.com/" + V + "/" + winning.id + "/adsets?" +
-        new URLSearchParams({ fields: "id,name,targeting,optimization_goal,billing_event,destination_type,promoted_object", access_token: token, limit: "20" })
-      )
-      const adsetsData = await adsetsRes.json()
+      const adsetsData = await get(winning.id + "/adsets", {
+        fields: "id,name,targeting,optimization_goal,billing_event,destination_type,promoted_object,daily_budget",
+        limit: "20"
+      })
+
       let targetAdset = adsetsData.data?.find((a: any) => a.id === adsetId)
       if (!targetAdset) targetAdset = adsetsData.data?.[0]
 
       if (targetAdset) {
+        // Clean targeting object
         const t = targetAdset.targeting || {}
-        const cleanT: Record<string,unknown> = { geo_locations: t.geo_locations || { countries: ["PK"] }, age_min: t.age_min || 18 }
+        const cleanT: Record<string, unknown> = {
+          geo_locations: t.geo_locations || { countries: ["PK"] },
+          age_min: t.age_min || 18
+        }
         if (t.age_max) cleanT.age_max = t.age_max
         if (t.genders) cleanT.genders = t.genders
         if (t.flexible_spec) cleanT.flexible_spec = t.flexible_spec
@@ -84,10 +126,10 @@ export async function POST(request: NextRequest) {
         if (t.exclusions) cleanT.exclusions = t.exclusions
         if (t.targeting_automation) cleanT.targeting_automation = t.targeting_automation
 
-        const adsetBody: Record<string,unknown> = {
+        const adsetBody: Record<string, unknown> = {
           name: (adsetName || targetAdset.name) + " — Scale " + budgetMultiplier + "x",
-          campaign_id: winning.id,
-          status: "ACTIVE",
+          campaign_id: scalingCampaign.id,   // ← KEY: goes into Scaling campaign
+          status: "PAUSED",                   // user activates manually
           daily_budget: Math.max(minBudget * 100, scaledBudget),
           targeting: cleanT,
           optimization_goal: targetAdset.optimization_goal || "OFFSITE_CONVERSIONS",
@@ -95,42 +137,43 @@ export async function POST(request: NextRequest) {
           destination_type: "WEBSITE",
         }
         if (targetAdset.promoted_object) adsetBody.promoted_object = targetAdset.promoted_object
+
         const newAdset = await post(adAccountId + "/adsets", adsetBody)
         duplicateAdsetId = newAdset?.id
 
-        // Copy ads to new adset
+        // Copy ads/creatives into new adset
         if (newAdset?.id) {
-          const adsRes = await fetch(
-            "https://graph.facebook.com/" + V + "/" + targetAdset.id + "/ads?" +
-            new URLSearchParams({ fields: "id,name,creative", access_token: token })
-          )
-          const adsData = await adsRes.json()
+          const adsData = await get(targetAdset.id + "/ads", {
+            fields: "id,name,creative"
+          })
           for (const ad of (adsData.data || []).slice(0, 3)) {
             await post(adAccountId + "/ads", {
               name: ad.name + " — Scale",
               adset_id: newAdset.id,
               creative: { creative_id: ad.creative?.id },
-              status: "ACTIVE",
+              status: "PAUSED",
             }).catch(() => null)
           }
         }
-      }
-    } catch(e: any) { console.log("Adset duplicate error:", e.message) }
 
-    // CREATE TEST AD SETS per selected interest
+        // ✅ Original adset stays UNTOUCHED — no pause, no changes
+      }
+    } catch (e: any) {
+      console.log("Adset duplicate error:", e.message)
+    }
+
+    // CREATE TEST AD SETS per selected interest (still in original prospecting campaign)
     const newAdsets: string[] = []
     for (const interestName of (selectedInterests as string[])) {
       try {
-        const intRes = await fetch(
-          "https://graph.facebook.com/" + V + "/" + adAccountId + "/search?" +
-          new URLSearchParams({ type: "adinterest", q: interestName, limit: "3", access_token: token })
-        )
-        const intData = await intRes.json()
+        const intData = await get(adAccountId + "/search", {
+          type: "adinterest", q: interestName, limit: "3"
+        })
         const match = intData.data?.[0]
         if (match) {
           await post(adAccountId + "/adsets", {
             name: campaignName + " — Test — " + match.name,
-            campaign_id: winning.id,
+            campaign_id: winning.id,  // test adsets stay in prospecting campaign
             status: "PAUSED",
             daily_budget: Math.max(minBudget * 100, testBudget * 100),
             targeting: {
@@ -144,12 +187,16 @@ export async function POST(request: NextRequest) {
           })
           newAdsets.push(match.name)
         }
-      } catch(e: any) { console.log("Test adset error:", e.message) }
+      } catch (e: any) {
+        console.log("Test adset error:", e.message)
+      }
     }
 
     return NextResponse.json({
       success: true,
       action: 'scaled',
+      scaling_campaign_id: scalingCampaign.id,
+      scaling_campaign_name: scalingCampaignName,
       duplicate_adset_id: duplicateAdsetId,
       new_test_adsets: newAdsets,
       new_interests: newAdsets.length,
