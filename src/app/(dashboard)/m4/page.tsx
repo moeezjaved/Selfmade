@@ -175,7 +175,7 @@ export default function M4Page() {
         </div>
       )}
       <label style={{background:'rgba(223,254,149,0.1)',border:'1px solid rgba(223,254,149,0.2)',color:'#dffe95',padding:'8px 16px',borderRadius:100,fontSize:13,fontWeight:700,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:8}}>
-        Upload<input type="file" accept="image/*,video/*" multiple onChange={e=>handleUpload(e,setter)} style={{display:'none'}}/>
+        Upload Image / Video (max 10MB)<input type="file" accept="image/*,video/*" multiple onChange={e=>handleUpload(e,setter)} style={{display:'none'}}/>
       </label>
     </div>
   )
