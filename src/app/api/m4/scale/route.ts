@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     // Duplicate campaign with scaled budget
     const duplicate = await post(`${adAccountId}/campaigns`, {
-      name: `${winning.name} — SCALED 2x`,
+      name: `${winning.name} — Scale ${budgetMultiplier}x`,
       objective: winning.objective,
       status: 'PAUSED',
       special_ad_categories: [],

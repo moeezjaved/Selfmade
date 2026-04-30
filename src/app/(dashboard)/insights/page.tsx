@@ -240,10 +240,11 @@ export default function InsightsPage() {
               <button onClick={()=>setIsBudgetIncrease(false)} style={{flex:1,padding:'8px 0',borderRadius:10,border:`2px solid ${!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.1)'}`,background:!isBudgetIncrease?'rgba(223,254,149,0.1)':'transparent',color:!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
                 Duplicate + Scale
               </button>
-              <button onClick={()=>setIsBudgetIncrease(true)} style={{flex:1,padding:'8px 0',borderRadius:10,border:`2px solid ${isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.1)'}`,background:isBudgetIncrease?'rgba(251,191,36,0.1)':'transparent',color:isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+              <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:`2px solid ${isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.1)'}`,background:isBudgetIncrease?'rgba(251,191,36,0.1)':'transparent',color:isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
                 Increase Budget Only
               </button>
             </div>
+            {isBudgetIncrease && <div style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.15)',borderRadius:10,padding:10,marginBottom:12,fontSize:12,color:'rgba(255,255,255,0.5)'}}>Use this only on campaigns that have <strong style={{color:'#fbbf24'}}>already been running</strong>. Duplicating first is usually better.</div>}
 
             <div style={{display:'flex',gap:10}}>
               <button onClick={()=>setScaleModal(null)} style={{flex:1,background:'none',border:'1.5px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.4)',padding:'11px 0',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'}}>Cancel</button>
