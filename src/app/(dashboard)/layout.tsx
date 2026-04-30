@@ -7,9 +7,9 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import type { UserProfile } from '@/types'
 import {
-  LayoutDashboard, Target, Megaphone, Sparkles, TrendingUp,
-  Zap, ClipboardList, Settings, CreditCard,
-  Bell, ChevronDown, RefreshCw, LogOut,
+  LayoutDashboard, Megaphone, Sparkles, TrendingUp,
+  ClipboardList, Settings, CreditCard, BarChart2,
+  Rocket, LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -18,10 +18,8 @@ const NAV = [
     label: 'Main',
     items: [
       { href: '/dashboard',        icon: LayoutDashboard, label: 'Dashboard',        badge: null },
-      { href: '/recommendations',  icon: Target,          label: 'Recommendations',  badge: '5'  },
+      { href: '/m4',               icon: Rocket,          label: 'Launch Ads',       badge: 'AI' },
       { href: '/campaigns',        icon: Megaphone,       label: 'Campaigns',        badge: null },
-      { href: '/ad-engine',        icon: Zap,             label: 'Ad Engine',        badge: 'New'},
-      { href: '/m4',               icon: TrendingUp,      label: 'M4 Method',        badge: 'AI'},
       { href: '/creative-studio',  icon: Sparkles,        label: 'Creative Studio',  badge: null },
     ],
   },
@@ -29,6 +27,7 @@ const NAV = [
     label: 'Insights',
     items: [
       { href: '/insights',         icon: TrendingUp,      label: 'Scale & Insights', badge: 'NEW'},
+      { href: '/reports',          icon: BarChart2,       label: 'Reports',          badge: 'NEW'},
       { href: '/activity',         icon: ClipboardList,   label: 'Activity Log',     badge: null },
     ],
   },
@@ -52,15 +51,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [syncing, setSyncing] = useState(false)
-  const [notifications, setNotifications] = useState(3)
 
   useEffect(() => {
     const loadUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUser(user)
-
       const { data: p } = await supabase
         .from('user_profiles')
         .select('*')
@@ -70,15 +66,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
     loadUser()
   }, [])
-
-  const handleSync = async () => {
-    setSyncing(true)
-    try {
-      await fetch('/api/meta/sync', { method: 'POST' })
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -98,8 +85,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Logo */}
         <div className="px-5 py-5 border-b border-white/10">
           <Link href="/dashboard">
-            {/* Logo image — replace src with actual logo */}
-            <div className="text-lime font-black text-2xl tracking-tight font-serif italic"><img src="/logo.png" alt="Selfmade" style={{height:42,width:"auto",display:"block"}}/></div>
+            <div className="text-lime font-black text-2xl tracking-tight font-serif italic">
+              <img src="/logo.png" alt="Selfmade" style={{height:42,width:"auto",display:"block"}}/>
+            </div>
           </Link>
         </div>
 
@@ -124,7 +112,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     {item.badge && (
                       <span className={cn(
                         'text-[10px] font-bold px-2 py-0.5 rounded-full',
-                        item.badge === 'New'
+                        item.badge === 'New' || item.badge === 'NEW'
                           ? 'bg-lime/20 text-lime border border-lime/30'
                           : 'bg-lime text-dark'
                       )}>
@@ -164,15 +152,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* ── MAIN ── */}
       <div className="flex-1 ml-[232px] flex flex-col min-h-screen">
-
-        {/* Topbar — rendered by each page via slot or context */}
         <div id="topbar-portal"/>
-
-        {/* Page content */}
         <main className="flex-1">
           {children}
         </main>
-
       </div>
     </div>
   )
