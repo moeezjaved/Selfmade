@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
       limit: "20"
     })
 
+    console.log("winning campaign id:", winning.id, "adsets found:", adsetsData.data?.length, "looking for adsetId:", adsetId)
     let targetAdset = adsetsData.data?.find((a: any) => a.id === adsetId)
     if (!targetAdset) targetAdset = adsetsData.data?.[0]
     if (!targetAdset) return NextResponse.json({ error: 'No adset found' }, { status: 404 })
