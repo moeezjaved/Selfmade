@@ -182,7 +182,7 @@ export default function InsightsPage() {
                           {recEmoji[adset.rec_type]} {recLabel[adset.rec_type]}
                         </div>
                         {adset.rec_type==='scale' && (
-                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false);setSuggestedInterests([]);setLoadingInterests(true);fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:campaign.name.replace(/M4/g,'').trim(),description:'',targetCustomer:'',competitorDomains:''})}).then(r=>r.json()).then(d=>setSuggestedInterests((d.interests||[]).slice(0,6).map((i:any)=>({name:i.name,why:i.why,selected:false})))).catch(()=>{}).finally(()=>setLoadingInterests(false))}} disabled={!!isActing} style={{background:'#86efac',color:'#10211f',border:'none',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false)}} disabled={!!isActing} style={{background:'#86efac',color:'#10211f',border:'none',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                             {isActing?'Scaling...':'Scale Now'}
                           </button>
                         )}
@@ -242,7 +242,6 @@ export default function InsightsPage() {
                 <div style={{display:'flex',flexDirection:'column',gap:6,fontSize:12,color:'rgba(255,255,255,0.7)'}}>
                   <div>✅ <strong style={{color:'white'}}>Duplicate this ad set</strong> — same creative + audience, higher budget, goes ACTIVE</div>
                   <div>✅ <strong style={{color:'white'}}>Original stays untouched</strong> — your control data keeps running</div>
-                  <div>✅ <strong style={{color:'white'}}>Test new interests</strong> — each interest creates a new ad set (same creative)</div>
                 </div>
               </div>
 
