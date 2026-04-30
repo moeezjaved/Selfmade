@@ -14,7 +14,6 @@ export async function POST(request: NextRequest) {
     const {
       campaignName, budgetMultiplier = 2, isBudgetIncrease = false,
       selectedInterests = [], adsetId, adsetName, testBudget = 500,
-      product = '', description = '', competitorDomains = ''
     } = await request.json()
 
     const admin = createAdminClient()
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ ...body, access_token: token })
       })
       const data = await res.json()
-      if (data.error) throw new Error(data.error.message)
+      if (data.error) throw new Error(JSON.stringify(data.error))
       return data
     }
 
@@ -45,10 +44,10 @@ export async function POST(request: NextRequest) {
       return res.json()
     }
 
-    // Find the winning campaign by name
+    // Find the winning campaign
     const campData = await get(adAccountId + "/campaigns", {
       fields: "id,name,status,objective,daily_budget",
-      limit: "50"
+      limit: "200"
     })
     const winning = campData.data?.find((c: any) =>
       c.name === campaignName || c.name.includes(campaignName.split(' — ')[0])
@@ -60,109 +59,82 @@ export async function POST(request: NextRequest) {
       ? Math.round(currentBudget * (1 + budgetMultiplier / 100) * 100)
       : Math.round(currentBudget * budgetMultiplier * 100)
 
-    // BUDGET INCREASE ONLY - update existing campaign
+    // BUDGET INCREASE ONLY
     if (isBudgetIncrease) {
       await post(winning.id, { daily_budget: Math.max(minBudget * 100, scaledBudget) })
-      return NextResponse.json({
-        success: true, action: 'budget_increased',
-        new_budget: scaledBudget / 100, increase_pct: budgetMultiplier,
-      })
+      return NextResponse.json({ success: true, action: 'budget_increased' })
     }
 
-    // ─── FIND OR CREATE SCALING CAMPAIGN ───────────────────────────────────
-    // Name format: "M4 | Scaling | <original campaign name>"
+    // FIND OR CREATE SCALING CAMPAIGN
     const scalingCampaignName = "M4 | Scaling | " + winning.name
-
-    let allCampaigns = campData.data || []
-    let scalingCampaign = allCampaigns.find((c: any) => c.name === scalingCampaignName)
+    let scalingCampaign = campData.data?.find((c: any) => c.name === scalingCampaignName)
 
     if (!scalingCampaign) {
-      // Fetch more campaigns if needed (paginate once)
-      if (campData.paging?.next) {
-        const moreCamps = await get(adAccountId + "/campaigns", {
-          fields: "id,name,status,objective",
-          limit: "200"
-        })
-        scalingCampaign = moreCamps.data?.find((c: any) => c.name === scalingCampaignName)
-      }
-    }
-
-    if (!scalingCampaign) {
-      // Create the Scaling campaign — PAUSED so user activates manually in Ads Manager
       scalingCampaign = await post(adAccountId + "/campaigns", {
         name: scalingCampaignName,
         objective: winning.objective || "OUTCOME_SALES",
         status: "PAUSED",
         special_ad_categories: [],
       })
-      console.log("Created new Scaling campaign:", scalingCampaign.id)
+      console.log("Created Scaling campaign:", scalingCampaign.id)
     } else {
-      console.log("Reusing existing Scaling campaign:", scalingCampaign.id)
+      console.log("Reusing Scaling campaign:", scalingCampaign.id)
     }
-    // ───────────────────────────────────────────────────────────────────────
 
-    // DUPLICATE WINNING AD SET → into Scaling campaign
-    let duplicateAdsetId = null
-    try {
-      const adsetsData = await get(winning.id + "/adsets", {
-        fields: "id,name,targeting,optimization_goal,billing_event,destination_type,promoted_object,daily_budget",
-        limit: "20"
-      })
+    // GET WINNING ADSET
+    const adsetsData = await get(winning.id + "/adsets", {
+      fields: "id,name,targeting,optimization_goal,billing_event,destination_type,promoted_object,daily_budget",
+      limit: "20"
+    })
 
-      let targetAdset = adsetsData.data?.find((a: any) => a.id === adsetId)
-      if (!targetAdset) targetAdset = adsetsData.data?.[0]
+    let targetAdset = adsetsData.data?.find((a: any) => a.id === adsetId)
+    if (!targetAdset) targetAdset = adsetsData.data?.[0]
+    if (!targetAdset) return NextResponse.json({ error: 'No adset found' }, { status: 404 })
 
-      if (targetAdset) {
-        // Clean targeting object
-        const t = targetAdset.targeting || {}
-        const cleanT: Record<string, unknown> = {
-          geo_locations: t.geo_locations || { countries: ["PK"] },
-          age_min: t.age_min || 18
-        }
-        if (t.age_max) cleanT.age_max = t.age_max
-        if (t.genders) cleanT.genders = t.genders
-        if (t.flexible_spec) cleanT.flexible_spec = t.flexible_spec
-        if (t.custom_audiences) cleanT.custom_audiences = t.custom_audiences
-        if (t.exclusions) cleanT.exclusions = t.exclusions
-        if (t.targeting_automation) cleanT.targeting_automation = t.targeting_automation
+    // CLEAN TARGETING
+    const t = targetAdset.targeting || {}
+    const cleanT: Record<string, unknown> = {
+      geo_locations: t.geo_locations || { countries: ["PK"] },
+      age_min: t.age_min || 18,
+    }
+    if (t.age_max) cleanT.age_max = t.age_max
+    if (t.genders) cleanT.genders = t.genders
+    if (t.flexible_spec) cleanT.flexible_spec = t.flexible_spec
+    if (t.custom_audiences) cleanT.custom_audiences = t.custom_audiences
+    if (t.exclusions) cleanT.exclusions = t.exclusions
+    if (t.targeting_automation) cleanT.targeting_automation = t.targeting_automation
 
-        const adsetBody: Record<string, unknown> = {
-          name: (adsetName || targetAdset.name) + " — Scale " + budgetMultiplier + "x",
-          campaign_id: scalingCampaign.id,   // ← KEY: goes into Scaling campaign
-          status: "PAUSED",                   // user activates manually
-          daily_budget: Math.max(minBudget * 100, scaledBudget),
-          targeting: cleanT,
-          optimization_goal: targetAdset.optimization_goal || "OFFSITE_CONVERSIONS",
-          billing_event: targetAdset.billing_event || "IMPRESSIONS",
-          destination_type: "WEBSITE",
-        }
-        if (targetAdset.promoted_object) adsetBody.promoted_object = targetAdset.promoted_object
+    // BUILD ADSET — no destination_type, let Meta inherit it
+    const adsetBody: Record<string, unknown> = {
+      name: (adsetName || targetAdset.name) + " — Scale " + budgetMultiplier + "x",
+      campaign_id: scalingCampaign.id,
+      status: "PAUSED",
+      daily_budget: Math.max(minBudget * 100, scaledBudget),
+      targeting: cleanT,
+      optimization_goal: targetAdset.optimization_goal || "OFFSITE_CONVERSIONS",
+      billing_event: targetAdset.billing_event || "IMPRESSIONS",
+    }
+    if (targetAdset.promoted_object) adsetBody.promoted_object = targetAdset.promoted_object
 
-        const newAdset = await post(adAccountId + "/adsets", adsetBody)
-        duplicateAdsetId = newAdset?.id
+    const newAdset = await post(adAccountId + "/adsets", adsetBody)
+    console.log("Created scaled adset:", newAdset.id)
 
-        // Copy ads/creatives into new adset
-        if (newAdset?.id) {
-          const adsData = await get(targetAdset.id + "/ads", {
-            fields: "id,name,creative"
-          })
-          for (const ad of (adsData.data || []).slice(0, 3)) {
-            await post(adAccountId + "/ads", {
-              name: ad.name + " — Scale",
-              adset_id: newAdset.id,
-              creative: { creative_id: ad.creative?.id },
-              status: "PAUSED",
-            }).catch(() => null)
-          }
-        }
-
-        // ✅ Original adset stays UNTOUCHED — no pause, no changes
+    // COPY ADS INTO NEW ADSET
+    if (newAdset?.id) {
+      const adsData = await get(targetAdset.id + "/ads", { fields: "id,name,creative" })
+      for (const ad of (adsData.data || []).slice(0, 3)) {
+        await post(adAccountId + "/ads", {
+          name: ad.name + " — Scale",
+          adset_id: newAdset.id,
+          creative: { creative_id: ad.creative?.id },
+          status: "PAUSED",
+        }).catch((e: any) => console.log("Ad copy error:", e.message))
       }
-    } catch (e: any) {
-      console.log("Adset duplicate error:", e.message)
     }
 
-    // CREATE TEST AD SETS per selected interest (still in original prospecting campaign)
+    // ORIGINAL ADSET STAYS UNTOUCHED
+
+    // TEST INTEREST ADSETS (stay in prospecting campaign)
     const newAdsets: string[] = []
     for (const interestName of (selectedInterests as string[])) {
       try {
@@ -173,7 +145,7 @@ export async function POST(request: NextRequest) {
         if (match) {
           await post(adAccountId + "/adsets", {
             name: campaignName + " — Test — " + match.name,
-            campaign_id: winning.id,  // test adsets stay in prospecting campaign
+            campaign_id: winning.id,
             status: "PAUSED",
             daily_budget: Math.max(minBudget * 100, testBudget * 100),
             targeting: {
@@ -181,7 +153,6 @@ export async function POST(request: NextRequest) {
               geo_locations: { countries: ["PK"] },
               flexible_spec: [{ interests: [{ id: match.id, name: match.name }] }],
             },
-            destination_type: "WEBSITE",
             optimization_goal: "OFFSITE_CONVERSIONS",
             billing_event: "IMPRESSIONS",
           })
@@ -197,9 +168,8 @@ export async function POST(request: NextRequest) {
       action: 'scaled',
       scaling_campaign_id: scalingCampaign.id,
       scaling_campaign_name: scalingCampaignName,
-      duplicate_adset_id: duplicateAdsetId,
+      duplicate_adset_id: newAdset.id,
       new_test_adsets: newAdsets,
-      new_interests: newAdsets.length,
     })
 
   } catch (err: any) {
