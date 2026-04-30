@@ -55,7 +55,6 @@ export default function CampaignsPage() {
     setEditModal({
       action: 'update_ad',
       id: ad.id,
-      type: 'ad',
       name: ad.name,
       primary_text: ad.primary_text || '',
       headline: ad.headline || '',
@@ -69,23 +68,12 @@ export default function CampaignsPage() {
     setEditModal({
       action: 'update_adset',
       id: adset.id,
-      type: 'adset',
       name: adset.name,
       age_min: adset.age_min || 18,
       age_max: adset.age_max || 65,
       genders: adset.genders || [],
     })
   }
-
-  const tabs = editModal?.action === 'update_ad'
-    ? [
-        { key: 'text', label: '📝 Copy' },
-        { key: 'url', label: '🔗 URL' },
-        { key: 'creative', label: '🎨 Creative' },
-      ]
-    : editModal?.action === 'update_adset'
-    ? [{ key: 'audience', label: '👥 Audience' }]
-    : [{ key: 'budget', label: '💰 Budget' }]
 
   return (
     <div style={{ padding: 28, maxWidth: 1200, margin: '0 auto' }}>
@@ -118,7 +106,7 @@ export default function CampaignsPage() {
 
               {/* Campaign Row */}
               <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
-                onClick={() => setExpandedCamp(p => ({ ...p, [camp.id]: !p[camp.id] }))}>
+                onClick={() => setExpandedCamp(prev => ({ ...prev, [camp.id]: !prev[camp.id] }))}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: camp.status === 'ACTIVE' ? '#86efac' : 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 800, color: 'white' }}>{camp.name}</div>
@@ -127,7 +115,7 @@ export default function CampaignsPage() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <button onClick={e => { e.stopPropagation(); setEditModal({ action: 'update_budget', id: camp.id, type: 'campaign', name: camp.name, budget: Math.round((camp.daily_budget || 0) / 100) }) }}
+                  <button onClick={e => { e.stopPropagation(); setEditModal({ action: 'update_budget', id: camp.id, name: camp.name, budget: Math.round((camp.daily_budget || 0) / 100) }) }}
                     style={{ background: 'rgba(223,254,149,0.1)', border: '1px solid rgba(223,254,149,0.2)', color: '#dffe95', padding: '5px 12px', borderRadius: 100, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
                     💰 Budget
                   </button>
@@ -143,7 +131,7 @@ export default function CampaignsPage() {
               {expandedCamp[camp.id] && (camp.adsets || []).map((adset: any) => (
                 <div key={adset.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ padding: '12px 20px 12px 36px', display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.01)', cursor: 'pointer' }}
-                    onClick={() => setExpandedAdset(p => ({ ...p, [adset.id]: !p[adset.id] }))}>
+                    onClick={() => setExpandedAdset(prev => ({ ...prev, [adset.id]: !prev[adset.id] }))}>
                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: adset.status === 'ACTIVE' ? '#86efac' : 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>{adset.name}</div>
@@ -195,17 +183,16 @@ export default function CampaignsPage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
           <div style={{ background: '#152928', border: '1px solid rgba(223,254,149,0.2)', borderRadius: 20, width: '100%', maxWidth: 500 }}>
 
-            {/* Modal Header */}
             <div style={{ padding: '20px 24px 0' }}>
               <div style={{ fontSize: 17, fontWeight: 900, color: 'white', marginBottom: 4 }}>
                 {editModal.action === 'update_budget' ? '💰 Edit Budget' : editModal.action === 'update_adset' ? '👥 Edit Audience' : '✏️ Edit Ad'}
               </div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>{editModal.name}</div>
 
-              {/* Tabs */}
-              {tabs.length > 1 && (
-                <div style={{ display: 'flex', gap: 4, marginBottom: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 0 }}>
-                  {tabs.map(t => (
+              {/* Tabs for Ad editing */}
+              {editModal.action === 'update_ad' && (
+                <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  {[{ key: 'text', label: '📝 Copy' }, { key: 'url', label: '🔗 URL' }, { key: 'creative', label: '🎨 Creative' }].map(t => (
                     <button key={t.key} onClick={() => setActiveTab(t.key)}
                       style={{ padding: '8px 16px', background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: activeTab === t.key ? '#dffe95' : 'rgba(255,255,255,0.4)', borderBottom: `2px solid ${activeTab === t.key ? '#dffe95' : 'transparent'}`, marginBottom: -1 }}>
                       {t.label}
@@ -215,9 +202,7 @@ export default function CampaignsPage() {
               )}
             </div>
 
-            {/* Modal Content */}
             <div style={{ padding: '20px 24px' }}>
-
               {/* Budget */}
               {editModal.action === 'update_budget' && (
                 <div>
@@ -225,59 +210,61 @@ export default function CampaignsPage() {
                   <input type="number" value={editModal.budget}
                     onChange={e => setEditModal((p: any) => ({ ...p, budget: parseFloat(e.target.value) }))}
                     style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 14px', color: 'white', fontSize: 18, fontWeight: 800, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 8 }}>⚠️ Changing budget by more than 20% resets Meta learning phase</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 8 }}>⚠️ Changing by more than 20% resets Meta learning phase</div>
                 </div>
               )}
 
-              {/* Ad Copy Tab */}
+              {/* Ad - Copy */}
               {editModal.action === 'update_ad' && activeTab === 'text' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <Field label="Primary Text" value={editModal.primary_text}
-                    onChange={(v: string) => setEditModal((p: any) => ({ ...p, primary_text: v }))} multiline />
-                  <Field label="Headline" value={editModal.headline}
-                    onChange={(v: string) => setEditModal((p: any) => ({ ...p, headline: v }))} />
-                </div>
-              )}
-
-              {/* URL Tab */}
-              {editModal.action === 'update_ad' && activeTab === 'url' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <Field label="Destination URL" value={editModal.link_url}
-                    onChange={(v: string) => setEditModal((p: any) => ({ ...p, link_url: v }))} />
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 8 }}>
-                    💡 Make sure the URL matches your ad's offer. Mismatched URLs hurt conversion rates.
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Primary Text</label>
+                    <textarea value={editModal.primary_text} onChange={e => setEditModal((p: any) => ({ ...p, primary_text: e.target.value }))} rows={5}
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Headline</label>
+                    <input type="text" value={editModal.headline} onChange={e => setEditModal((p: any) => ({ ...p, headline: e.target.value }))}
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
                   </div>
                 </div>
               )}
 
-              {/* Creative Tab */}
+              {/* Ad - URL */}
+              {editModal.action === 'update_ad' && activeTab === 'url' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Destination URL</label>
+                    <input type="text" value={editModal.link_url} onChange={e => setEditModal((p: any) => ({ ...p, link_url: e.target.value }))}
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 8 }}>
+                    💡 Make sure the URL matches your ad offer. Mismatched URLs hurt conversions.
+                  </div>
+                </div>
+              )}
+
+              {/* Ad - Creative */}
               {editModal.action === 'update_ad' && activeTab === 'creative' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, textAlign: 'center' }}>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>🎨</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginBottom: 4 }}>Change Creative</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Upload a new image or video for this ad</div>
-                    <input type="file" accept="image/*,video/*"
-                      onChange={e => {
-                        const file = e.target.files?.[0]
-                        if (file) setEditModal((p: any) => ({ ...p, new_creative_file: file, new_creative_name: file.name }))
-                      }}
-                      style={{ display: 'none' }} id="creative-upload" />
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginBottom: 4 }}>Upload New Creative</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>Replace the image or video for this ad</div>
+                    <input type="file" accept="image/*,video/*" id="creative-upload"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) setEditModal((p: any) => ({ ...p, new_creative_name: f.name })) }}
+                      style={{ display: 'none' }} />
                     <label htmlFor="creative-upload" style={{ background: '#dffe95', color: '#10211f', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-block' }}>
-                      Upload Image / Video
+                      Choose File
                     </label>
-                    {editModal.new_creative_name && (
-                      <div style={{ marginTop: 12, fontSize: 12, color: '#86efac' }}>✅ {editModal.new_creative_name} selected</div>
-                    )}
+                    {editModal.new_creative_name && <div style={{ marginTop: 12, fontSize: 12, color: '#86efac' }}>✅ {editModal.new_creative_name}</div>}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
-                    ⚠️ Changing creative resets the ad's learning phase and social proof (likes/comments)
-                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>⚠️ Changing creative resets learning phase and social proof</div>
                 </div>
               )}
 
-              {/* Audience Tab */}
-              {editModal.action === 'update_adset' && activeTab === 'audience' && (
+              {/* Audience */}
+              {editModal.action === 'update_adset' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>Age Range</label>
@@ -294,7 +281,7 @@ export default function CampaignsPage() {
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>Gender</label>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      {[{ label: 'All', value: [] }, { label: 'Male', value: [1] }, { label: 'Female', value: [2] }].map(g => (
+                      {[{ label: 'All', value: [] }, { label: '👨 Male', value: [1] }, { label: '👩 Female', value: [2] }].map(g => (
                         <button key={g.label} onClick={() => setEditModal((p: any) => ({ ...p, genders: g.value }))}
                           style={{ flex: 1, padding: '8px 0', borderRadius: 10, border: `2px solid ${JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#dffe95' : 'rgba(255,255,255,0.1)'}`, background: JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? 'rgba(223,254,149,0.1)' : 'transparent', color: JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#dffe95' : 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
                           {g.label}
@@ -303,13 +290,12 @@ export default function CampaignsPage() {
                     </div>
                   </div>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 8 }}>
-                    ⚠️ Changing audience resets Meta's learning phase. Make small changes only.
+                    ⚠️ Changing audience resets Meta learning phase
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Footer */}
             <div style={{ padding: '0 24px 20px', display: 'flex', gap: 10 }}>
               <button onClick={() => setEditModal(null)} style={{ flex: 1, background: 'none', border: '1.5px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)', padding: '11px 0', borderRadius: 100, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
               <button onClick={saveEdit} disabled={saving} style={{ flex: 2, background: '#dffe95', color: '#10211f', border: 'none', padding: '11px 0', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
@@ -321,21 +307,6 @@ export default function CampaignsPage() {
       )}
 
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
-    </div>
-  )
-}
-
-function Field({ label, value, onChange, multiline }: { label: string, value: string, onChange: (v: string) => void, multiline?: boolean }) {
-  return (
-    <div>
-      <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>{label}</label>
-      {multiline ? (
-        <textarea value={value} onChange={e => onChange(e.target.value)} rows={4}
-          style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
-      ) : (
-        <input type="text" value={value} onChange={e => onChange(e.target.value)}
-          style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-      )}
     </div>
   )
 }
