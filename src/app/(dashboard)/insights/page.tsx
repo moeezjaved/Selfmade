@@ -44,7 +44,7 @@ export default function InsightsPage() {
       setAccountROAS(data.accountROAS || 0)
       // Auto-expand ALL campaigns
       const exp: Record<string,boolean> = {}
-      ;(data.campaigns || []).forEach((c: CampaignInsight) => { exp[c.id] = true })
+      ;(data.campaigns || []).forEach((camp: CampaignInsight) => { exp[camp.id] = true })
       setExpanded(exp)
     } catch {}
     setLoading(false)
