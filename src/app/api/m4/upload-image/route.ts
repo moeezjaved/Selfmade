@@ -23,6 +23,24 @@ export async function POST(request: NextRequest) {
     const adAccountId = "act_" + metaAccount.account_id
     const isVideo = isVid || mimeType?.startsWith('video/')
 
+    // Handle chunk upload
+    const { isChunk, chunk, uploadSessionId, startOffset: chunkStart, adAccountId: chunkAccountId, token: chunkToken } = body
+    if (isChunk) {
+      const chunkBytes = Buffer.from(chunk, 'base64')
+      const cf = new FormData()
+      cf.append('upload_phase', 'transfer')
+      cf.append('upload_session_id', uploadSessionId)
+      cf.append('start_offset', String(chunkStart))
+      cf.append('video_file_chunk', new Blob([chunkBytes]))
+      cf.append('access_token', chunkToken)
+      const cr = await fetch("https://graph.facebook.com/" + V + "/" + chunkAccountId + "/advideos", {method:'POST', body:cf})
+      const cd = await cr.json()
+      if (cd.error) return NextResponse.json({error: cd.error.message}, {status:400})
+      const so = parseInt(cd.start_offset)
+      const eo = parseInt(cd.end_offset)
+      return NextResponse.json({startOffset: so, endOffset: eo, done: so === eo})
+    }
+
     if (isVideo) {
       const sessionRes = await fetch("https://graph.facebook.com/" + V + "/" + adAccountId + "/advideos", {
         method: 'POST',
