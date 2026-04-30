@@ -241,7 +241,7 @@ export default function DashboardPage() {
 
       {/* ── PROMO CARDS ── */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <Link href="/ad-engine" className="flex items-center gap-4 bg-gradient-to-r from-dark2 to-dark3 border border-lime/30 rounded-2xl px-5 py-4 hover:border-lime/50 transition-all group">
+        <Link href="/m4" className="flex items-center gap-4 bg-gradient-to-r from-dark2 to-dark3 border border-lime/30 rounded-2xl px-5 py-4 hover:border-lime/50 transition-all group">
           <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center flex-shrink-0">
             <Zap size={20} className="text-dark"/>
           </div>
@@ -250,7 +250,7 @@ export default function DashboardPage() {
               Ad Engine
               <span className="text-[10px] font-bold bg-lime text-dark px-2 py-0.5 rounded-full">New</span>
             </div>
-            <div className="text-xs text-white/40">Launch campaigns without opening Ads Manager</div>
+            <div className="text-xs text-white/40">Run Facebook & Instagram ads in minutes with AI</div>
           </div>
           <ChevronRight size={16} className="text-white/30 group-hover:text-lime transition-colors"/>
         </Link>
