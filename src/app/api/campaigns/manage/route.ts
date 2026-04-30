@@ -19,32 +19,22 @@ export async function GET(request: NextRequest) {
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = 'act_' + metaAccount.account_id
 
-    const get = async (path: string, params: Record<string, string>) => {
-      const url = `https://graph.facebook.com/${V}/${path}?` + new URLSearchParams({ ...params, access_token: token })
-      const res = await fetch(url)
-      return res.json()
-    }
-
-    const campData = await get(adAccountId + '/campaigns', {
-      fields: 'id,name,status,objective,daily_budget',
-      limit: '50',
+    // Single API call — fetch campaigns + adsets + ads nested
+    const url = `https://graph.facebook.com/${V}/${adAccountId}/campaigns?` + new URLSearchParams({
+      fields: 'id,name,status,objective,daily_budget,adsets{id,name,status,daily_budget,targeting,ads{id,name,status,creative{id,body,title,link_url,object_story_spec}}}',
+      limit: '20',
+      access_token: token,
     })
 
-    const campaigns = []
-    for (const camp of (campData.data || [])) {
-      const adsetData = await get(camp.id + '/adsets', {
-        fields: 'id,name,status,daily_budget',
-        limit: '20',
-      })
+    const res = await fetch(url)
+    const campData = await res.json()
 
-      const adsets = []
-      for (const adset of (adsetData.data || [])) {
-        const adData = await get(adset.id + '/ads', {
-          fields: 'id,name,status,creative{id,body,title,link_url,object_story_spec}',
-          limit: '10',
-        })
+    if (campData.error) return NextResponse.json({ error: campData.error.message }, { status: 400 })
 
-        const ads = (adData.data || []).map((ad: any) => {
+    const campaigns = (campData.data || []).map((camp: any) => {
+      const adsets = (camp.adsets?.data || []).map((adset: any) => {
+        const targeting = adset.targeting || {}
+        const ads = (adset.ads?.data || []).map((ad: any) => {
           const creative = ad.creative || {}
           const spec = creative.object_story_spec?.link_data || creative.object_story_spec?.video_data || {}
           return {
@@ -57,12 +47,18 @@ export async function GET(request: NextRequest) {
             link_url: spec.link || creative.link_url || '',
           }
         })
-
-        adsets.push({ id: adset.id, name: adset.name, status: adset.status, ads })
-      }
-
-      campaigns.push({ ...camp, adsets })
-    }
+        return {
+          id: adset.id,
+          name: adset.name,
+          status: adset.status,
+          age_min: targeting.age_min || 18,
+          age_max: targeting.age_max || 65,
+          genders: targeting.genders || [],
+          ads,
+        }
+      })
+      return { id: camp.id, name: camp.name, status: camp.status, objective: camp.objective, daily_budget: camp.daily_budget, adsets }
+    })
 
     return NextResponse.json({ campaigns })
   } catch (err: any) {
@@ -107,6 +103,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
+    if (body.action === 'update_adset') {
+      const targeting: Record<string, unknown> = {}
+      if (body.age_min) targeting.age_min = body.age_min
+      if (body.age_max) targeting.age_max = body.age_max
+      if (body.genders && body.genders.length > 0) targeting.genders = body.genders
+      await post(body.id, { targeting })
+      return NextResponse.json({ success: true })
+    }
+
     if (body.action === 'update_ad') {
       const creativeRes = await fetch(
         `https://graph.facebook.com/${V}/${body.creative_id}?fields=object_story_spec&access_token=${token}`
@@ -135,20 +140,11 @@ export async function POST(request: NextRequest) {
         name: 'Updated Creative',
         object_story_spec: updatedSpec,
       })
-
       await post(body.id, { creative: { creative_id: newCreative.id } })
       return NextResponse.json({ success: true })
     }
 
-    if (body.action === "update_adset") {
-      const targeting: Record<string,unknown> = {}
-      if (body.age_min) targeting.age_min = body.age_min
-      if (body.age_max) targeting.age_max = body.age_max
-      if (body.genders && body.genders.length > 0) targeting.genders = body.genders
-      await post(body.id, { targeting })
-      return NextResponse.json({ success: true })
-    }
-    return NextResponse.json({ error: "Unknown action" }, { status: 400 })
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
