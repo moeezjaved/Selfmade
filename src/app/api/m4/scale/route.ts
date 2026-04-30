@@ -74,7 +74,6 @@ export async function POST(request: NextRequest) {
         objective: winning.objective || "OUTCOME_SALES",
         status: "PAUSED",
         special_ad_categories: [],
-        bid_strategy: "LOWEST_COST",
         daily_budget: Math.max(minBudget * 100, scaledBudget),
       })
       console.log("Created Scaling campaign:", scalingCampaign.id)
