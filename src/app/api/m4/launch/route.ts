@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
       try {
         const excAud = await post(`${adAccountId}/customaudiences`, {
           name: `${campaignName} — Exclusion Visitors 60d`,
-          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 5184000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } } }),
+          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 5184000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }),
           prefill: true,
         })
         exclusionAudienceId = excAud.id
