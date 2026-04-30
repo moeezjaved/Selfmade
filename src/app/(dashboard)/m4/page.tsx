@@ -63,58 +63,23 @@ export default function M4Page() {
   },[])
 
   const uploadFile = async (file: File, setter: React.Dispatch<React.SetStateAction<Creative[]>>) => {
-    const id = `${Date.now()}-${Math.random().toString(36).substr(2,9)}`
+    const id = Date.now().toString() + Math.random().toString(36).substr(2,9)
     const isVid = file.type.startsWith('video/')
+    if (isVid && file.size > 5*1024*1024) {
+      alert('Video too large (max 5MB). Add larger videos directly in Meta Ads Manager.')
+      return
+    }
     setter(prev=>[...prev,{id,name:file.name.replace(/\.[^.]+$/,''),pack:1,type:isVid?'video':'image',mimeType:file.type,uploading:true}])
-    try {
-      if (isVid) {
-        const sessionRes = await fetch('/api/m4/upload-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mimeType:file.type,fileSize:file.size,name:file.name,isVideo:true})})
-        const session = await sessionRes.json()
-        if (session.error) throw new Error(session.error)
-        let startOffset = parseInt(session.startOffset||'0')
-        let endOffset = parseInt(session.endOffset||String(Math.min(4194304,file.size)))
-        // Upload chunks via our server (CORS prevents direct browser-to-Meta)
-        let done = false
-        while (!done) {
-          const chunk = file.slice(startOffset, endOffset)
-          const chunkB64 = await new Promise<string>((res) => {
-            const fr = new FileReader()
-            fr.onload = e => res((e.target?.result as string).split(',')[1])
-            fr.readAsDataURL(chunk)
-          })
-          const cr = await fetch('/api/m4/upload-image', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({
-              chunk: chunkB64,
-              uploadSessionId: session.uploadSessionId,
-              startOffset,
-              adAccountId: session.adAccountId,
-              token: session.token,
-              isChunk: true,
-            })
-          })
-          const cd = await cr.json()
-          if (cd.error) throw new Error(cd.error)
-          if (cd.done) { done = true; break }
-          startOffset = cd.startOffset
-          endOffset = Math.min(cd.endOffset, file.size)
-          if (startOffset >= file.size) break
-        }
-        const fr = await fetch('/api/m4/upload-image',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({uploadSessionId:session.uploadSessionId,videoId:session.videoId,token:session.token,adAccountId:session.adAccountId})})
-        const fd = await fr.json()
-        setter(prev=>prev.map(c=>c.id===id?{...c,hash:fd.videoId,uploading:false,uploaded:!fd.error}:c))
-      } else {
-        const reader = new FileReader()
-        reader.onload = async (ev) => {
-          const base64 = (ev.target?.result as string)?.split(',')[1]
-          const res = await fetch('/api/m4/upload-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64,mimeType:file.type,name:file.name})})
-          const data = await res.json()
-          setter(prev=>prev.map(c=>c.id===id?{...c,hash:data.hash||undefined,uploading:false,uploaded:!!data.hash}:c))
-        }
-        reader.readAsDataURL(file)
-      }
-    } catch(e:any) { setter(prev=>prev.map(c=>c.id===id?{...c,uploading:false}:c)) }
+    const reader = new FileReader()
+    reader.onload = async (ev) => {
+      const base64 = (ev.target?.result as string)?.split(',')[1]
+      try {
+        const res = await fetch('/api/m4/upload-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64,mimeType:file.type,name:file.name,isVideo:isVid})})
+        const data = await res.json()
+        setter(prev=>prev.map(c=>c.id===id?{...c,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:c))
+      } catch { setter(prev=>prev.map(c=>c.id===id?{...c,uploading:false}:c)) }
+    }
+    reader.readAsDataURL(file)
   }
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<Creative[]>>) => {
