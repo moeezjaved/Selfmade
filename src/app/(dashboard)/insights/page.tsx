@@ -29,6 +29,7 @@ export default function InsightsPage() {
   const [suggestedInterests, setSuggestedInterests] = useState<{name:string,why:string,selected:boolean}[]>([])
   const [loadingInterests, setLoadingInterests] = useState(false)
   const [productContext, setProductContext] = useState('')
+  const [testBudget, setTestBudget] = useState('500')
 
   useEffect(() => { loadInsights() }, [dateRange])
 
@@ -264,6 +265,11 @@ export default function InsightsPage() {
                   Test New Audiences (Optional) — Pick interests to test
                 </div>
                 <div style={{fontSize:11,color:'rgba(255,255,255,0.3)',marginBottom:8}}>Each selected interest creates a new test ad set with the same creative</div>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                  <label style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',flexShrink:0}}>Daily Budget per Test Ad Set:</label>
+                  <input type="number" value={testBudget} onChange={e=>setTestBudget(e.target.value)} placeholder="500" style={{width:120,background:'rgba(255,255,255,0.05)',border:'1.5px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'6px 10px',color:'white',fontSize:13,fontFamily:'inherit',outline:'none'}}/>
+                  <span style={{fontSize:12,color:'rgba(255,255,255,0.4)'}}>PKR/day</span>
+                </div>
                 {!scaleModal.campaign.launchData && (
                   <div style={{display:'flex',gap:8,marginBottom:8}}>
                     <input
