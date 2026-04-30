@@ -50,7 +50,6 @@ export async function POST(request: NextRequest) {
       limit: "200"
     })
     const winning = campData.data?.find((c: any) => c.id === campaignId ||
-      c.id === campaignId || c.name === campaignName
     )
     if (!winning) return NextResponse.json({ error: 'Campaign not found: ' + campaignName }, { status: 404 })
 

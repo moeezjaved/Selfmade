@@ -66,8 +66,6 @@ export default function InsightsPage() {
           campaignName: campaign.name,
           campaignId: campaign.id,
           adsetId: adset.id,
-          campaignId: campaign.id,
-          adsetName: adset.name,
           budgetMultiplier: parseFloat(scaleFactor),
           isBudgetIncrease,
           product: '', description: '', competitorDomains: ''
