@@ -75,17 +75,27 @@ export async function POST(request: NextRequest) {
       if (!targetAdset) targetAdset = adsetsData.data?.[0]
 
       if (targetAdset) {
-        const newAdset = await post(adAccountId + "/adsets", {
+        const t = targetAdset.targeting || {}
+        const cleanT: Record<string,unknown> = { geo_locations: t.geo_locations || { countries: ["PK"] }, age_min: t.age_min || 18 }
+        if (t.age_max) cleanT.age_max = t.age_max
+        if (t.genders) cleanT.genders = t.genders
+        if (t.flexible_spec) cleanT.flexible_spec = t.flexible_spec
+        if (t.custom_audiences) cleanT.custom_audiences = t.custom_audiences
+        if (t.exclusions) cleanT.exclusions = t.exclusions
+        if (t.targeting_automation) cleanT.targeting_automation = t.targeting_automation
+
+        const adsetBody: Record<string,unknown> = {
           name: (adsetName || targetAdset.name) + " — Scale " + budgetMultiplier + "x",
           campaign_id: winning.id,
           status: "ACTIVE",
           daily_budget: Math.max(minBudget * 100, scaledBudget),
-          targeting: targetAdset.targeting,
-          optimization_goal: targetAdset.optimization_goal,
-          billing_event: targetAdset.billing_event,
-          destination_type: targetAdset.destination_type || "WEBSITE",
-          ...(targetAdset.promoted_object ? { promoted_object: targetAdset.promoted_object } : {}),
-        })
+          targeting: cleanT,
+          optimization_goal: targetAdset.optimization_goal || "OFFSITE_CONVERSIONS",
+          billing_event: targetAdset.billing_event || "IMPRESSIONS",
+          destination_type: "WEBSITE",
+        }
+        if (targetAdset.promoted_object) adsetBody.promoted_object = targetAdset.promoted_object
+        const newAdset = await post(adAccountId + "/adsets", adsetBody)
         duplicateAdsetId = newAdset?.id
 
         // Copy ads to new adset
