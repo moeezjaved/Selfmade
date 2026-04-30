@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
       fields: "id,name,status,objective,daily_budget",
       limit: "200"
     })
-    const winning = campData.data?.find((c: any) =>
-      c.name === campaignName || c.name.includes(campaignName.split(' — ')[0])
+    const winning = campData.data?.find((c: any) => c.id === campaignId ||
+      c.id === campaignId || c.name === campaignName
     )
     if (!winning) return NextResponse.json({ error: 'Campaign not found: ' + campaignName }, { status: 404 })
 
