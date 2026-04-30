@@ -293,12 +293,6 @@ export default function InsightsPage() {
                 </div>
               )}
 
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Fixed Footer */}
