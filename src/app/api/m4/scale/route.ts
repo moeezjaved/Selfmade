@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
     if (existingScaling) {
       scalingCampaignId = existingScaling.id
       console.log("Reusing Scaling campaign:", scalingCampaignId)
+      await post(scalingCampaignId, { daily_budget: Math.max(10000, scaledBudget) }).catch(() => null)
     } else {
       const copied = await post(winning.id + "/copies", {
         deep_copy: false,
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
         rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
       })
       scalingCampaignId = copied.copied_campaign_id
-      await post(scalingCampaignId, { name: scalingCampaignName })
+      await post(scalingCampaignId, { name: scalingCampaignName, daily_budget: Math.max(10000, scaledBudget) })
       console.log("Created Scaling campaign:", scalingCampaignId)
     }
 
