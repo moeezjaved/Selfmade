@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { campaignName, product, description, competitorDomains } = await request.json()
+    const { campaignName, product, description, competitorDomains, budgetMultiplier = 2, isBudgetIncrease = false } = await request.json()
 
     const admin = createAdminClient()
     const { data: metaAccount } = await admin
@@ -54,9 +54,21 @@ export async function POST(request: NextRequest) {
     if (!winning) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
 
     const currentBudget = parseInt(winning.daily_budget || String(minBudget * 2))
-    const scaledBudget = currentBudget * 2
+    const scaledBudget = isBudgetIncrease ? Math.round(currentBudget * (1 + (budgetMultiplier / 100))) : Math.round(currentBudget * budgetMultiplier)
 
-    // Duplicate campaign with 2x budget
+    // If budget increase only - update existing campaign
+    if (isBudgetIncrease) {
+      await post(`${winning.id}`, { daily_budget: Math.max(minBudget, scaledBudget) })
+      return NextResponse.json({
+        success: true,
+        action: 'budget_increased',
+        new_budget: scaledBudget,
+        increase_pct: budgetMultiplier,
+        new_interests: 0,
+      })
+    }
+
+    // Duplicate campaign with scaled budget
     const duplicate = await post(`${adAccountId}/campaigns`, {
       name: `${winning.name} — SCALED 2x`,
       objective: winning.objective,
