@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const {
-      campaignName, budgetMultiplier = 2, isBudgetIncrease = false,
+      campaignName, campaignId, budgetMultiplier = 2, isBudgetIncrease = false,
       selectedInterests = [], adsetId, adsetName, testBudget = 500,
     } = await request.json()
 
