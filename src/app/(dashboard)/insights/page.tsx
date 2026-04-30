@@ -11,6 +11,7 @@ interface AdsetInsight {
 interface CampaignInsight {
   id: string; name: string; status: string; objective: string
   currency: string; budget: number; adsets: AdsetInsight[]
+  launchData?: {product:string,description:string,target_customer:string,competitor_domains:string}|null
 }
 
 export default function InsightsPage() {
