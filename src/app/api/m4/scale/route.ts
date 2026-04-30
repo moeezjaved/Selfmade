@@ -68,34 +68,35 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Add selected interest to original campaign if provided
+    // Create new test ad sets per selected interest (keep original untouched)
+    const newAdsets: string[] = []
     if (selectedInterests.length > 0 && !isBudgetIncrease) {
-      try {
-        const interestName = selectedInterests[0]
-        // Search Meta for interest ID
-        const intRes = await fetch("https://graph.facebook.com/" + V + "/" + adAccountId + "/search?" + new URLSearchParams({type:"adinterest",q:interestName,limit:"3",access_token:token}))
-        const intData = await intRes.json()
-        const match = intData.data?.[0]
-        if (match) {
-          // Add new adset with this interest to original campaign
-          await post(adAccountId + "/adsets", {
-            name: campaignName + " — Interest — " + match.name,
-            campaign_id: winning.id,
-            status: "PAUSED",
-            targeting: {
-              age_min: 18,
-              geo_locations: { countries: ["PK"] },
-              flexible_spec: [{ interests: [{ id: match.id, name: match.name }] }],
-            },
-            destination_type: "WEBSITE",
-            optimization_goal: "OFFSITE_CONVERSIONS",
-            billing_event: "IMPRESSIONS",
-          })
-        }
-      } catch(e: any) { console.log("Interest add error:", e.message) }
+      for (const interestName of (selectedInterests as string[])) {
+        try {
+          const intRes = await fetch("https://graph.facebook.com/" + V + "/" + adAccountId + "/search?" + new URLSearchParams({type:"adinterest",q:interestName,limit:"3",access_token:token}))
+          const intData = await intRes.json()
+          const match = intData.data?.[0]
+          if (match) {
+            await post(adAccountId + "/adsets", {
+              name: campaignName + " — Test — " + match.name,
+              campaign_id: winning.id,
+              status: "PAUSED",
+              targeting: {
+                age_min: 18,
+                geo_locations: { countries: ["PK"] },
+                flexible_spec: [{ interests: [{ id: match.id, name: match.name }] }],
+              },
+              destination_type: "WEBSITE",
+              optimization_goal: "OFFSITE_CONVERSIONS",
+              billing_event: "IMPRESSIONS",
+            })
+            newAdsets.push(match.name)
+          }
+        } catch(e: any) { console.log("Test adset error:", e.message) }
+      }
     }
 
-    // Duplicate campaign with scaled budget
+        // Duplicate campaign with scaled budget
     const duplicate = await post(`${adAccountId}/campaigns`, {
       name: `${winning.name} — Scale ${budgetMultiplier}x`,
       objective: winning.objective,
