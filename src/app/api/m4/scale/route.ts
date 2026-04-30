@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         status: "PAUSED",
         special_ad_categories: [],
         daily_budget: Math.max(minBudget * 100, scaledBudget), // CBO: budget on campaign
-        budget_rebalance_flag: true,
+
       })
       console.log("Created Scaling campaign:", scalingCampaign.id)
     } else {
