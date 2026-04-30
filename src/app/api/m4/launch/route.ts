@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
       headline = '',
       cta = 'LEARN_MORE',
       websiteUrl = '',
+      product = '',
+      description = '',
+      targetCustomer = '',
+      competitorDomains = '',
     } = body
 
     const admin = createAdminClient()
@@ -370,6 +374,19 @@ export async function POST(request: NextRequest) {
         performed_by: 'user',
       })
     } catch(e) { console.log('Activity log error') }
+
+    // Store launch data for insights
+    try {
+      const adminSb = createAdminClient()
+      await adminSb.from('m4_launches').insert({
+        user_id: user.id,
+        campaign_name: campaignName,
+        product: product || '',
+        description: description || '',
+        target_customer: targetCustomer || '',
+        competitor_domains: competitorDomains || '',
+      })
+    } catch(e: any) { console.log('Launch store error:', e.message) }
 
     return NextResponse.json({
       success: true,
