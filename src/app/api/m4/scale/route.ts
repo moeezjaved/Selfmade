@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { campaignName, product, description, competitorDomains, budgetMultiplier = 2, isBudgetIncrease = false, selectedInterests = [], adsetId, adsetName } = await request.json()
+    const { campaignName, product, description, competitorDomains, budgetMultiplier = 2, isBudgetIncrease = false, selectedInterests = [], adsetId, adsetName, testBudget = 500 } = await request.json()
 
     const admin = createAdminClient()
     const { data: metaAccount } = await admin
@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
               name: campaignName + " — Test — " + match.name,
               campaign_id: winning.id,
               status: "PAUSED",
+              daily_budget: Math.max(100, testBudget * 100),
               targeting: {
                 age_min: 18,
                 geo_locations: { countries: ["PK"] },
@@ -171,6 +172,7 @@ export async function POST(request: NextRequest) {
               name: campaignName + " — Test — " + match.name,
               campaign_id: winning.id,
               status: "PAUSED",
+              daily_budget: Math.max(100, testBudget * 100),
               targeting: {
                 age_min: 18,
                 geo_locations: { countries: ["PK"] },
