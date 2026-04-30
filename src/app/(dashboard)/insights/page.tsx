@@ -339,7 +339,7 @@ export default function InsightsPage() {
               </div>
             )}
 
-            <div style={{display:'flex',gap:10}}>
+            <div style={{display:'flex',gap:10,position:'sticky',bottom:0,background:'#152928',paddingTop:12,marginTop:8}}>
               <button onClick={()=>setScaleModal(null)} style={{flex:1,background:'none',border:'1.5px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.4)',padding:'11px 0',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'}}>Cancel</button>
               <button onClick={executeScale} style={{flex:2,background:'#dffe95',color:'#10211f',border:'none',padding:'11px 0',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                 {isBudgetIncrease ? 'Increase Budget +'+scaleFactor+'%' : 'Scale '+scaleFactor+'x — Duplicate Now'}
