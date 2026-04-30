@@ -64,7 +64,6 @@ export default function CampaignsPage() {
   }
 
   const openAdsetEdit = (adset: any) => {
-    setActiveTab('audience')
     setEditModal({
       action: 'update_adset',
       id: adset.id,
@@ -103,8 +102,6 @@ export default function CampaignsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {campaigns.map(camp => (
             <div key={camp.id} style={{ background: '#152928', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, overflow: 'hidden' }}>
-
-              {/* Campaign Row */}
               <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
                 onClick={() => setExpandedCamp(prev => ({ ...prev, [camp.id]: !prev[camp.id] }))}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: camp.status === 'ACTIVE' ? '#86efac' : 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
@@ -127,7 +124,6 @@ export default function CampaignsPage() {
                 </div>
               </div>
 
-              {/* Adsets */}
               {expandedCamp[camp.id] && (camp.adsets || []).map((adset: any) => (
                 <div key={adset.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ padding: '12px 20px 12px 36px', display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.01)', cursor: 'pointer' }}
@@ -150,24 +146,24 @@ export default function CampaignsPage() {
                     </div>
                   </div>
 
-                  {/* Ads */}
                   {expandedAdset[adset.id] && (adset.ads || []).map((ad: any) => (
-                    <div key={ad.id} style={{ padding: '10px 20px 10px 52px', borderTop: '1px solid rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.005)' }}>
-                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: ad.status === 'ACTIVE' ? '#86efac' : 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>{ad.name}</div>
-                        {ad.primary_text && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 400 }}>{ad.primary_text}</div>}
-                        {ad.link_url && <div style={{ fontSize: 10, color: 'rgba(147,197,253,0.6)', marginTop: 1 }}>🔗 {ad.link_url}</div>}
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => openAdEdit(ad)}
-                          style={{ background: 'rgba(223,254,149,0.08)', border: '1px solid rgba(223,254,149,0.15)', color: '#dffe95', padding: '4px 12px', borderRadius: 100, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
-                          ✏️ Edit Ad
-                        </button>
-                        <button onClick={() => toggleStatus(ad.id, 'ad', ad.status)}
-                          style={{ background: ad.status === 'ACTIVE' ? 'rgba(248,113,113,0.1)' : 'rgba(134,239,172,0.1)', border: `1px solid ${ad.status === 'ACTIVE' ? 'rgba(248,113,113,0.2)' : 'rgba(134,239,172,0.2)'}`, color: ad.status === 'ACTIVE' ? '#f87171' : '#86efac', padding: '4px 10px', borderRadius: 100, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
-                          {ad.status === 'ACTIVE' ? 'Pause' : 'Activate'}
-                        </button>
+                    <div key={ad.id} style={{ padding: '12px 20px 12px 52px', borderTop: '1px solid rgba(255,255,255,0.03)', background: 'rgba(255,255,255,0.005)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 5, height: 5, borderRadius: '50%', background: ad.status === 'ACTIVE' ? '#86efac' : 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>{ad.name}</div>
+                          {ad.primary_text && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 400 }}>{ad.primary_text}</div>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={e => { e.stopPropagation(); openAdEdit(ad) }}
+                            style={{ background: '#dffe95', border: 'none', color: '#10211f', padding: '6px 16px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
+                            ✏️ Edit Ad
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); toggleStatus(ad.id, 'ad', ad.status) }}
+                            style={{ background: ad.status === 'ACTIVE' ? 'rgba(248,113,113,0.1)' : 'rgba(134,239,172,0.1)', border: `1px solid ${ad.status === 'ACTIVE' ? 'rgba(248,113,113,0.2)' : 'rgba(134,239,172,0.2)'}`, color: ad.status === 'ACTIVE' ? '#f87171' : '#86efac', padding: '6px 12px', borderRadius: 100, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+                            {ad.status === 'ACTIVE' ? 'Pause' : 'Activate'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -178,18 +174,14 @@ export default function CampaignsPage() {
         </div>
       )}
 
-      {/* Edit Modal */}
       {editModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
           <div style={{ background: '#152928', border: '1px solid rgba(223,254,149,0.2)', borderRadius: 20, width: '100%', maxWidth: 500 }}>
-
             <div style={{ padding: '20px 24px 0' }}>
               <div style={{ fontSize: 17, fontWeight: 900, color: 'white', marginBottom: 4 }}>
                 {editModal.action === 'update_budget' ? '💰 Edit Budget' : editModal.action === 'update_adset' ? '👥 Edit Audience' : '✏️ Edit Ad'}
               </div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>{editModal.name}</div>
-
-              {/* Tabs for Ad editing */}
               {editModal.action === 'update_ad' && (
                 <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   {[{ key: 'text', label: '📝 Copy' }, { key: 'url', label: '🔗 URL' }, { key: 'creative', label: '🎨 Creative' }].map(t => (
@@ -203,7 +195,6 @@ export default function CampaignsPage() {
             </div>
 
             <div style={{ padding: '20px 24px' }}>
-              {/* Budget */}
               {editModal.action === 'update_budget' && (
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>Daily Budget (PKR)</label>
@@ -214,7 +205,6 @@ export default function CampaignsPage() {
                 </div>
               )}
 
-              {/* Ad - Copy */}
               {editModal.action === 'update_ad' && activeTab === 'text' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
@@ -230,7 +220,6 @@ export default function CampaignsPage() {
                 </div>
               )}
 
-              {/* Ad - URL */}
               {editModal.action === 'update_ad' && activeTab === 'url' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
@@ -244,7 +233,6 @@ export default function CampaignsPage() {
                 </div>
               )}
 
-              {/* Ad - Creative */}
               {editModal.action === 'update_ad' && activeTab === 'creative' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, textAlign: 'center' }}>
@@ -263,7 +251,6 @@ export default function CampaignsPage() {
                 </div>
               )}
 
-              {/* Audience */}
               {editModal.action === 'update_adset' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
