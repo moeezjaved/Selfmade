@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (!targetAdset) targetAdset = adsetsData.data?.[0]
     if (!targetAdset) return NextResponse.json({ error: 'No adset found' }, { status: 404 })
 
-    // CLEAN TARGETING
+    // CLEAN TARGETING - copy from original
     const t = targetAdset.targeting || {}
     const cleanT: Record<string, unknown> = {
       geo_locations: t.geo_locations || { countries: ["PK"] },
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     if (t.exclusions) cleanT.exclusions = t.exclusions
     if (t.targeting_automation) cleanT.targeting_automation = t.targeting_automation
 
-    // BUILD ADSET — no destination_type, let Meta inherit it
+    // BUILD ADSET - copy destination_type from original adset
     const adsetBody: Record<string, unknown> = {
       name: (adsetName || targetAdset.name) + " — Scale " + budgetMultiplier + "x",
       campaign_id: scalingCampaign.id,
@@ -114,6 +114,8 @@ export async function POST(request: NextRequest) {
       optimization_goal: targetAdset.optimization_goal || "OFFSITE_CONVERSIONS",
       billing_event: targetAdset.billing_event || "IMPRESSIONS",
     }
+    // Copy destination_type from original — never hardcode it
+    if (targetAdset.destination_type) adsetBody.destination_type = targetAdset.destination_type
     if (targetAdset.promoted_object) adsetBody.promoted_object = targetAdset.promoted_object
 
     const newAdset = await post(adAccountId + "/adsets", adsetBody)
@@ -134,7 +136,7 @@ export async function POST(request: NextRequest) {
 
     // ORIGINAL ADSET STAYS UNTOUCHED
 
-    // TEST INTEREST ADSETS (stay in prospecting campaign)
+    // TEST INTEREST ADSETS - also copy destination_type from original
     const newAdsets: string[] = []
     for (const interestName of (selectedInterests as string[])) {
       try {
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest) {
         })
         const match = intData.data?.[0]
         if (match) {
-          await post(adAccountId + "/adsets", {
+          const testAdsetBody: Record<string, unknown> = {
             name: campaignName + " — Test — " + match.name,
             campaign_id: winning.id,
             status: "PAUSED",
@@ -153,9 +155,14 @@ export async function POST(request: NextRequest) {
               geo_locations: { countries: ["PK"] },
               flexible_spec: [{ interests: [{ id: match.id, name: match.name }] }],
             },
-            optimization_goal: "OFFSITE_CONVERSIONS",
-            billing_event: "IMPRESSIONS",
-          })
+            optimization_goal: targetAdset.optimization_goal || "OFFSITE_CONVERSIONS",
+            billing_event: targetAdset.billing_event || "IMPRESSIONS",
+          }
+          // Copy destination_type from original adset
+          if (targetAdset.destination_type) testAdsetBody.destination_type = targetAdset.destination_type
+          if (targetAdset.promoted_object) testAdsetBody.promoted_object = targetAdset.promoted_object
+
+          await post(adAccountId + "/adsets", testAdsetBody)
           newAdsets.push(match.name)
         }
       } catch (e: any) {
