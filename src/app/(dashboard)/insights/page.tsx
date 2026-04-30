@@ -34,13 +34,27 @@ export default function InsightsPage() {
   const takeAction = async (campaign: CampaignInsight, action: string) => {
     setActing(campaign.id)
     try {
-      await fetch('/api/insights/action', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({campaignId: campaign.id, campaignName: campaign.name, action})
-      })
+      if (action === 'scale') {
+        const res = await fetch('/api/m4/scale', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({campaignName: campaign.name, product: '', description: '', competitorDomains: ''})
+        })
+        const data = await res.json()
+        if (data.error) alert('Scale failed: ' + data.error)
+        else alert('Scaled! Duplicate campaign created with 2x budget. ' + (data.new_interests || 0) + ' new interests added to original.')
+      } else if (action === 'pause') {
+        await fetch('/api/insights/action', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({campaignId: campaign.id, action: 'pause'})
+        })
+        alert('Campaign paused.')
+      } else if (action === 'hold') {
+        alert('Got it. Check back in 3-7 days for more data before deciding.')
+      }
       await loadInsights()
-    } catch {}
+    } catch(e: any) { alert('Error: ' + e.message) }
     setActing(null)
   }
 

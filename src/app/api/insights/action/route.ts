@@ -21,6 +21,20 @@ export async function POST(request: NextRequest) {
 
     const token = decryptToken(metaAccount.access_token)
 
+    if (action === 'scale') {
+      // Call the M4 scale API
+      const scaleRes = await fetch((process.env.NEXT_PUBLIC_APP_URL || 'https://www.tryselfmade.ai') + '/api/m4/scale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'cookie': request.headers.get('cookie') || '' },
+        body: JSON.stringify({
+          campaignName: request.headers.get('x-campaign-name') || '',
+          product: '', description: '', competitorDomains: ''
+        })
+      })
+      const scaleData = await scaleRes.json()
+      return NextResponse.json(scaleData)
+    }
+
     if (action === 'pause') {
       const r = await fetch(`https://graph.facebook.com/${V}/${campaignId}`, {
         method: 'POST',
