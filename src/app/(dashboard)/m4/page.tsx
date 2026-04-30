@@ -249,7 +249,7 @@ export default function M4Page() {
           </div>
           <div style={S.foot}>
             <button onClick={()=>setStep('welcome')} style={S.back}>Back</button>
-            {nb(async()=>{if(interests.length===0)await generateInterests();setStep('creatives')},loading?'Loading…':'Continue',!pixelChoice||!form.product||loading)}
+            {nb(async()=>{if(interests.length===0)await generateInterests();setStep('creatives')},loading?'Loading…':'Continue →',!pixelChoice||!form.product||!form.campaignName||!form.description||loading)}
           </div>
         </div>
       )}
@@ -288,7 +288,7 @@ export default function M4Page() {
           </div>
           <div style={S.foot}>
             <button onClick={()=>setStep('pixel')} style={S.back}>Back</button>
-            {nb(()=>setStep('retargeting'),`Set Up Retargeting (${creatives.length} creatives)`,creatives.length<1)}
+            {nb(()=>setStep('retargeting'),`Set Up Retargeting (${creatives.length} creative${creatives.length!==1?'s':''}) →`,creatives.length<1||!adCopy.primaryText||!adCopy.headline||!adCopy.destinationUrl||!selectedPageId)}
           </div>
         </div>
       )}
@@ -330,7 +330,7 @@ export default function M4Page() {
           </div>
           <div style={S.foot}>
             <button onClick={()=>setStep('creatives')} style={S.back}>Back</button>
-            {nb(()=>setStep('interests'),'Select Interests',retargetingCreatives.length<1)}
+            {nb(()=>setStep('interests'),'Select Interests →',retargetingCreatives.length<1||!retargetingCopy.primaryText||!retargetingCopy.destinationUrl)}
           </div>
         </div>
       )}
@@ -364,7 +364,7 @@ export default function M4Page() {
           </div>
           <div style={S.foot}>
             <div><button onClick={()=>setStep('retargeting')} style={S.back}>Back</button><span style={{marginLeft:14,fontSize:13,color:'rgba(255,255,255,0.4)'}}>{selectedInterests.length} selected</span></div>
-            {nb(()=>setStep('budget'),'Set Budget',selectedInterests.length<2)}
+            {nb(()=>setStep('budget'),'Set Budget →',selectedInterests.length<2)}
           </div>
         </div>
       )}
@@ -397,7 +397,7 @@ export default function M4Page() {
               <div><label style={S.label}>Location</label><input value={form.location} onChange={e=>set('location',e.target.value)} placeholder="PK, Lahore" style={S.input}/></div>
             </div>
           </div>
-          <div style={S.foot}><button onClick={()=>setStep('interests')} style={S.back}>Back</button>{nb(()=>setStep('review'),'Review and Launch')}</div>
+          <div style={S.foot}><button onClick={()=>setStep('interests')} style={S.back}>Back</button>{nb(()=>setStep('review'),'Review & Launch →',!form.budget||parseFloat(form.budget)<=0)}</div>
         </div>
       )}
 
