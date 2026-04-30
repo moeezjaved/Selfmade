@@ -62,19 +62,46 @@ export default function M4Page() {
     fetch('/api/m4/pages').then(r=>r.json()).then(d=>{setPages(d.pages||[]);if(d.pages?.[0]){setSelectedPageId(d.pages[0].id);if(d.pages[0].instagram?.id)setSelectedInstagramId(d.pages[0].instagram.id)}}).catch(()=>{})
   },[])
 
-  const uploadFile = (file: File, setter: React.Dispatch<React.SetStateAction<Creative[]>>) => {
+  const uploadFile = async (file: File, setter: React.Dispatch<React.SetStateAction<Creative[]>>) => {
     const id = `${Date.now()}-${Math.random().toString(36).substr(2,9)}`
-    setter(prev=>[...prev,{id,name:file.name.replace(/\.[^.]+$/,''),pack:1,type:file.type.startsWith('video')?'video':'image',mimeType:file.type,uploading:true}])
-    const reader = new FileReader()
-    reader.onload = async (ev) => {
-      const base64 = (ev.target?.result as string)?.split(',')[1]
-      try {
-        const res = await fetch('/api/m4/upload-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64,mimeType:file.type,name:file.name})})
-        const data = await res.json()
-        setter(prev=>prev.map(c=>c.id===id?{...c,hash:data.hash||undefined,uploading:false,uploaded:!!data.hash||data.isVideo===true||data.isVideo==="true"}:c))
-      } catch { setter(prev=>prev.map(c=>c.id===id?{...c,uploading:false}:c)) }
-    }
-    reader.readAsDataURL(file)
+    const isVid = file.type.startsWith('video/')
+    setter(prev=>[...prev,{id,name:file.name.replace(/\.[^.]+$/,''),pack:1,type:isVid?'video':'image',mimeType:file.type,uploading:true}])
+    try {
+      if (isVid) {
+        const sessionRes = await fetch('/api/m4/upload-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mimeType:file.type,fileSize:file.size,name:file.name,isVideo:true})})
+        const session = await sessionRes.json()
+        if (session.error) throw new Error(session.error)
+        let startOffset = parseInt(session.startOffset||'0')
+        let endOffset = parseInt(session.endOffset||String(Math.min(4194304,file.size)))
+        while (startOffset < file.size) {
+          const chunk = file.slice(startOffset, endOffset)
+          const cf = new FormData()
+          cf.append('upload_phase','transfer')
+          cf.append('upload_session_id',session.uploadSessionId)
+          cf.append('start_offset',String(startOffset))
+          cf.append('video_file_chunk',chunk)
+          cf.append('access_token',session.token)
+          const cr = await fetch(`https://graph.facebook.com/v20.0/${session.adAccountId}/advideos`,{method:'POST',body:cf})
+          const cd = await cr.json()
+          if (cd.error) throw new Error(cd.error.message)
+          startOffset = parseInt(cd.start_offset)
+          endOffset = parseInt(cd.end_offset)
+          if (startOffset === endOffset) break
+        }
+        const fr = await fetch('/api/m4/upload-image',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({uploadSessionId:session.uploadSessionId,videoId:session.videoId,token:session.token,adAccountId:session.adAccountId})})
+        const fd = await fr.json()
+        setter(prev=>prev.map(c=>c.id===id?{...c,hash:fd.videoId,uploading:false,uploaded:!fd.error}:c))
+      } else {
+        const reader = new FileReader()
+        reader.onload = async (ev) => {
+          const base64 = (ev.target?.result as string)?.split(',')[1]
+          const res = await fetch('/api/m4/upload-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64,mimeType:file.type,name:file.name})})
+          const data = await res.json()
+          setter(prev=>prev.map(c=>c.id===id?{...c,hash:data.hash||undefined,uploading:false,uploaded:!!data.hash}:c))
+        }
+        reader.readAsDataURL(file)
+      }
+    } catch(e:any) { setter(prev=>prev.map(c=>c.id===id?{...c,uploading:false}:c)) }
   }
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<Creative[]>>) => {
