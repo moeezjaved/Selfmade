@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
       status: 'PAUSED',
       special_ad_categories: [],
       daily_budget: Math.max(minBudget, Math.round(safeBudget * 0.3)),
-      is_adset_budget_sharing_enabled: true,
+      is_adset_budget_sharing_enabled: false,
     })
 
     for (const c of (creatives as any[]).slice(0, 5)) {
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
       status: 'PAUSED',
       special_ad_categories: [],
       daily_budget: Math.max(minBudget, Math.round(safeBudget * 0.3)),
-      is_adset_budget_sharing_enabled: true,
+      is_adset_budget_sharing_enabled: false,
     })
 
     // Use first creative's hash for interest ads
@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
           status: 'PAUSED',
           special_ad_categories: [],
           daily_budget: rtBudget,
-          is_adset_budget_sharing_enabled: true,
+          is_adset_budget_sharing_enabled: false,
         })
 
         for (const c of (retargetingCreatives as any[]).slice(0, 3)) {
@@ -308,7 +308,7 @@ export async function POST(request: NextRequest) {
           status: 'PAUSED',
           special_ad_categories: [],
           daily_budget: Math.max(minBudget, Math.round(safeBudget * 0.2)),
-          is_adset_budget_sharing_enabled: true,
+          is_adset_budget_sharing_enabled: false,
         })
 
         for (const c of (retainerCreatives as any[]).slice(0, 3)) {
