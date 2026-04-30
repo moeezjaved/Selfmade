@@ -237,7 +237,7 @@ export default function InsightsPage() {
               <div style={{display:'flex',flexDirection:'column',gap:8,fontSize:13,color:'rgba(255,255,255,0.7)'}}>
                 <div>✅ <strong style={{color:'white'}}>Duplicate this ad set</strong> — same creative + audience, higher budget</div>
                 <div>✅ <strong style={{color:'white'}}>Duplicate goes ACTIVE</strong> — original stays untouched as your control</div>
-                <div>✅ <strong style={{color:'white'}}>Select 1 interest below</strong> — added to original campaign to test new audiences</div>
+                <div>✅ <strong style={{color:'white'}}>Test new interests</strong> — each interest creates a new ad set (same creative, new audience)</div>
               </div>
             </div>
 
@@ -264,7 +264,7 @@ export default function InsightsPage() {
                   Test New Audiences (Optional) — Pick interests to test
                 </div>
                 <div style={{fontSize:11,color:'rgba(255,255,255,0.3)',marginBottom:8}}>Each selected interest creates a new test ad set with the same creative</div>
-                {!scaleModal.campaign.launchData && suggestedInterests.length === 0 && (
+                {!scaleModal.campaign.launchData && (
                   <div style={{display:'flex',gap:8,marginBottom:8}}>
                     <input
                       value={productContext}
