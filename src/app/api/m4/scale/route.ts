@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Find the winning campaign
     const campData = await get(adAccountId + "/campaigns", {
-      fields: "id,name,status,objective,daily_budget",
+      fields: "id,name,status,objective,daily_budget,budget_rebalance_flag",
       limit: "200"
     })
     const winning = campData.data?.find((c: any) =>
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, action: 'budget_increased' })
     }
 
-    // FIND OR CREATE SCALING CAMPAIGN
+    // FIND OR CREATE SCALING CAMPAIGN (CBO - budget at campaign level)
     const scalingCampaignName = "M4 | Scaling | " + winning.name
     let scalingCampaign = campData.data?.find((c: any) => c.name === scalingCampaignName)
 
@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
         objective: winning.objective || "OUTCOME_SALES",
         status: "PAUSED",
         special_ad_categories: [],
+        daily_budget: Math.max(minBudget * 100, scaledBudget), // CBO: budget on campaign
+        budget_rebalance_flag: true,
       })
       console.log("Created Scaling campaign:", scalingCampaign.id)
     } else {
@@ -83,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     // GET WINNING ADSET
     const adsetsData = await get(winning.id + "/adsets", {
-      fields: "id,name,targeting,optimization_goal,billing_event,destination_type,promoted_object,daily_budget",
+      fields: "id,name,targeting,optimization_goal,billing_event,destination_type,promoted_object",
       limit: "20"
     })
 
@@ -91,7 +93,7 @@ export async function POST(request: NextRequest) {
     if (!targetAdset) targetAdset = adsetsData.data?.[0]
     if (!targetAdset) return NextResponse.json({ error: 'No adset found' }, { status: 404 })
 
-    // CLEAN TARGETING - copy from original
+    // CLEAN TARGETING
     const t = targetAdset.targeting || {}
     const cleanT: Record<string, unknown> = {
       geo_locations: t.geo_locations || { countries: ["PK"] },
@@ -104,17 +106,16 @@ export async function POST(request: NextRequest) {
     if (t.exclusions) cleanT.exclusions = t.exclusions
     if (t.targeting_automation) cleanT.targeting_automation = t.targeting_automation
 
-    // BUILD ADSET - copy destination_type from original adset
+    // BUILD SCALED ADSET — no daily_budget (CBO handles it at campaign level)
     const adsetBody: Record<string, unknown> = {
       name: (adsetName || targetAdset.name) + " — Scale " + budgetMultiplier + "x",
       campaign_id: scalingCampaign.id,
       status: "PAUSED",
-      daily_budget: Math.max(minBudget * 100, scaledBudget),
       targeting: cleanT,
       optimization_goal: targetAdset.optimization_goal || "OFFSITE_CONVERSIONS",
       billing_event: targetAdset.billing_event || "IMPRESSIONS",
+      is_adset_budget_sharing_enabled: true,  // CBO: adset shares campaign budget
     }
-    // Copy destination_type from original — never hardcode it
     if (targetAdset.destination_type) adsetBody.destination_type = targetAdset.destination_type
     if (targetAdset.promoted_object) adsetBody.promoted_object = targetAdset.promoted_object
 
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     // ORIGINAL ADSET STAYS UNTOUCHED
 
-    // TEST INTEREST ADSETS - also copy destination_type from original
+    // TEST INTEREST ADSETS (in prospecting campaign — also CBO)
     const newAdsets: string[] = []
     for (const interestName of (selectedInterests as string[])) {
       try {
@@ -149,7 +150,6 @@ export async function POST(request: NextRequest) {
             name: campaignName + " — Test — " + match.name,
             campaign_id: winning.id,
             status: "PAUSED",
-            daily_budget: Math.max(minBudget * 100, testBudget * 100),
             targeting: {
               age_min: 18,
               geo_locations: { countries: ["PK"] },
@@ -157,8 +157,8 @@ export async function POST(request: NextRequest) {
             },
             optimization_goal: targetAdset.optimization_goal || "OFFSITE_CONVERSIONS",
             billing_event: targetAdset.billing_event || "IMPRESSIONS",
+            is_adset_budget_sharing_enabled: true,  // CBO
           }
-          // Copy destination_type from original adset
           if (targetAdset.destination_type) testAdsetBody.destination_type = targetAdset.destination_type
           if (targetAdset.promoted_object) testAdsetBody.promoted_object = targetAdset.promoted_object
 
