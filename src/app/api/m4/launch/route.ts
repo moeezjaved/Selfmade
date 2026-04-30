@@ -234,8 +234,6 @@ export async function POST(request: NextRequest) {
     let retargetingCount = 0
     let retainerCount = 0
 
-    // Create exclusion audience (website visitors 60 days) for prospecting campaigns
-    let exclusionAudienceId: string | null = null
     if (pixelId) {
       try {
         const excAud = await post(`${adAccountId}/customaudiences`, {
