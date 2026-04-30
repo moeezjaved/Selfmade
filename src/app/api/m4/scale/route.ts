@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const {
-      campaignName, campaignId, budgetMultiplier = 2, isBudgetIncrease = false,
+      campaignId, campaignName, budgetMultiplier = 2, isBudgetIncrease = false,
       adsetId, adsetName,
     } = await request.json()
 
@@ -24,14 +24,18 @@ export async function POST(request: NextRequest) {
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = "act_" + metaAccount.account_id
 
-    const post = async (path: string, body: Record<string, unknown>) => {
+    const postRaw = async (path: string, body: Record<string, unknown>) => {
       const url = "https://graph.facebook.com/" + V + "/" + path
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...body, access_token: token })
       })
-      const data = await res.json()
+      return res.json() // return raw, let caller decide on error
+    }
+
+    const post = async (path: string, body: Record<string, unknown>) => {
+      const data = await postRaw(path, body)
       if (data.error) throw new Error(JSON.stringify(data.error))
       return data
     }
@@ -43,7 +47,7 @@ export async function POST(request: NextRequest) {
       return res.json()
     }
 
-    // Find the winning campaign
+    // Find winning campaign
     const campData = await get(adAccountId + "/campaigns", {
       fields: "id,name,status,objective,daily_budget",
       limit: "200"
@@ -81,31 +85,32 @@ export async function POST(request: NextRequest) {
       console.log("Created Scaling campaign:", scalingCampaignId)
     }
 
-    // COPY WINNING ADSET (no deep copy — we copy ads separately)
-    const copiedAdset = await post(adsetId + "/copies", {
+    // COPY ADSET with deep_copy: true
+    // Meta may throw a deprecation warning but still creates the copy successfully
+    // We catch error_subcode 3858504 (standard enhancements deprecated) and treat as success
+    const adsetCopyRaw = await postRaw(adsetId + "/copies", {
       campaign_id: scalingCampaignId,
-      deep_copy: false,
+      deep_copy: true,
       status_override: "PAUSED",
       rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
     })
-    const newAdsetId = copiedAdset.copied_adset_id
-    if (!newAdsetId) throw new Error("Failed to copy adset")
 
-    // Rename adset
+    console.log("Adset copy response:", JSON.stringify(adsetCopyRaw))
+
+    // error_subcode 3858504 = standard enhancements deprecated warning
+    // Meta still creates the copy, so we treat it as success
+    if (adsetCopyRaw.error && adsetCopyRaw.error.error_subcode !== 3858504) {
+      throw new Error(JSON.stringify(adsetCopyRaw.error))
+    }
+
+    // Get the new adset ID — even on deprecation warning Meta returns copied_adset_id
+    const newAdsetId = adsetCopyRaw.copied_adset_id
+    if (!newAdsetId) throw new Error("Adset copy failed — no ID returned")
+
+    // Rename the adset
     await post(newAdsetId, {
       name: (adsetName || "Winner") + " — Scale " + budgetMultiplier + "x"
     }).catch(() => null)
-
-    // COPY EACH AD using /copies — this is the correct way to duplicate ads
-    // Meta handles all creative fields correctly when using ad /copies
-    const adsData = await get(adsetId + "/ads", { fields: "id,name" })
-    for (const ad of (adsData.data || []).slice(0, 5)) {
-      await post(ad.id + "/copies", {
-        adset_id: newAdsetId,
-        status_override: "PAUSED",
-        rename_options: { rename_strategy: "ONLY_TOP_LEVEL_RENAME" }
-      }).catch((e: any) => console.log("Ad copy error:", e.message))
-    }
 
     console.log("Scale complete. New adset:", newAdsetId)
 
