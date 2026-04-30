@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       OUTCOME_TRAFFIC: { optimization_goal: 'LINK_CLICKS', billing_event: 'IMPRESSIONS' },
       OUTCOME_AWARENESS: { optimization_goal: 'REACH', billing_event: 'IMPRESSIONS' },
     }
-    const optSettings = optimizationMap[objective] || optimizationMap.OUTCOME_TRAFFIC
+    const optSettings = {...(optimizationMap[objective] || optimizationMap.OUTCOME_TRAFFIC), bid_strategy: 'LOWEST_COST_WITHOUT_CAP'}
 
     const promotedObject = (pixelId && objective === 'OUTCOME_SALES')
       ? { promoted_object: { pixel_id: pixelId, custom_event_type: 'PURCHASE' } }
