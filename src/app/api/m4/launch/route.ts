@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
               }
             }
             retargetingCount++
-          } catch(e: any) { errors.push(`Retargeting "${c.name}": ${e.message}`) }
+          } catch(e: any) { console.log('Retargeting adset error:', e.message); errors.push(`Retargeting "${c.name}": ${e.message}`) }
         }
       } catch(e: any) { errors.push(`Retargeting campaign: ${e.message}`) }
     }
