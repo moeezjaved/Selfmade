@@ -140,7 +140,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+    if (body.action === "update_adset") {
+      const targeting: Record<string,unknown> = {}
+      if (body.age_min) targeting.age_min = body.age_min
+      if (body.age_max) targeting.age_max = body.age_max
+      if (body.genders && body.genders.length > 0) targeting.genders = body.genders
+      await post(body.id, { targeting })
+      return NextResponse.json({ success: true })
+    }
+    return NextResponse.json({ error: "Unknown action" }, { status: 400 })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
