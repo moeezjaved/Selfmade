@@ -240,7 +240,6 @@ export default function InsightsPage() {
               </div>
             </div>
 
-            {/* Show tabs: if already scaled show budget increase option too */}
             {!scaleModal.campaign.launchData && (
               <div style={{marginBottom:12}}>
                 <label style={{display:'block',fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'}}>What do you sell? (helps find better interests)</label>
