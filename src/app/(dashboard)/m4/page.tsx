@@ -73,20 +73,33 @@ export default function M4Page() {
         if (session.error) throw new Error(session.error)
         let startOffset = parseInt(session.startOffset||'0')
         let endOffset = parseInt(session.endOffset||String(Math.min(4194304,file.size)))
-        while (startOffset < file.size) {
+        // Upload chunks via our server (CORS prevents direct browser-to-Meta)
+        let done = false
+        while (!done) {
           const chunk = file.slice(startOffset, endOffset)
-          const cf = new FormData()
-          cf.append('upload_phase','transfer')
-          cf.append('upload_session_id',session.uploadSessionId)
-          cf.append('start_offset',String(startOffset))
-          cf.append('video_file_chunk',chunk)
-          cf.append('access_token',session.token)
-          const cr = await fetch(`https://graph.facebook.com/v20.0/${session.adAccountId}/advideos`,{method:'POST',body:cf})
+          const chunkB64 = await new Promise<string>((res) => {
+            const fr = new FileReader()
+            fr.onload = e => res((e.target?.result as string).split(',')[1])
+            fr.readAsDataURL(chunk)
+          })
+          const cr = await fetch('/api/m4/upload-image', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              chunk: chunkB64,
+              uploadSessionId: session.uploadSessionId,
+              startOffset,
+              adAccountId: session.adAccountId,
+              token: session.token,
+              isChunk: true,
+            })
+          })
           const cd = await cr.json()
-          if (cd.error) throw new Error(cd.error.message)
-          startOffset = parseInt(cd.start_offset)
-          endOffset = parseInt(cd.end_offset)
-          if (startOffset === endOffset) break
+          if (cd.error) throw new Error(cd.error)
+          if (cd.done) { done = true; break }
+          startOffset = cd.startOffset
+          endOffset = Math.min(cd.endOffset, file.size)
+          if (startOffset >= file.size) break
         }
         const fr = await fetch('/api/m4/upload-image',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({uploadSessionId:session.uploadSessionId,videoId:session.videoId,token:session.token,adAccountId:session.adAccountId})})
         const fd = await fr.json()
