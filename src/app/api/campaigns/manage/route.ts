@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     const res = await fetch(url)
     const campData = await res.json()
 
+    console.log('Total campaigns from Meta:', campData.data?.length, 'statuses:', campData.data?.map((c:any) => c.status + '/' + c.effective_status))
     if (campData.error) return NextResponse.json({ error: campData.error.message }, { status: 400 })
 
     const campaigns = (campData.data || [])
