@@ -403,7 +403,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.campaigns.slice(0, 6).map((campaign: any) => {
+                  {data.campaigns.filter((c:any) => c.status === 'ACTIVE' || c.status === 'PAUSED').slice(0, 6).map((campaign: any) => {
                     const insights = campaign.campaign_insights?.[0]
                     return (
                       <tr key={campaign.id} className="hover:bg-dark3 transition-colors" style={{borderTop:"1px solid rgba(0,0,0,0.04)"}}>
