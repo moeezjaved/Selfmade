@@ -36,58 +36,52 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    const { data: uploadData, error: uploadError } = await admin.storage
+    const { error: uploadError } = await admin.storage
       .from(bucket)
-      .upload(fileName, buffer, {
-        contentType: file.type,
-        upsert: false,
-      })
+      .upload(fileName, buffer, { contentType: file.type, upsert: false })
 
-    if (uploadError) {
-      console.error('Supabase upload error:', uploadError)
-      return NextResponse.json({ error: 'Storage upload failed: ' + uploadError.message }, { status: 400 })
-    }
+    if (uploadError) return NextResponse.json({ error: 'Storage upload failed: ' + uploadError.message }, { status: 400 })
 
     // Step 2: Get public URL
     const { data: urlData } = admin.storage.from(bucket).getPublicUrl(fileName)
     const publicUrl = urlData.publicUrl
+    console.log('Supabase URL:', publicUrl)
 
-    console.log('Uploaded to Supabase:', publicUrl)
-
-    // Step 3: Send URL to Meta
+    // Step 3: Send to Meta via multipart with URL
     if (isVideo) {
-      // For videos: use URL-based upload
+      // Video: use file_url parameter
+      const metaForm = new FormData()
+      metaForm.append('file_url', publicUrl)
+      metaForm.append('access_token', token)
       const res = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/advideos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file_url: publicUrl,
-          access_token: token,
-        })
+        body: metaForm
       })
       const data = await res.json()
-      console.log('Meta video response:', JSON.stringify(data))
+      console.log('Meta video:', JSON.stringify(data))
       if (data.error) return NextResponse.json({ error: data.error.message }, { status: 400 })
-      return NextResponse.json({ videoId: data.id, hash: data.id, isVideo: true, url: publicUrl })
+      return NextResponse.json({ videoId: data.id, hash: data.id, isVideo: true })
     } else {
-      // For images: use URL-based upload
+      // Image: fetch from Supabase and send as multipart to Meta
+      const imgRes = await fetch(publicUrl)
+      const imgBuffer = await imgRes.arrayBuffer()
+      
+      const metaForm = new FormData()
+      metaForm.append('access_token', token)
+      metaForm.append(file.name, new Blob([imgBuffer], { type: file.type }), file.name)
+      
       const res = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/adimages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: publicUrl,
-          access_token: token,
-        })
+        body: metaForm
       })
       const data = await res.json()
-      console.log('Meta image response:', JSON.stringify(data))
+      console.log('Meta image:', JSON.stringify(data))
       if (data.error) return NextResponse.json({ error: data.error.message }, { status: 400 })
       const images = data.images || {}
       const firstKey = Object.keys(images)[0]
-      if (!firstKey) return NextResponse.json({ error: 'No image hash returned' }, { status: 400 })
+      if (!firstKey) return NextResponse.json({ error: 'No image hash returned from Meta' }, { status: 400 })
       return NextResponse.json({ hash: images[firstKey]?.hash, url: images[firstKey]?.url })
     }
-
   } catch (err: any) {
     console.error('Upload error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
