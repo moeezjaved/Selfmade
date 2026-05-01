@@ -32,6 +32,7 @@ export default function DashboardPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [approving, setApproving] = useState<string | null>(null)
   const [currency, setCurrency] = useState<string>('USD')
+  const [winners, setWinners] = useState<any[]>([])
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -103,6 +104,18 @@ export default function DashboardPage() {
       lastSynced: account?.last_synced_at || null,
     })
     setLoading(false)
+
+    // Fetch winners from insights
+    try {
+      const insRes = await fetch('/api/insights/campaigns?dateRange=last_7d')
+      const insData = await insRes.json()
+      const w = (insData.campaigns || []).flatMap((c: any) =>
+        (c.adsets || []).filter((a: any) => a.rec_type === 'scale').map((a: any) => ({
+          ...a, campaignName: c.name,
+        }))
+      )
+      setWinners(w)
+    } catch(e) {}
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
