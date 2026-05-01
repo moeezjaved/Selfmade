@@ -51,7 +51,7 @@ export default function ReportsPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 900, color: '#1a3a1a' }}>Reports</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Deep insights from your Meta Ads</div>
+          <div style={{ fontSize: 13, color: '#7a9a7a', marginTop: 2 }}>Deep insights from your Meta Ads</div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {['last_3d', 'last_7d', 'last_14d', 'last_30d'].map(r => (
@@ -65,7 +65,7 @@ export default function ReportsPage() {
       {/* Sort Filter Bar */}
       {data && !loading && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, background: '#ffffff', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '10px 16px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.06em', marginRight: 4 }}>Sort by:</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#7a9a7a', textTransform: 'uppercase', letterSpacing: '.06em', marginRight: 4 }}>Sort by:</span>
           {sortBtns.map(b => (
             <button key={b.key} onClick={() => setSortKey(b.key)} style={{ padding: '5px 12px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, cursor: 'pointer', background: sortKey === b.key ? '#dffe95' : 'rgba(255,255,255,0.06)', color: sortKey === b.key ? '#10211f' : 'rgba(255,255,255,0.5)', transition: 'all .15s' }}>
               {b.label}
@@ -80,20 +80,20 @@ export default function ReportsPage() {
           <div style={{ color: '#1a3a1a', fontWeight: 700 }}>Loading your reports...</div>
         </div>
       ) : error ? (
-        <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 16, padding: 24, color: '#f87171' }}>{error}</div>
+        <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 16, padding: 24, color: '#c0392b' }}>{error}</div>
       ) : data && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Overview KPIs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             {[
-              { label: 'Total Spend', value: fmt(data.overview?.spend || 0, data.currency), color: '#f87171' },
-              { label: 'Total Revenue', value: fmt(data.overview?.revenue || 0, data.currency), color: '#86efac' },
+              { label: 'Total Spend', value: fmt(data.overview?.spend || 0, data.currency), color: '#c0392b' },
+              { label: 'Total Revenue', value: fmt(data.overview?.revenue || 0, data.currency), color: '#2d7a2d' },
               { label: 'Blended ROAS', value: (data.overview?.roas || 0).toFixed(2) + 'x', color: roasColor(data.overview?.roas || 0) },
-              { label: 'Conversions', value: String(data.overview?.conversions || 0), color: '#93c5fd' },
+              { label: 'Conversions', value: String(data.overview?.conversions || 0), color: '#2563eb' },
             ].map(k => (
               <div key={k.label} style={{ background: '#ffffff', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 20px' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>{k.label}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#7a9a7a', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>{k.label}</div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: k.color }}>{k.value}</div>
               </div>
             ))}
@@ -297,9 +297,9 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
       <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 800, color: '#1a3a1a' }}>{title}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{subtitle}</div>
+          <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1 }}>{subtitle}</div>
         </div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.05)', padding: '3px 10px', borderRadius: 100 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#8aaa8a', background: '#f8fcf6', padding: '3px 10px', borderRadius: 100 }}>
           {items.length} items
         </div>
       </div>
@@ -320,22 +320,22 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
                   {item.label}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{fmt(item.spend, currency)} spent</span>
+                  <span style={{ fontSize: 11, color: '#7a9a7a' }}>{fmt(item.spend, currency)} spent</span>
                   <span style={{ fontSize: 13, fontWeight: 900, color: metricColor(item), background: roasBg(item.roas), padding: '2px 10px', borderRadius: 100 }}>
                     {metricVal(item)}
                   </span>
                 </div>
               </div>
               {/* Progress bar */}
-              <div style={{ height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 100, overflow: 'hidden' }}>
+              <div style={{ height: 4, background: '#f8fcf6', borderRadius: 100, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: barWidth + '%', background: roasColor(item.roas), borderRadius: 100, transition: 'width .3s' }} />
               </div>
               {/* Sub metrics */}
               <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Revenue: {fmt(item.revenue, currency)}</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Conv: {item.conversions}</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>CTR: {item.ctr.toFixed(2)}%</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>CPA: {fmt(item.cpa, currency)}</span>
+                <span style={{ fontSize: 10, color: '#8aaa8a' }}>Revenue: {fmt(item.revenue, currency)}</span>
+                <span style={{ fontSize: 10, color: '#8aaa8a' }}>Conv: {item.conversions}</span>
+                <span style={{ fontSize: 10, color: '#8aaa8a' }}>CTR: {item.ctr.toFixed(2)}%</span>
+                <span style={{ fontSize: 10, color: '#8aaa8a' }}>CPA: {fmt(item.cpa, currency)}</span>
               </div>
             </div>
           )
@@ -344,7 +344,7 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
 
       {/* Show More */}
       {rest.length > 0 && (
-        <button onClick={() => toggle(sectionKey)} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.02)', border: 'none', borderTop: '1px solid rgba(255,255,255,0.04)', color: '#dffe95', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+        <button onClick={() => toggle(sectionKey)} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.02)', border: 'none', borderTop: '1px solid rgba(255,255,255,0.04)', color: '#1a3a1a', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
           {isExpanded ? '▲ Show Less' : `▼ Show ${rest.length} More`}
         </button>
       )}

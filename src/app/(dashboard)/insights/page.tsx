@@ -118,10 +118,10 @@ export default function InsightsPage() {
 
       <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:28}}>
         {[
-          {label:'Total Spend', value:fmt(totals.spend, campaigns[0]?.currency), color:'#f87171'},
-          {label:'Total Revenue', value:fmt(totals.revenue, campaigns[0]?.currency), color:'#86efac'},
+          {label:'Total Spend', value:fmt(totals.spend, campaigns[0]?.currency), color:'#c0392b'},
+          {label:'Total Revenue', value:fmt(totals.revenue, campaigns[0]?.currency), color:'#2d7a2d'},
           {label:'Blended ROAS', value:totals.roas.toFixed(2)+'x', color:totals.roas>=2?'#86efac':totals.roas>=1?'#fbbf24':'#f87171'},
-          {label:'Conversions', value:String(totals.conversions), color:'#93c5fd'},
+          {label:'Conversions', value:String(totals.conversions), color:'#2563eb'},
         ].map(k => (
           <div key={k.label} style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.06)',borderRadius:16,padding:20}}>
             <div style={{fontSize:11,fontWeight:700,color:'#7a9a7a',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>{k.label}</div>
@@ -157,7 +157,7 @@ export default function InsightsPage() {
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
                   {campaign.adsets.some(a=>a.rec_type==='scale') && (
-                    <div style={{background:'rgba(134,239,172,0.15)',border:'1px solid rgba(134,239,172,0.3)',borderRadius:100,padding:'4px 12px',fontSize:11,fontWeight:700,color:'#86efac'}}>🚀 Has Winner</div>
+                    <div style={{background:'rgba(134,239,172,0.15)',border:'1px solid rgba(134,239,172,0.3)',borderRadius:100,padding:'4px 12px',fontSize:11,fontWeight:700,color:'#2d7a2d'}}>🚀 Has Winner</div>
                   )}
                   <div style={{fontSize:18,color:'#8aaa8a'}}>{expanded[campaign.id]?'▲':'▼'}</div>
                 </div>
@@ -187,7 +187,7 @@ export default function InsightsPage() {
                           </button>
                         )}
                         {adset.rec_type==='pause' && (
-                          <button onClick={()=>pauseAdset(adset.id)} disabled={!!isActing} style={{background:'rgba(248,113,113,0.15)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+                          <button onClick={()=>pauseAdset(adset.id)} disabled={!!isActing} style={{background:'rgba(248,113,113,0.15)',border:'1px solid rgba(248,113,113,0.3)',color:'#c0392b',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                             {isActing?'Pausing...':'Pause'}
                           </button>
                         )}
@@ -229,7 +229,7 @@ export default function InsightsPage() {
             <div style={{padding:'20px 24px 16px',borderBottom:'1px solid rgba(0,0,0,0.06)',flexShrink:0}}>
               <div style={{fontSize:18,fontWeight:900,color:'#1a3a1a',marginBottom:4}}>Scale This Winner</div>
               <div style={{fontSize:13,color:'#6b8f6b'}}>
-                <strong style={{color:'#dffe95'}}>{scaleModal.adset.name}</strong> is beating your account average.
+                <strong style={{color:'#1a3a1a'}}>{scaleModal.adset.name}</strong> is beating your account average.
               </div>
             </div>
 
@@ -238,7 +238,7 @@ export default function InsightsPage() {
               
               {/* What Scale Does */}
               <div style={{background:'rgba(134,239,172,0.06)',border:'1px solid rgba(134,239,172,0.15)',borderRadius:12,padding:14,marginBottom:16}}>
-                <div style={{fontSize:11,fontWeight:700,color:'#86efac',marginBottom:8,textTransform:'uppercase',letterSpacing:'.06em'}}>What Scale Does</div>
+                <div style={{fontSize:11,fontWeight:700,color:'#2d7a2d',marginBottom:8,textTransform:'uppercase',letterSpacing:'.06em'}}>What Scale Does</div>
                 <div style={{display:'flex',flexDirection:'column',gap:6,fontSize:12,color:'#3a5a3a'}}>
                   <div>✅ <strong style={{color:'#1a3a1a'}}>Duplicate this ad set</strong> — same creative + audience, higher budget, goes ACTIVE</div>
                   <div>✅ <strong style={{color:'#1a3a1a'}}>Original stays untouched</strong> — your control data keeps running</div>
