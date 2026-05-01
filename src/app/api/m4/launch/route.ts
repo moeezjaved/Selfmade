@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
       targetCustomer = '',
       competitorDomains = '',
     } = body
+    console.log('LAUNCH creatives:', creatives?.length, 'interests:', interests?.length, 'budget:', budget)
 
     // Build geo_locations from locations array or fallback to location string
     const buildGeo = () => {
