@@ -88,7 +88,7 @@ export default function InsightsPage() {
     setActing(null)
   }
 
-  const recColor: Record<string,string> = {scale:'#86efac', hold:'#fbbf24', pause:'#f87171', retarget:'#93c5fd'}
+  const recColor: Record<string,string> = {scale:'#2d7a2d', hold:'#b8860b', pause:'#c0392b', retarget:'#93c5fd'}
   const recLabel: Record<string,string> = {scale:'Scale Winner', hold:'Hold & Monitor', pause:'Pause', retarget:'Build Retargeting'}
   const recEmoji: Record<string,string> = {scale:'🚀', hold:'⏳', pause:'⏸', retarget:'🔁'}
 
@@ -120,7 +120,7 @@ export default function InsightsPage() {
         {[
           {label:'Total Spend', value:fmt(totals.spend, campaigns[0]?.currency), color:'#c0392b'},
           {label:'Total Revenue', value:fmt(totals.revenue, campaigns[0]?.currency), color:'#2d7a2d'},
-          {label:'Blended ROAS', value:totals.roas.toFixed(2)+'x', color:totals.roas>=2?'#86efac':totals.roas>=1?'#fbbf24':'#f87171'},
+          {label:'Blended ROAS', value:totals.roas.toFixed(2)+'x', color:totals.roas>=2?'#2d7a2d':totals.roas>=1?'#b8860b':'#c0392b'},
           {label:'Conversions', value:String(totals.conversions), color:'#2563eb'},
         ].map(k => (
           <div key={k.label} style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.06)',borderRadius:16,padding:20}}>
@@ -149,7 +149,7 @@ export default function InsightsPage() {
               {/* Campaign Header */}
               <div onClick={()=>setExpanded(p=>({...p,[campaign.id]:!p[campaign.id]}))} style={{padding:'16px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',borderBottom:expanded[campaign.id]?'1px solid rgba(255,255,255,0.06)':'none'}}>
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
-                  <div style={{width:8,height:8,borderRadius:'50%',background:campaign.status==='ACTIVE'?'#86efac':'rgba(255,255,255,0.2)',flexShrink:0}}/>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:campaign.status==='ACTIVE'?'#2d7a2d':'rgba(255,255,255,0.2)',flexShrink:0}}/>
                   <div>
                     <div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>{campaign.name}</div>
                     <div style={{fontSize:11,color:'#8aaa8a',marginTop:2}}>{campaign.status} · {campaign.objective?.replace('OUTCOME_','')} · {campaign.adsets.length} ad sets</div>
@@ -165,13 +165,13 @@ export default function InsightsPage() {
 
               {/* Ad Sets */}
               {expanded[campaign.id] && campaign.adsets.map(adset => {
-                const rc = recColor[adset.rec_type] || '#fbbf24'
+                const rc = recColor[adset.rec_type] || '#b8860b'
                 const isActing = acting === adset.id
                 return (
                   <div key={adset.id} style={{borderBottom:'1px solid rgba(0,0,0,0.04)'}}>
                     <div style={{padding:'14px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
                       <div style={{display:'flex',alignItems:'center',gap:10}}>
-                        <div style={{width:6,height:6,borderRadius:'50%',background:adset.status==='ACTIVE'?'#86efac':'rgba(255,255,255,0.15)',flexShrink:0}}/>
+                        <div style={{width:6,height:6,borderRadius:'50%',background:adset.status==='ACTIVE'?'#2d7a2d':'rgba(255,255,255,0.15)',flexShrink:0}}/>
                         <div>
                           <div style={{fontSize:13,fontWeight:700,color:'#1a3a1a'}}>{adset.name}</div>
                           <div style={{fontSize:11,color:'#8aaa8a'}}>{adset.status}</div>
@@ -182,7 +182,7 @@ export default function InsightsPage() {
                           {recEmoji[adset.rec_type]} {recLabel[adset.rec_type]}
                         </div>
                         {adset.rec_type==='scale' && (
-                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false)}} disabled={!!isActing} style={{background:'#86efac',color:'#1a3a1a',border:'none',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false)}} disabled={!!isActing} style={{background:'#2d7a2d',color:'#1a3a1a',border:'none',padding:'6px 16px',borderRadius:100,fontSize:12,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                             {isActing?'Scaling...':'Scale Now'}
                           </button>
                         )}
@@ -197,14 +197,14 @@ export default function InsightsPage() {
                       {[
                         {label:'Spend', value:fmt(adset.spend,adset.currency)},
                         {label:'Revenue', value:fmt(adset.revenue,adset.currency)},
-                        {label:'ROAS', value:adset.roas.toFixed(2)+'x', color:adset.roas>=2?'#86efac':adset.roas>=1?'#fbbf24':'#f87171'},
+                        {label:'ROAS', value:adset.roas.toFixed(2)+'x', color:adset.roas>=2?'#2d7a2d':adset.roas>=1?'#b8860b':'#c0392b'},
                         {label:'Conversions', value:String(adset.conversions)},
                         {label:'CTR', value:adset.ctr.toFixed(2)+'%'},
                         {label:'CPA', value:fmt(adset.cpa,adset.currency)},
                       ].map(m => (
                         <div key={m.label} style={{textAlign:'center',background:'#f8fcf6',borderRadius:10,padding:'10px 6px'}}>
                           <div style={{fontSize:10,fontWeight:700,color:'#8aaa8a',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>{m.label}</div>
-                          <div style={{fontSize:14,fontWeight:800,color:m.color||'white'}}>{m.value}</div>
+                          <div style={{fontSize:14,fontWeight:800,color:m.color||'#1a3a1a'}}>{m.value}</div>
                         </div>
                       ))}
                     </div>
@@ -223,7 +223,7 @@ export default function InsightsPage() {
       {/* Scale Modal */}
       {scaleModal && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:16}}>
-          <div style={{background:'#ffffff',border:'1px solid rgba(74,138,0,0.2)',borderRadius:20,width:'100%',maxWidth:520,display:'flex',flexDirection:'column',maxHeight:'92vh'}}>
+          <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.1)',borderRadius:20,boxShadow:'0 20px 60px rgba(0,0,0,0.1)',width:'100%',maxWidth:520,display:'flex',flexDirection:'column',maxHeight:'92vh'}}>
             
             {/* Fixed Header */}
             <div style={{padding:'20px 24px 16px',borderBottom:'1px solid rgba(0,0,0,0.06)',flexShrink:0}}>
@@ -251,7 +251,7 @@ export default function InsightsPage() {
                   <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.1)'),background:!isBudgetIncrease?'rgba(223,254,149,0.1)':'transparent',color:!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
                     Duplicate Again
                   </button>
-                  <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.1)'),background:isBudgetIncrease?'rgba(251,191,36,0.1)':'transparent',color:isBudgetIncrease?'#fbbf24':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                  <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(isBudgetIncrease?'#b8860b':'rgba(255,255,255,0.1)'),background:isBudgetIncrease?'rgba(251,191,36,0.1)':'transparent',color:isBudgetIncrease?'#b8860b':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
                     Increase Budget (max 15%)
                   </button>
                 </div>
@@ -279,12 +279,12 @@ export default function InsightsPage() {
               ) : (
                 <div style={{marginBottom:16}}>
                   <div style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:10,padding:12,marginBottom:10}}>
-                    <div style={{fontSize:12,fontWeight:700,color:'#fbbf24',marginBottom:4}}>Max 15% — Protects Learning Phase</div>
+                    <div style={{fontSize:12,fontWeight:700,color:'#b8860b',marginBottom:4}}>Max 15% — Protects Learning Phase</div>
                     <div style={{fontSize:11,color:'#6b8f6b'}}>Increasing by more than 20% resets Meta learning. Stay under 15%.</div>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
                     {['5','10','15'].map(x=>(
-                      <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#fbbf24':'rgba(255,255,255,0.1)'),background:scaleFactor===x?'rgba(251,191,36,0.1)':'rgba(255,255,255,0.02)',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#fbbf24':'rgba(255,255,255,0.5)'}}>
+                      <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#b8860b':'rgba(255,255,255,0.1)'),background:scaleFactor===x?'rgba(251,191,36,0.1)':'rgba(255,255,255,0.02)',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#b8860b':'rgba(255,255,255,0.5)'}}>
                         +{x}%
                       </div>
                     ))}
