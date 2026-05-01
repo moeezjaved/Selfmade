@@ -320,7 +320,7 @@ export default function CampaignsPage() {
             </div>
 
             <div style={{ padding: '0 24px 20px', display: 'flex', gap: 10 }}>
-              <button onClick={() => setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false)} style={{ flex: 1, background: 'none', border: '1.5px solid rgba(255,255,255,0.15)', color: '#6b8f6b', padding: '11px 0', borderRadius: 100, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false) }} style={{ flex: 1, background: 'none', border: '1.5px solid rgba(255,255,255,0.15)', color: '#6b8f6b', padding: '11px 0', borderRadius: 100, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
               <button onClick={saveEdit} disabled={saving} style={{ flex: 2, background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '11px 0', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
