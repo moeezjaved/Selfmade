@@ -100,7 +100,7 @@ export default function CampaignsPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {campaigns.map(camp => (
+          {campaigns.filter((c:any) => c.status === 'ACTIVE' || c.status === 'PAUSED').map(camp => (
             <div key={camp.id} style={{ background: '#ffffff', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, overflow: 'hidden' }}>
               <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
                 onClick={() => setExpandedCamp(prev => ({ ...prev, [camp.id]: !prev[camp.id] }))}>

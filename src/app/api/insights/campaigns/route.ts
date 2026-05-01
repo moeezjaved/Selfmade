@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = "act_" + metaAccount.account_id
-    const currency = metaAccount.currency || 'USD'
+    const currency = metaAccount.currency || 'PKR'
 
     // Fetch latest launch data for this user (for interest suggestions)
     const { data: launches } = await admin
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
         if (spend < 50) {
           rec_type = "hold"
           recommendation = "Need more spend data. Let this run longer before deciding."
-        } else if (roas >= accountROAS * 1.3 && conversions >= 2) {
+        } else if (roas >= accountROAS * 1.1 && conversions >= 1 && spend >= 10) {
           rec_type = "scale"
           recommendation = roas.toFixed(2) + "x ROAS vs account avg " + accountROAS.toFixed(2) + "x. Duplicate this ad set with higher budget to scale this creative/audience."
         } else if (spend > 300 && roas < accountROAS * 0.7) {
