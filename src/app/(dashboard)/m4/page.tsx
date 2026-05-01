@@ -149,7 +149,7 @@ export default function M4Page() {
     const id = Date.now().toString() + Math.random().toString(36).substr(2,9)
     const isVid = file.type.startsWith('video/')
     setter(prev=>[...prev,{id,name:file.name.replace(/\.[^.]+$/,''),pack:1,type:isVid?'video':'image',mimeType:file.type,uploading:true}])
-    if (isVid && file.size > 5242880) {
+    if (isVid && file.size > 524288000) { // 500MB limit
       alert('Video too large — max 5MB. For larger videos, add directly in Meta Ads Manager.')
       setter(prev=>prev.filter(x=>x.id!==id))
       return
@@ -264,7 +264,7 @@ export default function M4Page() {
         </div>
       )}
       <label style={{background:'rgba(223,254,149,0.1)',border:'1px solid rgba(74,138,0,0.2)',color:'#1a3a1a',padding:'8px 16px',borderRadius:100,fontSize:13,fontWeight:700,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:8}}>
-        Upload Image / Video (max 10MB)<input type="file" accept="image/*,video/*" multiple onChange={e=>handleUpload(e,setter)} style={{display:'none'}}/>
+        Upload Image / Video (up to 500MB)<input type="file" accept="image/*,video/*" multiple onChange={e=>handleUpload(e,setter)} style={{display:'none'}}/>
       </label>
     </div>
   )
