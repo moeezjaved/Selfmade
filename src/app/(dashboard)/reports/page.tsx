@@ -102,20 +102,13 @@ export default function ReportsPage() {
           {/* 2-column grid for smaller sections */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
-            {/* Best Creatives */}
-            <ReportCard
-              title="🎨 Best Creatives"
-              subtitle="Top ads by performance"
-              sectionKey="creatives"
-              expanded={expanded}
-              toggle={toggle}
+            {/* Best Creatives with thumbnails */}
+            <CreativesCard
+              creatives={sorted(data.creatives)}
               currency={data.currency}
               sortKey={sortKey}
-              items={sorted(data.creatives).map((c: any) => ({
-                label: c.name,
-                roas: c.roas, spend: c.spend, revenue: c.revenue,
-                conversions: c.conversions, ctr: c.ctr, cpa: c.cpa,
-              }))}
+              expanded={expanded['creatives']}
+              toggle={() => toggle('creatives')}
             />
 
             {/* Placement */}
