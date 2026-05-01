@@ -16,6 +16,89 @@ const S = {
   back: {background:'none',border:'1.5px solid rgba(255,255,255,0.1)',color:'#7a9a7a',padding:'10px 22px',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'} as React.CSSProperties,
 }
 
+
+// Location picker with Meta API search
+function LocationPicker({selected, onChange}: {selected: any[], onChange: (v: any[]) => void}) {
+  const [query, setQuery] = React.useState('')
+  const [results, setResults] = React.useState<any[]>([])
+  const [loading, setLoading] = React.useState(false)
+
+  const search = async (q: string) => {
+    if (q.length < 2) { setResults([]); return }
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/m4/locations?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setResults(data.results || [])
+    } catch(e) {}
+    setLoading(false)
+  }
+
+  React.useEffect(() => {
+    const t = setTimeout(() => search(query), 400)
+    return () => clearTimeout(t)
+  }, [query])
+
+  const add = (loc: any) => {
+    if (!selected.find((s:any) => s.key === loc.key)) {
+      onChange([...selected, loc])
+    }
+    setQuery('')
+    setResults([])
+  }
+
+  const remove = (key: string) => onChange(selected.filter((s:any) => s.key !== key))
+
+  const typeLabel = (type: string) => {
+    if (type === 'country') return '🌍'
+    if (type === 'city') return '🏙'
+    if (type === 'region') return '📍'
+    if (type === 'zip') return '📮'
+    return '📍'
+  }
+
+  return (
+    <div style={{position:'relative'}}>
+      {/* Selected locations */}
+      {selected.length > 0 && (
+        <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:8}}>
+          {selected.map((loc:any) => (
+            <span key={loc.key} style={{display:'inline-flex',alignItems:'center',gap:4,background:'#1a3a1a',color:'#dffe95',padding:'3px 10px',borderRadius:100,fontSize:11,fontWeight:700}}>
+              {typeLabel(loc.type)} {loc.name}{loc.country_code ? `, ${loc.country_code}` : ''}
+              <button onClick={()=>remove(loc.key)} style={{background:'none',border:'none',color:'#dffe95',cursor:'pointer',fontSize:12,padding:0,lineHeight:1}}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      {/* Search input */}
+      <input
+        value={query}
+        onChange={e=>setQuery(e.target.value)}
+        placeholder="Search country, city, region..."
+        style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid rgba(0,0,0,0.1)',fontSize:13,fontFamily:'inherit',outline:'none',background:'#ffffff',color:'#1a3a1a',boxSizing:'border-box' as any}}
+      />
+      {/* Results dropdown */}
+      {(results.length > 0 || loading) && (
+        <div style={{position:'absolute',top:'100%',left:0,right:0,background:'white',border:'1px solid rgba(0,0,0,0.1)',borderRadius:10,marginTop:4,zIndex:100,maxHeight:200,overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.1)'}}>
+          {loading && <div style={{padding:'10px 14px',fontSize:12,color:'#8aaa8a'}}>Searching...</div>}
+          {results.map((r:any) => (
+            <button key={r.key} onClick={()=>add(r)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'none',border:'none',cursor:'pointer',textAlign:'left',borderBottom:'1px solid rgba(0,0,0,0.04)'}}>
+              <span style={{fontSize:14}}>{typeLabel(r.type)}</span>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:'#1a3a1a'}}>{r.name}</div>
+                <div style={{fontSize:11,color:'#8aaa8a'}}>{r.type}{r.country_name ? ` · ${r.country_name}` : ''}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      {selected.length === 0 && query.length === 0 && (
+        <div style={{fontSize:11,color:'#8aaa8a',marginTop:4}}>Search and add multiple countries, cities, or regions</div>
+      )}
+    </div>
+  )
+}
+
 export default function M4Page() {
   const [step, setStep] = useState<Step>('welcome')
   const [loading, setLoading] = useState(false)
@@ -43,7 +126,7 @@ export default function M4Page() {
   const [form, setForm] = useState({
     product:'', description:'',
     competitorDomains:'', competitorFBPages:'', competitorIGHandles:'',
-    targetCustomer:'', location:'PK', ageMin:'18', ageMax:'65', gender:'ALL',
+    targetCustomer:'', location:'', locations:[] as any[], ageMin:'18', ageMax:'65', gender:'ALL',
     budget:'500', campaignName:'', objective:'OUTCOME_SALES',
   })
 
@@ -400,7 +483,7 @@ export default function M4Page() {
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14}}>
               <div><label style={S.label}>Min Age</label><input type="number" value={form.ageMin} onChange={e=>set('ageMin',e.target.value)} style={S.input}/></div>
               <div><label style={S.label}>Max Age</label><input type="number" value={form.ageMax} onChange={e=>set('ageMax',e.target.value)} style={S.input}/></div>
-              <div><label style={S.label}>Location</label><input value={form.location} onChange={e=>set('location',e.target.value)} placeholder="PK, Lahore" style={S.input}/></div>
+              <div style={{gridColumn:'span 1'}}><label style={S.label}>Location</label><LocationPicker selected={form.locations||[]} onChange={(locs:any[])=>{set('locations',locs as any);set('location',locs.map((l:any)=>l.key).join(','))}}/></div>
             </div>
           </div>
           <div style={S.foot}><button onClick={()=>setStep('interests')} style={S.back}>Back</button>{nb(()=>setStep('review'),'Review & Launch →',!form.budget||parseFloat(form.budget)<=0)}</div>

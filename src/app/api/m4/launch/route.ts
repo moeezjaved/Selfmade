@@ -46,6 +46,24 @@ export async function POST(request: NextRequest) {
     if (!metaAccount) return NextResponse.json({ error: 'No primary Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)
+
+    // Build geo_locations from locations array or fallback to location string
+    const buildGeo = () => {
+      if (locations && locations.length > 0) {
+        const countries = locations.filter((l:any) => l.type === 'country').map((l:any) => l.key)
+        const cities = locations.filter((l:any) => l.type === 'city').map((l:any) => ({ key: parseInt(l.key) }))
+        const regions = locations.filter((l:any) => l.type === 'region').map((l:any) => ({ key: parseInt(l.key) }))
+        const result: any = {}
+        if (countries.length > 0) result.countries = countries
+        if (cities.length > 0) result.cities = cities
+        if (regions.length > 0) result.regions = regions
+        if (Object.keys(result).length === 0) result.countries = [location || 'PK']
+        return result
+      }
+      return { countries: [location || 'PK'] }
+    }
+    const geoLocations = buildGeo()
+
     const adAccountId = `act_${metaAccount.account_id}`
     const currency = metaAccount.currency || 'USD'
     const budgetAmount = parseFloat(budget) || 500
@@ -149,7 +167,7 @@ export async function POST(request: NextRequest) {
           status: 'PAUSED',
           targeting: {
             age_min: parseInt(ageMin) || 18,
-            geo_locations: { countries: ['PK'] },
+            geo_locations: geoLocations,
             ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
             targeting_automation: { advantage_audience: 1 },
             ...(exclusionAudienceId ? { exclusions: { custom_audiences: [{ id: exclusionAudienceId }] } } : {}),
@@ -200,7 +218,7 @@ export async function POST(request: NextRequest) {
         const intTargeting: Record<string,unknown> = {
           age_min: parseInt(ageMin) || 18,
           age_max: parseInt(ageMax) || 65,
-          geo_locations: { countries: ['PK'] },
+          geo_locations: geoLocations,
           ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
           targeting_automation: { advantage_audience: 0 },
         }
@@ -277,7 +295,7 @@ export async function POST(request: NextRequest) {
             const rtTargeting: Record<string,unknown> = {
               age_min: parseInt(ageMin) || 18,
               age_max: parseInt(ageMax) || 65,
-              geo_locations: { countries: ['PK'] },
+              geo_locations: geoLocations,
               targeting_automation: { advantage_audience: 0 },
             }
             if (rtAud?.id) rtTargeting.custom_audiences = [{ id: rtAud.id }]
@@ -333,7 +351,7 @@ export async function POST(request: NextRequest) {
             const rnTargeting: Record<string,unknown> = {
               age_min: parseInt(ageMin) || 18,
               age_max: parseInt(ageMax) || 65,
-              geo_locations: { countries: ['PK'] },
+              geo_locations: geoLocations,
               targeting_automation: { advantage_audience: 0 },
             }
             if (rnAud?.id) rnTargeting.custom_audiences = [{ id: rnAud.id }]
