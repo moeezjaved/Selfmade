@@ -10,6 +10,8 @@ export default function CampaignsPage() {
   const [selectedAccount, setSelectedAccount] = useState<string>('')
   const [editModal, setEditModal] = useState<any>(null)
   const [saving, setSaving] = useState(false)
+  const [uploadingCreative, setUploadingCreative] = useState(false)
+  const [uploadedCreativeHash, setUploadedCreativeHash] = useState<string|null>(null)
   const [expandedCamp, setExpandedCamp] = useState<Record<string, boolean>>({})
   const [expandedAdset, setExpandedAdset] = useState<Record<string, boolean>>({})
   const [activeTab, setActiveTab] = useState('text')
@@ -37,7 +39,7 @@ export default function CampaignsPage() {
       })
       const data = await res.json()
       if (data.error) alert('Error: ' + data.error)
-      else { setEditModal(null); await loadCampaigns() }
+      else { setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false); await loadCampaigns() }
     } catch(e: any) { alert(e.message) }
     setSaving(false)
   }
@@ -242,12 +244,44 @@ export default function CampaignsPage() {
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a', marginBottom: 4 }}>Upload New Creative</div>
                     <div style={{ fontSize: 12, color: '#7a9a7a', marginBottom: 16 }}>Replace the image or video for this ad</div>
                     <input type="file" accept="image/*,video/*" id="creative-upload"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) setEditModal((p: any) => ({ ...p, new_creative_name: f.name })) }}
+                      onChange={async e => {
+                        const f = e.target.files?.[0]
+                        if (!f) return
+                        setUploadingCreative(true)
+                        setUploadedCreativeHash(null)
+                        setEditModal((p: any) => ({ ...p, new_creative_name: f.name }))
+                        try {
+                          const reader = new FileReader()
+                          reader.onload = async (ev) => {
+                            const base64 = (ev.target?.result as string).split(',')[1]
+                            const isVideo = f.type.startsWith('video/')
+                            const res = await fetch('/api/m4/upload-image', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ base64, mimeType: f.type, name: f.name, isVideo, fileSize: f.size })
+                            })
+                            const data = await res.json()
+                            if (data.hash || data.videoId) {
+                              setUploadedCreativeHash(data.hash || data.videoId)
+                              setEditModal((p: any) => ({ ...p, new_creative_hash: data.hash || data.videoId, new_creative_is_video: isVideo }))
+                            } else {
+                              alert('Upload failed: ' + (data.error || 'Unknown error'))
+                            }
+                            setUploadingCreative(false)
+                          }
+                          reader.readAsDataURL(f)
+                        } catch(err) {
+                          setUploadingCreative(false)
+                          alert('Upload error')
+                        }
+                      }}
                       style={{ display: 'none' }} />
-                    <label htmlFor="creative-upload" style={{ background: '#dffe95', color: '#1a3a1a', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-block' }}>
-                      Choose File
+                    <label htmlFor="creative-upload" style={{ background: '#1a3a1a', color: '#dffe95', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-block' }}>
+                      {uploadingCreative ? '⏳ Uploading...' : '📁 Choose File'}
                     </label>
-                    {editModal.new_creative_name && <div style={{ marginTop: 12, fontSize: 12, color: '#2d7a2d' }}>✅ {editModal.new_creative_name}</div>}
+                    {uploadingCreative && <div style={{ marginTop: 12, fontSize: 12, color: '#b8860b', fontWeight: 600 }}>⏳ Uploading to Meta...</div>}
+                    {uploadedCreativeHash && <div style={{ marginTop: 12, fontSize: 12, color: '#2d7a2d', fontWeight: 700 }}>✅ Uploaded to Meta — ready to save</div>}
+                    {editModal.new_creative_name && !uploadingCreative && !uploadedCreativeHash && <div style={{ marginTop: 12, fontSize: 12, color: '#8aaa8a' }}>{editModal.new_creative_name}</div>}
                   </div>
                   <div style={{ fontSize: 11, color: '#8aaa8a' }}>⚠️ Changing creative resets learning phase and social proof</div>
                 </div>
@@ -286,7 +320,7 @@ export default function CampaignsPage() {
             </div>
 
             <div style={{ padding: '0 24px 20px', display: 'flex', gap: 10 }}>
-              <button onClick={() => setEditModal(null)} style={{ flex: 1, background: 'none', border: '1.5px solid rgba(255,255,255,0.15)', color: '#6b8f6b', padding: '11px 0', borderRadius: 100, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false)} style={{ flex: 1, background: 'none', border: '1.5px solid rgba(255,255,255,0.15)', color: '#6b8f6b', padding: '11px 0', borderRadius: 100, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
               <button onClick={saveEdit} disabled={saving} style={{ flex: 2, background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '11px 0', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
