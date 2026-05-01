@@ -271,7 +271,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <AccountSelector onAccountChange={(accountId) => { handleSync(accountId).then(() => loadData()) }} />
+          <AccountSelector onAccountChange={(accountId) => { setTimeout(() => { loadData() }, 800) }} />
           <div className="flex items-center gap-2 bg-green/10 border border-green/20 text-status-green text-xs font-bold px-3 py-2 rounded-lg">
             <span className="live-dot"/>
             Live

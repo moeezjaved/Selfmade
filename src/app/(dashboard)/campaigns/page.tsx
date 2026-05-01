@@ -1,18 +1,20 @@
 'use client'
 import { useState, useEffect } from 'react'
+import AccountSelector from '@/components/AccountSelector'
 
 const fmt = (n: number) => `PKR ${n.toLocaleString()}`
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedAccount, setSelectedAccount] = useState<string>('')
   const [editModal, setEditModal] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [expandedCamp, setExpandedCamp] = useState<Record<string, boolean>>({})
   const [expandedAdset, setExpandedAdset] = useState<Record<string, boolean>>({})
   const [activeTab, setActiveTab] = useState('text')
 
-  useEffect(() => { loadCampaigns() }, [])
+  useEffect(() => { loadCampaigns() }, [selectedAccount])
 
   const loadCampaigns = async () => {
     setLoading(true)
