@@ -220,8 +220,8 @@ export default function DashboardPage() {
       {/* ── TOPBAR ── */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Dashboard</h1>
-          <p className="text-sm text-white/40 mt-0.5">
+          <h1 className="text-2xl font-black tracking-tight" style={{color:"#1a3a1a"}}>Dashboard</h1>
+          <p className="text-sm mt-0.5" style={{color:"#8aaa8a"}}>
             {data.lastSynced ? `Last synced ${timeAgo(data.lastSynced)}` : 'Not yet synced'}
           </p>
         </div>
@@ -244,26 +244,26 @@ export default function DashboardPage() {
 
       {/* ── PROMO CARDS ── */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <Link href="/m4" className="flex items-center gap-4 bg-gradient-to-r from-dark2 to-dark3 border border-lime/30 rounded-2xl px-5 py-4 hover:border-lime/50 transition-all group">
+        <Link href="/insights" className="flex items-center gap-4 bg-gradient-to-r from-dark2 to-dark3 border border-lime/30 rounded-2xl px-5 py-4 hover:border-lime/50 transition-all group">
           <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center flex-shrink-0">
-            <Zap size={20} className="text-dark"/>
+            <TrendingUp size={20} className="text-dark"/>
           </div>
           <div className="flex-1">
             <div className="text-base font-bold text-white flex items-center gap-2">
-              Ad Engine
-              <span className="text-[10px] font-bold bg-lime text-dark px-2 py-0.5 rounded-full">New</span>
+              Scale & Insights
+              <span className="text-[10px] font-bold bg-lime text-dark px-2 py-0.5 rounded-full">NEW</span>
             </div>
-            <div className="text-xs text-white/40">Run Facebook & Instagram ads in minutes with AI</div>
+            <div className="text-xs text-white/40">Scale winners, pause losers, track ROAS live</div>
           </div>
           <ChevronRight size={16} className="text-white/30 group-hover:text-lime transition-colors"/>
         </Link>
-        <Link href="/creative-studio" className="flex items-center gap-4 bg-dark2 border border-white/10 rounded-2xl px-5 py-4 hover:border-lime/30 transition-all group">
+        <Link href="/reports" className="flex items-center gap-4 bg-dark2 border border-white/10 rounded-2xl px-5 py-4 hover:border-lime/30 transition-all group">
           <div className="w-10 h-10 rounded-xl bg-lime/10 border border-lime/20 flex items-center justify-center flex-shrink-0">
             <Sparkles size={20} className="text-lime"/>
           </div>
           <div className="flex-1">
-            <div className="text-base font-bold text-white">Creative Studio</div>
-            <div className="text-xs text-white/40">Generate variation briefs from your winning ads</div>
+            <div className="text-base font-bold text-white">Deep Reports</div>
+            <div className="text-xs text-white/40">Age, gender, placement, device breakdowns</div>
           </div>
           <ChevronRight size={16} className="text-white/30 group-hover:text-lime transition-colors"/>
         </Link>
@@ -284,12 +284,12 @@ export default function DashboardPage() {
             {kpi.featured && (
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-lime to-transparent"/>
             )}
-            <div className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2">
+            <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{color:"#8aaa8a"}}>
               {kpi.label}
             </div>
             <div className={cn(
               'text-3xl font-black tracking-tight leading-none',
-              kpi.featured ? 'text-lime' : 'text-white'
+              kpi.featured ? 'text-lime' : 'text-dark'
             )}>
               {kpi.value}
             </div>
@@ -310,71 +310,37 @@ export default function DashboardPage() {
         {/* Left: Recommendations + Campaigns */}
         <div className="flex flex-col gap-5">
 
-          {/* Recommendations */}
+          {/* Winners from Scale & Insights */}
           <div className="card">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
-              <div className="text-lg font-black text-white">Scale & Insights — Winners</div>
-              <div className="flex items-center gap-3">
-          <AccountSelector onAccountChange={(accountId) => { handleSync(accountId).then(() => loadData()) }} />
-                {data.recommendations.length > 0 && (
-                  <span className="text-xs font-bold bg-lime text-dark px-2.5 py-0.5 rounded-full">
-                    {data.recommendations.length} pending
-                  </span>
-                )}
-                <Link href="/recommendations" className="text-sm text-white/40 hover:text-white font-semibold">
-                  View Scale & Insights →
-                </Link>
-              </div>
+            <div className="flex items-center justify-between px-6 py-4" style={{borderBottom:"1px solid rgba(0,0,0,0.07)"}}>
+              <div className="font-black text-base" style={{color:"#1a3a1a"}}>🚀 Winning Ad Sets</div>
+              <Link href="/insights" className="text-sm font-semibold" style={{color:"#5a7a5a"}}>View Scale & Insights →</Link>
             </div>
-
-            {data.recommendations.length === 0 ? (
-              <div className="px-6 py-10 text-center text-white/40 text-sm">
-                No pending recommendations.{' '}
-                <button onClick={() => handleSync()} className="text-lime font-semibold hover:underline">
-                  Sync now
-                </button>
-                {' '}to analyse your account.
+            {winners.length === 0 ? (
+              <div className="px-6 py-10 text-center text-sm" style={{color:"#8aaa8a"}}>
+                No winners detected yet.{' '}
+                <Link href="/insights" style={{color:"#1a3a1a",fontWeight:700}}>Open Scale & Insights</Link>
+                {' '}to analyse your campaigns.
               </div>
             ) : (
-              data.recommendations.map(rec => (
-                <div key={rec.id} className="px-6 py-5 border-b border-white/10 last:border-none hover:bg-white/2 transition-colors">
-                  <div className="flex items-start gap-4">
-                    <div className={cn(
-                      'inline-flex text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-3 flex-shrink-0',
-                      rec.type === 'PAUSE' && 'bg-red/10 text-status-red',
-                      rec.type === 'SCALE' && 'bg-green/10 text-status-green',
-                      rec.type === 'TEST_CREATIVE' && 'bg-blue/10 text-status-blue',
-                      !['PAUSE','SCALE','TEST_CREATIVE'].includes(rec.type) && 'bg-amber/10 text-status-amber',
-                    )}>
-                      {rec.type === 'PAUSE' ? '⏸ Pause' :
-                       rec.type === 'SCALE' ? '↑ Scale' :
-                       rec.type === 'TEST_CREATIVE' ? '🧪 Test' : rec.type}
+              winners.slice(0,5).map((w: any, i: number) => (
+                <div key={i} style={{padding:"14px 24px",borderBottom:"1px solid rgba(0,0,0,0.05)"}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#1a3a1a"}}>{w.name}</div>
+                      <div style={{fontSize:11,color:"#8aaa8a",marginTop:2}}>{w.campaignName}</div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{background:"rgba(45,122,45,0.1)",border:"1px solid rgba(45,122,45,0.2)",color:"#2d7a2d",padding:"3px 10px",borderRadius:100,fontSize:11,fontWeight:700}}>
+                        🏆 {w.roas?.toFixed(2)}x ROAS
+                      </span>
+                      <Link href="/insights" style={{background:"#1a3a1a",color:"#dffe95",padding:"5px 14px",borderRadius:100,fontSize:11,fontWeight:800,textDecoration:"none"}}>
+                        Scale Now →
+                      </Link>
                     </div>
                   </div>
-
-                  <div className="text-base font-bold text-white mb-2">{rec.title}</div>
-                  <div className="bg-dark3 border-l-2 border-lime rounded-r-xl px-4 py-3 text-sm text-white/60 leading-relaxed mb-3">
-                    <strong className="text-white font-bold">Why:</strong> {rec.reasoning}
-                  </div>
-                  <div className="text-xs text-white/40 mb-3">
-                    Impact: <span className="text-lime font-semibold">{rec.impact_estimate}</span>
-                    {' · '}Confidence: <span className="text-white font-semibold">{rec.confidence_score}%</span>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleApprove(rec.id)}
-                      disabled={approving === rec.id}
-                      className="bg-lime text-dark text-sm font-bold px-4 py-2 rounded-full hover:bg-lime2 transition-all disabled:opacity-50"
-                    >
-                      {approving === rec.id ? '⏳ Executing…' : '✓ Approve'}
-                    </button>
-                    <button
-                      onClick={() => handleReject(rec.id)}
-                      className="text-white/40 text-sm font-semibold border border-white/10 px-4 py-2 rounded-full hover:border-white/20 hover:text-white transition-all"
-                    >
-                      ✕ Reject
-                    </button>
+                  <div style={{fontSize:12,color:"#6b8f6b",background:"#f0f7ee",borderLeft:"3px solid #2d7a2d",padding:"8px 12px",borderRadius:"0 8px 8px 0"}}>
+                    {w.recommendation}
                   </div>
                 </div>
               ))
@@ -383,28 +349,28 @@ export default function DashboardPage() {
 
           {/* Campaigns table */}
           <div className="card">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
-              <div className="text-lg font-black text-white">Campaigns</div>
-              <Link href="/campaigns" className="text-sm text-white/40 hover:text-white font-semibold">View Scale & Insights →</Link>
+            <div className="flex items-center justify-between px-6 py-5 border-b" style={{borderColor:"rgba(0,0,0,0.07)"}}>
+              <div className="text-lg font-black" style={{color:"#1a3a1a"}}>Campaigns</div>
+              <Link href="/campaigns" className="text-sm font-semibold" style={{color:"#5a7a5a"}}>View Campaigns →</Link>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-dark3">
-                    <th className="text-left px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-white/30">Campaign</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/30">Status</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/30">Spend</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/30">ROAS</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/30">CPA</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/30">CTR</th>
+                    <th className="text-left px-6 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>Campaign</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>Status</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>Spend</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>ROAS</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>CPA</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>CTR</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.campaigns.slice(0, 6).map((campaign: any) => {
                     const insights = campaign.campaign_insights?.[0]
                     return (
-                      <tr key={campaign.id} className="border-t border-white/5 hover:bg-white/2 transition-colors">
-                        <td className="px-6 py-4 text-sm font-bold text-white max-w-[200px] truncate">{campaign.name}</td>
+                      <tr key={campaign.id} className="hover:bg-dark3 transition-colors" style={{borderTop:"1px solid rgba(0,0,0,0.04)"}}>
+                        <td className="px-6 py-4 text-sm font-bold max-w-[200px] truncate" style={{color:"#1a3a1a"}}>{campaign.name}</td>
                         <td className="px-4 py-4">
                           <span className={cn(
                             'text-xs font-bold px-2 py-0.5 rounded-full',
@@ -413,10 +379,10 @@ export default function DashboardPage() {
                             {campaign.status === 'ACTIVE' ? '● Active' : '⏸ Paused'}
                           </span>
                         </td>
-                        <td className="px-4 py-4 text-sm font-bold text-white">{formatCurrency(insights?.spend || 0)}</td>
+                        <td className="px-4 py-4 text-sm font-bold" style={{color:"#1a3a1a"}}>{formatCurrency(insights?.spend || 0, currency)}</td>
                         <td className="px-4 py-4 text-sm font-bold text-status-green">{formatROAS(insights?.roas || 0)}</td>
-                        <td className="px-4 py-4 text-sm font-bold text-white">{formatCurrency(insights?.cpa || 0)}</td>
-                        <td className="px-4 py-4 text-sm font-bold text-white">{formatPercent(insights?.ctr || 0)}</td>
+                        <td className="px-4 py-4 text-sm font-bold" style={{color:"#1a3a1a"}}>{formatCurrency(insights?.cpa || 0, currency)}</td>
+                        <td className="px-4 py-4 text-sm font-bold" style={{color:"#1a3a1a"}}>{formatPercent(insights?.ctr || 0)}</td>
                       </tr>
                     )
                   })}
@@ -440,7 +406,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-5">
           {/* Account health */}
           <div className="card">
-            <div className="bg-dark3 px-6 py-6 text-center border-b border-white/10">
+            <div className="bg-dark3 px-6 py-6 text-center border-b" style={{borderColor:"rgba(0,0,0,0.07)"}}>
               <div
                 className="w-28 h-28 rounded-full mx-auto mb-4 flex items-center justify-center relative"
                 style={{
