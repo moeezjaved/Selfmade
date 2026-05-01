@@ -143,12 +143,40 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.action === 'update_ad') {
+      const adAccountId = 'act_' + metaAccount.account_id
+
+      // If a new creative was pre-uploaded, use the hash directly
+      if (body.new_creative_hash) {
+        const creativePayload: any = { name: 'Updated Creative — ' + new Date().toISOString() }
+        if (body.new_creative_is_video) {
+          // Get page_id from existing creative
+          const existRes = await fetch(`https://graph.facebook.com/${V}/${body.creative_id}?fields=object_story_spec&access_token=${token}`)
+          const existData = await existRes.json()
+          const pageId = existData.object_story_spec?.page_id || existData.object_story_spec?.link_data?.page_id
+          creativePayload.object_story_spec = {
+            page_id: pageId,
+            video_data: { video_id: body.new_creative_hash, message: body.primary_text || '' }
+          }
+        } else {
+          const existRes = await fetch(`https://graph.facebook.com/${V}/${body.creative_id}?fields=object_story_spec&access_token=${token}`)
+          const existData = await existRes.json()
+          const spec = existData.object_story_spec || {}
+          creativePayload.object_story_spec = {
+            ...spec,
+            ...(spec.link_data && { link_data: { ...spec.link_data, image_hash: body.new_creative_hash } }),
+          }
+        }
+        const newCreative = await post(adAccountId + '/adcreatives', creativePayload)
+        await post(body.id, { creative: { creative_id: newCreative.id } })
+        return NextResponse.json({ success: true })
+      }
+
+      // Otherwise update text/url only
       const creativeRes = await fetch(
         `https://graph.facebook.com/${V}/${body.creative_id}?fields=object_story_spec&access_token=${token}`
       )
       const creativeData = await creativeRes.json()
       const spec = creativeData.object_story_spec || {}
-
       const updatedSpec = { ...spec }
       if (spec.link_data) {
         updatedSpec.link_data = {
@@ -164,8 +192,6 @@ export async function POST(request: NextRequest) {
           ...(body.headline && { title: body.headline }),
         }
       }
-
-      const adAccountId = 'act_' + metaAccount.account_id
       const newCreative = await post(adAccountId + '/adcreatives', {
         name: 'Updated Creative',
         object_story_spec: updatedSpec,
