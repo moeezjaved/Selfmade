@@ -80,7 +80,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="flex min-h-screen bg-dark">
 
       {/* ── SIDEBAR ── */}
-      <aside style={{width:232,flexShrink:0,background:"#0f1f0a",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column",position:"fixed",top:0,left:0,bottom:0,zIndex:50}}>
+      <aside style={{width:232,flexShrink:0,background:"#243d20",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column",position:"fixed",top:0,left:0,bottom:0,zIndex:50}}>
 
         {/* Logo */}
         <div style={{padding:"18px 20px",borderBottom:"1px solid rgba(223,254,149,0.08)"}}>
@@ -151,7 +151,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </aside>
 
       {/* ── MAIN ── */}
-      <div style={{flex:1,marginLeft:232,display:"flex",flexDirection:"column",minHeight:"100vh",background:"#f4f7f3"}}>
+      <div style={{flex:1,marginLeft:232,display:"flex",flexDirection:"column",minHeight:"100vh",background:"#eef5eb"}}>
         <div id="topbar-portal"/>
         <main className="flex-1">
           {children}
