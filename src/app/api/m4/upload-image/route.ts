@@ -68,7 +68,9 @@ export async function POST(request: NextRequest) {
       
       const metaForm = new FormData()
       metaForm.append('access_token', token)
-      metaForm.append(file.name, new Blob([imgBuffer], { type: file.type }), file.name)
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const safeName = 'image.' + ext
+      metaForm.append('filename', new Blob([imgBuffer], { type: file.type }), safeName)
       
       const res = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/adimages`, {
         method: 'POST',
