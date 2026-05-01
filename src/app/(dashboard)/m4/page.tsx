@@ -435,24 +435,24 @@ export default function M4Page() {
             ):(
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
                 {interests.map((interest,i)=>(
-                  <div key={i} onClick={()=>setInterests(prev=>prev.map((x,j)=>j===i?{...x,selected:!x.selected}:x))} style={{padding:14,borderRadius:14,border:`2px solid ${interest.selected?'#dffe95':'rgba(255,255,255,0.08)'}`,background:interest.selected?'rgba(223,254,149,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer',display:'flex',alignItems:'flex-start',gap:12}}>
-                    <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${interest.selected?'#dffe95':'rgba(255,255,255,0.2)'}`,background:interest.selected?'#dffe95':'none',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#1a3a1a',flexShrink:0,marginTop:2}}>{interest.selected?'V':''}</div>
+                  <div key={i} onClick={()=>setInterests(prev=>prev.map((x,j)=>j===i?{...x,selected:!x.selected}:x))} style={{padding:14,borderRadius:14,border:`2px solid ${interest.selected?'#1a3a1a':'rgba(0,0,0,0.1)'}`,background:interest.selected?'rgba(26,58,26,0.06)':'#ffffff',cursor:'pointer',display:'flex',alignItems:'flex-start',gap:12}}>
+                    <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${interest.selected?'#1a3a1a':'rgba(0,0,0,0.15)'}`,background:interest.selected?'#1a3a1a':'none',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#dffe95',flexShrink:0,marginTop:2}}>{interest.selected?'✓':''}</div>
                     <div style={{flex:1}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>{interest.name}</span><span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:100,background:'#f8fcf6',color:'#7a9a7a',textTransform:'uppercase'}}>{interest.category}</span></div>
-                      <div style={{fontSize:13,color:'rgba(255,255,255,0.55)',lineHeight:1.6}}>{interest.why}</div>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>{interest.name}</span><span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:100,background:'rgba(0,0,0,0.06)',color:'#5a7a5a',textTransform:'uppercase'}}>{interest.category}</span></div>
+                      <div style={{fontSize:13,color:'#5a7a5a',lineHeight:1.6}}>{interest.why}</div>
                     </div>
-                    <div style={{fontSize:11,color:interest.confidence>80?'#86efac':'#fbbf24',flexShrink:0}}>{interest.confidence}%</div>
+                    <div style={{fontSize:11,color:interest.confidence>80?'#2d7a2d':'#b8860b',flexShrink:0}}>{interest.confidence}%</div>
                   </div>
                 ))}
                 <div style={{display:'flex',gap:8,marginTop:4}}>
                   <input value={customInterest} onChange={e=>setCustomInterest(e.target.value)} onKeyDown={e=>e.key==='Enter'&&customInterest.trim()&&(setInterests(prev=>[...prev,{name:customInterest.trim(),category:'Custom',why:'Added by you.',size:'Unknown',confidence:70,selected:true,custom:true}]),setCustomInterest(''))} placeholder="Add custom interest…" style={{flex:1,...S.input}}/>
-                  <button onClick={()=>{if(customInterest.trim()){setInterests(prev=>[...prev,{name:customInterest.trim(),category:'Custom',why:'Added by you.',size:'Unknown',confidence:70,selected:true,custom:true}]);setCustomInterest('')}}} style={{background:'rgba(223,254,149,0.1)',border:'1px solid rgba(74,138,0,0.2)',color:'#1a3a1a',padding:'10px 16px',borderRadius:10,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Add</button>
+                  <button onClick={()=>{if(customInterest.trim()){setInterests(prev=>[...prev,{name:customInterest.trim(),category:'Custom',why:'Added by you.',size:'Unknown',confidence:70,selected:true,custom:true}]);setCustomInterest('')}}} style={{background:'#1a3a1a',border:'none',color:'#dffe95',padding:'10px 16px',borderRadius:10,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Add</button>
                 </div>
               </div>
             )}
           </div>
           <div style={S.foot}>
-            <div><button onClick={()=>setStep('retargeting')} style={S.back}>Back</button><span style={{marginLeft:14,fontSize:13,color:'#7a9a7a'}}>{selectedInterests.length} selected</span></div>
+            <div><button onClick={()=>setStep('retargeting')} style={S.back}>Back</button><span style={{marginLeft:14,fontSize:13,color:'#1a3a1a',fontWeight:600}}>{selectedInterests.length} selected</span></div>
             {nb(()=>setStep('budget'),'Set Budget →',selectedInterests.length<2)}
           </div>
         </div>
