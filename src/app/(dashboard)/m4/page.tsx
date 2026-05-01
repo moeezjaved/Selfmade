@@ -154,16 +154,14 @@ export default function M4Page() {
       setter(prev=>prev.filter(x=>x.id!==id))
       return
     }
-    const reader = new FileReader()
-    reader.onload = async (ev) => {
-      const base64 = (ev.target?.result as string)?.split(',')[1]
-      try {
-        const res = await fetch('/api/m4/upload-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64,mimeType:file.type,name:file.name,isVideo:isVid})})
-        const data = await res.json()
-        setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:x))
-      } catch { setter(prev=>prev.map(x=>x.id===id?{...x,uploading:false}:x)) }
-    }
-    reader.readAsDataURL(file)
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('isVideo', String(isVid))
+    try {
+      const res = await fetch('/api/m4/upload-image',{method:'POST',body:fd})
+      const data = await res.json()
+      setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:x))
+    } catch { setter(prev=>prev.map(x=>x.id===id?{...x,uploading:false}:x)) }
   }
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<Creative[]>>) => {
