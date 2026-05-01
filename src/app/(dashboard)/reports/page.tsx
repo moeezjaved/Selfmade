@@ -251,6 +251,76 @@ interface ReportItem {
   cpa: number
 }
 
+function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
+  creatives: any[], currency: string, sortKey: string, expanded: boolean, toggle: () => void
+}) {
+  const fmt = (n: number) => new Intl.NumberFormat('en-PK', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
+  const shown = expanded ? creatives : creatives.slice(0, 3)
+
+  return (
+    <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#1a3a1a' }}>🎨 Best Creatives</div>
+          <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1 }}>Top ads by performance</div>
+        </div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#8aaa8a', background: '#f0f7ee', padding: '3px 10px', borderRadius: 100 }}>{creatives.length} ads</div>
+      </div>
+
+      {shown.map((c: any, i: number) => (
+        <div key={i} style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* Thumbnail */}
+          <div style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.08)', position: 'relative' }}>
+            {c.thumbnail_url ? (
+              <img src={c.thumbnail_url} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🎨</div>
+            )}
+          </div>
+
+          {/* Info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: '#8aaa8a' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <span style={{ fontSize: 11, color: '#8aaa8a' }}>Spent: {fmt(c.spend)}</span>
+              <span style={{ fontSize: 11, color: '#8aaa8a' }}>Conv: {c.conversions}</span>
+              <span style={{ fontSize: 11, color: '#8aaa8a' }}>CTR: {c.ctr.toFixed(2)}%</span>
+            </div>
+            {/* Progress bar */}
+            <div style={{ height: 3, background: 'rgba(0,0,0,0.06)', borderRadius: 100, marginTop: 6, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.min(100, (c.roas / Math.max(...creatives.map((x:any)=>x.roas),1)) * 100)}%`, background: c.roas >= 2 ? '#2d7a2d' : c.roas >= 1 ? '#b8860b' : '#c0392b', borderRadius: 100 }} />
+            </div>
+          </div>
+
+          {/* ROAS + Preview */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+            <span style={{ fontSize: 15, fontWeight: 900, color: c.roas >= 2 ? '#2d7a2d' : c.roas >= 1 ? '#b8860b' : '#c0392b', background: c.roas >= 2 ? 'rgba(45,122,45,0.08)' : 'rgba(184,134,11,0.08)', padding: '3px 10px', borderRadius: 100 }}>
+              {c.roas.toFixed(2)}x
+            </span>
+            {c.preview_url ? (
+              <a href={c.preview_url} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 11, fontWeight: 700, color: '#1a3a1a', background: '#dffe95', padding: '3px 10px', borderRadius: 100, textDecoration: 'none' }}>
+                👁 Preview
+              </a>
+            ) : (
+              <span style={{ fontSize: 11, color: '#8aaa8a' }}>No preview</span>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {creatives.length > 3 && (
+        <button onClick={toggle} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: 'none', borderTop: '1px solid rgba(0,0,0,0.04)', color: '#1a3a1a', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+          {expanded ? '▲ Show Less' : `▼ Show ${creatives.length - 3} More`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, sortKey, items, fullWidth }: {
   title: string, subtitle: string, sectionKey: string,
   expanded: Record<string, boolean>, toggle: (k: string) => void,

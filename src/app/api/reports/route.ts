@@ -57,17 +57,41 @@ export async function GET(request: NextRequest) {
     const overviewIns = overviewRes.data?.[0]
     const overview = overviewIns ? parseInsight(overviewIns) : {}
 
-    // Best creatives (ad level)
+    // Best creatives (ad level) with ad_id for thumbnail
     const creativesRes = await get({
-      fields: 'ad_name,spend,action_values,actions,impressions,clicks,ctr,cpc',
+      fields: 'ad_name,ad_id,spend,action_values,actions,impressions,clicks,ctr,cpc',
       time_range: timeRange,
       level: 'ad',
       limit: '20',
     })
-    const creatives = (creativesRes.data || [])
-      .map((ins:any) => ({ name: ins.ad_name, ...parseInsight(ins) }))
+    const creativesRaw = (creativesRes.data || [])
+      .map((ins:any) => ({ name: ins.ad_name, ad_id: ins.ad_id, ...parseInsight(ins) }))
       .filter((c:any) => c.spend > 0)
       .sort((a:any,b:any) => b.roas - a.roas)
+
+    // Fetch thumbnails and preview URLs for top 10 creatives
+    const creatives = await Promise.all(creativesRaw.slice(0, 10).map(async (c:any) => {
+      if (!c.ad_id) return c
+      try {
+        const adRes = await fetch(
+          `https://graph.facebook.com/${V}/${c.ad_id}?fields=creative{thumbnail_url,effective_object_story_id,object_story_spec}&access_token=${token}`
+        )
+        const adData = await adRes.json()
+        const creative = adData.creative || {}
+        const previewUrl = creative.effective_object_story_id
+          ? `https://www.facebook.com/${creative.effective_object_story_id}`
+          : null
+        return {
+          ...c,
+          thumbnail_url: creative.thumbnail_url || null,
+          preview_url: previewUrl,
+        }
+      } catch(e) {
+        return c
+      }
+    }))
+    // Add remaining without thumbnails
+    creativesRaw.slice(10).forEach((c:any) => creatives.push(c))
 
     // Age breakdown
     const ageRes = await get({
