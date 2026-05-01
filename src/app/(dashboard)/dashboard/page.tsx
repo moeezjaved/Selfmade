@@ -444,7 +444,7 @@ export default function DashboardPage() {
               <div
                 className="w-28 h-28 rounded-full mx-auto mb-4 flex items-center justify-center relative"
                 style={{
-                  background: ``conic-gradient(var(--lime) 0% ${Math.min(100, Math.round((data.accountInsights?.roas || 0) / 4 * 100))}%, rgba(0,0,0,0.06) ${Math.min(100, Math.round((data.accountInsights?.roas || 0) / 4 * 100))}% 100%)``,
+                  background: `conic-gradient(var(--lime) 0% ${Math.min(100, Math.round((data.accountInsights?.roas || 0) / 4 * 100))}%, rgba(0,0,0,0.06) ${Math.min(100, Math.round((data.accountInsights?.roas || 0) / 4 * 100))}% 100%)`,
                 }}
               >
                 <div className="absolute inset-3 bg-dark3 rounded-full flex items-center justify-center">
