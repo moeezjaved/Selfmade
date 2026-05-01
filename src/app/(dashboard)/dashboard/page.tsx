@@ -262,23 +262,23 @@ export default function DashboardPage() {
             <TrendingUp size={20} className="text-dark"/>
           </div>
           <div className="flex-1">
-            <div className="text-base font-bold text-white flex items-center gap-2">
+            <div className="text-base font-bold flex items-center gap-2" style={{color:"#1a3a1a"}}>
               Scale & Insights
               <span className="text-[10px] font-bold bg-lime text-dark px-2 py-0.5 rounded-full">NEW</span>
             </div>
-            <div className="text-xs text-white/40">Scale winners, pause losers, track ROAS live</div>
+            <div className="text-xs" style={{color:"#8aaa8a"}}>Scale winners, pause losers, track ROAS live</div>
           </div>
-          <ChevronRight size={16} className="text-white/30 group-hover:text-lime transition-colors"/>
+          <ChevronRight size={16} className="transition-colors" style={{color:"#8aaa8a"}}/>
         </Link>
         <Link href="/reports" className="flex items-center gap-4 bg-dark2 border border-white/10 rounded-2xl px-5 py-4 hover:border-lime/30 transition-all group">
           <div className="w-10 h-10 rounded-xl bg-lime/10 border border-lime/20 flex items-center justify-center flex-shrink-0">
             <Sparkles size={20} className="text-lime"/>
           </div>
           <div className="flex-1">
-            <div className="text-base font-bold text-white">Deep Reports</div>
-            <div className="text-xs text-white/40">Age, gender, placement, device breakdowns</div>
+            <div className="text-base font-bold" style={{color:"#1a3a1a"}}>Deep Reports</div>
+            <div className="text-xs" style={{color:"#8aaa8a"}}>Age, gender, placement, device breakdowns</div>
           </div>
-          <ChevronRight size={16} className="text-white/30 group-hover:text-lime transition-colors"/>
+          <ChevronRight size={16} className="transition-colors" style={{color:"#8aaa8a"}}/>
         </Link>
       </div>
 
@@ -290,8 +290,8 @@ export default function DashboardPage() {
             className={cn(
               'rounded-2xl p-5 border relative overflow-hidden',
               kpi.featured
-                ? 'bg-dark3 border-lime/25'
-                : 'bg-dark2 border-white/10'
+                ? 'bg-dark border-lime/25'
+                : 'bg-dark2 border-dark4'
             )}
           >
             {kpi.featured && (
