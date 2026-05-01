@@ -110,7 +110,7 @@ export default function CampaignsPage() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 800, color: '#1a3a1a' }}>{camp.name}</div>
                   <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 2 }}>
-                    {camp.status} · {camp.objective?.replace('OUTCOME_', '')} · {fmt(Math.round((camp.daily_budget || 0) / 100))}/day · {camp.adsets?.length || 0} ad sets
+                    {camp.status} · {camp.objective?.replace('OUTCOME_', '')} · {fmt(Math.round((camp.daily_budget || 0) / 100))}/day · {camp.created_time ? new Date(camp.created_time).toLocaleDateString('en-PK', {day:'numeric',month:'short',year:'numeric'}) : ''}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

@@ -75,15 +75,19 @@ export async function GET(request: NextRequest) {
           effective_status: camp.effective_status,
           objective: camp.objective,
           daily_budget: camp.daily_budget,
+          created_time: camp.created_time,
           adsets
         }
       })
 
-    // Sort: ACTIVE first, then PAUSED
+    // Sort: ACTIVE first, then by created_time newest first
     campaigns.sort((a: any, b: any) => {
       if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1
       if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1
-      return a.name.localeCompare(b.name)
+      // Both same status - sort by created_time newest first
+      const dateA = new Date(a.created_time || 0).getTime()
+      const dateB = new Date(b.created_time || 0).getTime()
+      return dateB - dateA
     })
 
     return NextResponse.json({ campaigns })
