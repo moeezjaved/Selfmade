@@ -38,15 +38,6 @@ export async function POST(request: NextRequest) {
       competitorDomains = '',
     } = body
 
-    const admin = createAdminClient()
-    const { data: metaAccount } = await admin
-      .from('meta_accounts').select('*')
-      .eq('user_id', user.id).eq('is_primary', true).single()
-
-    if (!metaAccount) return NextResponse.json({ error: 'No primary Meta account' }, { status: 400 })
-
-    const token = decryptToken(metaAccount.access_token)
-
     // Build geo_locations from locations array or fallback to location string
     const buildGeo = () => {
       if (locations && locations.length > 0) {
@@ -64,6 +55,15 @@ export async function POST(request: NextRequest) {
     }
     const geoLocations = buildGeo()
 
+
+    const admin = createAdminClient()
+    const { data: metaAccount } = await admin
+      .from('meta_accounts').select('*')
+      .eq('user_id', user.id).eq('is_primary', true).single()
+
+    if (!metaAccount) return NextResponse.json({ error: 'No primary Meta account' }, { status: 400 })
+
+    const token = decryptToken(metaAccount.access_token)
     const adAccountId = `act_${metaAccount.account_id}`
     const currency = metaAccount.currency || 'USD'
     const budgetAmount = parseFloat(budget) || 500
