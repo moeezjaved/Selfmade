@@ -50,7 +50,7 @@ export default function ReportsPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: 'white' }}>Reports</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: '#1a3a1a' }}>Reports</div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Deep insights from your Meta Ads</div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -64,7 +64,7 @@ export default function ReportsPage() {
 
       {/* Sort Filter Bar */}
       {data && !loading && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, background: '#152928', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '10px 16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, background: '#ffffff', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '10px 16px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.06em', marginRight: 4 }}>Sort by:</span>
           {sortBtns.map(b => (
             <button key={b.key} onClick={() => setSortKey(b.key)} style={{ padding: '5px 12px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, cursor: 'pointer', background: sortKey === b.key ? '#dffe95' : 'rgba(255,255,255,0.06)', color: sortKey === b.key ? '#10211f' : 'rgba(255,255,255,0.5)', transition: 'all .15s' }}>
@@ -77,7 +77,7 @@ export default function ReportsPage() {
       {loading ? (
         <div style={{ textAlign: 'center', padding: 80 }}>
           <img src='/favicon.png' alt='' style={{ width: 44, height: 44, borderRadius: 11, animation: 'spin 1s linear infinite', margin: '0 auto 16px', display: 'block' }} />
-          <div style={{ color: 'white', fontWeight: 700 }}>Loading your reports...</div>
+          <div style={{ color: '#1a3a1a', fontWeight: 700 }}>Loading your reports...</div>
         </div>
       ) : error ? (
         <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 16, padding: 24, color: '#f87171' }}>{error}</div>
@@ -92,7 +92,7 @@ export default function ReportsPage() {
               { label: 'Blended ROAS', value: (data.overview?.roas || 0).toFixed(2) + 'x', color: roasColor(data.overview?.roas || 0) },
               { label: 'Conversions', value: String(data.overview?.conversions || 0), color: '#93c5fd' },
             ].map(k => (
-              <div key={k.label} style={{ background: '#152928', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 20px' }}>
+              <div key={k.label} style={{ background: '#ffffff', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 20px' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>{k.label}</div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: k.color }}>{k.value}</div>
               </div>
@@ -292,11 +292,11 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
   if (!items.length) return null
 
   return (
-    <div style={{ background: '#152928', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, overflow: 'hidden' }}>
+    <div style={{ background: '#ffffff', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: 'white' }}>{title}</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#1a3a1a' }}>{title}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{subtitle}</div>
         </div>
         <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.05)', padding: '3px 10px', borderRadius: 100 }}>
@@ -313,7 +313,7 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
           return (
             <div key={i} style={{ padding: '10px 20px', borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'white', flex: 1, marginRight: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a', flex: 1, marginRight: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {i === 0 && <span style={{ marginRight: 6 }}>🥇</span>}
                   {i === 1 && <span style={{ marginRight: 6 }}>🥈</span>}
                   {i === 2 && <span style={{ marginRight: 6 }}>🥉</span>}
