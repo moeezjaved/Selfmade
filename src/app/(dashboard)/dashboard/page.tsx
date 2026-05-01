@@ -211,7 +211,7 @@ export default function DashboardPage() {
       value: formatCurrency(data.accountInsights?.spend || 0, currency),
       change: '+12%',
       up: true,
-      featured: true,
+      featured: false,
     },
     {
       label: 'ROAS',
@@ -321,9 +321,7 @@ export default function DashboardPage() {
             key={kpi.label}
             className={cn(
               'rounded-2xl p-5 border relative overflow-hidden',
-              kpi.featured
-                ? 'bg-dark border-lime/25'
-                : 'bg-dark2 border-dark4'
+              'bg-dark2 border-dark4'
             )}
           >
             {kpi.featured && (
@@ -334,7 +332,7 @@ export default function DashboardPage() {
             </div>
             <div className={cn(
               'text-3xl font-black tracking-tight leading-none',
-              kpi.featured ? 'text-lime' : 'text-dark'
+              'text-dark'
             )}>
               {kpi.value}
             </div>
