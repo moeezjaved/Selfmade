@@ -251,25 +251,19 @@ export default function CampaignsPage() {
                         setUploadedCreativeHash(null)
                         setEditModal((p: any) => ({ ...p, new_creative_name: f.name }))
                         try {
-                          const reader = new FileReader()
-                          reader.onload = async (ev) => {
-                            const base64 = (ev.target?.result as string).split(',')[1]
-                            const isVideo = f.type.startsWith('video/')
-                            const res = await fetch('/api/m4/upload-image', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ base64, mimeType: f.type, name: f.name, isVideo, fileSize: f.size })
-                            })
-                            const data = await res.json()
-                            if (data.hash || data.videoId) {
-                              setUploadedCreativeHash(data.hash || data.videoId)
-                              setEditModal((p: any) => ({ ...p, new_creative_hash: data.hash || data.videoId, new_creative_is_video: isVideo }))
-                            } else {
-                              alert('Upload failed: ' + (data.error || 'Unknown error'))
-                            }
-                            setUploadingCreative(false)
+                          const isVideo = f.type.startsWith('video/')
+                          const fd = new FormData()
+                          fd.append('file', f)
+                          fd.append('isVideo', String(isVideo))
+                          const res = await fetch('/api/m4/upload-image', { method: 'POST', body: fd })
+                          const data = await res.json()
+                          if (data.hash || data.videoId) {
+                            setUploadedCreativeHash(data.hash || data.videoId)
+                            setEditModal((p) => ({ ...p, new_creative_hash: data.hash || data.videoId, new_creative_is_video: isVideo }))
+                          } else {
+                            alert('Upload failed: ' + (data.error || 'Unknown error'))
                           }
-                          reader.readAsDataURL(f)
+                          setUploadingCreative(false)
                         } catch(err) {
                           setUploadingCreative(false)
                           alert('Upload error')
