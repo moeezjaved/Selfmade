@@ -259,7 +259,7 @@ export default function CampaignsPage() {
                           const data = await res.json()
                           if (data.hash || data.videoId) {
                             setUploadedCreativeHash(data.hash || data.videoId)
-                            setEditModal((p) => ({ ...p, new_creative_hash: data.hash || data.videoId, new_creative_is_video: isVideo }))
+                            setEditModal((p: any) => ({ ...p, new_creative_hash: data.hash || data.videoId, new_creative_is_video: isVideo }))
                           } else {
                             alert('Upload failed: ' + (data.error || 'Unknown error'))
                           }
