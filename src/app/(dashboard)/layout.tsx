@@ -80,10 +80,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="flex min-h-screen bg-dark">
 
       {/* ── SIDEBAR ── */}
-      <aside className="w-[232px] flex-shrink-0 bg-dark2 border-r border-white/10 flex flex-col fixed top-0 left-0 bottom-0 z-50">
+      <aside style={{width:232,flexShrink:0,background:"#0f1f0a",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column",position:"fixed",top:0,left:0,bottom:0,zIndex:50}}>
 
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/10">
+        <div style={{padding:"18px 20px",borderBottom:"1px solid rgba(223,254,149,0.08)"}}>
           <Link href="/dashboard">
             <div className="text-lime font-black text-2xl tracking-tight font-serif italic">
               <img src="/logo.png" alt="Selfmade" style={{height:42,width:"auto",display:"block"}}/>
@@ -95,7 +95,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <nav className="flex-1 py-3 overflow-y-auto">
           {NAV.map(section => (
             <div key={section.label}>
-              <div className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-white/25">
+              <div style={{padding:"16px 20px 6px",fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:".1em",color:"rgba(255,255,255,0.2)"}}>
                 {section.label}
               </div>
               {section.items.map(item => {
@@ -127,7 +127,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </nav>
 
         {/* User */}
-        <div className="p-4 border-t border-white/10">
+        <div style={{padding:16,borderTop:"1px solid rgba(223,254,149,0.08)"}}>
           <div className="flex items-center gap-3 cursor-pointer group">
             <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">
               {initials}
@@ -151,7 +151,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </aside>
 
       {/* ── MAIN ── */}
-      <div className="flex-1 ml-[232px] flex flex-col min-h-screen">
+      <div style={{flex:1,marginLeft:232,display:"flex",flexDirection:"column",minHeight:"100vh",background:"#f4f7f3"}}>
         <div id="topbar-portal"/>
         <main className="flex-1">
           {children}
