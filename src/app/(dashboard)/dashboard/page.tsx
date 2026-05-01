@@ -173,6 +173,30 @@ export default function DashboardPage() {
     }))
   }
 
+  // Dynamic health score based on multiple factors
+  const calcHealthScore = () => {
+    const ins = data.accountInsights
+    if (!ins || ins.spend === 0) return 0
+    let score = 0
+    // ROAS score (40 points) - good ROAS is 2x+
+    const roasScore = Math.min(40, Math.round((ins.roas / 3) * 40))
+    score += roasScore
+    // CTR score (20 points) - good CTR is 2%+
+    const ctrScore = Math.min(20, Math.round((ins.ctr / 2) * 20))
+    score += ctrScore
+    // Conversion rate score (20 points)
+    const convRate = ins.clicks > 0 ? (ins.conversions / ins.clicks) * 100 : 0
+    const convScore = Math.min(20, Math.round((convRate / 3) * 20))
+    score += convScore
+    // Spend activity score (20 points) - is account actively spending
+    const spendScore = ins.spend > 100 ? 20 : Math.round((ins.spend / 100) * 20)
+    score += spendScore
+    return Math.min(100, Math.max(0, score))
+  }
+  const healthScore = calcHealthScore()
+  const healthLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs work'
+  const healthColor = healthScore >= 80 ? '#2d7a2d' : healthScore >= 60 ? '#b8860b' : healthScore >= 40 ? '#d97706' : '#c0392b'
+
   const kpis = [
     {
       label: 'Total Spend',
@@ -423,16 +447,16 @@ export default function DashboardPage() {
               <div
                 className="w-28 h-28 rounded-full mx-auto mb-4 flex items-center justify-center relative"
                 style={{
-                  background: `conic-gradient(var(--lime) 0% ${Math.min(100, Math.round((data.accountInsights?.roas || 0) / 4 * 100))}%, rgba(0,0,0,0.06) ${Math.min(100, Math.round((data.accountInsights?.roas || 0) / 4 * 100))}% 100%)`,
+                  background: `conic-gradient(${healthColor} 0% ${healthScore}%, rgba(0,0,0,0.06) ${healthScore}% 100%)`,
                 }}
               >
                 <div className="absolute inset-3 bg-dark3 rounded-full flex items-center justify-center">
-                  <span className="text-2xl font-black text-lime">{Math.min(100, Math.round((data.accountInsights?.roas || 0) / 4 * 100))}</span>
+                  <span className="text-2xl font-black" style={{color:healthColor}}>{healthScore}</span>
                 </div>
               </div>
-              <div className="text-sm text-white/40 mb-2">Account Health Score</div>
+              <div className="text-sm mb-2" style={{color:"#8aaa8a"}}>Account Health Score</div>
               <div className="inline-flex items-center gap-2 bg-green/10 border border-green/20 text-status-green text-xs font-bold px-3 py-1 rounded-full">
-                ● Good performance
+                {healthScore >= 80 ? "● Excellent" : healthScore >= 60 ? "● Good" : healthScore >= 40 ? "● Fair" : "● Needs work"}
               </div>
             </div>
             <div className="px-5 py-2">
