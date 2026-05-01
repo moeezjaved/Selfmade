@@ -67,7 +67,7 @@ export default function ReportsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, background: '#ffffff', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '10px 16px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#7a9a7a', textTransform: 'uppercase', letterSpacing: '.06em', marginRight: 4 }}>Sort by:</span>
           {sortBtns.map(b => (
-            <button key={b.key} onClick={() => setSortKey(b.key)} style={{ padding: '5px 12px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, cursor: 'pointer', background: sortKey === b.key ? '#dffe95' : 'rgba(255,255,255,0.06)', color: sortKey === b.key ? '#10211f' : 'rgba(255,255,255,0.5)', transition: 'all .15s' }}>
+            <button key={b.key} onClick={() => setSortKey(b.key)} style={{ padding: '5px 12px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, cursor: 'pointer', background: sortKey === b.key ? '#1a3a1a' : '#f0f7ee', color: sortKey === b.key ? '#dffe95' : '#5a7a5a', border: '1px solid rgba(0,0,0,0.1)', transition: 'all .15s' }}>
               {b.label}
             </button>
           ))}
