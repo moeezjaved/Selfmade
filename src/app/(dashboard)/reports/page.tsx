@@ -272,7 +272,13 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
           {/* Thumbnail */}
           <div style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.08)', position: 'relative' }}>
             {c.thumbnail_url ? (
-              <img src={c.thumbnail_url} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <a href={c.preview_url || c.thumbnail_url} target="_blank" rel="noopener noreferrer" style={{display:'block',width:'100%',height:'100%'}}>
+                <img src={c.thumbnail_url} alt={c.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e:any) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}
+                />
+                <div style={{ width: '100%', height: '100%', display: 'none', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🎨</div>
+              </a>
             ) : (
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🎨</div>
             )}
@@ -302,12 +308,10 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
             </span>
             {c.preview_url ? (
               <a href={c.preview_url} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, fontWeight: 700, color: '#1a3a1a', background: '#dffe95', padding: '3px 10px', borderRadius: 100, textDecoration: 'none' }}>
-                👁 Preview
+                style={{ fontSize: 11, fontWeight: 700, color: '#1a3a1a', background: '#dffe95', padding: '4px 12px', borderRadius: 100, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                👁 View Ad
               </a>
-            ) : (
-              <span style={{ fontSize: 11, color: '#8aaa8a' }}>No preview</span>
-            )}
+            ) : null}
           </div>
         </div>
       ))}
