@@ -55,7 +55,7 @@ export default function ReportsPage() {
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {['last_3d', 'last_7d', 'last_14d', 'last_30d'].map(r => (
-            <button key={r} onClick={() => setDateRange(r)} style={{ padding: '7px 14px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 700, fontSize: 12, cursor: 'pointer', background: dateRange === r ? '#dffe95' : 'rgba(255,255,255,0.06)', color: dateRange === r ? '#10211f' : 'rgba(255,255,255,0.5)' }}>
+            <button key={r} onClick={() => setDateRange(r)} style={{ padding: '7px 14px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 700, fontSize: 12, cursor: 'pointer', background: dateRange === r ? '#1a3a1a' : '#f0f7ee', color: dateRange === r ? '#dffe95' : '#5a7a5a', border: '1px solid rgba(0,0,0,0.1)' }}>
               {r.replace('last_', '').replace('d', 'd')}
             </button>
           ))}
