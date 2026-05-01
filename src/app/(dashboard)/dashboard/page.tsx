@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [approving, setApproving] = useState<string | null>(null)
   const [currency, setCurrency] = useState<string>('USD')
   const [winners, setWinners] = useState<any[]>([])
+  const [liveCampaigns, setLiveCampaigns] = useState<any[]>([])
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -104,6 +105,13 @@ export default function DashboardPage() {
       lastSynced: account?.last_synced_at || null,
     })
     setLoading(false)
+
+    // Fetch live campaigns from Meta API
+    try {
+      const campRes = await fetch('/api/campaigns/manage')
+      const campData = await campRes.json()
+      setLiveCampaigns(campData.campaigns || [])
+    } catch(e) {}
 
     // Fetch winners from insights
     try {
@@ -461,7 +469,7 @@ export default function DashboardPage() {
             </div>
             <div className="px-5 py-2">
               {[
-                { label: 'Active campaigns', value: `${data.campaigns.filter((c: any) => c.status === 'ACTIVE').length} of ${data.campaigns.length}`, good: true },
+                { label: 'Active campaigns', value: `${liveCampaigns.filter((c: any) => c.status === 'ACTIVE').length} of ${liveCampaigns.length}`, good: true },
                 { label: 'Avg ROAS', value: formatROAS(data.accountInsights?.roas || 0), good: (data.accountInsights?.roas || 0) > 2 },
                 { label: 'Pending actions', value: data.recommendations.length.toString(), good: data.recommendations.length === 0 },
               ].map(row => (
