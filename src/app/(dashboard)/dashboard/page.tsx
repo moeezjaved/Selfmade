@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [syncing, setSyncing] = useState(false)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [approving, setApproving] = useState<string | null>(null)
+  const [currency, setCurrency] = useState<string>('USD')
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -39,10 +40,12 @@ export default function DashboardPage() {
     // Get primary account
     const { data: primaryAccount } = await supabase
       .from('meta_accounts')
-      .select('id,account_id,account_name,last_synced_at')
+      .select('id,account_id,account_name,last_synced_at,currency')
       .eq('user_id', user.id)
       .eq('is_primary', true)
       .single()
+
+    if (primaryAccount?.currency) setCurrency(primaryAccount.currency)
 
     // Fetch campaigns with insights filtered by primary account
     let campQuery = supabase
@@ -160,7 +163,7 @@ export default function DashboardPage() {
   const kpis = [
     {
       label: 'Total Spend',
-      value: formatCurrency(data.accountInsights?.spend || 0),
+      value: formatCurrency(data.accountInsights?.spend || 0, currency),
       change: '+12%',
       up: true,
       featured: true,
@@ -173,7 +176,7 @@ export default function DashboardPage() {
     },
     {
       label: 'CPA',
-      value: formatCurrency(data.accountInsights?.cpa || 0),
+      value: formatCurrency(data.accountInsights?.cpa || 0, currency),
       change: '-$2.10',
       up: true,
     },
@@ -310,7 +313,7 @@ export default function DashboardPage() {
           {/* Recommendations */}
           <div className="card">
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
-              <div className="text-lg font-black text-white">Active Recommendations</div>
+              <div className="text-lg font-black text-white">Scale & Insights — Winners</div>
               <div className="flex items-center gap-3">
           <AccountSelector onAccountChange={(accountId) => { handleSync(accountId).then(() => loadData()) }} />
                 {data.recommendations.length > 0 && (
@@ -319,7 +322,7 @@ export default function DashboardPage() {
                   </span>
                 )}
                 <Link href="/recommendations" className="text-sm text-white/40 hover:text-white font-semibold">
-                  View all →
+                  View Scale & Insights →
                 </Link>
               </div>
             </div>
@@ -382,7 +385,7 @@ export default function DashboardPage() {
           <div className="card">
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
               <div className="text-lg font-black text-white">Campaigns</div>
-              <Link href="/campaigns" className="text-sm text-white/40 hover:text-white font-semibold">View all →</Link>
+              <Link href="/campaigns" className="text-sm text-white/40 hover:text-white font-semibold">View Scale & Insights →</Link>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -441,11 +444,11 @@ export default function DashboardPage() {
               <div
                 className="w-28 h-28 rounded-full mx-auto mb-4 flex items-center justify-center relative"
                 style={{
-                  background: `conic-gradient(var(--lime) 0% 78%, rgba(255,255,255,0.06) 78% 100%)`,
+                  background: ``conic-gradient(var(--lime) 0% ${Math.min(100, Math.round((data.accountInsights?.roas || 0) / 4 * 100))}%, rgba(0,0,0,0.06) ${Math.min(100, Math.round((data.accountInsights?.roas || 0) / 4 * 100))}% 100%)``,
                 }}
               >
                 <div className="absolute inset-3 bg-dark3 rounded-full flex items-center justify-center">
-                  <span className="text-2xl font-black text-lime">78</span>
+                  <span className="text-2xl font-black text-lime">{Math.min(100, Math.round((data.accountInsights?.roas || 0) / 4 * 100))}</span>
                 </div>
               </div>
               <div className="text-sm text-white/40 mb-2">Account Health Score</div>

@@ -60,6 +60,12 @@ export async function GET(request: NextRequest) {
       return { id: camp.id, name: camp.name, status: camp.status, objective: camp.objective, daily_budget: camp.daily_budget, adsets }
     })
 
+    // Sort: ACTIVE first, then PAUSED, then others
+    campaigns.sort((a: any, b: any) => {
+      if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1
+      if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1
+      return a.name.localeCompare(b.name)
+    })
     return NextResponse.json({ campaigns })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
