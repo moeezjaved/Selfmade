@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
       retargetingCopy = {} as any,
       retainerCopy = {} as any,
       includeRetainer = false,
+      location = 'PK',
+      locations = [] as any[],
       primaryText = '',
       headline = '',
       cta = 'LEARN_MORE',
