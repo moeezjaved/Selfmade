@@ -257,7 +257,7 @@ export default function M4Page() {
             <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'#f5f9f3',border:'1px solid rgba(0,0,0,0.07)'}}>
               <div style={{width:26,height:26,borderRadius:7,background:'rgba(223,254,149,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#1a3a1a',flexShrink:0}}>A{i+1}</div>
               <input value={c.name} onChange={e=>setter(prev=>prev.map(x=>x.id===c.id?{...x,name:e.target.value}:x))} style={{flex:1,background:'none',border:'none',color:'#1a3a1a',fontSize:13,fontFamily:'inherit',outline:'none'}}/>
-              <span style={{fontSize:11,color:c.uploaded?'#86efac':c.uploading?'#fbbf24':'rgba(255,255,255,0.3)'}}>{c.uploading?'Uploading…':c.uploaded?'Uploaded':c.type==='video'?'Video':'Image'}</span>
+              <span style={{fontSize:11,color:c.uploaded?'#2d7a2d':c.uploading?'#b8860b':'#8aaa8a'}}>{c.uploading?'⏳ Uploading…':c.uploaded?'✅ Uploaded to Meta':c.type==='video'?'Video':'Image'}</span>
               <button onClick={()=>setter(prev=>prev.filter(x=>x.id!==c.id))} style={{background:'none',border:'none',color:'#8aaa8a',cursor:'pointer',fontSize:16,padding:0}}>x</button>
             </div>
           ))}
