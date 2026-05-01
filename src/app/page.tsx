@@ -16,7 +16,7 @@ export default function LandingPage() {
 
       {/* NAV */}
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(15,31,10,0.96)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(223,254,149,0.08)', padding: '0 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
-        <img src="/logo.png" alt="Selfmade" style={{ height: 34, width: 'auto' }} />
+        <img src="/logo.png" alt="Selfmade" style={{ height: 44, width: 'auto' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
           {[['#how', 'How it works'], ['#features', 'Features'], ['#pricing', 'Pricing']].map(([href, label]) => (
             <a key={href} href={href} style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>{label}</a>
@@ -39,7 +39,7 @@ export default function LandingPage() {
           Launch profitable
         </h1>
         <h1 style={{ fontSize: 76, fontWeight: 900, lineHeight: 1.04, letterSpacing: '-0.035em', maxWidth: 860, margin: '0 auto 8px', color: '#0a0a0a' }}>
-          <span style={{ color: '#3a7000' }}>Meta ads</span>
+          <span style={{ background: '#0f1f0a', color: '#dffe95', padding: '0 14px', borderRadius: 8, display: 'inline-block' }}>Meta ads</span>
         </h1>
         <h1 style={{ fontSize: 76, fontWeight: 900, lineHeight: 1.04, letterSpacing: '-0.035em', maxWidth: 860, margin: '0 auto 28px', color: '#0a0a0a', fontStyle: 'italic' }}>
           for your brand
@@ -102,7 +102,7 @@ export default function LandingPage() {
           <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.3)', borderRadius: 100, padding: '6px 18px', fontSize: 12, fontWeight: 800, color: '#dffe95', marginBottom: 16 }}>HOW IT WORKS</div>
           <h2 style={{ fontSize: 50, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, margin: 0 }}>
             You know what worked.<br />
-            <span style={{ color: '#3a7000', fontStyle: 'italic' }}>Selfmade knows why.</span>
+            <span style={{ background: '#0f1f0a', color: '#dffe95', padding: '2px 16px', borderRadius: 8, display: 'inline-block', fontStyle: 'italic' }}>Selfmade knows why.</span>
           </h2>
         </div>
 
@@ -141,7 +141,7 @@ export default function LandingPage() {
             <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.3)', borderRadius: 100, padding: '6px 18px', fontSize: 12, fontWeight: 800, color: '#dffe95', marginBottom: 16 }}>FEATURES</div>
             <h2 style={{ fontSize: 50, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, margin: 0 }}>
               From assets to live ads,<br />
-              <span style={{ color: '#3a7000', fontStyle: 'italic' }}>in a click.</span>
+              <span style={{ background: '#0f1f0a', color: '#dffe95', padding: '2px 16px', borderRadius: 8, display: 'inline-block', fontStyle: 'italic' }}>in a click.</span>
             </h2>
           </div>
 
