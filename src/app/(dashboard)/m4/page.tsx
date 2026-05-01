@@ -7,13 +7,13 @@ interface Interest { name: string; category: string; why: string; size: string; 
 interface Grade { campaign_name: string; grade: string; emoji: string; label: string; why: string; action: string; action_reason: string; applied?: boolean }
 
 const S = {
-  input: {width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'#f8fcf6',color:'#1a3a1a',fontSize:14,fontFamily:'inherit',outline:'none'} as React.CSSProperties,
-  label: {display:'block',fontSize:12,fontWeight:700,color:'#6b8f6b',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'} as React.CSSProperties,
-  card: {background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:20,overflow:'hidden'} as React.CSSProperties,
-  head: {padding:'20px 24px',borderBottom:'1px solid rgba(223,254,149,0.08)'} as React.CSSProperties,
+  input: {width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(0,0,0,0.12)',background:'#ffffff',color:'#1a3a1a',fontSize:14,fontFamily:'inherit',outline:'none'} as React.CSSProperties,
+  label: {display:'block',fontSize:11,fontWeight:700,color:'#5a7a5a',marginBottom:6,textTransform:'uppercase',letterSpacing:'.07em'} as React.CSSProperties,
+  card: {background:'#ffffff',border:'1px solid rgba(0,0,0,0.08)',borderRadius:20,overflow:'hidden',boxShadow:'0 2px 12px rgba(0,0,0,0.05)'} as React.CSSProperties,
+  head: {padding:'20px 24px',borderBottom:'1px solid rgba(0,0,0,0.07)'} as React.CSSProperties,
   body: {padding:24} as React.CSSProperties,
-  foot: {padding:'16px 24px',borderTop:'1px solid rgba(255,255,255,0.04)',display:'flex',justifyContent:'space-between'} as React.CSSProperties,
-  back: {background:'none',border:'1.5px solid rgba(255,255,255,0.1)',color:'#7a9a7a',padding:'10px 22px',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'} as React.CSSProperties,
+  foot: {padding:'16px 24px',borderTop:'1px solid rgba(0,0,0,0.07)',display:'flex',justifyContent:'space-between'} as React.CSSProperties,
+  back: {background:'#f0f7ee',border:'1.5px solid rgba(0,0,0,0.1)',color:'#1a3a1a',padding:'10px 22px',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'} as React.CSSProperties,
 }
 
 
@@ -254,7 +254,7 @@ export default function M4Page() {
       {list.length===0?<div style={{padding:20,textAlign:'center',border:'2px dashed rgba(255,255,255,0.08)',borderRadius:12,fontSize:13,color:'#8aaa8a',marginBottom:10}}>{label}</div>:(
         <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10}}>
           {list.map((c,i)=>(
-            <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(0,0,0,0.07)'}}>
+            <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'#f5f9f3',border:'1px solid rgba(0,0,0,0.07)'}}>
               <div style={{width:26,height:26,borderRadius:7,background:'rgba(223,254,149,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#1a3a1a',flexShrink:0}}>A{i+1}</div>
               <input value={c.name} onChange={e=>setter(prev=>prev.map(x=>x.id===c.id?{...x,name:e.target.value}:x))} style={{flex:1,background:'none',border:'none',color:'#1a3a1a',fontSize:13,fontFamily:'inherit',outline:'none'}}/>
               <span style={{fontSize:11,color:c.uploaded?'#86efac':c.uploading?'#fbbf24':'rgba(255,255,255,0.3)'}}>{c.uploading?'Uploading…':c.uploaded?'Uploaded':c.type==='video'?'Video':'Image'}</span>
@@ -281,7 +281,7 @@ export default function M4Page() {
           <div style={{width:40,height:40,borderRadius:10,background:'rgba(223,254,149,0.1)',border:'1px solid rgba(74,138,0,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,color:'#1a3a1a'}}>M4</div>
           <div><h1 style={{fontSize:22,fontWeight:800,color:'#1a3a1a'}}>M4 Method</h1><p style={{fontSize:13,color:'#7a9a7a'}}>Find winners, scale them, retarget everyone</p></div>
         </div>
-        <div style={{display:'flex',gap:3}}>{STEPS.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:100,background:step===s?'#dffe95':STEPS.indexOf(step)>i?'rgba(223,254,149,0.4)':'rgba(255,255,255,0.08)'}}/>)}</div>
+        <div style={{display:'flex',gap:3}}>{STEPS.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:100,background:step===s?'#1a3a1a':STEPS.indexOf(step)>i?'rgba(26,58,26,0.3)':'rgba(0,0,0,0.08)'}}/>)}</div>
       </div>
 
       {step==='welcome'&&(
@@ -290,7 +290,7 @@ export default function M4Page() {
           <h2 style={{fontSize:24,fontWeight:900,color:'#1a3a1a',marginBottom:8}}>The complete M4 ad system.</h2>
           <p style={{fontSize:14,color:'#5a7a5a',lineHeight:1.8,marginBottom:24}}>4 campaigns. Every customer lifecycle stage. Zero guesswork.</p>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:28}}>
-            {[{color:'#2d7a2d',label:'Campaign 1 — Broad',title:'Find winning creative',desc:'Advantage+ audience. One creative per ad set.'},{color:'#2563eb',label:'Campaign 2 — Interest',title:'Find winning audience',desc:'Manual interests from competitor data. One per ad set.'},{color:'#fbbf24',label:'Campaign 3 — Retargeting',title:'Convert warm visitors',desc:'Website visitors last 60 days. Different message.'},{color:'#f9a8d4',label:'Campaign 4 — Retainer',title:'Reward your buyers',desc:'Past purchasers. Loyalty offers. Maximize LTV.'}].map(c=>(
+            {[{color:'#2d7a2d',label:'Campaign 1 — Broad',title:'Find winning creative',desc:'Advantage+ audience. One creative per ad set.'},{color:'#1a5c1a',label:'Campaign 2 — Interest',title:'Find winning audience',desc:'Manual interests from competitor data. One per ad set.'},{color:'#fbbf24',label:'Campaign 3 — Retargeting',title:'Convert warm visitors',desc:'Website visitors last 60 days. Different message.'},{color:'#f9a8d4',label:'Campaign 4 — Retainer',title:'Reward your buyers',desc:'Past purchasers. Loyalty offers. Maximize LTV.'}].map(c=>(
               <div key={c.label} style={{background:`${c.color}08`,border:`1px solid ${c.color}25`,borderRadius:16,padding:18}}>
                 <div style={{fontSize:11,fontWeight:800,color:c.color,textTransform:'uppercase',letterSpacing:'.1em',marginBottom:6}}>{c.label}</div>
                 <div style={{fontSize:14,fontWeight:700,color:'#1a3a1a',marginBottom:4}}>{c.title}</div>
@@ -316,8 +316,8 @@ export default function M4Page() {
             <div style={{marginBottom:14}}><label style={S.label}>What do you sell?</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>The juicier the details, the smarter our targeting. Benefits, guarantees, who it is for.</div><textarea value={form.description} onChange={e=>set('description',e.target.value)} placeholder="Describe your product, unique benefits, guarantee..." style={{...S.input,resize:'vertical',minHeight:70,lineHeight:1.6} as React.CSSProperties}></textarea></div>
             <div style={{marginBottom:20}}><label style={S.label}>Target Customer</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Paint a picture of your ideal buyer — age, gender, pain points. Claude uses this to speak directly to them.</div><input value={form.targetCustomer} onChange={e=>set('targetCustomer',e.target.value)} placeholder="e.g. Men and women 25-45 with hair loss" style={S.input}/></div>
             <div style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.15)',borderRadius:14,padding:18,marginBottom:20}}>
-              <div style={{fontSize:13,fontWeight:800,color:'#2563eb',marginBottom:4}}>Competitor Intelligence</div>
-              <div style={{fontSize:12,color:'#6b8f6b',marginBottom:14,lineHeight:1.7}}>Selfmade searches Meta's interest database for your competitors' audiences. <strong style={{color:'#2563eb'}}>Add as many as you want</strong> — more competitors = better targeting. Separate each with a comma.</div>
+              <div style={{fontSize:13,fontWeight:800,color:'#1a5c1a',marginBottom:4}}>Competitor Intelligence</div>
+              <div style={{fontSize:12,color:'#6b8f6b',marginBottom:14,lineHeight:1.7}}>Selfmade searches Meta's interest database for your competitors' audiences. <strong style={{color:'#1a5c1a'}}>Add as many as you want</strong> — more competitors = better targeting. Separate each with a comma.</div>
               <div style={{display:'flex',flexDirection:'column',gap:12}}>
                 <div><label style={S.label}>Competitor Websites <span style={{color:'#8aaa8a',fontWeight:400,textTransform:'none'}}>— paste their domain names</span></label><input value={form.competitorDomains} onChange={e=>set('competitorDomains',e.target.value)} placeholder="minoxidil.com, regaine.com, foligain.com" style={S.input}/></div>
                 <div><label style={S.label}>Competitor Facebook Pages <span style={{color:'#8aaa8a',fontWeight:400,textTransform:'none'}}>— their page URLs or names</span></label><input value={form.competitorFBPages} onChange={e=>set('competitorFBPages',e.target.value)} placeholder="facebook.com/Regaine, Minoxidil" style={S.input}/></div>
@@ -389,8 +389,8 @@ export default function M4Page() {
             <div style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:14,padding:18,marginBottom:20}}>
               <div style={{fontSize:13,fontWeight:800,color:'#fbbf24',marginBottom:10}}>Smart Budget Split</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                <div style={{textAlign:'center',padding:12,background:'rgba(255,255,255,0.04)',borderRadius:10}}><div style={{fontSize:28,fontWeight:900,color:'#1a3a1a'}}>60%</div><div style={{fontSize:12,color:'#6b8f6b',marginTop:4}}>Broad + Interest — New customers</div></div>
-                <div style={{textAlign:'center',padding:12,background:'rgba(255,255,255,0.04)',borderRadius:10}}><div style={{fontSize:28,fontWeight:900,color:'#fbbf24'}}>40%</div><div style={{fontSize:12,color:'#6b8f6b',marginTop:4}}>Retargeting + Retainer — Warm audiences</div></div>
+                <div style={{textAlign:'center',padding:12,background:'#f5f9f3',borderRadius:10}}><div style={{fontSize:28,fontWeight:900,color:'#1a3a1a'}}>60%</div><div style={{fontSize:12,color:'#6b8f6b',marginTop:4}}>Broad + Interest — New customers</div></div>
+                <div style={{textAlign:'center',padding:12,background:'#f5f9f3',borderRadius:10}}><div style={{fontSize:28,fontWeight:900,color:'#fbbf24'}}>40%</div><div style={{fontSize:12,color:'#6b8f6b',marginTop:4}}>Retargeting + Retainer — Warm audiences</div></div>
               </div>
             </div>
             <div style={{marginBottom:20}}>
@@ -495,7 +495,7 @@ export default function M4Page() {
           <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>Step 6 — Review and Launch</div></div>
           <div style={S.body}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:20}}>
-              {[{color:'#2d7a2d',label:'Broad',count:creatives.length,pct:30},{color:'#2563eb',label:'Interest',count:selectedInterests.length,pct:30},{color:'#fbbf24',label:'Retargeting',count:retargetingCreatives.length,pct:40},...(includeRetainer?[{color:'#f9a8d4',label:'Retainer',count:retainerCreatives.length,pct:20}]:[])].map(c=>(
+              {[{color:'#2d7a2d',label:'Broad',count:creatives.length,pct:30},{color:'#1a5c1a',label:'Interest',count:selectedInterests.length,pct:30},{color:'#fbbf24',label:'Retargeting',count:retargetingCreatives.length,pct:40},...(includeRetainer?[{color:'#f9a8d4',label:'Retainer',count:retainerCreatives.length,pct:20}]:[])].map(c=>(
                 <div key={c.label} style={{background:`${c.color}08`,border:`1px solid ${c.color}20`,borderRadius:14,padding:16}}>
                   <div style={{fontSize:11,fontWeight:800,color:c.color,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>{c.label}</div>
                   <div style={{fontSize:22,fontWeight:900,color:'#1a3a1a',marginBottom:4}}>{c.count} <span style={{fontSize:12,fontWeight:500,color:'#7a9a7a'}}>ad sets</span></div>
@@ -550,7 +550,7 @@ export default function M4Page() {
                           <button onClick={()=>applyAction(grade)} disabled={!!applying||!!scaling} style={{background:cfg.color,color:'#1a3a1a',border:'none',padding:'10px 18px',borderRadius:100,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',opacity:(applying||scaling)?0.7:1,whiteSpace:'nowrap'}}>
                             {scaling===grade.campaign_name?'Scaling…':applying===grade.campaign_name?'Applying…':grade.grade==='GRADUATE'?'Scale Winner':grade.grade==='HOLD'?'Keep Running':'Pause This Ad'}
                           </button>
-                          <button style={{background:'none',border:'1.5px solid rgba(255,255,255,0.1)',color:'#7a9a7a',padding:'8px 16px',borderRadius:100,fontSize:12,fontFamily:'inherit',cursor:'pointer'}}>Skip</button>
+                          <button style={{background:'none',border:'1.5px solid rgba(0,0,0,0.1)',color:'#7a9a7a',padding:'8px 16px',borderRadius:100,fontSize:12,fontFamily:'inherit',cursor:'pointer'}}>Skip</button>
                         </div>
                       )}
                     </div>
