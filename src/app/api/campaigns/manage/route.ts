@@ -11,61 +11,80 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()
-    const { data: metaAccount } = await admin
-      .from('meta_accounts').select('*')
-      .eq('user_id', user.id).eq('is_primary', true).single()
+    const accountId = request.nextUrl.searchParams.get('account_id')
+
+    let accountQuery = admin.from('meta_accounts').select('*').eq('user_id', user.id)
+    if (accountId) {
+      accountQuery = accountQuery.eq('account_id', accountId)
+    } else {
+      accountQuery = accountQuery.eq('is_primary', true)
+    }
+    const { data: metaAccount } = await accountQuery.single()
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = 'act_' + metaAccount.account_id
 
-    // Single API call — fetch campaigns + adsets + ads nested
-    const url = `https://graph.facebook.com/${V}/${adAccountId}/campaigns?` + new URLSearchParams({
-      fields: 'id,name,status,objective,daily_budget,adsets{id,name,status,daily_budget,targeting,ads{id,name,status,creative{id,body,title,link_url,object_story_spec}}}',
-      limit: '20',
+    // Fetch campaigns with effective_status filter - only ACTIVE and PAUSED
+    const params = new URLSearchParams({
+      fields: 'id,name,status,effective_status,objective,daily_budget,adsets{id,name,status,daily_budget,targeting,ads{id,name,status,creative{id,body,title,link_url,object_story_spec}}}',
+      effective_status: '["ACTIVE","PAUSED"]',
+      limit: '50',
       access_token: token,
     })
 
+    const url = `https://graph.facebook.com/${V}/${adAccountId}/campaigns?${params}`
     const res = await fetch(url)
     const campData = await res.json()
 
     if (campData.error) return NextResponse.json({ error: campData.error.message }, { status: 400 })
 
-    const campaigns = (campData.data || []).map((camp: any) => {
-      const adsets = (camp.adsets?.data || []).map((adset: any) => {
-        const targeting = adset.targeting || {}
-        const ads = (adset.ads?.data || []).map((ad: any) => {
-          const creative = ad.creative || {}
-          const spec = creative.object_story_spec?.link_data || creative.object_story_spec?.video_data || {}
+    const campaigns = (campData.data || [])
+      .filter((camp: any) => camp.effective_status === 'ACTIVE' || camp.effective_status === 'PAUSED' || camp.status === 'ACTIVE' || camp.status === 'PAUSED')
+      .map((camp: any) => {
+        const adsets = (camp.adsets?.data || []).map((adset: any) => {
+          const targeting = adset.targeting || {}
+          const ads = (adset.ads?.data || []).map((ad: any) => {
+            const creative = ad.creative || {}
+            const spec = creative.object_story_spec?.link_data || creative.object_story_spec?.video_data || {}
+            return {
+              id: ad.id,
+              name: ad.name,
+              status: ad.status,
+              creative_id: creative.id,
+              primary_text: spec.message || creative.body || '',
+              headline: spec.name || creative.title || '',
+              link_url: spec.link || creative.link_url || '',
+            }
+          })
           return {
-            id: ad.id,
-            name: ad.name,
-            status: ad.status,
-            creative_id: creative.id,
-            primary_text: spec.message || creative.body || '',
-            headline: spec.name || creative.title || '',
-            link_url: spec.link || creative.link_url || '',
+            id: adset.id,
+            name: adset.name,
+            status: adset.status,
+            age_min: targeting.age_min || 18,
+            age_max: targeting.age_max || 65,
+            genders: targeting.genders || [],
+            ads,
           }
         })
         return {
-          id: adset.id,
-          name: adset.name,
-          status: adset.status,
-          age_min: targeting.age_min || 18,
-          age_max: targeting.age_max || 65,
-          genders: targeting.genders || [],
-          ads,
+          id: camp.id,
+          name: camp.name,
+          status: camp.status,
+          effective_status: camp.effective_status,
+          objective: camp.objective,
+          daily_budget: camp.daily_budget,
+          adsets
         }
       })
-      return { id: camp.id, name: camp.name, status: camp.status, objective: camp.objective, daily_budget: camp.daily_budget, adsets }
-    })
 
-    // Sort: ACTIVE first, then PAUSED, then others
+    // Sort: ACTIVE first, then PAUSED
     campaigns.sort((a: any, b: any) => {
       if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1
       if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1
       return a.name.localeCompare(b.name)
     })
+
     return NextResponse.json({ campaigns })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
