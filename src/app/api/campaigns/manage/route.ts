@@ -143,6 +143,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.action === 'update_ad') {
+      console.log('UPDATE_AD body:', JSON.stringify({id:body.id, creative_id:body.creative_id, new_creative_hash:body.new_creative_hash, has_text:!!body.primary_text}))
       const adAccountId = 'act_' + metaAccount.account_id
 
       // If a new creative was pre-uploaded, use the hash directly
