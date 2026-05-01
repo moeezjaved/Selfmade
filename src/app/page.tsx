@@ -15,23 +15,23 @@ export default function LandingPage() {
       </div>
 
       {/* NAV */}
-      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(240,244,238,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(168,230,61,0.15)', padding: '0 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
+      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(15,31,10,0.96)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(223,254,149,0.08)', padding: '0 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
         <img src="/logo.png" alt="Selfmade" style={{ height: 34, width: 'auto' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
           {[['#how', 'How it works'], ['#features', 'Features'], ['#pricing', 'Pricing']].map(([href, label]) => (
-            <a key={href} href={href} style={{ fontSize: 14, fontWeight: 500, color: '#444', textDecoration: 'none' }}>{label}</a>
+            <a key={href} href={href} style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>{label}</a>
           ))}
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <Link href="/login" style={{ fontSize: 14, fontWeight: 600, color: '#333', textDecoration: 'none', padding: '8px 16px' }}>Log in</Link>
-          <Link href="/signup" style={{ background: '#7dd600', color: '#fff', padding: '9px 22px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none', display: 'inline-block', boxShadow: '0 2px 16px rgba(125,214,0,0.35)' }}>Start free trial</Link>
+          <Link href="/login" style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', padding: '8px 16px' }}>Log in</Link>
+          <Link href="/signup" style={{ background: '#dffe95', color: '#10211f', padding: '9px 22px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none', display: 'inline-block' }}>Start free trial</Link>
         </div>
       </nav>
 
       {/* HERO */}
       <section style={{ paddingTop: 160, paddingBottom: 80, textAlign: 'center', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.35)', borderRadius: 100, padding: '7px 18px', marginBottom: 28, fontSize: 13, fontWeight: 600, color: '#3a6b00', backdropFilter: 'blur(8px)' }}>
-          <span style={{ background: '#7dd600', borderRadius: 100, padding: '2px 10px', fontSize: 11, fontWeight: 800, color: '#fff' }}>NEW</span>
+          <span style={{ background: '#dffe95', borderRadius: 100, padding: '2px 10px', fontSize: 11, fontWeight: 800, color: '#10211f' }}>NEW</span>
           AI trained on $2.4M+ in real ad spend
         </div>
 
@@ -39,7 +39,7 @@ export default function LandingPage() {
           Launch profitable
         </h1>
         <h1 style={{ fontSize: 76, fontWeight: 900, lineHeight: 1.04, letterSpacing: '-0.035em', maxWidth: 860, margin: '0 auto 8px', color: '#0a0a0a' }}>
-          <span style={{ background: 'linear-gradient(135deg, #4a9500 0%, #7dd600 50%, #a8e63d 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Meta ads</span>
+          <span style={{ color: '#3a7000' }}>Meta ads</span>
         </h1>
         <h1 style={{ fontSize: 76, fontWeight: 900, lineHeight: 1.04, letterSpacing: '-0.035em', maxWidth: 860, margin: '0 auto 28px', color: '#0a0a0a', fontStyle: 'italic' }}>
           for your brand
@@ -50,7 +50,7 @@ export default function LandingPage() {
         </p>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 16 }}>
-          <Link href="/signup" style={{ background: 'linear-gradient(135deg, #5aab00, #7dd600)', color: '#fff', padding: '15px 36px', borderRadius: 100, fontSize: 16, fontWeight: 800, textDecoration: 'none', display: 'inline-block', boxShadow: '0 6px 30px rgba(125,214,0,0.4)' }}>Start free trial →</Link>
+          <Link href="/signup" style={{ background: '#dffe95', color: '#10211f', padding: '15px 36px', borderRadius: 100, fontSize: 16, fontWeight: 800, textDecoration: 'none', display: 'inline-block' }}>Start free trial →</Link>
           <Link href="/login" style={{ background: 'rgba(255,255,255,0.8)', color: '#333', padding: '15px 36px', borderRadius: 100, fontSize: 16, fontWeight: 600, textDecoration: 'none', display: 'inline-block', border: '1px solid rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)' }}>Log in</Link>
         </div>
         <div style={{ fontSize: 13, color: '#888', marginBottom: 56 }}>$169/mo · 7-day free trial · Cancel anytime</div>
@@ -71,12 +71,12 @@ export default function LandingPage() {
             <div style={{ background: '#0f1f0a', borderRadius: 18, padding: 32, minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
-                <div style={{ fontSize: 18, color: '#7dd600', fontWeight: 800, marginBottom: 8 }}>Scale & Insights Dashboard</div>
+                <div style={{ fontSize: 18, color: '#dffe95', fontWeight: 800, marginBottom: 8 }}>Scale & Insights Dashboard</div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Live ROAS · Scale winners · Pause losers · Deep reports</div>
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 24 }}>
                   {[['3.97×', 'ROAS'], ['PKR 90K', 'Revenue'], ['5', 'Conversions'], ['5.2%', 'CTR']].map(([v, l]) => (
                     <div key={l} style={{ background: 'rgba(125,214,0,0.1)', border: '1px solid rgba(125,214,0,0.2)', borderRadius: 12, padding: '10px 18px' }}>
-                      <div style={{ fontSize: 18, fontWeight: 900, color: '#7dd600' }}>{v}</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: '#dffe95' }}>{v}</div>
                       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{l}</div>
                     </div>
                   ))}
@@ -91,7 +91,7 @@ export default function LandingPage() {
       <div style={{ background: '#0f1f0a', padding: '13px 0', overflow: 'hidden', position: 'relative', zIndex: 1, margin: '48px 0' }}>
         <div style={{ display: 'flex', gap: 48, animation: 'ticker 25s linear infinite', whiteSpace: 'nowrap' }}>
           {Array(2).fill(['✦ Approval-First AI', '✦ Live ROAS Tracking', '✦ Auto Pause Losers', '✦ Scale Winners', '✦ Meta API Direct', '✦ Creative Studio', '✦ Deep Reports', '✦ Zero Ads Manager']).flat().map((t, i) => (
-            <span key={i} style={{ fontSize: 13, fontWeight: 700, color: '#7dd600', letterSpacing: '.06em', flexShrink: 0 }}>{t}</span>
+            <span key={i} style={{ fontSize: 13, fontWeight: 700, color: '#dffe95', letterSpacing: '.06em', flexShrink: 0 }}>{t}</span>
           ))}
         </div>
       </div>
@@ -99,10 +99,10 @@ export default function LandingPage() {
       {/* HOW IT WORKS */}
       <section id="how" style={{ padding: '80px 48px', maxWidth: 1100, margin: '0 auto', position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 64 }}>
-          <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.3)', borderRadius: 100, padding: '6px 18px', fontSize: 12, fontWeight: 800, color: '#3a6b00', marginBottom: 16 }}>HOW IT WORKS</div>
+          <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.3)', borderRadius: 100, padding: '6px 18px', fontSize: 12, fontWeight: 800, color: '#dffe95', marginBottom: 16 }}>HOW IT WORKS</div>
           <h2 style={{ fontSize: 50, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, margin: 0 }}>
             You know what worked.<br />
-            <span style={{ background: 'linear-gradient(135deg, #4a9500, #7dd600)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontStyle: 'italic' }}>Selfmade knows why.</span>
+            <span style={{ color: '#3a7000', fontStyle: 'italic' }}>Selfmade knows why.</span>
           </h2>
         </div>
 
@@ -115,7 +115,7 @@ export default function LandingPage() {
             <div key={i} style={{ background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(168,230,61,0.2)', borderRadius: 24, padding: '32px 40px', display: 'flex', alignItems: 'center', gap: 40, backdropFilter: 'blur(12px)', boxShadow: '0 4px 24px rgba(0,0,0,0.04)' }}>
               <div style={{ width: 64, height: 64, background: 'linear-gradient(135deg, rgba(168,230,61,0.2), rgba(125,214,0,0.1))', border: '1px solid rgba(168,230,61,0.3)', borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>{step.emoji}</div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#7dd600', letterSpacing: '.1em', marginBottom: 6 }}>{step.num}</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#dffe95', letterSpacing: '.1em', marginBottom: 6 }}>{step.num}</div>
                 <div style={{ fontSize: 22, fontWeight: 800, color: '#0a0a0a', marginBottom: 8 }}>{step.title}</div>
                 <div style={{ fontSize: 15, color: '#666', lineHeight: 1.7 }}>{step.desc}</div>
               </div>
@@ -125,11 +125,11 @@ export default function LandingPage() {
       </section>
 
       {/* METRIC BANNER */}
-      <div style={{ background: 'linear-gradient(135deg, #5aab00, #7dd600, #a8e63d)', padding: '28px 48px', display: 'flex', justifyContent: 'center', gap: 80, position: 'relative', zIndex: 1 }}>
+      <div style={{ background: '#dffe95', padding: '28px 48px', display: 'flex', justifyContent: 'center', gap: 80, position: 'relative', zIndex: 1 }}>
         {[['2-3×', 'faster from insight to launch'], ['40%', 'higher ROAS on average'], ['10×', 'faster campaign creation']].map(([val, label]) => (
           <div key={label} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 38, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', textShadow: '0 2px 10px rgba(0,0,0,0.15)' }}>{val}</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>{label}</div>
+            <div style={{ fontSize: 38, fontWeight: 900, color: '#dffe95', letterSpacing: '-0.02em' }}>{val}</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{label}</div>
           </div>
         ))}
       </div>
@@ -138,10 +138,10 @@ export default function LandingPage() {
       <section id="features" style={{ padding: '100px 48px', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 64 }}>
-            <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.3)', borderRadius: 100, padding: '6px 18px', fontSize: 12, fontWeight: 800, color: '#3a6b00', marginBottom: 16 }}>FEATURES</div>
+            <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.3)', borderRadius: 100, padding: '6px 18px', fontSize: 12, fontWeight: 800, color: '#dffe95', marginBottom: 16 }}>FEATURES</div>
             <h2 style={{ fontSize: 50, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, margin: 0 }}>
               From assets to live ads,<br />
-              <span style={{ background: 'linear-gradient(135deg, #4a9500, #7dd600)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontStyle: 'italic' }}>in a click.</span>
+              <span style={{ color: '#3a7000', fontStyle: 'italic' }}>in a click.</span>
             </h2>
           </div>
 
@@ -169,10 +169,10 @@ export default function LandingPage() {
         <div style={{ position: 'absolute', top: -100, right: -100, width: 400, height: 400, background: 'radial-gradient(circle, rgba(125,214,0,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ flex: 1, position: 'relative' }}>
           <h2 style={{ fontSize: 42, fontWeight: 900, color: 'white', letterSpacing: '-0.03em', lineHeight: 1.2, margin: '0 0 20px' }}>
-            One platform to replace<br />analytics, ad launchers,<br />and <span style={{ background: 'linear-gradient(135deg, #7dd600, #a8e63d)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>agency fees.</span>
+            One platform to replace<br />analytics, ad launchers,<br />and <span style={{ color: '#dffe95' }}>agency fees.</span>
           </h2>
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, margin: '0 0 28px' }}>Selfmade replaces your $4k/month agency with AI that works 24/7, shows every decision, and executes only with your approval.</p>
-          <Link href="/signup" style={{ background: 'linear-gradient(135deg, #5aab00, #7dd600)', color: '#fff', padding: '14px 30px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', display: 'inline-block', boxShadow: '0 4px 24px rgba(125,214,0,0.3)' }}>Start free trial →</Link>
+          <Link href="/signup" style={{ background: '#dffe95', color: '#10211f', padding: '14px 30px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', display: 'inline-block',  }}>Start free trial →</Link>
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, position: 'relative' }}>
           {[
@@ -182,7 +182,7 @@ export default function LandingPage() {
           ].map((t, i) => (
             <div key={i} style={{ background: 'rgba(125,214,0,0.06)', border: '1px solid rgba(125,214,0,0.12)', borderRadius: 16, padding: '16px 20px' }}>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6, marginBottom: 8 }}>"{t.q}"</div>
-              <div style={{ fontSize: 12, color: '#7dd600', fontWeight: 700 }}>{t.n} <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}>· {t.r}</span></div>
+              <div style={{ fontSize: 12, color: '#dffe95', fontWeight: 700 }}>{t.n} <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}>· {t.r}</span></div>
             </div>
           ))}
         </div>
@@ -190,26 +190,26 @@ export default function LandingPage() {
 
       {/* PRICING */}
       <section id="pricing" style={{ padding: '100px 48px', textAlign: 'center', position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.3)', borderRadius: 100, padding: '6px 18px', fontSize: 12, fontWeight: 800, color: '#3a6b00', marginBottom: 16 }}>PRICING</div>
+        <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.3)', borderRadius: 100, padding: '6px 18px', fontSize: 12, fontWeight: 800, color: '#dffe95', marginBottom: 16 }}>PRICING</div>
         <h2 style={{ fontSize: 50, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 12 }}>
           One plan.<br />
-          <span style={{ background: 'linear-gradient(135deg, #4a9500, #7dd600)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontStyle: 'italic' }}>Everything included.</span>
+          <span style={{ color: '#3a7000', fontStyle: 'italic' }}>Everything included.</span>
         </h2>
         <p style={{ fontSize: 17, color: '#666', marginBottom: 48 }}>No agency. No contracts. Cancel anytime.</p>
 
         <div style={{ background: 'rgba(255,255,255,0.8)', border: '1.5px solid rgba(125,214,0,0.4)', borderRadius: 32, padding: 48, maxWidth: 460, margin: '0 auto', boxShadow: '0 24px 80px rgba(125,214,0,0.12), 0 4px 20px rgba(0,0,0,0.06)', backdropFilter: 'blur(16px)' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#3a6b00', letterSpacing: '.1em', marginBottom: 8 }}>SELFMADE PRO</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#3a7000', letterSpacing: '.1em', marginBottom: 8 }}>SELFMADE PRO</div>
           <div style={{ fontSize: 60, fontWeight: 900, letterSpacing: '-0.04em', color: '#0a0a0a', lineHeight: 1 }}>$99<span style={{ fontSize: 18, fontWeight: 500, color: '#999' }}>/mo</span></div>
           <div style={{ fontSize: 13, color: '#aaa', marginBottom: 28 }}>7-day free trial · Cancel anytime</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28, textAlign: 'left' }}>
             {['Live KPI Dashboard', 'AI Recommendations', 'Approval-First AI', 'Launch Ads (M4 Method)', 'Scale & Insights', 'Creative Studio', 'Deep Reports', 'Multiple Accounts', 'Activity Log'].map(f => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#333' }}>
-                <span style={{ background: 'linear-gradient(135deg, #5aab00, #7dd600)', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, flexShrink: 0, color: '#fff' }}>✓</span>
+                <span style={{ background: '#dffe95', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, flexShrink: 0, color: '#10211f' }}>✓</span>
                 {f}
               </div>
             ))}
           </div>
-          <Link href="/signup" style={{ display: 'block', background: 'linear-gradient(135deg, #5aab00, #7dd600)', color: '#fff', padding: '15px 32px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', textAlign: 'center', boxShadow: '0 4px 24px rgba(125,214,0,0.4)' }}>Start Free Trial →</Link>
+          <Link href="/signup" style={{ display: 'block', background: '#dffe95', color: '#10211f', padding: '15px 32px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', textAlign: 'center',  }}>Start Free Trial →</Link>
         </div>
       </section>
 
@@ -218,7 +218,7 @@ export default function LandingPage() {
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <h2 style={{ fontSize: 44, fontWeight: 900, letterSpacing: '-0.03em' }}>
             Frequently asked<br />
-            <span style={{ background: 'linear-gradient(135deg, #4a9500, #7dd600)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontStyle: 'italic' }}>questions.</span>
+            <span style={{ color: '#3a7000', fontStyle: 'italic' }}>questions.</span>
           </h2>
         </div>
         {[
@@ -231,7 +231,7 @@ export default function LandingPage() {
           <details key={i} style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(168,230,61,0.2)', borderRadius: 16, padding: '18px 24px', marginBottom: 10, backdropFilter: 'blur(8px)' }}>
             <summary style={{ fontSize: 16, fontWeight: 700, cursor: 'pointer', color: '#0a0a0a', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
               {faq.q}
-              <span style={{ fontSize: 18, color: '#7dd600', flexShrink: 0, fontWeight: 900 }}>+</span>
+              <span style={{ fontSize: 18, color: '#dffe95', flexShrink: 0, fontWeight: 900 }}>+</span>
             </summary>
             <div style={{ fontSize: 14, color: '#666', lineHeight: 1.7, marginTop: 12 }}>{faq.a}</div>
           </details>
@@ -244,10 +244,10 @@ export default function LandingPage() {
         <div style={{ position: 'relative' }}>
           <h2 style={{ fontSize: 54, fontWeight: 900, color: 'white', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 16 }}>
             You know what worked.<br />
-            <span style={{ background: 'linear-gradient(135deg, #7dd600, #a8e63d)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontStyle: 'italic' }}>Let's build.</span>
+            <span style={{ color: '#3a7000', fontStyle: 'italic' }}>Let's build.</span>
           </h2>
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.4)', marginBottom: 40 }}>Join 1,200+ advertisers who replaced agency fees with AI-powered media buying.</p>
-          <Link href="/signup" style={{ background: 'linear-gradient(135deg, #5aab00, #7dd600)', color: '#fff', padding: '16px 40px', borderRadius: 100, fontSize: 17, fontWeight: 800, textDecoration: 'none', display: 'inline-block', boxShadow: '0 8px 40px rgba(125,214,0,0.4)' }}>Start Free Trial → No card needed</Link>
+          <Link href="/signup" style={{ background: '#dffe95', color: '#10211f', padding: '16px 40px', borderRadius: 100, fontSize: 17, fontWeight: 800, textDecoration: 'none', display: 'inline-block',  }}>Start Free Trial → No card needed</Link>
         </div>
       </section>
 
