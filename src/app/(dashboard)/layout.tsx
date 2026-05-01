@@ -133,10 +133,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold text-white truncate">
+              <div style={{fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.9)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {user?.user_metadata?.full_name || user?.email || 'User'}
               </div>
-              <div className="text-xs text-white/40 truncate">
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {profile?.subscription_status === 'trialing' ? 'Trial' : 'Pro'} · Active
               </div>
             </div>

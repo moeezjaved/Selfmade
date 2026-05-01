@@ -64,8 +64,8 @@ export default function CreativeStudioPage() {
             {results.map(r => (
               <div key={r.n} style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:16,padding:22}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
-                  <div style={{width:28,height:28,borderRadius:8,background:'rgba(223,254,149,0.1)',border:'1px solid rgba(74,138,0,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#dffe95'}}>V{r.n}</div>
-                  <div style={{fontSize:13,fontWeight:700,color:'#dffe95'}}>{r.angle}</div>
+                  <div style={{width:28,height:28,borderRadius:8,background:'rgba(223,254,149,0.1)',border:'1px solid rgba(74,138,0,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#1a3a1a'}}>V{r.n}</div>
+                  <div style={{fontSize:13,fontWeight:700,color:'#1a3a1a'}}>{r.angle}</div>
                 </div>
                 <div style={{marginBottom:10}}>
                   <div style={{fontSize:10,fontWeight:700,color:'#8aaa8a',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>Hook</div>

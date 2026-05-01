@@ -38,15 +38,15 @@ export default function SettingsPage() {
         <div style={{padding:22}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
             <div style={{fontSize:14,color:'#3a5a3a'}}>Meta / Facebook — Connected ✓</div>
-            <a href="/connect-meta" style={{fontSize:13,color:'#dffe95',fontWeight:700,textDecoration:'none'}}>Manage →</a>
+            <a href="/connect-meta" style={{fontSize:13,color:'#1a3a1a',fontWeight:700,textDecoration:'none'}}>Manage →</a>
           </div>
         </div>
       </div>
 
       <div style={{background:'rgba(248,113,113,0.05)',border:'1px solid rgba(248,113,113,0.15)',borderRadius:18,padding:22}}>
-        <div style={{fontSize:15,fontWeight:700,color:'#f87171',marginBottom:8}}>Danger Zone</div>
+        <div style={{fontSize:15,fontWeight:700,color:'#c0392b',marginBottom:8}}>Danger Zone</div>
         <div style={{fontSize:13,color:'#7a9a7a',marginBottom:14}}>Sign out of your Selfmade account.</div>
-        <button onClick={signOut} style={{background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.25)',color:'#f87171',padding:'8px 18px',borderRadius:100,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Sign Out</button>
+        <button onClick={signOut} style={{background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.25)',color:'#c0392b',padding:'8px 18px',borderRadius:100,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Sign Out</button>
       </div>
     </div>
   )
