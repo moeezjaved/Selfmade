@@ -270,7 +270,7 @@ export default function M4Page() {
   )
 
   const nb = (onClick:()=>void,label:string,disabled=false) => (
-    <button onClick={onClick} disabled={disabled} style={{background:disabled?'rgba(223,254,149,0.2)':'#dffe95',color:disabled?'rgba(255,255,255,0.3)':'#10211f',border:'none',padding:'10px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:disabled?'not-allowed':'pointer'}}>{label}</button>
+    <button onClick={onClick} disabled={disabled} style={{background:disabled?'#e8ede6':'#1a3a1a',color:disabled?'#9caa9c':'#dffe95',border:'none',padding:'10px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:disabled?'not-allowed':'pointer'}}>{label}</button>
   )
 
   return (
