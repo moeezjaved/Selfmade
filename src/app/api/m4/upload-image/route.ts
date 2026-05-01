@@ -4,6 +4,9 @@ import { decryptToken } from '@/lib/meta/client'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -48,7 +51,6 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ upload_phase: 'start', file_size: fileSize || 10000000, access_token: token })
       })
       const session = await sessionRes.json()
-      console.log('Video session:', JSON.stringify(session))
       if (session.error) return NextResponse.json({ error: session.error.message }, { status: 400 })
       return NextResponse.json({
         uploadSessionId: session.upload_session_id,
