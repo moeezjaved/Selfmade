@@ -645,7 +645,7 @@ export default function M4Page() {
 
       {step==='interests'&&(
         <div style={S.card}>
-          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>Step 4 — Select Interests</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Claude used your competitor data to suggest the best audiences.</div></div>
+          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>Step 4 — Select Interests</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Core product interests + buyer persona targeting — all validated against Meta's real database.</div></div>
           <div style={S.body}>
             {interests.length===0?(
               <div style={{textAlign:'center',padding:32}}>
@@ -657,10 +657,22 @@ export default function M4Page() {
                   <div key={i} onClick={()=>setInterests(prev=>prev.map((x,j)=>j===i?{...x,selected:!x.selected}:x))} style={{padding:14,borderRadius:14,border:`2px solid ${interest.selected?'#1a3a1a':'rgba(0,0,0,0.1)'}`,background:interest.selected?'rgba(26,58,26,0.06)':'#ffffff',cursor:'pointer',display:'flex',alignItems:'flex-start',gap:12}}>
                     <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${interest.selected?'#1a3a1a':'rgba(0,0,0,0.15)'}`,background:interest.selected?'#1a3a1a':'none',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#dffe95',flexShrink:0,marginTop:2}}>{interest.selected?'✓':''}</div>
                     <div style={{flex:1}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>{interest.name}</span><span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:100,background:'rgba(0,0,0,0.06)',color:'#5a7a5a',textTransform:'uppercase'}}>{interest.category}</span></div>
-                      <div style={{fontSize:13,color:'#5a7a5a',lineHeight:1.6}}>{interest.why}</div>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                        <span style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>{interest.name}</span>
+                        <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:100,background:interest.category==='Core'?'rgba(26,58,26,0.12)':'rgba(0,0,0,0.06)',color:interest.category==='Core'?'#1a5c1a':'#5a7a5a',textTransform:'uppercase'}}>{interest.category}</span>
+                      </div>
+                      <div style={{fontSize:12,color:'#5a7a5a',lineHeight:1.5,marginBottom:4}}>{interest.why}</div>
+                      <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                        {(interest as any).audienceSize > 0 && (
+                          <span style={{fontSize:11,fontWeight:700,color:'#1a5c1a'}}>
+                            👥 {(interest as any).audienceSize >= 1_000_000
+                              ? `${((interest as any).audienceSize/1_000_000).toFixed(0)}M+`
+                              : `${Math.round((interest as any).audienceSize/1000)}K+`} reach
+                          </span>
+                        )}
+                        <span style={{fontSize:11,color:interest.confidence>80?'#2d7a2d':'#b8860b'}}>{interest.confidence}% match</span>
+                      </div>
                     </div>
-                    <div style={{fontSize:11,color:interest.confidence>80?'#2d7a2d':'#b8860b',flexShrink:0}}>{interest.confidence}%</div>
                   </div>
                 ))}
                 <div style={{marginTop:8}}>
