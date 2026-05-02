@@ -529,7 +529,11 @@ export default function M4Page() {
                   ):(
                     <div style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:10,padding:14,marginTop:4}}>
                       <div style={{fontSize:12,fontWeight:700,color:'#fbbf24',marginBottom:6}}>Instagram Not Connected</div>
-                      <div style={{fontSize:12,color:'#6b8f6b',marginBottom:10,lineHeight:1.6}}>Your ads run on both Facebook and Instagram. To auto-connect: go to Meta Business Suite → Instagram Accounts → connect your Instagram to this Facebook page, then <a href="/connect-meta" style={{color:'#1a3a1a',fontWeight:700}}>reconnect Selfmade here</a>.</div>
+                      <div style={{fontSize:12,color:'#6b8f6b',marginBottom:10,lineHeight:1.6}}>
+                        Your ads run on both Facebook and Instagram. Two possible fixes:<br/>
+                        <strong style={{color:'#1a3a1a'}}>1. Reconnect Selfmade</strong> — your current connection may be missing Instagram permission. <a href="/connect-meta" style={{color:'#1a3a1a',fontWeight:700}}>Click here to reconnect →</a><br/>
+                        <strong style={{color:'#1a3a1a'}}>2. Link in Meta Business Suite</strong> — go to Business Suite → Instagram Accounts → connect your Instagram to this Facebook page, then reconnect above.
+                      </div>
                       <input value={selectedInstagramId} onChange={e=>setSelectedInstagramId(e.target.value)} placeholder="Or paste Instagram Account ID manually (find in Meta Business Suite)" style={{...S.input,fontSize:12}}/>
                     </div>
                   )}
