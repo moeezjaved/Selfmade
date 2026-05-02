@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
             geo_locations: geoLocations,
             ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
             targeting_automation: { advantage_audience: 1 },
-            ...(exclusionAudienceId ? { exclusions: { custom_audiences: [{ id: exclusionAudienceId }] } } : {}),
+            ...(exclusionAudienceId ? { excluded_custom_audiences: [{ id: exclusionAudienceId }] } : {}),
           },
           destination_type: 'WEBSITE',
           ...optSettings,
@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
           geo_locations: geoLocations,
           ...(gender === 'MALE' ? { genders: [1] } : gender === 'FEMALE' ? { genders: [2] } : {}),
           targeting_automation: { advantage_audience: 0 },
-          ...(exclusionAudienceId ? { exclusions: { custom_audiences: [{ id: exclusionAudienceId }] } } : {}),
+          ...(exclusionAudienceId ? { excluded_custom_audiences: [{ id: exclusionAudienceId }] } : {}),
         }
         if (metaInterest) {
           intTargeting.flexible_spec = [{ interests: [{ id: metaInterest.id, name: metaInterest.name }] }]
