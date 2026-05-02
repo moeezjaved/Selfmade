@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { product, description, competitorDomains, targetCustomer } = await request.json()
+  const { product, description, competitorDomains, targetCustomer, country } = await request.json()
 
   const extractBrands = (input: string) => {
     if (!input) return []
@@ -73,20 +73,24 @@ export async function POST(request: NextRequest) {
     allBrands.length > 0 ? 'Competitor brands entered: ' + allBrands.join(', ') : '',
   ].filter(Boolean).join('\n')
 
+  const countryLine = country ? `Primary Market: ${country}` : ''
+
   const prompt = `You are an expert Facebook/Meta Ads media buyer.
 
 Product: ${product}
 Description: ${description}
 Target Customer: ${targetCustomer || 'General'}
+${countryLine}
 ${compCtx ? '\nCompetitor Intelligence:\n' + compCtx : ''}
 
 Suggest 14 Meta Ads interests highly relevant to this specific product. These will be validated against Meta's real interest database.
 
 Rules:
 - Every interest MUST be directly related to the product niche — do NOT suggest generic fitness, sports, or lifestyle interests unless they are core to this product
-- Competitor brand names that are well-known enough to appear in Meta (e.g. "Hims", "Keeps", "Rogaine" for hair loss)
-- Niche-specific publications and magazines (e.g. "Men's Health" for male grooming)
-- Product-category activities (e.g. "Hair care", "Hair loss", "Trichology" for hair products)
+${country ? `- Prioritize competitor brands and publications popular in ${country} first, then include well-known international ones to fill remaining slots` : '- Include well-known competitor brands in this niche'}
+- Competitor brand names that are well-known enough to appear in Meta
+- Niche-specific publications and magazines
+- Product-category activities and behaviors
 - Do NOT suggest geographic places, sports teams, or interests unrelated to the product
 - Use the exact name format Meta uses (e.g. "Hair products (hair care)" not just "hair care")
 

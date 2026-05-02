@@ -149,6 +149,8 @@ export default function M4Page() {
   const autoDate = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
   const uid = () => Math.random().toString(36).slice(2, 6).toUpperCase()
   const autoCampaignName = (name: string) => `${name} — ${autoDate()} #${uid()}`
+  const CURRENCY_COUNTRY: Record<string,string> = {PKR:'Pakistan',USD:'United States',GBP:'United Kingdom',EUR:'Europe',AED:'UAE',INR:'India',SAR:'Saudi Arabia',CAD:'Canada',AUD:'Australia',MYR:'Malaysia',SGD:'Singapore',BDT:'Bangladesh',LKR:'Sri Lanka',NGN:'Nigeria',ZAR:'South Africa',BRL:'Brazil',MXN:'Mexico',TRY:'Turkey',EGP:'Egypt',IDR:'Indonesia',PHP:'Philippines',THB:'Thailand',VND:'Vietnam',KWD:'Kuwait',QAR:'Qatar',OMR:'Oman',JOD:'Jordan'}
+  const accountCountry = CURRENCY_COUNTRY[accountCurrency] || 'United States'
 
   const handleProductChange = (val: string) => {
     setForm(p => ({
@@ -284,7 +286,7 @@ export default function M4Page() {
 
   const generateInterests = async () => {
     setLoading(true)
-    try{const d=await fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,competitorDomains:competitorList.join(', '),targetCustomer:form.targetCustomer})}).then(r=>r.json());setInterests((d.interests||[]).map((i:Interest)=>({...i,selected:false})))}catch{alert('Failed to generate interests')}
+    try{const d=await fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,competitorDomains:competitorList.join(', '),targetCustomer:form.targetCustomer,country:accountCountry})}).then(r=>r.json());setInterests((d.interests||[]).map((i:Interest)=>({...i,selected:false})))}catch{alert('Failed to generate interests')}
     setLoading(false)
   }
 
@@ -448,9 +450,7 @@ export default function M4Page() {
                 <button disabled={genCompetitors||!form.product} onClick={async()=>{
                   setGenCompetitors(true)
                   try{
-                    const currencyCountry:Record<string,string>={PKR:'Pakistan',USD:'United States',GBP:'United Kingdom',EUR:'Europe',AED:'UAE',INR:'India',SAR:'Saudi Arabia',CAD:'Canada',AUD:'Australia',MYR:'Malaysia',SGD:'Singapore',BDT:'Bangladesh',LKR:'Sri Lanka',NGN:'Nigeria',ZAR:'South Africa',BRL:'Brazil',MXN:'Mexico',TRY:'Turkey',EGP:'Egypt',IDR:'Indonesia',PHP:'Philippines',THB:'Thailand',VND:'Vietnam',KWD:'Kuwait',QAR:'Qatar',OMR:'Oman',JOD:'Jordan'}
-                    const country=currencyCountry[accountCurrency]||'United States'
-                    const res=await fetch('/api/m4/competitors',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,targetCustomer:form.targetCustomer,country})})
+                    const res=await fetch('/api/m4/competitors',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,targetCustomer:form.targetCustomer,country:accountCountry})})
                     const d=await res.json()
                     if(d.competitors?.length){
                       const entries: string[]=[]
