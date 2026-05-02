@@ -180,6 +180,9 @@ export default function M4Page() {
   const [genCompetitors, setGenCompetitors] = useState(false)
   const [competitorList, setCompetitorList] = useState<string[]>([])
   const [competitorInput, setCompetitorInput] = useState('')
+  const [detecting, setDetecting] = useState(false)
+  const [detectedGroups, setDetectedGroups] = useState<{local:any[],regional:any[],global:any[]}|null>(null)
+  const [detectionContext, setDetectionContext] = useState<{category:string,targetCustomer:string,country:string,confidence:number}|null>(null)
   const [form, setForm] = useState({
     product:'', description:'',
     competitorDomains:'', competitorFBPages:'', competitorIGHandles:'',
@@ -192,6 +195,11 @@ export default function M4Page() {
     if (!val) return
     setCompetitorList(p => p.includes(val) ? p : [...p, val])
     setCompetitorInput('')
+  }
+
+  const removeDetectedComp = (group: 'local'|'regional'|'global', c: any) => {
+    setDetectedGroups(prev => prev ? { ...prev, [group]: prev[group].filter((x: any) => x.name !== c.name) } : null)
+    setCompetitorList(prev => prev.filter(e => e !== c.domain && e !== c.instagram))
   }
 
   const set = (k: string, v: string) => setForm(p => ({...p, [k]: v}))
@@ -223,6 +231,30 @@ export default function M4Page() {
   }
 
   React.useEffect(()=>{
+    // Auto-detect business context from connected Meta account (runs in background)
+    setDetecting(true)
+    fetch('/api/m4/detect').then(r=>r.json()).then(data=>{
+      if(data.context){
+        setDetectionContext(data.context)
+        setForm(prev=>({
+          ...prev,
+          description: prev.description || data.context.description || '',
+          targetCustomer: prev.targetCustomer || data.context.targetCustomer || '',
+        }))
+      }
+      if(data.competitors){
+        setDetectedGroups(data.competitors)
+        const entries: string[] = []
+        for(const grp of [data.competitors.local||[], data.competitors.regional||[], data.competitors.global||[]]){
+          for(const c of grp){
+            if(c.domain) entries.push(c.domain)
+            if(c.instagram) entries.push(c.instagram)
+          }
+        }
+        setCompetitorList(entries)
+      }
+    }).catch(()=>{}).finally(()=>setDetecting(false))
+
     Promise.all([
       fetch('/api/meta/accounts').then(r=>r.json()).catch(()=>({})),
       fetch('/api/m4/pages').then(r=>r.json()).catch(()=>({})),
@@ -498,46 +530,74 @@ export default function M4Page() {
               </div>
             </div>
             <div style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.15)',borderRadius:14,padding:18,marginBottom:20}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
                 <div style={{fontSize:13,fontWeight:800,color:'#1a5c1a'}}>Competitor Intelligence</div>
-                <button disabled={genCompetitors||!form.product} onClick={async()=>{
-                  setGenCompetitors(true)
-                  try{
-                    const res=await fetch('/api/m4/competitors',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,targetCustomer:form.targetCustomer,country:accountCountry})})
-                    const d=await res.json()
-                    if(d.competitors?.length){
-                      const entries: string[]=[]
-                      d.competitors.forEach((c:any)=>{
-                        if(c.domain) entries.push(c.domain)
-                        if(c.instagram) entries.push(c.instagram)
-                      })
-                      setCompetitorList(prev=>{
-                        const merged=[...prev]
-                        entries.forEach(e=>{if(!merged.includes(e))merged.push(e)})
-                        return merged
-                      })
-                    }
-                  }catch{}
-                  setGenCompetitors(false)
-                }} style={{background:'rgba(26,58,26,0.08)',border:'1.5px solid rgba(26,58,26,0.15)',color:'#1a3a1a',padding:'6px 12px',borderRadius:8,fontSize:11,fontWeight:700,fontFamily:'inherit',cursor:'pointer',opacity:genCompetitors||!form.product?0.5:1}}>
-                  {genCompetitors?'Finding…':'✦ Auto-suggest'}
-                </button>
+                {detecting&&<div style={{fontSize:11,color:'#8aaa8a',display:'flex',alignItems:'center',gap:6}}>
+                  <span style={{display:'inline-block',width:10,height:10,border:'2px solid #8aaa8a',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 1s linear infinite'}}/>Detecting from Meta…
+                </div>}
               </div>
-              <div style={{fontSize:12,color:'#6b8f6b',marginBottom:14,lineHeight:1.7}}>We suggest competitors based on your product — remove any that don't fit and add your own. <strong style={{color:'#1a5c1a'}}>More competitors = better targeting.</strong></div>
-              <div style={{display:'flex',gap:8,marginBottom:10}}>
+
+              {/* Detection result banner */}
+              {detectionContext&&!detecting&&(
+                <div style={{background:'rgba(26,58,26,0.06)',border:'1px solid rgba(26,58,26,0.1)',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:12,color:'#1a5c1a',lineHeight:1.6}}>
+                  🔍 <strong>Detected:</strong> {detectionContext.category} · {detectionContext.country}
+                  {detectionContext.confidence<0.7&&<span style={{marginLeft:8,color:'#b8860b',fontWeight:700}}>— Low confidence, please review</span>}
+                </div>
+              )}
+
+              {/* Grouped competitors */}
+              {detectedGroups&&(
+                <div style={{marginBottom:14}}>
+                  {([
+                    {key:'local', label:`🏠 Local — ${detectionContext?.country||'Your Market'}`, bg:'rgba(26,58,26,0.08)', border:'rgba(26,58,26,0.15)'},
+                    {key:'regional', label:'🌍 Regional', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)'},
+                    {key:'global', label:'🌐 Global', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.3)'},
+                  ] as const).map(grp=>{
+                    const group = detectedGroups[grp.key]
+                    if(!group?.length) return null
+                    return(
+                      <div key={grp.key} style={{marginBottom:10}}>
+                        <div style={{fontSize:10,fontWeight:700,color:'#8aaa8a',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6}}>{grp.label} ({group.length})</div>
+                        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                          {group.map((c:any)=>(
+                            <div key={c.name} style={{display:'flex',alignItems:'center',gap:5,background:grp.bg,border:`1px solid ${grp.border}`,borderRadius:100,padding:'4px 12px',fontSize:12,fontWeight:600,color:'#1a3a1a'}}>
+                              <span>{c.name}</span>
+                              <span onClick={()=>removeDetectedComp(grp.key,c)} style={{cursor:'pointer',fontSize:14,lineHeight:1,color:'#7a9a7a',marginLeft:2}}>×</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Custom additions */}
+              {(()=>{
+                const detectedEntries = detectedGroups
+                  ? [...(detectedGroups.local||[]),...(detectedGroups.regional||[]),...(detectedGroups.global||[])].flatMap((d:any)=>[d.domain,d.instagram].filter(Boolean))
+                  : []
+                const custom = competitorList.filter(e=>!detectedEntries.includes(e))
+                return custom.length>0?(
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>
+                    {custom.map((c,i)=>(
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:6,background:'rgba(26,58,26,0.08)',border:'1px solid rgba(26,58,26,0.15)',borderRadius:100,padding:'5px 12px',fontSize:12,fontWeight:600,color:'#1a3a1a'}}>
+                        <span>{c.startsWith('@')?'📸 ':'🌐 '}{c}</span>
+                        <span onClick={()=>setCompetitorList(p=>p.filter(e=>e!==c))} style={{cursor:'pointer',fontSize:14,lineHeight:1,color:'#7a9a7a'}}>×</span>
+                      </div>
+                    ))}
+                  </div>
+                ):null
+              })()}
+
+              <div style={{fontSize:12,color:'#6b8f6b',marginBottom:10,lineHeight:1.6}}>
+                {detectedGroups?'Remove irrelevant competitors or add your own below.':'Add competitor domains or @handles for better targeting.'}{' '}
+                <strong style={{color:'#1a5c1a'}}>More competitors = better targeting.</strong>
+              </div>
+              <div style={{display:'flex',gap:8}}>
                 <input value={competitorInput} onChange={e=>setCompetitorInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),addCompetitor())} placeholder="Add domain or @handle" style={{...S.input,flex:1}}/>
                 <button onClick={addCompetitor} style={{background:'#1a3a1a',color:'#dffe95',border:'none',padding:'10px 18px',borderRadius:10,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',whiteSpace:'nowrap'}}>+ Add</button>
               </div>
-              {competitorList.length>0&&(
-                <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-                  {competitorList.map((c,i)=>(
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:6,background:'rgba(26,58,26,0.08)',border:'1px solid rgba(26,58,26,0.15)',borderRadius:100,padding:'5px 12px',fontSize:12,fontWeight:600,color:'#1a3a1a'}}>
-                      <span>{c.startsWith('@')?'📸 ':'🌐 '}{c}</span>
-                      <span onClick={()=>setCompetitorList(p=>p.filter((_,j)=>j!==i))} style={{cursor:'pointer',fontSize:14,lineHeight:1,color:'#7a9a7a',fontWeight:400}}>×</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
             <div style={{marginBottom:8}}><label style={S.label}>Meta Pixel</label></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
