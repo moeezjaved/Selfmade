@@ -317,7 +317,7 @@ export default function M4Page() {
         </div>
       )}
       <label style={{background:'rgba(223,254,149,0.1)',border:'1px solid rgba(74,138,0,0.2)',color:'#1a3a1a',padding:'8px 16px',borderRadius:100,fontSize:13,fontWeight:700,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:8}}>
-        Upload Image / Video (up to 500MB)<input type="file" accept="image/*,video/*" multiple onChange={e=>handleUpload(e,setter)} style={{display:'none'}}/>
+        Upload Image / Video (up to 200MB)<input type="file" accept="image/*,video/*" multiple onChange={e=>handleUpload(e,setter)} style={{display:'none'}}/>
       </label>
     </div>
   )
