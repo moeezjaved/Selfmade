@@ -23,7 +23,7 @@ export async function GET() {
     const res = await fetch(
       `https://graph.facebook.com/${V}/me/accounts?` +
       new URLSearchParams({ 
-        fields: 'id,name,category,fan_count,access_token,instagram_business_account,connected_instagram_account',
+        fields: 'id,name,category,fan_count,access_token,instagram_business_account,connected_instagram_account,about,description,products,website',
         access_token: token,
         limit: '20',
       })
@@ -54,7 +54,9 @@ export async function GET() {
         }
       } catch(e: any) { console.log('IG fetch error:', e.message) }
 
-      return { id: p.id, name: p.name, category: p.category, fan_count: p.fan_count, instagram }
+      // Use about > products > description — in order of usefulness for ad targeting context
+      const pageAbout = p.about || p.products || p.description || ''
+      return { id: p.id, name: p.name, category: p.category, fan_count: p.fan_count, instagram, about: pageAbout, website: p.website || '' }
     }))
     
     return NextResponse.json({ pages })
