@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
   if (!user) return NextResponse.redirect(`${APP_URL}/login`)
 
-  const scopes = 'ads_management,ads_read,business_management,pages_read_engagement'
+  const scopes = 'ads_management,ads_read,business_management,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish'
   const nonce = Math.random().toString(36).slice(2)
   const state = encodeURIComponent(btoa(JSON.stringify({ user_id: user.id, nonce, ts: Date.now() })))
 
