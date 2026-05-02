@@ -5,14 +5,16 @@ const client = new Anthropic()
 
 export async function POST(request: NextRequest) {
   try {
-    const { product, description, targetCustomer } = await request.json()
+    const { product, description, targetCustomer, country } = await request.json()
     if (!product) return NextResponse.json({ competitors: [] })
+
+    const countryLine = country ? `\nPrimary Market: ${country} — prioritize competitors that operate in or are popular in ${country}. If there are not enough local competitors, include well-known international ones.` : ''
 
     const prompt = `You are an expert in brand research and competitive analysis.
 
 Product/Brand: ${product}
 Description: ${description || ''}
-Target Customer: ${targetCustomer || ''}
+Target Customer: ${targetCustomer || ''}${countryLine}
 
 List 6 real direct competitors for this brand. Only include brands that actually exist.
 For each competitor provide their website domain and Instagram handle if they have one.
