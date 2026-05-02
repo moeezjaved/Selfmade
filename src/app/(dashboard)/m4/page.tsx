@@ -168,11 +168,17 @@ export default function M4Page() {
         })
         const presign = await presignRes.json()
         if (presign.error) { alert('Upload error: ' + presign.error); setter(prev=>prev.filter(x=>x.id!==id)); return }
-        await fetch(presign.signedUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+        const uploadRes = await fetch(presign.signedUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+        if (!uploadRes.ok) {
+          const errText = await uploadRes.text().catch(()=>'')
+          alert('Video upload to storage failed (' + uploadRes.status + '). ' + (uploadRes.status === 413 ? 'File too large — increase Supabase bucket size limit in Storage settings.' : errText.slice(0,200)))
+          setter(prev=>prev.filter(x=>x.id!==id))
+          return
+        }
         const metaRes = await fetch('/api/m4/upload-image', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ publicUrl: presign.publicUrl }),
+          body: JSON.stringify({ publicUrl: presign.downloadUrl }),
         })
         const data = await metaRes.json()
         setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:x))
