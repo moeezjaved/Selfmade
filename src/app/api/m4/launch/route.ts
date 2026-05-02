@@ -131,15 +131,24 @@ export async function POST(request: NextRequest) {
       try {
         let storySpec: Record<string,unknown>
         if (isVideo) {
-          storySpec = {
-            page_id: pageId,
-            video_data: {
-              video_id: imageHash,
-              message: msg,
-              title: hd,
-              call_to_action: { type: ct, value: { link: lnk } },
-            },
+          // Meta video_data requires a thumbnail (image_url or image_hash)
+          // Fetch auto-generated thumbnail from Meta's video thumbnails endpoint
+          let thumbnailUrl: string | undefined
+          try {
+            const thumbRes = await fetch(`https://graph.facebook.com/${V}/${imageHash}/thumbnails?access_token=${token}`)
+            const thumbData = await thumbRes.json()
+            thumbnailUrl = thumbData.data?.[0]?.uri
+          } catch {}
+
+          const videoData: Record<string,unknown> = {
+            video_id: imageHash,
+            message: msg,
+            title: hd,
+            call_to_action: { type: ct, value: { link: lnk } },
           }
+          if (thumbnailUrl) videoData.image_url = thumbnailUrl
+
+          storySpec = { page_id: pageId, video_data: videoData }
         } else {
           storySpec = {
             page_id: pageId,
