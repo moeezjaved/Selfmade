@@ -178,6 +178,7 @@ export default function M4Page() {
       if(d.pages?.[0]){
         setSelectedPageId(d.pages[0].id)
         if(d.pages[0].instagram?.id) setSelectedInstagramId(d.pages[0].instagram.id)
+        if(d.pages[0].about) setForm(p=>({...p, description: p.description || d.pages[0].about}))
       }
     }).catch(()=>{})
   },[])
