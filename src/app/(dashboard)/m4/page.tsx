@@ -124,6 +124,7 @@ export default function M4Page() {
   const [accountCurrency, setAccountCurrency] = useState('USD')
   const [genCopy, setGenCopy] = useState<'main'|'retargeting'|'retainer'|null>(null)
   const [genTarget, setGenTarget] = useState(false)
+  const [genCompetitors, setGenCompetitors] = useState(false)
   const [competitorList, setCompetitorList] = useState<string[]>([])
   const [competitorInput, setCompetitorInput] = useState('')
   const [form, setForm] = useState({
@@ -441,17 +442,41 @@ export default function M4Page() {
               </div>
             </div>
             <div style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.15)',borderRadius:14,padding:18,marginBottom:20}}>
-              <div style={{fontSize:13,fontWeight:800,color:'#1a5c1a',marginBottom:4}}>Competitor Intelligence</div>
-              <div style={{fontSize:12,color:'#6b8f6b',marginBottom:14,lineHeight:1.7}}>Add competitor websites, Facebook pages, or Instagram handles. Selfmade searches Meta's interest database for each one. <strong style={{color:'#1a5c1a'}}>More competitors = better targeting.</strong></div>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                <div style={{fontSize:13,fontWeight:800,color:'#1a5c1a'}}>Competitor Intelligence</div>
+                <button disabled={genCompetitors||!form.product} onClick={async()=>{
+                  setGenCompetitors(true)
+                  try{
+                    const res=await fetch('/api/m4/competitors',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,targetCustomer:form.targetCustomer})})
+                    const d=await res.json()
+                    if(d.competitors?.length){
+                      const entries: string[]=[]
+                      d.competitors.forEach((c:any)=>{
+                        if(c.domain) entries.push(c.domain)
+                        if(c.instagram) entries.push(c.instagram)
+                      })
+                      setCompetitorList(prev=>{
+                        const merged=[...prev]
+                        entries.forEach(e=>{if(!merged.includes(e))merged.push(e)})
+                        return merged
+                      })
+                    }
+                  }catch{}
+                  setGenCompetitors(false)
+                }} style={{background:'rgba(26,58,26,0.08)',border:'1.5px solid rgba(26,58,26,0.15)',color:'#1a3a1a',padding:'6px 12px',borderRadius:8,fontSize:11,fontWeight:700,fontFamily:'inherit',cursor:'pointer',opacity:genCompetitors||!form.product?0.5:1}}>
+                  {genCompetitors?'Finding…':'✦ Auto-suggest'}
+                </button>
+              </div>
+              <div style={{fontSize:12,color:'#6b8f6b',marginBottom:14,lineHeight:1.7}}>We suggest competitors based on your product — remove any that don't fit and add your own. <strong style={{color:'#1a5c1a'}}>More competitors = better targeting.</strong></div>
               <div style={{display:'flex',gap:8,marginBottom:10}}>
-                <input value={competitorInput} onChange={e=>setCompetitorInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),addCompetitor())} placeholder="e.g. regaine.com or @minoxidilformen" style={{...S.input,flex:1}}/>
+                <input value={competitorInput} onChange={e=>setCompetitorInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),addCompetitor())} placeholder="Add domain or @handle" style={{...S.input,flex:1}}/>
                 <button onClick={addCompetitor} style={{background:'#1a3a1a',color:'#dffe95',border:'none',padding:'10px 18px',borderRadius:10,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',whiteSpace:'nowrap'}}>+ Add</button>
               </div>
               {competitorList.length>0&&(
                 <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
                   {competitorList.map((c,i)=>(
                     <div key={i} style={{display:'flex',alignItems:'center',gap:6,background:'rgba(26,58,26,0.08)',border:'1px solid rgba(26,58,26,0.15)',borderRadius:100,padding:'5px 12px',fontSize:12,fontWeight:600,color:'#1a3a1a'}}>
-                      <span>{c}</span>
+                      <span>{c.startsWith('@')?'📸 ':'🌐 '}{c}</span>
                       <span onClick={()=>setCompetitorList(p=>p.filter((_,j)=>j!==i))} style={{cursor:'pointer',fontSize:14,lineHeight:1,color:'#7a9a7a',fontWeight:400}}>×</span>
                     </div>
                   ))}
