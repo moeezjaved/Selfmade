@@ -147,13 +147,15 @@ export default function M4Page() {
   const goTo = (s: Step) => { setStep(s); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
   const autoDate = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  const uid = () => Math.random().toString(36).slice(2, 6).toUpperCase()
+  const autoCampaignName = (name: string) => `${name} — ${autoDate()} #${uid()}`
 
   const handleProductChange = (val: string) => {
     setForm(p => ({
       ...p,
       product: val,
-      campaignName: (!p.campaignName || p.campaignName === `${p.product} — ${autoDate()}`)
-        ? `${val} — ${autoDate()}`
+      campaignName: (!p.campaignName || /^.+ — \d+ \w+ \d{4} #[A-Z0-9]{4}$/.test(p.campaignName))
+        ? autoCampaignName(val)
         : p.campaignName,
     }))
   }
@@ -177,7 +179,6 @@ export default function M4Page() {
       if(primary?.currency) setAccountCurrency(primary.currency)
 
       const accountName = primary?.account_name || ''
-      const dateStr = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})
 
       // Find the page whose name best matches the primary ad account name
       const nameLower = accountName.toLowerCase()
@@ -191,14 +192,14 @@ export default function M4Page() {
         setForm(prev=>({
           ...prev,
           product: prev.product || accountName || matchedPage.name,
-          campaignName: prev.campaignName || `${accountName || matchedPage.name} — ${dateStr}`,
+          campaignName: prev.campaignName || autoCampaignName(accountName || matchedPage.name),
           description: prev.description || matchedPage.about || '',
         }))
       } else if(accountName) {
         setForm(prev=>({
           ...prev,
           product: prev.product || accountName,
-          campaignName: prev.campaignName || `${accountName} — ${dateStr}`,
+          campaignName: prev.campaignName || autoCampaignName(accountName),
         }))
       }
     })
