@@ -149,19 +149,55 @@ export default function M4Page() {
     const id = Date.now().toString() + Math.random().toString(36).substr(2,9)
     const isVid = file.type.startsWith('video/')
     setter(prev=>[...prev,{id,name:file.name.replace(/\.[^.]+$/,''),pack:1,type:isVid?'video':'image',mimeType:file.type,uploading:true}])
-    if (isVid && file.size > 524288000) { // 500MB limit
-      alert('Video too large — max 5MB. For larger videos, add directly in Meta Ads Manager.')
-      setter(prev=>prev.filter(x=>x.id!==id))
-      return
-    }
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('isVideo', String(isVid))
     try {
-      const res = await fetch('/api/m4/upload-image',{method:'POST',body:fd})
-      const data = await res.json()
-      setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:x))
-    } catch { setter(prev=>prev.map(x=>x.id===id?{...x,uploading:false}:x)) }
+      if (isVid) {
+        // Upload video directly from browser to Supabase (bypasses Vercel 4.5MB body limit)
+        const presignRes = await fetch('/api/m4/upload-presigned', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+        })
+        const presign = await presignRes.json()
+        if (presign.error) { alert('Upload error: ' + presign.error); setter(prev=>prev.filter(x=>x.id!==id)); return }
+        await fetch(presign.signedUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+        const metaRes = await fetch('/api/m4/upload-image', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ publicUrl: presign.publicUrl }),
+        })
+        const data = await metaRes.json()
+        setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:x))
+      } else {
+        // Resize images >3MB client-side before upload
+        let fileToUpload: File | Blob = file
+        if (file.size > 3 * 1024 * 1024) {
+          fileToUpload = await new Promise<Blob>((resolve, reject) => {
+            const img = new Image()
+            const url = URL.createObjectURL(file)
+            img.onload = () => {
+              URL.revokeObjectURL(url)
+              const scale = Math.sqrt((3 * 1024 * 1024) / file.size)
+              const canvas = document.createElement('canvas')
+              canvas.width = Math.round(img.width * scale)
+              canvas.height = Math.round(img.height * scale)
+              canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+              canvas.toBlob(b => b ? resolve(b) : reject(new Error('Resize failed')), 'image/jpeg', 0.88)
+            }
+            img.onerror = reject
+            img.src = url
+          })
+        }
+        const fd = new FormData()
+        fd.append('file', fileToUpload, file.name)
+        fd.append('isVideo', 'false')
+        const res = await fetch('/api/m4/upload-image', { method: 'POST', body: fd })
+        const data = await res.json()
+        setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:x))
+      }
+    } catch(err: any) {
+      alert('Upload error: ' + err.message)
+      setter(prev=>prev.map(x=>x.id===id?{...x,uploading:false}:x))
+    }
   }
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<Creative[]>>) => {

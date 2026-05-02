@@ -82,3 +82,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
+// Called after a browser-direct upload to Supabase — registers the video URL with Meta
+export async function PUT(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const admin = createAdminClient()
+    const { data: metaAccount } = await admin
+      .from('meta_accounts').select('*')
+      .eq('user_id', user.id).eq('is_primary', true).single()
+    if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
+
+    const token = decryptToken(metaAccount.access_token)
+    const adAccountId = 'act_' + metaAccount.account_id
+
+    const { publicUrl } = await request.json()
+    if (!publicUrl) return NextResponse.json({ error: 'Missing publicUrl' }, { status: 400 })
+
+    const metaForm = new FormData()
+    metaForm.append('file_url', publicUrl)
+    metaForm.append('access_token', token)
+    const res = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/advideos`, {
+      method: 'POST',
+      body: metaForm,
+    })
+    const data = await res.json()
+    console.log('Meta video (direct):', JSON.stringify(data))
+    if (data.error) return NextResponse.json({ error: data.error.message }, { status: 400 })
+    return NextResponse.json({ videoId: data.id, hash: data.id, isVideo: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
