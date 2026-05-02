@@ -164,18 +164,20 @@ export default function M4Page() {
   }
 
   React.useEffect(()=>{
-    fetch('/api/meta/accounts').then(r=>r.json()).then(d=>{const p=d.accounts?.find((a:any)=>a.is_primary);if(p?.currency)setAccountCurrency(p.currency)}).catch(()=>{})
+    fetch('/api/meta/accounts').then(r=>r.json()).then(d=>{
+      const p=d.accounts?.find((a:any)=>a.is_primary)
+      if(p?.currency) setAccountCurrency(p.currency)
+      if(p?.account_name) setForm(prev=>({
+        ...prev,
+        product: prev.product || p.account_name,
+        campaignName: prev.campaignName || `${p.account_name} — ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`,
+      }))
+    }).catch(()=>{})
     fetch('/api/m4/pages').then(r=>r.json()).then(d=>{
       setPages(d.pages||[])
       if(d.pages?.[0]){
         setSelectedPageId(d.pages[0].id)
         if(d.pages[0].instagram?.id) setSelectedInstagramId(d.pages[0].instagram.id)
-        const pageName = d.pages[0].name || ''
-        if(pageName) setForm(p=>({
-          ...p,
-          product: p.product || pageName,
-          campaignName: p.campaignName || `${pageName} — ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`,
-        }))
       }
     }).catch(()=>{})
   },[])
