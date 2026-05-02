@@ -252,8 +252,26 @@ export default function CampaignsPage() {
                         setEditModal((p: any) => ({ ...p, new_creative_name: f.name }))
                         try {
                           const isVideo = f.type.startsWith('video/')
+                          let fileToUpload: File | Blob = f
+                          if (!isVideo && f.size > 3 * 1024 * 1024) {
+                            fileToUpload = await new Promise<Blob>((resolve, reject) => {
+                              const img = new Image()
+                              const url = URL.createObjectURL(f)
+                              img.onload = () => {
+                                URL.revokeObjectURL(url)
+                                const scale = Math.sqrt((3 * 1024 * 1024) / f.size)
+                                const canvas = document.createElement('canvas')
+                                canvas.width = Math.round(img.width * scale)
+                                canvas.height = Math.round(img.height * scale)
+                                canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+                                canvas.toBlob(b => b ? resolve(b) : reject(new Error('Resize failed')), 'image/jpeg', 0.88)
+                              }
+                              img.onerror = reject
+                              img.src = url
+                            })
+                          }
                           const fd = new FormData()
-                          fd.append('file', f)
+                          fd.append('file', fileToUpload, f.name)
                           fd.append('isVideo', String(isVideo))
                           const res = await fetch('/api/m4/upload-image', { method: 'POST', body: fd })
                           const text = await res.text()
