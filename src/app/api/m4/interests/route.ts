@@ -4,6 +4,14 @@ import { createClient } from '@/lib/supabase/server'
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
 
+// Intent types in priority order — higher = shown first, harder to filter out
+const INTENT_PRIORITY: Record<string, number> = {
+  'problem':   4, // Hair loss, Alopecia — buyer knows they have the problem
+  'solution':  3, // Rogaine, Minoxidil, Hair transplant — actively seeking a fix
+  'category':  2, // Hair care, Men's grooming — in the product category
+  'lifestyle': 1, // Men's Health magazine, Fitness — persona signal
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -20,8 +28,8 @@ export async function POST(request: NextRequest) {
     if (ma) tok = decryptToken(ma.access_token)
   } catch {}
 
-  // ── Meta interest search ─────────────────────────────────────
-  const searchMeta = async (q: string): Promise<{ id: string; name: string; path: string[]; topic: string; audience_size_lower_bound?: number } | null> => {
+  // ── Meta interest search ────────────────────────────────────
+  const searchMeta = async (q: string): Promise<{ id: string; name: string; path: string[]; topic: string; audience_size_lower_bound?: number; audience_size_upper_bound?: number } | null> => {
     if (!tok) return null
     try {
       const r = await fetch('https://graph.facebook.com/v20.0/search?' + new URLSearchParams({ type: 'adinterest', q, limit: '10', access_token: tok }))
@@ -38,30 +46,40 @@ export async function POST(request: NextRequest) {
         return false
       })
       if (!match) return null
-      return { id: match.id, name: match.name, path: match.path || [], topic: match.topic || '', audience_size_lower_bound: match.audience_size_lower_bound }
+      return {
+        id: match.id,
+        name: match.name,
+        path: match.path || [],
+        topic: match.topic || '',
+        audience_size_lower_bound: match.audience_size_lower_bound,
+        audience_size_upper_bound: match.audience_size_upper_bound,
+      }
     } catch { return null }
   }
 
-  // ── Reject clearly wrong Meta results ────────────────────────
+  // ── Junk filter — reject clearly wrong results ──────────────
   const isJunk = (meta: { name: string; path: string[] }, suggestedName: string): boolean => {
     const topCat = (meta.path[1] || '').toLowerCase()
     const mn = meta.name.toLowerCase()
     const sn = suggestedName.toLowerCase()
-    // Geographic places
     if (topCat.includes('place') || topCat.includes('geograph') || /\(place\)|\(city\)|\(country\)/.test(mn)) return true
-    // Name completely unrelated — no word overlap at all
+    // No word overlap between suggested and returned name AND path
     const snWords = sn.split(/[\s(),]+/).filter(w => w.length >= 4)
-    const mnWords = mn.split(/[\s(),]+/).filter(w => w.length >= 4)
-    if (snWords.length > 0 && mnWords.length > 0) {
-      const hasOverlap = snWords.some(sw => mnWords.some(mw => mw.includes(sw) || sw.includes(mw)))
-      if (!hasOverlap && meta.path.length > 0) {
-        // allow if same broad topic category
-        const pathStr = meta.path.join(' ').toLowerCase()
-        const topicMatch = snWords.some(w => pathStr.includes(w))
-        if (!topicMatch) return true
-      }
+    if (snWords.length > 0) {
+      const pathStr = (meta.path.join(' ') + ' ' + mn).toLowerCase()
+      if (!snWords.some(w => pathStr.includes(w))) return true
     }
     return false
+  }
+
+  // ── Audience size rules ─────────────────────────────────────
+  // Too broad = waste spend. Too narrow = can't scale.
+  const passesAudienceFilter = (aud: number, intentType: string, isCore: boolean): boolean => {
+    if (isCore) return true // always allow core anchors regardless of size
+    if (intentType === 'problem' || intentType === 'solution') return aud >= 100_000 // high intent — allow small
+    if (aud > 900_000_000) return false // >900M is too broad for non-core (e.g. "Fitness and wellness")
+    if (aud < 500_000) return false     // <500K won't scale for lifestyle/category interests
+    return true
   }
 
   // ── Extract competitor brands for context ───────────────────
@@ -79,8 +97,8 @@ export async function POST(request: NextRequest) {
     ? `These competitor brands are confirmed in Meta: ${confirmedBrands.join(', ')}`
     : allBrands.length > 0 ? `Competitor brands (unverified): ${allBrands.join(', ')}` : ''
 
-  // ── Prompt: anchor-first + real personas ─────────────────────
-  const prompt = `You are a performance media buyer with 10 years of Facebook Ads experience. You are generating interest targeting for a real ad campaign that needs to spend money and convert.
+  // ── Claude prompt ────────────────────────────────────────────
+  const prompt = `You are a performance media buyer with 10 years Facebook Ads experience managing $10M+ in ad spend. You are generating interest targeting for a real campaign.
 
 Product: ${product}
 Description: ${description || ''}
@@ -88,53 +106,51 @@ Target Customer: ${targetCustomer || ''}
 ${country ? `Market: ${country}` : ''}
 ${compCtx ? `\n${compCtx}` : ''}
 
-YOUR JOB: Suggest interests that:
-1. Actually exist in Meta Ads Manager (real, searchable interests)
-2. Have large enough audiences to scale (prefer 1M+ reach)
-3. Are proven ad categories — not theoretical or psychological labels
+INTENT FRAMEWORK — interests ranked by purchase intent:
+🔥 problem    = person KNOWS they have this problem (e.g. Hair loss, Alopecia, Hair thinning)
+🔥 solution   = person is SEEKING a solution (e.g. Rogaine, Minoxidil, Hair transplant)
+🔥 category   = product category interest (e.g. Hair care, Men's grooming, Personal care)
+⚡ lifestyle  = persona signal — correlates with buyer (e.g. Men's Health magazine, GQ, LinkedIn)
 
-━━━━━━━━━━━━━━━━━━━━━━━
-PART 1 — ANCHOR INTERESTS (required)
-━━━━━━━━━━━━━━━━━━━━━━━
-Suggest 5 anchor interests that are DIRECTLY about this product category.
-These should be the most obvious, broad, high-volume interests.
-Think: what would any media buyer immediately put in for this product?
+STEP 1 — ANCHORS (5-6 interests, always include)
+The most obvious, proven, high-volume interests for this product.
+Must include:
+- At least 2 problem-aware interests (person knows they have this problem)
+- At least 2 solution-aware or category interests
+- Use exact Meta names
 
-Examples:
-- Hair loss product → Hair loss, Hair care, Men's grooming, Beauty, Personal care
-- Baby milk → Baby food, Parenting, Motherhood, Infant formula, Child nutrition
-- Fitness supplement → Fitness, Bodybuilding, Nutrition, Whey protein, Gym
+STEP 2 — PERSONA INTERESTS (3 personas × 3-4 interests)
+Translate each persona into real Meta interests.
+Think: what does this buyer follow, read, search for?
 
-━━━━━━━━━━━━━━━━━━━━━━━
-PART 2 — PERSONA INTERESTS
-━━━━━━━━━━━━━━━━━━━━━━━
-Identify 3 buyer personas and for each suggest 3-4 REAL Facebook interests.
-Translate each persona into actual behaviors and real interest names — NOT abstract labels.
-
-STRICT RULES:
-- Only suggest interests that are real Meta interest names (what you'd type in Ads Manager)
-- Prefer: grooming brands, health/fitness publications, lifestyle activities, well-known apps
-- Reject: dating shows, obscure niches, micro-psychological labels, entertainment categories unrelated to product
-- If suggesting a publication/magazine, use its exact Meta name (e.g. "Men's Health (magazine)")
-- If suggesting a brand, only use it if it's large enough to be in Meta (millions of users)
+HARD RULES:
+✅ Use real, searchable Meta interest names
+✅ Include high-intent specifics: brand names of treatments, clinical terms people search for
+✅ Publications use exact name e.g. "Men's Health (magazine)"
+❌ NO pet/animal interests (dog grooming, cat food etc) unless product is for pets
+❌ NO sports/gymnastics unless product is sports-related
+❌ NO fashion accessories, random hobbies, entertainment unless directly relevant
+❌ NO interests with audience <500K (they won't scale) — exception: high-intent problem/solution
+❌ NO interests with audience >1B (too broad — Facebook, Instagram, etc)
+❌ NO duplicates — each interest name must be unique
 
 Respond ONLY with valid JSON:
 {
   "anchors": [
     {
-      "name": "Interest name exactly as Meta would show it",
-      "expected_path": "Category > Subcategory",
-      "reason": "Core product category interest"
+      "name": "Exact Meta interest name",
+      "intent_type": "problem|solution|category|lifestyle",
+      "reason": "Why this is a must-have for this product"
     }
   ],
   "personas": [
     {
-      "name": "Short practical persona name",
+      "name": "Short practical persona name (3-4 words max)",
       "interests": [
         {
-          "name": "Interest name exactly as Meta would show it",
-          "expected_path": "Category > Subcategory",
-          "reason": "One sentence — why this converts for this product"
+          "name": "Exact Meta interest name",
+          "intent_type": "problem|solution|category|lifestyle",
+          "reason": "One sentence why this converts"
         }
       ]
     }
@@ -162,39 +178,66 @@ Respond ONLY with valid JSON:
   }
 
   const validated: any[] = []
-  const seen = new Set<string>()
+  const seenIds = new Set<string>()   // dedupe by Meta ID
+  const seenNames = new Set<string>() // dedupe by lowercase name
 
-  const addInterest = async (name: string, category: string, reason: string) => {
+  const addInterest = async (name: string, category: string, reason: string, intentType: string, isCore: boolean) => {
     if (validated.length >= 14) return
-    if (seen.has(name.toLowerCase())) return
+    const nameLower = name.toLowerCase()
+    if (seenNames.has(nameLower)) return
+
     const meta = await searchMeta(name)
     if (!meta) return
     if (isJunk(meta, name)) return
-    seen.add(meta.name.toLowerCase())
+    if (seenIds.has(meta.id)) return // exact duplicate from Meta
+
     const aud = meta.audience_size_lower_bound || 0
+    if (!passesAudienceFilter(aud, intentType, isCore)) return
+
+    seenIds.add(meta.id)
+    seenNames.add(meta.name.toLowerCase())
+    seenNames.add(nameLower)
+
+    // Intent badge shown in UI
+    const intentBadge =
+      intentType === 'problem'   ? 'High Intent 🔥' :
+      intentType === 'solution'  ? 'High Intent 🔥' :
+      intentType === 'category'  ? 'Core Category' :
+      'Lifestyle ⚡'
+
     validated.push({
       name: meta.name,
-      category,
+      category: isCore ? 'Core' : category,
       why: reason,
       size: aud >= 10_000_000 ? 'Large' : aud >= 1_000_000 ? 'Medium' : 'Small',
-      confidence: meta.id ? 85 : 70, // confirmed in Meta = high confidence
+      confidence: INTENT_PRIORITY[intentType] || 1,
       metaId: meta.id,
       audienceSize: aud,
+      intentType,
+      intentBadge,
     })
   }
 
-  // Anchors first — shown at top, tagged "Core"
+  // Anchors first (isCore = true, bypass size filter)
   for (const a of anchors) {
-    await addInterest(a.name, 'Core', a.reason)
+    await addInterest(a.name, 'Core', a.reason, a.intent_type || 'category', true)
   }
 
-  // Then persona interests
+  // Persona interests (size filter applies)
   for (const persona of personas) {
     for (const interest of (persona.interests || [])) {
-      await addInterest(interest.name, persona.name, interest.reason)
+      await addInterest(interest.name, persona.name, interest.reason, interest.intent_type || 'lifestyle', false)
     }
   }
 
-  console.log(`Anchors: ${anchors.length}, Personas: ${personas.length}, Validated: ${validated.length}`)
+  // Sort: problem > solution > category > lifestyle, then by audience size desc
+  validated.sort((a, b) => {
+    const pa = INTENT_PRIORITY[a.intentType] || 0
+    const pb = INTENT_PRIORITY[b.intentType] || 0
+    if (pb !== pa) return pb - pa
+    return (b.audienceSize || 0) - (a.audienceSize || 0)
+  })
+
+  console.log(`Anchors: ${anchors.length}, Personas: ${personas.length}, Validated+filtered: ${validated.length}`)
   return NextResponse.json({ interests: validated })
 }

@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 
 type Step = 'welcome' | 'pixel' | 'creatives' | 'retargeting' | 'interests' | 'budget' | 'review' | 'grades'
 interface Creative { id: string; name: string; pack: number; type?: string; hash?: string; uploading?: boolean; uploaded?: boolean; mimeType?: string }
-interface Interest { name: string; category: string; why: string; size: string; confidence: number; selected: boolean; custom?: boolean }
+interface Interest { name: string; category: string; why: string; size: string; confidence: number; selected: boolean; custom?: boolean; intentType?: string; intentBadge?: string; audienceSize?: number; metaId?: string }
 interface Grade { campaign_name: string; grade: string; emoji: string; label: string; why: string; action: string; action_reason: string; applied?: boolean }
 
 const S = {
@@ -656,21 +656,27 @@ export default function M4Page() {
                 {interests.map((interest,i)=>(
                   <div key={i} onClick={()=>setInterests(prev=>prev.map((x,j)=>j===i?{...x,selected:!x.selected}:x))} style={{padding:14,borderRadius:14,border:`2px solid ${interest.selected?'#1a3a1a':'rgba(0,0,0,0.1)'}`,background:interest.selected?'rgba(26,58,26,0.06)':'#ffffff',cursor:'pointer',display:'flex',alignItems:'flex-start',gap:12}}>
                     <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${interest.selected?'#1a3a1a':'rgba(0,0,0,0.15)'}`,background:interest.selected?'#1a3a1a':'none',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#dffe95',flexShrink:0,marginTop:2}}>{interest.selected?'✓':''}</div>
-                    <div style={{flex:1}}>
+                    <div style={{flex:1,minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
                         <span style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>{interest.name}</span>
-                        <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:100,background:interest.category==='Core'?'rgba(26,58,26,0.12)':'rgba(0,0,0,0.06)',color:interest.category==='Core'?'#1a5c1a':'#5a7a5a',textTransform:'uppercase'}}>{interest.category}</span>
+                        {interest.category==='Core'&&<span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:100,background:'rgba(26,58,26,0.12)',color:'#1a5c1a',textTransform:'uppercase',letterSpacing:'.05em'}}>CORE</span>}
                       </div>
-                      <div style={{fontSize:12,color:'#5a7a5a',lineHeight:1.5,marginBottom:4}}>{interest.why}</div>
-                      <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                        {(interest as any).audienceSize > 0 && (
-                          <span style={{fontSize:11,fontWeight:700,color:'#1a5c1a'}}>
-                            👥 {(interest as any).audienceSize >= 1_000_000
-                              ? `${((interest as any).audienceSize/1_000_000).toFixed(0)}M+`
-                              : `${Math.round((interest as any).audienceSize/1000)}K+`} reach
+                      <div style={{fontSize:12,color:'#5a7a5a',lineHeight:1.5,marginBottom:6}}>{interest.why}</div>
+                      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                        {/* Intent badge */}
+                        <span style={{
+                          fontSize:11,fontWeight:700,padding:'2px 10px',borderRadius:100,
+                          background: (interest.intentType==='problem'||interest.intentType==='solution') ? 'rgba(220,38,38,0.08)' : interest.intentType==='category' ? 'rgba(26,58,26,0.08)' : 'rgba(0,0,0,0.05)',
+                          color: (interest.intentType==='problem'||interest.intentType==='solution') ? '#dc2626' : interest.intentType==='category' ? '#1a5c1a' : '#5a7a5a',
+                        }}>{interest.intentBadge || (interest.category==='Core' ? 'Core Category' : 'Lifestyle ⚡')}</span>
+                        {/* Audience size */}
+                        {(interest.audienceSize||0) > 0 && (
+                          <span style={{fontSize:11,color:'#6b8f6b',fontWeight:600}}>
+                            👥 {(interest.audienceSize||0) >= 1_000_000
+                              ? `${((interest.audienceSize||0)/1_000_000).toFixed(0)}M+`
+                              : `${Math.round((interest.audienceSize||0)/1000)}K+`}
                           </span>
                         )}
-                        <span style={{fontSize:11,color:interest.confidence>80?'#2d7a2d':'#b8860b'}}>{interest.confidence}% match</span>
                       </div>
                     </div>
                   </div>
