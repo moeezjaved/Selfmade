@@ -99,12 +99,65 @@ function LocationPicker({selected, onChange}: {selected: any[], onChange: (v: an
   )
 }
 
+function InterestSearch({onAdd}: {onAdd: (interest: {id:string,name:string,topic:string}) => void}) {
+  const [query, setQuery] = React.useState('')
+  const [results, setResults] = React.useState<any[]>([])
+  const [loading, setLoading] = React.useState(false)
+
+  const search = async (q: string) => {
+    if (q.length < 2) { setResults([]); return }
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/m4/search-interests?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setResults(data.interests || [])
+    } catch {}
+    setLoading(false)
+  }
+
+  React.useEffect(() => {
+    const t = setTimeout(() => search(query), 350)
+    return () => clearTimeout(t)
+  }, [query])
+
+  const formatSize = (lower?: number) => {
+    if (!lower) return ''
+    if (lower >= 1_000_000) return `${(lower/1_000_000).toFixed(0)}M+`
+    if (lower >= 1_000) return `${(lower/1_000).toFixed(0)}K+`
+    return `${lower}+`
+  }
+
+  return (
+    <div style={{position:'relative'}}>
+      <input
+        value={query}
+        onChange={e=>setQuery(e.target.value)}
+        placeholder="Search Meta interests (e.g. Hair care, Rogaine, Men's Health)..."
+        style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid rgba(0,0,0,0.1)',fontSize:13,fontFamily:'inherit',outline:'none',background:'#ffffff',color:'#1a3a1a',boxSizing:'border-box' as any}}
+      />
+      {(results.length > 0 || loading) && (
+        <div style={{position:'absolute',top:'100%',left:0,right:0,background:'white',border:'1px solid rgba(0,0,0,0.1)',borderRadius:10,marginTop:4,zIndex:200,maxHeight:240,overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.1)'}}>
+          {loading && <div style={{padding:'10px 14px',fontSize:12,color:'#8aaa8a'}}>Searching Meta...</div>}
+          {results.map((r:any) => (
+            <button key={r.id} onClick={()=>{onAdd({id:r.id,name:r.name,topic:r.topic});setQuery('');setResults([])}} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'10px 14px',background:'none',border:'none',cursor:'pointer',textAlign:'left',borderBottom:'1px solid rgba(0,0,0,0.04)'}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:'#1a3a1a'}}>{r.name}</div>
+                {r.topic && <div style={{fontSize:11,color:'#8aaa8a'}}>{r.topic}</div>}
+              </div>
+              {r.audience_size_lower_bound && <div style={{fontSize:11,color:'#5a7a5a',fontWeight:700,whiteSpace:'nowrap'}}>{formatSize(r.audience_size_lower_bound)}</div>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function M4Page() {
   const [step, setStep] = useState<Step>('welcome')
   const [loading, setLoading] = useState(false)
   const [grades, setGrades] = useState<Grade[]>([])
   const [interests, setInterests] = useState<Interest[]>([])
-  const [customInterest, setCustomInterest] = useState('')
   const [applying, setApplying] = useState<string|null>(null)
   const [scaling, setScaling] = useState<string|null>(null)
   const [creatives, setCreatives] = useState<Creative[]>([])
@@ -610,9 +663,14 @@ export default function M4Page() {
                     <div style={{fontSize:11,color:interest.confidence>80?'#2d7a2d':'#b8860b',flexShrink:0}}>{interest.confidence}%</div>
                   </div>
                 ))}
-                <div style={{display:'flex',gap:8,marginTop:4}}>
-                  <input value={customInterest} onChange={e=>setCustomInterest(e.target.value)} onKeyDown={e=>e.key==='Enter'&&customInterest.trim()&&(setInterests(prev=>[...prev,{name:customInterest.trim(),category:'Custom',why:'Added by you.',size:'Unknown',confidence:70,selected:true,custom:true}]),setCustomInterest(''))} placeholder="Add custom interest…" style={{flex:1,...S.input}}/>
-                  <button onClick={()=>{if(customInterest.trim()){setInterests(prev=>[...prev,{name:customInterest.trim(),category:'Custom',why:'Added by you.',size:'Unknown',confidence:70,selected:true,custom:true}]);setCustomInterest('')}}} style={{background:'#1a3a1a',border:'none',color:'#dffe95',padding:'10px 16px',borderRadius:10,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Add</button>
+                <div style={{marginTop:8}}>
+                  <div style={{fontSize:11,color:'#8aaa8a',marginBottom:6,fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em'}}>Search & add from Meta's interest database</div>
+                  <InterestSearch onAdd={(interest)=>{
+                    setInterests(prev=>{
+                      if(prev.find(i=>i.name===interest.name)) return prev
+                      return [...prev,{name:interest.name,category:interest.topic||'Custom',why:'Added from Meta interest search.',size:'Unknown',confidence:80,selected:true,custom:true}]
+                    })
+                  }}/>
                 </div>
               </div>
             )}
