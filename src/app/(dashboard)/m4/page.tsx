@@ -668,7 +668,7 @@ export default function M4Page() {
                           fontSize:11,fontWeight:700,padding:'2px 10px',borderRadius:100,
                           background: (interest.intentType==='problem'||interest.intentType==='solution') ? 'rgba(220,38,38,0.08)' : interest.intentType==='category' ? 'rgba(26,58,26,0.08)' : 'rgba(0,0,0,0.05)',
                           color: (interest.intentType==='problem'||interest.intentType==='solution') ? '#dc2626' : interest.intentType==='category' ? '#1a5c1a' : '#5a7a5a',
-                        }}>{interest.intentBadge || (interest.category==='Core' ? 'Core Category' : 'Lifestyle ⚡')}</span>
+                        }}>{interest.intentBadge || (interest.category==='Core' ? 'Core Category 🎯' : 'Support ⚡')}</span>
                         {/* Audience size */}
                         {(interest.audienceSize||0) > 0 && (
                           <span style={{fontSize:11,color:'#6b8f6b',fontWeight:600}}>
