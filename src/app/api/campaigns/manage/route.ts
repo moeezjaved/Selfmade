@@ -161,15 +161,26 @@ export async function POST(request: NextRequest) {
         } else {
           const existRes = await fetch(`https://graph.facebook.com/${V}/${body.creative_id}?fields=object_story_spec&access_token=${token}`)
           const existData = await existRes.json()
+          if (existData.error) return NextResponse.json({ error: 'Failed to fetch creative: ' + existData.error.message }, { status: 400 })
           const spec = existData.object_story_spec || {}
+          const ld = spec.link_data || {}
+          // Only pass writable fields — spreading the full spec includes read-only fields Meta rejects on create
           creativePayload.object_story_spec = {
-            ...spec,
-            ...(spec.link_data && { link_data: { ...spec.link_data, image_hash: body.new_creative_hash } }),
+            page_id: spec.page_id,
+            link_data: {
+              image_hash: body.new_creative_hash,
+              link: ld.link || '',
+              message: ld.message || body.primary_text || '',
+              name: ld.name || body.headline || '',
+              ...(ld.call_to_action && { call_to_action: ld.call_to_action }),
+            },
           }
         }
         const newCreative = await post(adAccountId + '/adcreatives', creativePayload)
-        await post(body.id, { creative: { creative_id: newCreative.id } })
-        return NextResponse.json({ success: true })
+        console.log('New creative id:', newCreative.id, 'assigning to ad:', body.id)
+        const adUpdateResult = await post(body.id, { creative: { creative_id: newCreative.id } })
+        console.log('Ad update result:', JSON.stringify(adUpdateResult))
+        return NextResponse.json({ success: true, newCreativeId: newCreative.id })
       }
 
       // Otherwise update text/url only
