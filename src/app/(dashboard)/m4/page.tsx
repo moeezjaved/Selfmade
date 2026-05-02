@@ -164,23 +164,42 @@ export default function M4Page() {
   }
 
   React.useEffect(()=>{
-    fetch('/api/meta/accounts').then(r=>r.json()).then(d=>{
-      const p=d.accounts?.find((a:any)=>a.is_primary)
-      if(p?.currency) setAccountCurrency(p.currency)
-      if(p?.account_name) setForm(prev=>({
-        ...prev,
-        product: prev.product || p.account_name,
-        campaignName: prev.campaignName || `${p.account_name} — ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`,
-      }))
-    }).catch(()=>{})
-    fetch('/api/m4/pages').then(r=>r.json()).then(d=>{
-      setPages(d.pages||[])
-      if(d.pages?.[0]){
-        setSelectedPageId(d.pages[0].id)
-        if(d.pages[0].instagram?.id) setSelectedInstagramId(d.pages[0].instagram.id)
-        if(d.pages[0].about) setForm(p=>({...p, description: p.description || d.pages[0].about}))
+    Promise.all([
+      fetch('/api/meta/accounts').then(r=>r.json()).catch(()=>({})),
+      fetch('/api/m4/pages').then(r=>r.json()).catch(()=>({})),
+    ]).then(([accountData, pagesData]) => {
+      const primary = accountData.accounts?.find((a:any)=>a.is_primary)
+      const pages = pagesData.pages || []
+      setPages(pages)
+
+      if(primary?.currency) setAccountCurrency(primary.currency)
+
+      const accountName = primary?.account_name || ''
+      const dateStr = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})
+
+      // Find the page whose name best matches the primary ad account name
+      const nameLower = accountName.toLowerCase()
+      const matchedPage = pages.find((p:any) =>
+        p.name.toLowerCase().includes(nameLower) || nameLower.includes(p.name.toLowerCase())
+      ) || pages[0]
+
+      if(matchedPage) {
+        setSelectedPageId(matchedPage.id)
+        if(matchedPage.instagram?.id) setSelectedInstagramId(matchedPage.instagram.id)
+        setForm(prev=>({
+          ...prev,
+          product: prev.product || accountName || matchedPage.name,
+          campaignName: prev.campaignName || `${accountName || matchedPage.name} — ${dateStr}`,
+          description: prev.description || matchedPage.about || '',
+        }))
+      } else if(accountName) {
+        setForm(prev=>({
+          ...prev,
+          product: prev.product || accountName,
+          campaignName: prev.campaignName || `${accountName} — ${dateStr}`,
+        }))
       }
-    }).catch(()=>{})
+    })
   },[])
 
   const uploadFile = async (file: File, setter: React.Dispatch<React.SetStateAction<Creative[]>>) => {
