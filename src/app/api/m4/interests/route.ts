@@ -40,15 +40,19 @@ export async function POST(request: NextRequest) {
       const d = await r.json()
       if (!d.data?.length) return null
       const ql = q.toLowerCase().trim()
-      // Require the interest name to actually contain or be contained by the query
-      // Never fall back to d.data[0] blindly — that's what caused "Ball sports" and "Canada"
+      // Significant words from the query (4+ chars) — used for word-level matching
+      const qWords = ql.split(/[\s(),]+/).filter(w => w.length >= 4)
+
       const match = d.data.find((i: any) => {
         const nl = i.name.toLowerCase()
-        return nl === ql ||
-          nl.startsWith(ql) ||
-          ql.startsWith(nl) ||
-          (ql.length >= 4 && nl.includes(ql)) ||
-          (nl.length >= 4 && ql.includes(nl))
+        // Exact or substring match
+        if (nl === ql || nl.startsWith(ql) || ql.startsWith(nl)) return true
+        if (ql.length >= 4 && nl.includes(ql)) return true
+        if (nl.length >= 4 && ql.includes(nl)) return true
+        // Word-level: any significant query word appears in the result name
+        // This catches "Hair loss (health & wellness)" when searching "Hair loss"
+        if (qWords.length > 0 && qWords.some(w => nl.includes(w))) return true
+        return false
       })
       return match || null
     } catch { return null }
@@ -87,7 +91,7 @@ Suggest 14 Meta Ads interests highly relevant to this specific product. These wi
 
 Rules:
 - Every interest MUST be directly related to the product niche — do NOT suggest generic fitness, sports, or lifestyle interests unless they are core to this product
-${country ? `- Prioritize competitor brands and publications popular in ${country} first, then include well-known international ones to fill remaining slots` : '- Include well-known competitor brands in this niche'}
+${country ? `- Include local ${country} brands IF they are large enough to exist as a Meta interest (millions of followers); otherwise use well-known international brands that target the same niche — Meta's interest database is global so local small brands often don't exist there` : '- Include well-known competitor brands in this niche'}
 - Competitor brand names that are well-known enough to appear in Meta
 - Niche-specific publications and magazines
 - Product-category activities and behaviors
