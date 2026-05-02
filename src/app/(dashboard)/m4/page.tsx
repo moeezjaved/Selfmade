@@ -141,6 +141,20 @@ export default function M4Page() {
 
   const set = (k: string, v: string) => setForm(p => ({...p, [k]: v}))
   const selectedInterests = interests.filter(i => i.selected)
+
+  const goTo = (s: Step) => { setStep(s); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+
+  const autoDate = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+
+  const handleProductChange = (val: string) => {
+    setForm(p => ({
+      ...p,
+      product: val,
+      campaignName: (!p.campaignName || p.campaignName === `${p.product} — ${autoDate()}`)
+        ? `${val} — ${autoDate()}`
+        : p.campaignName,
+    }))
+  }
   const STEPS: Step[] = ['welcome','pixel','creatives','retargeting','interests','budget','review','grades']
   const gc: Record<string,{bg:string,border:string,color:string}> = {
     GRADUATE:{bg:'rgba(134,239,172,.08)',border:'rgba(134,239,172,.25)',color:'#2d7a2d'},
@@ -151,7 +165,19 @@ export default function M4Page() {
 
   React.useEffect(()=>{
     fetch('/api/meta/accounts').then(r=>r.json()).then(d=>{const p=d.accounts?.find((a:any)=>a.is_primary);if(p?.currency)setAccountCurrency(p.currency)}).catch(()=>{})
-    fetch('/api/m4/pages').then(r=>r.json()).then(d=>{setPages(d.pages||[]);if(d.pages?.[0]){setSelectedPageId(d.pages[0].id);if(d.pages[0].instagram?.id)setSelectedInstagramId(d.pages[0].instagram.id)}}).catch(()=>{})
+    fetch('/api/m4/pages').then(r=>r.json()).then(d=>{
+      setPages(d.pages||[])
+      if(d.pages?.[0]){
+        setSelectedPageId(d.pages[0].id)
+        if(d.pages[0].instagram?.id) setSelectedInstagramId(d.pages[0].instagram.id)
+        const pageName = d.pages[0].name || ''
+        if(pageName) setForm(p=>({
+          ...p,
+          product: p.product || pageName,
+          campaignName: p.campaignName || `${pageName} — ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`,
+        }))
+      }
+    }).catch(()=>{})
   },[])
 
   const uploadFile = async (file: File, setter: React.Dispatch<React.SetStateAction<Creative[]>>) => {
@@ -245,7 +271,7 @@ export default function M4Page() {
 
   const gradeNow = async () => {
     setLoading(true)
-    try{const d=await fetch('/api/m4/grade',{method:'POST'}).then(r=>r.json());setGrades(d.grades||[]);setStep('grades')}catch{alert('Failed')}
+    try{const d=await fetch('/api/m4/grade',{method:'POST'}).then(r=>r.json());setGrades(d.grades||[]);goTo('grades')}catch{alert('Failed')}
     setLoading(false)
   }
 
@@ -277,7 +303,7 @@ export default function M4Page() {
       else{
         const errMsg=data.errors?.length?'\n\nErrors:\n'+data.errors.join('\n'):''
         alert('LAUNCHED in '+data.account+'!\n\nBroad: '+data.broad_adsets+' ad sets\nInterest: '+data.interest_adsets+' ad sets\nRetargeting: '+(data.retargeting_adsets||0)+' ad sets\n'+(includeRetainer?'Retainer: '+(data.retainer_adsets||0)+' ad sets\n':'')+'\nAll PAUSED. Activate in Meta Ads Manager.'+errMsg)
-        setStep('grades')
+        goTo('grades')
       }
     }catch(e:any){alert('Error: '+e.message)}
     setLoading(false)
@@ -352,7 +378,7 @@ export default function M4Page() {
             ))}
           </div>
           <div style={{display:'flex',gap:12}}>
-            <button onClick={()=>setStep('pixel')} style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'13px 32px',borderRadius:100,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Start M4 Setup</button>
+            <button onClick={()=>goTo('pixel')} style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'13px 32px',borderRadius:100,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Start M4 Setup</button>
             <button onClick={gradeNow} disabled={loading} style={{background:'none',border:'1.5px solid rgba(223,254,149,0.2)',color:'#1a3a1a',padding:'13px 24px',borderRadius:100,fontSize:14,fontWeight:700,fontFamily:'inherit',cursor:'pointer',opacity:loading?0.6:1}}>{loading?'Analysing…':'Grade and Scale My Campaigns'}</button>
           </div>
         </div>
@@ -363,11 +389,11 @@ export default function M4Page() {
           <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>Step 1 — Product and Competitor Intelligence</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>The more detail you give, the smarter Selfmade targets your audience.</div></div>
           <div style={S.body}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
-              <div><label style={S.label}>Product Name</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>What do you call your brand? This helps us name your campaigns.</div><input value={form.product} onChange={e=>set('product',e.target.value)} placeholder="e.g. HairResQ" style={S.input}/></div>
-              <div><label style={S.label}>Campaign Name</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Give this launch a name so you can track it. E.g. Hair Fall — May 2025</div><input value={form.campaignName} onChange={e=>set('campaignName',e.target.value)} placeholder="e.g. Hair Fall M4 May 2025" style={S.input}/></div>
+              <div><label style={S.label}>Product Name</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Your brand or product name — synced from your Facebook Page.</div><input value={form.product} onChange={e=>handleProductChange(e.target.value)} placeholder="e.g. HairResQ" style={S.input}/></div>
+              <div><label style={S.label}>Campaign Name</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Auto-generated from your product name and today's date. Edit freely.</div><input value={form.campaignName} onChange={e=>set('campaignName',e.target.value)} placeholder="e.g. HairResQ — 2 May 2025" style={S.input}/></div>
             </div>
             <div style={{marginBottom:14}}><label style={S.label}>What do you sell?</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>The juicier the details, the smarter our targeting. Benefits, guarantees, who it is for.</div><textarea value={form.description} onChange={e=>set('description',e.target.value)} placeholder="Describe your product, unique benefits, guarantee..." style={{...S.input,resize:'vertical',minHeight:70,lineHeight:1.6} as React.CSSProperties}></textarea></div>
-            <div style={{marginBottom:20}}><label style={S.label}>Target Customer</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Paint a picture of your ideal buyer — age, gender, pain points. Claude uses this to speak directly to them.</div><input value={form.targetCustomer} onChange={e=>set('targetCustomer',e.target.value)} placeholder="e.g. Men and women 25-45 with hair loss" style={S.input}/></div>
+            <div style={{marginBottom:20}}><label style={S.label}>Target Customer</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Describe your ideal buyer — age, gender, pain points. Used to write your ad copy and find the right audiences.</div><input value={form.targetCustomer} onChange={e=>set('targetCustomer',e.target.value)} placeholder="e.g. Men and women 25-45 with hair loss" style={S.input}/></div>
             <div style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.15)',borderRadius:14,padding:18,marginBottom:20}}>
               <div style={{fontSize:13,fontWeight:800,color:'#1a5c1a',marginBottom:4}}>Competitor Intelligence</div>
               <div style={{fontSize:12,color:'#6b8f6b',marginBottom:14,lineHeight:1.7}}>Add competitor websites, Facebook pages, or Instagram handles. Selfmade searches Meta's interest database for each one. <strong style={{color:'#1a5c1a'}}>More competitors = better targeting.</strong></div>
@@ -399,8 +425,8 @@ export default function M4Page() {
             {pixelChoice==='new'&&<div style={{background:'rgba(223,254,149,0.05)',border:'1px solid rgba(223,254,149,0.15)',borderRadius:10,padding:14,fontSize:13,color:'#5a7a5a',lineHeight:1.8}}>Meta Events Manager → Connect Data Sources → Web → Pixel → Copy ID<br/><a href="https://business.facebook.com/events_manager" target="_blank" rel="noreferrer" style={{color:'#1a3a1a',fontWeight:700}}>Open Events Manager</a></div>}
           </div>
           <div style={S.foot}>
-            <button onClick={()=>setStep('welcome')} style={S.back}>Back</button>
-            {nb(async()=>{if(interests.length===0)await generateInterests();setStep('creatives')},loading?'Loading…':'Continue →',!pixelChoice||!form.product||!form.campaignName||!form.description||loading)}
+            <button onClick={()=>goTo('welcome')} style={S.back}>Back</button>
+            {nb(async()=>{if(interests.length===0)await generateInterests();goTo('creatives')},loading?'Loading…':'Continue →',!pixelChoice||!form.product||!form.campaignName||!form.description||loading)}
           </div>
         </div>
       )}
@@ -438,8 +464,8 @@ export default function M4Page() {
             </div>
           </div>
           <div style={S.foot}>
-            <button onClick={()=>setStep('pixel')} style={S.back}>Back</button>
-            {nb(()=>setStep('retargeting'),`Set Up Retargeting (${creatives.length} creative${creatives.length!==1?'s':''}) →`,creatives.length<1||!adCopy.primaryText||!adCopy.headline||!adCopy.destinationUrl||!selectedPageId)}
+            <button onClick={()=>goTo('pixel')} style={S.back}>Back</button>
+            {nb(()=>goTo('retargeting'),`Set Up Retargeting (${creatives.length} creative${creatives.length!==1?'s':''}) →`,creatives.length<1||!adCopy.primaryText||!adCopy.headline||!adCopy.destinationUrl||!selectedPageId)}
           </div>
         </div>
       )}
@@ -480,8 +506,8 @@ export default function M4Page() {
             </div>
           </div>
           <div style={S.foot}>
-            <button onClick={()=>setStep('creatives')} style={S.back}>Back</button>
-            {nb(()=>setStep('interests'),'Select Interests →',retargetingCreatives.length<1||!retargetingCopy.primaryText||!retargetingCopy.destinationUrl)}
+            <button onClick={()=>goTo('creatives')} style={S.back}>Back</button>
+            {nb(()=>goTo('interests'),'Select Interests →',retargetingCreatives.length<1||!retargetingCopy.primaryText||!retargetingCopy.destinationUrl)}
           </div>
         </div>
       )}
@@ -514,8 +540,8 @@ export default function M4Page() {
             )}
           </div>
           <div style={S.foot}>
-            <div><button onClick={()=>setStep('retargeting')} style={S.back}>Back</button><span style={{marginLeft:14,fontSize:13,color:'#1a3a1a',fontWeight:600}}>{selectedInterests.length} selected</span></div>
-            {nb(()=>setStep('budget'),'Set Budget →',selectedInterests.length<2)}
+            <div><button onClick={()=>goTo('retargeting')} style={S.back}>Back</button><span style={{marginLeft:14,fontSize:13,color:'#1a3a1a',fontWeight:600}}>{selectedInterests.length} selected</span></div>
+            {nb(()=>goTo('budget'),'Set Budget →',selectedInterests.length<2)}
           </div>
         </div>
       )}
@@ -548,7 +574,7 @@ export default function M4Page() {
               <div style={{gridColumn:'span 1'}}><label style={S.label}>Location</label><LocationPicker selected={form.locations||[]} onChange={(locs:any[])=>{set('locations',locs as any);set('location',locs.map((l:any)=>l.key).join(','))}}/></div>
             </div>
           </div>
-          <div style={S.foot}><button onClick={()=>setStep('interests')} style={S.back}>Back</button>{nb(()=>setStep('review'),'Review & Launch →',!form.budget||parseFloat(form.budget)<=0)}</div>
+          <div style={S.foot}><button onClick={()=>goTo('interests')} style={S.back}>Back</button>{nb(()=>goTo('review'),'Review & Launch →',!form.budget||parseFloat(form.budget)<=0)}</div>
         </div>
       )}
 
@@ -569,7 +595,7 @@ export default function M4Page() {
               {loading?'Creating in Meta Ads Manager…':'Launch All Campaigns (PAUSED for review)'}
             </button>
           </div>
-          <div style={{padding:'12px 24px'}}><button onClick={()=>setStep('budget')} style={{background:'none',border:'none',color:'#8aaa8a',fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>Back to budget</button></div>
+          <div style={{padding:'12px 24px'}}><button onClick={()=>goTo('budget')} style={{background:'none',border:'none',color:'#8aaa8a',fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>Back to budget</button></div>
         </div>
       )}
 
@@ -619,7 +645,7 @@ export default function M4Page() {
                   </div>
                 )
               })}
-              <button onClick={()=>setStep('welcome')} style={{background:'none',border:'1.5px solid rgba(223,254,149,0.2)',color:'#1a3a1a',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:700,fontFamily:'inherit',cursor:'pointer',alignSelf:'flex-start'}}>Launch Another Campaign</button>
+              <button onClick={()=>goTo('welcome')} style={{background:'none',border:'1.5px solid rgba(223,254,149,0.2)',color:'#1a3a1a',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:700,fontFamily:'inherit',cursor:'pointer',alignSelf:'flex-start'}}>Launch Another Campaign</button>
             </div>
           )}
         </div>
