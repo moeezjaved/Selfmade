@@ -62,19 +62,12 @@ export async function POST(request: NextRequest) {
       if (data.error) return NextResponse.json({ error: data.error.message }, { status: 400 })
       return NextResponse.json({ videoId: data.id, hash: data.id, isVideo: true })
     } else {
-      // Image: fetch from Supabase and send as multipart to Meta
-      const imgRes = await fetch(publicUrl)
-      const imgBuffer = await imgRes.arrayBuffer()
-      
-      const metaForm = new FormData()
-      metaForm.append('access_token', token)
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-      const safeName = 'image.' + ext
-      metaForm.append('filename', new Blob([imgBuffer], { type: file.type }), safeName)
-      
+      // Image: send the buffer we already have to Meta as base64 bytes (JSON path).
+      const base64 = buffer.toString('base64')
       const res = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/adimages`, {
         method: 'POST',
-        body: metaForm
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bytes: base64, access_token: token }),
       })
       const data = await res.json()
       console.log('Meta image:', JSON.stringify(data))
