@@ -6,6 +6,7 @@ interface AdsetInsight {
   spend: number; revenue: number; roas: number; conversions: number
   ctr: number; cpc: number; cpa: number; clicks: number; impressions: number
   currency: string; rec_type: string; recommendation: string; budget: number
+  top_thumbnail_url?: string | null; top_preview_url?: string | null
 }
 
 interface CampaignInsight {
