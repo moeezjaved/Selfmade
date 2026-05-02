@@ -32,28 +32,40 @@ export async function POST(request: NextRequest) {
     }
   } catch {}
 
-  // Search Meta for each competitor brand to find confirmed interests
-  const searchMeta = async (q: string): Promise<{id:string,name:string,audience_size_lower_bound?:number}|null> => {
+  // Search Meta and only return a result if the name genuinely matches the query
+  const searchMeta = async (q: string): Promise<{id:string,name:string,topic?:string,audience_size_lower_bound?:number}|null> => {
     if (!tok) return null
     try {
-      const r = await fetch('https://graph.facebook.com/v20.0/search?' + new URLSearchParams({ type: 'adinterest', q, limit: '5', access_token: tok }))
+      const r = await fetch('https://graph.facebook.com/v20.0/search?' + new URLSearchParams({ type: 'adinterest', q, limit: '10', access_token: tok }))
       const d = await r.json()
       if (!d.data?.length) return null
-      const ql = q.toLowerCase()
-      // Prefer exact or close name match
-      const match = d.data.find((i: any) =>
-        i.name.toLowerCase() === ql ||
-        i.name.toLowerCase().includes(ql) ||
-        ql.includes(i.name.toLowerCase())
-      )
-      return match || d.data[0]
+      const ql = q.toLowerCase().trim()
+      // Require the interest name to actually contain or be contained by the query
+      // Never fall back to d.data[0] blindly — that's what caused "Ball sports" and "Canada"
+      const match = d.data.find((i: any) => {
+        const nl = i.name.toLowerCase()
+        return nl === ql ||
+          nl.startsWith(ql) ||
+          ql.startsWith(nl) ||
+          (ql.length >= 4 && nl.includes(ql)) ||
+          (nl.length >= 4 && ql.includes(nl))
+      })
+      return match || null
     } catch { return null }
+  }
+
+  // Geographic place interests are useless for audience targeting
+  const isPlace = (topic?: string, name?: string) => {
+    const t = (topic || '').toLowerCase()
+    const n = (name || '').toLowerCase()
+    return t === 'place' || t === 'geography' || t === 'location' ||
+      /\(place\)|\(city\)|\(country\)|\(region\)/.test(n)
   }
 
   const confirmedBrandInterests: string[] = []
   for (const brand of allBrands.slice(0, 8)) {
     const match = await searchMeta(brand)
-    if (match) confirmedBrandInterests.push(match.name)
+    if (match && !isPlace(match.topic, match.name)) confirmedBrandInterests.push(match.name)
   }
 
   const compCtx = [
@@ -68,14 +80,15 @@ Description: ${description}
 Target Customer: ${targetCustomer || 'General'}
 ${compCtx ? '\nCompetitor Intelligence:\n' + compCtx : ''}
 
-Suggest 14 Meta Ads interests to target for this product. These will be validated against Meta's actual interest database so suggest interests likely to exist:
-- Competitor brand names (if they are large enough to have a Meta interest)
-- Publications, magazines, blogs in this niche
-- Influencers with large followings in this space
-- Activities, hobbies, behaviors related to the product
-- Adjacent lifestyle interests
+Suggest 14 Meta Ads interests highly relevant to this specific product. These will be validated against Meta's real interest database.
 
-Use realistic Meta interest names — not too generic (not just "Health") and not obscure brands. Aim for interests with real audiences.
+Rules:
+- Every interest MUST be directly related to the product niche — do NOT suggest generic fitness, sports, or lifestyle interests unless they are core to this product
+- Competitor brand names that are well-known enough to appear in Meta (e.g. "Hims", "Keeps", "Rogaine" for hair loss)
+- Niche-specific publications and magazines (e.g. "Men's Health" for male grooming)
+- Product-category activities (e.g. "Hair care", "Hair loss", "Trichology" for hair products)
+- Do NOT suggest geographic places, sports teams, or interests unrelated to the product
+- Use the exact name format Meta uses (e.g. "Hair products (hair care)" not just "hair care")
 
 Respond ONLY with valid JSON:
 {"interests":[{"name":"exact interest name as it would appear in Meta","category":"Competitor|Publication|Influencer|Activity|Lifestyle","why":"one sentence why this audience buys this product","size":"Small|Medium|Large","confidence":85}]}`
@@ -114,7 +127,7 @@ Respond ONLY with valid JSON:
     for (const suggestion of claudeSuggestions) {
       if (validated.length >= 10) break
       const match = await searchMeta(suggestion.name)
-      if (match) {
+      if (match && !isPlace(match.topic, match.name)) {
         validated.push({
           ...suggestion,
           name: match.name, // use exact Meta name
