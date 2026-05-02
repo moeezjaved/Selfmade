@@ -207,6 +207,11 @@ export default function M4Page() {
           body: JSON.stringify({ path: presign.path, bucket: presign.bucket }),
         })
         const data = await metaRes.json()
+        if (data.error) {
+          alert('Meta video registration failed: ' + data.error)
+          setter(prev=>prev.filter(x=>x.id!==id))
+          return
+        }
         setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:x))
       } else {
         // Resize images >3MB client-side before upload
@@ -393,7 +398,12 @@ export default function M4Page() {
               <div><label style={S.label}>Campaign Name</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Auto-generated from your product name and today's date. Edit freely.</div><input value={form.campaignName} onChange={e=>set('campaignName',e.target.value)} placeholder="e.g. HairResQ — 2 May 2025" style={S.input}/></div>
             </div>
             <div style={{marginBottom:14}}><label style={S.label}>What do you sell?</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>The juicier the details, the smarter our targeting. Benefits, guarantees, who it is for.</div><textarea value={form.description} onChange={e=>set('description',e.target.value)} placeholder="Describe your product, unique benefits, guarantee..." style={{...S.input,resize:'vertical',minHeight:70,lineHeight:1.6} as React.CSSProperties}></textarea></div>
-            <div style={{marginBottom:20}}><label style={S.label}>Target Customer</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Describe your ideal buyer — age, gender, pain points. Used to write your ad copy and find the right audiences.</div><input value={form.targetCustomer} onChange={e=>set('targetCustomer',e.target.value)} placeholder="e.g. Men and women 25-45 with hair loss" style={S.input}/></div>
+            <div style={{marginBottom:20}}>
+              <label style={S.label}>Target Customer</label>
+              <div style={{fontSize:13,fontWeight:600,color:'#2d5a2d',marginBottom:4}}>The more detail you give, the better your ads will perform.</div>
+              <div style={{fontSize:11,color:'#8aaa8a',marginBottom:8}}>Describe age, gender, pain points, and what they want. Used to write your ad copy and find the right audiences.</div>
+              <input value={form.targetCustomer} onChange={e=>set('targetCustomer',e.target.value)} placeholder="e.g. Men and women 25-45 struggling with hair loss, want to regrow hair confidently" style={S.input}/>
+            </div>
             <div style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.15)',borderRadius:14,padding:18,marginBottom:20}}>
               <div style={{fontSize:13,fontWeight:800,color:'#1a5c1a',marginBottom:4}}>Competitor Intelligence</div>
               <div style={{fontSize:12,color:'#6b8f6b',marginBottom:14,lineHeight:1.7}}>Add competitor websites, Facebook pages, or Instagram handles. Selfmade searches Meta's interest database for each one. <strong style={{color:'#1a5c1a'}}>More competitors = better targeting.</strong></div>
