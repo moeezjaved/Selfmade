@@ -411,9 +411,27 @@ export default function DashboardPage() {
                 <tbody>
                   {data.campaigns.filter((c:any) => c.status === 'ACTIVE' || c.status === 'PAUSED').slice(0, 6).map((campaign: any) => {
                     const insights = campaign.campaign_insights?.[0]
+                    const liveMatch = liveCampaigns.find((lc: any) => lc.name === campaign.name)
+                    const topAd = liveMatch?.adsets?.[0]?.ads?.[0]
                     return (
                       <tr key={campaign.id} className="hover:bg-dark3 transition-colors" style={{borderTop:"1px solid rgba(0,0,0,0.04)"}}>
-                        <td className="px-6 py-4 text-sm font-bold max-w-[200px] truncate" style={{color:"#1a3a1a"}}>{campaign.name}</td>
+                        <td className="px-6 py-4">
+                          <div style={{display:'flex',alignItems:'center',gap:10}}>
+                            <div style={{width:40,height:40,borderRadius:8,overflow:'hidden',flexShrink:0,background:'#f0f7ee',border:'1px solid rgba(0,0,0,0.08)'}}>
+                              {topAd?.thumbnail_url ? (
+                                <img src={topAd.thumbnail_url} alt={campaign.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e:any)=>{e.target.style.display='none'}} />
+                              ) : (
+                                <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>🎨</div>
+                              )}
+                            </div>
+                            <div style={{minWidth:0}}>
+                              <div className="text-sm font-bold truncate max-w-[160px]" style={{color:'#1a3a1a'}}>{campaign.name}</div>
+                              {topAd?.preview_url && (
+                                <a href={topAd.preview_url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,fontWeight:700,color:'#5a7a5a',textDecoration:'none'}}>👁 View Ad</a>
+                              )}
+                            </div>
+                          </div>
+                        </td>
                         <td className="px-4 py-4">
                           <span className={cn(
                             'text-xs font-bold px-2 py-0.5 rounded-full',

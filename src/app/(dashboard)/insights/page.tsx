@@ -171,10 +171,26 @@ export default function InsightsPage() {
                   <div key={adset.id} style={{borderBottom:'1px solid rgba(0,0,0,0.04)'}}>
                     <div style={{padding:'14px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
                       <div style={{display:'flex',alignItems:'center',gap:10}}>
+                        {/* Top ad thumbnail */}
+                        <div style={{width:44,height:44,borderRadius:8,overflow:'hidden',flexShrink:0,background:'#f0f7ee',border:'1px solid rgba(0,0,0,0.08)'}}>
+                          {adset.top_thumbnail_url ? (
+                            <img src={adset.top_thumbnail_url} alt={adset.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e:any)=>{e.target.style.display='none'}} />
+                          ) : (
+                            <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🎨</div>
+                          )}
+                        </div>
                         <div style={{width:6,height:6,borderRadius:'50%',background:adset.status==='ACTIVE'?'#2d7a2d':'rgba(255,255,255,0.15)',flexShrink:0}}/>
                         <div>
                           <div style={{fontSize:13,fontWeight:700,color:'#1a3a1a'}}>{adset.name}</div>
-                          <div style={{fontSize:11,color:'#8aaa8a'}}>{adset.status}</div>
+                          <div style={{fontSize:11,color:'#8aaa8a',display:'flex',alignItems:'center',gap:8}}>
+                            <span>{adset.status}</span>
+                            {adset.top_preview_url && (
+                              <a href={adset.top_preview_url} target="_blank" rel="noopener noreferrer"
+                                style={{fontSize:11,fontWeight:700,color:'#1a3a1a',background:'#dffe95',padding:'2px 10px',borderRadius:100,textDecoration:'none'}}>
+                                👁 View Ad
+                              </a>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div style={{display:'flex',alignItems:'center',gap:8}}>

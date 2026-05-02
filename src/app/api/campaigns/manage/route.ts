@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch campaigns with effective_status filter - only ACTIVE and PAUSED
     const params = new URLSearchParams({
-      fields: 'id,name,status,effective_status,objective,daily_budget,adsets{id,name,status,daily_budget,targeting,ads{id,name,status,creative{id,body,title,link_url,object_story_spec}}}',
+      fields: 'id,name,status,effective_status,objective,daily_budget,adsets{id,name,status,daily_budget,targeting,ads{id,name,status,creative{id,body,title,link_url,object_story_spec,thumbnail_url,effective_object_story_id}}}',
       effective_status: '["ACTIVE","PAUSED"]',
       limit: '50',
       access_token: token,
@@ -48,6 +48,9 @@ export async function GET(request: NextRequest) {
           const ads = (adset.ads?.data || []).map((ad: any) => {
             const creative = ad.creative || {}
             const spec = creative.object_story_spec?.link_data || creative.object_story_spec?.video_data || {}
+            const previewUrl = creative.effective_object_story_id
+              ? `https://www.facebook.com/${creative.effective_object_story_id}`
+              : null
             return {
               id: ad.id,
               name: ad.name,
@@ -56,6 +59,8 @@ export async function GET(request: NextRequest) {
               primary_text: spec.message || creative.body || '',
               headline: spec.name || creative.title || '',
               link_url: spec.link || creative.link_url || '',
+              thumbnail_url: creative.thumbnail_url || null,
+              preview_url: previewUrl,
             }
           })
           return {
