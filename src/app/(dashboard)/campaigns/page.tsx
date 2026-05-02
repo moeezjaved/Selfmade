@@ -153,15 +153,29 @@ export default function CampaignsPage() {
                   {expandedAdset[adset.id] && (adset.ads || []).map((ad: any) => (
                     <div key={ad.id} style={{ padding: '12px 20px 12px 52px', borderTop: '1px solid rgba(255,255,255,0.03)', background: 'rgba(255,255,255,0.005)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {/* Thumbnail */}
+                        <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.08)' }}>
+                          {ad.thumbnail_url ? (
+                            <img src={ad.thumbnail_url} alt={ad.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e:any) => { e.target.style.display='none' }} />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎨</div>
+                          )}
+                        </div>
                         <div style={{ width: 5, height: 5, borderRadius: '50%', background: ad.status === 'ACTIVE' ? '#86efac' : 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
-                        <div style={{ flex: 1 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 12, fontWeight: 700, color: '#2a4a2a' }}>{ad.name}</div>
                           {ad.primary_text && <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 400 }}>{ad.primary_text}</div>}
                         </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          {ad.preview_url && (
+                            <a href={ad.preview_url} target="_blank" rel="noopener noreferrer"
+                              style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a', background: '#dffe95', padding: '6px 14px', borderRadius: 100, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              👁 View Ad
+                            </a>
+                          )}
                           <button onClick={e => { e.stopPropagation(); openAdEdit(ad) }}
-                            style={{ background: '#dffe95', border: 'none', color: '#1a3a1a', padding: '6px 16px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
-                            ✏️ Edit Ad
+                            style={{ background: 'rgba(0,0,0,0.06)', border: 'none', color: '#1a3a1a', padding: '6px 16px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
+                            ✏️ Edit
                           </button>
                           <button onClick={e => { e.stopPropagation(); toggleStatus(ad.id, 'ad', ad.status) }}
                             style={{ background: ad.status === 'ACTIVE' ? 'rgba(248,113,113,0.1)' : 'rgba(134,239,172,0.1)', border: `1px solid ${ad.status === 'ACTIVE' ? 'rgba(248,113,113,0.2)' : 'rgba(134,239,172,0.2)'}`, color: ad.status === 'ACTIVE' ? '#f87171' : '#86efac', padding: '6px 12px', borderRadius: 100, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>

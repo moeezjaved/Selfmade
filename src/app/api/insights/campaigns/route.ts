@@ -150,6 +150,24 @@ export async function GET(request: NextRequest) {
       return aHasScale - bHasScale
     })
 
+    // Fetch top ad thumbnail for each adset in parallel
+    const allAdsets = campaigns.flatMap((c: any) => c.adsets)
+    await Promise.all(allAdsets.map(async (adset: any) => {
+      try {
+        const r = await fetch(
+          `https://graph.facebook.com/${V}/${adset.id}/ads?fields=creative{thumbnail_url,effective_object_story_id}&limit=1&access_token=${token}`
+        )
+        const d = await r.json()
+        const creative = d.data?.[0]?.creative
+        if (creative?.thumbnail_url) {
+          adset.top_thumbnail_url = creative.thumbnail_url
+          adset.top_preview_url = creative.effective_object_story_id
+            ? `https://www.facebook.com/${creative.effective_object_story_id}`
+            : null
+        }
+      } catch {}
+    }))
+
     campaigns.sort((a:any,b:any)=>(a.adsets.some((x:any)=>x.rec_type==='scale')?0:1)-(b.adsets.some((x:any)=>x.rec_type==='scale')?0:1))
     return NextResponse.json({
       campaigns,
