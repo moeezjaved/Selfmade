@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     : allBrands.length > 0 ? `Competitor brands (unverified): ${allBrands.join(', ')}` : ''
 
   // ── Claude prompt ────────────────────────────────────────────
-  const prompt = `You are a performance media buyer with 10 years Facebook Ads experience managing $10M+ in ad spend. You are generating interest targeting for a real campaign.
+  const prompt = `You are a performance media buyer with 10 years Facebook Ads experience managing $10M+ in ad spend. You are generating interest targeting for a real campaign that needs to be PROFITABLE, not just "interesting."
 
 Product: ${product}
 Description: ${description || ''}
@@ -108,30 +108,41 @@ ${compCtx ? `\n${compCtx}` : ''}
 
 INTENT FRAMEWORK — interests ranked by purchase intent:
 🔥 problem    = person KNOWS they have this problem (e.g. Hair loss, Alopecia, Hair thinning)
-🔥 solution   = person is SEEKING a solution (e.g. Rogaine, Minoxidil, Hair transplant)
-🔥 category   = product category interest (e.g. Hair care, Men's grooming, Personal care)
-⚡ lifestyle  = persona signal — correlates with buyer (e.g. Men's Health magazine, GQ, LinkedIn)
+🔥 solution   = person is SEEKING a fix (e.g. Rogaine, Minoxidil, Hair transplant)
+🎯 category   = product category interest (e.g. Hair care, Men's grooming, Personal care)
+⚡ lifestyle  = strong persona signal — high-correlation publications or communities (e.g. Men's Health (magazine), LinkedIn)
 
 STEP 1 — ANCHORS (5-6 interests, always include)
-The most obvious, proven, high-volume interests for this product.
+The highest-converting, most buyer-ready interests for this product.
 Must include:
-- At least 2 problem-aware interests (person knows they have this problem)
-- At least 2 solution-aware or category interests
-- Use exact Meta names
+- At least 2 problem-aware interests (person identifies with having this problem)
+- At least 2 solution-aware interests (brand names of treatments/products people search for)
+- At least 1 core category interest
+
+AUDIENCE SIZE TARGET MIX:
+- 1–2 broad anchors (100M+ audience) — category-level reach
+- 2–3 mid-tier (5M–50M audience) — core buyers
+- 1–2 high-intent (1M–10M audience) — problem/solution aware
 
 STEP 2 — PERSONA INTERESTS (3 personas × 3-4 interests)
-Translate each persona into real Meta interests.
-Think: what does this buyer follow, read, search for?
+Translate each buyer persona into real Meta interests.
+Think: what does this buyer follow, read, search for? Include publications, communities, and brands.
 
-HARD RULES:
-✅ Use real, searchable Meta interest names
-✅ Include high-intent specifics: brand names of treatments, clinical terms people search for
-✅ Publications use exact name e.g. "Men's Health (magazine)"
-❌ NO pet/animal interests (dog grooming, cat food etc) unless product is for pets
+ABSOLUTE HARD RULES:
+✅ Use REAL, exact, searchable Meta interest names
+✅ Use CONSUMER BEHAVIOR interests — what people actually search/follow, not medical body parts
+   ❌ BAD: "Human hair growth" (biological/anatomical — maps weirdly, weak performance)
+   ✅ GOOD: "Hair loss", "Hair care", "Rogaine"
+✅ Include brand names of competitor treatments and clinically-known terms people search
+✅ Publications: use exact name with type e.g. "Men's Health (magazine)"
+✅ LinkedIn is a strong lifestyle signal — always include for professional buyer personas
+❌ NO biological/anatomical terms (hair follicle, keratin production, sebaceous gland)
+❌ NO pet/animal interests unless product is for pets
 ❌ NO sports/gymnastics unless product is sports-related
+❌ NO vague wellness interests with no direct purchase correlation (e.g. "Vegan nutrition" for hair products)
 ❌ NO fashion accessories, random hobbies, entertainment unless directly relevant
-❌ NO interests with audience <500K (they won't scale) — exception: high-intent problem/solution
-❌ NO interests with audience >1B (too broad — Facebook, Instagram, etc)
+❌ NO interests with audience <500K — exception: high-intent problem/solution (allow ≥100K)
+❌ NO interests with audience >1B (too broad)
 ❌ NO duplicates — each interest name must be unique
 
 Respond ONLY with valid JSON:
@@ -202,8 +213,8 @@ Respond ONLY with valid JSON:
     const intentBadge =
       intentType === 'problem'   ? 'High Intent 🔥' :
       intentType === 'solution'  ? 'High Intent 🔥' :
-      intentType === 'category'  ? 'Core Category' :
-      'Lifestyle ⚡'
+      intentType === 'category'  ? 'Core Category 🎯' :
+      'Support ⚡'
 
     validated.push({
       name: meta.name,
