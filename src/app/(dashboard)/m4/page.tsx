@@ -123,6 +123,7 @@ export default function M4Page() {
   const [loadingPixels, setLoadingPixels] = useState(false)
   const [accountCurrency, setAccountCurrency] = useState('USD')
   const [genCopy, setGenCopy] = useState<'main'|'retargeting'|'retainer'|null>(null)
+  const [genTarget, setGenTarget] = useState(false)
   const [competitorList, setCompetitorList] = useState<string[]>([])
   const [competitorInput, setCompetitorInput] = useState('')
   const [form, setForm] = useState({
@@ -424,7 +425,20 @@ export default function M4Page() {
               <label style={S.label}>Target Customer</label>
               <div style={{fontSize:13,fontWeight:600,color:'#2d5a2d',marginBottom:4}}>The more detail you give, the better your ads will perform.</div>
               <div style={{fontSize:11,color:'#8aaa8a',marginBottom:8}}>Describe age, gender, pain points, and what they want. Used to write your ad copy and find the right audiences.</div>
-              <input value={form.targetCustomer} onChange={e=>set('targetCustomer',e.target.value)} placeholder="e.g. Men and women 25-45 struggling with hair loss, want to regrow hair confidently" style={S.input}/>
+              <div style={{display:'flex',gap:8,alignItems:'flex-start'}}>
+                <input value={form.targetCustomer} onChange={e=>set('targetCustomer',e.target.value)} placeholder="e.g. Men and women 25-45 struggling with hair loss, want to regrow hair confidently" style={{...S.input,flex:1}}/>
+                <button disabled={genTarget||!form.product} onClick={async()=>{
+                  setGenTarget(true)
+                  try{
+                    const res=await fetch('/api/m4/copy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,type:'target'})})
+                    const d=await res.json()
+                    if(d.targetCustomer) set('targetCustomer',d.targetCustomer)
+                  }catch{}
+                  setGenTarget(false)
+                }} style={{background:'rgba(26,58,26,0.08)',border:'1.5px solid rgba(26,58,26,0.15)',color:'#1a3a1a',padding:'10px 14px',borderRadius:10,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer',whiteSpace:'nowrap',opacity:genTarget||!form.product?0.5:1}}>
+                  {genTarget?'Generating…':'✦ Auto-fill'}
+                </button>
+              </div>
             </div>
             <div style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.15)',borderRadius:14,padding:18,marginBottom:20}}>
               <div style={{fontSize:13,fontWeight:800,color:'#1a5c1a',marginBottom:4}}>Competitor Intelligence</div>

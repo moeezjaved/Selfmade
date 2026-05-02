@@ -18,6 +18,12 @@ export async function POST(request: NextRequest) {
     const toneGuide = toneInstructions[tone] || toneInstructions.attention_grabbing
 
     const typePrompts: Record<string, string> = {
+      target: `Describe the ideal target customer for this product in one concise sentence.
+Product: ${product}
+Description: ${description}
+Include: age range, gender (if relevant), key pain point, and what they want.
+Example format: "Women 28-45 struggling with acne-prone skin who want clear, glowing skin without harsh chemicals."
+Respond ONLY with JSON: {"targetCustomer": "..."}`,
       main: `Write Facebook ad copy for NEW customer acquisition.
 Product: ${product}
 Description: ${description}
