@@ -256,7 +256,9 @@ export default function CampaignsPage() {
                           fd.append('file', f)
                           fd.append('isVideo', String(isVideo))
                           const res = await fetch('/api/m4/upload-image', { method: 'POST', body: fd })
-                          const data = await res.json()
+                          const text = await res.text()
+                          let data: any = {}
+                          try { data = JSON.parse(text) } catch { alert('Upload error (bad response): ' + text.slice(0, 200)); setUploadingCreative(false); return }
                           if (data.hash || data.videoId) {
                             setUploadedCreativeHash(data.hash || data.videoId)
                             setEditModal((p: any) => ({ ...p, new_creative_hash: data.hash || data.videoId, new_creative_is_video: isVideo }))
@@ -264,9 +266,9 @@ export default function CampaignsPage() {
                             alert('Upload failed: ' + (data.error || 'Unknown error'))
                           }
                           setUploadingCreative(false)
-                        } catch(err) {
+                        } catch(err: any) {
                           setUploadingCreative(false)
-                          alert('Upload error')
+                          alert('Upload error: ' + err.message)
                         }
                       }}
                       style={{ display: 'none' }} />
