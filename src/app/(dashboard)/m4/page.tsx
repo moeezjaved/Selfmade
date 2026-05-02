@@ -178,7 +178,7 @@ export default function M4Page() {
         const metaRes = await fetch('/api/m4/upload-image', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ publicUrl: presign.downloadUrl }),
+          body: JSON.stringify({ path: presign.path, bucket: presign.bucket }),
         })
         const data = await metaRes.json()
         setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:x))

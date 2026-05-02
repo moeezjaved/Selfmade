@@ -23,18 +23,10 @@ export async function POST(request: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-    // Create a signed download URL (1 hour) — works even if bucket is private,
-    // and is what we pass to Meta's file_url so Meta can download the video
-    const { data: signedDownload, error: dlErr } = await admin.storage
-      .from(bucket)
-      .createSignedUrl(storagePath, 3600)
-
-    if (dlErr) return NextResponse.json({ error: dlErr.message }, { status: 400 })
-
     return NextResponse.json({
       signedUrl: data.signedUrl,
       path: storagePath,
-      downloadUrl: signedDownload.signedUrl,
+      bucket,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
