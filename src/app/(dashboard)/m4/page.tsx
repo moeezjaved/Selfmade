@@ -268,7 +268,11 @@ export default function M4Page() {
       const res=await fetch('/api/m4/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:form.campaignName||'M4',creatives,retargetingCreatives,retainerCreatives,interests:selectedInterests,budget:form.budget,location:form.location,ageMin:form.ageMin,ageMax:form.ageMax,gender:form.gender,pixelId,objective:form.objective,pageId:selectedPageId,instagramActorId:selectedInstagramId,primaryText:adCopy.primaryText,headline:adCopy.headline,cta:adCopy.cta,websiteUrl:adCopy.destinationUrl,retargetingCopy,retainerCopy,includeRetainer})})
       const data=await res.json()
       if(data.error)alert('Launch failed: '+data.error)
-      else{alert('LAUNCHED in '+data.account+'!\n\nBroad: '+data.broad_adsets+' ad sets\nInterest: '+data.interest_adsets+' ad sets\nRetargeting: '+(data.retargeting_adsets||0)+' ad sets\n'+(includeRetainer?'Retainer: '+(data.retainer_adsets||0)+' ad sets\n':'')+'\nAll PAUSED. Activate in Meta Ads Manager.');setStep('grades')}
+      else{
+        const errMsg=data.errors?.length?'\n\nErrors:\n'+data.errors.join('\n'):''
+        alert('LAUNCHED in '+data.account+'!\n\nBroad: '+data.broad_adsets+' ad sets\nInterest: '+data.interest_adsets+' ad sets\nRetargeting: '+(data.retargeting_adsets||0)+' ad sets\n'+(includeRetainer?'Retainer: '+(data.retainer_adsets||0)+' ad sets\n':'')+'\nAll PAUSED. Activate in Meta Ads Manager.'+errMsg)
+        setStep('grades')
+      }
     }catch(e:any){alert('Error: '+e.message)}
     setLoading(false)
   }
