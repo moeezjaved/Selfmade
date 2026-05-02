@@ -123,12 +123,21 @@ export default function M4Page() {
   const [loadingPixels, setLoadingPixels] = useState(false)
   const [accountCurrency, setAccountCurrency] = useState('USD')
   const [genCopy, setGenCopy] = useState<'main'|'retargeting'|'retainer'|null>(null)
+  const [competitorList, setCompetitorList] = useState<string[]>([])
+  const [competitorInput, setCompetitorInput] = useState('')
   const [form, setForm] = useState({
     product:'', description:'',
     competitorDomains:'', competitorFBPages:'', competitorIGHandles:'',
     targetCustomer:'', location:'', locations:[] as any[], ageMin:'18', ageMax:'65', gender:'ALL',
     budget:'500', campaignName:'', objective:'OUTCOME_SALES',
   })
+
+  const addCompetitor = () => {
+    const val = competitorInput.trim()
+    if (!val) return
+    setCompetitorList(p => p.includes(val) ? p : [...p, val])
+    setCompetitorInput('')
+  }
 
   const set = (k: string, v: string) => setForm(p => ({...p, [k]: v}))
   const selectedInterests = interests.filter(i => i.selected)
@@ -213,7 +222,7 @@ export default function M4Page() {
 
   const generateInterests = async () => {
     setLoading(true)
-    try{const d=await fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,competitorDomains:form.competitorDomains,competitorFBPages:form.competitorFBPages,competitorIGHandles:form.competitorIGHandles,targetCustomer:form.targetCustomer})}).then(r=>r.json());setInterests((d.interests||[]).map((i:Interest)=>({...i,selected:false})))}catch{alert('Failed to generate interests')}
+    try{const d=await fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,competitorDomains:competitorList.join(', '),targetCustomer:form.targetCustomer})}).then(r=>r.json());setInterests((d.interests||[]).map((i:Interest)=>({...i,selected:false})))}catch{alert('Failed to generate interests')}
     setLoading(false)
   }
 
@@ -237,7 +246,7 @@ export default function M4Page() {
   const scaleWinner = async (grade: Grade) => {
     setScaling(grade.campaign_name)
     try{
-      const res=await fetch('/api/m4/scale',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:grade.campaign_name,product:form.product,description:form.description,competitorDomains:form.competitorDomains})})
+      const res=await fetch('/api/m4/scale',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:grade.campaign_name,product:form.product,description:form.description,competitorDomains:competitorList.join(', ')})})
       const data=await res.json()
       if(data.error)alert('Scale failed: '+data.error)
       else{alert('Scaled! Duplicate created with 2x budget. '+data.new_interests+' new interests added.');setGrades(prev=>prev.map(g=>g.campaign_name===grade.campaign_name?{...g,applied:true}:g))}
@@ -351,12 +360,21 @@ export default function M4Page() {
             <div style={{marginBottom:20}}><label style={S.label}>Target Customer</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Paint a picture of your ideal buyer — age, gender, pain points. Claude uses this to speak directly to them.</div><input value={form.targetCustomer} onChange={e=>set('targetCustomer',e.target.value)} placeholder="e.g. Men and women 25-45 with hair loss" style={S.input}/></div>
             <div style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.15)',borderRadius:14,padding:18,marginBottom:20}}>
               <div style={{fontSize:13,fontWeight:800,color:'#1a5c1a',marginBottom:4}}>Competitor Intelligence</div>
-              <div style={{fontSize:12,color:'#6b8f6b',marginBottom:14,lineHeight:1.7}}>Selfmade searches Meta's interest database for your competitors' audiences. <strong style={{color:'#1a5c1a'}}>Add as many as you want</strong> — more competitors = better targeting. Separate each with a comma.</div>
-              <div style={{display:'flex',flexDirection:'column',gap:12}}>
-                <div><label style={S.label}>Competitor Websites <span style={{color:'#8aaa8a',fontWeight:400,textTransform:'none'}}>— paste their domain names</span></label><input value={form.competitorDomains} onChange={e=>set('competitorDomains',e.target.value)} placeholder="minoxidil.com, regaine.com, foligain.com" style={S.input}/></div>
-                <div><label style={S.label}>Competitor Facebook Pages <span style={{color:'#8aaa8a',fontWeight:400,textTransform:'none'}}>— their page URLs or names</span></label><input value={form.competitorFBPages} onChange={e=>set('competitorFBPages',e.target.value)} placeholder="facebook.com/Regaine, Minoxidil" style={S.input}/></div>
-                <div><label style={S.label}>Competitor Instagram Handles <span style={{color:'#8aaa8a',fontWeight:400,textTransform:'none'}}>— their @handles</span></label><input value={form.competitorIGHandles} onChange={e=>set('competitorIGHandles',e.target.value)} placeholder="@regaine_uk, @minoxidilfor.men" style={S.input}/></div>
+              <div style={{fontSize:12,color:'#6b8f6b',marginBottom:14,lineHeight:1.7}}>Add competitor websites, Facebook pages, or Instagram handles. Selfmade searches Meta's interest database for each one. <strong style={{color:'#1a5c1a'}}>More competitors = better targeting.</strong></div>
+              <div style={{display:'flex',gap:8,marginBottom:10}}>
+                <input value={competitorInput} onChange={e=>setCompetitorInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),addCompetitor())} placeholder="e.g. regaine.com or @minoxidilformen" style={{...S.input,flex:1}}/>
+                <button onClick={addCompetitor} style={{background:'#1a3a1a',color:'#dffe95',border:'none',padding:'10px 18px',borderRadius:10,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',whiteSpace:'nowrap'}}>+ Add</button>
               </div>
+              {competitorList.length>0&&(
+                <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                  {competitorList.map((c,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:6,background:'rgba(26,58,26,0.08)',border:'1px solid rgba(26,58,26,0.15)',borderRadius:100,padding:'5px 12px',fontSize:12,fontWeight:600,color:'#1a3a1a'}}>
+                      <span>{c}</span>
+                      <span onClick={()=>setCompetitorList(p=>p.filter((_,j)=>j!==i))} style={{cursor:'pointer',fontSize:14,lineHeight:1,color:'#7a9a7a',fontWeight:400}}>×</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div style={{marginBottom:8}}><label style={S.label}>Meta Pixel</label></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
