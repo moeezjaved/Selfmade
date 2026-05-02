@@ -76,9 +76,9 @@ export async function POST(request: NextRequest) {
   // Too broad = waste spend. Too narrow = can't scale.
   const passesAudienceFilter = (aud: number, intentType: string, isCore: boolean): boolean => {
     if (isCore) return true // always allow core anchors regardless of size
-    if (intentType === 'problem' || intentType === 'solution') return aud >= 100_000 // high intent — allow small
-    if (aud > 900_000_000) return false // >900M is too broad for non-core (e.g. "Fitness and wellness")
-    if (aud < 500_000) return false     // <500K won't scale for lifestyle/category interests
+    if (intentType === 'problem' || intentType === 'solution') return aud >= 100_000 // high intent — allow small, they convert
+    if (aud > 900_000_000) return false // >900M is too broad (e.g. "Shopping", "Fitness and wellness")
+    if (aud < 1_000_000) return false   // <1M won't scale for category/lifestyle
     return true
   }
 
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     : allBrands.length > 0 ? `Competitor brands (unverified): ${allBrands.join(', ')}` : ''
 
   // ── Claude prompt ────────────────────────────────────────────
-  const prompt = `You are a performance media buyer with 10 years Facebook Ads experience managing $10M+ in ad spend. You are generating interest targeting for a real campaign that needs to be PROFITABLE, not just "interesting."
+  const prompt = `You are a performance media buyer with 10 years Facebook Ads experience managing $10M+ in ad spend. Your job is to generate interest targeting that drives CONVERSIONS, not just reach.
 
 Product: ${product}
 Description: ${description || ''}
@@ -106,44 +106,70 @@ Target Customer: ${targetCustomer || ''}
 ${country ? `Market: ${country}` : ''}
 ${compCtx ? `\n${compCtx}` : ''}
 
-INTENT FRAMEWORK — interests ranked by purchase intent:
-🔥 problem    = person KNOWS they have this problem (e.g. Hair loss, Alopecia, Hair thinning)
-🔥 solution   = person is SEEKING a fix (e.g. Rogaine, Minoxidil, Hair transplant)
-🎯 category   = product category interest (e.g. Hair care, Men's grooming, Personal care)
-⚡ lifestyle  = strong persona signal — high-correlation publications or communities (e.g. Men's Health (magazine), LinkedIn)
+══════════════════════════════════════
+INTENT FRAMEWORK (ranked by conversion rate)
+══════════════════════════════════════
+🔥 problem  = person KNOWS they have the problem and wants a fix
+              e.g. "Hair loss", "Alopecia", "Hair thinning" — BUYERS, not browsers
+🔥 solution = person is actively searching for a treatment/brand
+              e.g. "Rogaine", "Minoxidil", "Hair transplant" — HIGHEST purchase intent
+🎯 category = product category, captures buyers in research mode
+              e.g. "Hair care", "Men's grooming", "Personal care"
+⚡ support  = lifestyle persona signal — correlates with buyer profile
+              e.g. "Men's Health (magazine)", "LinkedIn"
 
-STEP 1 — ANCHORS (5-6 interests, always include)
-The highest-converting, most buyer-ready interests for this product.
-Must include:
-- At least 2 problem-aware interests (person identifies with having this problem)
-- At least 2 solution-aware interests (brand names of treatments/products people search for)
-- At least 1 core category interest
+══════════════════════════════════════
+STEP 1 — MANDATORY ANCHORS (5–6 interests)
+══════════════════════════════════════
+These are NON-NEGOTIABLE. You MUST include ALL of the following:
 
-AUDIENCE SIZE TARGET MIX:
-- 1–2 broad anchors (100M+ audience) — category-level reach
-- 2–3 mid-tier (5M–50M audience) — core buyers
-- 1–2 high-intent (1M–10M audience) — problem/solution aware
+▸ MINIMUM 2 × problem (intent_type: "problem")
+  → The exact terms people use when they identify they have this problem
+  → Example for hair product: "Hair loss", "Alopecia"
 
-STEP 2 — PERSONA INTERESTS (3 personas × 3-4 interests)
+▸ MINIMUM 2 × solution (intent_type: "solution")
+  → Brand names of treatments, products, or procedures people search for
+  → Example for hair product: "Rogaine", "Minoxidil"
+  → DO NOT substitute category interests here — specific brands/treatments only
+
+▸ MINIMUM 1 × category (intent_type: "category")
+  → The product category itself
+
+⚠️ IF YOU SKIP problem or solution anchors, the output is INVALID.
+
+TARGET AUDIENCE SIZE MIX (across all interests):
+  • 1–2 Broad (100M+) — category-level reach
+  • 2–3 Mid (10M–100M) — core buyers
+  • 2 High-intent (1M–10M) — problem/solution aware, highest converters
+
+══════════════════════════════════════
+STEP 2 — PERSONA INTERESTS (3 personas × 3–4 interests)
+══════════════════════════════════════
 Translate each buyer persona into real Meta interests.
-Think: what does this buyer follow, read, search for? Include publications, communities, and brands.
+Think: what does this specific buyer follow, read, watch, or buy?
 
-ABSOLUTE HARD RULES:
-✅ Use REAL, exact, searchable Meta interest names
-✅ Use CONSUMER BEHAVIOR interests — what people actually search/follow, not medical body parts
-   ❌ BAD: "Human hair growth" (biological/anatomical — maps weirdly, weak performance)
-   ✅ GOOD: "Hair loss", "Hair care", "Rogaine"
-✅ Include brand names of competitor treatments and clinically-known terms people search
-✅ Publications: use exact name with type e.g. "Men's Health (magazine)"
-✅ LinkedIn is a strong lifestyle signal — always include for professional buyer personas
-❌ NO biological/anatomical terms (hair follicle, keratin production, sebaceous gland)
-❌ NO pet/animal interests unless product is for pets
-❌ NO sports/gymnastics unless product is sports-related
-❌ NO vague wellness interests with no direct purchase correlation (e.g. "Vegan nutrition" for hair products)
-❌ NO fashion accessories, random hobbies, entertainment unless directly relevant
-❌ NO interests with audience <500K — exception: high-intent problem/solution (allow ≥100K)
-❌ NO interests with audience >1B (too broad)
-❌ NO duplicates — each interest name must be unique
+══════════════════════════════════════
+HARD RULES
+══════════════════════════════════════
+✅ Use REAL exact Meta interest names people can actually follow
+✅ Brand names of treatments/products = strongest signal — always include
+✅ Publications: exact name e.g. "Men's Health (magazine)" not "Men's Health"
+✅ LinkedIn always include for professional/career-oriented buyers
+❌ NO biological/anatomical terms ("hair follicle", "keratin production")
+❌ NO weak indirect wellness interests with no direct purchase link
+   BAD: "Natural skin care" for a hair loss product (indirect, dilutes targeting)
+   GOOD: "Hair care", "Rogaine" (direct)
+❌ NO pet/animal unless product is for pets
+❌ NO sports/fashion/hobbies unless directly tied to the product use case
+❌ NO interests audience >1B (too broad — "Facebook", "Shopping" etc)
+❌ NO audience <500K for category/lifestyle — exception: problem/solution (allow ≥100K)
+❌ NO duplicates
+
+PRE-FLIGHT CHECK before outputting:
+  □ Do anchors include ≥2 problem interests? If not, add them.
+  □ Do anchors include ≥2 solution interests (specific brands/treatments)? If not, add them.
+  □ Is any interest audience >1B? Remove it.
+  □ Are there indirect/weak lifestyle interests? Replace with direct problem/solution.
 
 Respond ONLY with valid JSON:
 {
@@ -151,7 +177,7 @@ Respond ONLY with valid JSON:
     {
       "name": "Exact Meta interest name",
       "intent_type": "problem|solution|category|lifestyle",
-      "reason": "Why this is a must-have for this product"
+      "reason": "Why this converts for this product"
     }
   ],
   "personas": [
