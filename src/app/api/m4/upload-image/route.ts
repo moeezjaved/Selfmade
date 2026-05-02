@@ -99,11 +99,17 @@ export async function PUT(request: NextRequest) {
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = 'act_' + metaAccount.account_id
 
-    const { publicUrl } = await request.json()
-    if (!publicUrl) return NextResponse.json({ error: 'Missing publicUrl' }, { status: 400 })
+    const { path, bucket: bucketName } = await request.json()
+    if (!path) return NextResponse.json({ error: 'Missing path' }, { status: 400 })
+
+    // Create signed download URL now — file exists in storage after client upload
+    const { data: signedData, error: signedErr } = await admin.storage
+      .from(bucketName || 'ads-media')
+      .createSignedUrl(path, 3600)
+    if (signedErr) return NextResponse.json({ error: 'Failed to sign URL: ' + signedErr.message }, { status: 400 })
 
     const metaForm = new FormData()
-    metaForm.append('file_url', publicUrl)
+    metaForm.append('file_url', signedData.signedUrl)
     metaForm.append('access_token', token)
     const res = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/advideos`, {
       method: 'POST',
