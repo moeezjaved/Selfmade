@@ -19,20 +19,16 @@ export async function POST(request: NextRequest) {
   const allBrands = Array.from(new Set(extractBrands(competitorDomains || '')))
 
   let tok = ''
-  let adAccountId = ''
 
   try {
     const { createAdminClient } = await import('@/lib/supabase/server')
     const { decryptToken } = await import('@/lib/meta/client')
     const admin = createAdminClient()
     const { data: ma } = await admin.from('meta_accounts').select('*').eq('user_id', user.id).eq('is_primary', true).single()
-    if (ma) {
-      tok = decryptToken(ma.access_token)
-      adAccountId = 'act_' + ma.account_id
-    }
+    if (ma) tok = decryptToken(ma.access_token)
   } catch {}
 
-  // Search Meta and only return a result if the name genuinely matches the query
+  // Search Meta — word-level match to handle "Hair loss (health & wellness)" for query "Hair loss"
   const searchMeta = async (q: string): Promise<{id:string,name:string,topic?:string,audience_size_lower_bound?:number}|null> => {
     if (!tok) return null
     try {
@@ -40,17 +36,13 @@ export async function POST(request: NextRequest) {
       const d = await r.json()
       if (!d.data?.length) return null
       const ql = q.toLowerCase().trim()
-      // Significant words from the query (4+ chars) — used for word-level matching
       const qWords = ql.split(/[\s(),]+/).filter(w => w.length >= 4)
 
       const match = d.data.find((i: any) => {
         const nl = i.name.toLowerCase()
-        // Exact or substring match
         if (nl === ql || nl.startsWith(ql) || ql.startsWith(nl)) return true
         if (ql.length >= 4 && nl.includes(ql)) return true
         if (nl.length >= 4 && ql.includes(nl)) return true
-        // Word-level: any significant query word appears in the result name
-        // This catches "Hair loss (health & wellness)" when searching "Hair loss"
         if (qWords.length > 0 && qWords.some(w => nl.includes(w))) return true
         return false
       })
@@ -58,7 +50,6 @@ export async function POST(request: NextRequest) {
     } catch { return null }
   }
 
-  // Geographic place interests are useless for audience targeting
   const isPlace = (topic?: string, name?: string) => {
     const t = (topic || '').toLowerCase()
     const n = (name || '').toLowerCase()
@@ -66,42 +57,60 @@ export async function POST(request: NextRequest) {
       /\(place\)|\(city\)|\(country\)|\(region\)/.test(n)
   }
 
+  // Validate competitor brands to feed as context
   const confirmedBrandInterests: string[] = []
-  for (const brand of allBrands.slice(0, 8)) {
+  for (const brand of allBrands.slice(0, 6)) {
     const match = await searchMeta(brand)
     if (match && !isPlace(match.topic, match.name)) confirmedBrandInterests.push(match.name)
   }
 
-  const compCtx = [
-    confirmedBrandInterests.length > 0 ? 'Confirmed Meta interests from competitor brands: ' + confirmedBrandInterests.join(', ') : '',
-    allBrands.length > 0 ? 'Competitor brands entered: ' + allBrands.join(', ') : '',
-  ].filter(Boolean).join('\n')
+  const compCtx = confirmedBrandInterests.length > 0
+    ? 'These competitor brands are confirmed in Meta: ' + confirmedBrandInterests.join(', ')
+    : allBrands.length > 0 ? 'Competitor brands (not yet verified in Meta): ' + allBrands.join(', ') : ''
 
-  const countryLine = country ? `Primary Market: ${country}` : ''
+  // ── PERSONA-FIRST PROMPT ────────────────────────────────────────
+  // Products don't buy — people do. Map product → buyer personas → interests.
+  const prompt = `You are a Facebook Ads targeting expert. Your job is to suggest interests that actually exist in Meta Ads Manager and convert well.
 
-  const prompt = `You are an expert Facebook/Meta Ads media buyer.
+CRITICAL RULE: Don't think "what is this product?" — think "WHO BUYS this product and what are they into?"
 
 Product: ${product}
-Description: ${description}
-Target Customer: ${targetCustomer || 'General'}
-${countryLine}
-${compCtx ? '\nCompetitor Intelligence:\n' + compCtx : ''}
+Description: ${description || ''}
+Target Customer: ${targetCustomer || ''}
+${country ? `Market: ${country}` : ''}
+${compCtx ? `\n${compCtx}` : ''}
 
-Suggest 14 Meta Ads interests highly relevant to this specific product. These will be validated against Meta's real interest database.
+STEP 1 — Identify 3-4 buyer personas for this product.
+STEP 2 — For each persona, suggest 3-4 Facebook interests that:
+  • Are broad and common enough to exist globally in Meta's database
+  • Reflect the persona's BEHAVIOR and MINDSET, not just the product name
+  • Are real interest categories Meta actually uses (e.g. "Parenting", "Organic food", "Men's Health (magazine)")
+  • Include a mix of: lifestyle interests, publications/media, behaviors, and brand/competitor names if large enough
 
-Rules:
-- Every interest MUST be directly related to the product niche — do NOT suggest generic fitness, sports, or lifestyle interests unless they are core to this product
-${country ? `- Include local ${country} brands IF they are large enough to exist as a Meta interest (millions of followers); otherwise use well-known international brands that target the same niche — Meta's interest database is global so local small brands often don't exist there` : '- Include well-known competitor brands in this niche'}
-- Competitor brand names that are well-known enough to appear in Meta
-- Niche-specific publications and magazines
-- Product-category activities and behaviors
-- Do NOT suggest geographic places, sports teams, or interests unrelated to the product
-- Use the exact name format Meta uses (e.g. "Hair products (hair care)" not just "hair care")
+AVOID:
+  • Obscure local brands (they won't exist in Meta)
+  • Geographic places or sports teams
+  • Interests too generic to convert (e.g. just "Health" or "Food")
+  • Interests too specific/obscure to exist (e.g. small local brands)
+
+EXAMPLE — if product is "Baby Milk Formula":
+  Persona: New Mothers → Parenting, Motherhood, Baby food, What to Expect
+  Persona: Health-conscious parents → Organic food, Healthy eating, Child nutrition
+  Persona: Busy families → Family, Grocery shopping, Household management
 
 Respond ONLY with valid JSON:
-{"interests":[{"name":"exact interest name as it would appear in Meta","category":"Competitor|Publication|Influencer|Activity|Lifestyle","why":"one sentence why this audience buys this product","size":"Small|Medium|Large","confidence":85}]}`
+{
+  "personas": [
+    {
+      "persona": "Persona name",
+      "interests": [
+        {"name": "Interest name exactly as Meta uses it", "why": "one sentence", "confidence": 85}
+      ]
+    }
+  ]
+}`
 
-  let claudeSuggestions: any[] = []
+  let personas: any[] = []
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -118,37 +127,52 @@ Respond ONLY with valid JSON:
     })
     const data = await res.json()
     const text = (data.content?.[0]?.text || '').trim()
-    console.log('Claude interests raw:', text.substring(0, 300))
+    console.log('Claude personas raw:', text.substring(0, 400))
     const start = text.indexOf('{')
     const end = text.lastIndexOf('}')
     if (start !== -1 && end !== -1) {
       const parsed = JSON.parse(text.slice(start, end + 1))
-      claudeSuggestions = parsed.interests || []
+      personas = parsed.personas || []
     }
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 
-  // Validate every Claude suggestion against Meta's actual interest database
+  // Flatten persona → interests, preserving persona as category
+  const allSuggestions: any[] = []
+  for (const p of personas) {
+    for (const interest of (p.interests || [])) {
+      allSuggestions.push({ ...interest, category: p.persona })
+    }
+  }
+
+  // Validate each against Meta — use persona name as category label
   const validated: any[] = []
   if (tok) {
-    for (const suggestion of claudeSuggestions) {
-      if (validated.length >= 10) break
+    for (const suggestion of allSuggestions) {
+      if (validated.length >= 12) break
       const match = await searchMeta(suggestion.name)
       if (match && !isPlace(match.topic, match.name)) {
         validated.push({
-          ...suggestion,
-          name: match.name, // use exact Meta name
+          name: match.name,
+          category: suggestion.category,
+          why: suggestion.why,
+          size: match.audience_size_lower_bound
+            ? match.audience_size_lower_bound >= 10_000_000 ? 'Large'
+              : match.audience_size_lower_bound >= 1_000_000 ? 'Medium' : 'Small'
+            : 'Unknown',
+          confidence: suggestion.confidence || 80,
           metaId: match.id,
           audienceSize: match.audience_size_lower_bound,
         })
       }
     }
   } else {
-    // No Meta token — return Claude suggestions unvalidated
-    validated.push(...claudeSuggestions.slice(0, 10))
+    validated.push(...allSuggestions.slice(0, 10).map((s: any) => ({
+      ...s, size: 'Unknown', confidence: s.confidence || 80,
+    })))
   }
 
-  console.log(`Interests: ${claudeSuggestions.length} suggested, ${validated.length} confirmed in Meta`)
+  console.log(`Personas: ${personas.length}, Suggestions: ${allSuggestions.length}, Confirmed: ${validated.length}`)
   return NextResponse.json({ interests: validated })
 }
