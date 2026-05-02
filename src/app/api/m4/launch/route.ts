@@ -114,17 +114,23 @@ export async function POST(request: NextRequest) {
       } catch { return null }
     }
 
-    // Create ad creative with image hash and optional custom copy
-    const createAdCreative = async (name: string, imageHash: string | null, customCopy?: any, isVideo = false) => {
+    const errors: string[] = []
+
+    // Create ad creative — throws descriptive error so caller can surface it
+    const createAdCreative = async (name: string, imageHash: string | null, customCopy?: any, isVideo = false): Promise<string | null> => {
       const cp = customCopy || {}
       const msg = cp.primaryText || primaryText || 'Check out our products'
-      const lnk = cp.destinationUrl || websiteUrl
+      const lnk = (cp.destinationUrl || websiteUrl || '').trim()
       const hd = cp.headline || headline || campaignName
       const ct = cp.cta || cta || 'LEARN_MORE'
-      if (!pageId || !lnk) return null
+
+      if (!pageId) { errors.push(`Creative "${name}": no Facebook Page selected`); return null }
+      if (!lnk) { errors.push(`Creative "${name}": destination URL is empty`); return null }
+      if (!imageHash) { errors.push(`Creative "${name}": no image/video uploaded — upload a creative first`); return null }
+
       try {
         let storySpec: Record<string,unknown>
-        if (isVideo && imageHash) {
+        if (isVideo) {
           storySpec = {
             page_id: pageId,
             video_data: {
@@ -135,31 +141,28 @@ export async function POST(request: NextRequest) {
             },
           }
         } else {
-          const linkData: Record<string,unknown> = {
-            message: msg, link: lnk, name: hd, description: '',
-            call_to_action: { type: ct, value: { link: lnk } },
+          storySpec = {
+            page_id: pageId,
+            link_data: {
+              message: msg, link: lnk, name: hd, description: '',
+              image_hash: imageHash,
+              call_to_action: { type: ct, value: { link: lnk } },
+            },
           }
-          if (imageHash) linkData.image_hash = imageHash
-          storySpec = { page_id: pageId, link_data: linkData }
         }
 
-        const creativeSpec: Record<string,unknown> = {
-          name,
-          object_story_spec: storySpec,
-        }
-        // Add Instagram actor if available
+        const creativeSpec: Record<string,unknown> = { name, object_story_spec: storySpec }
         if (instagramActorId) creativeSpec.instagram_actor_id = instagramActorId
 
         const creative = await post(`${adAccountId}/adcreatives`, creativeSpec)
         return creative.id
       } catch(e: any) {
-        console.log('Creative error:', e.message)
+        errors.push(`Creative "${name}": ${e.message}`)
         return null
       }
     }
 
     let exclusionAudienceId: string | null = null
-    const errors: string[] = []
     let broadCount = 0
     let intCount = 0
 
@@ -214,10 +217,9 @@ export async function POST(request: NextRequest) {
             creative: { creative_id: creativeId },
             status: 'PAUSED',
           })
+          broadCount++
         }
-        broadCount++
       } catch(e: any) {
-        console.log('Broad error:', e.message)
         errors.push(`Broad "${c.name}": ${e.message}`)
       }
     }
@@ -273,10 +275,9 @@ export async function POST(request: NextRequest) {
             creative: { creative_id: creativeId },
             status: 'PAUSED',
           })
+          intCount++
         }
-        intCount++
       } catch(e: any) {
-        console.log('Interest error:', e.message)
         errors.push(`Interest "${interest.name}": ${e.message}`)
       }
     }
@@ -327,19 +328,17 @@ export async function POST(request: NextRequest) {
               ...promotedObject,
             })
 
-            if (pageId && (retargetingCopy as any).websiteUrl || (retargetingCopy as any).destinationUrl) {
-              const rtCreative = await createAdCreative(`RT Creative — ${c.name}`, c.hash || null, retargetingCopy, c.type === 'video')
-              if (rtCreative) {
-                await post(`${adAccountId}/ads`, {
-                  name: `RT Ad — ${c.name}`,
-                  adset_id: rtAdset.id,
-                  creative: { creative_id: rtCreative },
-                  status: 'PAUSED',
-                })
-              }
+            const rtCreative = await createAdCreative(`RT Creative — ${c.name}`, c.hash || null, retargetingCopy, c.type === 'video')
+            if (rtCreative) {
+              await post(`${adAccountId}/ads`, {
+                name: `RT Ad — ${c.name}`,
+                adset_id: rtAdset.id,
+                creative: { creative_id: rtCreative },
+                status: 'PAUSED',
+              })
+              retargetingCount++
             }
-            retargetingCount++
-          } catch(e: any) { console.log('Retargeting adset error:', e.message); errors.push(`Retargeting "${c.name}": ${e.message}`) }
+          } catch(e: any) { errors.push(`Retargeting "${c.name}": ${e.message}`) }
         }
       } catch(e: any) { errors.push(`Retargeting campaign: ${e.message}`) }
     }
@@ -383,18 +382,16 @@ export async function POST(request: NextRequest) {
               ...promotedObject,
             })
 
-            if (pageId && (retainerCopy as any).websiteUrl || (retainerCopy as any).destinationUrl) {
-              const rnCreative = await createAdCreative(`RN Creative — ${c.name}`, c.hash || null, retainerCopy)
-              if (rnCreative) {
-                await post(`${adAccountId}/ads`, {
-                  name: `RN Ad — ${c.name}`,
-                  adset_id: rnAdset.id,
-                  creative: { creative_id: rnCreative },
-                  status: 'PAUSED',
-                })
-              }
+            const rnCreative = await createAdCreative(`RN Creative — ${c.name}`, c.hash || null, retainerCopy)
+            if (rnCreative) {
+              await post(`${adAccountId}/ads`, {
+                name: `RN Ad — ${c.name}`,
+                adset_id: rnAdset.id,
+                creative: { creative_id: rnCreative },
+                status: 'PAUSED',
+              })
+              retainerCount++
             }
-            retainerCount++
           } catch(e: any) { errors.push(`Retainer "${c.name}": ${e.message}`) }
         }
       } catch(e: any) { errors.push(`Retainer campaign: ${e.message}`) }
