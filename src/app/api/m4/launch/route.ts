@@ -123,19 +123,29 @@ export async function POST(request: NextRequest) {
       const ct = cp.cta || cta || 'LEARN_MORE'
       if (!pageId || !lnk) return null
       try {
-        const linkData: Record<string,unknown> = {
-          message: msg, link: lnk, name: hd, description: '',
-          call_to_action: { type: ct, value: { link: lnk } },
-        }
+        let storySpec: Record<string,unknown>
         if (isVideo && imageHash) {
-          linkData.video_id = imageHash
-        } else if (imageHash) {
-          linkData.image_hash = imageHash
+          storySpec = {
+            page_id: pageId,
+            video_data: {
+              video_id: imageHash,
+              message: msg,
+              title: hd,
+              call_to_action: { type: ct, value: { link: lnk } },
+            },
+          }
+        } else {
+          const linkData: Record<string,unknown> = {
+            message: msg, link: lnk, name: hd, description: '',
+            call_to_action: { type: ct, value: { link: lnk } },
+          }
+          if (imageHash) linkData.image_hash = imageHash
+          storySpec = { page_id: pageId, link_data: linkData }
         }
 
         const creativeSpec: Record<string,unknown> = {
           name,
-          object_story_spec: { page_id: pageId, link_data: linkData },
+          object_story_spec: storySpec,
         }
         // Add Instagram actor if available
         if (instagramActorId) creativeSpec.instagram_actor_id = instagramActorId
@@ -157,8 +167,8 @@ export async function POST(request: NextRequest) {
     if (pixelId) {
       try {
         const excAud = await post(`${adAccountId}/customaudiences`, {
-          name: `${campaignName} — Exclusion Visitors 60d`,
-          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 5184000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }),
+          name: `${campaignName} — Exclusion Visitors 180d`,
+          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }),
           prefill: true,
         })
         exclusionAudienceId = excAud.id
@@ -280,8 +290,8 @@ export async function POST(request: NextRequest) {
       try {
         // Create retargeting audience
         const rtAud = await post(`${adAccountId}/customaudiences`, {
-          name: `${campaignName} — Retargeting 60d`,
-          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 5184000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }),
+          name: `${campaignName} — Retargeting 180d`,
+          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }),
           prefill: true,
         }).catch(() => null)
 
