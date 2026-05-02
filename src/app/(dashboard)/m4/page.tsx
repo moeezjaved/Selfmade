@@ -447,7 +447,9 @@ export default function M4Page() {
                 <button disabled={genCompetitors||!form.product} onClick={async()=>{
                   setGenCompetitors(true)
                   try{
-                    const res=await fetch('/api/m4/competitors',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,targetCustomer:form.targetCustomer})})
+                    const currencyCountry:Record<string,string>={PKR:'Pakistan',USD:'United States',GBP:'United Kingdom',EUR:'Europe',AED:'UAE',INR:'India',SAR:'Saudi Arabia',CAD:'Canada',AUD:'Australia',MYR:'Malaysia',SGD:'Singapore',BDT:'Bangladesh',LKR:'Sri Lanka',NGN:'Nigeria',ZAR:'South Africa',BRL:'Brazil',MXN:'Mexico',TRY:'Turkey',EGP:'Egypt',IDR:'Indonesia',PHP:'Philippines',THB:'Thailand',VND:'Vietnam',KWD:'Kuwait',QAR:'Qatar',OMR:'Oman',JOD:'Jordan'}
+                    const country=currencyCountry[accountCurrency]||'United States'
+                    const res=await fetch('/api/m4/competitors',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,targetCustomer:form.targetCustomer,country})})
                     const d=await res.json()
                     if(d.competitors?.length){
                       const entries: string[]=[]
