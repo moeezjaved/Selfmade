@@ -439,7 +439,7 @@ export default function M4Page() {
                   <div style={{fontSize:14,fontWeight:800,color:'#1a3a1a'}}>Retainer Campaign <span style={{fontSize:10,padding:'2px 8px',borderRadius:100,background:'rgba(249,168,212,0.1)',color:'#f9a8d4',marginLeft:6}}>OPTIONAL</span></div>
                   <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>Past purchasers — loyalty offers, repeat buyers, LTV maximization</div>
                 </div>
-                <div onClick={()=>setIncludeRetainer(v=>!v)} style={{width:44,height:24,borderRadius:100,background:includeRetainer?'#dffe95':'rgba(255,255,255,0.1)',cursor:'pointer',position:'relative',flexShrink:0}}>
+                <div onClick={()=>setIncludeRetainer(v=>!v)} style={{width:44,height:24,borderRadius:100,background:includeRetainer?'#dffe95':'#c4c4c4',cursor:'pointer',position:'relative',flexShrink:0}}>
                   <div style={{position:'absolute',top:3,left:includeRetainer?22:3,width:18,height:18,borderRadius:'50%',background:includeRetainer?'#10211f':'white',transition:'left .2s'}}/>
                 </div>
               </div>
