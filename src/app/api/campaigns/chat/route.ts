@@ -189,37 +189,37 @@ Respond ONLY with valid JSON (no markdown fences):
       console.log('Creating creative:', JSON.stringify(creativePayload))
       const newCreative = await post(adAccountId + '/adcreatives', creativePayload)
 
-      // Copy targeting from first existing adset
-      const srcAdset = campaign.adsets?.[0]
-      const targeting: any = {
-        age_min: srcAdset?.age_min || 18,
-        age_max: srcAdset?.age_max || 65,
-      }
-      if (srcAdset?.genders?.length) targeting.genders = srcAdset.genders
+      // Fetch the full config of the first existing adset so we copy everything
+      // (targeting with locations, optimization_goal, billing_event, promoted_object, etc.)
+      const srcAdsetId = campaign.adsets?.[0]?.id
+      if (!srcAdsetId) throw new Error('No existing ad set found to copy settings from.')
 
-      // Map campaign objective → optimization settings + destination_type
-      const obj = campaign.objective || ''
-      let optimization_goal = 'OFFSITE_CONVERSIONS'
-      let billing_event     = 'IMPRESSIONS'
-      let destination_type  = 'WEBSITE'
-      if (obj.includes('TRAFFIC'))    { optimization_goal = 'LINK_CLICKS';     billing_event = 'IMPRESSIONS'; destination_type = 'WEBSITE' }
-      if (obj.includes('AWARENESS'))  { optimization_goal = 'REACH';           billing_event = 'IMPRESSIONS'; destination_type = 'WEBSITE' }
-      if (obj.includes('ENGAGEMENT')) { optimization_goal = 'POST_ENGAGEMENT'; billing_event = 'IMPRESSIONS'; destination_type = 'FACEBOOK' }
-      if (obj.includes('LEAD'))       { optimization_goal = 'LEAD_GENERATION'; billing_event = 'IMPRESSIONS'; destination_type = 'ON_AD' }
+      const srcFields = 'targeting,optimization_goal,billing_event,destination_type,bid_strategy,daily_budget,lifetime_budget,promoted_object,pacing_type,attribution_spec'
+      const srcRes = await fetch(`https://graph.facebook.com/${V}/${srcAdsetId}?fields=${srcFields}&access_token=${token}`)
+      const src = await srcRes.json()
+      if (src.error) throw new Error('Could not fetch source ad set: ' + src.error.message)
 
-      const adsetName = parsed.params?.adset_name || 'New Creative Ad Set — ' + new Date().toLocaleDateString()
-      console.log('Creating adset:', JSON.stringify({ campaign_id: campaign.id, name: adsetName, optimization_goal, billing_event, destination_type }))
-      const newAdset = await post(adAccountId + '/adsets', {
+      // Build new adset payload from source — only override name and status
+      const adsetName = parsed.params?.adset_name || 'New Creative — ' + new Date().toLocaleDateString()
+      const adsetPayload: Record<string, unknown> = {
         campaign_id: campaign.id,
         name: adsetName,
-        targeting,
-        daily_budget: campaign.daily_budget || 100000,
-        billing_event,
-        optimization_goal,
-        destination_type,
-        bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
         status: 'PAUSED',
-      })
+        targeting: src.targeting,
+        optimization_goal: src.optimization_goal,
+        billing_event: src.billing_event,
+        bid_strategy: src.bid_strategy || 'LOWEST_COST_WITHOUT_CAP',
+      }
+      // Only set the budget field that the source uses
+      if (src.daily_budget)    adsetPayload.daily_budget    = src.daily_budget
+      if (src.lifetime_budget) adsetPayload.lifetime_budget = src.lifetime_budget
+      if (src.destination_type)  adsetPayload.destination_type  = src.destination_type
+      if (src.promoted_object)   adsetPayload.promoted_object   = src.promoted_object
+      if (src.pacing_type)       adsetPayload.pacing_type       = src.pacing_type
+      if (src.attribution_spec)  adsetPayload.attribution_spec  = src.attribution_spec
+
+      console.log('Creating adset from source:', srcAdsetId, JSON.stringify(adsetPayload))
+      const newAdset = await post(adAccountId + '/adsets', adsetPayload)
 
       await post(adAccountId + '/ads', {
         adset_id: newAdset.id,
