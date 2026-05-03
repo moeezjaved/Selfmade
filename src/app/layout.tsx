@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Toaster } from 'react-hot-toast'
 import './globals.css'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: { default: 'Selfmade', template: '%s — Selfmade' },
   description: 'AI-powered Meta ads platform. Stop guessing. Start winning.',
