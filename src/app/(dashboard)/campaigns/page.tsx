@@ -8,7 +8,7 @@ const DATE_RANGES = [
   { label: 'Last 90 days', value: 'last_90d' },
 ]
 
-const COLS = '44px 1fr 120px 86px 100px 106px 100px 100px 88px 116px'
+const COLS = '44px 1fr 120px 86px 100px 106px 100px 100px 88px 148px'
 
 const fmt = (n: number, cur: string) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n)
@@ -399,14 +399,11 @@ export default function CampaignsPage() {
                   {camp.reach > 0 ? camp.reach.toLocaleString() : '—'}
                 </div>
                 {/* Actions */}
-                <div style={{ display: 'flex', gap: 5, justifyContent: 'flex-end', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setEditModal({ action: 'update_budget', id: camp.id, name: camp.name, budget: Math.round((camp.daily_budget || 0) / 100) })}
-                    style={{ background: '#f0f7ee', color: '#1a3a1a', border: 'none', padding: '5px 9px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="Edit Budget">
-                    💰
-                  </button>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => openChat(camp)}
-                    style={{ background: '#dffe95', color: '#1a3a1a', border: '1.5px solid #b8e050', padding: '5px 9px', borderRadius: 8, fontSize: 11, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }} title="AI Assistant">
-                    <span>✨</span><span>AI</span>
+                    style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '7px 13px', borderRadius: 9, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 14 }}>✨</span>
+                    <span>Manage with AI</span>
                   </button>
                 </div>
               </div>
