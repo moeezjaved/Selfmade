@@ -151,6 +151,17 @@ Respond ONLY with valid JSON (no markdown fences):
       const defaultCTA  = destLink ? { type: 'SHOP_NOW', value: { link: destLink } } : undefined
       const callToAction = existingCTA || defaultCTA
 
+      // Fetch auto-generated thumbnail from Meta for video ads
+      let videoImageUrl = ''
+      if (uploaded_is_video) {
+        try {
+          const thumbRes = await fetch(`https://graph.facebook.com/${V}/${uploaded_creative_hash}?fields=picture&access_token=${token}`)
+          const thumbData = await thumbRes.json()
+          videoImageUrl = thumbData.picture || ''
+          console.log('Video thumbnail:', videoImageUrl)
+        } catch {}
+      }
+
       const creativePayload: any = {
         name: (parsed.params?.adset_name || 'New Creative') + ' — ' + new Date().toISOString().slice(0, 10),
         object_story_spec: uploaded_is_video
@@ -159,6 +170,7 @@ Respond ONLY with valid JSON (no markdown fences):
               video_data: {
                 video_id: uploaded_creative_hash,
                 message: primaryText,
+                ...(videoImageUrl && { image_url: videoImageUrl }),
                 ...(destLink && { link: destLink }),
                 ...(callToAction && { call_to_action: callToAction }),
               },
