@@ -8,7 +8,7 @@ const DATE_RANGES = [
   { label: 'Last 90 days', value: 'last_90d' },
 ]
 
-const COLS = '44px 1fr 140px 100px 110px 120px 110px 96px'
+const COLS = '44px 1fr 120px 86px 100px 106px 100px 100px 88px 116px'
 
 const fmt = (n: number, cur: string) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n)
@@ -295,12 +295,14 @@ export default function CampaignsPage() {
           {/* Sticky table header */}
           <div style={{ ...rowBase, padding: '0 16px', borderBottom: '2px solid #e8f0e8', background: '#f8fbf7', position: 'sticky', top: 0, zIndex: 10 }}>
             <div />
-            <ColHeader style={{ paddingLeft: 8 }}>Campaign</ColHeader>
+            <ColHeader style={{ paddingLeft: 8 }}>Campaign / Ad Set</ColHeader>
             <ColHeader>Delivery</ColHeader>
             <ColHeader>Results</ColHeader>
             <ColHeader>Cost/Result</ColHeader>
             <ColHeader>Budget/Day</ColHeader>
             <ColHeader>Spent</ColHeader>
+            <ColHeader>Impressions</ColHeader>
+            <ColHeader>Reach</ColHeader>
             <ColHeader style={{ textAlign: 'right' }}>Actions</ColHeader>
           </div>
 
@@ -339,15 +341,23 @@ export default function CampaignsPage() {
                 </div>
                 {/* Spent */}
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>{camp.spend > 0 ? fmt(camp.spend, currency) : '—'}</div>
+                {/* Impressions */}
+                <div style={{ fontSize: 13, color: camp.impressions > 0 ? '#1a3a1a' : '#9e9e9e' }}>
+                  {camp.impressions > 0 ? camp.impressions.toLocaleString() : '—'}
+                </div>
+                {/* Reach */}
+                <div style={{ fontSize: 13, color: camp.reach > 0 ? '#1a3a1a' : '#9e9e9e' }}>
+                  {camp.reach > 0 ? camp.reach.toLocaleString() : '—'}
+                </div>
                 {/* Actions */}
-                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', gap: 5, justifyContent: 'flex-end', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => setEditModal({ action: 'update_budget', id: camp.id, name: camp.name, budget: Math.round((camp.daily_budget || 0) / 100) })}
-                    style={{ background: '#f0f7ee', color: '#1a3a1a', border: 'none', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="Edit Budget">
+                    style={{ background: '#f0f7ee', color: '#1a3a1a', border: 'none', padding: '5px 9px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="Edit Budget">
                     💰
                   </button>
                   <button onClick={() => openChat(camp)}
-                    style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="AI Assistant">
-                    ✨
+                    style={{ background: '#dffe95', color: '#1a3a1a', border: '1.5px solid #b8e050', padding: '5px 9px', borderRadius: 8, fontSize: 11, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }} title="AI Assistant">
+                    <span>✨</span><span>AI</span>
                   </button>
                 </div>
               </div>
@@ -383,11 +393,25 @@ export default function CampaignsPage() {
                     {/* Budget */}
                     <div style={{ fontSize: 12, color: '#616161' }}>{adset.daily_budget ? fmt(Math.round(adset.daily_budget / 100), currency) : '—'}</div>
                     {/* Spent */}
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a' }}>{adset.spend > 0 ? fmt(adset.spend, currency) : '—'}</div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a' }}>{adset.spend > 0 ? fmt(adset.spend, currency) : '—'}</div>
+                    </div>
+                    {/* Impressions */}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: adset.impressions > 0 ? '#1a3a1a' : '#9e9e9e' }}>
+                        {adset.impressions > 0 ? adset.impressions.toLocaleString() : '—'}
+                      </div>
+                    </div>
+                    {/* Reach */}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: adset.reach > 0 ? '#1a3a1a' : '#9e9e9e' }}>
+                        {adset.reach > 0 ? adset.reach.toLocaleString() : '—'}
+                      </div>
+                    </div>
                     {/* Actions */}
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', gap: 5, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                       <button onClick={() => openAdsetEdit(adset)}
-                        style={{ background: '#e8f0ff', color: '#2563eb', border: 'none', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="Edit Audience">
+                        style={{ background: '#e8f0ff', color: '#2563eb', border: 'none', padding: '5px 9px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="Edit Audience">
                         👥
                       </button>
                     </div>
@@ -423,6 +447,10 @@ export default function CampaignsPage() {
                       {/* Budget */}
                       <div style={{ fontSize: 12, color: '#9e9e9e' }}>—</div>
                       {/* Spent */}
+                      <div style={{ fontSize: 12, color: '#9e9e9e' }}>—</div>
+                      {/* Impressions */}
+                      <div style={{ fontSize: 12, color: '#9e9e9e' }}>—</div>
+                      {/* Reach */}
                       <div style={{ fontSize: 12, color: '#9e9e9e' }}>—</div>
                       {/* Actions */}
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
