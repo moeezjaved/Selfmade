@@ -223,17 +223,34 @@ export async function GET(request: NextRequest) {
   const explanations: Record<string, string> = {}
 
   if (toExplain.length > 0) {
-    const prompt = `You are a Facebook Ads expert. For each creative below, write ONE short sentence (max 20 words) explaining WHY Facebook is choosing to show it to those specific audiences. Focus on the likely reason (performance signal, creative-audience fit, etc). Be specific and direct — no fluff.
+    const prompt = `You are a Facebook Ads analyst. For each ad creative below, write ONE specific sentence (max 25 words) explaining WHY Meta is spending most on that exact audience segment.
+
+Your explanation MUST:
+1. Quote or reference a specific word, phrase, or theme from the actual ad copy
+2. Connect it directly to why that demographic (age + gender) responds to it
+3. Be grounded in the creative content — NOT generic phrases like "performance signal" or "high CTR"
+
+Examples of BAD explanations (do not write these):
+- "High CTR signals strong audience alignment with this demographic"
+- "Performance data indicates this segment converts well"
+- "Facebook's algorithm optimized delivery to this group"
+
+Examples of GOOD explanations:
+- "The phrase 'hair loss solution' resonates with men 35-44 who are most likely experiencing this concern"
+- "Mentioning 'busy moms' directly speaks to women 25-34 juggling family and work"
+- "The urgency of 'limited offer' appeals to deal-seeking women 18-24 who impulse-buy on Instagram"
 
 ${toExplain.map((c, i) => `
 Creative ${i + 1} [ID: ${c.creative_id}]:
-- Copy: "${c.primary_text.slice(0, 80)}"
-- Top audiences: ${c.topAgeGender.slice(0, 3).map(a => `${a.age} ${a.gender} (${a.pct}% of spend)`).join(', ')}
+- Full ad copy: "${c.primary_text.slice(0, 200)}"
+- Headline: "${c.headline || '(none)'}"
+- Top audience receiving spend: ${c.topAgeGender.slice(0, 2).map(a => `${a.age} ${a.gender} (${a.pct}% of spend)`).join(', ')}
+- Gender split: ${c.genderSplit.map(g => `${g.gender} ${g.pct}%`).join(', ')}
 - Top placements: ${c.topPlacements.slice(0, 2).map(p => `${p.platform} ${p.position} (${p.pct}%)`).join(', ')}
-- Spend: ${c.total_spend.toFixed(0)} | CTR: ${c.ctr.toFixed(2)}% | Conversions: ${c.conversions}
 `).join('')}
 
-Respond ONLY with a JSON object: { "creative_id": "one sentence why" }`
+Respond ONLY with valid JSON — keys are the creative IDs exactly as shown:
+{ "${toExplain[0]?.creative_id}": "your specific reason here", ... }`
 
     try {
       const res = await claude.messages.create({
