@@ -251,9 +251,7 @@ Respond ONLY with a JSON object: { "creative_id": "one sentence why" }`
   }
 
   // Attach explanations
-  for (const c of creatives) {
-    c.why = explanations[c.creative_id] || null
-  }
+  const creativesWithWhy = creatives.map(c => ({ ...c, why: explanations[c.creative_id] || null }))
 
-  return NextResponse.json({ creatives, currency, dateRange })
+  return NextResponse.json({ creatives: creativesWithWhy, currency, dateRange })
 }
