@@ -1,30 +1,107 @@
 'use client'
-import { useState, useEffect } from 'react'
-import AccountSelector from '@/components/AccountSelector'
+import { useState, useEffect, useRef } from 'react'
 
-const fmt = (n: number) => `PKR ${n.toLocaleString()}`
+const DATE_RANGES = [
+  { label: 'Last 7 days', value: 'last_7d' },
+  { label: 'Last 14 days', value: 'last_14d' },
+  { label: 'Last 30 days', value: 'last_30d' },
+  { label: 'Last 90 days', value: 'last_90d' },
+]
+
+const COLS = '44px 1fr 140px 100px 110px 120px 110px 96px'
+
+const fmt = (n: number, cur: string) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n)
+
+const fmtCPA = (n: number, cur: string) =>
+  n === 0 ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n)
+
+function ToggleSwitch({ active, onChange }: { active: boolean; onChange: () => void }) {
+  return (
+    <div onClick={e => { e.stopPropagation(); onChange() }}
+      style={{ width: 32, height: 18, borderRadius: 9, background: active ? '#4caf50' : '#ccc', cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+      <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2, left: active ? 16 : 2, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+    </div>
+  )
+}
+
+function DeliveryBadge({ status, effectiveStatus }: { status: string; effectiveStatus?: string }) {
+  const es = effectiveStatus || status
+  if (es === 'ACTIVE') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#4caf50' }} />
+        <span style={{ fontSize: 12, color: '#2e7d32', fontWeight: 600 }}>Active</span>
+      </div>
+    )
+  }
+  if (es === 'PAUSED' || status === 'PAUSED') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#9e9e9e' }} />
+        <span style={{ fontSize: 12, color: '#616161', fontWeight: 600 }}>Paused</span>
+      </div>
+    )
+  }
+  if (es === 'CAMPAIGN_PAUSED') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff9800' }} />
+        <span style={{ fontSize: 12, color: '#e65100', fontWeight: 600 }}>Campaign off</span>
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#bdbdbd' }} />
+      <span style={{ fontSize: 12, color: '#757575', fontWeight: 600 }}>{status}</span>
+    </div>
+  )
+}
+
+function ColHeader({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 700, color: '#6b8f6b', textTransform: 'uppercase', letterSpacing: '.05em', ...style }}>
+      {children}
+    </div>
+  )
+}
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedAccount, setSelectedAccount] = useState<string>('')
+  const [currency, setCurrency] = useState('USD')
+  const [dateRange, setDateRange] = useState('last_7d')
   const [editModal, setEditModal] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [uploadingCreative, setUploadingCreative] = useState(false)
-  const [uploadedCreativeHash, setUploadedCreativeHash] = useState<string|null>(null)
+  const [uploadedCreativeHash, setUploadedCreativeHash] = useState<string | null>(null)
   const [expandedCamp, setExpandedCamp] = useState<Record<string, boolean>>({})
   const [expandedAdset, setExpandedAdset] = useState<Record<string, boolean>>({})
   const [activeTab, setActiveTab] = useState('text')
 
-  useEffect(() => { loadCampaigns() }, [selectedAccount])
+  // Chat assistant
+  const [chatCampaign, setChatCampaign] = useState<any>(null)
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatBusy, setChatBusy] = useState(false)
+  const [chatCreativeHash, setChatCreativeHash] = useState<string | null>(null)
+  const [chatIsVideo, setChatIsVideo] = useState(false)
+  const [chatCreativeName, setChatCreativeName] = useState<string | null>(null)
+  const [chatUploadingCreative, setChatUploadingCreative] = useState(false)
+  const chatBottomRef = useRef<HTMLDivElement>(null)
+  const chatFileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { loadCampaigns() }, [dateRange])
 
   const loadCampaigns = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/campaigns/manage')
+      const res = await fetch(`/api/campaigns/manage?dateRange=${dateRange}`)
       const data = await res.json()
       setCampaigns(data.campaigns || [])
-    } catch(e) {}
+      if (data.currency) setCurrency(data.currency)
+    } catch {}
     setLoading(false)
   }
 
@@ -35,12 +112,12 @@ export default function CampaignsPage() {
       const res = await fetch('/api/campaigns/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editModal)
+        body: JSON.stringify(editModal),
       })
       const data = await res.json()
       if (data.error) alert('Error: ' + data.error)
       else { setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false); await loadCampaigns() }
-    } catch(e: any) { alert(e.message) }
+    } catch (e: any) { alert(e.message) }
     setSaving(false)
   }
 
@@ -49,7 +126,7 @@ export default function CampaignsPage() {
     await fetch('/api/campaigns/manage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'toggle_status', id, type, status: newStatus })
+      body: JSON.stringify({ action: 'toggle_status', id, type, status: newStatus }),
     })
     await loadCampaigns()
   }
@@ -78,16 +155,127 @@ export default function CampaignsPage() {
     })
   }
 
+  const openChat = (camp: any) => {
+    setChatCampaign(camp)
+    setChatHistory([{
+      role: 'assistant',
+      content: `Hi! I'm your campaign assistant for "${camp.name}". I can help you:\n• Add a new ad set with a new creative (upload an image/video below)\n• Change the daily budget — e.g. "Set budget to 5000"\n• Pause or activate the campaign or any ad set\n\nWhat would you like to do?`
+    }])
+    setChatInput('')
+    setChatCreativeHash(null)
+    setChatCreativeName(null)
+  }
+
+  const sendChat = async () => {
+    const msg = chatInput.trim()
+    if (!msg || chatBusy || !chatCampaign) return
+    setChatInput('')
+    const userMsg = { role: 'user' as const, content: msg }
+    const newHistory = [...chatHistory, userMsg]
+    setChatHistory(newHistory)
+    setChatBusy(true)
+    setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+
+    try {
+      const res = await fetch('/api/campaigns/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaign: chatCampaign,
+          message: msg,
+          history: chatHistory,
+          uploaded_creative_hash: chatCreativeHash,
+          uploaded_is_video: chatIsVideo,
+        }),
+      })
+      const data = await res.json()
+      const assistantMsg = { role: 'assistant' as const, content: data.reply || 'Done.' }
+      setChatHistory(h => [...h, assistantMsg])
+      if (data.reload) {
+        setChatCreativeHash(null)
+        setChatCreativeName(null)
+        await loadCampaigns()
+        // Refresh the chatCampaign reference with updated data
+        setChatCampaign((prev: any) => campaigns.find((c: any) => c.id === prev?.id) || prev)
+      }
+    } catch {
+      setChatHistory(h => [...h, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
+    }
+    setChatBusy(false)
+    setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  const uploadChatCreative = async (file: File) => {
+    setChatUploadingCreative(true)
+    setChatCreativeHash(null)
+    setChatCreativeName(file.name)
+    const isVideo = file.type.startsWith('video/')
+    setChatIsVideo(isVideo)
+    try {
+      let fileToUpload: File | Blob = file
+      if (!isVideo && file.size > 3 * 1024 * 1024) {
+        fileToUpload = await new Promise<Blob>((resolve, reject) => {
+          const img = new Image()
+          const url = URL.createObjectURL(file)
+          img.onload = () => {
+            URL.revokeObjectURL(url)
+            const scale = Math.sqrt((3 * 1024 * 1024) / file.size)
+            const canvas = document.createElement('canvas')
+            canvas.width = Math.round(img.width * scale)
+            canvas.height = Math.round(img.height * scale)
+            canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+            canvas.toBlob(b => b ? resolve(b) : reject(new Error('Resize failed')), 'image/jpeg', 0.88)
+          }
+          img.onerror = reject
+          img.src = url
+        })
+      }
+      const fd = new FormData()
+      fd.append('file', fileToUpload, file.name)
+      fd.append('isVideo', String(isVideo))
+      const res = await fetch('/api/m4/upload-image', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (data.hash || data.videoId) {
+        setChatCreativeHash(data.hash || data.videoId)
+        setChatHistory(h => [...h, { role: 'assistant', content: `✅ Creative uploaded! Now tell me what you'd like to do with it — e.g. "Add this to a new ad set called Retargeting" or "Replace the creative in the existing ad set".` }])
+      } else {
+        setChatHistory(h => [...h, { role: 'assistant', content: 'Upload failed: ' + (data.error || 'Unknown error') }])
+      }
+    } catch (err: any) {
+      setChatHistory(h => [...h, { role: 'assistant', content: 'Upload error: ' + err.message }])
+    }
+    setChatUploadingCreative(false)
+    setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  const rowBase: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: COLS,
+    alignItems: 'center',
+    minHeight: 48,
+    gap: 0,
+  }
+
   return (
-    <div style={{ padding: 28, maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+    <div style={{ padding: '24px 28px', maxWidth: 1300, margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 900, color: '#1a3a1a' }}>Campaigns</div>
           <div style={{ fontSize: 13, color: '#7a9a7a', marginTop: 2 }}>Manage your Meta campaigns, ad sets and ads</div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={loadCampaigns} style={{ background: 'rgba(255,255,255,0.06)', color: '#3a5a3a', border: 'none', padding: '10px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>↻ Refresh</button>
-          <button onClick={() => window.location.href = '/m4'} style={{ background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '10px 22px', borderRadius: 100, fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch New</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Date range selector */}
+          <div style={{ display: 'flex', background: '#f0f7ee', borderRadius: 10, padding: 3, gap: 2 }}>
+            {DATE_RANGES.map(dr => (
+              <button key={dr.value} onClick={() => setDateRange(dr.value)}
+                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: dateRange === dr.value ? '#1a3a1a' : 'transparent', color: dateRange === dr.value ? '#dffe95' : '#4a6a4a', transition: 'all .15s' }}>
+                {dr.label}
+              </button>
+            ))}
+          </div>
+          <button onClick={loadCampaigns} style={{ background: '#f0f7ee', color: '#3a5a3a', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>↻ Refresh</button>
+          <button onClick={() => window.location.href = '/m4'} style={{ background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch New</button>
         </div>
       </div>
 
@@ -97,91 +285,157 @@ export default function CampaignsPage() {
           <div style={{ color: '#1a3a1a', fontWeight: 700 }}>Loading campaigns...</div>
         </div>
       ) : campaigns.length === 0 ? (
-        <div style={{ background: '#ffffff', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: 48, textAlign: 'center' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #e8f0e8', borderRadius: 16, padding: 48, textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#1a3a1a', marginBottom: 16 }}>No campaigns found</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#1a3a1a', marginBottom: 16 }}>No active or paused campaigns found</div>
           <button onClick={() => window.location.href = '/m4'} style={{ background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '10px 24px', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch First Campaign</button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {campaigns.filter((c:any) => c.status === 'ACTIVE' || c.status === 'PAUSED').map(camp => (
-            <div key={camp.id} style={{ background: '#ffffff', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, overflow: 'hidden' }}>
-              <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+        <div style={{ background: '#fff', border: '1px solid #e8f0e8', borderRadius: 16, overflow: 'hidden' }}>
+          {/* Sticky table header */}
+          <div style={{ ...rowBase, padding: '0 16px', borderBottom: '2px solid #e8f0e8', background: '#f8fbf7', position: 'sticky', top: 0, zIndex: 10 }}>
+            <div />
+            <ColHeader style={{ paddingLeft: 8 }}>Campaign</ColHeader>
+            <ColHeader>Delivery</ColHeader>
+            <ColHeader>Results</ColHeader>
+            <ColHeader>Cost/Result</ColHeader>
+            <ColHeader>Budget/Day</ColHeader>
+            <ColHeader>Spent</ColHeader>
+            <ColHeader style={{ textAlign: 'right' }}>Actions</ColHeader>
+          </div>
+
+          {campaigns.map((camp: any, ci_) => (
+            <div key={camp.id} style={{ borderBottom: ci_ < campaigns.length - 1 ? '1px solid #e8f0e8' : 'none' }}>
+              {/* Campaign row */}
+              <div style={{ ...rowBase, padding: '0 16px', background: '#fff', cursor: 'pointer', transition: 'background .1s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f8fbf7')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
                 onClick={() => setExpandedCamp(prev => ({ ...prev, [camp.id]: !prev[camp.id] }))}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: camp.status === 'ACTIVE' ? '#86efac' : 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#1a3a1a' }}>{camp.name}</div>
-                  <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 2 }}>
-                    {camp.status} · {camp.objective?.replace('OUTCOME_', '')} · {fmt(Math.round((camp.daily_budget || 0) / 100))}/day · {camp.created_time ? new Date(camp.created_time).toLocaleDateString('en-PK', {day:'numeric',month:'short',year:'numeric'}) : ''}
+                {/* Toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 48 }}>
+                  <ToggleSwitch active={camp.status === 'ACTIVE'} onChange={() => toggleStatus(camp.id, 'campaign', camp.status)} />
+                </div>
+                {/* Name */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 8, overflow: 'hidden' }}>
+                  <span style={{ fontSize: 11, color: '#9e9e9e', transition: 'transform .15s', display: 'inline-block', transform: expandedCamp[camp.id] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                  <div style={{ overflow: 'hidden' }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{camp.name}</div>
+                    <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1 }}>{camp.objective?.replace('OUTCOME_', '') || ''}</div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <button onClick={e => { e.stopPropagation(); setEditModal({ action: 'update_budget', id: camp.id, name: camp.name, budget: Math.round((camp.daily_budget || 0) / 100) }) }}
-                    style={{ background: '#1a3a1a', border: '1px solid #1a3a1a', color: '#dffe95', padding: '5px 12px', borderRadius: 100, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
-                    💰 Budget
+                {/* Delivery */}
+                <div><DeliveryBadge status={camp.status} effectiveStatus={camp.effective_status} /></div>
+                {/* Results */}
+                <div style={{ fontSize: 13, fontWeight: 700, color: camp.conversions > 0 ? '#2e7d32' : '#9e9e9e' }}>
+                  {camp.conversions > 0 ? camp.conversions : '—'}
+                  {camp.conversions > 0 && <div style={{ fontSize: 10, color: '#7a9a7a', fontWeight: 500 }}>purchases</div>}
+                </div>
+                {/* Cost/Result */}
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>{fmtCPA(camp.cpa, currency)}</div>
+                {/* Budget */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>{camp.daily_budget ? fmt(Math.round(camp.daily_budget / 100), currency) : '—'}</div>
+                  <div style={{ fontSize: 10, color: '#8aaa8a' }}>daily</div>
+                </div>
+                {/* Spent */}
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>{camp.spend > 0 ? fmt(camp.spend, currency) : '—'}</div>
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setEditModal({ action: 'update_budget', id: camp.id, name: camp.name, budget: Math.round((camp.daily_budget || 0) / 100) })}
+                    style={{ background: '#f0f7ee', color: '#1a3a1a', border: 'none', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="Edit Budget">
+                    💰
                   </button>
-                  <button onClick={e => { e.stopPropagation(); toggleStatus(camp.id, 'campaign', camp.status) }}
-                    style={{ background: camp.status === 'ACTIVE' ? 'rgba(248,113,113,0.1)' : 'rgba(134,239,172,0.1)', border: `1px solid ${camp.status === 'ACTIVE' ? 'rgba(248,113,113,0.2)' : 'rgba(134,239,172,0.2)'}`, color: camp.status === 'ACTIVE' ? '#f87171' : '#86efac', padding: '5px 12px', borderRadius: 100, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
-                    {camp.status === 'ACTIVE' ? 'Pause' : 'Activate'}
+                  <button onClick={() => openChat(camp)}
+                    style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="AI Assistant">
+                    ✨
                   </button>
-                  <span style={{ fontSize: 14, color: '#8aaa8a' }}>{expandedCamp[camp.id] ? '▲' : '▼'}</span>
                 </div>
               </div>
 
-              {expandedCamp[camp.id] && (camp.adsets || []).map((adset: any) => (
-                <div key={adset.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ padding: '12px 20px 12px 36px', display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.01)', cursor: 'pointer' }}
+              {/* Adsets */}
+              {expandedCamp[camp.id] && (camp.adsets || []).map((adset: any, ai_: number) => (
+                <div key={adset.id}>
+                  {/* Adset row */}
+                  <div style={{ ...rowBase, padding: '0 16px', background: '#fafcfa', borderTop: '1px solid #f0f5f0', cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f4f8f4')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#fafcfa')}
                     onClick={() => setExpandedAdset(prev => ({ ...prev, [adset.id]: !prev[adset.id] }))}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: adset.status === 'ACTIVE' ? '#86efac' : 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>{adset.name}</div>
-                      <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1 }}>{adset.status} · {adset.ads?.length || 0} ads</div>
+                    {/* Toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 44 }}>
+                      <ToggleSwitch active={adset.status === 'ACTIVE'} onChange={() => toggleStatus(adset.id, 'adset', adset.status)} />
                     </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <button onClick={e => { e.stopPropagation(); openAdsetEdit(adset) }}
-                        style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)', color: '#2563eb', padding: '4px 10px', borderRadius: 100, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
-                        👥 Audience
+                    {/* Name — indented */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 28, overflow: 'hidden' }}>
+                      <span style={{ fontSize: 10, color: '#b0b0b0', transition: 'transform .15s', display: 'inline-block', transform: expandedAdset[adset.id] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                      <div style={{ overflow: 'hidden' }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#2a4a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{adset.name}</div>
+                        <div style={{ fontSize: 10, color: '#8aaa8a', marginTop: 1 }}>Age {adset.age_min}–{adset.age_max} · {adset.genders?.length === 1 ? (adset.genders[0] === 1 ? 'Male' : 'Female') : 'All'} · {adset.ads?.length || 0} ads</div>
+                      </div>
+                    </div>
+                    {/* Delivery */}
+                    <div><DeliveryBadge status={adset.status} /></div>
+                    {/* Results */}
+                    <div style={{ fontSize: 12, fontWeight: 700, color: adset.conversions > 0 ? '#2e7d32' : '#9e9e9e' }}>
+                      {adset.conversions > 0 ? adset.conversions : '—'}
+                    </div>
+                    {/* CPA */}
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a' }}>{fmtCPA(adset.cpa, currency)}</div>
+                    {/* Budget */}
+                    <div style={{ fontSize: 12, color: '#616161' }}>{adset.daily_budget ? fmt(Math.round(adset.daily_budget / 100), currency) : '—'}</div>
+                    {/* Spent */}
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a' }}>{adset.spend > 0 ? fmt(adset.spend, currency) : '—'}</div>
+                    {/* Actions */}
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => openAdsetEdit(adset)}
+                        style={{ background: '#e8f0ff', color: '#2563eb', border: 'none', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="Edit Audience">
+                        👥
                       </button>
-                      <button onClick={e => { e.stopPropagation(); toggleStatus(adset.id, 'adset', adset.status) }}
-                        style={{ background: adset.status === 'ACTIVE' ? 'rgba(248,113,113,0.1)' : 'rgba(134,239,172,0.1)', border: `1px solid ${adset.status === 'ACTIVE' ? 'rgba(248,113,113,0.2)' : 'rgba(134,239,172,0.2)'}`, color: adset.status === 'ACTIVE' ? '#f87171' : '#86efac', padding: '4px 10px', borderRadius: 100, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
-                        {adset.status === 'ACTIVE' ? 'Pause' : 'Activate'}
-                      </button>
-                      <span style={{ fontSize: 12, color: '#8aaa8a' }}>{expandedAdset[adset.id] ? '▲' : '▼'}</span>
                     </div>
                   </div>
 
+                  {/* Ads */}
                   {expandedAdset[adset.id] && (adset.ads || []).map((ad: any) => (
-                    <div key={ad.id} style={{ padding: '12px 20px 12px 52px', borderTop: '1px solid rgba(255,255,255,0.03)', background: 'rgba(255,255,255,0.005)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        {/* Thumbnail */}
-                        <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.08)' }}>
+                    <div key={ad.id} style={{ ...rowBase, padding: '0 16px', background: '#f7fbf7', borderTop: '1px solid #eef3ee' }}>
+                      {/* Toggle */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 52 }}>
+                        <ToggleSwitch active={ad.status === 'ACTIVE'} onChange={() => toggleStatus(ad.id, 'ad', ad.status)} />
+                      </div>
+                      {/* Name — deeply indented with thumbnail */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 52, overflow: 'hidden' }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8f0e8', border: '1px solid rgba(0,0,0,.06)' }}>
                           {ad.thumbnail_url ? (
-                            <img src={ad.thumbnail_url} alt={ad.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e:any) => { e.target.style.display='none' }} />
+                            <img src={ad.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} />
                           ) : (
-                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎨</div>
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🎨</div>
                           )}
                         </div>
-                        <div style={{ width: 5, height: 5, borderRadius: '50%', background: ad.status === 'ACTIVE' ? '#86efac' : 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: '#2a4a2a' }}>{ad.name}</div>
-                          {ad.primary_text && <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 400 }}>{ad.primary_text}</div>}
+                        <div style={{ overflow: 'hidden' }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#2a4a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.name}</div>
+                          {ad.primary_text && <div style={{ fontSize: 10, color: '#8aaa8a', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{ad.primary_text}</div>}
                         </div>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          {ad.preview_url && (
-                            <a href={ad.preview_url} target="_blank" rel="noopener noreferrer"
-                              style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a', background: '#dffe95', padding: '6px 14px', borderRadius: 100, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
-                              👁 View Ad
-                            </a>
-                          )}
-                          <button onClick={e => { e.stopPropagation(); openAdEdit(ad) }}
-                            style={{ background: 'rgba(0,0,0,0.06)', border: 'none', color: '#1a3a1a', padding: '6px 16px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
-                            ✏️ Edit
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); toggleStatus(ad.id, 'ad', ad.status) }}
-                            style={{ background: ad.status === 'ACTIVE' ? 'rgba(248,113,113,0.1)' : 'rgba(134,239,172,0.1)', border: `1px solid ${ad.status === 'ACTIVE' ? 'rgba(248,113,113,0.2)' : 'rgba(134,239,172,0.2)'}`, color: ad.status === 'ACTIVE' ? '#f87171' : '#86efac', padding: '6px 12px', borderRadius: 100, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
-                            {ad.status === 'ACTIVE' ? 'Pause' : 'Activate'}
-                          </button>
-                        </div>
+                      </div>
+                      {/* Delivery */}
+                      <div><DeliveryBadge status={ad.status} /></div>
+                      {/* Results — ads don't have separate insight in this view */}
+                      <div style={{ fontSize: 12, color: '#9e9e9e' }}>—</div>
+                      {/* CPA */}
+                      <div style={{ fontSize: 12, color: '#9e9e9e' }}>—</div>
+                      {/* Budget */}
+                      <div style={{ fontSize: 12, color: '#9e9e9e' }}>—</div>
+                      {/* Spent */}
+                      <div style={{ fontSize: 12, color: '#9e9e9e' }}>—</div>
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        {ad.preview_url && (
+                          <a href={ad.preview_url} target="_blank" rel="noopener noreferrer"
+                            style={{ background: '#f0f7ee', color: '#1a3a1a', border: 'none', padding: '5px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center' }} title="View Ad">
+                            👁
+                          </a>
+                        )}
+                        <button onClick={() => openAdEdit(ad)}
+                          style={{ background: '#f0f7ee', color: '#1a3a1a', border: 'none', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="Edit Ad">
+                          ✏️
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -192,6 +446,7 @@ export default function CampaignsPage() {
         </div>
       )}
 
+      {/* Edit modals — preserved exactly */}
       {editModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
           <div style={{ background: '#ffffff', border: '1px solid rgba(223,254,149,0.2)', borderRadius: 20, width: '100%', maxWidth: 500 }}>
@@ -215,7 +470,7 @@ export default function CampaignsPage() {
             <div style={{ padding: '20px 24px' }}>
               {editModal.action === 'update_budget' && (
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#6b8f6b', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>Daily Budget (PKR)</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#6b8f6b', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>Daily Budget ({currency})</label>
                   <input type="number" value={editModal.budget}
                     onChange={e => setEditModal((p: any) => ({ ...p, budget: parseFloat(e.target.value) }))}
                     style={{ width: '100%', background: '#f8fcf6', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, padding: '12px 14px', color: '#1a3a1a', fontSize: 18, fontWeight: 800, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
@@ -298,7 +553,7 @@ export default function CampaignsPage() {
                             alert('Upload failed: ' + (data.error || 'Unknown error'))
                           }
                           setUploadingCreative(false)
-                        } catch(err: any) {
+                        } catch (err: any) {
                           setUploadingCreative(false)
                           alert('Upload error: ' + err.message)
                         }
@@ -334,7 +589,7 @@ export default function CampaignsPage() {
                     <div style={{ display: 'flex', gap: 8 }}>
                       {[{ label: 'All', value: [] }, { label: '👨 Male', value: [1] }, { label: '👩 Female', value: [2] }].map(g => (
                         <button key={g.label} onClick={() => setEditModal((p: any) => ({ ...p, genders: g.value }))}
-                          style={{ flex: 1, padding: '8px 0', borderRadius: 10, border: `2px solid ${JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#dffe95' : 'rgba(255,255,255,0.1)'}`, background: JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? 'rgba(223,254,149,0.1)' : 'transparent', color: JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#dffe95' : 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+                          style={{ flex: 1, padding: '8px 0', borderRadius: 10, border: `2px solid ${JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#1a3a1a' : 'rgba(0,0,0,0.1)'}`, background: JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#f0f7ee' : 'transparent', color: JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#1a3a1a' : '#6b8f6b', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
                           {g.label}
                         </button>
                       ))}
@@ -348,8 +603,10 @@ export default function CampaignsPage() {
             </div>
 
             <div style={{ padding: '0 24px 20px', display: 'flex', gap: 10 }}>
-              <button onClick={() => { setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false) }} style={{ flex: 1, background: 'none', border: '1.5px solid rgba(255,255,255,0.15)', color: '#6b8f6b', padding: '11px 0', borderRadius: 100, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={saveEdit} disabled={saving} style={{ flex: 2, background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '11px 0', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
+              <button onClick={() => { setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false) }}
+                style={{ flex: 1, background: 'none', border: '1.5px solid rgba(0,0,0,0.12)', color: '#6b8f6b', padding: '11px 0', borderRadius: 100, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={saveEdit} disabled={saving}
+                style={{ flex: 2, background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '11px 0', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
@@ -357,7 +614,126 @@ export default function CampaignsPage() {
         </div>
       )}
 
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+      {/* ── Chat Drawer ─────────────────────────────────────────── */}
+      {chatCampaign && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', pointerEvents: 'none' }}>
+          {/* Backdrop */}
+          <div style={{ flex: 1, background: 'rgba(0,0,0,0.35)', pointerEvents: 'auto' }}
+            onClick={() => setChatCampaign(null)} />
+
+          {/* Drawer panel */}
+          <div style={{ width: 400, background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 32px rgba(0,0,0,0.18)', pointerEvents: 'auto' }}>
+            {/* Header */}
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', background: '#1a3a1a', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: '#dffe95' }}>✨ Campaign Assistant</div>
+                <div style={{ fontSize: 11, color: '#7a9a7a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chatCampaign.name}</div>
+              </div>
+              <button onClick={() => setChatCampaign(null)}
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#dffe95', width: 28, height: 28, borderRadius: 8, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            </div>
+
+            {/* Campaign quick stats */}
+            <div style={{ padding: '10px 18px', background: '#f8fbf7', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 16 }}>
+              <div style={{ fontSize: 11 }}>
+                <div style={{ color: '#8aaa8a', marginBottom: 1 }}>Status</div>
+                <div style={{ fontWeight: 700, color: chatCampaign.status === 'ACTIVE' ? '#2e7d32' : '#757575' }}>{chatCampaign.status}</div>
+              </div>
+              <div style={{ fontSize: 11 }}>
+                <div style={{ color: '#8aaa8a', marginBottom: 1 }}>Budget/Day</div>
+                <div style={{ fontWeight: 700, color: '#1a3a1a' }}>{chatCampaign.daily_budget ? fmt(Math.round(chatCampaign.daily_budget / 100), currency) : '—'}</div>
+              </div>
+              <div style={{ fontSize: 11 }}>
+                <div style={{ color: '#8aaa8a', marginBottom: 1 }}>Spent</div>
+                <div style={{ fontWeight: 700, color: '#1a3a1a' }}>{chatCampaign.spend > 0 ? fmt(chatCampaign.spend, currency) : '—'}</div>
+              </div>
+              <div style={{ fontSize: 11 }}>
+                <div style={{ color: '#8aaa8a', marginBottom: 1 }}>Results</div>
+                <div style={{ fontWeight: 700, color: '#1a3a1a' }}>{chatCampaign.conversions > 0 ? chatCampaign.conversions : '—'}</div>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {chatHistory.map((msg, idx) => (
+                <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    maxWidth: '88%',
+                    padding: '9px 13px',
+                    borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                    background: msg.role === 'user' ? '#1a3a1a' : '#f0f7ee',
+                    color: msg.role === 'user' ? '#dffe95' : '#1a3a1a',
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {chatBusy && (
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <div style={{ padding: '9px 13px', borderRadius: '16px 16px 16px 4px', background: '#f0f7ee', fontSize: 13, color: '#7a9a7a' }}>
+                    <span style={{ animation: 'pulse 1.2s ease-in-out infinite' }}>Thinking…</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatBottomRef} />
+            </div>
+
+            {/* Creative upload indicator */}
+            {(chatCreativeHash || chatUploadingCreative || chatCreativeName) && (
+              <div style={{ padding: '8px 16px', background: '#f0f7ee', borderTop: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: 18 }}>{chatIsVideo ? '🎬' : '🖼️'}</div>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: chatCreativeHash ? '#2e7d32' : '#b8860b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {chatUploadingCreative ? '⏳ Uploading to Meta…' : chatCreativeHash ? '✅ Creative ready' : chatCreativeName}
+                  </div>
+                  {chatCreativeName && <div style={{ fontSize: 10, color: '#8aaa8a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chatCreativeName}</div>}
+                </div>
+                {!chatUploadingCreative && (
+                  <button onClick={() => { setChatCreativeHash(null); setChatCreativeName(null) }}
+                    style={{ background: 'none', border: 'none', color: '#9e9e9e', cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1 }}>×</button>
+                )}
+              </div>
+            )}
+
+            {/* Input area */}
+            <div style={{ padding: '12px 14px', borderTop: '1px solid #e8f0e8', background: '#fff' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                {/* File upload */}
+                <input type="file" accept="image/*,video/*" ref={chatFileRef}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) { uploadChatCreative(f); e.target.value = '' } }}
+                  style={{ display: 'none' }} />
+                <button onClick={() => chatFileRef.current?.click()} disabled={chatUploadingCreative}
+                  style={{ background: '#f0f7ee', border: 'none', color: '#1a3a1a', width: 36, height: 36, borderRadius: 10, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }} title="Upload creative">
+                  📎
+                </button>
+                {/* Text input */}
+                <textarea
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
+                  placeholder='e.g. "Add this creative to a new ad set" or "Increase budget to 8000"'
+                  rows={2}
+                  style={{ flex: 1, background: '#f8fbf7', border: '1px solid #e8f0e8', borderRadius: 10, padding: '8px 12px', color: '#1a3a1a', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.5 }}
+                />
+                {/* Send */}
+                <button onClick={sendChat} disabled={chatBusy || !chatInput.trim()}
+                  style={{ background: chatBusy || !chatInput.trim() ? '#e8f0e8' : '#dffe95', color: '#1a3a1a', border: 'none', width: 36, height: 36, borderRadius: 10, cursor: chatBusy || !chatInput.trim() ? 'default' : 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}>
+                  ↑
+                </button>
+              </div>
+              <div style={{ fontSize: 10, color: '#b0b0b0', marginTop: 6, textAlign: 'center' }}>Enter to send · Shift+Enter for new line · 📎 to attach a creative</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+        @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .4 } }
+      `}</style>
     </div>
   )
 }

@@ -24,6 +24,13 @@ export async function GET(request: NextRequest) {
 
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = 'act_' + metaAccount.account_id
+    const currency = metaAccount.currency || 'PKR'
+
+    const dateRange = request.nextUrl.searchParams.get('dateRange') || 'last_7d'
+    const days = parseInt(dateRange.replace('last_', '').replace('d', '')) || 7
+    const since = new Date(Date.now() - days * 86400000).toISOString().split('T')[0]
+    const until = new Date().toISOString().split('T')[0]
+    const timeRange = JSON.stringify({ since, until })
 
     // Fetch campaigns with effective_status filter - only ACTIVE and PAUSED
     const params = new URLSearchParams({
@@ -37,8 +44,22 @@ export async function GET(request: NextRequest) {
     const res = await fetch(url)
     const campData = await res.json()
 
-    console.log('Total campaigns from Meta:', campData.data?.length, 'statuses:', campData.data?.map((c:any) => c.status + '/' + c.effective_status))
     if (campData.error) return NextResponse.json({ error: campData.error.message }, { status: 400 })
+
+    // Fetch campaign + adset level insights in parallel (one call each, not per-campaign)
+    const insFields = 'spend,impressions,clicks,ctr,actions,action_values'
+    const [ciRes, aiRes] = await Promise.all([
+      fetch(`https://graph.facebook.com/${V}/${adAccountId}/insights?` + new URLSearchParams({ fields: `campaign_id,${insFields}`, level: 'campaign', time_range: timeRange, limit: '50', access_token: token })).then(r => r.json()).catch(() => ({})),
+      fetch(`https://graph.facebook.com/${V}/${adAccountId}/insights?` + new URLSearchParams({ fields: `adset_id,${insFields}`, level: 'adset', time_range: timeRange, limit: '200', access_token: token })).then(r => r.json()).catch(() => ({})),
+    ])
+
+    const px = (raw: any) => {
+      const spend = parseFloat(raw?.spend || '0')
+      const conv = parseInt(raw?.actions?.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || '0')
+      return { spend, conversions: conv, cpa: conv > 0 ? spend / conv : 0, ctr: parseFloat(raw?.ctr || '0') }
+    }
+    const ci: Record<string, any> = {}; for (const i of (ciRes.data || [])) ci[i.campaign_id] = px(i)
+    const ai: Record<string, any> = {}; for (const i of (aiRes.data || [])) ai[i.adset_id] = px(i)
 
     const campaigns = (campData.data || [])
       .filter((camp: any) => camp.effective_status === 'ACTIVE' || camp.effective_status === 'PAUSED' || camp.status === 'ACTIVE' || camp.status === 'PAUSED')
@@ -63,6 +84,7 @@ export async function GET(request: NextRequest) {
               preview_url: previewUrl,
             }
           })
+          const adsetIns = ai[adset.id] || { spend: 0, conversions: 0, cpa: 0, ctr: 0 }
           return {
             id: adset.id,
             name: adset.name,
@@ -71,8 +93,13 @@ export async function GET(request: NextRequest) {
             age_max: targeting.age_max || 65,
             genders: targeting.genders || [],
             ads,
+            spend: adsetIns.spend,
+            conversions: adsetIns.conversions,
+            cpa: adsetIns.cpa,
+            ctr: adsetIns.ctr,
           }
         })
+        const campIns = ci[camp.id] || { spend: 0, conversions: 0, cpa: 0, ctr: 0 }
         return {
           id: camp.id,
           name: camp.name,
@@ -81,7 +108,11 @@ export async function GET(request: NextRequest) {
           objective: camp.objective,
           daily_budget: camp.daily_budget,
           created_time: camp.created_time,
-          adsets
+          adsets,
+          spend: campIns.spend,
+          conversions: campIns.conversions,
+          cpa: campIns.cpa,
+          ctr: campIns.ctr,
         }
       })
 
@@ -95,7 +126,7 @@ export async function GET(request: NextRequest) {
       return dateB - dateA
     })
 
-    return NextResponse.json({ campaigns })
+    return NextResponse.json({ campaigns, currency, dateRange })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
