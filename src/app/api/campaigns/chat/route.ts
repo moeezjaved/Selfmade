@@ -53,19 +53,20 @@ Supported actions:
 1. "update_budget" — change campaign daily budget
 2. "add_adset" — add a new ad set (only valid if creative was uploaded)
 3. "toggle_status" — pause or activate a campaign/adset/ad
-4. "none" — answer a question
+4. "delete_adset" — permanently delete an ad set (user says delete/remove)
+5. "none" — answer a question
 
 CRITICAL RULES:
-- For add_adset: DO NOT ask the user for primary_text or headline. The system will automatically copy them from the first existing ad set. Just set action="add_adset" and proceed.
+- For add_adset: DO NOT ask the user for primary_text or headline. The system copies them automatically. Just set action="add_adset" and proceed.
 - Only put primary_text/headline in params if the user EXPLICITLY provided new copy in their message.
 - For adset_name: use what the user said (e.g. "Dr rinu" → adset_name: "Dr rinu"). If not mentioned, leave it out.
 - For update_budget: extract the number. Budget is in ${currency} (not cents). Compute new value if relative (e.g. "increase by 20%").
-- For toggle_status: use the IDs from context above.
+- For toggle_status / delete_adset: match the ad set name the user mentions to the IDs from context above.
 - Keep "reply" to 1 sentence confirming the action. No questions. No markdown.
 
 Respond ONLY with valid JSON (no markdown fences):
 {
-  "action": "update_budget" | "add_adset" | "toggle_status" | "none",
+  "action": "update_budget" | "add_adset" | "toggle_status" | "delete_adset" | "none",
   "reply": "One sentence confirmation",
   "params": {
     "budget": 5000,
@@ -245,6 +246,18 @@ Respond ONLY with valid JSON (no markdown fences):
     if (parsed.action === 'toggle_status' && parsed.params?.entity_id && parsed.params?.new_status) {
       await post(parsed.params.entity_id, { status: parsed.params.new_status })
       return NextResponse.json({ reply: parsed.reply, action_taken: 'toggle_status', reload: true })
+    }
+
+    // ── Delete ad set ───────────────────────────────────────────
+    if (parsed.action === 'delete_adset' && parsed.params?.entity_id) {
+      const url = `https://graph.facebook.com/${V}/${parsed.params.entity_id}?access_token=${token}`
+      const res = await fetch(url, { method: 'DELETE' })
+      const json = await res.json()
+      if (json.error) {
+        const e = json.error
+        throw new Error(e.error_user_msg || e.error_user_title || e.message)
+      }
+      return NextResponse.json({ reply: parsed.reply, action_taken: 'delete_adset', reload: true })
     }
 
     // ── add_adset requested but no creative uploaded ────────────

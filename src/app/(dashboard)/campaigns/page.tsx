@@ -81,8 +81,11 @@ export default function CampaignsPage() {
   const [activeTab, setActiveTab] = useState('text')
 
   // Chat assistant
+  type ChatMsg = { role: 'user' | 'assistant'; content: string }
   const [chatCampaign, setChatCampaign] = useState<any>(null)
-  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [chatHistory, setChatHistory] = useState<ChatMsg[]>([])
+  // Persist history per campaign so reopening restores the conversation
+  const chatHistoriesRef = useRef<Record<string, ChatMsg[]>>({})
   const [chatInput, setChatInput] = useState('')
   const [chatBusy, setChatBusy] = useState(false)
   const [chatCreativeHash, setChatCreativeHash] = useState<string | null>(null)
@@ -157,22 +160,23 @@ export default function CampaignsPage() {
 
   const openChat = (camp: any) => {
     setChatCampaign(camp)
-    setChatHistory([{
+    // Restore existing history for this campaign, or show welcome message
+    const saved = chatHistoriesRef.current[camp.id]
+    setChatHistory(saved ?? [{
       role: 'assistant',
-      content: `Hi! I'm your campaign assistant for "${camp.name}". I can help you:\n• Add a new ad set with a new creative (upload an image/video below)\n• Change the daily budget — e.g. "Set budget to 5000"\n• Pause or activate the campaign or any ad set\n\nWhat would you like to do?`
+      content: `Hi! I'm your campaign assistant for "${camp.name}". I can help you:\n• Add a new ad set with a new creative (upload an image/video below)\n• Change the daily budget — e.g. "Set budget to 5000"\n• Pause or activate the campaign or any ad set\n• Delete an ad set — e.g. "Delete the retargeting ad set"\n\nWhat would you like to do?`,
     }])
-    setChatInput('')
-    setChatCreativeHash(null)
-    setChatCreativeName(null)
+    setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
   const sendChat = async () => {
     const msg = chatInput.trim()
     if (!msg || chatBusy || !chatCampaign) return
     setChatInput('')
-    const userMsg = { role: 'user' as const, content: msg }
-    const newHistory = [...chatHistory, userMsg]
-    setChatHistory(newHistory)
+    const userMsg: ChatMsg = { role: 'user', content: msg }
+    const withUser = [...chatHistory, userMsg]
+    setChatHistory(withUser)
+    chatHistoriesRef.current[chatCampaign.id] = withUser
     setChatBusy(true)
     setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
 
@@ -189,17 +193,21 @@ export default function CampaignsPage() {
         }),
       })
       const data = await res.json()
-      const assistantMsg = { role: 'assistant' as const, content: data.reply || 'Done.' }
-      setChatHistory(h => [...h, assistantMsg])
+      const assistantMsg: ChatMsg = { role: 'assistant', content: data.reply || 'Done.' }
+      const withAssistant = [...withUser, assistantMsg]
+      setChatHistory(withAssistant)
+      chatHistoriesRef.current[chatCampaign.id] = withAssistant
       if (data.reload) {
         setChatCreativeHash(null)
         setChatCreativeName(null)
         await loadCampaigns()
-        // Refresh the chatCampaign reference with updated data
         setChatCampaign((prev: any) => campaigns.find((c: any) => c.id === prev?.id) || prev)
       }
     } catch {
-      setChatHistory(h => [...h, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
+      const errMsg: ChatMsg = { role: 'assistant', content: 'Something went wrong. Please try again.' }
+      const withErr = [...withUser, errMsg]
+      setChatHistory(withErr)
+      chatHistoriesRef.current[chatCampaign.id] = withErr
     }
     setChatBusy(false)
     setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
@@ -685,10 +693,9 @@ export default function CampaignsPage() {
 
       {/* ── Chat Drawer ─────────────────────────────────────────── */}
       {chatCampaign && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', pointerEvents: 'none' }}>
-          {/* Backdrop */}
-          <div style={{ flex: 1, background: 'rgba(0,0,0,0.35)', pointerEvents: 'auto' }}
-            onClick={() => setChatCampaign(null)} />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', pointerEvents: 'none', alignItems: 'stretch' }}>
+          {/* Backdrop — click-through, close only via X button */}
+          <div style={{ flex: 1, background: 'rgba(0,0,0,0.25)', pointerEvents: 'none' }} />
 
           {/* Drawer panel */}
           <div style={{ width: 400, background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 32px rgba(0,0,0,0.18)', pointerEvents: 'auto' }}>
