@@ -212,37 +212,78 @@ export default function CampaignsPage() {
     const isVideo = file.type.startsWith('video/')
     setChatIsVideo(isVideo)
     try {
-      let fileToUpload: File | Blob = file
-      if (!isVideo && file.size > 3 * 1024 * 1024) {
-        fileToUpload = await new Promise<Blob>((resolve, reject) => {
-          const img = new Image()
-          const url = URL.createObjectURL(file)
-          img.onload = () => {
-            URL.revokeObjectURL(url)
-            const scale = Math.sqrt((3 * 1024 * 1024) / file.size)
-            const canvas = document.createElement('canvas')
-            canvas.width = Math.round(img.width * scale)
-            canvas.height = Math.round(img.height * scale)
-            canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-            canvas.toBlob(b => b ? resolve(b) : reject(new Error('Resize failed')), 'image/jpeg', 0.88)
-          }
-          img.onerror = reject
-          img.src = url
+      if (isVideo) {
+        // Videos go direct to Supabase (presigned URL) to bypass Vercel's 4.5MB body limit,
+        // then we register the stored URL with Meta via the PUT endpoint.
+        const presignRes = await fetch('/api/m4/upload-presigned', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name, contentType: file.type }),
         })
-      }
-      const fd = new FormData()
-      fd.append('file', fileToUpload, file.name)
-      fd.append('isVideo', String(isVideo))
-      const res = await fetch('/api/m4/upload-image', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (data.hash || data.videoId) {
-        setChatCreativeHash(data.hash || data.videoId)
-        setChatHistory(h => [...h, { role: 'assistant', content: `✅ Creative uploaded! Now tell me what you'd like to do with it — e.g. "Add this to a new ad set called Retargeting" or "Replace the creative in the existing ad set".` }])
+        const presignText = await presignRes.text()
+        let presign: any = {}
+        try { presign = JSON.parse(presignText) } catch {
+          throw new Error('Presign error: ' + presignText.slice(0, 120))
+        }
+        if (presign.error) throw new Error(presign.error)
+
+        // Upload directly to Supabase storage (no Vercel in the path)
+        const uploadRes = await fetch(presign.signedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        })
+        if (!uploadRes.ok) throw new Error('Storage upload failed: ' + uploadRes.status)
+
+        // Register the stored video with Meta
+        const metaRes = await fetch('/api/m4/upload-image', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: presign.path, bucket: presign.bucket }),
+        })
+        const metaText = await metaRes.text()
+        let metaData: any = {}
+        try { metaData = JSON.parse(metaText) } catch {
+          throw new Error('Meta register error: ' + metaText.slice(0, 120))
+        }
+        if (metaData.error) throw new Error(metaData.error)
+        setChatCreativeHash(metaData.videoId || metaData.hash)
+        setChatHistory(h => [...h, { role: 'assistant', content: `✅ Video uploaded! Now tell me what you'd like to do — e.g. "Add this to a new ad set called Retargeting".` }])
       } else {
-        setChatHistory(h => [...h, { role: 'assistant', content: 'Upload failed: ' + (data.error || 'Unknown error') }])
+        // Images: compress if needed, then upload through server
+        let fileToUpload: File | Blob = file
+        if (file.size > 3 * 1024 * 1024) {
+          fileToUpload = await new Promise<Blob>((resolve, reject) => {
+            const img = new Image()
+            const url = URL.createObjectURL(file)
+            img.onload = () => {
+              URL.revokeObjectURL(url)
+              const scale = Math.sqrt((3 * 1024 * 1024) / file.size)
+              const canvas = document.createElement('canvas')
+              canvas.width = Math.round(img.width * scale)
+              canvas.height = Math.round(img.height * scale)
+              canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+              canvas.toBlob(b => b ? resolve(b) : reject(new Error('Resize failed')), 'image/jpeg', 0.88)
+            }
+            img.onerror = reject
+            img.src = url
+          })
+        }
+        const fd = new FormData()
+        fd.append('file', fileToUpload, file.name)
+        fd.append('isVideo', 'false')
+        const res = await fetch('/api/m4/upload-image', { method: 'POST', body: fd })
+        const text = await res.text()
+        let data: any = {}
+        try { data = JSON.parse(text) } catch {
+          throw new Error('Server error: ' + text.slice(0, 120))
+        }
+        if (data.error) throw new Error(data.error)
+        setChatCreativeHash(data.hash)
+        setChatHistory(h => [...h, { role: 'assistant', content: `✅ Image uploaded! Now tell me what you'd like to do — e.g. "Add this to a new ad set called Retargeting".` }])
       }
     } catch (err: any) {
-      setChatHistory(h => [...h, { role: 'assistant', content: 'Upload error: ' + err.message }])
+      setChatHistory(h => [...h, { role: 'assistant', content: '❌ Upload failed: ' + err.message }])
     }
     setChatUploadingCreative(false)
     setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
