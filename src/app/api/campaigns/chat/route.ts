@@ -27,55 +27,77 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const { campaign, message, history = [], uploaded_creative_hash, uploaded_is_video } = body
 
-  // Build adset + ad creative context so Claude never has to ask the user for it
-  const adsetList = (campaign.adsets || []).map((a: any) => {
+  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) // e.g. "03 May 2026"
+
+  // Build adset + ad creative context — Claude must never ask for info that's already here
+  const adsetList = (campaign.adsets || []).map((a: any, idx: number) => {
     const adLines = (a.ads || []).map((ad: any) =>
       `      - Ad "${ad.name}" | Text: "${(ad.primary_text || '').slice(0, 120)}" | Headline: "${ad.headline || ''}" | URL: "${ad.link_url || ''}"`
     ).join('\n')
-    return `  • "${a.name}" [${a.id}] (${a.status})\n${adLines || '      (no ads)'}`
+    return `  ${idx + 1}. "${a.name}" [ID: ${a.id}] (${a.status})\n${adLines || '      (no ads yet)'}`
   }).join('\n')
 
-  const systemPrompt = `You are a Meta Ads AI assistant. Parse the user's intent and return a structured action. NEVER ask the user for information you already have — act immediately.
+  const systemPrompt = `You are a smart Meta Ads campaign manager AI. Extract the user's intent from natural language and return a JSON action immediately — never ask clarifying questions unless truly impossible to proceed.
 
-Campaign context:
-- Name: "${campaign.name}"
-- ID: ${campaign.id}
-- Status: ${campaign.status}
-- Objective: ${campaign.objective?.replace('OUTCOME_', '') || 'unknown'}
-- Daily Budget: ${Math.round((campaign.daily_budget || 0) / 100)} ${currency}
-- Currency: ${currency}
+TODAY'S DATE: ${today}
 
-Ad Sets and their current creative content:
+Campaign: "${campaign.name}" [ID: ${campaign.id}]
+Status: ${campaign.status} | Objective: ${campaign.objective?.replace('OUTCOME_', '') || 'unknown'} | Budget: ${Math.round((campaign.daily_budget || 0) / 100)} ${currency}/day
+
+Ad Sets (most recent last):
 ${adsetList || '  (none yet)'}
-${uploaded_creative_hash ? `\nUser has uploaded a new ${uploaded_is_video ? 'video' : 'image'} creative (hash/id: ${uploaded_creative_hash}).` : ''}
+${uploaded_creative_hash ? `\nUploaded creative ready: ${uploaded_is_video ? 'VIDEO' : 'IMAGE'} [hash: ${uploaded_creative_hash}]` : '\n(No creative uploaded)'}
 
-Supported actions:
-1. "update_budget" — change campaign daily budget
-2. "add_adset" — add a new ad set (only valid if creative was uploaded)
-3. "toggle_status" — pause or activate a campaign/adset/ad
-4. "delete_adset" — permanently delete an ad set (user says delete/remove)
-5. "none" — answer a question
+──────────────────────────────────────
+AVAILABLE ACTIONS
+──────────────────────────────────────
+1. add_adset       — create new ad set with uploaded creative
+2. rename_adset    — rename an ad set (user says "rename", "call it", "name it")
+3. update_budget   — change campaign daily budget
+4. toggle_status   — pause / activate campaign, ad set, or ad
+5. delete_adset    — delete an ad set (user says "delete", "remove")
+6. none            — answer a question or say what you need
 
-CRITICAL RULES:
-- For add_adset: DO NOT ask the user for primary_text or headline. The system copies them automatically. Just set action="add_adset" and proceed.
-- Only put primary_text/headline in params if the user EXPLICITLY provided new copy in their message.
-- For adset_name: use what the user said (e.g. "Dr rinu" → adset_name: "Dr rinu"). If not mentioned, leave it out.
-- For update_budget: extract the number. Budget is in ${currency} (not cents). Compute new value if relative (e.g. "increase by 20%").
-- For toggle_status / delete_adset: match the ad set name the user mentions to the IDs from context above.
-- Keep "reply" to 1 sentence confirming the action. No questions. No markdown.
+──────────────────────────────────────
+RULES — read carefully
+──────────────────────────────────────
+• "this ad set" / "that ad set" / "the one I just created" = the LAST ad set in the list above (highest index)
+• "today's date" / "today" in a name = substitute ${today}
+• For rename_adset: entity_id = ID of the matched ad set, new_name = exact name user specified (resolve "today" → ${today})
+• For add_adset: NEVER ask for primary_text or headline — system copies from existing ads automatically. Just proceed.
+• For add_adset: adset_name = what user said; if not mentioned omit it (system auto-names).
+• For update_budget: number is in ${currency} not cents. Compute final value for relative requests ("increase by 20%" → multiply current ${Math.round((campaign.daily_budget || 0) / 100)} by 1.2).
+• For toggle_status / delete_adset / rename_adset: match ad set name from user message to IDs above; if user says "this"/"that" use the last adset.
+• reply = 1 short sentence confirming what was done. No questions. No markdown.
 
-Respond ONLY with valid JSON (no markdown fences):
+──────────────────────────────────────
+EXAMPLES
+──────────────────────────────────────
+User: "rename this ad set to Dr Renu and today date"
+→ { "action": "rename_adset", "reply": "Renamed to Dr Renu — ${today}.", "params": { "entity_id": "<last adset id>", "new_name": "Dr Renu — ${today}" } }
+
+User: "increase budget by 20%"
+→ { "action": "update_budget", "reply": "Budget updated.", "params": { "budget": <computed value> } }
+
+User: "pause the retargeting ad set"
+→ { "action": "toggle_status", "reply": "Paused the retargeting ad set.", "params": { "entity_id": "<matched id>", "new_status": "PAUSED" } }
+
+User: "add this creative to a new ad set called Dr Renu"
+→ { "action": "add_adset", "reply": "Creating ad set Dr Renu with your new creative.", "params": { "adset_name": "Dr Renu" } }
+
+──────────────────────────────────────
+Respond ONLY with valid JSON, no markdown fences:
 {
-  "action": "update_budget" | "add_adset" | "toggle_status" | "delete_adset" | "none",
-  "reply": "One sentence confirmation",
+  "action": "add_adset" | "rename_adset" | "update_budget" | "toggle_status" | "delete_adset" | "none",
+  "reply": "...",
   "params": {
+    "entity_id": "adset or ad ID from context",
+    "new_name": "resolved name with date if needed",
+    "new_status": "ACTIVE" | "PAUSED",
     "budget": 5000,
-    "adset_name": "Dr rinu",
-    "primary_text": "(only if user explicitly provided new copy)",
-    "headline": "(only if user explicitly provided new headline)",
-    "entity_type": "campaign" | "adset" | "ad",
-    "entity_id": "...",
-    "new_status": "ACTIVE" | "PAUSED"
+    "adset_name": "name for new adset",
+    "primary_text": "(only if user explicitly wrote new ad copy)",
+    "headline": "(only if user explicitly wrote new headline)"
   }
 }`
 
@@ -87,8 +109,8 @@ Respond ONLY with valid JSON (no markdown fences):
   let parsed: any = { action: 'none', reply: 'Sorry, I had trouble understanding that. Could you rephrase?', params: {} }
   try {
     const res = await claude.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 600,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 800,
       system: systemPrompt,
       messages: msgs,
     })
@@ -240,6 +262,12 @@ Respond ONLY with valid JSON (no markdown fences):
         action_taken: 'add_adset',
         reload: true,
       })
+    }
+
+    // ── Rename ad set ───────────────────────────────────────────
+    if (parsed.action === 'rename_adset' && parsed.params?.entity_id && parsed.params?.new_name) {
+      await post(parsed.params.entity_id, { name: parsed.params.new_name })
+      return NextResponse.json({ reply: parsed.reply, action_taken: 'rename_adset', reload: true })
     }
 
     // ── Toggle status ───────────────────────────────────────────
