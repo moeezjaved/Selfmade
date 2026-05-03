@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
   if (!allAds.length) return NextResponse.json({ creatives: [], currency })
 
   // 2. Fetch ad-level insights broken down by age+gender and by publisher+placement in parallel
-  const adIds = [...new Set(allAds.map(a => a.ad_id))].slice(0, 50)
+  const adIds = Array.from(new Set(allAds.map(a => a.ad_id))).slice(0, 50)
 
   // Batch insights: age+gender breakdown and placement breakdown per ad
   const insightBase = {
