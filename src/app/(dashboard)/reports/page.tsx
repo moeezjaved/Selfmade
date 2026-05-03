@@ -16,8 +16,12 @@ export default function ReportsPage() {
   const [error, setError] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('roas')
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [caData, setCaData] = useState<any[]>([])
+  const [caCurrency, setCaCurrency] = useState('USD')
+  const [caLoading, setCaLoading] = useState(false)
+  const [caExpanded, setCaExpanded] = useState<Record<string, boolean>>({})
 
-  useEffect(() => { loadReports() }, [dateRange])
+  useEffect(() => { loadReports(); loadCreativeAudience() }, [dateRange])
 
   const loadReports = async () => {
     setLoading(true)
@@ -29,6 +33,20 @@ export default function ReportsPage() {
       else setData(json)
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
+  }
+
+  const loadCreativeAudience = async () => {
+    setCaLoading(true)
+    try {
+      const res = await fetch(`/api/insights/creative-audience?dateRange=${dateRange}`)
+      const json = await res.json()
+      setCaData(json.creatives || [])
+      if (json.currency) setCaCurrency(json.currency)
+      const exp: Record<string, boolean> = {}
+      ;(json.creatives || []).slice(0, 3).forEach((c: any) => { exp[c.creative_id] = true })
+      setCaExpanded(exp)
+    } catch {}
+    finally { setCaLoading(false) }
   }
 
   const toggle = (key: string) => setExpanded(p => ({ ...p, [key]: !p[key] }))
@@ -226,6 +244,15 @@ export default function ReportsPage() {
             }))}
           />
 
+          {/* ── Creative × Audience Intelligence ── */}
+          <CreativeAudienceSection
+            creatives={caData}
+            currency={caCurrency}
+            loading={caLoading}
+            expanded={caExpanded}
+            toggle={(id: string) => setCaExpanded(p => ({ ...p, [id]: !p[id] }))}
+          />
+
         </div>
       )}
 
@@ -313,6 +340,164 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
         <button onClick={toggle} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: 'none', borderTop: '1px solid rgba(0,0,0,0.04)', color: '#1a3a1a', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
           {expanded ? '▲ Show Less' : `▼ Show ${creatives.length - 3} More`}
         </button>
+      )}
+    </div>
+  )
+}
+
+const GENDER_COLOR: Record<string, string> = { Male: '#3b82f6', Female: '#ec4899', Unknown: '#9ca3af' }
+const PLATFORM_EMOJI: Record<string, string> = { Facebook: '👥', Instagram: '📸', 'Audience Network': '🌐', Messenger: '💬' }
+
+function CreativeAudienceSection({ creatives, currency, loading, expanded, toggle }: {
+  creatives: any[], currency: string, loading: boolean,
+  expanded: Record<string, boolean>, toggle: (id: string) => void
+}) {
+  const fmtN = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
+
+  return (
+    <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+      {/* Header */}
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 900, color: '#1a3a1a' }}>🎯 Creative × Audience Intelligence</div>
+          <div style={{ fontSize: 12, color: '#8aaa8a', marginTop: 2 }}>
+            Which audiences Meta is showing each creative to — and why
+          </div>
+        </div>
+        {!loading && <div style={{ fontSize: 10, fontWeight: 700, color: '#8aaa8a', background: '#f0f7ee', padding: '3px 10px', borderRadius: 100 }}>{creatives.length} creatives</div>}
+      </div>
+
+      {loading ? (
+        <div style={{ padding: '32px 20px', textAlign: 'center', color: '#8aaa8a', fontSize: 13 }}>
+          ⏳ Fetching audience breakdowns from Meta…
+        </div>
+      ) : creatives.length === 0 ? (
+        <div style={{ padding: '32px 20px', textAlign: 'center', color: '#8aaa8a', fontSize: 13 }}>
+          No creative data yet — needs active campaigns with spend.
+        </div>
+      ) : (
+        <div>
+          {creatives.map((c: any, idx: number) => (
+            <div key={c.creative_id} style={{ borderBottom: idx < creatives.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none' }}>
+              {/* Row header */}
+              <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr auto', gap: 14, padding: '14px 20px', alignItems: 'center', cursor: 'pointer', transition: 'background .1s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#fafcfa')}
+                onMouseLeave={e => (e.currentTarget.style.background = '')}
+                onClick={() => toggle(c.creative_id)}>
+                {/* Thumbnail */}
+                <div style={{ width: 56, height: 56, borderRadius: 10, overflow: 'hidden', background: '#f0f7ee', border: '1px solid #e8f0e8', flexShrink: 0 }}>
+                  {c.thumbnail_url
+                    ? <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} />
+                    : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🎨</div>}
+                </div>
+                {/* Copy + campaign tags */}
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 10, background: '#f0f7ee', color: '#4a7a4a', padding: '2px 7px', borderRadius: 5, fontWeight: 700 }}>#{idx + 1}</span>
+                    {c.campaigns.slice(0, 1).map((n: string) => (
+                      <span key={n} style={{ fontSize: 10, background: '#f0f4ff', color: '#5b21b6', padding: '2px 7px', borderRadius: 5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{n}</span>
+                    ))}
+                    {/* Top audience preview */}
+                    {c.topAgeGender[0] && (
+                      <span style={{ fontSize: 10, background: '#fff7ed', color: '#c2410c', padding: '2px 7px', borderRadius: 5, fontWeight: 600 }}>
+                        Top: {c.topAgeGender[0].age} {c.topAgeGender[0].gender} ({c.topAgeGender[0].pct}%)
+                      </span>
+                    )}
+                    {c.topPlacements[0] && (
+                      <span style={{ fontSize: 10, background: '#f0fdf4', color: '#15803d', padding: '2px 7px', borderRadius: 5, fontWeight: 600 }}>
+                        {PLATFORM_EMOJI[c.topPlacements[0].platform] || '📱'} {c.topPlacements[0].platform} {c.topPlacements[0].position}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#1a3a1a', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.primary_text || c.headline || '(no copy)'}
+                  </div>
+                </div>
+                {/* Metrics */}
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#1a3a1a' }}>{fmtN(c.total_spend)}</div>
+                    <div style={{ fontSize: 10, color: '#8aaa8a' }}>spent</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: c.conversions > 0 ? '#2e7d32' : '#9ca3af' }}>{c.conversions > 0 ? c.conversions : '—'}</div>
+                    <div style={{ fontSize: 10, color: '#8aaa8a' }}>purchases</div>
+                  </div>
+                  {c.preview_url && (
+                    <a href={c.preview_url} target="_blank" rel="noopener noreferrer" onClick={(e: any) => e.stopPropagation()}
+                      style={{ background: '#dffe95', color: '#1a3a1a', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>👁</a>
+                  )}
+                  <span style={{ fontSize: 11, color: '#9ca3af' }}>{expanded[c.creative_id] ? '▲' : '▼'}</span>
+                </div>
+              </div>
+
+              {/* Expanded breakdown */}
+              {expanded[c.creative_id] && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, borderTop: '1px solid #f0f5f0' }}>
+                  {/* Left: Who */}
+                  <div style={{ padding: '16px 20px', borderRight: '1px solid #f0f5f0' }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#1a3a1a', marginBottom: 12 }}>👤 Who Meta is showing this to</div>
+                    {/* Gender pills */}
+                    {c.genderSplit.length > 0 && (
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                        {c.genderSplit.map((g: any) => (
+                          <div key={g.gender} style={{ flex: 1, background: (GENDER_COLOR[g.gender] || '#9ca3af') + '18', border: `1px solid ${(GENDER_COLOR[g.gender] || '#9ca3af')}30`, borderRadius: 8, padding: '7px 10px', textAlign: 'center' }}>
+                            <div style={{ fontSize: 16, fontWeight: 900, color: GENDER_COLOR[g.gender] || '#6b7280' }}>{g.pct}%</div>
+                            <div style={{ fontSize: 10, color: '#6b7280', marginTop: 1 }}>{g.gender}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Age bars */}
+                    {c.topAgeGender.length > 0 ? c.topAgeGender.map((seg: any, i: number) => {
+                      const col = seg.gender === 'male' ? '#3b82f6' : seg.gender === 'female' ? '#ec4899' : '#9ca3af'
+                      return (
+                        <div key={i} style={{ marginBottom: 8 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                            <span style={{ fontSize: 12, color: '#374151', fontWeight: 600 }}>
+                              {seg.age} · <span style={{ color: col }}>{seg.gender === 'male' ? 'Male' : seg.gender === 'female' ? 'Female' : 'Other'}</span>
+                            </span>
+                            <span style={{ fontSize: 11, color: '#6b7280' }}>{seg.pct}% · {fmtN(seg.spend)}</span>
+                          </div>
+                          <div style={{ height: 6, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${seg.pct}%`, background: col, borderRadius: 3 }} />
+                          </div>
+                        </div>
+                      )
+                    }) : <div style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>Needs more spend for demographic data</div>}
+                  </div>
+
+                  {/* Right: Where + Why */}
+                  <div style={{ padding: '16px 20px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#1a3a1a', marginBottom: 12 }}>📍 Where Meta is placing it</div>
+                    {c.topPlacements.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                        {c.topPlacements.map((p: any, i: number) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#f8fbf7', border: '1px solid #e8f0e8', borderRadius: 8 }}>
+                            <span style={{ fontSize: 13 }}>{PLATFORM_EMOJI[p.platform] || '📱'}</span>
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: '#1a3a1a' }}>{p.platform}</div>
+                              <div style={{ fontSize: 10, color: '#6b7280' }}>{p.position}</div>
+                            </div>
+                            <div style={{ marginLeft: 4, fontSize: 11, fontWeight: 800, color: '#4caf50' }}>{p.pct}%</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <div style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic', marginBottom: 16 }}>No placement data yet</div>}
+
+                    {/* AI Why */}
+                    {c.why && (
+                      <div style={{ background: 'linear-gradient(135deg,#f0f7ee,#e8f5e3)', border: '1px solid #c8e6c0', borderRadius: 10, padding: '10px 14px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#2e7d32', marginBottom: 4 }}>✨ Why Meta chose this audience</div>
+                        <div style={{ fontSize: 12, color: '#1a3a1a', lineHeight: 1.5 }}>{c.why}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
