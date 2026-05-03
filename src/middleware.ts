@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHmac } from 'crypto'
+
+function getAdminToken() {
+  const password = process.env.ADMIN_PASSWORD || ''
+  const salt = process.env.ADMIN_SECRET_SALT || 'selfmade-admin-2024'
+  return createHmac('sha256', salt).update(password).digest('hex')
+}
 
 const PROTECTED = [
   '/dashboard',
@@ -15,6 +22,16 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   if (pathname === '/') return NextResponse.next()
+
+  // ── Admin routes ────────────────────────────────────────────────
+  if (pathname.startsWith('/admin')) {
+    if (pathname === '/admin/login') return NextResponse.next()
+    const cookie = request.cookies.get('admin_token')?.value
+    if (!process.env.ADMIN_PASSWORD || cookie !== getAdminToken()) {
+      return NextResponse.redirect(new URL('/admin/login', request.url))
+    }
+    return NextResponse.next()
+  }
 
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
