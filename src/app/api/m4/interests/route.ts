@@ -220,27 +220,17 @@ Respond ONLY with valid JSON:
     if (seenNames.has(nameLower)) return
 
     const results = await searchMetaAll(name)
+    const isHighIntent = intentType === 'problem' || intentType === 'solution'
 
-    for (const meta of results) {
-      if (isJunk(meta, name)) continue
-      if (seenIds.has(meta.id)) continue   // skip same ID, try next match
-
+    const push = (meta: MetaInterest, overrideName?: string) => {
       const aud = meta.audience_size_lower_bound || 0
-      if (!passesAudienceFilter(aud, intentType, isCore)) continue
-
-      // Valid non-duplicate found
-      seenIds.add(meta.id)
-      seenNames.add(meta.name.toLowerCase())
-      seenNames.add(nameLower)
-
       const intentBadge =
         intentType === 'problem'  ? 'High Intent 🔥' :
         intentType === 'solution' ? 'High Intent 🔥' :
         intentType === 'category' ? 'Core Category 🎯' :
         'Support ⚡'
-
       validated.push({
-        name: meta.name,
+        name: overrideName || meta.name,
         category: displayCategory,
         why: reason,
         size: aud >= 10_000_000 ? 'Large' : aud >= 1_000_000 ? 'Medium' : 'Small',
@@ -250,7 +240,31 @@ Respond ONLY with valid JSON:
         intentType,
         intentBadge,
       })
-      return // stop at first valid match
+      seenNames.add(nameLower)
+    }
+
+    // Pass 1: find a unique, valid, non-duplicate match
+    for (const meta of results) {
+      if (isJunk(meta, name)) continue
+      if (seenIds.has(meta.id)) continue
+
+      const aud = meta.audience_size_lower_bound || 0
+      if (!passesAudienceFilter(aud, intentType, isCore)) continue
+
+      seenIds.add(meta.id)
+      seenNames.add(meta.name.toLowerCase())
+      push(meta)
+      return
+    }
+
+    // Pass 2 (high-intent only): all Meta IDs were duplicates — keep it anyway.
+    // Same ID in adset targeting is harmless (Meta deduplicates). We preserve the
+    // suggested name so users see "Minoxidil" even when it shares Rogaine's ID.
+    if (isHighIntent && isCore) {
+      const fallback = results.find(r => !isJunk(r, name))
+      if (fallback) {
+        push(fallback, name) // use suggested name, not Meta's duplicate name
+      }
     }
   }
 
