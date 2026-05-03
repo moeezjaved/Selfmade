@@ -99,7 +99,12 @@ Respond ONLY with valid JSON (no markdown fences):
       body: JSON.stringify({ ...data, access_token: token }),
     })
     const json = await res.json()
-    if (json.error) throw new Error(json.error.message)
+    if (json.error) {
+      const e = json.error
+      const detail = e.error_user_msg || e.error_user_title || e.message
+      console.error(`Meta API error [${path}]:`, JSON.stringify(e))
+      throw new Error(detail + (e.error_subcode ? ` (${e.error_subcode})` : ''))
+    }
     return json
   }
 
@@ -135,26 +140,41 @@ Respond ONLY with valid JSON (no markdown fences):
         return NextResponse.json({ reply: "I couldn't find a connected Facebook Page. Please verify your Meta account is linked to a Page.", action_taken: 'none' })
       }
 
-      // Build creative payload
-      const primaryText = parsed.params?.primary_text || existingSpec.link_data?.message || existingSpec.video_data?.message || ''
-      const headline    = parsed.params?.headline    || existingSpec.link_data?.name || ''
+      // Build creative payload — copy as much from existing spec as possible
       const ld = existingSpec.link_data || {}
+      const vd = existingSpec.video_data || {}
+      const primaryText = parsed.params?.primary_text || ld.message || vd.message || ''
+      const headline    = parsed.params?.headline    || ld.name || ''
+      const destLink    = ld.link || vd.link || ''
+      // Prefer existing CTA; fall back to a sensible default for sales campaigns
+      const existingCTA = ld.call_to_action || vd.call_to_action
+      const defaultCTA  = destLink ? { type: 'SHOP_NOW', value: { link: destLink } } : undefined
+      const callToAction = existingCTA || defaultCTA
 
       const creativePayload: any = {
         name: (parsed.params?.adset_name || 'New Creative') + ' — ' + new Date().toISOString().slice(0, 10),
         object_story_spec: uploaded_is_video
-          ? { page_id: pageId, video_data: { video_id: uploaded_creative_hash, message: primaryText } }
+          ? {
+              page_id: pageId,
+              video_data: {
+                video_id: uploaded_creative_hash,
+                message: primaryText,
+                ...(destLink && { link: destLink }),
+                ...(callToAction && { call_to_action: callToAction }),
+              },
+            }
           : {
               page_id: pageId,
               link_data: {
                 image_hash: uploaded_creative_hash,
-                link: ld.link || '',
+                link: destLink,
                 message: primaryText,
                 name: headline,
-                ...(ld.call_to_action && { call_to_action: ld.call_to_action }),
+                ...(callToAction && { call_to_action: callToAction }),
               },
             },
       }
+      console.log('Creating creative:', JSON.stringify(creativePayload))
       const newCreative = await post(adAccountId + '/adcreatives', creativePayload)
 
       // Copy targeting from first existing adset
@@ -165,16 +185,18 @@ Respond ONLY with valid JSON (no markdown fences):
       }
       if (srcAdset?.genders?.length) targeting.genders = srcAdset.genders
 
-      // Map campaign objective → optimization settings
+      // Map campaign objective → optimization settings + destination_type
       const obj = campaign.objective || ''
       let optimization_goal = 'OFFSITE_CONVERSIONS'
-      let billing_event    = 'IMPRESSIONS'
-      if (obj.includes('TRAFFIC'))   { optimization_goal = 'LINK_CLICKS';      billing_event = 'LINK_CLICKS' }
-      if (obj.includes('AWARENESS')) { optimization_goal = 'REACH';            billing_event = 'IMPRESSIONS' }
-      if (obj.includes('ENGAGEMENT')){ optimization_goal = 'POST_ENGAGEMENT';  billing_event = 'IMPRESSIONS' }
-      if (obj.includes('LEAD'))      { optimization_goal = 'LEAD_GENERATION';  billing_event = 'IMPRESSIONS' }
+      let billing_event     = 'IMPRESSIONS'
+      let destination_type  = 'WEBSITE'
+      if (obj.includes('TRAFFIC'))    { optimization_goal = 'LINK_CLICKS';     billing_event = 'IMPRESSIONS'; destination_type = 'WEBSITE' }
+      if (obj.includes('AWARENESS'))  { optimization_goal = 'REACH';           billing_event = 'IMPRESSIONS'; destination_type = 'WEBSITE' }
+      if (obj.includes('ENGAGEMENT')) { optimization_goal = 'POST_ENGAGEMENT'; billing_event = 'IMPRESSIONS'; destination_type = 'FACEBOOK' }
+      if (obj.includes('LEAD'))       { optimization_goal = 'LEAD_GENERATION'; billing_event = 'IMPRESSIONS'; destination_type = 'ON_AD' }
 
       const adsetName = parsed.params?.adset_name || 'New Creative Ad Set — ' + new Date().toLocaleDateString()
+      console.log('Creating adset:', JSON.stringify({ campaign_id: campaign.id, name: adsetName, optimization_goal, billing_event, destination_type }))
       const newAdset = await post(adAccountId + '/adsets', {
         campaign_id: campaign.id,
         name: adsetName,
@@ -182,6 +204,7 @@ Respond ONLY with valid JSON (no markdown fences):
         daily_budget: campaign.daily_budget || 100000,
         billing_event,
         optimization_goal,
+        destination_type,
         bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
         status: 'PAUSED',
       })
@@ -216,6 +239,7 @@ Respond ONLY with valid JSON (no markdown fences):
 
     return NextResponse.json({ reply: parsed.reply, action_taken: 'none' })
   } catch (err: any) {
-    return NextResponse.json({ reply: `Something went wrong: ${err.message}`, action_taken: 'error' })
+    console.error('Chat action error:', err.message)
+    return NextResponse.json({ reply: `❌ Meta API error: ${err.message}`, action_taken: 'error' })
   }
 }
