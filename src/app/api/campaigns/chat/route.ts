@@ -27,11 +27,15 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const { campaign, message, history = [], uploaded_creative_hash, uploaded_is_video } = body
 
-  const adsetList = (campaign.adsets || [])
-    .map((a: any) => `  • "${a.name}" [${a.id}] (${a.status}) — ${a.ads?.length || 0} ads`)
-    .join('\n')
+  // Build adset + ad creative context so Claude never has to ask the user for it
+  const adsetList = (campaign.adsets || []).map((a: any) => {
+    const adLines = (a.ads || []).map((ad: any) =>
+      `      - Ad "${ad.name}" | Text: "${(ad.primary_text || '').slice(0, 120)}" | Headline: "${ad.headline || ''}" | URL: "${ad.link_url || ''}"`
+    ).join('\n')
+    return `  • "${a.name}" [${a.id}] (${a.status})\n${adLines || '      (no ads)'}`
+  }).join('\n')
 
-  const systemPrompt = `You are a Meta Ads AI assistant. Parse the user's intent and return a structured action.
+  const systemPrompt = `You are a Meta Ads AI assistant. Parse the user's intent and return a structured action. NEVER ask the user for information you already have — act immediately.
 
 Campaign context:
 - Name: "${campaign.name}"
@@ -39,33 +43,35 @@ Campaign context:
 - Status: ${campaign.status}
 - Objective: ${campaign.objective?.replace('OUTCOME_', '') || 'unknown'}
 - Daily Budget: ${Math.round((campaign.daily_budget || 0) / 100)} ${currency}
-- Ad Sets:
-${adsetList || '  (none yet)'}
 - Currency: ${currency}
+
+Ad Sets and their current creative content:
+${adsetList || '  (none yet)'}
 ${uploaded_creative_hash ? `\nUser has uploaded a new ${uploaded_is_video ? 'video' : 'image'} creative (hash/id: ${uploaded_creative_hash}).` : ''}
 
 Supported actions:
-1. "update_budget" — user wants to change campaign daily budget
-2. "add_adset" — user wants to add a new ad set (requires uploaded creative)
-3. "toggle_status" — user wants to pause or activate something
-4. "none" — user is asking a question or you need clarification
+1. "update_budget" — change campaign daily budget
+2. "add_adset" — add a new ad set (only valid if creative was uploaded)
+3. "toggle_status" — pause or activate a campaign/adset/ad
+4. "none" — answer a question
 
-Rules:
-- For update_budget: extract the number from the message. Budget is in ${currency} (not cents).
-- For add_adset: only valid if a creative was uploaded. Extract adset_name, primary_text, headline if mentioned.
-- For toggle_status: identify which entity (campaign/adset/ad) and whether to ACTIVE or PAUSED. Use the IDs from context.
-- If budget change is ambiguous (e.g. "increase by 20%"), compute the new value.
-- Keep "reply" short, friendly, action-confirming. No markdown.
+CRITICAL RULES:
+- For add_adset: DO NOT ask the user for primary_text or headline. The system will automatically copy them from the first existing ad set. Just set action="add_adset" and proceed.
+- Only put primary_text/headline in params if the user EXPLICITLY provided new copy in their message.
+- For adset_name: use what the user said (e.g. "Dr rinu" → adset_name: "Dr rinu"). If not mentioned, leave it out.
+- For update_budget: extract the number. Budget is in ${currency} (not cents). Compute new value if relative (e.g. "increase by 20%").
+- For toggle_status: use the IDs from context above.
+- Keep "reply" to 1 sentence confirming the action. No questions. No markdown.
 
 Respond ONLY with valid JSON (no markdown fences):
 {
   "action": "update_budget" | "add_adset" | "toggle_status" | "none",
-  "reply": "Short confirmation or question",
+  "reply": "One sentence confirmation",
   "params": {
     "budget": 5000,
-    "adset_name": "Retargeting — New Creative",
-    "primary_text": "...",
-    "headline": "...",
+    "adset_name": "Dr rinu",
+    "primary_text": "(only if user explicitly provided new copy)",
+    "headline": "(only if user explicitly provided new headline)",
     "entity_type": "campaign" | "adset" | "ad",
     "entity_id": "...",
     "new_status": "ACTIVE" | "PAUSED"
