@@ -24,9 +24,9 @@ export async function GET(request: NextRequest) {
 
   // Get distinct user counts for launch and scale (the count above counts rows, not distinct users)
   const [distinctLaunchRes, distinctScaleRes, distinctAdPlanRes] = await Promise.all([
-    admin.from('campaigns').select('user_id').then(r => new Set((r.data || []).map((x: any) => x.user_id)).size),
-    admin.from('activity_logs').select('user_id').ilike('action_type', '%scale%').then(r => new Set((r.data || []).map((x: any) => x.user_id)).size),
-    admin.from('campaign_drafts').select('user_id').then(r => new Set((r.data || []).map((x: any) => x.user_id)).size),
+    admin.from('campaigns').select('user_id').then((r: { data: { user_id: string }[] | null }) => new Set((r.data || []).map(x => x.user_id)).size),
+    admin.from('activity_logs').select('user_id').ilike('action_type', '%scale%').then((r: { data: { user_id: string }[] | null }) => new Set((r.data || []).map(x => x.user_id)).size),
+    admin.from('campaign_drafts').select('user_id').then((r: { data: { user_id: string }[] | null }) => new Set((r.data || []).map(x => x.user_id)).size),
   ])
 
   const signups = signupRes.count || 0
