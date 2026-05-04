@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
     .select('user_id, full_name, subscription_status, created_at')
     .in('user_id', userIds)
 
-  const profileMap = Object.fromEntries((profiles || []).map(p => [p.user_id, p]))
+  type Profile = { user_id: string; full_name: string | null; subscription_status: string | null; created_at: string | null }
+  const profileMap = Object.fromEntries((profiles || []).map((p: Profile) => [p.user_id, p]))
 
   let users = authUsers.map((u: User) => ({
     id: u.id,
