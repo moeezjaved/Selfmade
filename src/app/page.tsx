@@ -53,7 +53,7 @@ export default function LandingPage() {
           <Link href="/signup" style={{ background: '#dffe95', color: '#10211f', padding: '15px 36px', borderRadius: 100, fontSize: 16, fontWeight: 800, textDecoration: 'none', display: 'inline-block' }}>Start free trial →</Link>
           <Link href="/login" style={{ background: 'rgba(255,255,255,0.8)', color: '#333', padding: '15px 36px', borderRadius: 100, fontSize: 16, fontWeight: 600, textDecoration: 'none', display: 'inline-block', border: '1px solid rgba(0,0,0,0.1)', backdropFilter: 'blur(8px)' }}>Log in</Link>
         </div>
-        <div style={{ fontSize: 13, color: '#888', marginBottom: 56 }}>$169/mo · 7-day free trial · Cancel anytime</div>
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 56 }}>$49/mo · 7-day free trial · Cancel anytime</div>
 
         {/* Stats row */}
         <div style={{ display: 'inline-flex', gap: 0, background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.2)', borderRadius: 20, padding: '16px 0', marginBottom: 64, backdropFilter: 'blur(12px)' }}>
@@ -128,8 +128,8 @@ export default function LandingPage() {
       <div style={{ background: '#dffe95', padding: '28px 48px', display: 'flex', justifyContent: 'center', gap: 80, position: 'relative', zIndex: 1 }}>
         {[['2-3×', 'faster from insight to launch'], ['40%', 'higher ROAS on average'], ['10×', 'faster campaign creation']].map(([val, label]) => (
           <div key={label} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 38, fontWeight: 900, color: '#dffe95', letterSpacing: '-0.02em' }}>{val}</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{label}</div>
+            <div style={{ fontSize: 38, fontWeight: 900, color: '#10211f', letterSpacing: '-0.02em' }}>{val}</div>
+            <div style={{ fontSize: 13, color: '#3a6b00', fontWeight: 600 }}>{label}</div>
           </div>
         ))}
       </div>

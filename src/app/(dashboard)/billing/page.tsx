@@ -123,13 +123,25 @@ export default function BillingPage() {
             </div>
             <span style={{ background: '#dffe9520', border: '1px solid #dffe9540', color: '#dffe95', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 100 }}>✓ Active</span>
           </div>
-          <button
-            onClick={() => checkout('portal')}
-            disabled={loading}
-            style={{ marginTop: 20, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            {loading ? 'Loading…' : 'Manage subscription →'}
-          </button>
+          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+            <button
+              onClick={() => checkout('portal')}
+              disabled={loading}
+              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              {loading ? 'Loading…' : 'Manage subscription →'}
+            </button>
+            <button
+              onClick={() => checkout('portal')}
+              disabled={loading}
+              style={{ background: 'transparent', border: '1px solid rgba(220,38,38,0.3)', color: '#f87171', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Cancel subscription
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 10, marginBottom: 0 }}>
+            Cancelling opens the Stripe portal — your access continues until the end of the billing period.
+          </p>
         </div>
       )}
 
@@ -142,6 +154,83 @@ export default function BillingPage() {
           </div>
           <span style={{ fontSize: 22 }}>⏳</span>
         </div>
+      )}
+
+      {/* Marketing content — shown when not active */}
+      {!isActive && (
+        <>
+          {/* Hero pitch */}
+          <div style={{ background: '#0f1f0a', borderRadius: 20, padding: '28px 28px 24px', marginBottom: 16, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, background: 'radial-gradient(circle, rgba(223,254,149,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1.3, marginBottom: 8 }}>
+              Run Profitable Facebook Ads<br />
+              <span style={{ color: '#dffe95' }}>Without Being an Expert</span>
+            </div>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, margin: '0 0 20px' }}>
+              Selfmade finds winning ads, builds campaigns, and scales them — automatically.
+            </p>
+            <div style={{ display: 'flex', gap: 16 }}>
+              {[['$49/mo', 'All features included'], ['7 days', 'Free trial'], ['Cancel', 'Anytime']].map(([val, label]) => (
+                <div key={label} style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: '#dffe95' }}>{val}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Value comparison */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 14, padding: '16px 18px' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#dc2626', letterSpacing: '.08em', marginBottom: 12, textTransform: 'uppercase' }}>Without Selfmade</div>
+              {['Agency → $500–$2,000/mo', 'Months of trial & error', 'Wasting money on wrong creatives'].map((item, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 8, fontSize: 13, color: '#555' }}>
+                  <span style={{ color: '#dc2626', fontWeight: 700, flexShrink: 0 }}>✕</span> {item}
+                </div>
+              ))}
+            </div>
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 14, padding: '16px 18px' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#15803d', letterSpacing: '.08em', marginBottom: 12, textTransform: 'uppercase' }}>With Selfmade</div>
+              {['Finds winning ads automatically', 'Builds campaigns for you', 'Scales what works — pauses losers'].map((item, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 8, fontSize: 13, color: '#333' }}>
+                  <span style={{ color: '#16a34a', fontWeight: 700, flexShrink: 0 }}>✓</span> {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Steps */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 20px 12px', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#111', marginBottom: 14 }}>What happens when you use Selfmade</div>
+            {[
+              { n: '1', t: 'Enter your product', d: 'Tell us what you sell — that\'s it.' },
+              { n: '2', t: 'We find your best audiences & competitors', d: 'AI maps your market and targets.' },
+              { n: '3', t: 'We generate and launch your ads', d: 'Full campaigns live on Meta in minutes.' },
+              { n: '4', t: 'We scale what\'s working automatically', d: 'You focus on your business. We handle ads.' },
+            ].map((s, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#152928', color: '#dffe95', fontSize: 11, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{s.n}</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{s.t}</div>
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{s.d}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Features */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#111', marginBottom: 14 }}>Everything you need to run ads</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+              {['AI Ad Strategy Builder', 'Winning Interest & Audience Targeting', 'Competitor Ad Intelligence', 'One-click Campaign Launch', 'Automatic Scaling System', 'Built for beginners and experts'].map(f => (
+                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#444' }}>
+                  <span style={{ background: '#dffe95', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#10211f', flexShrink: 0 }}>✓</span>
+                  {f}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Pricing selector (shown when not active) */}
