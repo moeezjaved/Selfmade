@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import { logError } from '@/lib/admin/logError'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 export const maxDuration = 300
@@ -429,6 +430,19 @@ export async function POST(request: NextRequest) {
       })
     } catch(e: any) { console.log('Launch store error:', e.message) }
 
+    // Log any partial errors (creative failures, interest failures, etc.) to admin dashboard
+    if (errors.length > 0) {
+      for (const errMsg of errors) {
+        await logError({
+          user_id: user.id,
+          user_email: user.email,
+          error_message: `M4 Launch: ${errMsg}`,
+          page_url: '/m4',
+          extra: { campaign_name: campaignName, account: metaAccount.account_name },
+        })
+      }
+    }
+
     return NextResponse.json({
       success: true,
       account: metaAccount.account_name,
@@ -444,6 +458,20 @@ export async function POST(request: NextRequest) {
 
   } catch (err: any) {
     console.error('M4 launch error:', err.message)
+    // Log fatal launch failure
+    try {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await logError({
+          user_id: user.id,
+          user_email: user.email,
+          error_message: `M4 Launch failed: ${err.message}`,
+          error_stack: err.stack,
+          page_url: '/m4',
+        })
+      }
+    } catch {}
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
