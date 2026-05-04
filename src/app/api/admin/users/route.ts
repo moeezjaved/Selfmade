@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { verifyAdminRequest } from '@/lib/admin/auth'
+import type { User } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,10 +15,10 @@ export async function GET(request: NextRequest) {
 
   // List auth users with pagination
   const { data: authData } = await admin.auth.admin.listUsers({ page, perPage })
-  const authUsers = authData?.users || []
+  const authUsers: User[] = authData?.users || []
 
   // Get profiles for these users
-  const userIds = authUsers.map(u => u.id)
+  const userIds = authUsers.map((u: User) => u.id)
   const { data: profiles } = await admin
     .from('user_profiles')
     .select('user_id, full_name, subscription_status, created_at')
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
 
   const profileMap = Object.fromEntries((profiles || []).map(p => [p.user_id, p]))
 
-  let users = authUsers.map(u => ({
+  let users = authUsers.map((u: User) => ({
     id: u.id,
     email: u.email || '',
     full_name: profileMap[u.id]?.full_name || '',
