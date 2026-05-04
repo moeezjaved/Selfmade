@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import { logError } from '@/lib/admin/logError'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 
@@ -133,6 +134,19 @@ export async function POST(request: NextRequest) {
 
   } catch (err: any) {
     console.error('Scale error:', err.message)
+    try {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await logError({
+          user_id: user.id,
+          user_email: user.email,
+          error_message: `M4 Scale failed: ${err.message}`,
+          error_stack: err.stack,
+          page_url: '/m4',
+        })
+      }
+    } catch {}
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
