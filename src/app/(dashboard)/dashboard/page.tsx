@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [approving, setApproving] = useState<string | null>(null)
   const [currency, setCurrency] = useState<string>('USD')
   const [winners, setWinners] = useState<any[]>([])
+  const [winnersLoading, setWinnersLoading] = useState(true)
   const [liveCampaigns, setLiveCampaigns] = useState<any[]>([])
 
   const loadData = useCallback(async () => {
@@ -114,6 +115,7 @@ export default function DashboardPage() {
     } catch(e) {}
 
     // Fetch winners from insights
+    setWinnersLoading(true)
     try {
       const insRes = await fetch('/api/insights/campaigns?dateRange=last_7d')
       const insData = await insRes.json()
@@ -123,7 +125,9 @@ export default function DashboardPage() {
         }))
       )
       setWinners(w)
-    } catch(e) {}
+    } catch(e) {} finally {
+      setWinnersLoading(false)
+    }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
@@ -359,7 +363,22 @@ export default function DashboardPage() {
               <div className="font-black text-base" style={{color:"#1a3a1a"}}>🚀 Winning Ad Sets</div>
               <Link href="/insights" className="text-sm font-semibold" style={{color:"#5a7a5a"}}>View Scale & Insights →</Link>
             </div>
-            {winners.length === 0 ? (
+            {winnersLoading ? (
+              <div className="px-6 py-4 flex flex-col gap-3">
+                {[1,2,3].map(i => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="h-3.5 w-40 bg-dark3 rounded shimmer"/>
+                      <div className="h-2.5 w-24 bg-dark3 rounded shimmer"/>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-24 bg-dark3 rounded-full shimmer"/>
+                      <div className="h-6 w-20 bg-dark3 rounded-full shimmer"/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : winners.length === 0 ? (
               <div className="px-6 py-10 text-center text-sm" style={{color:"#8aaa8a"}}>
                 No winners detected yet.{' '}
                 <Link href="/insights" style={{color:"#1a3a1a",fontWeight:700}}>Open Scale & Insights</Link>
@@ -402,14 +421,18 @@ export default function DashboardPage() {
                   <tr className="bg-dark3">
                     <th className="text-left px-6 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>Campaign</th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>Status</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>Spend</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>ROAS</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>CPA</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>CTR</th>
+                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8aaa8a"}}>Spend</th>
+                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8aaa8a"}}>ROAS</th>
+                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8aaa8a"}}>CPA</th>
+                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8aaa8a"}}>CTR</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.campaigns.filter((c:any) => c.status === 'ACTIVE' || c.status === 'PAUSED').slice(0, 6).map((campaign: any) => {
+                  {data.campaigns
+                    .filter((c:any) => c.status === 'ACTIVE' || c.status === 'PAUSED')
+                    .sort((a:any, b:any) => (a.status === 'ACTIVE' ? -1 : 1) - (b.status === 'ACTIVE' ? -1 : 1))
+                    .slice(0, 6)
+                    .map((campaign: any) => {
                     const insights = campaign.campaign_insights?.[0]
                     const liveMatch = liveCampaigns.find((lc: any) => lc.name === campaign.name)
                     const topAd = liveMatch?.adsets?.[0]?.ads?.[0]
@@ -440,10 +463,10 @@ export default function DashboardPage() {
                             {campaign.status === 'ACTIVE' ? '● Active' : '⏸ Paused'}
                           </span>
                         </td>
-                        <td className="px-4 py-4 text-sm font-bold" style={{color:"#1a3a1a"}}>{formatCurrency(insights?.spend || 0, currency)}</td>
-                        <td className="px-4 py-4 text-sm font-bold text-status-green">{formatROAS(insights?.roas || 0)}</td>
-                        <td className="px-4 py-4 text-sm font-bold" style={{color:"#1a3a1a"}}>{formatCurrency(insights?.cpa || 0, currency)}</td>
-                        <td className="px-4 py-4 text-sm font-bold" style={{color:"#1a3a1a"}}>{formatPercent(insights?.ctr || 0)}</td>
+                        <td className="px-3 py-4 text-sm font-bold whitespace-nowrap" style={{color:"#1a3a1a"}}>{formatCurrency(insights?.spend || 0, currency)}</td>
+                        <td className="px-3 py-4 text-sm font-bold whitespace-nowrap text-status-green">{formatROAS(insights?.roas || 0)}</td>
+                        <td className="px-3 py-4 text-sm font-bold whitespace-nowrap" style={{color:"#1a3a1a"}}>{formatCurrency(insights?.cpa || 0, currency)}</td>
+                        <td className="px-3 py-4 text-sm font-bold whitespace-nowrap" style={{color:"#1a3a1a"}}>{formatPercent(insights?.ctr || 0)}</td>
                       </tr>
                     )
                   })}
