@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 interface Profile {
   subscription_status: string
@@ -24,7 +25,11 @@ export default function BillingPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly')
   const [loading, setLoading] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const searchParams = useSearchParams()
+  const router = useRouter()
   const expired = searchParams.get('expired') === '1'
 
   useEffect(() => {
@@ -37,6 +42,27 @@ export default function BillingPage() {
         .then(({ data }) => setProfile(data))
     })
   }, [])
+
+  const redeemCode = async () => {
+    if (!inviteCode.trim()) return
+    setInviteLoading(true)
+    setInviteMsg(null)
+    const res = await fetch('/api/invite/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode.trim() }),
+    })
+    const { ok, message, error } = await res.json()
+    if (ok) {
+      setInviteMsg({ ok: true, text: message })
+      setInviteCode('')
+      // Refresh profile and redirect to dashboard after short delay
+      setTimeout(() => router.push('/dashboard'), 2000)
+    } else {
+      setInviteMsg({ ok: false, text: error || 'Something went wrong.' })
+    }
+    setInviteLoading(false)
+  }
 
   const checkout = async (action: 'checkout' | 'portal' = 'checkout') => {
     setLoading(true)
@@ -165,6 +191,36 @@ export default function BillingPage() {
             {loading ? 'Redirecting to Stripe…' : isLocked ? `Restore access — $${plan === 'monthly' ? '49' : '39'}/mo` : `Start paying — $${plan === 'monthly' ? '49' : '39'}/mo`}
           </button>
           <p style={{ fontSize: 11, color: '#aaa', textAlign: 'center', marginTop: 10 }}>Secure payment via Stripe · Cancel anytime</p>
+        </div>
+      )}
+
+      {/* Invite code section — shown when not on active paid plan */}
+      {!isActive && (
+        <div style={{ marginTop: 20, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 24px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 4 }}>Have an invite code?</div>
+          <div style={{ fontSize: 12, color: '#888', marginBottom: 14 }}>Enter your code to unlock free access</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value.toUpperCase())}
+              placeholder="SM-XXXXXXXX"
+              onKeyDown={e => e.key === 'Enter' && redeemCode()}
+              style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #e5e7eb', borderRadius: 10, fontSize: 15, fontFamily: 'monospace', fontWeight: 700, letterSpacing: '.05em', outline: 'none' }}
+            />
+            <button
+              onClick={redeemCode}
+              disabled={inviteLoading || !inviteCode.trim()}
+              style={{ padding: '10px 20px', background: '#152928', color: '#dffe95', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: inviteLoading || !inviteCode.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: !inviteCode.trim() ? 0.5 : 1 }}
+            >
+              {inviteLoading ? 'Checking…' : 'Apply'}
+            </button>
+          </div>
+          {inviteMsg && (
+            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 8, background: inviteMsg.ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${inviteMsg.ok ? '#bbf7d0' : '#fecaca'}`, fontSize: 13, color: inviteMsg.ok ? '#15803d' : '#dc2626', fontWeight: 500 }}>
+              {inviteMsg.ok ? '✓ ' : '✕ '}{inviteMsg.text}
+            </div>
+          )}
         </div>
       )}
     </div>

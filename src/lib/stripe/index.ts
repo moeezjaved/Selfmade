@@ -106,9 +106,18 @@ export async function handleStripeWebhook(payload: string, signature: string) {
       const userId = session.metadata?.user_id
       if (!userId) break
 
+      // Fetch the real subscription so we get the actual status + trial_end
+      const subscriptionId = session.subscription as string
+      const sub = await stripe.subscriptions.retrieve(subscriptionId)
+
       await supabase.from('user_profiles').update({
-        stripe_subscription_id: session.subscription as string,
-        subscription_status: 'trialing',
+        stripe_subscription_id: subscriptionId,
+        stripe_customer_id: session.customer as string,
+        subscription_status: sub.status,
+        // Update trial_ends_at so the app knows the new trial window
+        trial_ends_at: sub.trial_end
+          ? new Date(sub.trial_end * 1000).toISOString()
+          : null,
       }).eq('user_id', userId)
       break
     }
@@ -119,7 +128,10 @@ export async function handleStripeWebhook(payload: string, signature: string) {
       if (!userId) break
 
       await supabase.from('user_profiles').update({
-        subscription_status: sub.status as string,
+        subscription_status: sub.status,
+        trial_ends_at: sub.trial_end
+          ? new Date(sub.trial_end * 1000).toISOString()
+          : null,
       }).eq('user_id', userId)
       break
     }
