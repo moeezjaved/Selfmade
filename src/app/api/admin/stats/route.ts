@@ -12,16 +12,18 @@ export async function GET(request: NextRequest) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const [totalRes, todayRes, payingRes] = await Promise.all([
+  const [totalRes, todayRes, activeRes, trialRes] = await Promise.all([
     admin.from('user_profiles').select('id', { count: 'exact', head: true }),
     admin.from('user_profiles').select('id', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
-    admin.from('user_profiles').select('id', { count: 'exact', head: true }).in('subscription_status', ['active', 'trialing']),
+    admin.from('user_profiles').select('id', { count: 'exact', head: true }).eq('subscription_status', 'active'),
+    admin.from('user_profiles').select('id', { count: 'exact', head: true }).eq('subscription_status', 'trialing'),
   ])
 
   const totalUsers = totalRes.count || 0
   const newToday = todayRes.count || 0
-  const payingUsers = payingRes.count || 0
+  const payingUsers = activeRes.count || 0   // only truly paid, not trialing
+  const trialUsers = trialRes.count || 0
   const mrr = payingUsers * 99
 
-  return NextResponse.json({ totalUsers, newToday, payingUsers, mrr })
+  return NextResponse.json({ totalUsers, newToday, payingUsers, trialUsers, mrr })
 }

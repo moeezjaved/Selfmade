@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 
-interface Stats { totalUsers: number; newToday: number; payingUsers: number; mrr: number }
+interface Stats { totalUsers: number; newToday: number; payingUsers: number; trialUsers: number; mrr: number }
 
 function KPI({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
@@ -28,11 +28,12 @@ export default function AdminDashboard() {
       {!stats ? (
         <div style={{ color: '#aaa', fontSize: '14px' }}>Loading…</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
           <KPI label="Total Users" value={stats.totalUsers.toLocaleString()} />
           <KPI label="New Today" value={stats.newToday.toLocaleString()} />
-          <KPI label="Paying Users" value={stats.payingUsers.toLocaleString()} sub="active subscriptions" />
-          <KPI label="MRR" value={`$${stats.mrr.toLocaleString()}`} sub="estimated monthly revenue" />
+          <KPI label="On Trial" value={stats.trialUsers.toLocaleString()} sub="7-day free trial" />
+          <KPI label="Paying Users" value={stats.payingUsers.toLocaleString()} sub="active paid subscriptions" />
+          <KPI label="MRR" value={`$${stats.mrr.toLocaleString()}`} sub="paid users × $99" />
         </div>
       )}
     </div>
