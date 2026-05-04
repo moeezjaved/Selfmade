@@ -9,6 +9,23 @@ const PROTECTED = [
   '/activity',
   '/settings',
   '/billing',
+  '/reports',
+  '/insights',
+  '/m4',
+]
+
+// Pages that need an active subscription (billing itself is always accessible)
+const REQUIRES_SUBSCRIPTION = [
+  '/dashboard',
+  '/recommendations',
+  '/campaigns',
+  '/creative-studio',
+  '/ad-engine',
+  '/activity',
+  '/settings',
+  '/reports',
+  '/insights',
+  '/m4',
 ]
 
 export async function middleware(request: NextRequest) {
@@ -63,6 +80,26 @@ export async function middleware(request: NextRequest) {
 
     if ((pathname === '/login' || pathname === '/signup') && user) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // ── Subscription gate ────────────────────────────────────────
+    if (user && REQUIRES_SUBSCRIPTION.some(p => pathname.startsWith(p))) {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('subscription_status, trial_ends_at')
+        .eq('user_id', user.id)
+        .single()
+
+      if (profile) {
+        const status = profile.subscription_status
+        const trialEnded = profile.trial_ends_at && new Date(profile.trial_ends_at) < new Date()
+        const isLocked = status === 'canceled' || status === 'past_due' || status === 'incomplete'
+          || (status === 'trialing' && trialEnded)
+
+        if (isLocked) {
+          return NextResponse.redirect(new URL('/billing?expired=1', request.url))
+        }
+      }
     }
 
     return response
