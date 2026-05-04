@@ -199,7 +199,7 @@ export default function LandingPage() {
 
         <div style={{ background: 'rgba(255,255,255,0.8)', border: '1.5px solid rgba(125,214,0,0.4)', borderRadius: 32, padding: 48, maxWidth: 460, margin: '0 auto', boxShadow: '0 24px 80px rgba(125,214,0,0.12), 0 4px 20px rgba(0,0,0,0.06)', backdropFilter: 'blur(16px)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#3a7000', letterSpacing: '.1em', marginBottom: 8 }}>SELFMADE PRO</div>
-          <div style={{ fontSize: 60, fontWeight: 900, letterSpacing: '-0.04em', color: '#0a0a0a', lineHeight: 1 }}>$99<span style={{ fontSize: 18, fontWeight: 500, color: '#999' }}>/mo</span></div>
+          <div style={{ fontSize: 60, fontWeight: 900, letterSpacing: '-0.04em', color: '#0a0a0a', lineHeight: 1 }}>$49<span style={{ fontSize: 18, fontWeight: 500, color: '#999' }}>/mo</span></div>
           <div style={{ fontSize: 13, color: '#aaa', marginBottom: 28 }}>7-day free trial · Cancel anytime</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28, textAlign: 'left' }}>
             {['Live KPI Dashboard', 'AI Recommendations', 'Approval-First AI', 'Launch Ads (M4 Method)', 'Scale & Insights', 'Creative Studio', 'Deep Reports', 'Multiple Accounts', 'Activity Log'].map(f => (

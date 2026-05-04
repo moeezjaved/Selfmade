@@ -40,10 +40,10 @@ export default function PaymentPage() {
                 {p==='annual' && <div style={{position:'absolute',top:-11,right:14,background:'#dffe95',color:'#10211f',fontSize:10,fontWeight:800,padding:'2px 10px',borderRadius:100}}>Save 20%</div>}
                 <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>{p==='monthly'?'Monthly':'Annual'}</div>
                 <div style={{display:'flex',alignItems:'baseline',gap:4,marginBottom:4}}>
-                  <span style={{fontSize:36,fontWeight:900,color:'white'}}>{p==='monthly'?'$99':'$79'}</span>
+                  <span style={{fontSize:36,fontWeight:900,color:'white'}}>{p==='monthly'?'$49':'$39'}</span>
                   <span style={{fontSize:13,color:'rgba(255,255,255,0.4)'}}>/mo</span>
                 </div>
-                <div style={{fontSize:12,color:'rgba(255,255,255,0.35)'}}>{p==='monthly'?'Billed monthly':'$948 billed yearly'}</div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,0.35)'}}>{p==='monthly'?'Billed monthly':'$470 billed yearly'}</div>
                 <div style={{position:'absolute',top:14,right:14,width:20,height:20,borderRadius:'50%',border:`2px solid ${plan===p?'#dffe95':'rgba(255,255,255,0.15)'}`,background:plan===p?'#dffe95':'none',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900,color:'#10211f'}}>{plan===p?'✓':''}</div>
               </div>
             ))}

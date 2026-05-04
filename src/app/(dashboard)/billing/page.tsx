@@ -8,7 +8,7 @@ export default function BillingPage() {
         <div style={{position:'absolute',top:0,left:'20%',right:'20%',height:'1.5px',background:'linear-gradient(90deg,transparent,#dffe95,transparent)'}}/>
         <div style={{fontSize:13,fontWeight:700,color:'#1a3a1a',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>Selfmade Pro</div>
         <div style={{display:'flex',alignItems:'baseline',gap:4,marginBottom:6}}>
-          <span style={{fontSize:48,fontWeight:900,color:'#1a3a1a'}}>$99</span>
+          <span style={{fontSize:48,fontWeight:900,color:'#1a3a1a'}}>$49</span>
           <span style={{fontSize:15,color:'#7a9a7a'}}>/month</span>
         </div>
         <div style={{fontSize:13,color:'#7a9a7a',marginBottom:24}}>Trial active · No charge yet</div>
