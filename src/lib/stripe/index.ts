@@ -8,13 +8,13 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export const PLANS = {
   monthly: {
     priceId: process.env.STRIPE_PRICE_ID_MONTHLY!,
-    amount: 9900,   // $99.00 in cents
+    amount: 4900,   // $49.00 in cents
     interval: 'month' as const,
     label: 'Pro Monthly',
   },
   annual: {
     priceId: process.env.STRIPE_PRICE_ID_ANNUAL!,
-    amount: 94800,  // $79/mo × 12 = $948/year
+    amount: 47040,  // $39.20/mo × 12 = $470.40/year (20% off)
     interval: 'year' as const,
     label: 'Pro Annual',
   },

@@ -33,7 +33,7 @@ export default function AdminDashboard() {
           <KPI label="New Today" value={stats.newToday.toLocaleString()} />
           <KPI label="On Trial" value={stats.trialUsers.toLocaleString()} sub="7-day free trial" />
           <KPI label="Paying Users" value={stats.payingUsers.toLocaleString()} sub="active paid subscriptions" />
-          <KPI label="MRR" value={`$${stats.mrr.toLocaleString()}`} sub="paid users × $99" />
+          <KPI label="MRR" value={`$${stats.mrr.toLocaleString()}`} sub="paid users × $49" />
         </div>
       )}
     </div>

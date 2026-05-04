@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   const newToday = todayRes.count || 0
   const payingUsers = activeRes.count || 0   // only truly paid, not trialing
   const trialUsers = trialRes.count || 0
-  const mrr = payingUsers * 99
+  const mrr = payingUsers * 49
 
   return NextResponse.json({ totalUsers, newToday, payingUsers, trialUsers, mrr })
 }
