@@ -370,7 +370,7 @@ export default function CampaignsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 8, overflow: 'hidden' }}>
                   <span style={{ fontSize: 11, color: '#9e9e9e', transition: 'transform .15s', display: 'inline-block', transform: expandedCamp[camp.id] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
                   <div style={{ overflow: 'hidden' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{camp.name}</div>
+                    <div title={camp.name} style={{ fontSize: 13, fontWeight: 800, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{camp.name}</div>
                     <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1 }}>{camp.objective?.replace('OUTCOME_', '') || ''}</div>
                   </div>
                 </div>
@@ -424,7 +424,7 @@ export default function CampaignsPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 28, overflow: 'hidden' }}>
                       <span style={{ fontSize: 10, color: '#b0b0b0', transition: 'transform .15s', display: 'inline-block', transform: expandedAdset[adset.id] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
                       <div style={{ overflow: 'hidden' }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#2a4a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{adset.name}</div>
+                        <div title={adset.name} style={{ fontSize: 12, fontWeight: 700, color: '#2a4a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{adset.name}</div>
                         <div style={{ fontSize: 10, color: '#8aaa8a', marginTop: 1 }}>Age {adset.age_min}–{adset.age_max} · {adset.genders?.length === 1 ? (adset.genders[0] === 1 ? 'Male' : 'Female') : 'All'} · {adset.ads?.length || 0} ads</div>
                       </div>
                     </div>
@@ -480,7 +480,7 @@ export default function CampaignsPage() {
                           )}
                         </div>
                         <div style={{ overflow: 'hidden' }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: '#2a4a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.name}</div>
+                          <div title={ad.name} style={{ fontSize: 12, fontWeight: 700, color: '#2a4a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.name}</div>
                           {ad.primary_text && <div style={{ fontSize: 10, color: '#8aaa8a', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{ad.primary_text}</div>}
                         </div>
                       </div>
