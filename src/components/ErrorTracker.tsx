@@ -18,13 +18,23 @@ export default function ErrorTracker() {
       } catch {}
     }
 
+    const isNoise = (message: string) => {
+      if (!message || message === 'Script error.') return true
+      if (message.includes('ResizeObserver loop')) return true
+      if (message.includes('Non-Error promise rejection')) return true
+      if (message.includes('Load failed')) return true
+      return false
+    }
+
     const onError = (event: ErrorEvent) => {
+      if (isNoise(event.message)) return
       log(event.message, event.error?.stack)
     }
 
     const onUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason
       const message = reason instanceof Error ? reason.message : String(reason)
+      if (isNoise(message)) return
       const stack = reason instanceof Error ? reason.stack : undefined
       log(`Unhandled Promise: ${message}`, stack)
     }
