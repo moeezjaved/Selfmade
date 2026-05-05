@@ -12,6 +12,7 @@ const PROTECTED = [
   '/reports',
   '/insights',
   '/m4',
+  '/discovery',
 ]
 
 // Pages that need an active subscription (billing itself is always accessible)
@@ -26,6 +27,7 @@ const REQUIRES_SUBSCRIPTION = [
   '/reports',
   '/insights',
   '/m4',
+  '/discovery',
 ]
 
 export async function middleware(request: NextRequest) {
