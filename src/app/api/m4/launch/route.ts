@@ -117,6 +117,32 @@ export async function POST(request: NextRequest) {
 
     const errors: string[] = []
 
+    // Reuse existing custom audience by name — only create if not found
+    const getOrCreateAudience = async (name: string, rule: object): Promise<string | null> => {
+      try {
+        // Search existing audiences for this account by name
+        const searchRes = await fetch(
+          `https://graph.facebook.com/${V}/${adAccountId}/customaudiences?` +
+          new URLSearchParams({ fields: 'id,name', limit: '200', access_token: token })
+        )
+        const searchData = await searchRes.json()
+        const existing = (searchData.data || []).find((a: any) => a.name === name)
+        if (existing) {
+          console.log(`Reusing existing audience "${name}":`, existing.id)
+          return existing.id
+        }
+        // Not found — create it
+        const created = await post(`${adAccountId}/customaudiences`, {
+          name, rule: JSON.stringify(rule), prefill: true,
+        })
+        console.log(`Created new audience "${name}":`, created.id)
+        return created.id
+      } catch(e: any) {
+        console.log(`Audience "${name}" error:`, e.message)
+        return null
+      }
+    }
+
     // Create ad creative — throws descriptive error so caller can surface it
     const createAdCreative = async (name: string, imageHash: string | null, customCopy?: any, isVideo = false): Promise<string | null> => {
       const cp = customCopy || {}
@@ -176,17 +202,12 @@ export async function POST(request: NextRequest) {
     let broadCount = 0
     let intCount = 0
 
-    // Create exclusion audience first so both prospecting campaigns can use it
+    // Get or create exclusion audience (shared across all campaigns — reused not duplicated)
     if (pixelId) {
-      try {
-        const excAud = await post(`${adAccountId}/customaudiences`, {
-          name: `${campaignName} — Exclusion Visitors 180d`,
-          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }),
-          prefill: true,
-        })
-        exclusionAudienceId = excAud.id
-        console.log('Exclusion audience created:', exclusionAudienceId)
-      } catch(e: any) { console.log('Exclusion audience error:', e.message) }
+      exclusionAudienceId = await getOrCreateAudience(
+        `M4 — Website Visitors 180d (Exclusion)`,
+        { inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }
+      )
     }
 
     // ── CAMPAIGN 1: Broad (Advantage+ audience ON) ────────────
@@ -299,12 +320,12 @@ export async function POST(request: NextRequest) {
     console.log('Retargeting check - pixelId:', pixelId, 'retargetingCreatives:', (retargetingCreatives as any[]).length)
     if (pixelId && (retargetingCreatives as any[]).length > 0) {
       try {
-        // Create retargeting audience
-        const rtAud = await post(`${adAccountId}/customaudiences`, {
-          name: `${campaignName} — Retargeting 180d`,
-          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }),
-          prefill: true,
-        }).catch(() => null)
+        // Get or create retargeting audience (reused not duplicated)
+        const rtAudId = await getOrCreateAudience(
+          `M4 — Website Visitors 180d (Retargeting)`,
+          { inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }
+        )
+        const rtAud = rtAudId ? { id: rtAudId } : null
 
         const rtPct = includeRetainer ? 0.2 : 0.4
         const rtBudget = Math.max(minBudget, Math.round(safeBudget * rtPct))
@@ -356,11 +377,12 @@ export async function POST(request: NextRequest) {
     // ── CAMPAIGN 4: Retainer (past purchasers) ────────────────
     if (includeRetainer && pixelId && (retainerCreatives as any[]).length > 0) {
       try {
-        const rnAud = await post(`${adAccountId}/customaudiences`, {
-          name: `${campaignName} — Purchasers 180d`,
-          rule: JSON.stringify({ inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'Purchase' }] } }] } }),
-          prefill: true,
-        }).catch(() => null)
+        // Get or create purchasers audience (reused not duplicated)
+        const rnAudId = await getOrCreateAudience(
+          `M4 — Purchasers 180d`,
+          { inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'Purchase' }] } }] } }
+        )
+        const rnAud = rnAudId ? { id: rnAudId } : null
 
         const rnBudget = Math.max(minBudget, Math.round(safeBudget * 0.2))
         const rnCamp = await post(`${adAccountId}/campaigns`, {
