@@ -190,9 +190,9 @@ export default function BrandPage() {
     maxDays: ads.length ? Math.max(...ads.map(a => a.daysRunning)) : 0,
   }
 
-  const hooks = [...new Set(ads.map(a => extractHook(a.body)).filter(Boolean))].slice(0, 20)
-  const copies = [...new Set(ads.map(a => a.body).filter(Boolean))].slice(0, 30)
-  const headlines = [...new Set(ads.map(a => a.title).filter(Boolean))].slice(0, 30)
+  const hooks = Array.from(new Set(ads.map(a => extractHook(a.body)).filter(Boolean))).slice(0, 20)
+  const copies = Array.from(new Set(ads.map(a => a.body).filter(Boolean))).slice(0, 30)
+  const headlines = Array.from(new Set(ads.map(a => a.title).filter(Boolean))).slice(0, 30)
 
   // ── Themes from regex ────────────────────────────────────
   const THEME_PATTERNS: [string, RegExp][] = [
