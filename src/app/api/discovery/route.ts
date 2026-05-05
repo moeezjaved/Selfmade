@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       'page_id',
       'publisher_platforms',
       'languages',
+      'media_type',
     ].join(',')
 
     const params: Record<string, string> = {
@@ -94,6 +95,7 @@ export async function GET(request: NextRequest) {
       createdAt: ad.ad_creation_time,
       platforms: ad.publisher_platforms || [],
       languages: ad.languages || [],
+      mediaType: ad.media_type || '',
       isActive: !ad.ad_delivery_stop_time,
       daysRunning: ad.ad_delivery_start_time
         ? Math.floor((Date.now() - new Date(ad.ad_delivery_start_time).getTime()) / 86400000)
