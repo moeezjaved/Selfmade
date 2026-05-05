@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { decryptToken } from '@/lib/meta/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,17 +12,18 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Use app-level access token for Meta Ads Library (required by /ads_archive endpoint)
-    const token = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
-    if (!process.env.META_APP_ID || !process.env.META_APP_SECRET) {
-      return NextResponse.json({ error: 'Meta app credentials not configured' }, { status: 500 })
-    }
-
-    // Still fetch meta account for default country preference
     const admin = createAdminClient()
     const { data: metaAccount } = await admin
-      .from('meta_accounts').select('country')
+      .from('meta_accounts').select('*')
       .eq('user_id', user.id).eq('is_primary', true).single()
+
+    if (!metaAccount) return NextResponse.json({ error: 'No Meta account connected' }, { status: 400 })
+
+    // Try user token first (works after identity confirmation at facebook.com/ads/library/api/)
+    // Fall back to app token for basic access
+    const userToken = decryptToken(metaAccount.access_token)
+    const appToken = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
+    const token = userToken || appToken
 
     const { searchParams } = request.nextUrl
 
