@@ -559,12 +559,26 @@ export default function M4Page() {
                       <div key={grp.key} style={{marginBottom:10}}>
                         <div style={{fontSize:10,fontWeight:700,color:'#8aaa8a',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6}}>{grp.label} ({group.length})</div>
                         <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                          {group.map((c:any)=>(
+                          {group.map((c:any)=>{
+                            const url = c.domain
+                              ? (c.domain.startsWith('http') ? c.domain : `https://${c.domain}`)
+                              : c.instagram
+                              ? `https://www.instagram.com/${c.instagram.replace('@','')}/`
+                              : null
+                            return(
                             <div key={c.name} style={{display:'flex',alignItems:'center',gap:5,background:grp.bg,border:`1px solid ${grp.border}`,borderRadius:100,padding:'4px 12px',fontSize:12,fontWeight:600,color:'#1a3a1a'}}>
-                              <span>{c.name}</span>
+                              {url ? (
+                                <a href={url} target="_blank" rel="noopener noreferrer" title={url} style={{color:'#1a3a1a',textDecoration:'none',display:'flex',alignItems:'center',gap:4}}>
+                                  <span style={{fontSize:10}}>{c.domain ? '🌐' : '📸'}</span>
+                                  <span style={{borderBottom:'1px dashed rgba(26,58,26,0.3)'}}>{c.name}</span>
+                                </a>
+                              ) : (
+                                <span>{c.name}</span>
+                              )}
                               <span onClick={()=>removeDetectedComp(grp.key,c)} style={{cursor:'pointer',fontSize:14,lineHeight:1,color:'#7a9a7a',marginLeft:2}}>×</span>
                             </div>
-                          ))}
+                          )})}
+
                         </div>
                       </div>
                     )
@@ -580,12 +594,21 @@ export default function M4Page() {
                 const custom = competitorList.filter(e=>!detectedEntries.includes(e))
                 return custom.length>0?(
                   <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>
-                    {custom.map((c,i)=>(
+                    {custom.map((c,i)=>{
+                      const isIG = c.startsWith('@')
+                      const url = isIG
+                        ? `https://www.instagram.com/${c.replace('@','')}/`
+                        : (c.startsWith('http') ? c : `https://${c}`)
+                      return(
                       <div key={i} style={{display:'flex',alignItems:'center',gap:6,background:'rgba(26,58,26,0.08)',border:'1px solid rgba(26,58,26,0.15)',borderRadius:100,padding:'5px 12px',fontSize:12,fontWeight:600,color:'#1a3a1a'}}>
-                        <span>{c.startsWith('@')?'📸 ':'🌐 '}{c}</span>
+                        <a href={url} target="_blank" rel="noopener noreferrer" title={url} style={{color:'#1a3a1a',textDecoration:'none',display:'flex',alignItems:'center',gap:4}}>
+                          <span style={{fontSize:10}}>{isIG?'📸':'🌐'}</span>
+                          <span style={{borderBottom:'1px dashed rgba(26,58,26,0.3)'}}>{c}</span>
+                        </a>
                         <span onClick={()=>setCompetitorList(p=>p.filter(e=>e!==c))} style={{cursor:'pointer',fontSize:14,lineHeight:1,color:'#7a9a7a'}}>×</span>
                       </div>
-                    ))}
+                    )})}
+
                   </div>
                 ):null
               })()}
