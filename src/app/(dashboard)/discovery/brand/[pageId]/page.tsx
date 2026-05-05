@@ -351,10 +351,10 @@ export default function BrandPage() {
                       {stats.carousel > 0 && <div style={{ flex: stats.carousel, background: '#f59e0b' }} title={`Carousel: ${stats.carousel}`} />}
                     </div>
                     <div style={{ display: 'flex', gap: 20 }}>
-                      {[['🟢 Video', stats.video], ['🔵 Image', stats.image], ['🟡 Carousel', stats.carousel]].map(([label, count]) => (
+                      {([['🟢 Video', stats.video], ['🔵 Image', stats.image], ['🟡 Carousel', stats.carousel]] as [string, number][]).map(([label, count]) => (
                         count > 0 && (
-                          <div key={String(label)} style={{ fontSize: 13, color: '#374151' }}>
-                            {label}: <strong>{count}</strong> ({Math.round(Number(count) / stats.total * 100)}%)
+                          <div key={label} style={{ fontSize: 13, color: '#374151' }}>
+                            {label}: <strong>{count}</strong> ({Math.round(count / stats.total * 100)}%)
                           </div>
                         )
                       ))}
