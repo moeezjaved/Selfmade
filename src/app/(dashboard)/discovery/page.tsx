@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Search, ExternalLink, RefreshCw } from 'lucide-react'
+import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 // ── Types ────────────────────────────────────────────────────
 interface Ad {
@@ -365,8 +366,108 @@ function NumberInput({ label, value, onChange, placeholder, suffix }: {
   )
 }
 
+// ── Save Modal ───────────────────────────────────────────────
+function SaveModal({ ad, onClose }: { ad: Ad; onClose: () => void }) {
+  const [boards, setBoards] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [saved, setSaved] = useState<string[]>([])
+  const [newName, setNewName] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/discovery/boards').then(r => r.json()).then(d => {
+      setBoards(d.boards || [])
+      setLoading(false)
+    })
+  }, [])
+
+  const saveToBoard = async (boardId: string) => {
+    if (saved.includes(boardId)) return
+    setSaving(boardId)
+    await fetch('/api/discovery/saved', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        board_id: boardId, ad_id: ad.id, page_id: ad.pageId,
+        page_name: ad.pageName, snapshot_url: ad.snapshotUrl, ad_data: ad,
+      }),
+    })
+    setSaved(prev => [...prev, boardId])
+    setSaving(null)
+  }
+
+  const createAndSave = async () => {
+    if (!newName.trim()) return
+    setCreating(true)
+    const res = await fetch('/api/discovery/boards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim() }),
+    })
+    const data = await res.json()
+    if (data.board) {
+      setBoards(prev => [data.board, ...prev])
+      await saveToBoard(data.board.id)
+      setNewName('')
+    }
+    setCreating(false)
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 24, minWidth: 320, maxWidth: 400, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#111', marginBottom: 16 }}>💾 Save Ad to Board</div>
+
+        {loading ? (
+          <div style={{ color: '#9ca3af', fontSize: 13, padding: '20px 0' }}>Loading boards…</div>
+        ) : boards.length === 0 ? (
+          <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 16 }}>No boards yet — create one below.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, maxHeight: 200, overflowY: 'auto' }}>
+            {boards.map(b => {
+              const isSaved = saved.includes(b.id)
+              return (
+                <button key={b.id} onClick={() => saveToBoard(b.id)} disabled={isSaved || saving === b.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: isSaved ? '#f0fdf4' : '#f8fafc', border: `1px solid ${isSaved ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: 10, cursor: isSaved ? 'default' : 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                  <span style={{ fontSize: 20 }}>{b.emoji}</span>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#111' }}>{b.name}</span>
+                  {isSaved ? <span style={{ color: '#22c55e', fontSize: 18 }}>✓</span> : saving === b.id ? <span style={{ fontSize: 12, color: '#9ca3af' }}>…</span> : null}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>+ New Board</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createAndSave()}
+              placeholder="Board name…"
+              style={{ flex: 1, padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
+            <button onClick={createAndSave} disabled={creating || !newName.trim()}
+              style={{ padding: '8px 14px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {creating ? '…' : 'Save'}
+            </button>
+          </div>
+        </div>
+
+        <button onClick={onClose} style={{ marginTop: 14, width: '100%', padding: '8px', background: 'none', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#6b7280', cursor: 'pointer', fontFamily: 'inherit' }}>
+          Done
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── AdCard ───────────────────────────────────────────────────
 function AdCard({ ad }: { ad: Ad }) {
+  const router = useRouter()
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
+
   const daysText = ad.daysRunning > 365
     ? `${Math.floor(ad.daysRunning / 365)}y ${Math.floor((ad.daysRunning % 365) / 30)}mo`
     : ad.daysRunning > 30
@@ -376,10 +477,11 @@ function AdCard({ ad }: { ad: Ad }) {
     : 'New'
 
   const initials = ad.pageName?.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
-
   const formatIcon = ad.format === 'Video' ? '🎬' : ad.format === 'Carousel' ? '🔁' : '🖼'
 
   return (
+    <>
+    {showSaveModal && <SaveModal ad={ad} onClose={() => { setShowSaveModal(false); setIsSaved(true) }} />}
     <div
       style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'box-shadow .2s' }}
       onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.1)')}
@@ -391,9 +493,11 @@ function AdCard({ ad }: { ad: Ad }) {
           {initials}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <button onClick={() => router.push(`/discovery/brand/${ad.pageId}?name=${encodeURIComponent(ad.pageName)}`)}
+            style={{ fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', display: 'block', width: '100%', textAlign: 'left' }}
+            title={`View ${ad.pageName} brand profile`}>
             {ad.pageName || 'Unknown Brand'}
-          </div>
+          </button>
           <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#9ca3af', display: 'inline-block', flexShrink: 0 }} />
             {ad.isActive ? 'Active' : 'Inactive'} · {daysText}
@@ -401,6 +505,10 @@ function AdCard({ ad }: { ad: Ad }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span title={ad.format} style={{ fontSize: 14 }}>{formatIcon}</span>
+          <button onClick={() => setShowSaveModal(true)} title="Save to board"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#9ca3af', padding: 2 }}>
+            {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+          </button>
           <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer"
             title="View on Meta Ads Library"
             style={{ color: '#6b7280', flexShrink: 0 }}
@@ -462,6 +570,7 @@ function AdCard({ ad }: { ad: Ad }) {
         </div>
       </div>
     </div>
+    </>
   )
 }
 
