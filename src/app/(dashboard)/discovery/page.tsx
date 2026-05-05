@@ -297,11 +297,48 @@ export default function DiscoveryPage() {
       <div style={{ padding: '24px 28px' }}>
 
         {/* Error */}
-        {error && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '14px 18px', marginBottom: 20, color: '#dc2626', fontSize: 13 }}>
-            ⚠️ {error}
-          </div>
-        )}
+        {error && (() => {
+          const isPermError = error.toLowerCase().includes('permission') || error.toLowerCase().includes('application does not')
+          const metaLibraryUrl = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=US${query ? `&q=${encodeURIComponent(query)}` : ''}&media_type=all`
+          if (isPermError) {
+            return (
+              <div style={{ maxWidth: 560, margin: '60px auto', textAlign: 'center', padding: '0 20px' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🔐</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#111', marginBottom: 10 }}>API Access Needed</div>
+                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.7, marginBottom: 28 }}>
+                  The Meta Ads Library API requires identity confirmation on Facebook. This is a one-time setup — takes about 1 minute.<br/><br/>
+                  <strong style={{ color: '#111' }}>Steps:</strong><br/>
+                  1. Go to <a href="https://www.facebook.com/ads/library/api/" target="_blank" rel="noopener noreferrer" style={{ color: '#1a3a1a', fontWeight: 700 }}>facebook.com/ads/library/api</a><br/>
+                  2. Click <strong>"Get Access"</strong> and confirm your identity<br/>
+                  3. Come back here and refresh
+                </div>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <a
+                    href="https://www.facebook.com/ads/library/api/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#1a3a1a', color: '#dffe95', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}
+                  >
+                    🔑 Get API Access
+                  </a>
+                  <a
+                    href={metaLibraryUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#f1f5f9', color: '#374151', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none', border: '1px solid #e2e8f0' }}
+                  >
+                    <ExternalLink size={14}/> Browse Meta Ads Library
+                  </a>
+                </div>
+              </div>
+            )
+          }
+          return (
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '14px 18px', marginBottom: 20, color: '#dc2626', fontSize: 13 }}>
+              ⚠️ {error}
+            </div>
+          )
+        })()}
 
         {/* Loading skeleton */}
         {loading && ads.length === 0 && (
