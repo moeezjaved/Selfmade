@@ -670,11 +670,30 @@ export default function DiscoveryPage() {
       {/* ── Header ── */}
       <div style={{ borderBottom: '1px solid #e2e8f0', background: '#fff', padding: '14px 24px', position: 'sticky', top: 0, zIndex: 40 }}>
 
-        {/* Row 1: title + search + refresh */}
+        {/* Row 1: title + nav + search + refresh */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
           <div style={{ marginRight: 4, flexShrink: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>Ad Discovery</div>
             <div style={{ fontSize: 11, color: '#6b7280' }}>Browse live ads from Meta Ads Library</div>
+          </div>
+
+          {/* Sub-nav tabs */}
+          <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 9, padding: 3, flexShrink: 0 }}>
+            {[
+              { label: '🔍 Explore', href: '/discovery' },
+              { label: '🔖 Saved', href: '/discovery/saved' },
+            ].map(tab => (
+              <a key={tab.href} href={tab.href}
+                style={{
+                  padding: '6px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+                  background: tab.href === '/discovery' ? '#fff' : 'transparent',
+                  color: tab.href === '/discovery' ? '#111' : '#6b7280',
+                  textDecoration: 'none',
+                  boxShadow: tab.href === '/discovery' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                }}>
+                {tab.label}
+              </a>
+            ))}
           </div>
           <form onSubmit={handleSearch} style={{ flex: 1, maxWidth: 500 }}>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>

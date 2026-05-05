@@ -75,7 +75,32 @@ export default function SavedAdsPage() {
   const adCount = (b: Board) => b.discovery_saved_ads?.[0]?.count ?? 0
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+
+      {/* ── Top nav ── */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ marginRight: 4 }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>Ad Discovery</div>
+          <div style={{ fontSize: 11, color: '#6b7280' }}>Browse live ads from Meta Ads Library</div>
+        </div>
+        <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 9, padding: 3 }}>
+          {[{ label: '🔍 Explore', href: '/discovery' }, { label: '🔖 Saved', href: '/discovery/saved' }].map(tab => (
+            <a key={tab.href} href={tab.href}
+              style={{
+                padding: '6px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+                background: tab.href === '/discovery/saved' ? '#fff' : 'transparent',
+                color: tab.href === '/discovery/saved' ? '#111' : '#6b7280',
+                textDecoration: 'none',
+                boxShadow: tab.href === '/discovery/saved' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              }}>
+              {tab.label}
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Body ── */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
       {/* ── Sidebar ── */}
       <div style={{ width: 260, background: '#fff', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
@@ -214,6 +239,7 @@ export default function SavedAdsPage() {
           </>
         )}
       </div>
+      </div> {/* end body flex */}
     </div>
   )
 }
