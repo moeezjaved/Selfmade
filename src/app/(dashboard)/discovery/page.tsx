@@ -112,6 +112,40 @@ const INDUSTRY_LIST = INDUSTRY_KEYWORDS.map(([name]) => name).concat(['Other'])
 const THEME_LIST = THEME_PATTERNS.map(([name]) => name)
 const STATUS_OPTS = [{ value: 'ALL', label: 'All' }, { value: 'ACTIVE', label: '🟢 Active' }, { value: 'INACTIVE', label: '⚫ Inactive' }]
 
+const COUNTRIES = [
+  { code: 'ALL', name: 'All Countries', flag: '🌍' },
+  { code: 'US', name: 'United States', flag: '🇺🇸' },
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'CA', name: 'Canada', flag: '🇨🇦' },
+  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
+  { code: 'IN', name: 'India', flag: '🇮🇳' },
+  { code: 'PK', name: 'Pakistan', flag: '🇵🇰' },
+  { code: 'AE', name: 'UAE', flag: '🇦🇪' },
+  { code: 'SA', name: 'Saudi Arabia', flag: '🇸🇦' },
+  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
+  { code: 'FR', name: 'France', flag: '🇫🇷' },
+  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
+  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
+  { code: 'NL', name: 'Netherlands', flag: '🇳🇱' },
+  { code: 'SE', name: 'Sweden', flag: '🇸🇪' },
+  { code: 'NO', name: 'Norway', flag: '🇳🇴' },
+  { code: 'DK', name: 'Denmark', flag: '🇩🇰' },
+  { code: 'SG', name: 'Singapore', flag: '🇸🇬' },
+  { code: 'MY', name: 'Malaysia', flag: '🇲🇾' },
+  { code: 'PH', name: 'Philippines', flag: '🇵🇭' },
+  { code: 'ID', name: 'Indonesia', flag: '🇮🇩' },
+  { code: 'BR', name: 'Brazil', flag: '🇧🇷' },
+  { code: 'MX', name: 'Mexico', flag: '🇲🇽' },
+  { code: 'ZA', name: 'South Africa', flag: '🇿🇦' },
+  { code: 'NG', name: 'Nigeria', flag: '🇳🇬' },
+  { code: 'EG', name: 'Egypt', flag: '🇪🇬' },
+  { code: 'JP', name: 'Japan', flag: '🇯🇵' },
+  { code: 'KR', name: 'South Korea', flag: '🇰🇷' },
+  { code: 'NZ', name: 'New Zealand', flag: '🇳🇿' },
+  { code: 'PT', name: 'Portugal', flag: '🇵🇹' },
+  { code: 'PL', name: 'Poland', flag: '🇵🇱' },
+]
+
 const SORT_OPTS = [
   { value: 'recent', label: 'Most Recent' },
   { value: 'longest', label: 'Longest Running' },
@@ -233,6 +267,104 @@ function SortDropdown({ value, onChange }: { value: string; onChange: (v: string
   )
 }
 
+// ── CountryDropdown ──────────────────────────────────────────
+function CountryDropdown({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+  const current = COUNTRIES.find(c => c.code === value) || COUNTRIES[0]
+  const visible = COUNTRIES.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase())
+  )
+  const isFiltered = value !== 'ALL'
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+        background: isFiltered ? '#1a3a1a' : '#fff',
+        border: `1px solid ${isFiltered ? '#1a3a1a' : '#e2e8f0'}`,
+        borderRadius: 8, fontSize: 13, fontWeight: 600,
+        color: isFiltered ? '#dffe95' : '#374151',
+        cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+      }}>
+        <span>{current.flag}</span>
+        {current.code === 'ALL' ? 'Country' : current.name}
+        <span style={{ fontSize: 10, opacity: 0.5 }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, marginTop: 4,
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100,
+          minWidth: 220, maxHeight: 320, display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
+            <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search country…"
+              style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ overflowY: 'auto' }}>
+            {visible.map(c => (
+              <button key={c.code} onClick={() => { onChange(c.code); setOpen(false); setSearch('') }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                  padding: '9px 14px', fontSize: 13, background: c.code === value ? '#f0fdf4' : 'none',
+                  color: c.code === value ? '#1a3a1a' : '#111', fontWeight: c.code === value ? 700 : 400,
+                  border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                <span style={{ fontSize: 18 }}>{c.flag}</span>
+                <span>{c.name}</span>
+                {c.code !== 'ALL' && <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af' }}>{c.code}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── NumberInput ──────────────────────────────────────────────
+function NumberInput({ label, value, onChange, placeholder, suffix }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder: string; suffix?: string
+}) {
+  const isActive = value !== '' && value !== '0'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        border: `1px solid ${isActive ? '#1a3a1a' : '#e2e8f0'}`,
+        borderRadius: 8, background: isActive ? '#1a3a1a' : '#fff',
+        padding: '0 10px 0 10px', height: 34,
+      }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? '#dffe95' : '#6b7280', whiteSpace: 'nowrap' }}>{label}</span>
+        <input
+          type="number"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          min={0}
+          style={{
+            width: 60, border: 'none', outline: 'none', fontSize: 13, fontWeight: 600,
+            background: 'transparent', color: isActive ? '#dffe95' : '#111',
+            fontFamily: 'inherit', padding: 0,
+          }}
+        />
+        {suffix && <span style={{ fontSize: 11, color: isActive ? '#dffe95' : '#9ca3af', whiteSpace: 'nowrap' }}>{suffix}</span>}
+        {isActive && (
+          <button onClick={() => onChange('')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dffe95', fontSize: 14, padding: '0 0 0 2px', lineHeight: 1 }}>×</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── AdCard ───────────────────────────────────────────────────
 function AdCard({ ad }: { ad: Ad }) {
   const daysText = ad.daysRunning > 365
@@ -343,16 +475,19 @@ export default function DiscoveryPage() {
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState('')
 
-  // Server-side filters
+  // Server-side filters (trigger re-fetch)
   const [sort, setSort] = useState('recent')
   const [status, setStatus] = useState('ALL')
   const [platforms, setPlatforms] = useState<string[]>([])
+  const [country, setCountry] = useState('US')
 
-  // Client-side filters (applied after fetch)
+  // Client-side filters (applied to loaded ads instantly)
   const [format, setFormat] = useState<string[]>([])
   const [industry, setIndustry] = useState<string[]>([])
   const [language, setLanguage] = useState<string[]>([])
   const [theme, setTheme] = useState<string[]>([])
+  const [minDaysStr, setMinDaysStr] = useState('')
+  const [minBrandAdsStr, setMinBrandAdsStr] = useState('')
 
   const fetchAds = useCallback(async (reset = true, cursor?: string) => {
     setLoading(true)
@@ -360,6 +495,7 @@ export default function DiscoveryPage() {
     try {
       const params = new URLSearchParams({
         q: query, sort, status,
+        ...(country && country !== 'ALL' ? { country } : {}),
         ...(platforms.length ? { platforms: platforms.join(',') } : {}),
         ...(cursor ? { after: cursor } : {}),
       })
@@ -375,9 +511,9 @@ export default function DiscoveryPage() {
     } finally {
       setLoading(false)
     }
-  }, [query, sort, status, platforms])
+  }, [query, sort, status, platforms, country])
 
-  useEffect(() => { fetchAds(true) }, [query, sort, status, platforms])
+  useEffect(() => { fetchAds(true) }, [query, sort, status, platforms, country])
 
   // Collect available languages from loaded ads
   const availableLanguages = useMemo(() => {
@@ -386,6 +522,16 @@ export default function DiscoveryPage() {
     return Array.from(set).sort()
   }, [rawAds])
 
+  // Brand ad counts from loaded results
+  const brandAdCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    rawAds.forEach(ad => { counts[ad.pageId] = (counts[ad.pageId] || 0) + 1 })
+    return counts
+  }, [rawAds])
+
+  const minDays = parseInt(minDaysStr) || 0
+  const minBrandAds = parseInt(minBrandAdsStr) || 0
+
   // Apply client-side filters
   const filteredAds = useMemo(() => {
     return rawAds.filter(ad => {
@@ -393,16 +539,19 @@ export default function DiscoveryPage() {
       if (industry.length && !ad.industries.some(i => industry.includes(i))) return false
       if (language.length && !ad.langNames.some(l => language.includes(l))) return false
       if (theme.length && !ad.themes.some(t => theme.includes(t))) return false
+      if (minDays > 0 && ad.daysRunning < minDays) return false
+      if (minBrandAds > 0 && (brandAdCounts[ad.pageId] || 0) < minBrandAds) return false
       return true
     })
-  }, [rawAds, format, industry, language, theme])
+  }, [rawAds, format, industry, language, theme, minDays, minBrandAds, brandAdCounts])
 
   const handleSearch = (e: React.FormEvent) => { e.preventDefault(); setQuery(searchInput) }
 
   const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (v: string) =>
     setter(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])
 
-  const activeFilterCount = format.length + industry.length + language.length + theme.length + (status !== 'ALL' ? 1 : 0) + platforms.length
+  const activeFilterCount = format.length + industry.length + language.length + theme.length
+    + (status !== 'ALL' ? 1 : 0) + platforms.length + (minDays > 0 ? 1 : 0) + (minBrandAds > 0 ? 1 : 0)
 
   const isPermError = error.toLowerCase().includes('permission') || error.toLowerCase().includes('application does not')
 
@@ -443,6 +592,11 @@ export default function DiscoveryPage() {
 
         {/* Row 2: filters */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Country — server-side, prominent */}
+          <CountryDropdown value={country} onChange={v => { setCountry(v); setRawAds([]) }} />
+
+          <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
+
           <FilterDropdown
             label="Format"
             options={FORMAT_OPTS.map(f => ({ value: f, label: f, icon: f === 'Video' ? '🎬' : f === 'Carousel' ? '🔁' : '🖼' }))}
@@ -482,10 +636,33 @@ export default function DiscoveryPage() {
             searchable
           />
 
+          <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
+
+          {/* Runtime minimum */}
+          <NumberInput
+            label="Min Runtime"
+            value={minDaysStr}
+            onChange={setMinDaysStr}
+            placeholder="0"
+            suffix="days"
+          />
+
+          {/* Brand active ads minimum */}
+          <NumberInput
+            label="Brand Ads ≥"
+            value={minBrandAdsStr}
+            onChange={setMinBrandAdsStr}
+            placeholder="0"
+            suffix="ads"
+          />
+
           {/* Clear all */}
           {activeFilterCount > 0 && (
             <button
-              onClick={() => { setFormat([]); setIndustry([]); setLanguage([]); setTheme([]); setStatus('ALL'); setPlatforms([]) }}
+              onClick={() => {
+                setFormat([]); setIndustry([]); setLanguage([]); setTheme([])
+                setStatus('ALL'); setPlatforms([]); setMinDaysStr(''); setMinBrandAdsStr('')
+              }}
               style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: '4px 8px', fontFamily: 'inherit' }}
             >
               Clear all ({activeFilterCount})
@@ -518,7 +695,7 @@ export default function DiscoveryPage() {
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#1a3a1a', color: '#dffe95', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
                 🔑 Confirm Identity on Meta
               </a>
-              <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=US${query ? `&q=${encodeURIComponent(query)}` : ''}&media_type=all`}
+              <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=${country === 'ALL' ? 'US' : country}${query ? `&q=${encodeURIComponent(query)}` : ''}&media_type=all`}
                 target="_blank" rel="noopener noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#f1f5f9', color: '#374151', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none', border: '1px solid #e2e8f0' }}>
                 <ExternalLink size={14} /> Browse Meta Ads Library
