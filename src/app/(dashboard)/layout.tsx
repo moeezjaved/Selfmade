@@ -9,7 +9,7 @@ import type { UserProfile } from '@/types'
 import {
   LayoutDashboard, Megaphone, Sparkles, TrendingUp,
   ClipboardList, Settings, CreditCard, BarChart2,
-  Rocket, LogOut,
+  Rocket, LogOut, Compass,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +21,7 @@ const NAV = [
       { href: '/m4',               icon: Rocket,          label: 'Launch Ads',       badge: 'AI' },
       { href: '/campaigns',        icon: Megaphone,       label: 'Campaigns',        badge: null },
       { href: '/creative-studio',  icon: Sparkles,        label: 'Creative Studio',  badge: null },
+      { href: '/discovery',         icon: Compass,         label: 'Ad Discovery',     badge: 'NEW' },
     ],
   },
   {
