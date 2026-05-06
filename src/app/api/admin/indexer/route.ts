@@ -89,16 +89,19 @@ export async function POST(request: NextRequest) {
   const { action } = body
 
   if (action === 'add_term') {
-    const { term, category, countries, priority, term_type } = body
+    const { term, category, countries, priority, term_type, page_id } = body
     if (!term?.trim()) return NextResponse.json({ error: 'Term required' }, { status: 400 })
-    const { data, error } = await admin.from('discovery_crawl_terms').insert({
+    const row: Record<string, any> = {
       term: term.trim().toLowerCase(),
       category: category || 'General',
       countries: countries || ['US'],
       priority: priority || 5,
       term_type: term_type || 'adcopy',
       is_active: true,
-    }).select().single()
+    }
+    // Store page_id so scheduled crawls can use it directly (no slug lookup needed)
+    if (page_id) row.page_id = page_id
+    const { data, error } = await admin.from('discovery_crawl_terms').insert(row).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ term: data })
   }
