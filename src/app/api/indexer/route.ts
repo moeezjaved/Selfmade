@@ -361,12 +361,14 @@ async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> 
   } catch { return null }
 }
 
-// ── Filter ads to only those with real creatives ─────────────
-// Scrapes snapshot URLs in parallel (10 at a time), returns only ads
-// where we successfully extracted a real image or video URL.
-// Brand profile pictures (graph.facebook.com) do NOT count.
-async function fetchCreativesAndFilter(rawAds: any[], term: string, country: string): Promise<any[]> {
-  const CONCURRENCY = 10
+// ── Attach creatives to all ads ──────────────────────────────
+// Stores ALL ads regardless of whether we get a real creative.
+// For each ad, tries to scrape the snapshot URL for a real image/video.
+// If scraping fails (common — Facebook is a SPA), falls back to the brand
+// profile picture which is always available via the Graph API.
+// Either way, every ad gets a thumbnail_url so cards always show something.
+async function attachCreatives(rawAds: any[], term: string, country: string): Promise<any[]> {
+  const CONCURRENCY = 5  // low concurrency to avoid Facebook rate-limits
   const results: any[] = []
 
   for (let i = 0; i < rawAds.length; i += CONCURRENCY) {
@@ -374,34 +376,34 @@ async function fetchCreativesAndFilter(rawAds: any[], term: string, country: str
     const settled = await Promise.allSettled(
       chunk.map(async (ad: any) => {
         const row = transformAd(ad, term, country)
+
+        // Try snapshot URL first (has access_token — sometimes returns image data)
         const snapshotUrl = ad.ad_snapshot_url || ''
-
-        // Try snapshot URL and ads library page for real creative
-        const urls = [
-          snapshotUrl,
-          `https://www.facebook.com/ads/library/?id=${ad.id}&country=ALL`,
-        ].filter(Boolean)
-
-        for (const url of urls) {
-          const html = await fetchHtml(url, 6000).catch(() => null)
-          if (!html) continue
-          const { thumbnail, videoUrl } = extractMediaFromHtml(html)
-          if (thumbnail || videoUrl) {
-            row.thumbnail_url = thumbnail || null
-            row.video_url = videoUrl || null
-            row.format = videoUrl ? 'Video' : 'Image'
-            return row  // ✅ has real creative
+        if (snapshotUrl) {
+          const html = await fetchHtml(snapshotUrl, 5000).catch(() => null)
+          if (html) {
+            const { thumbnail, videoUrl } = extractMediaFromHtml(html)
+            if (thumbnail) { row.thumbnail_url = thumbnail; row.format = videoUrl ? 'Video' : 'Image' }
+            if (videoUrl)  { row.video_url = videoUrl; row.format = 'Video' }
           }
         }
-        return null  // ❌ no real creative found — discard this ad
+
+        // If no real creative found, use brand profile picture as reliable fallback.
+        // graph.facebook.com/{page_id}/picture always works for public FB pages.
+        if (!row.thumbnail_url && row.page_id) {
+          row.thumbnail_url = `https://graph.facebook.com/${row.page_id}/picture?type=large`
+        }
+
+        return row
       })
     )
 
     for (const r of settled) {
-      if (r.status === 'fulfilled' && r.value !== null) {
-        results.push(r.value)
-      }
+      if (r.status === 'fulfilled') results.push(r.value)
     }
+
+    // Small delay between chunks to be polite to Facebook
+    if (i + CONCURRENCY < rawAds.length) await new Promise(r => setTimeout(r, 300))
   }
 
   return results
@@ -634,27 +636,24 @@ export async function GET(request: NextRequest) {
               continue
             }
 
-            // ── Fetch real ad creatives BEFORE saving ──────────────
-            // Only keep ads where we can extract an actual image or video.
-            // Ads with no real creative are skipped — brand logos don't count.
-            send('log', `  🖼 Fetching creatives for ${ads.length} ads (10 parallel)…`)
-            const rowsWithCreatives = await fetchCreativesAndFilter(ads, term, country)
-            send('log', `  ✅ ${term}/${country}: ${rowsWithCreatives.length}/${ads.length} ads have real creatives`)
-
-            if (!rowsWithCreatives.length) {
-              await admin.from('discovery_crawl_log').insert({ term, country, ads_fetched: ads.length, ads_new: 0, error: 'No real creatives found' })
-              continue
-            }
+            // ── Attach creatives then save all ads ─────────────────
+            // Try to scrape real images from snapshot URLs (5 parallel).
+            // Falls back to brand profile picture so every ad has a visual.
+            send('log', `  🖼 Fetching creatives for ${ads.length} ads…`)
+            const rows = await attachCreatives(ads, term, country)
+            const realCreatives = rows.filter(r => r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com')).length
+            send('log', `  📸 ${realCreatives} real ad images, ${rows.length - realCreatives} brand logos`)
 
             const { error } = await admin
               .from('discovery_ads_index')
-              .upsert(rowsWithCreatives, { onConflict: 'ad_id', ignoreDuplicates: false })
+              .upsert(rows, { onConflict: 'ad_id', ignoreDuplicates: false })
 
             await admin.from('discovery_crawl_log').insert({
-              term, country, ads_fetched: ads.length, ads_new: error ? 0 : rowsWithCreatives.length, error: error?.message,
+              term, country, ads_fetched: ads.length, ads_new: error ? 0 : rows.length, error: error?.message,
             })
 
-            totalAdsUpserted += rowsWithCreatives.length
+            send('log', `  ✅ ${term}/${country}: ${rows.length} ads saved`)
+            totalAdsUpserted += rows.length
           }
 
           if (id !== 'manual') {
