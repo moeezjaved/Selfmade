@@ -42,6 +42,7 @@ export default function IndexerAdminPage() {
   const [termSearch, setTermSearch] = useState('')
   const [runTerm, setRunTerm] = useState('')
   const [runCountry, setRunCountry] = useState('US')
+  const [runPageId, setRunPageId] = useState('')
   const [seeding, setSeeding] = useState(false)
 
   const fetchStats = useCallback(async () => {
@@ -65,7 +66,7 @@ export default function IndexerAdminPage() {
     }
   }, [])
 
-  const runCrawler = async (term?: string, country?: string) => {
+  const runCrawler = async (term?: string, country?: string, pageId?: string) => {
     setRunning(true)
     setCrawlResults([])
     setRunLog(['🚀 Starting crawler...'])
@@ -74,6 +75,7 @@ export default function IndexerAdminPage() {
       const params = new URLSearchParams({ stream: '1' })
       if (term) params.set('term', term)
       if (country) params.set('country', country)
+      if (pageId) params.set('page_id', pageId)
       const res = await fetch(`/api/indexer?${params}`)
       if (!res.ok) {
         const text = await res.text().catch(() => res.statusText)
@@ -232,22 +234,31 @@ export default function IndexerAdminPage() {
             {/* Input row */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
               <input value={runTerm} onChange={e => setRunTerm(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !running && runCrawler(runTerm || undefined, runCountry)}
+                onKeyDown={e => e.key === 'Enter' && !running && runCrawler(runTerm || undefined, runCountry, runPageId || undefined)}
                 placeholder="Brand name or keyword…"
-                style={{ flex: 1, minWidth: 200, padding: '9px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+                style={{ flex: 1, minWidth: 160, padding: '9px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+              <input value={runPageId} onChange={e => setRunPageId(e.target.value.trim())}
+                placeholder="Page ID (optional)"
+                title="Paste the Facebook page_id to fetch ALL ads from this brand directly. Find it in: facebook.com/ads/library → search brand → URL has view_all_page_id=XXXXX"
+                style={{ width: 160, padding: '9px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
               <select value={runCountry} onChange={e => setRunCountry(e.target.value)} style={{ padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
                 {COUNTRIES.map(c => <option key={c}>{c}</option>)}
               </select>
-              <button onClick={() => runCrawler(runTerm || undefined, runCountry)} disabled={running} style={btn()}>
+              <button onClick={() => runCrawler(runTerm || undefined, runCountry, runPageId || undefined)} disabled={running} style={btn()}>
                 {running ? '⏳' : '▶ Crawl'}
               </button>
             </div>
-            {/* What will happen */}
-            {runTerm && (
-              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
-                Will search Meta for: <strong>"{runTerm}"</strong> as ad copy text · as brand name · as category keyword
+            {/* Hint */}
+            {runPageId ? (
+              <div style={{ fontSize: 11, color: '#1d4ed8', marginBottom: 10, padding: '8px 12px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
+                🏷 Will fetch <strong>ALL ads</strong> from page <strong>{runPageId}</strong> directly — no keyword filter
               </div>
-            )}
+            ) : runTerm ? (
+              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                Will search Meta for: <strong>"{runTerm}"</strong> as ad copy · brand name · category keyword
+                <span style={{ color: '#9ca3af' }}> — add Page ID above to also fetch all brand ads directly</span>
+              </div>
+            ) : null}
             {runLog.length > 0 && (
               <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, maxHeight: 260, overflowY: 'auto' }}>
                 {runLog.map((l, i) => (
