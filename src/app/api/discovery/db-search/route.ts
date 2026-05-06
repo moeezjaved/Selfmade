@@ -130,6 +130,7 @@ export async function GET(request: NextRequest) {
       description: ad.description,
       snapshotUrl: ad.snapshot_url,
       thumbnailUrl: ad.thumbnail_url || null,
+      videoUrl: ad.video_url || null,
       startDate: ad.start_date,
       stopDate: ad.stop_date,
       platforms: ad.platforms || [],
