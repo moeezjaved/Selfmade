@@ -42,7 +42,6 @@ export default function IndexerAdminPage() {
   const [termSearch, setTermSearch] = useState('')
   const [runTerm, setRunTerm] = useState('')
   const [runCountry, setRunCountry] = useState('US')
-  const [runTermType, setRunTermType] = useState('adcopy')
   const [seeding, setSeeding] = useState(false)
 
   const fetchStats = useCallback(async () => {
@@ -66,7 +65,7 @@ export default function IndexerAdminPage() {
     }
   }, [])
 
-  const runCrawler = async (term?: string, country?: string, termType?: string) => {
+  const runCrawler = async (term?: string, country?: string) => {
     setRunning(true)
     setCrawlResults([])
     setRunLog(['🚀 Starting crawler...'])
@@ -75,7 +74,6 @@ export default function IndexerAdminPage() {
       const params = new URLSearchParams({ stream: '1' })
       if (term) params.set('term', term)
       if (country) params.set('country', country)
-      if (termType) params.set('term_type', termType)
       const res = await fetch(`/api/indexer?${params}`)
       if (!res.ok) {
         const text = await res.text().catch(() => res.statusText)
@@ -228,17 +226,15 @@ export default function IndexerAdminPage() {
           {/* Manual run */}
           <div style={card}>
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>⚡ Manual Crawl</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
+              Crawls using <strong>all 3 modes</strong> simultaneously: ad copy text search, brand page lookup, and category keyword expansion.
+            </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-              <input value={runTerm} onChange={e => setRunTerm(e.target.value)} placeholder="e.g. Nike OR fashion OR skincare" style={{ flex: 1, minWidth: 160, padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-              <select value={runTermType} onChange={e => setRunTermType(e.target.value)} style={{ padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
-                <option value="adcopy">📝 Ad Copy</option>
-                <option value="brand">🏷️ Brand</option>
-                <option value="category">📂 Category</option>
-              </select>
+              <input value={runTerm} onChange={e => setRunTerm(e.target.value)} placeholder="e.g. Nike, fashion, skincare…" style={{ flex: 1, minWidth: 160, padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
               <select value={runCountry} onChange={e => setRunCountry(e.target.value)} style={{ padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
                 {COUNTRIES.map(c => <option key={c}>{c}</option>)}
               </select>
-              <button onClick={() => runCrawler(runTerm || undefined, runCountry, runTermType)} disabled={running} style={btn()}>Run</button>
+              <button onClick={() => runCrawler(runTerm || undefined, runCountry)} disabled={running} style={btn()}>Run</button>
             </div>
             {runLog.length > 0 && (
               <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, maxHeight: 260, overflowY: 'auto' }}>
@@ -516,7 +512,7 @@ export default function IndexerAdminPage() {
                     </td>
                     <td style={{ padding: '8px 12px' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => runCrawler(t.term, t.countries?.[0] || 'US', t.term_type)} title="Crawl now" style={{ ...btn('#f1f5f9', '#374151'), padding: '4px 8px', fontSize: 11 }}>▶</button>
+                        <button onClick={() => runCrawler(t.term, t.countries?.[0] || 'US')} title="Crawl now" style={{ ...btn('#f1f5f9', '#374151'), padding: '4px 8px', fontSize: 11 }}>▶</button>
                         <button onClick={() => toggleTerm(t.id, !t.is_active)} style={{ ...btn(t.is_active ? '#fef2f2' : '#f0fdf4', t.is_active ? '#dc2626' : '#166534'), padding: '4px 8px', fontSize: 11 }}>{t.is_active ? 'Pause' : 'Resume'}</button>
                         <button onClick={() => deleteTerm(t.id)} style={{ ...btn('#fef2f2', '#dc2626'), padding: '4px 8px', fontSize: 11 }}>🗑</button>
                       </div>
