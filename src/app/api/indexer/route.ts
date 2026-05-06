@@ -131,72 +131,81 @@ async function fetchOnePage(
 }
 
 // ── Find a brand's Facebook page_id ─────────────────────────
-// Strategy A: Graph API slug lookup (fast, no credits)
-// Strategy B: ScrapingBee scrape of facebook.com/{slug} → extract pageID from HTML
-// Facebook always embeds the numeric page_id in the page source.
+// Scrapes the public Facebook Ads Library page search (no login required).
+// URL: facebook.com/ads/library/?q=BRAND&search_type=page
+// ScrapingBee renders the React SPA and we extract page_ids from the HTML.
 async function findBrandPageIds(brandName: string, token: string): Promise<string[]> {
   const found = new Set<string>()
-  const base = brandName.toLowerCase().replace(/[^a-z0-9]/g, '') // "gymshark"
-  const slugs = Array.from(new Set([
-    base,
-    brandName.toLowerCase().replace(/\s+/g, ''),
-    brandName.toLowerCase().replace(/\s+/g, '.'),
-  ]))
 
-  // ── Strategy A: Graph API node lookup by slug ────────────────
-  await Promise.all(slugs.map(async (slug) => {
-    try {
-      const url = `https://graph.facebook.com/${V}/${slug}?fields=id,name&access_token=${token}`
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
-      const data = await res.json() as { id?: string; name?: string; error?: any }
-      if (data.error || !data.id) return
+  // ── Strategy A: Graph API slug lookup (fast, free) ───────────
+  const base = brandName.toLowerCase().replace(/[^a-z0-9]/g, '')
+  try {
+    const url = `https://graph.facebook.com/${V}/${base}?fields=id,name&access_token=${token}`
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+    const data = await res.json() as { id?: string; name?: string; error?: any }
+    if (!data.error && data.id) {
       const nameLower = (data.name || '').toLowerCase()
       if (nameLower.includes(base) || base.includes(nameLower.replace(/\s/g, ''))) {
         found.add(data.id)
       }
-    } catch { /* ignore */ }
-  }))
+    }
+  } catch { /* ignore */ }
 
   if (found.size > 0) return Array.from(found)
 
-  // ── Strategy B: ScrapingBee scrape facebook.com/{slug} ──────
-  // Facebook embeds the numeric page_id in the page source as:
-  //   "pageID":"12345678"  or  "page_id":12345678
+  // ── Strategy B: Scrape Facebook Ads Library page search ──────
+  // This page is PUBLIC — no login needed. It shows brand pages when
+  // search_type=page. The rendered HTML contains page_ids in links and data.
   const sbKey = process.env.SCRAPINGBEE_KEY
   if (sbKey) {
-    for (const slug of slugs) {
-      try {
-        const params = new URLSearchParams({
-          api_key: sbKey,
-          url: `https://www.facebook.com/${slug}`,
-          render_js: 'false',   // don't need JS for page source — saves credits
-          premium_proxy: 'true',
-        })
-        const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params}`, {
-          signal: AbortSignal.timeout(20000),
-        })
-        if (!res.ok) continue
+    try {
+      const adsLibraryUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&q=${encodeURIComponent(brandName)}&search_type=page`
+      const params = new URLSearchParams({
+        api_key: sbKey,
+        url: adsLibraryUrl,
+        render_js: 'true',
+        premium_proxy: 'true',
+        wait: '4000',   // wait for React to load page results
+      })
+      const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params}`, {
+        signal: AbortSignal.timeout(30000),
+      })
+      if (res.ok) {
         const html = await res.text()
-
-        // Extract page_id from various embed patterns
+        // Page_ids appear in multiple patterns in the rendered Ads Library HTML
         const patterns = [
-          /"pageID"\s*:\s*"(\d+)"/,
-          /"page_id"\s*:\s*"(\d+)"/,
-          /"page_id"\s*:\s*(\d+)/,
-          /\\"pageID\\"\s*:\s*\\"(\d+)\\"/,
-          /content_id=(\d{10,})/,
-          /"entity_id"\s*:\s*"(\d{10,})"/,
+          /view_all_page_id=(\d{10,})/g,            // in "See all ads" links
+          /"page_id"\s*[=:]\s*['"]*(\d{10,})/g,     // JSON data
+          /\/ads\/library\/\?.*?id=(\d{10,})/g,      // ad detail links
+          /"advertiserID"\s*:\s*"(\d{10,})"/g,       // advertiser data
+          /page_id%3D(\d{10,})/g,                    // URL-encoded
         ]
+        const nameLower = brandName.toLowerCase()
+        // Collect all candidate page_ids from the HTML
+        const candidates = new Set<string>()
         for (const pat of patterns) {
-          const m = html.match(pat)
-          if (m?.[1] && m[1].length >= 10) { // FB page IDs are 10-17 digits
-            found.add(m[1])
-            break
+          let m: RegExpExecArray | null
+          const regex = new RegExp(pat.source, 'g')
+          while ((m = regex.exec(html)) !== null) {
+            if (m[1]) candidates.add(m[1])
           }
         }
-        if (found.size > 0) break
-      } catch { /* ignore */ }
-    }
+        // Pick IDs that appear near the brand name in the HTML (within 500 chars)
+        for (const id of Array.from(candidates)) {
+          const idx = html.indexOf(id)
+          if (idx === -1) continue
+          const surrounding = html.slice(Math.max(0, idx - 500), idx + 500).toLowerCase()
+          if (surrounding.includes(nameLower) || surrounding.includes(base)) {
+            found.add(id)
+            if (found.size >= 3) break  // enough
+          }
+        }
+        // Fallback: just take first few candidates if proximity check found nothing
+        if (found.size === 0) {
+          Array.from(candidates).slice(0, 3).forEach(id => found.add(id))
+        }
+      }
+    } catch { /* ignore */ }
   }
 
   return Array.from(found)
