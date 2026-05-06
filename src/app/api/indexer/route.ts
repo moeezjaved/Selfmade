@@ -255,20 +255,27 @@ async function fetchAdsForTerm(
   _termType: string = 'all',
   admin?: any,
   preDiscoveredPageIds: string[] = [], // page_ids found by caller before this call
-): Promise<{ ads: any[], externalFiltered: number, error?: string }> {
+  deadlineMs?: number,                 // absolute epoch ms — stop before this to avoid 300 s timeout
+): Promise<{ ads: any[], externalFiltered: number, timedOut: boolean, error?: string }> {
   const metaCountry = normalizeCountry(country)
   const seenIds = new Set<string>()
   const allAds: any[] = []
   const brandPageIds = new Set<string>(preDiscoveredPageIds)
+  let timedOut = false
 
-  const addAds = (ads: any[]) => {
+  const addAds = (ads: any[]): number => {
+    let added = 0
     for (const ad of ads) {
       if (ad.id && !seenIds.has(ad.id)) {
         seenIds.add(ad.id)
         allAds.push(ad)
+        added++
       }
     }
+    return added
   }
+
+  const isNearDeadline = () => deadlineMs ? Date.now() > deadlineMs : false
 
   const baseParams = (searchTerm: string): Record<string, string> => ({
     access_token: token,
@@ -283,6 +290,7 @@ async function fetchAdsForTerm(
     const params = baseParams(term)
     let cursor = ''
     for (let p = 0; p < PAGES_PER_TERM; p++) {
+      if (isNearDeadline()) { timedOut = true; break }
       const { ads, nextCursor, hasMore, error } = await fetchOnePage(params, cursor)
       if (error) break
       addAds(ads)
@@ -313,44 +321,79 @@ async function fetchAdsForTerm(
 
     const pageIds = Array.from(brandPageIds).slice(0, 10)
 
-    if (pageIds.length) {
-      // search_terms is OPTIONAL when search_page_ids is set.
-      // active_status=ALL gets both running and stopped ads — historical winners are valuable.
-      // NOTE: search_page_ids must be comma-separated numeric IDs, not JSON-stringified —
-      // the Meta API rejects JSON array format (["id"]) for this field.
-      const brandParams: Record<string, string> = {
+    if (pageIds.length && !isNearDeadline()) {
+      // ── Test both search_page_ids formats on first page ──────────────
+      // Meta's Ads Library API accepts both but some versions differ.
+      // We test both, log counts, and continue paginating with the winner.
+      //   Format A (CSV):  search_page_ids=129669023798560
+      //   Format B (JSON): search_page_ids=["129669023798560"]
+      const makePageParams = (pageIdsParam: string): Record<string, string> => ({
         access_token: token,
-        search_page_ids: pageIds.join(','),          // ✅ "123,456" not '["123","456"]'
+        search_page_ids: pageIdsParam,
         ad_reached_countries: JSON.stringify([metaCountry]),
         ad_type: 'ALL',
-        active_status: 'ALL',   // include stopped/paused ads — not just currently active
+        active_status: 'ALL', // include stopped/paused — historical winners matter
         fields: META_FIELDS,
         limit: String(ADS_PER_TERM),
-      }
-      let brandCursor = ''
-      // Fetch ALL pages for brand — no artificial limit.
-      // With active_status=ALL, major brands can have 500-3000+ ads.
-      // attachCreatives is now instant (no ScrapingBee) so we can handle volume.
+      })
+
+      const csvParam  = pageIds.join(',')
+      const jsonParam = JSON.stringify(pageIds)
+
+      // Parallel test of both formats on page 1
+      const [csvResult, jsonResult] = await Promise.all([
+        fetchOnePage(makePageParams(csvParam), ''),
+        fetchOnePage(makePageParams(jsonParam), ''),
+      ])
+
+      const csvCount  = csvResult.ads.length
+      const jsonCount = jsonResult.ads.length
+      console.log(`[brand-fetch] format test | CSV: ${csvCount} ads | JSON: ${jsonCount} ads | page_ids: ${csvParam}`)
+      if (csvResult.error)  console.log(`[brand-fetch] CSV  error: ${csvResult.error}`)
+      if (jsonResult.error) console.log(`[brand-fetch] JSON error: ${jsonResult.error}`)
+
+      // Prefer CSV on tie (simpler, no extra URL-encoding overhead)
+      const useJson = jsonCount > csvCount
+      const winnerParam = useJson ? jsonParam : csvParam
+      console.log(`[brand-fetch] using ${useJson ? 'JSON' : 'CSV'} format (${Math.max(csvCount, jsonCount)} ads on page 1)`)
+
+      const firstResult = useJson ? jsonResult : csvResult
+      addAds(firstResult.ads)
+
+      // ── Paginate until no new IDs, cursor missing, or deadline ──────
       const MAX_BRAND_PAGES = 60 // 60 × 50 = 3000 ads max per brand per run
-      let brandPage = 0
-      for (let p = 0; p < MAX_BRAND_PAGES; p++) {
-        const { ads, nextCursor, hasMore, error } = await fetchOnePage(brandParams, brandCursor)
-        if (error) {
-          // Surface the error so we know if search_page_ids format is wrong
-          console.error(`[brand-fetch] page ${p} error for pages ${pageIds.join(',')}:`, error)
+      let brandCursor = firstResult.nextCursor
+      let hasMore = firstResult.hasMore
+      let pagesTotal = 1
+
+      for (let p = 1; p < MAX_BRAND_PAGES && hasMore && brandCursor; p++) {
+        if (isNearDeadline()) {
+          timedOut = true
+          console.log(`[brand-fetch] deadline reached at page ${p} — saving ${allAds.length} ads so far`)
           break
         }
-        addAds(ads)
-        brandPage = p + 1
-        if (!hasMore) break
+        const { ads: pageAds, nextCursor, hasMore: more, error } = await fetchOnePage(makePageParams(winnerParam), brandCursor)
+        if (error) {
+          console.error(`[brand-fetch] page ${p} error:`, error)
+          break
+        }
+        // Stop if this page returned zero NEW ad_archive_ids (cursor looped or exhausted)
+        const newThisPage = addAds(pageAds)
+        pagesTotal++
+        if (newThisPage === 0) {
+          console.log(`[brand-fetch] page ${p} returned 0 new IDs — stopping pagination`)
+          break
+        }
+        hasMore = more
         brandCursor = nextCursor
       }
-      console.log(`[brand-fetch] fetched ${brandPage} pages → ${allAds.length} ads for page_ids: ${pageIds.join(',')}`)
+
+      console.log(`[brand-fetch] done — ${pagesTotal} pages fetched → ${allAds.length} total ads for ${csvParam}`)
     }
   }
 
   // ── 3. CATEGORY: expand term → related keywords, search each ─
-  {
+  if (!timedOut) {
     const termLower = term.toLowerCase()
     const matchedKey = Object.keys(CATEGORY_KEYWORDS).find(k =>
       termLower.includes(k) || k.includes(termLower)
@@ -360,6 +403,7 @@ async function fetchAdsForTerm(
       : [] // for brand names don't fall back to raw term — already covered in step 1
 
     for (const kw of keywords) {
+      if (isNearDeadline()) { timedOut = true; break }
       const params = baseParams(kw)
       // 1 page per keyword keeps total volume reasonable
       const { ads, error } = await fetchOnePage(params, '')
@@ -400,7 +444,7 @@ async function fetchAdsForTerm(
     }
   }
 
-  return { ads: filteredAds, externalFiltered }
+  return { ads: filteredAds, externalFiltered, timedOut }
 }
 
 // ── Classification helpers ───────────────────────────────────
@@ -536,13 +580,13 @@ async function fetchRenderedHtml(url: string): Promise<string | null> {
         url,
         render_js: 'true',
         premium_proxy: 'true',   // residential IP — bypasses Facebook bot detection
-        wait: '6000',            // wait 6s for React to render ad creative
-        timeout: '45000',
+        wait: '8000',            // wait 8s for React to render ad creative
+        timeout: '20000',        // 20 s total — keeps per-ad overhead manageable
         block_ads: 'false',      // don't block — we ARE fetching ads
         return_page_source: 'false',
       })
       const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params}`, {
-        signal: AbortSignal.timeout(35000),
+        signal: AbortSignal.timeout(25000), // 25 s hard cap
       })
       if (res.ok) return await res.text()
     } catch { /* fall through */ }
@@ -595,9 +639,17 @@ async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> 
 // For brand crawls: ScrapingBee is tried as fallback to extract real thumbnail/video URLs,
 // capped at MAX_SB_CALLS per run to stay within Vercel's 300 s route limit.
 // Discovery UI always falls back to iframe if thumbnail is null.
-const MAX_SB_CALLS_PER_CRAWL = 15  // ~15 × 35 s = ~525 s worst-case, but usually much faster
+// Max ScrapingBee calls per attachCreatives pass.
+// Each call takes ~8–35 s; stay conservative so we don't eat the route timeout.
+const MAX_SB_CALLS_PER_CRAWL = 12
 
-async function attachCreatives(rawAds: any[], term: string, country: string, termType: string = 'adcopy'): Promise<{ rows: any[]; skipped: number }> {
+async function attachCreatives(
+  rawAds: any[],
+  term: string,
+  country: string,
+  termType: string = 'adcopy',
+  deadlineMs?: number,
+): Promise<{ rows: any[]; skipped: number }> {
   const rows: any[] = []
   const isBrandCrawl = termType === 'brand'
   let sbCalls = 0
@@ -605,8 +657,17 @@ async function attachCreatives(rawAds: any[], term: string, country: string, ter
   for (const ad of rawAds) {
     const row = transformAd(ad, term, country)
 
-    // For brand crawls: try ScrapingBee to extract real thumbnail/video
-    if (isBrandCrawl && !row.thumbnail_url && row.snapshot_url && process.env.SCRAPINGBEE_KEY && sbCalls < MAX_SB_CALLS_PER_CRAWL) {
+    // For brand crawls: try ScrapingBee to extract real thumbnail/video.
+    // Skip if:
+    //  - not a brand crawl (term/category discovery uses iframes, faster)
+    //  - already have a real thumbnail (not brand logo)
+    //  - no snapshot_url to scrape
+    //  - no ScrapingBee key configured
+    //  - hit the per-crawl cap
+    //  - near route deadline
+    const hasRealThumb = row.thumbnail_url && !row.thumbnail_url.includes('graph.facebook.com')
+    const nearDeadline = deadlineMs ? Date.now() > deadlineMs : false
+    if (isBrandCrawl && !hasRealThumb && row.snapshot_url && process.env.SCRAPINGBEE_KEY && sbCalls < MAX_SB_CALLS_PER_CRAWL && !nearDeadline) {
       const html = await fetchRenderedHtml(row.snapshot_url)
       if (html) {
         const { thumbnail, videoUrl } = extractMediaFromHtml(html)
@@ -833,11 +894,22 @@ export async function GET(request: NextRequest) {
 
         let totalAdsUpserted = 0
 
+        // Route has 300 s max. Reserve 60 s for embeddings + classification.
+        // Crawl must finish within 240 s. We pass this deadline to the fetch
+        // functions so they can stop cleanly and save partial results.
+        const ROUTE_BUDGET_MS = 240_000
+        const crawlDeadline = Date.now() + ROUTE_BUDGET_MS
+
         // ── Crawl each term × country ──
         for (const { term, countries, id, term_type, pageId: manualPageId } of termsToRun) {
+          if (Date.now() > crawlDeadline) {
+            send('log', '⏰ Crawl budget exhausted — saving partial results, embeddings & classification will run next tick')
+            break
+          }
           const countriesToCrawl = forceCountry ? [forceCountry] : (countries || ['US'])
 
           for (const country of countriesToCrawl) {
+            if (Date.now() > crawlDeadline) break
             send('log', `🔍 Crawling "${term}" [${term_type || 'all'}] / ${country}…`)
 
             // ── Brand page discovery ──────────────────────────────────────
@@ -856,7 +928,14 @@ export async function GET(request: NextRequest) {
               }
             }
 
-            const { ads, externalFiltered, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, 'all', admin, knownBrandPageIds)
+            const { ads, externalFiltered, timedOut: fetchTimedOut, error: fetchError } = await fetchAdsForTerm(
+              term, country, metaToken, 'all', admin, knownBrandPageIds,
+              crawlDeadline - 30_000  // hand over deadline 30 s early for buffer
+            )
+
+            if (fetchTimedOut) {
+              send('log', `  ⏰ Deadline reached mid-crawl — saving ${ads.length} partial ads for "${term}"`)
+            }
 
             if (fetchError) {
               send('log', `  ❌ ${term}/${country}: ${fetchError}`)
@@ -875,17 +954,26 @@ export async function GET(request: NextRequest) {
 
             // ── Attach creatives then save all ads ───────────────────────
             send('log', `  🖼 Fetching creatives for ${ads.length} ads…`)
-            const { rows, skipped } = await attachCreatives(ads, term, country, term_type || 'adcopy')
+            const { rows, skipped } = await attachCreatives(ads, term, country, term_type || 'adcopy', crawlDeadline - 15_000)
             const realCreatives = rows.filter(r => r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com')).length
             send('log', `  📸 ${realCreatives} real creatives, ${rows.length - realCreatives} brand logo placeholders`)
 
-            // ── Deduplicate by ad_archive_id ─────────────────────────────
-            // Meta's ad.id IS the ad_archive_id — globally unique per ad creative.
-            // Using body+title as the key was wrong: visual ads with no text all
-            // collapsed into one. Use ad_id always; the DB upsert also uses ad_id.
+            // ── Deduplicate by ad_archive_id (fallback chain) ────────────
+            // Primary key = ad_id (= ad_archive_id from Meta — globally unique).
+            // Fallbacks handle edge cases where Meta returns ads without an id.
+            const getDedupKey = (r: any): string => {
+              if (r.ad_id)        return `archive:${r.ad_id}`
+              if (r.snapshot_url) return `snap:${r.snapshot_url}`
+              if (r.video_url)    return `vid:${r.video_url}`
+              if (r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com'))
+                                  return `img:${r.thumbnail_url}`
+              // Last resort: page + date + body prefix (same as old logic but only as fallback)
+              const text = `${r.body || ''}${r.title || ''}`.trim()
+              return `text:${r.page_id}:${r.start_date}:${text.slice(0, 80)}`
+            }
             const creativeMap = new Map<string, any>()
             for (const row of rows) {
-              const key = row.ad_id  // ad_archive_id — always unique
+              const key = getDedupKey(row)
               const existing = creativeMap.get(key)
               if (!existing || row.days_running > (existing.days_running ?? 0)) {
                 creativeMap.set(key, row)
@@ -893,7 +981,7 @@ export async function GET(request: NextRequest) {
             }
             const dedupedRows = Array.from(creativeMap.values())
             const dupCount = rows.length - dedupedRows.length
-            if (dupCount > 0) send('log', `  🔄 ${dupCount} exact duplicate ad_ids collapsed — ${dedupedRows.length} unique ads`)
+            if (dupCount > 0) send('log', `  🔄 ${dupCount} duplicate ad_ids collapsed — ${dedupedRows.length} unique ads`)
 
             const { error } = await admin
               .from('discovery_ads_index')
