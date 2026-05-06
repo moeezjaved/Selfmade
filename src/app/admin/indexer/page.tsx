@@ -332,9 +332,12 @@ export default function IndexerAdminPage() {
             {!crawlResultsLoading && crawlResults.length > 0 && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
                 {crawlResults.map((ad: any) => {
-                  const thumb = ad.thumbnail_url || `https://graph.facebook.com/${ad.page_id}/picture?type=large`
+                  const thumb = ad.thumbnail_url || (ad.page_id ? `https://graph.facebook.com/${ad.page_id}/picture?type=large` : null)
                   const body = (ad.body || ad.title || '').slice(0, 100)
                   const isActive = ad.is_active
+                  const initials = (ad.page_name || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+                  const bgColors = ['#1a3a1a','#1e3a5f','#4a1942','#3a1a1a','#1a3a38']
+                  const bgColor = bgColors[(ad.page_name || '').charCodeAt(0) % bgColors.length]
                   return (
                     <a key={ad.ad_id} href={ad.snapshot_url} target="_blank" rel="noopener noreferrer"
                       style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', transition: 'box-shadow .15s' }}
@@ -342,16 +345,20 @@ export default function IndexerAdminPage() {
                       onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
                     >
                       {/* Thumbnail */}
-                      <div style={{ position: 'relative', height: 160, background: '#f1f5f9', overflow: 'hidden', flexShrink: 0 }}>
-                        <img
-                          src={thumb}
-                          alt={ad.page_name}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                          onError={e => {
-                            // Fallback to brand initials on image error
-                            (e.target as HTMLImageElement).style.display = 'none'
-                          }}
-                        />
+                      <div style={{ position: 'relative', height: 160, overflow: 'hidden', flexShrink: 0 }}>
+                        {/* Always-visible initials base layer */}
+                        <div style={{ position: 'absolute', inset: 0, background: bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ fontSize: 36, fontWeight: 800, color: '#dffe95', letterSpacing: -1 }}>{initials}</span>
+                        </div>
+                        {/* Brand/creative image on top — covers initials when it loads */}
+                        {thumb && (
+                          <img
+                            src={thumb}
+                            alt={ad.page_name}
+                            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        )}
                         {/* Status dot */}
                         <div style={{ position: 'absolute', top: 8, left: 8, width: 8, height: 8, borderRadius: '50%', background: isActive ? '#22c55e' : '#9ca3af', border: '1.5px solid #fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
                         {/* Format badge */}
