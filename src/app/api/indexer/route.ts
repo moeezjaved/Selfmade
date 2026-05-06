@@ -130,33 +130,43 @@ async function fetchOnePage(
   }
 }
 
-// ── Search Meta Graph for pages by name → get page_ids ──────
-// Used to find a brand's actual Facebook page_id before fetching their ads.
-// The Graph page search is far more reliable than hoping the brand's own ads
-// appear in a keyword search (many brand ads don't contain their own name).
+// ── Find a brand's Facebook page_id by slug/username ────────
+// The Graph API lets you look up a page by its username directly:
+//   GET /gymshark?fields=id,name  →  { id: "112543612", name: "Gymshark" }
+// This is far more reliable than the /search?type=page endpoint which is
+// restricted for most app tokens.
+// We try several slug variations: "gymshark", "gymsharkwomen", "gymshark.com", etc.
 async function findBrandPageIds(brandName: string, token: string): Promise<string[]> {
-  try {
-    const params = new URLSearchParams({
-      q: brandName,
-      type: 'page',
-      fields: 'id,name,fan_count',
-      limit: '10',
-      access_token: token,
-    })
-    const res = await fetch(`https://graph.facebook.com/${V}/search?${params}`, {
-      signal: AbortSignal.timeout(10000),
-    })
-    if (!res.ok) return []
-    const data = await res.json() as { data?: { id: string; name: string; fan_count?: number }[] }
-    const nameLower = brandName.toLowerCase()
-    // Keep pages whose name closely matches — filter out unrelated pages
-    return (data.data || [])
-      .filter(p => p.name.toLowerCase().includes(nameLower) || nameLower.includes(p.name.toLowerCase()))
-      .map(p => p.id)
-      .slice(0, 5) // max 5 matching pages
-  } catch {
-    return []
-  }
+  const found = new Set<string>()
+
+  // Build slug candidates from the brand name
+  const base = brandName.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const slugs = Array.from(new Set([
+    base,
+    brandName.toLowerCase().replace(/\s+/g, ''),
+    brandName.toLowerCase().replace(/\s+/g, '.'),
+    brandName.toLowerCase().replace(/\s+/g, '-'),
+  ]))
+
+  await Promise.all(slugs.map(async (slug) => {
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/${V}/${encodeURIComponent(slug)}?fields=id,name&access_token=${encodeURIComponent(token)}`,
+        { signal: AbortSignal.timeout(8000) }
+      )
+      if (!res.ok) return
+      const data = await res.json() as { id?: string; name?: string; error?: any }
+      if (data.error || !data.id) return
+      // Sanity check: page name should loosely match the brand
+      const nameLower = (data.name || '').toLowerCase()
+      const termLower = brandName.toLowerCase()
+      if (nameLower.includes(termLower) || termLower.includes(nameLower) || nameLower.includes(base)) {
+        found.add(data.id)
+      }
+    } catch { /* ignore */ }
+  }))
+
+  return Array.from(found)
 }
 
 // ── Batch-fetch page follower counts from Graph API ─────────
