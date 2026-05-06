@@ -600,6 +600,10 @@ export default function DiscoveryPage() {
   const [minDaysStr, setMinDaysStr] = useState('')
   const [minBrandAdsStr, setMinBrandAdsStr] = useState('')
 
+  // Top brands strip
+  const [topBrands, setTopBrands] = useState<{ pageId: string; name: string; adCount: number; picture: string | null }[]>([])
+  const [brandsLoading, setBrandsLoading] = useState(false)
+
   // Search dropdown
   const [showDropdown, setShowDropdown] = useState(false)
   const [dropdownBrands, setDropdownBrands] = useState<{ pageId: string; name: string; picture: string | null; category: string; adCount: number | string }[]>([])
@@ -638,14 +642,48 @@ export default function DiscoveryPage() {
     return () => clearTimeout(timer)
   }, [searchInput])
 
-  const fetchAds = useCallback(async (reset = true, cursor?: string) => {
+  const [searchSource, setSearchSource] = useState<'indexed' | 'live'>('indexed')
+  const [dbPage, setDbPage] = useState(0)
+  const [dbTotal, setDbTotal] = useState(0)
+  const [totalInDB, setTotalInDB] = useState(0)
+
+  const fetchAds = useCallback(async (reset = true, cursor?: string, forcePage?: number) => {
     setLoading(true)
     setError('')
+    const page = reset ? 0 : (forcePage ?? dbPage + 1)
+    if (reset) setDbPage(0)
+
     try {
+      // ── Try our indexed DB first ──
+      const dbParams = new URLSearchParams({
+        q: query, mode: searchMode, sort, status,
+        page: String(page),
+        ...(platforms.length ? { platforms: platforms.join(',') } : {}),
+        ...(format.length === 1 ? { format: format[0] } : {}),
+        ...(industry.length === 1 ? { industry: industry[0] } : {}),
+      })
+      const dbRes = await fetch(`/api/discovery/db-search?${dbParams}`)
+      const dbData = await dbRes.json()
+
+      if (!dbData.error && dbData.ads?.length > 0) {
+        // We have indexed results — use them
+        const classified = dbData.ads.map((ad: any) => classifyAd({
+          ...ad, mediaType: ad.format || '',
+        }))
+        setRawAds(prev => reset ? classified : [...prev, ...classified])
+        setHasMore(dbData.hasMore)
+        setDbPage(page)
+        setDbTotal(dbData.total || 0)
+        setTotalInDB(dbData.totalInDB || 0)
+        setSearchSource('indexed')
+        setNextCursor(null)
+        return
+      }
+
+      // ── Fallback to live Meta API if DB has no results ──
+      setSearchSource('live')
       const params = new URLSearchParams({
-        q: query,
-        mode: searchMode,
-        sort, status,
+        q: query, mode: searchMode, sort, status,
         ...(country && country !== 'ALL' ? { country } : {}),
         ...(platforms.length ? { platforms: platforms.join(',') } : {}),
         ...(cursor ? { after: cursor } : {}),
@@ -662,9 +700,9 @@ export default function DiscoveryPage() {
     } finally {
       setLoading(false)
     }
-  }, [query, searchMode, sort, status, platforms, country])
+  }, [query, searchMode, sort, status, platforms, country, format, industry, dbPage])
 
-  // Meta Ads Library API requires search_terms or search_page_ids — only fetch when there's a query
+  // Fetch ads when query/filters change
   useEffect(() => {
     if (query.trim()) {
       fetchAds(true)
@@ -673,8 +711,23 @@ export default function DiscoveryPage() {
       setRawAds([])
       setHasMore(false)
       setNextCursor(null)
+      setTopBrands([])
     }
   }, [query, searchMode, sort, status, platforms, country])
+
+  // Fetch top brands strip when query changes
+  useEffect(() => {
+    if (!query.trim()) { setTopBrands([]); return }
+    setBrandsLoading(true)
+    const params = new URLSearchParams({ q: query, country: country !== 'ALL' ? country : '' })
+    if (industry.length === 1) params.set('industry', industry[0])
+    if (status !== 'ALL') params.set('status', status)
+    fetch(`/api/discovery/top-brands?${params}`)
+      .then(r => r.json())
+      .then(d => setTopBrands(d.brands || []))
+      .catch(() => {})
+      .finally(() => setBrandsLoading(false))
+  }, [query, country, industry, status])
 
   // Collect available languages from loaded ads
   const availableLanguages = useMemo(() => {
@@ -1047,18 +1100,53 @@ export default function DiscoveryPage() {
           </div>
         )}
 
+        {/* ── Top Brands Strip (like Atria) ── */}
+        {(topBrands.length > 0 || brandsLoading) && query && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Top Brands</div>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+              {brandsLoading && !topBrands.length && [1,2,3,4,5].map(i => (
+                <div key={i} style={{ flexShrink: 0, width: 140, height: 64, background: '#e2e8f0', borderRadius: 10 }} className="shimmer" />
+              ))}
+              {topBrands.map(brand => (
+                <button key={brand.pageId}
+                  onClick={() => router.push(`/discovery/brand/${brand.pageId}?name=${encodeURIComponent(brand.name)}`)}
+                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minWidth: 140, maxWidth: 200 }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#1a3a1a'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}>
+                  {/* Avatar */}
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: `hsl(${brand.name.charCodeAt(0) * 7 % 360},50%,85%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: `hsl(${brand.name.charCodeAt(0) * 7 % 360},50%,30%)`, flexShrink: 0 }}>
+                    {brand.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brand.name}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{brand.adCount.toLocaleString()} Ads</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Ad grid */}
         {filteredAds.length > 0 && (
           <>
             <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span>Showing <strong style={{ color: '#111' }}>{filteredAds.length}</strong>{rawAds.length !== filteredAds.length ? ` of ${rawAds.length}` : ''} ads</span>
+              <span>
+                Showing <strong style={{ color: '#111' }}>{filteredAds.length}</strong>
+                {rawAds.length !== filteredAds.length ? ` of ${rawAds.length}` : ''}
+                {searchSource === 'indexed' && dbTotal > 0 ? ` of ${dbTotal.toLocaleString()} matching` : ''} ads
+              </span>
               {/* Search mode badge */}
               <span style={{ background: searchMode === 'brand' ? '#eff6ff' : searchMode === 'category' ? '#f0fdf4' : '#faf5ff', color: searchMode === 'brand' ? '#1d4ed8' : searchMode === 'category' ? '#166534' : '#7c3aed', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100, border: `1px solid ${searchMode === 'brand' ? '#bfdbfe' : searchMode === 'category' ? '#bbf7d0' : '#e9d5ff'}` }}>
                 {searchMode === 'brand' ? '🏷️ Brand' : searchMode === 'category' ? '📂 Category' : '📝 Ad copy'} · "{query}"
               </span>
+              {/* Source badge */}
+              <span style={{ background: searchSource === 'indexed' ? '#f0fdf4' : '#fffbeb', color: searchSource === 'indexed' ? '#166534' : '#92400e', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 100 }}>
+                {searchSource === 'indexed' ? `⚡ ${totalInDB.toLocaleString()} ads indexed` : '🔴 Live from Meta'}
+              </span>
               {activeFilterCount > 0 && <span style={{ background: '#f0fdf4', color: '#166534', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af' }}>Results via Meta Ads Library</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
               {filteredAds.map(ad => <AdCard key={ad.id} ad={ad} />)}
@@ -1066,7 +1154,7 @@ export default function DiscoveryPage() {
             {hasMore && (
               <div style={{ textAlign: 'center', marginTop: 32 }}>
                 <button
-                  onClick={() => fetchAds(false, nextCursor || undefined)}
+                  onClick={() => searchSource === 'indexed' ? fetchAds(false, undefined, dbPage + 1) : fetchAds(false, nextCursor || undefined)}
                   disabled={loading}
                   style={{ padding: '12px 32px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: loading ? 0.7 : 1 }}>
                   {loading ? 'Loading…' : 'Load more ads'}
