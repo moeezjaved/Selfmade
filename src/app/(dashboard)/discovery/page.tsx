@@ -12,6 +12,7 @@ interface Ad {
   title: string
   caption: string
   snapshotUrl: string
+  thumbnailUrl?: string | null
   startDate: string
   stopDate: string | null
   platforms: string[]
@@ -91,6 +92,7 @@ function classifyAd(raw: any): Ad {
   const text = `${raw.body} ${raw.title} ${raw.caption} ${raw.pageName}`
   return {
     ...raw,
+    thumbnailUrl: raw.thumbnailUrl || raw.thumbnail_url || null,
     format: detectFormat(raw.mediaType),
     industries: detectIndustries(text),
     themes: detectThemes(text),
@@ -474,6 +476,26 @@ function AdCard({ ad }: { ad: Ad }) {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [thumbnail, setThumbnail] = useState<string | null>(ad.thumbnailUrl || null)
+  const [thumbLoading, setThumbLoading] = useState(!ad.thumbnailUrl && !!ad.snapshotUrl)
+
+  // Lazily fetch thumbnail if not already cached
+  useEffect(() => {
+    if (ad.thumbnailUrl || !ad.snapshotUrl || !ad.id) return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/discovery/thumbnail?ad_id=${encodeURIComponent(ad.id)}&url=${encodeURIComponent(ad.snapshotUrl)}`)
+        const data = await res.json()
+        if (!cancelled && data.thumbnail) setThumbnail(data.thumbnail)
+      } catch { /* ignore */ } finally {
+        if (!cancelled) setThumbLoading(false)
+      }
+    }
+    // Stagger requests to avoid hammering server
+    const timer = setTimeout(load, Math.random() * 800)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [ad.id, ad.snapshotUrl, ad.thumbnailUrl])
 
   const daysText = ad.daysRunning > 365
     ? `${Math.floor(ad.daysRunning / 365)}y ${Math.floor((ad.daysRunning % 365) / 30)}mo`
@@ -527,6 +549,33 @@ function AdCard({ ad }: { ad: Ad }) {
           </a>
         </div>
       </div>
+
+      {/* ── Visual preview ── */}
+      {(thumbnail || thumbLoading) && (
+        <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer"
+          style={{ display: 'block', position: 'relative', background: '#0f0f0f', overflow: 'hidden', aspectRatio: '1/1', maxHeight: 320 }}>
+          {thumbnail ? (
+            <img
+              src={thumbnail}
+              alt={ad.pageName}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              onError={() => setThumbnail(null)}
+            />
+          ) : (
+            <div style={{ width: '100%', height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 24, height: 24, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            </div>
+          )}
+          {/* Format badge overlay */}
+          {ad.format === 'Video' && thumbnail && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)' }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 18, marginLeft: 3 }}>▶</span>
+              </div>
+            </div>
+          )}
+        </a>
+      )}
 
       {/* ── Ad copy body ── */}
       <div style={{ padding: '0 14px 12px', flex: 1 }}>
@@ -798,6 +847,7 @@ export default function DiscoveryPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
       {/* ── Header ── */}
       <div style={{ borderBottom: '1px solid #e2e8f0', background: '#fff', padding: '14px 24px', position: 'sticky', top: 0, zIndex: 40 }}>
