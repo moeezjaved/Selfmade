@@ -286,7 +286,13 @@ async function fetchAdsForTerm(
   })
 
   // ── 1. AD COPY: keyword search — finds all ads mentioning this term ──
-  {
+  // IMPORTANT: Skip keyword search when we already have a brand page_id.
+  // Keyword search for "gymshark" finds Gymshark's own ads AND competitor
+  // ads that mention them. Those Gymshark-owned ads end up in seenIds and
+  // then the brand page pagination stops early (0 new IDs per page), even
+  // though there are 2000+ more ads to fetch from pages 3–60.
+  // When page_id is known, brand fetch (step 2) is comprehensive on its own.
+  if (preDiscoveredPageIds.length === 0) {
     const params = baseParams(term)
     let cursor = ''
     for (let p = 0; p < PAGES_PER_TERM; p++) {
@@ -649,9 +655,15 @@ async function attachCreatives(
   country: string,
   termType: string = 'adcopy',
   deadlineMs?: number,
+  hasBrandPageIds: boolean = false, // true when caller had a known page_id
 ): Promise<{ rows: any[]; skipped: number }> {
   const rows: any[] = []
-  const isBrandCrawl = termType === 'brand'
+  // Trigger ScrapingBee for brand crawls. A "brand crawl" is when:
+  //  - term_type is explicitly 'brand', OR
+  //  - the crawler had a known page_id (hasBrandPageIds=true), meaning we
+  //    fetched directly from a brand's page, not just keyword search.
+  // We do NOT run ScrapingBee for keyword/category searches — iframes handle those.
+  const isBrandCrawl = termType === 'brand' || hasBrandPageIds
   let sbCalls = 0
 
   for (const ad of rawAds) {
@@ -725,12 +737,13 @@ async function generateEmbeddings(admin: any): Promise<number> {
 async function callClaudeWithRetry(prompt: string): Promise<string> {
   let lastErr: any
 
-  // Model fallback chain — newest/most capable first, older as safety nets.
+  // Model fallback chain — newest/most capable first, fast model as safety net.
   // If ANTHROPIC_MODEL env var is set and not already in the list, prepend it.
+  // NOTE: claude-3-7-sonnet uses extended_thinking which breaks standard messages API.
+  // NOTE: claude-3-haiku-20240307 was deprecated — use claude-3-5-haiku-20241022 instead.
   const DEFAULT_MODELS = [
-    'claude-3-5-sonnet-20241022',  // most reliable, widely available
-    'claude-3-7-sonnet-20250219',  // extended thinking model
-    'claude-3-haiku-20240307',     // fast fallback
+    'claude-3-5-sonnet-20241022',  // primary — reliable, fast, widely available
+    'claude-3-5-haiku-20241022',   // fast fallback — still capable for classification
   ]
   const envModel = process.env.ANTHROPIC_MODEL
   const MODELS = envModel && !DEFAULT_MODELS.includes(envModel)
@@ -954,7 +967,7 @@ export async function GET(request: NextRequest) {
 
             // ── Attach creatives then save all ads ───────────────────────
             send('log', `  🖼 Fetching creatives for ${ads.length} ads…`)
-            const { rows, skipped } = await attachCreatives(ads, term, country, term_type || 'adcopy', crawlDeadline - 15_000)
+            const { rows, skipped } = await attachCreatives(ads, term, country, term_type || 'adcopy', crawlDeadline - 15_000, knownBrandPageIds.length > 0)
             const realCreatives = rows.filter(r => r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com')).length
             send('log', `  📸 ${realCreatives} real creatives, ${rows.length - realCreatives} brand logo placeholders`)
 
