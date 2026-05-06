@@ -13,6 +13,7 @@ interface Ad {
   caption: string
   snapshotUrl: string
   thumbnailUrl?: string | null
+  videoUrl?: string | null
   startDate: string
   stopDate: string | null
   platforms: string[]
@@ -93,6 +94,7 @@ function classifyAd(raw: any): Ad {
   return {
     ...raw,
     thumbnailUrl: raw.thumbnailUrl || raw.thumbnail_url || null,
+    videoUrl: raw.videoUrl || raw.video_url || null,
     format: detectFormat(raw.mediaType),
     industries: detectIndustries(text),
     themes: detectThemes(text),
@@ -477,17 +479,23 @@ function AdCard({ ad }: { ad: Ad }) {
   const [isSaved, setIsSaved] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [thumbnail, setThumbnail] = useState<string | null>(ad.thumbnailUrl || null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(ad.videoUrl || null)
   const [thumbLoading, setThumbLoading] = useState(!ad.thumbnailUrl && !!ad.snapshotUrl)
+  const [playing, setPlaying] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
-  // Lazily fetch thumbnail if not already cached
+  // Lazily fetch thumbnail + video URL if not already cached
   useEffect(() => {
-    if (ad.thumbnailUrl || !ad.snapshotUrl || !ad.id) return
+    if ((ad.thumbnailUrl && ad.videoUrl !== undefined) || !ad.snapshotUrl || !ad.id) return
     let cancelled = false
     const load = async () => {
       try {
         const res = await fetch(`/api/discovery/thumbnail?ad_id=${encodeURIComponent(ad.id)}&url=${encodeURIComponent(ad.snapshotUrl)}`)
         const data = await res.json()
-        if (!cancelled && data.thumbnail) setThumbnail(data.thumbnail)
+        if (!cancelled) {
+          if (data.thumbnail) setThumbnail(data.thumbnail)
+          if (data.videoUrl) setVideoUrl(data.videoUrl)
+        }
       } catch { /* ignore */ } finally {
         if (!cancelled) setThumbLoading(false)
       }
@@ -495,7 +503,7 @@ function AdCard({ ad }: { ad: Ad }) {
     // Stagger requests to avoid hammering server
     const timer = setTimeout(load, Math.random() * 800)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [ad.id, ad.snapshotUrl, ad.thumbnailUrl])
+  }, [ad.id, ad.snapshotUrl, ad.thumbnailUrl, ad.videoUrl])
 
   const daysText = ad.daysRunning > 365
     ? `${Math.floor(ad.daysRunning / 365)}y ${Math.floor((ad.daysRunning % 365) / 30)}mo`
@@ -551,30 +559,61 @@ function AdCard({ ad }: { ad: Ad }) {
       </div>
 
       {/* ── Visual preview ── */}
-      {(thumbnail || thumbLoading) && (
-        <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer"
-          style={{ display: 'block', position: 'relative', background: '#0f0f0f', overflow: 'hidden', aspectRatio: '1/1', maxHeight: 320 }}>
-          {thumbnail ? (
-            <img
-              src={thumbnail}
-              alt={ad.pageName}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              onError={() => setThumbnail(null)}
-            />
+      {(thumbnail || videoUrl || thumbLoading) && (
+        <div style={{ position: 'relative', background: '#0f0f0f', overflow: 'hidden', aspectRatio: '1/1', maxHeight: 320 }}>
+          {/* ── Video player ── */}
+          {videoUrl ? (
+            <>
+              <video
+                ref={videoRef}
+                src={videoUrl}
+                poster={thumbnail || undefined}
+                controls={playing}
+                preload="metadata"
+                playsInline
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                onEnded={() => setPlaying(false)}
+                onError={() => {
+                  // Video URL expired — fall back to thumbnail only
+                  setVideoUrl(null)
+                  setPlaying(false)
+                }}
+              />
+              {/* Play button overlay — only show when not playing */}
+              {!playing && (
+                <div
+                  onClick={() => {
+                    setPlaying(true)
+                    setTimeout(() => videoRef.current?.play(), 50)
+                  }}
+                  style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)', cursor: 'pointer' }}
+                >
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', transition: 'transform 0.15s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.08)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)' }}
+                  >
+                    <span style={{ fontSize: 22, marginLeft: 4 }}>▶</span>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : thumbnail ? (
+            /* ── Static image (no video) ── */
+            <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', height: '100%' }}>
+              <img
+                src={thumbnail}
+                alt={ad.pageName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                onError={() => setThumbnail(null)}
+              />
+            </a>
           ) : (
+            /* ── Loading spinner ── */
             <div style={{ width: '100%', height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ width: 24, height: 24, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
             </div>
           )}
-          {/* Format badge overlay */}
-          {ad.format === 'Video' && thumbnail && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)' }}>
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 18, marginLeft: 3 }}>▶</span>
-              </div>
-            </div>
-          )}
-        </a>
+        </div>
       )}
 
       {/* ── Ad copy body ── */}

@@ -1,8 +1,7 @@
 /**
- * Thumbnail extractor — gets actual ad creative image/video from the
- * public Facebook Ads Library page (no login required).
- * facebook.com/ads/library/?id=XXX has og:image set to the real creative.
- * Results cached in discovery_ads_index.thumbnail_url
+ * Media extractor — fetches the public Facebook Ads Library page server-side
+ * and extracts the actual image/video URLs (no login required).
+ * facebook.com/ads/library/?id=XXX has the full creative data in its HTML.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -10,87 +9,116 @@ import { createAdminClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
-const cache = new Map<string, string | null>()
+const cache = new Map<string, { thumbnail: string | null; videoUrl: string | null }>()
 
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'en-US,en;q=0.9',
-  'Cache-Control': 'no-cache',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
 }
 
-function extractFromHtml(html: string): string | null {
-  // 1. og:image — most reliable, Facebook sets this to the actual creative
-  const og1 = html.match(/property="og:image"\s+content="([^"]+)"/)?.[1]
-  const og2 = html.match(/content="([^"]+)"\s+property="og:image"/)?.[1]
-  const og3 = html.match(/property='og:image'\s+content='([^']+)'/)?.[1]
-  const ogImage = og1 || og2 || og3
-  if (ogImage?.startsWith('http')) return decodeHtmlEntities(ogImage)
-
-  // 2. twitter:image
-  const tw = html.match(/name="twitter:image"\s+content="([^"]+)"/)?.[1]
-    || html.match(/content="([^"]+)"\s+name="twitter:image"/)?.[1]
-  if (tw?.startsWith('http')) return decodeHtmlEntities(tw)
-
-  // 3. JSON-LD thumbnail
-  const jld = html.match(/"thumbnailUrl"\s*:\s*"(https:[^"]+)"/)?.[1]
-    || html.match(/"thumbnail_url"\s*:\s*"(https:[^"]+)"/)?.[1]
-  if (jld) return decodeHtmlEntities(jld)
-
-  // 4. Direct fbcdn image URLs in the page
-  const fbcdn = html.match(/https:\/\/[a-z0-9-]+\.fbcdn\.net\/[^"'\s>]{20,}/g)
-  if (fbcdn?.length) {
-    // Prefer larger images (skip small icons)
-    const large = fbcdn.find(u => u.includes('_n.') || u.includes('_o.') || u.length > 100)
-    if (large) return large
-    return fbcdn[0]
-  }
-
-  // 5. Instagram CDN
-  const ig = html.match(/https:\/\/[a-z0-9-]+\.cdninstagram\.com\/[^"'\s>]{20,}/g)
-  if (ig?.length) return ig[0]
-
-  return null
+function dec(s: string) {
+  return s.replace(/&amp;/g, '&').replace(/\\u0025/g, '%').replace(/\\/g, '')
 }
 
-function decodeHtmlEntities(str: string): string {
-  return str.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+function extractMedia(html: string): { thumbnail: string | null; videoUrl: string | null } {
+  let thumbnail: string | null = null
+  let videoUrl: string | null = null
+
+  // ── VIDEO URLs (highest priority) ──
+  // Facebook embeds video data in JSON inside the page HTML
+  const videoPatterns = [
+    /["']playable_url["']\s*:\s*["'](https:\/\/video[^"'\\]+)["']/,
+    /["']playable_url_quality_hd["']\s*:\s*["'](https:\/\/video[^"'\\]+)["']/,
+    /["']src_no_ratelimit["']\s*:\s*["'](https:\/\/video[^"'\\]+)["']/,
+    /["']video_sd_url["']\s*:\s*["'](https:\/\/[^"'\\]+fbcdn[^"'\\]+\.mp4[^"'\\]*)["']/,
+    /["']video_hd_url["']\s*:\s*["'](https:\/\/[^"'\\]+fbcdn[^"'\\]+\.mp4[^"'\\]*)["']/,
+    /"src"\s*:\s*"(https:\/\/video\.xx\.fbcdn\.net[^"]+)"/,
+    /https:\/\/video\.[a-z0-9-]+\.fbcdn\.net\/v\/[^\s"'<>]{30,}/,
+  ]
+  for (const pat of videoPatterns) {
+    const m = html.match(pat)
+    if (m) {
+      const url = pat.source.includes('(') ? m[1] : m[0]
+      if (url?.includes('fbcdn.net') || url?.includes('facebook.com')) {
+        videoUrl = dec(url)
+        break
+      }
+    }
+  }
+
+  // ── THUMBNAIL / IMAGE ──
+  // og:image is set by Facebook to the actual ad creative
+  const ogPatterns = [
+    /property="og:image"\s+content="([^"]+)"/,
+    /content="([^"]+)"\s+property="og:image"/,
+    /property='og:image'\s+content='([^']+)'/,
+  ]
+  for (const pat of ogPatterns) {
+    const m = html.match(pat)
+    if (m?.[1]?.startsWith('http')) {
+      thumbnail = dec(m[1])
+      break
+    }
+  }
+
+  // If video found, also look for its poster/thumbnail
+  if (videoUrl && !thumbnail) {
+    const posterPats = [
+      /["']thumbnailImage["'][^}]*?["']uri["']\s*:\s*["'](https:\/\/[^"']+fbcdn[^"']+)["']/,
+      /["']preferred_thumbnail["'][^}]*?["']uri["']\s*:\s*["'](https:\/\/[^"']+fbcdn[^"']+)["']/,
+      /["']thumbnail_url["']\s*:\s*["'](https:\/\/[^"']+fbcdn[^"']+)["']/,
+    ]
+    for (const pat of posterPats) {
+      const m = html.match(pat)
+      if (m?.[1]) { thumbnail = dec(m[1]); break }
+    }
+  }
+
+  // Fallback: any fbcdn image URL
+  if (!thumbnail) {
+    const fbImgs = html.match(/https:\/\/[a-z0-9-]+\.fbcdn\.net\/v\/[^\s"'<>]{30,}/g)
+    if (fbImgs?.length) {
+      // Prefer non-video, larger images
+      thumbnail = fbImgs.find(u => !u.includes('video') && !u.includes('.mp4')) || fbImgs[0]
+    }
+  }
+
+  return { thumbnail, videoUrl }
 }
 
-async function fetchAndExtract(url: string): Promise<string | null> {
-  try {
-    const controller = new AbortController()
-    const t = setTimeout(() => controller.abort(), 10000)
-    const res = await fetch(url, { signal: controller.signal, headers: HEADERS })
-    clearTimeout(t)
-    if (!res.ok) return null
-    const html = await res.text()
-    return extractFromHtml(html)
-  } catch {
-    return null
-  }
-}
+async function fetchMedia(adId: string, snapshotUrl: string) {
+  if (cache.has(adId)) return cache.get(adId)!
 
-async function getThumbnail(adId: string, snapshotUrl: string): Promise<string | null> {
-  const cacheKey = adId
-  if (cache.has(cacheKey)) return cache.get(cacheKey)!
+  const result = { thumbnail: null as string | null, videoUrl: null as string | null }
 
-  // Strategy 1: Public Ads Library page — no login needed, has og:image = actual creative
-  const publicLibraryUrl = `https://www.facebook.com/ads/library/?id=${adId}&country=ALL`
-  let thumb = await fetchAndExtract(publicLibraryUrl)
+  const urls = [
+    `https://www.facebook.com/ads/library/?id=${adId}&country=ALL`,
+    `https://www.facebook.com/ads/library/?id=${adId}`,
+    snapshotUrl,
+  ].filter(Boolean)
 
-  // Strategy 2: render_ad snapshot URL (includes access_token)
-  if (!thumb && snapshotUrl) {
-    thumb = await fetchAndExtract(snapshotUrl)
-  }
-
-  // Strategy 3: Try without country param
-  if (!thumb) {
-    thumb = await fetchAndExtract(`https://www.facebook.com/ads/library/?id=${adId}`)
+  for (const url of urls) {
+    try {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), 10000)
+      const res = await fetch(url, { signal: ctrl.signal, headers: HEADERS })
+      clearTimeout(t)
+      if (!res.ok) continue
+      const html = await res.text()
+      const extracted = extractMedia(html)
+      if (extracted.thumbnail || extracted.videoUrl) {
+        result.thumbnail = extracted.thumbnail
+        result.videoUrl = extracted.videoUrl
+        break
+      }
+    } catch { continue }
   }
 
-  cache.set(cacheKey, thumb)
-  return thumb
+  cache.set(adId, result)
+  return result
 }
 
 export async function GET(request: NextRequest) {
@@ -98,36 +126,34 @@ export async function GET(request: NextRequest) {
   const adId = searchParams.get('ad_id')
   const snapshotUrl = searchParams.get('url') || ''
 
-  if (!adId) return NextResponse.json({ thumbnail: null }, { status: 400 })
+  if (!adId) return NextResponse.json({ thumbnail: null, videoUrl: null }, { status: 400 })
 
   const admin = createAdminClient()
 
-  // Return cached DB value immediately if exists
+  // Return cached DB values immediately
   const { data: existing } = await admin
     .from('discovery_ads_index')
-    .select('thumbnail_url')
+    .select('thumbnail_url, video_url')
     .eq('ad_id', adId)
     .single()
 
-  if (existing?.thumbnail_url) {
+  if (existing?.thumbnail_url || existing?.video_url) {
     return NextResponse.json(
-      { thumbnail: existing.thumbnail_url },
+      { thumbnail: existing.thumbnail_url, videoUrl: existing.video_url },
       { headers: { 'Cache-Control': 'public, max-age=86400' } }
     )
   }
 
-  // Extract thumbnail
-  const thumbnail = await getThumbnail(adId, snapshotUrl)
+  const { thumbnail, videoUrl } = await fetchMedia(adId, snapshotUrl)
 
-  // Persist to DB
-  if (thumbnail) {
+  if (thumbnail || videoUrl) {
     await admin.from('discovery_ads_index')
-      .update({ thumbnail_url: thumbnail })
+      .update({ thumbnail_url: thumbnail, video_url: videoUrl })
       .eq('ad_id', adId)
   }
 
   return NextResponse.json(
-    { thumbnail },
+    { thumbnail, videoUrl },
     { headers: { 'Cache-Control': 'public, max-age=3600' } }
   )
 }
