@@ -486,11 +486,24 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
   const isBrandLogo = (url: string | null | undefined) =>
     !!url && url.includes('graph.facebook.com')
 
-  const [thumbnail] = useState<string | null>(ad.thumbnailUrl ?? null)
   const [videoUrl] = useState<string | null>(ad.videoUrl ?? null)
   const [playing, setPlaying] = useState(false)
-  const [showIframe, setShowIframe] = useState(false)
+  const [iframeVisible, setIframeVisible] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
+
+  // Lazy-load the snapshot iframe when the card enters the viewport
+  useEffect(() => {
+    if (!ad.snapshotUrl || videoUrl) return
+    const el = previewRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setIframeVisible(true); obs.disconnect() } },
+      { rootMargin: '200px' }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [ad.snapshotUrl, videoUrl])
 
   const daysText = ad.daysRunning > 365
     ? `${Math.floor(ad.daysRunning / 365)}y ${Math.floor((ad.daysRunning % 365) / 30)}mo`
@@ -546,71 +559,50 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
       </div>
 
       {/* ── Visual preview ── */}
-      <div style={{ position: 'relative', background: '#f1f5f9', overflow: 'hidden', aspectRatio: '4/3', maxHeight: 320 }}>
+      <div ref={previewRef} style={{ position: 'relative', background: avatarBg, overflow: 'hidden', aspectRatio: '4/3', maxHeight: 320 }}>
 
-        {/* ── Iframe mode: renders the actual ad from Meta snapshot URL ── */}
-        {showIframe && ad.snapshotUrl ? (
+        {/* ── Brand initials — always visible behind iframe while it loads ── */}
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 48, fontWeight: 800, color: '#dffe95', letterSpacing: -2, opacity: 0.9 }}>{initials}</span>
+        </div>
+
+        {/* ── Lazy-loaded snapshot iframe — shows real ad image/video ── */}
+        {/* Only renders when card scrolls into view (Intersection Observer) */}
+        {iframeVisible && ad.snapshotUrl && !videoUrl && (
+          <iframe
+            src={ad.snapshotUrl}
+            title={ad.pageName}
+            scrolling="no"
+            style={{
+              position: 'absolute', inset: 0,
+              width: '200%', height: '200%',          // render at 2× size
+              border: 'none', background: 'transparent',
+              transform: 'scale(0.5)', transformOrigin: 'top left', // scale down to fit
+              pointerEvents: 'none',                  // card click-through works normally
+            }}
+            sandbox="allow-scripts allow-same-origin"
+          />
+        )}
+
+        {/* ── Video player (if video URL stored) ── */}
+        {videoUrl && (
           <>
-            <iframe
-              src={ad.snapshotUrl}
-              title={ad.pageName}
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none', background: '#fff' }}
-              sandbox="allow-scripts allow-same-origin"
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              controls={playing}
+              preload="metadata"
+              playsInline
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              onEnded={() => setPlaying(false)}
             />
-            <button
-              onClick={() => setShowIframe(false)}
-              style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 6, padding: '2px 8px', fontSize: 11, cursor: 'pointer', zIndex: 10 }}
-            >✕ Close</button>
-          </>
-        ) : (
-          <>
-            {/* ── Brand initials fallback ── */}
-            <div style={{ position: 'absolute', inset: 0, background: avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 48, fontWeight: 800, color: '#dffe95', letterSpacing: -2, opacity: 0.9 }}>{initials}</span>
-            </div>
-
-            {/* ── Real thumbnail (if scraped) ── */}
-            {thumbnail && !isBrandLogo(thumbnail) && !videoUrl && (
-              <img
-                src={thumbnail}
-                alt={ad.pageName}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                onError={() => {/* keep initials */}}
-              />
-            )}
-
-            {/* ── Video player ── */}
-            {videoUrl && (
-              <>
-                <video
-                  ref={videoRef}
-                  src={videoUrl}
-                  poster={thumbnail || undefined}
-                  controls={playing}
-                  preload="metadata"
-                  playsInline
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  onEnded={() => setPlaying(false)}
-                />
-                {!playing && (
-                  <div onClick={() => { setPlaying(true); setTimeout(() => videoRef.current?.play(), 50) }}
-                    style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer' }}>
-                    <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
-                      <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* ── "View Ad" button — loads real creative in iframe ── */}
-            {ad.snapshotUrl && !videoUrl && (
-              <button
-                onClick={() => setShowIframe(true)}
-                style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.65)', color: '#fff', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', backdropFilter: 'blur(4px)' }}
-              >
-                👁 View Ad
-              </button>
+            {!playing && (
+              <div onClick={() => { setPlaying(true); setTimeout(() => videoRef.current?.play(), 50) }}
+                style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer' }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
+                  <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
+                </div>
+              </div>
             )}
           </>
         )}
