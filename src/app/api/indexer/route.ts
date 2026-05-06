@@ -71,7 +71,54 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
   return false
 }
 
-// ── Meta Ads Library fetch ───────────────────────────────────
+// ── Category keyword expansion map ──────────────────────────
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  'fashion':        ['fashion','clothing','outfit','apparel','streetwear','style'],
+  'beauty':         ['beauty','skincare','makeup','cosmetics','serum','moisturizer'],
+  'fitness':        ['fitness','workout','gym','weight loss','muscle','protein'],
+  'health':         ['health','wellness','supplement','vitamin','immunity','detox'],
+  'food':           ['food','meal delivery','snack','recipe','restaurant','beverage'],
+  'coffee':         ['coffee','espresso','cold brew','cafe','beans'],
+  'tech':           ['software','saas','app','ai tool','automation','productivity'],
+  'finance':        ['investing','crypto','trading','insurance','credit','wealth'],
+  'home':           ['home decor','furniture','kitchen','bedroom','interior','cleaning'],
+  'baby':           ['baby','toddler','kids','parenting','infant','nursery'],
+  'pets':           ['dog','cat','pet','puppy','vet','grooming'],
+  'travel':         ['travel','hotel','vacation','flight','holiday','destination'],
+  'education':      ['course','coaching','masterclass','certification','training','skills'],
+  'ecommerce':      ['shop now','free shipping','sale','discount','limited offer','buy now'],
+  'jewelry':        ['jewelry','ring','necklace','bracelet','watch','diamond','gold'],
+  'sports':         ['sports','outdoor','hiking','cycling','running','athletic'],
+  'gaming':         ['gaming','esports','streamer','console','pc gaming','game'],
+  'real estate':    ['real estate','property','mortgage','apartment','rent','listing'],
+  'automotive':     ['car','vehicle','auto','truck','electric vehicle','lease'],
+  'b2b':            ['b2b','agency','marketing','lead generation','enterprise','consulting'],
+}
+
+// ── Single-page Meta fetch helper ───────────────────────────
+async function fetchOnePage(
+  params: Record<string, string>,
+  after = ''
+): Promise<{ ads: any[]; nextCursor: string; hasMore: boolean; error?: string }> {
+  if (after) params = { ...params, after }
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 15000)
+    const res = await fetch(`https://graph.facebook.com/${V}/ads_archive?` + new URLSearchParams(params), { signal: ctrl.signal })
+    clearTimeout(t)
+    const data = await res.json()
+    if (data.error) return { ads: [], nextCursor: '', hasMore: false, error: data.error.message }
+    return {
+      ads: data.data || [],
+      nextCursor: data.paging?.cursors?.after || '',
+      hasMore: !!data.paging?.next,
+    }
+  } catch (e: any) {
+    return { ads: [], nextCursor: '', hasMore: false, error: e.name === 'AbortError' ? 'Timed out after 15s' : e.message }
+  }
+}
+
+// ── Meta Ads Library fetch (supports ad copy, brand, category) ─
 async function fetchAdsForTerm(
   term: string,
   country: string,
@@ -79,50 +126,104 @@ async function fetchAdsForTerm(
   termType: string = 'adcopy',
   admin?: any,
 ): Promise<{ ads: any[], error?: string }> {
-  const allAds: any[] = []
-  let after = ''
   const metaCountry = normalizeCountry(country)
+  const seenIds = new Set<string>()
+  const allAds: any[] = []
 
-  // For brand-type terms: look up known page_ids from our DB so we can
-  // fetch ALL ads from that brand's page directly (not just ad-copy mentions)
-  let pageIds: string[] = []
-  if (termType === 'brand' && admin) {
-    const { data: pages } = await admin
-      .from('discovery_ads_index')
-      .select('page_id')
-      .ilike('page_name', `%${term}%`)
-      .limit(20)
-    pageIds = [...new Set((pages || []).map((p: any) => p.page_id).filter(Boolean))] as string[]
+  const addAds = (ads: any[]) => {
+    for (const ad of ads) {
+      if (ad.id && !seenIds.has(ad.id)) {
+        seenIds.add(ad.id)
+        allAds.push(ad)
+      }
+    }
   }
 
-  for (let page = 0; page < PAGES_PER_TERM; page++) {
-    const params: Record<string, string> = {
-      access_token: token,
-      search_terms: term,
-      ad_reached_countries: JSON.stringify([metaCountry]),
-      fields: META_FIELDS,
-      limit: String(ADS_PER_TERM),
-    }
-    // Brand crawl: also filter by page IDs if we already know them
-    if (termType === 'brand' && pageIds.length) {
-      params.search_page_ids = JSON.stringify(pageIds)
-    }
-    if (after) params.after = after
-    try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 15000) // 15s per page
-      const res = await fetch(`https://graph.facebook.com/${V}/ads_archive?` + new URLSearchParams(params), { signal: controller.signal })
-      clearTimeout(timeout)
-      const data = await res.json()
-      if (data.error) return { ads: allAds, error: data.error.message }
-      if (!data.data?.length) break
-      allAds.push(...data.data)
-      if (!data.paging?.next) break
-      after = data.paging.cursors?.after || ''
-    } catch (e: any) {
-      return { ads: allAds, error: e.name === 'AbortError' ? 'Timed out after 15s' : e.message }
+  const baseParams = (searchTerm: string): Record<string, string> => ({
+    access_token: token,
+    search_terms: searchTerm,
+    ad_reached_countries: JSON.stringify([metaCountry]),
+    fields: META_FIELDS,
+    limit: String(ADS_PER_TERM),
+  })
+
+  // ── AD COPY: keyword search in ad creative text ──────────────
+  if (termType === 'adcopy') {
+    const params = baseParams(term)
+    let cursor = ''
+    for (let p = 0; p < PAGES_PER_TERM; p++) {
+      const { ads, nextCursor, hasMore, error } = await fetchOnePage(params, cursor)
+      if (error) return { ads: allAds, error }
+      addAds(ads)
+      if (!hasMore) break
+      cursor = nextCursor
     }
   }
+
+  // ── BRAND: search by name AND by known page IDs from DB ──────
+  if (termType === 'brand') {
+    // Pass 1 — search Meta for ads mentioning the brand name (finds page_ids too)
+    const params = baseParams(term)
+    let cursor = ''
+    for (let p = 0; p < PAGES_PER_TERM; p++) {
+      const { ads, nextCursor, hasMore, error } = await fetchOnePage(params, cursor)
+      if (error) return { ads: allAds, error }
+      addAds(ads)
+      if (!hasMore) break
+      cursor = nextCursor
+    }
+
+    // Pass 2 — look up page_ids in our DB and fetch ALL ads directly from those pages
+    if (admin) {
+      const { data: pages } = await admin
+        .from('discovery_ads_index')
+        .select('page_id')
+        .ilike('page_name', `%${term}%`)
+        .limit(30)
+      const pageIds = [...new Set((pages || []).map((p: any) => p.page_id).filter(Boolean))] as string[]
+
+      if (pageIds.length) {
+        // search_page_ids lets us fetch every ad from those pages regardless of ad copy
+        const brandParams: Record<string, string> = {
+          access_token: token,
+          search_terms: term,
+          search_page_ids: JSON.stringify(pageIds),
+          ad_reached_countries: JSON.stringify([metaCountry]),
+          fields: META_FIELDS,
+          limit: String(ADS_PER_TERM),
+        }
+        let brandCursor = ''
+        for (let p = 0; p < PAGES_PER_TERM + 1; p++) { // extra page for brands
+          const { ads, nextCursor, hasMore, error } = await fetchOnePage(brandParams, brandCursor)
+          if (error) break
+          addAds(ads)
+          if (!hasMore) break
+          brandCursor = nextCursor
+        }
+      }
+    }
+  }
+
+  // ── CATEGORY: expand term → related keywords, search each ────
+  if (termType === 'category') {
+    // Find the expansion list for this category (fuzzy match against keys)
+    const termLower = term.toLowerCase()
+    const matchedKey = Object.keys(CATEGORY_KEYWORDS).find(k =>
+      termLower.includes(k) || k.includes(termLower)
+    )
+    const keywords = matchedKey
+      ? CATEGORY_KEYWORDS[matchedKey]
+      : [term] // fallback to the raw term if no expansion found
+
+    for (const kw of keywords) {
+      const params = baseParams(kw)
+      let cursor = ''
+      // 1 page per keyword keeps total volume reasonable
+      const { ads, error } = await fetchOnePage(params, cursor)
+      if (!error) addAds(ads)
+    }
+  }
+
   return { ads: allAds }
 }
 

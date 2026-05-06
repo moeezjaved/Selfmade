@@ -70,13 +70,14 @@ export async function POST(request: NextRequest) {
   const { action } = body
 
   if (action === 'add_term') {
-    const { term, category, countries, priority } = body
+    const { term, category, countries, priority, term_type } = body
     if (!term?.trim()) return NextResponse.json({ error: 'Term required' }, { status: 400 })
     const { data, error } = await admin.from('discovery_crawl_terms').insert({
       term: term.trim().toLowerCase(),
       category: category || 'General',
       countries: countries || ['US'],
       priority: priority || 5,
+      term_type: term_type || 'adcopy',
       is_active: true,
     }).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
