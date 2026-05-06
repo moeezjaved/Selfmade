@@ -118,12 +118,15 @@ async function fetchOnePage(
   }
 }
 
-// ── Meta Ads Library fetch (supports ad copy, brand, category) ─
+// ── Meta Ads Library fetch — always runs all 3 strategies ──────
+// adcopy: searches ad body text for the term
+// brand:  searches by term + fetches all ads from known page IDs
+// category: expands the term into related keywords and searches each
 async function fetchAdsForTerm(
   term: string,
   country: string,
   token: string,
-  termType: string = 'adcopy',
+  _termType: string = 'all', // kept for signature compat, always runs all 3
   admin?: any,
 ): Promise<{ ads: any[], error?: string }> {
   const metaCountry = normalizeCountry(country)
@@ -147,33 +150,33 @@ async function fetchAdsForTerm(
     limit: String(ADS_PER_TERM),
   })
 
-  // ── AD COPY: keyword search in ad creative text ──────────────
-  if (termType === 'adcopy') {
+  // ── 1. AD COPY: keyword search in ad creative text ───────────
+  {
     const params = baseParams(term)
     let cursor = ''
     for (let p = 0; p < PAGES_PER_TERM; p++) {
       const { ads, nextCursor, hasMore, error } = await fetchOnePage(params, cursor)
-      if (error) return { ads: allAds, error }
+      if (error) break  // non-fatal — continue to brand pass
       addAds(ads)
       if (!hasMore) break
       cursor = nextCursor
     }
   }
 
-  // ── BRAND: search by name AND by known page IDs from DB ──────
-  if (termType === 'brand') {
-    // Pass 1 — search Meta for ads mentioning the brand name (finds page_ids too)
+  // ── 2. BRAND: search by name AND by known page IDs from DB ───
+  {
+    // Pass 2a — search Meta for ads mentioning the brand name
     const params = baseParams(term)
     let cursor = ''
     for (let p = 0; p < PAGES_PER_TERM; p++) {
       const { ads, nextCursor, hasMore, error } = await fetchOnePage(params, cursor)
-      if (error) return { ads: allAds, error }
+      if (error) break
       addAds(ads)
       if (!hasMore) break
       cursor = nextCursor
     }
 
-    // Pass 2 — look up page_ids in our DB and fetch ALL ads directly from those pages
+    // Pass 2b — look up page_ids in our DB and fetch ALL ads directly from those pages
     if (admin) {
       const { data: pages } = await admin
         .from('discovery_ads_index')
@@ -183,7 +186,6 @@ async function fetchAdsForTerm(
       const pageIds = Array.from(new Set((pages || []).map((p: any) => p.page_id).filter(Boolean))) as string[]
 
       if (pageIds.length) {
-        // search_page_ids lets us fetch every ad from those pages regardless of ad copy
         const brandParams: Record<string, string> = {
           access_token: token,
           search_terms: term,
@@ -193,7 +195,7 @@ async function fetchAdsForTerm(
           limit: String(ADS_PER_TERM),
         }
         let brandCursor = ''
-        for (let p = 0; p < PAGES_PER_TERM + 1; p++) { // extra page for brands
+        for (let p = 0; p < PAGES_PER_TERM + 1; p++) {
           const { ads, nextCursor, hasMore, error } = await fetchOnePage(brandParams, brandCursor)
           if (error) break
           addAds(ads)
@@ -204,8 +206,8 @@ async function fetchAdsForTerm(
     }
   }
 
-  // ── CATEGORY: expand term → related keywords, search each ────
-  if (termType === 'category') {
+  // ── 3. CATEGORY: expand term → related keywords, search each ─
+  {
     // Find the expansion list for this category (fuzzy match against keys)
     const termLower = term.toLowerCase()
     const matchedKey = Object.keys(CATEGORY_KEYWORDS).find(k =>
@@ -525,8 +527,7 @@ export async function GET(request: NextRequest) {
         // ── Get terms to crawl ──
         let termsToRun: { term: string; countries: string[]; id: string; term_type: string }[] = []
         if (forceTerm) {
-          const forceType = request.nextUrl.searchParams.get('term_type') || 'adcopy'
-          termsToRun = [{ term: forceTerm, countries: [forceCountry || 'US'], id: 'manual', term_type: forceType }]
+          termsToRun = [{ term: forceTerm, countries: [forceCountry || 'US'], id: 'manual', term_type: 'all' }]
         } else {
           const { data: terms } = await admin
             .from('discovery_crawl_terms')
@@ -534,7 +535,7 @@ export async function GET(request: NextRequest) {
             .eq('is_active', true)
             .order('last_crawled_at', { ascending: true, nullsFirst: true })
             .limit(TERMS_PER_RUN)
-          termsToRun = (terms || []).map((t: any) => ({ ...t, term_type: t.term_type || 'adcopy' }))
+          termsToRun = (terms || []).map((t: any) => ({ ...t, term_type: 'all' }))
         }
 
         if (!termsToRun.length) {
@@ -543,10 +544,7 @@ export async function GET(request: NextRequest) {
           return
         }
 
-        const typeCounts = termsToRun.reduce((acc: Record<string, number>, t) => {
-          acc[t.term_type] = (acc[t.term_type] || 0) + 1; return acc
-        }, {})
-        send('log', `📋 Found ${termsToRun.length} terms to crawl (${Object.entries(typeCounts).map(([k,v]) => `${v} ${k}`).join(', ')})`)
+        send('log', `📋 Found ${termsToRun.length} terms to crawl (ad copy + brand + category for each)`)
 
         // ── Get Meta token ──
         const metaToken = await getMetaToken(admin)
@@ -555,14 +553,13 @@ export async function GET(request: NextRequest) {
         let totalAdsUpserted = 0
 
         // ── Crawl each term × country ──
-        for (const { term, countries, id, term_type } of termsToRun) {
+        for (const { term, countries, id } of termsToRun) {
           const countriesToCrawl = forceCountry ? [forceCountry] : (countries || ['US'])
-          const typeIcon = term_type === 'brand' ? '🏷️' : term_type === 'category' ? '📂' : '📝'
 
           for (const country of countriesToCrawl) {
-            send('log', `${typeIcon} Crawling "${term}" [${term_type}] / ${country}…`)
+            send('log', `🔍 Crawling "${term}" [ad copy + brand + category] / ${country}…`)
 
-            const { ads, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, term_type, admin)
+            const { ads, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, 'all', admin)
 
             if (fetchError) {
               send('log', `  ❌ ${term}/${country}: ${fetchError}`)
