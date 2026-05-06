@@ -53,7 +53,6 @@ export async function GET(request: NextRequest) {
 
     const params: Record<string, string> = {
       access_token: token,
-      ad_type: 'ALL',
       ad_reached_countries: JSON.stringify([country]),
       fields,
       limit: String(limit),
@@ -77,7 +76,8 @@ export async function GET(request: NextRequest) {
     const data = await res.json()
 
     if (data.error) {
-      return NextResponse.json({ error: data.error.message }, { status: 400 })
+      console.log('META API ERROR:', JSON.stringify(data.error))
+      return NextResponse.json({ error: `${data.error.message} (code: ${data.error.code}, type: ${data.error.type})` }, { status: 400 })
     }
 
     // Transform ads
