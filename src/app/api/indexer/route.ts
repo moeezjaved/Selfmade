@@ -899,22 +899,39 @@ export async function GET(request: NextRequest) {
             }
 
             // ── Attach creatives then save all ads ───────────────────────
-            // ScrapingBee renders the snapshot URL → extracts real image/video URL.
-            // Falls back to brand profile picture so every card has a visual.
             send('log', `  🖼 Fetching creatives for ${ads.length} ads…`)
             const { rows, skipped } = await attachCreatives(ads, term, country, term_type || 'adcopy')
             const realCreatives = rows.filter(r => r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com')).length
             send('log', `  📸 ${realCreatives} real creatives, ${rows.length - realCreatives} brand logo placeholders`)
 
+            // ── Deduplicate by creative content ──────────────────────────
+            // Meta creates multiple ad_ids for the same creative (split-testing audiences/budgets).
+            // We keep one row per unique creative fingerprint: page + body + title.
+            // When duplicates exist, keep the one with the most days_running (most proven).
+            const creativeMap = new Map<string, any>()
+            for (const row of rows) {
+              const body100  = (row.body  || '').slice(0, 100).trim()
+              const title50  = (row.title || '').slice(0, 50).trim()
+              const thumb    = (row.thumbnail_url || '').split('?')[0].slice(-40) // last 40 chars of path (stable)
+              const key = `${row.page_id}||${body100}||${title50}||${thumb}`
+              const existing = creativeMap.get(key)
+              if (!existing || row.days_running > existing.days_running) {
+                creativeMap.set(key, row)
+              }
+            }
+            const dedupedRows = Array.from(creativeMap.values())
+            const dupCount = rows.length - dedupedRows.length
+            if (dupCount > 0) send('log', `  🔄 Deduplicated ${dupCount} duplicate creatives — ${dedupedRows.length} unique ads`)
+
             const { error } = await admin
               .from('discovery_ads_index')
-              .upsert(rows, { onConflict: 'ad_id', ignoreDuplicates: false })
+              .upsert(dedupedRows, { onConflict: 'ad_id', ignoreDuplicates: false })
 
             await admin.from('discovery_crawl_log').insert({
-              term, country, ads_fetched: ads.length, ads_new: error ? 0 : rows.length, error: error?.message,
+              term, country, ads_fetched: ads.length, ads_new: error ? 0 : dedupedRows.length, error: error?.message,
             })
 
-            send('log', `  ✅ ${term}/${country}: ${rows.length} ads saved`)
+            send('log', `  ✅ ${term}/${country}: ${dedupedRows.length} unique ads saved`)
             totalAdsUpserted += rows.length
           }
 
