@@ -45,13 +45,12 @@ const EMBED_BATCH = 200    // embed ALL new ads per run (OpenAI handles large ba
 const CLASSIFY_BATCH = 25  // ads per Claude call — 25 is safe within token limits
 
 // ── Curation threshold ───────────────────────────────────────
-// Only keep ads that have been running at least this many days.
-// 30+ days = brand is profitable on this ad, it's a proven winner.
-// Brand-tier terms can use a lower threshold (7 days) since we
-// specifically want to track known brands closely.
-const MIN_DAYS_ADCOPY   = 30  // broad keyword crawls — only proven winners
-const MIN_DAYS_BRAND    = 7   // brand watchlist — catch winners earlier
-const MIN_DAYS_CATEGORY = 21  // category crawls — balance volume vs quality
+// Set to 0 = index everything, let users filter in Discovery UI.
+// Atria indexes ALL ads — curation is a display filter, not a crawl filter.
+// Increase these only when the DB is large enough (100k+ ads) to afford filtering.
+const MIN_DAYS_ADCOPY   = 0
+const MIN_DAYS_BRAND    = 0
+const MIN_DAYS_CATEGORY = 0
 
 const META_FIELDS = [
   'id','ad_creation_time','ad_delivery_start_time','ad_delivery_stop_time',
@@ -127,20 +126,27 @@ async function fetchOnePage(
   }
 }
 
-// ── Meta Ads Library fetch — always runs all 3 strategies ──────
-// adcopy: searches ad body text for the term
-// brand:  searches by term + fetches all ads from known page IDs
-// category: expands the term into related keywords and searches each
+// ── Meta Ads Library fetch ──────────────────────────────────
+//
+// Strategy:
+//  1. AD COPY  — keyword search in ad body text (good for topic/product searches)
+//  2. BRAND    — discover the brand's actual page_id, then fetch ALL their ads directly
+//               This is the key fix: searching "gymshark" as search_terms returns ads
+//               that MENTION gymshark (competitors, reviewers). We need to find Gymshark's
+//               page_id from the initial results, then fetch ALL ads from that page.
+//  3. CATEGORY — expand the term into related keywords (e.g. "fitness" → ["gym","protein",…])
+//
 async function fetchAdsForTerm(
   term: string,
   country: string,
   token: string,
   _termType: string = 'all', // kept for signature compat, always runs all 3
   admin?: any,
-): Promise<{ ads: any[], error?: string }> {
+): Promise<{ ads: any[], brandPageIds: string[], error?: string }> {
   const metaCountry = normalizeCountry(country)
   const seenIds = new Set<string>()
   const allAds: any[] = []
+  const discoveredBrandPageIds = new Set<string>()
 
   const addAds = (ads: any[]) => {
     for (const ad of ads) {
@@ -160,6 +166,8 @@ async function fetchAdsForTerm(
   })
 
   // ── 1. AD COPY: keyword search in ad creative text ───────────
+  // This finds ads whose body/title contains the term. For brand names this
+  // returns ads that MENTION the brand — good for discovery but not complete.
   {
     const params = baseParams(term)
     let cursor = ''
@@ -172,70 +180,76 @@ async function fetchAdsForTerm(
     }
   }
 
-  // ── 2. BRAND: search by name AND by known page IDs from DB ───
+  // ── 2. BRAND: find the brand's page_id, then fetch ALL their ads ──────────────────
+  // The critical step: after step 1 we have some ads. Among them, find any whose
+  // page_name closely matches our term — those ARE the brand's own ads. Extract their
+  // page_id(s), then fetch ALL ads from those pages using search_page_ids (no
+  // content restriction, so we get every ad the brand has ever run).
   {
-    // Pass 2a — search Meta for ads mentioning the brand name
-    const params = baseParams(term)
-    let cursor = ''
-    for (let p = 0; p < PAGES_PER_TERM; p++) {
-      const { ads, nextCursor, hasMore, error } = await fetchOnePage(params, cursor)
-      if (error) break
-      addAds(ads)
-      if (!hasMore) break
-      cursor = nextCursor
-    }
+    const termLower = term.toLowerCase()
 
-    // Pass 2b — look up page_ids in our DB and fetch ALL ads directly from those pages
+    // Collect page_ids from step-1 results where page_name ≈ term
+    const fromSearch = allAds
+      .filter((ad: any) => ad.page_name && ad.page_name.toLowerCase().includes(termLower))
+      .map((ad: any) => ad.page_id)
+      .filter(Boolean)
+    fromSearch.forEach((id: string) => discoveredBrandPageIds.add(id))
+
+    // Also check our DB for previously crawled matching pages
     if (admin) {
-      const { data: pages } = await admin
+      const { data: dbPages } = await admin
         .from('discovery_ads_index')
         .select('page_id')
         .ilike('page_name', `%${term}%`)
-        .limit(30)
-      const pageIds = Array.from(new Set((pages || []).map((p: any) => p.page_id).filter(Boolean))) as string[]
+        .limit(10)
+      ;(dbPages || []).forEach((p: any) => { if (p.page_id) discoveredBrandPageIds.add(p.page_id) })
+    }
 
-      if (pageIds.length) {
-        const brandParams: Record<string, string> = {
-          access_token: token,
-          search_terms: term,
-          search_page_ids: JSON.stringify(pageIds),
-          ad_reached_countries: JSON.stringify([metaCountry]),
-          fields: META_FIELDS,
-          limit: String(ADS_PER_TERM),
-        }
-        let brandCursor = ''
-        for (let p = 0; p < PAGES_PER_TERM + 1; p++) {
-          const { ads, nextCursor, hasMore, error } = await fetchOnePage(brandParams, brandCursor)
-          if (error) break
-          addAds(ads)
-          if (!hasMore) break
-          brandCursor = nextCursor
-        }
+    const pageIds = Array.from(discoveredBrandPageIds).slice(0, 10) // Meta allows max 10
+
+    if (pageIds.length) {
+      // Fetch ALL ads from these brand pages using search_page_ids.
+      // Use a single space for search_terms — Meta requires it but it acts as a wildcard
+      // when search_page_ids is set, so all ads for that page are returned.
+      const brandParams: Record<string, string> = {
+        access_token: token,
+        search_terms: ' ',             // required by API but effectively a wildcard
+        search_page_ids: JSON.stringify(pageIds),
+        ad_reached_countries: JSON.stringify([metaCountry]),
+        fields: META_FIELDS,
+        limit: String(ADS_PER_TERM),
+      }
+      let brandCursor = ''
+      // Fetch more pages for brand — we want ALL their ads, not just 150
+      for (let p = 0; p < PAGES_PER_TERM * 2; p++) {
+        const { ads, nextCursor, hasMore, error } = await fetchOnePage(brandParams, brandCursor)
+        if (error) break
+        addAds(ads)
+        if (!hasMore) break
+        brandCursor = nextCursor
       }
     }
   }
 
   // ── 3. CATEGORY: expand term → related keywords, search each ─
   {
-    // Find the expansion list for this category (fuzzy match against keys)
     const termLower = term.toLowerCase()
     const matchedKey = Object.keys(CATEGORY_KEYWORDS).find(k =>
       termLower.includes(k) || k.includes(termLower)
     )
     const keywords = matchedKey
       ? CATEGORY_KEYWORDS[matchedKey]
-      : [term] // fallback to the raw term if no expansion found
+      : [] // for brand names don't fall back to raw term — already covered in step 1
 
     for (const kw of keywords) {
       const params = baseParams(kw)
-      let cursor = ''
       // 1 page per keyword keeps total volume reasonable
-      const { ads, error } = await fetchOnePage(params, cursor)
+      const { ads, error } = await fetchOnePage(params, '')
       if (!error) addAds(ads)
     }
   }
 
-  return { ads: allAds }
+  return { ads: allAds, brandPageIds: Array.from(discoveredBrandPageIds) }
 }
 
 // ── Classification helpers ───────────────────────────────────
@@ -355,31 +369,50 @@ function extractMediaFromHtml(html: string): { thumbnail: string | null; videoUr
   return { thumbnail, videoUrl }
 }
 
-// ── Browserless-powered full render ──────────────────────────
-// Uses a real headless Chrome to fully execute JavaScript before returning
-// the HTML. This is the only reliable way to get images from Facebook's SPA.
-// Falls back to plain HTTP fetch if BROWSERLESS_TOKEN is not set.
+// ── ScrapingBee / Browserless renderer ──────────────────────
+// Priority: ScrapingBee (SCRAPINGBEE_KEY) → Browserless (BROWSERLESS_TOKEN) → plain fetch
+// ScrapingBee and Browserless both use real headless Chrome with residential IPs —
+// the only way to get real ad images from Facebook's JavaScript SPA.
 async function fetchRenderedHtml(url: string): Promise<string | null> {
-  const token = process.env.BROWSERLESS_TOKEN
-  if (token) {
+  // 1. ScrapingBee (preferred — simpler API, residential proxies included)
+  const sbKey = process.env.SCRAPINGBEE_KEY
+  if (sbKey) {
     try {
-      const res = await fetch(`https://chrome.browserless.io/content?token=${token}`, {
+      const params = new URLSearchParams({
+        api_key: sbKey,
+        url,
+        render_js: 'true',
+        premium_proxy: 'true',   // residential IP — bypasses Facebook bot detection
+        wait: '3000',            // wait 3s after JS load for lazy images
+        timeout: '30000',
+      })
+      const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params}`, {
+        signal: AbortSignal.timeout(35000),
+      })
+      if (res.ok) return await res.text()
+    } catch { /* fall through */ }
+  }
+
+  // 2. Browserless (legacy / alternative)
+  const blToken = process.env.BROWSERLESS_TOKEN
+  if (blToken) {
+    try {
+      const res = await fetch(`https://chrome.browserless.io/content?token=${blToken}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url,
-          // Wait for network to go quiet + extra 2s for lazy-loaded images
           gotoOptions: { waitUntil: 'networkidle2', timeout: 25000 },
           waitFor: 2000,
-          // Pass realistic browser headers so Facebook doesn't block us
           userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         }),
         signal: AbortSignal.timeout(35000),
       })
       if (res.ok) return await res.text()
-    } catch { /* fall through to plain fetch */ }
+    } catch { /* fall through */ }
   }
-  // Plain HTTP fetch — works for non-SPA pages, fails silently for Facebook
+
+  // 3. Plain HTTP fetch — fast but fails for Facebook's JS-rendered pages
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), 8000)
@@ -689,13 +722,10 @@ export async function GET(request: NextRequest) {
         for (const { term, countries, id, term_type } of termsToRun) {
           const countriesToCrawl = forceCountry ? [forceCountry] : (countries || ['US'])
 
-          // Show the min-days threshold being applied for this term
-          const minDaysLabel = term_type === 'brand' ? `${MIN_DAYS_BRAND}d` : term_type === 'category' ? `${MIN_DAYS_CATEGORY}d` : `${MIN_DAYS_ADCOPY}d`
-
           for (const country of countriesToCrawl) {
-            send('log', `🔍 Crawling "${term}" [${term_type || 'adcopy'}, min ${minDaysLabel}] / ${country}…`)
+            send('log', `🔍 Crawling "${term}" [${term_type || 'all'}] / ${country}…`)
 
-            const { ads, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, 'all', admin)
+            const { ads, brandPageIds, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, 'all', admin)
 
             if (fetchError) {
               send('log', `  ❌ ${term}/${country}: ${fetchError}`)
@@ -708,20 +738,17 @@ export async function GET(request: NextRequest) {
               continue
             }
 
-            // ── Attach creatives then save proven-winner ads ─────────────
-            // Curation filter applied: ads running fewer than min days are skipped.
-            // Real image scraped via Browserless; falls back to brand profile picture.
-            send('log', `  🖼 Filtering & fetching creatives for ${ads.length} raw ads…`)
+            if (brandPageIds.length) {
+              send('log', `  🏷 Found brand page${brandPageIds.length > 1 ? 's' : ''}: ${brandPageIds.slice(0,3).join(', ')}${brandPageIds.length > 3 ? ` +${brandPageIds.length-3} more` : ''} — fetching ALL their ads`)
+            }
+
+            // ── Attach creatives then save all ads ───────────────────────
+            // ScrapingBee renders the snapshot URL → extracts real image/video URL.
+            // Falls back to brand profile picture so every card has a visual.
+            send('log', `  🖼 Fetching creatives for ${ads.length} ads…`)
             const { rows, skipped } = await attachCreatives(ads, term, country, term_type || 'adcopy')
             const realCreatives = rows.filter(r => r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com')).length
-            send('log', `  ✂️ Kept ${rows.length} proven winners, skipped ${skipped} short-running ads`)
-            send('log', `  📸 ${realCreatives} real ad images, ${rows.length - realCreatives} brand logos`)
-
-            if (!rows.length) {
-              send('log', `  ⚠️ ${term}/${country}: no ads passed curation filter`)
-              await admin.from('discovery_crawl_log').insert({ term, country, ads_fetched: ads.length, ads_new: 0 })
-              continue
-            }
+            send('log', `  📸 ${realCreatives} real creatives, ${rows.length - realCreatives} brand logo placeholders`)
 
             const { error } = await admin
               .from('discovery_ads_index')
