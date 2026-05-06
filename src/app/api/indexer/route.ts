@@ -5,7 +5,7 @@
  * Triggered by Vercel cron every 6 hours OR manually from admin dashboard.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 
@@ -31,12 +31,23 @@ const META_FIELDS = [
 ].join(',')
 
 // ── Auth ────────────────────────────────────────────────────
-function isAuthorized(request: NextRequest): boolean {
+async function isAuthorized(request: NextRequest): Promise<boolean> {
   const secret = request.nextUrl.searchParams.get('secret')
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
+
+  // Vercel Cron / manual secret auth
   if (!cronSecret) return true // no secret set = open (dev only)
-  return secret === cronSecret || authHeader === `Bearer ${cronSecret}`
+  if (secret === cronSecret || authHeader === `Bearer ${cronSecret}`) return true
+
+  // Fallback: allow any authenticated Supabase user (admin dashboard)
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) return true
+  } catch { /* ignore */ }
+
+  return false
 }
 
 // ── Meta Ads Library fetch ───────────────────────────────────
@@ -241,7 +252,7 @@ Return only the JSON array.`
 
 // ── Main handler ─────────────────────────────────────────────
 export async function GET(request: NextRequest) {
-  if (!isAuthorized(request)) {
+  if (!(await isAuthorized(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
