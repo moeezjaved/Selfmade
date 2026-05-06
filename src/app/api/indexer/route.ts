@@ -256,7 +256,9 @@ async function fetchAdsForTerm(
   admin?: any,
   preDiscoveredPageIds: string[] = [], // page_ids found by caller before this call
   deadlineMs?: number,                 // absolute epoch ms — stop before this to avoid 300 s timeout
+  onLog?: (msg: string) => void,       // stream-visible progress callback
 ): Promise<{ ads: any[], externalFiltered: number, timedOut: boolean, error?: string }> {
+  const log = (msg: string) => { console.log(msg); onLog?.(msg) }
   const metaCountry = normalizeCountry(country)
   const seenIds = new Set<string>()
   const allAds: any[] = []
@@ -358,24 +360,25 @@ async function fetchAdsForTerm(
       for (let p = 0; p < MAX_BRAND_PAGES; p++) {
         if (isNearDeadline()) {
           timedOut = true
-          console.log(`[brand-fetch] deadline reached at page ${p} — ${allAds.length} ads saved`)
+          log(`  ⏰ Brand fetch deadline at page ${p + 1} — ${allAds.length} ads saved so far`)
           break
         }
         const { ads: pageAds, nextCursor, hasMore, error } = await fetchOnePage(brandPageParams, brandCursor)
         if (error) {
-          console.error(`[brand-fetch] page ${p} error for ${pageIdsParam}:`, error)
+          log(`  ❌ Brand page ${p + 1} error: ${error}`)
           break
         }
         // Count only genuinely new ad_archive_ids (not already seen from any prior source)
         const newThisPage = addAds(pageAds)
         pagesTotal++
-        console.log(`[brand-fetch] p${p} → ${pageAds.length} returned, ${newThisPage} new | total: ${allAds.length} | hasMore: ${hasMore}`)
+        // This goes to both Vercel console AND the admin stream log
+        log(`  📄 Brand page ${p + 1}: ${pageAds.length} returned, ${newThisPage} new | running total: ${allAds.length}`)
         // Stop when no new IDs (cursor loop) or no next page
         if (newThisPage === 0 || !hasMore || !nextCursor) break
         brandCursor = nextCursor
       }
 
-      console.log(`[brand-fetch] done — ${pagesTotal} pages → ${allAds.length} ads for page_ids: ${pageIdsParam}`)
+      log(`  ✅ Brand fetch done — ${pagesTotal} pages → ${allAds.length} ads for page_ids: ${pageIdsParam}`)
     }
   }
 
@@ -925,7 +928,8 @@ export async function GET(request: NextRequest) {
 
             const { ads, externalFiltered, timedOut: fetchTimedOut, error: fetchError } = await fetchAdsForTerm(
               term, country, metaToken, 'all', admin, knownBrandPageIds,
-              crawlDeadline - 30_000  // hand over deadline 30 s early for buffer
+              crawlDeadline - 30_000,                 // hand over deadline 30 s early for buffer
+              (msg) => send('log', msg),              // stream brand-fetch progress to admin UI
             )
 
             if (fetchTimedOut) {
