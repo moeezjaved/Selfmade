@@ -43,6 +43,20 @@ export default function IndexerAdminPage() {
   const [runTerm, setRunTerm] = useState('')
   const [runCountry, setRunCountry] = useState('US')
   const [runPageId, setRunPageId] = useState('')
+
+  // Extract page_id from a Facebook Ads Library URL or raw ID
+  const parsePageId = (raw: string): string => {
+    const trimmed = raw.trim()
+    // Full URL: extract view_all_page_id param
+    try {
+      const u = new URL(trimmed)
+      const fromParam = u.searchParams.get('view_all_page_id') || u.searchParams.get('id') || u.searchParams.get('page_id')
+      if (fromParam && /^\d+$/.test(fromParam)) return fromParam
+    } catch { /* not a URL */ }
+    // Raw numeric ID
+    if (/^\d+$/.test(trimmed)) return trimmed
+    return trimmed
+  }
   const [seeding, setSeeding] = useState(false)
 
   const fetchStats = useCallback(async () => {
@@ -234,31 +248,33 @@ export default function IndexerAdminPage() {
             {/* Input row */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
               <input value={runTerm} onChange={e => setRunTerm(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !running && runCrawler(runTerm || undefined, runCountry, runPageId || undefined)}
+                onKeyDown={e => e.key === 'Enter' && !running && runCrawler(runTerm || undefined, runCountry, parsePageId(runPageId) || undefined)}
                 placeholder="Brand name or keyword…"
                 style={{ flex: 1, minWidth: 160, padding: '9px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-              <input value={runPageId} onChange={e => setRunPageId(e.target.value.trim())}
-                placeholder="Page ID (optional)"
-                title="Paste the Facebook page_id to fetch ALL ads from this brand directly. Find it in: facebook.com/ads/library → search brand → URL has view_all_page_id=XXXXX"
-                style={{ width: 160, padding: '9px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+              <input value={runPageId} onChange={e => setRunPageId(e.target.value)}
+                placeholder="Paste FB Ads Library URL or page_id"
+                title="Go to facebook.com/ads/library → search brand → click Advertisers tab → click the brand → copy the URL and paste here"
+                style={{ width: 260, padding: '9px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
               <select value={runCountry} onChange={e => setRunCountry(e.target.value)} style={{ padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
                 {COUNTRIES.map(c => <option key={c}>{c}</option>)}
               </select>
-              <button onClick={() => runCrawler(runTerm || undefined, runCountry, runPageId || undefined)} disabled={running} style={btn()}>
+              <button onClick={() => runCrawler(runTerm || undefined, runCountry, parsePageId(runPageId) || undefined)} disabled={running} style={btn()}>
                 {running ? '⏳' : '▶ Crawl'}
               </button>
             </div>
             {/* Hint */}
-            {runPageId ? (
+            {runPageId && parsePageId(runPageId) ? (
               <div style={{ fontSize: 11, color: '#1d4ed8', marginBottom: 10, padding: '8px 12px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
-                🏷 Will fetch <strong>ALL ads</strong> from page <strong>{runPageId}</strong> directly — no keyword filter
+                🏷 Page ID <strong>{parsePageId(runPageId)}</strong> detected — will fetch ALL ads from this brand directly
               </div>
-            ) : runTerm ? (
-              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
-                Will search Meta for: <strong>"{runTerm}"</strong> as ad copy · brand name · category keyword
-                <span style={{ color: '#9ca3af' }}> — add Page ID above to also fetch all brand ads directly</span>
+            ) : (
+              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                {runTerm ? <>Keyword search for <strong>"{runTerm}"</strong> · </> : null}
+                💡 <strong>For brands:</strong> go to{' '}
+                <a href="https://www.facebook.com/ads/library/" target="_blank" rel="noreferrer" style={{ color: '#1d4ed8' }}>Facebook Ads Library</a>
+                {' '}→ search brand → click <strong>Advertisers</strong> tab → click the brand → paste the URL above
               </div>
-            ) : null}
+            )}
             {runLog.length > 0 && (
               <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, maxHeight: 260, overflowY: 'auto' }}>
                 {runLog.map((l, i) => (
