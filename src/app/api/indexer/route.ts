@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { decryptToken } from '@/lib/meta/client'
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 
@@ -16,6 +17,22 @@ const V = process.env.META_API_VERSION || 'v20.0'
 const APP_TOKEN = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+
+// ── Get best available Meta access token ─────────────────────
+async function getMetaToken(admin: any): Promise<string> {
+  // Try to get a real user access token from any connected account
+  const { data: accounts } = await admin
+    .from('meta_accounts')
+    .select('access_token')
+    .eq('is_primary', true)
+    .limit(1)
+  if (accounts?.[0]?.access_token) {
+    const userToken = decryptToken(accounts[0].access_token)
+    if (userToken) return userToken
+  }
+  // Fallback to app token
+  return APP_TOKEN
+}
 
 const TERMS_PER_RUN = 10   // terms per cron run
 const ADS_PER_TERM = 50    // ads per Meta API call
@@ -51,12 +68,12 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
 }
 
 // ── Meta Ads Library fetch ───────────────────────────────────
-async function fetchAdsForTerm(term: string, country: string): Promise<any[]> {
+async function fetchAdsForTerm(term: string, country: string, token: string): Promise<{ ads: any[], error?: string }> {
   const allAds: any[] = []
   let after = ''
   for (let page = 0; page < PAGES_PER_TERM; page++) {
     const params: Record<string, string> = {
-      access_token: APP_TOKEN,
+      access_token: token,
       search_terms: term,
       ad_reached_countries: JSON.stringify([country]),
       fields: META_FIELDS,
@@ -66,13 +83,16 @@ async function fetchAdsForTerm(term: string, country: string): Promise<any[]> {
     try {
       const res = await fetch(`https://graph.facebook.com/${V}/ads_archive?` + new URLSearchParams(params))
       const data = await res.json()
-      if (data.error || !data.data?.length) break
+      if (data.error) return { ads: allAds, error: data.error.message }
+      if (!data.data?.length) break
       allAds.push(...data.data)
       if (!data.paging?.next) break
       after = data.paging.cursors?.after || ''
-    } catch { break }
+    } catch (e: any) {
+      return { ads: allAds, error: e.message }
+    }
   }
-  return allAds
+  return { ads: allAds }
 }
 
 // ── Classification helpers ───────────────────────────────────
@@ -291,18 +311,26 @@ export async function GET(request: NextRequest) {
   const crawlLog: any[] = []
   let totalAdsUpserted = 0
 
+  // ── Get Meta access token ──
+  const metaToken = await getMetaToken(admin)
+
   // ── Crawl each term × country ──
   for (const { term, countries, id } of termsToRun) {
     const countriesToCrawl = forceCountry ? [forceCountry] : (countries || ['US'])
 
     for (const country of countriesToCrawl) {
-      const ads = await fetchAdsForTerm(term, country)
+      const { ads, error: fetchError } = await fetchAdsForTerm(term, country, metaToken)
+      if (fetchError) {
+        crawlLog.push({ term, country, ads_fetched: 0, ads_new: 0, error: fetchError })
+        await admin.from('discovery_crawl_log').insert({ term, country, ads_fetched: 0, error: fetchError })
+        continue
+      }
       if (!ads.length) {
         crawlLog.push({ term, country, ads_fetched: 0, ads_new: 0 })
         continue
       }
 
-      const rows = ads.map(ad => transformAd(ad, term, country))
+      const rows = ads.map((ad: any) => transformAd(ad, term, country))
 
       const { error } = await admin
         .from('discovery_ads_index')
