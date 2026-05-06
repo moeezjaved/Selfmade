@@ -329,14 +329,21 @@ async function fetchAdsForTerm(
 
     if (pageIds.length && !isNearDeadline()) {
       // search_page_ids format: use comma-separated numeric IDs (e.g. "123456789").
-      // Both CSV and JSON array work with Meta's API; CSV is the canonical form for
-      // the ids= parameter family and avoids URL-encoding overhead.
       const pageIdsParam = pageIds.join(',')
+
+      // For brand page crawls, expand beyond the term's single configured country.
+      // A brand like Gymshark is UK-based; 90%+ of their ads target GB/AU/CA/US.
+      // Searching only "US" returns ~53 ads; searching all English-speaking markets
+      // returns the full 2000+ ad library. We include all term countries + standard
+      // brand markets. Meta's ad_reached_countries is an OR filter — ads that
+      // targeted ANY of the listed countries are returned.
+      const BRAND_COUNTRIES = ['US', 'GB', 'CA', 'AU', 'NZ', 'IE', 'IN', 'ZA', 'SG']
+      const brandCountries = Array.from(new Set([metaCountry, ...BRAND_COUNTRIES]))
 
       const brandPageParams: Record<string, string> = {
         access_token: token,
         search_page_ids: pageIdsParam,
-        ad_reached_countries: JSON.stringify([metaCountry]),
+        ad_reached_countries: JSON.stringify(brandCountries),
         ad_type: 'ALL',
         active_status: 'ALL', // include stopped/paused — historical winners matter
         fields: META_FIELDS,
@@ -943,8 +950,10 @@ export async function GET(request: NextRequest) {
             // ── Attach creatives then save all ads ───────────────────────
             send('log', `  🖼 Fetching creatives for ${ads.length} ads…`)
             const { rows, skipped } = await attachCreatives(ads, term, country, term_type || 'adcopy', crawlDeadline - 15_000, knownBrandPageIds.length > 0)
-            const realCreatives = rows.filter(r => r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com')).length
-            send('log', `  📸 ${realCreatives} real creatives, ${rows.length - realCreatives} brand logo placeholders`)
+            const realCreatives = rows.filter(r => r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com') && !r.thumbnail_url.includes('/picture')).length
+            const nullThumbs    = rows.filter(r => !r.thumbnail_url).length
+            const sbStatus = process.env.SCRAPINGBEE_KEY ? `ScrapingBee tried on ${Math.min(rows.length, MAX_SB_CALLS_PER_CRAWL)} ads` : 'no ScrapingBee key'
+            send('log', `  📸 ${realCreatives} real creatives, ${nullThumbs} null (iframe fallback) | ${sbStatus}`)
 
             // ── Deduplicate by ad_archive_id (fallback chain) ────────────
             // Primary key = ad_id (= ad_archive_id from Meta — globally unique).
