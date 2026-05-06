@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 
-const COUNTRIES = ['US','UK','CA','AU','IN','DE','FR','AE','PK','NG','SG','NZ']
+const COUNTRIES = ['US','GB','CA','AU','IN','DE','FR','AE','PK','NG','SG','NZ']
 const CATEGORIES = ['Fashion & Apparel','Beauty & Skincare','Health & Wellness','Fitness & Sports','Food & Beverage','Technology','Finance & Investing','Home & Living','Baby & Kids','Pets','Travel','Education','Business & Marketing','Entertainment','Automotive','General']
 
 interface Term {

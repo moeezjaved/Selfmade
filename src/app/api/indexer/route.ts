@@ -15,6 +15,10 @@ export const maxDuration = 300
 
 const V = process.env.META_API_VERSION || 'v20.0'
 const APP_TOKEN = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
+
+// Meta uses ISO codes — normalize common aliases
+const COUNTRY_MAP: Record<string, string> = { UK: 'GB' }
+const normalizeCountry = (c: string) => COUNTRY_MAP[c.toUpperCase()] || c.toUpperCase()
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
@@ -71,11 +75,12 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
 async function fetchAdsForTerm(term: string, country: string, token: string): Promise<{ ads: any[], error?: string }> {
   const allAds: any[] = []
   let after = ''
+  const metaCountry = normalizeCountry(country)
   for (let page = 0; page < PAGES_PER_TERM; page++) {
     const params: Record<string, string> = {
       access_token: token,
       search_terms: term,
-      ad_reached_countries: JSON.stringify([country]),
+      ad_reached_countries: JSON.stringify([metaCountry]),
       fields: META_FIELDS,
       limit: String(ADS_PER_TERM),
     }
@@ -221,7 +226,7 @@ async function classifyWithClaude(admin: any): Promise<number> {
   ).join('\n\n---\n\n')
 
   const msg = await anthropic.messages.create({
-    model: 'claude-3-haiku-20240307',
+    model: 'claude-3-5-haiku-20241022',
     max_tokens: 2000,
     messages: [{
       role: 'user',
