@@ -177,19 +177,24 @@ export async function GET(request: NextRequest) {
   // 2. Try scraping the ad creative from Facebook pages
   const { thumbnail, videoUrl } = await fetchMedia(adId, snapshotUrl)
 
-  // 3. Fallback: brand profile picture — always available for public FB pages
-  //    Returns graph.facebook.com redirect URL; browser follows it to the CDN image.
-  const finalThumbnail = thumbnail || (pageId ? pagePictureUrl(pageId) : null)
+  // 3. Fallback for display: brand profile picture — always available for public FB pages
+  //    We return it to the browser but do NOT store it in DB as thumbnail_url.
+  //    Storing it would prevent the card from ever retrying for a real creative URL.
+  const displayThumbnail = thumbnail || (pageId ? pagePictureUrl(pageId) : null)
 
-  // Persist to DB so subsequent requests are instant
-  if (finalThumbnail || videoUrl) {
+  // Only persist REAL creative URLs (not the brand profile picture fallback)
+  const isRealCreative = thumbnail && !thumbnail.includes('graph.facebook.com')
+  if (isRealCreative || videoUrl) {
     await admin.from('discovery_ads_index')
-      .update({ thumbnail_url: finalThumbnail, video_url: videoUrl || null })
+      .update({
+        ...(isRealCreative ? { thumbnail_url: thumbnail } : {}),
+        ...(videoUrl ? { video_url: videoUrl } : {}),
+      })
       .eq('ad_id', adId)
   }
 
   return NextResponse.json(
-    { thumbnail: finalThumbnail, videoUrl },
+    { thumbnail: displayThumbnail, videoUrl },
     { headers: { 'Cache-Control': 'public, max-age=3600' } }
   )
 }

@@ -307,39 +307,44 @@ function transformAd(ad: any, term: string, country: string) {
 }
 
 // ── Batch thumbnail extraction ───────────────────────────────
-// Uses graph.facebook.com/{page_id}/picture — publicly accessible for all
-// public FB pages, no auth required, always returns a real image URL.
-// This gives the brand's profile picture as the card thumbnail, which is
-// far more reliable than scraping the ads/library page (requires JS rendering).
-async function extractThumbnailsForNewAds(admin: any, limit = 50): Promise<number> {
+// Attempts to extract real ad creative thumbnails from the Facebook snapshot URL.
+// We only store REAL creative URLs in thumbnail_url — never the brand profile
+// picture (that's always computed on-the-fly from page_id in the UI).
+// If scraping returns nothing, we leave thumbnail_url null so the card will
+// retry on next load and show brand pic as a placeholder in the meantime.
+async function extractThumbnailsForNewAds(admin: any, limit = 30): Promise<number> {
   const { data: ads } = await admin
     .from('discovery_ads_index')
-    .select('ad_id, page_id')
+    .select('ad_id, page_id, snapshot_url')
     .is('thumbnail_url', null)
-    .not('page_id', 'eq', '')
-    .not('page_id', 'is', null)
+    .not('snapshot_url', 'eq', '')
+    .not('snapshot_url', 'is', null)
     .limit(limit)
 
   if (!ads?.length) return 0
 
-  // Batch-update: use graph.facebook.com/{page_id}/picture directly
-  // The browser's <img src> follows the 302 redirect to the actual CDN image.
-  // We store the redirect URL — it's stable and doesn't expire.
-  const updates = (ads as any[]).map((ad: any) => ({
-    ad_id: ad.ad_id,
-    thumbnail_url: `https://graph.facebook.com/${ad.page_id}/picture?type=large`,
-  }))
-
   let count = 0
-  // Update in parallel chunks (records already exist — no upsert needed)
-  for (let i = 0; i < updates.length; i += 25) {
-    const chunk = updates.slice(i, i + 25)
-    await Promise.all(chunk.map((u: any) =>
-      admin.from('discovery_ads_index')
-        .update({ thumbnail_url: u.thumbnail_url })
-        .eq('ad_id', u.ad_id)
-    ))
-    count += chunk.length
+  // Try to scrape each ad's snapshot page for the real creative image
+  for (const ad of ads as any[]) {
+    try {
+      const params = new URLSearchParams({ ad_id: ad.ad_id })
+      if (ad.snapshot_url) params.set('url', ad.snapshot_url)
+      if (ad.page_id) params.set('page_id', ad.page_id)
+      // Call our own thumbnail API — it handles scraping + caching
+      const origin = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000'
+      const res = await fetch(`${origin}/api/discovery/thumbnail?${params}`, { signal: AbortSignal.timeout(8000) })
+      if (res.ok) {
+        const data = await res.json()
+        // Only count if we got a real creative URL (not just the graph fallback)
+        if (data.thumbnail && !data.thumbnail.includes('graph.facebook.com')) {
+          count++
+        }
+      }
+    } catch {
+      // Skip — thumbnail extraction is best-effort
+    }
   }
 
   return count
