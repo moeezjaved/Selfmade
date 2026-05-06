@@ -180,7 +180,7 @@ async function fetchAdsForTerm(
         .select('page_id')
         .ilike('page_name', `%${term}%`)
         .limit(30)
-      const pageIds = [...new Set((pages || []).map((p: any) => p.page_id).filter(Boolean))] as string[]
+      const pageIds = Array.from(new Set((pages || []).map((p: any) => p.page_id).filter(Boolean))) as string[]
 
       if (pageIds.length) {
         // search_page_ids lets us fetch every ad from those pages regardless of ad copy
@@ -329,13 +329,15 @@ async function extractThumbnailsForNewAds(admin: any, limit = 50): Promise<numbe
   }))
 
   let count = 0
-  // Upsert in chunks to avoid hitting Supabase row limits
+  // Update in parallel chunks (records already exist — no upsert needed)
   for (let i = 0; i < updates.length; i += 25) {
     const chunk = updates.slice(i, i + 25)
-    const { error } = await admin
-      .from('discovery_ads_index')
-      .upsert(chunk.map((u: any) => ({ ad_id: u.ad_id, thumbnail_url: u.thumbnail_url })), { onConflict: 'ad_id' })
-    if (!error) count += chunk.length
+    await Promise.all(chunk.map((u: any) =>
+      admin.from('discovery_ads_index')
+        .update({ thumbnail_url: u.thumbnail_url })
+        .eq('ad_id', u.ad_id)
+    ))
+    count += chunk.length
   }
 
   return count
@@ -375,18 +377,25 @@ async function generateEmbeddings(admin: any): Promise<number> {
 }
 
 // ── Claude AI classification ─────────────────────────────────
-async function callClaudeWithRetry(prompt: string, maxRetries = 3): Promise<string> {
+async function callClaudeWithRetry(prompt: string): Promise<string> {
   let lastErr: any
-  // Try models in order — fall back if one is deprecated/unavailable
-  const MODELS = [
-    process.env.ANTHROPIC_MODEL,
-    'claude-3-5-sonnet-20241022',
-    'claude-3-5-haiku-20241022',
-    'claude-3-haiku-20240307',
-  ].filter(Boolean) as string[]
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const model = MODELS[Math.min(attempt - 1, MODELS.length - 1)]
+  // Model fallback chain — newest/most capable first, older as safety nets.
+  // If ANTHROPIC_MODEL env var is set and not already in the list, prepend it.
+  const DEFAULT_MODELS = [
+    'claude-opus-4-5',
+    'claude-sonnet-4-5',
+    'claude-3-7-sonnet-20250219',
+    'claude-3-5-sonnet-20241022',
+    'claude-3-opus-20240229',
+  ]
+  const envModel = process.env.ANTHROPIC_MODEL
+  const MODELS = envModel && !DEFAULT_MODELS.includes(envModel)
+    ? [envModel, ...DEFAULT_MODELS]
+    : DEFAULT_MODELS
+
+  for (let i = 0; i < MODELS.length; i++) {
+    const model = MODELS[i]
     try {
       const msg = await anthropic.messages.create({
         model,
@@ -396,14 +405,20 @@ async function callClaudeWithRetry(prompt: string, maxRetries = 3): Promise<stri
       return msg.content[0].type === 'text' ? msg.content[0].text : ''
     } catch (e: any) {
       lastErr = e
-      const isRetryable = e?.status >= 500
-        || e?.status === 404  // model not found → try next model
-        || e?.message?.includes('overloaded')
-        || e?.message?.includes('Internal server error')
-        || e?.message?.includes('not_found')
-      if (!isRetryable || attempt === maxRetries) break
-      // Exponential back-off: 2s, 4s
-      await new Promise(r => setTimeout(r, 2000 * attempt))
+      const isDeprecated = e?.status === 404 || e?.message?.includes('not_found') || e?.message?.includes('model')
+      const isOverloaded = e?.status >= 500 || e?.message?.includes('overloaded') || e?.message?.includes('Internal server error')
+
+      if (isDeprecated) {
+        // Model deprecated/not found — skip straight to next model, no wait
+        continue
+      }
+      if (isOverloaded && i < MODELS.length - 1) {
+        // Temporary overload — wait briefly then try next model
+        await new Promise(r => setTimeout(r, 1500))
+        continue
+      }
+      // Non-retryable error (auth, bad request, etc.)
+      break
     }
   }
   throw lastErr

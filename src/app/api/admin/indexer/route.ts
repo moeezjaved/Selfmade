@@ -123,5 +123,58 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, countries })
   }
 
+  if (action === 'seed_terms') {
+    // Pre-built starter library — covers ad copy, brands, and categories
+    const SEED_TERMS = [
+      // ── Brand terms (crawls ALL ads from these pages) ──────────
+      { term: 'gymshark',     category: 'Fitness',   countries: ['US','GB'], priority: 8, term_type: 'brand' },
+      { term: 'nike',         category: 'Sports',    countries: ['US','GB'], priority: 8, term_type: 'brand' },
+      { term: 'sephora',      category: 'Beauty',    countries: ['US'],      priority: 8, term_type: 'brand' },
+      { term: 'lululemon',    category: 'Fitness',   countries: ['US','CA'], priority: 7, term_type: 'brand' },
+      { term: 'skims',        category: 'Fashion',   countries: ['US'],      priority: 7, term_type: 'brand' },
+      { term: 'hims',         category: 'Health',    countries: ['US'],      priority: 7, term_type: 'brand' },
+      { term: 'dropbox',      category: 'Tech',      countries: ['US'],      priority: 6, term_type: 'brand' },
+      { term: 'notion',       category: 'Tech',      countries: ['US'],      priority: 6, term_type: 'brand' },
+      { term: 'duolingo',     category: 'Education', countries: ['US'],      priority: 6, term_type: 'brand' },
+      { term: 'allbirds',     category: 'Fashion',   countries: ['US'],      priority: 6, term_type: 'brand' },
+      // ── Category terms (broad keyword expansion) ───────────────
+      { term: 'fashion',      category: 'Fashion',   countries: ['US','GB'], priority: 7, term_type: 'category' },
+      { term: 'beauty',       category: 'Beauty',    countries: ['US'],      priority: 7, term_type: 'category' },
+      { term: 'fitness',      category: 'Fitness',   countries: ['US'],      priority: 7, term_type: 'category' },
+      { term: 'health',       category: 'Health',    countries: ['US'],      priority: 6, term_type: 'category' },
+      { term: 'food',         category: 'Food',      countries: ['US'],      priority: 6, term_type: 'category' },
+      { term: 'tech',         category: 'Tech',      countries: ['US'],      priority: 6, term_type: 'category' },
+      { term: 'finance',      category: 'Finance',   countries: ['US'],      priority: 6, term_type: 'category' },
+      { term: 'education',    category: 'Education', countries: ['US'],      priority: 6, term_type: 'category' },
+      { term: 'ecommerce',    category: 'E-commerce',countries: ['US'],      priority: 5, term_type: 'category' },
+      { term: 'pets',         category: 'Pets',      countries: ['US'],      priority: 5, term_type: 'category' },
+      // ── Ad Copy terms (keyword in ad body text) ────────────────
+      { term: 'shop now',     category: 'E-commerce',countries: ['US'],      priority: 8, term_type: 'adcopy' },
+      { term: 'free shipping',category: 'E-commerce',countries: ['US'],      priority: 8, term_type: 'adcopy' },
+      { term: 'limited offer',category: 'E-commerce',countries: ['US'],      priority: 7, term_type: 'adcopy' },
+      { term: 'skin care',    category: 'Beauty',    countries: ['US'],      priority: 7, term_type: 'adcopy' },
+      { term: 'weight loss',  category: 'Fitness',   countries: ['US'],      priority: 7, term_type: 'adcopy' },
+      { term: 'learn online', category: 'Education', countries: ['US'],      priority: 6, term_type: 'adcopy' },
+      { term: 'free trial',   category: 'Tech',      countries: ['US'],      priority: 6, term_type: 'adcopy' },
+      { term: 'get started',  category: 'General',   countries: ['US'],      priority: 6, term_type: 'adcopy' },
+      { term: 'before after', category: 'Health',    countries: ['US'],      priority: 5, term_type: 'adcopy' },
+      { term: 'as seen on',   category: 'General',   countries: ['US'],      priority: 5, term_type: 'adcopy' },
+    ]
+
+    // Fetch existing terms to avoid duplicates
+    const { data: existing } = await admin.from('discovery_crawl_terms').select('term, term_type')
+    const existingKeys = new Set((existing || []).map((t: any) => `${t.term}:${t.term_type}`))
+
+    const toInsert = SEED_TERMS
+      .filter(t => !existingKeys.has(`${t.term}:${t.term_type}`))
+      .map(t => ({ ...t, is_active: true }))
+
+    if (!toInsert.length) return NextResponse.json({ success: true, added: 0, message: 'All seed terms already exist' })
+
+    const { data: inserted, error } = await admin.from('discovery_crawl_terms').insert(toInsert).select()
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ success: true, added: inserted?.length || 0 })
+  }
+
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
