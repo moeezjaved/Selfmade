@@ -156,6 +156,7 @@ export default function IndexerAdminPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 24 }}>
         {[
           { label: 'Total Ads Indexed', value: stats?.totalAds?.toLocaleString() || '0', icon: '📦', color: '#1a3a1a' },
+          { label: 'With Thumbnails', value: stats?.withThumbnail?.toLocaleString() || '0', icon: '🖼️', color: '#0891b2' },
           { label: 'AI Classified', value: stats?.classified?.toLocaleString() || '0', icon: '🤖', color: '#7c3aed' },
           { label: 'With Embeddings', value: stats?.withEmbedding?.toLocaleString() || '0', icon: '🔢', color: '#1d4ed8' },
           { label: 'Crawl Terms', value: stats?.terms?.length || '0', icon: '🔑', color: '#b45309' },

@@ -20,30 +20,35 @@ export async function GET(request: NextRequest) {
       { data: state },
       { data: recentLog },
       { data: terms },
-      { data: industryStats },
+      { data: adIndustries },
       { count: classified },
       { count: withEmbedding },
+      { count: withThumbnail },
     ] = await Promise.all([
       admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }),
       admin.from('discovery_index_state').select('*').eq('id', 'main').single(),
       admin.from('discovery_crawl_log').select('*').order('ran_at', { ascending: false }).limit(50),
       admin.from('discovery_crawl_terms').select('*').order('priority', { ascending: false }),
-      // Count per industry (approximate via seed terms)
-      admin.from('discovery_crawl_terms').select('category, ads_found'),
+      // Fetch industries array from actual ads — sample up to 5000 rows
+      admin.from('discovery_ads_index').select('industries').not('industries', 'is', null).limit(5000),
       admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).eq('ai_classified', true),
       admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).not('embedding', 'is', null),
+      admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).not('thumbnail_url', 'is', null),
     ])
 
-    // Aggregate industry stats
+    // Count each industry across all indexed ads
     const industryMap: Record<string, number> = {}
-    for (const t of industryStats || []) {
-      industryMap[t.category] = (industryMap[t.category] || 0) + (t.ads_found || 0)
+    for (const row of adIndustries || []) {
+      for (const ind of row.industries || []) {
+        if (ind) industryMap[ind] = (industryMap[ind] || 0) + 1
+      }
     }
 
     return NextResponse.json({
       totalAds,
       classified,
       withEmbedding,
+      withThumbnail,
       lastRunAt: state?.last_run_at,
       termsProcessedLast: state?.terms_processed || [],
       recentLog: recentLog || [],
