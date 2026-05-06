@@ -6,8 +6,21 @@ const CATEGORIES = ['Fashion & Apparel','Beauty & Skincare','Health & Wellness',
 
 interface Term {
   id: string; term: string; category: string; countries: string[]
+  term_type: string
   is_active: boolean; priority: number; last_crawled_at: string | null
   crawl_count: number; ads_found: number; created_at: string
+}
+
+const TERM_TYPES = [
+  { value: 'adcopy', label: '📝 Ad Copy', hint: 'Keyword that appears in ad body text' },
+  { value: 'brand',  label: '🏷️ Brand',   hint: 'Brand name — finds all ads from that advertiser' },
+  { value: 'category', label: '📂 Category', hint: 'Industry/niche keyword — broad topic crawl' },
+]
+
+const TYPE_STYLES: Record<string, { bg: string; color: string; border: string }> = {
+  adcopy:   { bg: '#faf5ff', color: '#7c3aed', border: '#e9d5ff' },
+  brand:    { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+  category: { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' },
 }
 interface LogEntry { term: string; country: string; ads_fetched: number; error?: string; ran_at: string }
 
@@ -21,9 +34,11 @@ export default function IndexerAdminPage() {
   const [newCategory, setNewCategory] = useState('General')
   const [newCountries, setNewCountries] = useState<string[]>(['US'])
   const [newPriority, setNewPriority] = useState(5)
+  const [newTermType, setNewTermType] = useState('adcopy')
   const [termSearch, setTermSearch] = useState('')
   const [runTerm, setRunTerm] = useState('')
   const [runCountry, setRunCountry] = useState('US')
+  const [runTermType, setRunTermType] = useState('adcopy')
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
@@ -35,13 +50,14 @@ export default function IndexerAdminPage() {
 
   useEffect(() => { fetchStats() }, [fetchStats])
 
-  const runCrawler = async (term?: string, country?: string) => {
+  const runCrawler = async (term?: string, country?: string, termType?: string) => {
     setRunning(true)
     setRunLog(['🚀 Starting crawler...'])
     try {
       const params = new URLSearchParams({ stream: '1' })
       if (term) params.set('term', term)
       if (country) params.set('country', country)
+      if (termType) params.set('term_type', termType)
       const res = await fetch(`/api/indexer?${params}`)
       if (!res.ok) {
         const text = await res.text().catch(() => res.statusText)
@@ -83,7 +99,7 @@ export default function IndexerAdminPage() {
     await fetch('/api/admin/indexer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'add_term', term: newTerm, category: newCategory, countries: newCountries, priority: newPriority }),
+      body: JSON.stringify({ action: 'add_term', term: newTerm, category: newCategory, countries: newCountries, priority: newPriority, term_type: newTermType }),
     })
     setNewTerm('')
     fetchStats()
@@ -168,12 +184,17 @@ export default function IndexerAdminPage() {
           {/* Manual run */}
           <div style={card}>
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>⚡ Manual Crawl</div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <input value={runTerm} onChange={e => setRunTerm(e.target.value)} placeholder="Enter term (e.g. yoga mats)" style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              <input value={runTerm} onChange={e => setRunTerm(e.target.value)} placeholder="e.g. Nike OR fashion OR skincare" style={{ flex: 1, minWidth: 160, padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+              <select value={runTermType} onChange={e => setRunTermType(e.target.value)} style={{ padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
+                <option value="adcopy">📝 Ad Copy</option>
+                <option value="brand">🏷️ Brand</option>
+                <option value="category">📂 Category</option>
+              </select>
               <select value={runCountry} onChange={e => setRunCountry(e.target.value)} style={{ padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
                 {COUNTRIES.map(c => <option key={c}>{c}</option>)}
               </select>
-              <button onClick={() => runCrawler(runTerm || undefined, runCountry)} disabled={running} style={btn()}>Run</button>
+              <button onClick={() => runCrawler(runTerm || undefined, runCountry, runTermType)} disabled={running} style={btn()}>Run</button>
             </div>
             {runLog.length > 0 && (
               <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, maxHeight: 260, overflowY: 'auto' }}>
@@ -236,10 +257,33 @@ export default function IndexerAdminPage() {
         <div>
           <div style={{ ...card, marginBottom: 16 }}>
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>➕ Add New Term</div>
+
+            {/* Type explainer */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              {TERM_TYPES.map(t => (
+                <button key={t.value} onClick={() => setNewTermType(t.value)} style={{
+                  flex: 1, padding: '10px 12px', borderRadius: 10, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+                  border: `2px solid ${newTermType === t.value ? TYPE_STYLES[t.value].border : '#e2e8f0'}`,
+                  background: newTermType === t.value ? TYPE_STYLES[t.value].bg : '#f8fafc',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: newTermType === t.value ? TYPE_STYLES[t.value].color : '#374151', marginBottom: 2 }}>{t.label}</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af' }}>{t.hint}</div>
+                </button>
+              ))}
+            </div>
+
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <div>
-                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, fontWeight: 600 }}>SEARCH TERM</div>
-                <input value={newTerm} onChange={e => setNewTerm(e.target.value)} placeholder="e.g. luxury watches" onKeyDown={e => e.key === 'Enter' && addTerm()} style={{ padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: 200 }} />
+                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, fontWeight: 600 }}>
+                  {newTermType === 'brand' ? 'BRAND NAME' : newTermType === 'category' ? 'CATEGORY KEYWORD' : 'SEARCH TERM'}
+                </div>
+                <input
+                  value={newTerm}
+                  onChange={e => setNewTerm(e.target.value)}
+                  placeholder={newTermType === 'brand' ? 'e.g. Nike' : newTermType === 'category' ? 'e.g. fashion' : 'e.g. luxury watches'}
+                  onKeyDown={e => e.key === 'Enter' && addTerm()}
+                  style={{ padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: 200 }}
+                />
               </div>
               <div>
                 <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, fontWeight: 600 }}>CATEGORY</div>
@@ -275,17 +319,26 @@ export default function IndexerAdminPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
-                  {['Term','Category','Countries','Priority','Last Crawled','Crawls','Status','Actions'].map(h => (
+                  {['Term','Type','Category','Countries','Priority','Last Crawled','Crawls','Status','Actions'].map(h => (
                     <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredTerms.map((t: Term) => (
+                {filteredTerms.map((t: Term) => {
+                  const termType = t.term_type || 'adcopy'
+                  const typeStyle = TYPE_STYLES[termType] || TYPE_STYLES.adcopy
+                  const typeLabel = TERM_TYPES.find(x => x.value === termType)?.label || '📝 Ad Copy'
+                  return (
                   <tr key={t.id} style={{ borderBottom: '1px solid #f8fafc' }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                     <td style={{ padding: '8px 12px', fontWeight: 600, color: '#111' }}>{t.term}</td>
+                    <td style={{ padding: '8px 12px' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100, background: typeStyle.bg, color: typeStyle.color, border: `1px solid ${typeStyle.border}`, whiteSpace: 'nowrap' }}>
+                        {typeLabel}
+                      </span>
+                    </td>
                     <td style={{ padding: '8px 12px', color: '#6b7280' }}>{t.category}</td>
                     <td style={{ padding: '8px 12px' }}>
                       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
@@ -306,13 +359,13 @@ export default function IndexerAdminPage() {
                     </td>
                     <td style={{ padding: '8px 12px' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => runCrawler(t.term, 'US')} title="Crawl now" style={{ ...btn('#f1f5f9', '#374151'), padding: '4px 8px', fontSize: 11 }}>▶</button>
+                        <button onClick={() => runCrawler(t.term, t.countries?.[0] || 'US', t.term_type)} title="Crawl now" style={{ ...btn('#f1f5f9', '#374151'), padding: '4px 8px', fontSize: 11 }}>▶</button>
                         <button onClick={() => toggleTerm(t.id, !t.is_active)} style={{ ...btn(t.is_active ? '#fef2f2' : '#f0fdf4', t.is_active ? '#dc2626' : '#166534'), padding: '4px 8px', fontSize: 11 }}>{t.is_active ? 'Pause' : 'Resume'}</button>
                         <button onClick={() => deleteTerm(t.id)} style={{ ...btn('#fef2f2', '#dc2626'), padding: '4px 8px', fontSize: 11 }}>🗑</button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
