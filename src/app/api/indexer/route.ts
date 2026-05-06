@@ -44,13 +44,17 @@ const PAGES_PER_TERM = 3   // pages to fetch (50 × 3 = 150 ads per term×countr
 const EMBED_BATCH = 200    // embed ALL new ads per run (OpenAI handles large batches fine)
 const CLASSIFY_BATCH = 25  // ads per Claude call — 25 is safe within token limits
 
-// ── Curation threshold ───────────────────────────────────────
-// Set to 0 = index everything, let users filter in Discovery UI.
-// Atria indexes ALL ads — curation is a display filter, not a crawl filter.
-// Increase these only when the DB is large enough (100k+ ads) to afford filtering.
+// ── Curation thresholds ──────────────────────────────────────
+// MIN_DAYS = 0 means index everything — curation is a UI filter, not a crawl filter.
 const MIN_DAYS_ADCOPY   = 0
 const MIN_DAYS_BRAND    = 0
 const MIN_DAYS_CATEGORY = 0
+
+// External page quality gate: when a keyword search returns ads from pages that are
+// NOT the target brand (influencers, marketplaces, review accounts), only keep ads
+// from pages with at least this many followers. Filters out micro accounts and junk.
+// Set to 0 to disable. Atria-like platforms typically use ~50k as the cutoff.
+const MIN_EXTERNAL_PAGE_FOLLOWERS = 50_000
 
 const META_FIELDS = [
   'id','ad_creation_time','ad_delivery_start_time','ad_delivery_stop_time',
@@ -126,6 +130,31 @@ async function fetchOnePage(
   }
 }
 
+// ── Batch-fetch page follower counts from Graph API ─────────
+// Used to quality-gate external pages (influencers, marketplaces, etc.).
+// Returns a Map<page_id, fan_count>. Missing pages default to 0.
+async function getPageFollowers(pageIds: string[], token: string): Promise<Map<string, number>> {
+  const result = new Map<string, number>()
+  if (!pageIds.length) return result
+
+  const BATCH = 50 // Graph API ids= endpoint handles up to 50 at once
+  for (let i = 0; i < pageIds.length; i += BATCH) {
+    const batch = pageIds.slice(i, i + BATCH)
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/${V}/?ids=${batch.join(',')}&fields=fan_count&access_token=${encodeURIComponent(token)}`,
+        { signal: AbortSignal.timeout(10000) }
+      )
+      if (!res.ok) continue
+      const data = await res.json() as Record<string, any>
+      for (const [id, page] of Object.entries(data)) {
+        if (page?.fan_count != null) result.set(id, page.fan_count as number)
+      }
+    } catch { /* ignore — missing pages just won't be in the map */ }
+  }
+  return result
+}
+
 // ── Meta Ads Library fetch ──────────────────────────────────
 //
 // Strategy:
@@ -136,13 +165,15 @@ async function fetchOnePage(
 //               page_id from the initial results, then fetch ALL ads from that page.
 //  3. CATEGORY — expand the term into related keywords (e.g. "fitness" → ["gym","protein",…])
 //
+// Quality gate: external pages (not the brand itself) must have ≥ MIN_EXTERNAL_PAGE_FOLLOWERS
+// followers. This filters out micro-influencers, review spam, and junk pages.
 async function fetchAdsForTerm(
   term: string,
   country: string,
   token: string,
   _termType: string = 'all', // kept for signature compat, always runs all 3
   admin?: any,
-): Promise<{ ads: any[], brandPageIds: string[], error?: string }> {
+): Promise<{ ads: any[], brandPageIds: string[], externalFiltered: number, error?: string }> {
   const metaCountry = normalizeCountry(country)
   const seenIds = new Set<string>()
   const allAds: any[] = []
@@ -249,7 +280,40 @@ async function fetchAdsForTerm(
     }
   }
 
-  return { ads: allAds, brandPageIds: Array.from(discoveredBrandPageIds) }
+  // ── Quality gate: filter external pages by follower count ────
+  // Brand's own pages → always keep (no filter).
+  // Everyone else (influencers, marketplaces, review accounts) → must have
+  // at least MIN_EXTERNAL_PAGE_FOLLOWERS followers to be worth indexing.
+  // This kills micro-influencer spam and junk one-post pages.
+  let filteredAds = allAds
+  let externalFiltered = 0
+
+  if (MIN_EXTERNAL_PAGE_FOLLOWERS > 0 && discoveredBrandPageIds.size > 0) {
+    // Find unique external page_ids (ads NOT from the brand's own pages)
+    const externalPageIds = Array.from(
+      new Set(
+        allAds
+          .filter((ad: any) => ad.page_id && !discoveredBrandPageIds.has(ad.page_id))
+          .map((ad: any) => ad.page_id)
+      )
+    ) as string[]
+
+    if (externalPageIds.length) {
+      const followerMap = await getPageFollowers(externalPageIds, token)
+
+      filteredAds = allAds.filter((ad: any) => {
+        // Brand's own ads: always keep
+        if (!ad.page_id || discoveredBrandPageIds.has(ad.page_id)) return true
+        // External page: check follower count
+        const fans = followerMap.get(ad.page_id) ?? 0
+        if (fans >= MIN_EXTERNAL_PAGE_FOLLOWERS) return true
+        externalFiltered++
+        return false
+      })
+    }
+  }
+
+  return { ads: filteredAds, brandPageIds: Array.from(discoveredBrandPageIds), externalFiltered }
 }
 
 // ── Classification helpers ───────────────────────────────────
@@ -725,7 +789,7 @@ export async function GET(request: NextRequest) {
           for (const country of countriesToCrawl) {
             send('log', `🔍 Crawling "${term}" [${term_type || 'all'}] / ${country}…`)
 
-            const { ads, brandPageIds, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, 'all', admin)
+            const { ads, brandPageIds, externalFiltered, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, 'all', admin)
 
             if (fetchError) {
               send('log', `  ❌ ${term}/${country}: ${fetchError}`)
@@ -739,7 +803,10 @@ export async function GET(request: NextRequest) {
             }
 
             if (brandPageIds.length) {
-              send('log', `  🏷 Found brand page${brandPageIds.length > 1 ? 's' : ''}: ${brandPageIds.slice(0,3).join(', ')}${brandPageIds.length > 3 ? ` +${brandPageIds.length-3} more` : ''} — fetching ALL their ads`)
+              send('log', `  🏷 Brand page${brandPageIds.length > 1 ? 's' : ''} found: ${brandPageIds.slice(0,3).join(', ')}${brandPageIds.length > 3 ? ` +${brandPageIds.length-3} more` : ''} — fetching ALL their ads directly`)
+            }
+            if (externalFiltered > 0) {
+              send('log', `  🚫 Skipped ${externalFiltered} ads from small external pages (<${MIN_EXTERNAL_PAGE_FOLLOWERS.toLocaleString()} followers)`)
             }
 
             // ── Attach creatives then save all ads ───────────────────────
