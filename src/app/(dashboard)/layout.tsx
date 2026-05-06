@@ -9,7 +9,7 @@ import type { UserProfile } from '@/types'
 import {
   LayoutDashboard, Megaphone, Sparkles, TrendingUp,
   ClipboardList, Settings, CreditCard, BarChart2,
-  Rocket, LogOut, Compass, DatabaseZap,
+  Rocket, LogOut, Compass,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -37,12 +37,6 @@ const NAV = [
     items: [
       { href: '/settings',         icon: Settings,        label: 'Settings',         badge: null },
       { href: '/billing',          icon: CreditCard,      label: 'Billing',          badge: null },
-    ],
-  },
-  {
-    label: 'Admin',
-    items: [
-      { href: '/indexer',          icon: DatabaseZap,     label: 'Ad Indexer',       badge: null },
     ],
   },
 ]

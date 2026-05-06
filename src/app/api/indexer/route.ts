@@ -305,8 +305,11 @@ export async function GET(request: NextRequest) {
   const encoder = new TextEncoder()
   const readable = new ReadableStream({
     async start(controller) {
-      const send = (line: string) => {
-        controller.enqueue(encoder.encode(line + '\n'))
+      const send = (type: string, msg: string) => {
+        // Sanitize msg: strip control chars that could break JSON
+        const safe = msg.replace(/[\x00-\x1F\x7F]/g, ' ').trim()
+        const json = JSON.stringify({ type, msg: safe })
+        controller.enqueue(encoder.encode(json + '\n'))
       }
 
       try {
@@ -325,16 +328,16 @@ export async function GET(request: NextRequest) {
         }
 
         if (!termsToRun.length) {
-          send(JSON.stringify({ type: 'error', msg: '❌ No active terms found. Add terms in the Terms tab first.' }))
+          send('error', '❌ No active terms found. Add terms in the Terms tab first.')
           controller.close()
           return
         }
 
-        send(JSON.stringify({ type: 'log', msg: `📋 Found ${termsToRun.length} terms to crawl` }))
+        send('log', `📋 Found ${termsToRun.length} terms to crawl`)
 
         // ── Get Meta token ──
         const metaToken = await getMetaToken(admin)
-        send(JSON.stringify({ type: 'log', msg: '🔑 Meta token acquired' }))
+        send('log', '🔑 Meta token acquired')
 
         let totalAdsUpserted = 0
 
@@ -343,18 +346,18 @@ export async function GET(request: NextRequest) {
           const countriesToCrawl = forceCountry ? [forceCountry] : (countries || ['US'])
 
           for (const country of countriesToCrawl) {
-            send(JSON.stringify({ type: 'log', msg: `🌐 Crawling "${term}" / ${country}…` }))
+            send('log', `🌐 Crawling "${term}" / ${country}…`)
 
             const { ads, error: fetchError } = await fetchAdsForTerm(term, country, metaToken)
 
             if (fetchError) {
-              send(JSON.stringify({ type: 'log', msg: `  ❌ ${term}/${country}: ${fetchError}` }))
+              send('log', `  ❌ ${term}/${country}: ${fetchError}`)
               await admin.from('discovery_crawl_log').insert({ term, country, ads_fetched: 0, error: fetchError })
               continue
             }
 
             if (!ads.length) {
-              send(JSON.stringify({ type: 'log', msg: `  ⚠️ ${term}/${country}: 0 ads returned` }))
+              send('log', `  ⚠️ ${term}/${country}: 0 ads returned`)
               continue
             }
 
@@ -367,7 +370,7 @@ export async function GET(request: NextRequest) {
               term, country, ads_fetched: ads.length, ads_new: error ? 0 : ads.length, error: error?.message,
             })
 
-            send(JSON.stringify({ type: 'log', msg: `  ✅ ${term}/${country}: ${ads.length} ads` }))
+            send('log', `  ✅ ${term}/${country}: ${ads.length} ads`)
             totalAdsUpserted += ads.length
           }
 
@@ -379,23 +382,23 @@ export async function GET(request: NextRequest) {
         }
 
         // ── Embeddings ──
-        send(JSON.stringify({ type: 'log', msg: '🔢 Generating embeddings…' }))
+        send('log', '🔢 Generating embeddings…')
         let embedded = 0
         try {
           embedded = await generateEmbeddings(admin)
-          send(JSON.stringify({ type: 'log', msg: `  ✅ ${embedded} embeddings generated` }))
+          send('log', `  ✅ ${embedded} embeddings generated`)
         } catch (e: any) {
-          send(JSON.stringify({ type: 'log', msg: `  ❌ Embeddings error: ${e.message}` }))
+          send('log', `  ❌ Embeddings error: ${String(e?.message ?? e)}`)
         }
 
         // ── Claude classification ──
-        send(JSON.stringify({ type: 'log', msg: '🤖 Running Claude classification…' }))
+        send('log', '🤖 Running Claude classification…')
         let classified = 0
         try {
           classified = await classifyWithClaude(admin)
-          send(JSON.stringify({ type: 'log', msg: `  ✅ ${classified} ads classified` }))
+          send('log', `  ✅ ${classified} ads classified`)
         } catch (e: any) {
-          send(JSON.stringify({ type: 'log', msg: `  ❌ Classification error: ${e.message}` }))
+          send('log', `  ❌ Classification error: ${String(e?.message ?? e)}`)
         }
 
         // ── Update state ──
@@ -410,17 +413,9 @@ export async function GET(request: NextRequest) {
           terms_processed: termsToRun.map(t => t.term),
         }, { onConflict: 'id' })
 
-        send(JSON.stringify({
-          type: 'done',
-          msg: `🎉 Done! ${totalAdsUpserted} ads indexed, ${embedded} embeddings, ${classified} classified. Total in DB: ${(totalInDB || 0).toLocaleString()}`,
-          totalAdsUpserted,
-          embedded,
-          classified,
-          totalInDB,
-          termsProcessed: termsToRun.map(t => t.term),
-        }))
+        send('done', `🎉 Done! ${totalAdsUpserted} ads indexed, ${embedded} embeddings, ${classified} classified. Total in DB: ${(totalInDB || 0).toLocaleString()}`)
       } catch (e: any) {
-        send(JSON.stringify({ type: 'error', msg: `❌ Fatal error: ${e.message}` }))
+        send('error', `❌ Fatal error: ${String(e?.message ?? e)}`)
       }
 
       controller.close()
