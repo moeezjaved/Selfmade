@@ -24,11 +24,15 @@ const TYPE_STYLES: Record<string, { bg: string; color: string; border: string }>
 }
 interface LogEntry { term: string; country: string; ads_fetched: number; error?: string; ran_at: string }
 
+const PLATFORM_ICONS: Record<string, string> = { facebook: '📘', instagram: '📸', audience_network: '🌐', messenger: '💬' }
+
 export default function IndexerAdminPage() {
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [runLog, setRunLog] = useState<string[]>([])
+  const [crawlResults, setCrawlResults] = useState<any[]>([])
+  const [crawlResultsLoading, setCrawlResultsLoading] = useState(false)
   const [tab, setTab] = useState<'overview'|'terms'|'log'>('overview')
   const [newTerm, setNewTerm] = useState('')
   const [newCategory, setNewCategory] = useState('General')
@@ -50,9 +54,22 @@ export default function IndexerAdminPage() {
 
   useEffect(() => { fetchStats() }, [fetchStats])
 
+  const fetchCrawlResults = useCallback(async (since: string) => {
+    setCrawlResultsLoading(true)
+    try {
+      const res = await fetch(`/api/admin/indexer?action=recent_ads&since=${encodeURIComponent(since)}`)
+      const data = await res.json()
+      setCrawlResults(data.ads || [])
+    } catch { /* ignore */ } finally {
+      setCrawlResultsLoading(false)
+    }
+  }, [])
+
   const runCrawler = async (term?: string, country?: string, termType?: string) => {
     setRunning(true)
+    setCrawlResults([])
     setRunLog(['🚀 Starting crawler...'])
+    const runStartedAt = new Date().toISOString()
     try {
       const params = new URLSearchParams({ stream: '1' })
       if (term) params.set('term', term)
@@ -72,7 +89,6 @@ export default function IndexerAdminPage() {
         const { done, value } = await reader.read()
         if (done) break
         buffer += decoder.decode(value, { stream: true })
-        // Split on double-newline (SSE) or single newline (NDJSON)
         const lines = buffer.split('\n')
         buffer = lines.pop() ?? ''
         for (const raw of lines) {
@@ -81,9 +97,11 @@ export default function IndexerAdminPage() {
           try {
             const parsed = JSON.parse(line)
             if (parsed.msg) setRunLog(prev => [...prev, String(parsed.msg)])
-            if (parsed.type === 'done') fetchStats()
+            if (parsed.type === 'done') {
+              fetchStats()
+              fetchCrawlResults(runStartedAt)
+            }
           } catch {
-            // Show raw line if it's not JSON
             if (line) setRunLog(prev => [...prev, line])
           }
         }
@@ -134,7 +152,8 @@ export default function IndexerAdminPage() {
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, fontSize: 16, color: '#6b7280' }}>Loading indexer stats…</div>
 
   return (
-    <div style={{ maxWidth: 1100 }}>
+    <div style={{ maxWidth: 1200 }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -251,6 +270,112 @@ export default function IndexerAdminPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Crawl Results Preview ── */}
+        {(crawlResultsLoading || crawlResults.length > 0) && (
+          <div style={{ marginTop: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>
+                🎯 Crawl Results
+              </div>
+              {crawlResultsLoading && (
+                <div style={{ fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 12, height: 12, border: '2px solid #e2e8f0', borderTopColor: '#6b7280', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  Loading ads from this run…
+                </div>
+              )}
+              {!crawlResultsLoading && crawlResults.length > 0 && (
+                <div style={{ fontSize: 12, color: '#6b7280' }}>
+                  {crawlResults.length} ads indexed in this run
+                </div>
+              )}
+              <a href="/discovery" target="_blank"
+                style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: '#1a3a1a', textDecoration: 'none', padding: '5px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7 }}>
+                Open Discovery →
+              </a>
+            </div>
+
+            {crawlResultsLoading && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                    <div style={{ height: 160, background: '#f1f5f9' }} />
+                    <div style={{ padding: '10px 12px' }}>
+                      <div style={{ height: 10, background: '#e2e8f0', borderRadius: 5, marginBottom: 6, width: '60%' }} />
+                      <div style={{ height: 8, background: '#e2e8f0', borderRadius: 5, width: '80%' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!crawlResultsLoading && crawlResults.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
+                {crawlResults.map((ad: any) => {
+                  const thumb = ad.thumbnail_url || `https://graph.facebook.com/${ad.page_id}/picture?type=large`
+                  const body = (ad.body || ad.title || '').slice(0, 100)
+                  const isActive = ad.is_active
+                  return (
+                    <a key={ad.ad_id} href={ad.snapshot_url} target="_blank" rel="noopener noreferrer"
+                      style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', transition: 'box-shadow .15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)')}
+                      onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+                    >
+                      {/* Thumbnail */}
+                      <div style={{ position: 'relative', height: 160, background: '#f1f5f9', overflow: 'hidden', flexShrink: 0 }}>
+                        <img
+                          src={thumb}
+                          alt={ad.page_name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          onError={e => {
+                            // Fallback to brand initials on image error
+                            (e.target as HTMLImageElement).style.display = 'none'
+                          }}
+                        />
+                        {/* Status dot */}
+                        <div style={{ position: 'absolute', top: 8, left: 8, width: 8, height: 8, borderRadius: '50%', background: isActive ? '#22c55e' : '#9ca3af', border: '1.5px solid #fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                        {/* Format badge */}
+                        {ad.format && (
+                          <div style={{ position: 'absolute', top: 6, right: 6, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 5, background: 'rgba(0,0,0,0.55)', color: '#fff' }}>
+                            {ad.format === 'Video' ? '🎬' : ad.format === 'Carousel' ? '🔁' : '🖼'} {ad.format}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {/* Brand */}
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {ad.page_name || 'Unknown Brand'}
+                        </div>
+                        {/* Ad copy */}
+                        {body && (
+                          <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                            {body}
+                          </div>
+                        )}
+                        {/* Meta row */}
+                        <div style={{ marginTop: 'auto', paddingTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 100, background: isActive ? '#f0fdf4' : '#f1f5f9', color: isActive ? '#166534' : '#6b7280' }}>
+                            {isActive ? '🟢 Active' : '⚫ Ended'}
+                          </span>
+                          {(ad.platforms || []).slice(0, 2).map((p: string) => (
+                            <span key={p} title={p} style={{ fontSize: 13 }}>{PLATFORM_ICONS[p] || '🌐'}</span>
+                          ))}
+                          {ad.days_running > 0 && (
+                            <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9ca3af' }}>
+                              {ad.days_running}d
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </a>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
       )}
 
       {/* TERMS TAB */}
