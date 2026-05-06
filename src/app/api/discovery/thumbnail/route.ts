@@ -112,6 +112,25 @@ function pagePictureUrl(pageId: string): string {
 }
 
 async function fetchHtml(url: string, timeoutMs = 10000): Promise<string | null> {
+  // Use Browserless headless Chrome if configured — executes JS, gets real images
+  const token = process.env.BROWSERLESS_TOKEN
+  if (token) {
+    try {
+      const res = await fetch(`https://chrome.browserless.io/content?token=${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          gotoOptions: { waitUntil: 'networkidle2', timeout: 20000 },
+          waitFor: 2000,
+          userAgent: HEADERS['User-Agent'],
+        }),
+        signal: AbortSignal.timeout(30000),
+      })
+      if (res.ok) return await res.text()
+    } catch { /* fall through */ }
+  }
+  // Plain fetch fallback (no JS execution)
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), timeoutMs)

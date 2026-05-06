@@ -343,10 +343,34 @@ function extractMediaFromHtml(html: string): { thumbnail: string | null; videoUr
   return { thumbnail, videoUrl }
 }
 
-async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> {
+// ── Browserless-powered full render ──────────────────────────
+// Uses a real headless Chrome to fully execute JavaScript before returning
+// the HTML. This is the only reliable way to get images from Facebook's SPA.
+// Falls back to plain HTTP fetch if BROWSERLESS_TOKEN is not set.
+async function fetchRenderedHtml(url: string): Promise<string | null> {
+  const token = process.env.BROWSERLESS_TOKEN
+  if (token) {
+    try {
+      const res = await fetch(`https://chrome.browserless.io/content?token=${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          // Wait for network to go quiet + extra 2s for lazy-loaded images
+          gotoOptions: { waitUntil: 'networkidle2', timeout: 25000 },
+          waitFor: 2000,
+          // Pass realistic browser headers so Facebook doesn't block us
+          userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        }),
+        signal: AbortSignal.timeout(35000),
+      })
+      if (res.ok) return await res.text()
+    } catch { /* fall through to plain fetch */ }
+  }
+  // Plain HTTP fetch — works for non-SPA pages, fails silently for Facebook
   try {
     const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), timeoutMs)
+    const t = setTimeout(() => ctrl.abort(), 8000)
     const res = await fetch(url, {
       signal: ctrl.signal,
       headers: {
@@ -361,14 +385,20 @@ async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> 
   } catch { return null }
 }
 
+// Legacy alias used by thumbnail route
+async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> {
+  return fetchRenderedHtml(url)
+}
+
 // ── Attach creatives to all ads ──────────────────────────────
-// Stores ALL ads regardless of whether we get a real creative.
-// For each ad, tries to scrape the snapshot URL for a real image/video.
-// If scraping fails (common — Facebook is a SPA), falls back to the brand
-// profile picture which is always available via the Graph API.
-// Either way, every ad gets a thumbnail_url so cards always show something.
+// Uses Browserless (headless Chrome) when configured so the full page renders
+// and image/video URLs are extractable. Every ad gets saved — real creative
+// if we can get it, brand profile picture otherwise.
 async function attachCreatives(rawAds: any[], term: string, country: string): Promise<any[]> {
-  const CONCURRENCY = 5  // low concurrency to avoid Facebook rate-limits
+  const hasBrowserless = !!process.env.BROWSERLESS_TOKEN
+  // With Browserless: 5 parallel (each takes ~5s → 25s per chunk, well within 300s limit)
+  // Without: 10 parallel plain fetches (fast but mostly fail for Facebook SPA)
+  const CONCURRENCY = hasBrowserless ? 5 : 10
   const results: any[] = []
 
   for (let i = 0; i < rawAds.length; i += CONCURRENCY) {
@@ -377,10 +407,10 @@ async function attachCreatives(rawAds: any[], term: string, country: string): Pr
       chunk.map(async (ad: any) => {
         const row = transformAd(ad, term, country)
 
-        // Try snapshot URL first (has access_token — sometimes returns image data)
+        // Snapshot URL has access_token embedded — best chance of seeing the real ad
         const snapshotUrl = ad.ad_snapshot_url || ''
         if (snapshotUrl) {
-          const html = await fetchHtml(snapshotUrl, 5000).catch(() => null)
+          const html = await fetchRenderedHtml(snapshotUrl).catch(() => null)
           if (html) {
             const { thumbnail, videoUrl } = extractMediaFromHtml(html)
             if (thumbnail) { row.thumbnail_url = thumbnail; row.format = videoUrl ? 'Video' : 'Image' }
@@ -388,8 +418,7 @@ async function attachCreatives(rawAds: any[], term: string, country: string): Pr
           }
         }
 
-        // If no real creative found, use brand profile picture as reliable fallback.
-        // graph.facebook.com/{page_id}/picture always works for public FB pages.
+        // Fallback: brand profile picture — always available for public FB pages
         if (!row.thumbnail_url && row.page_id) {
           row.thumbnail_url = `https://graph.facebook.com/${row.page_id}/picture?type=large`
         }
