@@ -42,7 +42,7 @@ const TERMS_PER_RUN = 10   // terms per cron run
 const ADS_PER_TERM = 50    // ads per Meta API call
 const PAGES_PER_TERM = 2   // pages to fetch (50 × 2 = 100 ads per term×country)
 const EMBED_BATCH = 50     // ads to embed per batch
-const CLASSIFY_BATCH = 15  // ads to classify per Claude call
+const CLASSIFY_BATCH = 10  // ads to classify per Claude call (smaller = less likely to hit token limits)
 
 const META_FIELDS = [
   'id','ad_creation_time','ad_delivery_start_time','ad_delivery_stop_time',
@@ -72,10 +72,29 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
 }
 
 // ── Meta Ads Library fetch ───────────────────────────────────
-async function fetchAdsForTerm(term: string, country: string, token: string): Promise<{ ads: any[], error?: string }> {
+async function fetchAdsForTerm(
+  term: string,
+  country: string,
+  token: string,
+  termType: string = 'adcopy',
+  admin?: any,
+): Promise<{ ads: any[], error?: string }> {
   const allAds: any[] = []
   let after = ''
   const metaCountry = normalizeCountry(country)
+
+  // For brand-type terms: look up known page_ids from our DB so we can
+  // fetch ALL ads from that brand's page directly (not just ad-copy mentions)
+  let pageIds: string[] = []
+  if (termType === 'brand' && admin) {
+    const { data: pages } = await admin
+      .from('discovery_ads_index')
+      .select('page_id')
+      .ilike('page_name', `%${term}%`)
+      .limit(20)
+    pageIds = [...new Set((pages || []).map((p: any) => p.page_id).filter(Boolean))] as string[]
+  }
+
   for (let page = 0; page < PAGES_PER_TERM; page++) {
     const params: Record<string, string> = {
       access_token: token,
@@ -83,6 +102,10 @@ async function fetchAdsForTerm(term: string, country: string, token: string): Pr
       ad_reached_countries: JSON.stringify([metaCountry]),
       fields: META_FIELDS,
       limit: String(ADS_PER_TERM),
+    }
+    // Brand crawl: also filter by page IDs if we already know them
+    if (termType === 'brand' && pageIds.length) {
+      params.search_page_ids = JSON.stringify(pageIds)
     }
     if (after) params.after = after
     try {
@@ -261,6 +284,27 @@ async function generateEmbeddings(admin: any): Promise<number> {
 }
 
 // ── Claude AI classification ─────────────────────────────────
+async function callClaudeWithRetry(prompt: string, maxRetries = 3): Promise<string> {
+  let lastErr: any
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const msg = await anthropic.messages.create({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }],
+      })
+      return msg.content[0].type === 'text' ? msg.content[0].text : ''
+    } catch (e: any) {
+      lastErr = e
+      const isRetryable = e?.status >= 500 || e?.message?.includes('overloaded') || e?.message?.includes('Internal server error')
+      if (!isRetryable || attempt === maxRetries) break
+      // Exponential back-off: 2s, 4s
+      await new Promise(r => setTimeout(r, 2000 * attempt))
+    }
+  }
+  throw lastErr
+}
+
 async function classifyWithClaude(admin: any): Promise<number> {
   const { data: unclassified } = await admin
     .from('discovery_ads_index')
@@ -275,12 +319,8 @@ async function classifyWithClaude(admin: any): Promise<number> {
     `AD ${i + 1} [${ad.ad_id}]:\nBrand: ${ad.page_name}\nHeadline: ${ad.title}\nBody: ${ad.body.slice(0, 400)}`
   ).join('\n\n---\n\n')
 
-  const msg = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022',
-    max_tokens: 2000,
-    messages: [{
-      role: 'user',
-      content: `Analyze these ${unclassified.length} ads and classify each one. Return a JSON array only, no explanation.
+  const content = await callClaudeWithRetry(
+    `Analyze these ${unclassified.length} ads and classify each one. Return a JSON array only, no explanation.
 
 For each ad return:
 {
@@ -299,14 +339,17 @@ Ads to classify:
 ${adsText}
 
 Return only the JSON array.`
-    }]
-  })
+  )
 
-  const content = msg.content[0].type === 'text' ? msg.content[0].text : ''
   const jsonMatch = content.match(/\[[\s\S]*\]/)
   if (!jsonMatch) return 0
 
-  const classifications = JSON.parse(jsonMatch[0]) as any[]
+  let classifications: any[]
+  try {
+    classifications = JSON.parse(jsonMatch[0])
+  } catch {
+    return 0  // malformed JSON — skip, will retry next run
+  }
 
   for (const cls of classifications) {
     await admin.from('discovery_ads_index').update({
@@ -361,17 +404,18 @@ export async function GET(request: NextRequest) {
 
       try {
         // ── Get terms to crawl ──
-        let termsToRun: { term: string; countries: string[]; id: string }[] = []
+        let termsToRun: { term: string; countries: string[]; id: string; term_type: string }[] = []
         if (forceTerm) {
-          termsToRun = [{ term: forceTerm, countries: [forceCountry || 'US'], id: 'manual' }]
+          const forceType = request.nextUrl.searchParams.get('term_type') || 'adcopy'
+          termsToRun = [{ term: forceTerm, countries: [forceCountry || 'US'], id: 'manual', term_type: forceType }]
         } else {
           const { data: terms } = await admin
             .from('discovery_crawl_terms')
-            .select('id, term, countries')
+            .select('id, term, countries, term_type')
             .eq('is_active', true)
             .order('last_crawled_at', { ascending: true, nullsFirst: true })
             .limit(TERMS_PER_RUN)
-          termsToRun = terms || []
+          termsToRun = (terms || []).map((t: any) => ({ ...t, term_type: t.term_type || 'adcopy' }))
         }
 
         if (!termsToRun.length) {
@@ -380,7 +424,10 @@ export async function GET(request: NextRequest) {
           return
         }
 
-        send('log', `📋 Found ${termsToRun.length} terms to crawl`)
+        const typeCounts = termsToRun.reduce((acc: Record<string, number>, t) => {
+          acc[t.term_type] = (acc[t.term_type] || 0) + 1; return acc
+        }, {})
+        send('log', `📋 Found ${termsToRun.length} terms to crawl (${Object.entries(typeCounts).map(([k,v]) => `${v} ${k}`).join(', ')})`)
 
         // ── Get Meta token ──
         const metaToken = await getMetaToken(admin)
@@ -389,13 +436,14 @@ export async function GET(request: NextRequest) {
         let totalAdsUpserted = 0
 
         // ── Crawl each term × country ──
-        for (const { term, countries, id } of termsToRun) {
+        for (const { term, countries, id, term_type } of termsToRun) {
           const countriesToCrawl = forceCountry ? [forceCountry] : (countries || ['US'])
+          const typeIcon = term_type === 'brand' ? '🏷️' : term_type === 'category' ? '📂' : '📝'
 
           for (const country of countriesToCrawl) {
-            send('log', `🌐 Crawling "${term}" / ${country}…`)
+            send('log', `${typeIcon} Crawling "${term}" [${term_type}] / ${country}…`)
 
-            const { ads, error: fetchError } = await fetchAdsForTerm(term, country, metaToken)
+            const { ads, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, term_type, admin)
 
             if (fetchError) {
               send('log', `  ❌ ${term}/${country}: ${fetchError}`)
@@ -454,7 +502,9 @@ export async function GET(request: NextRequest) {
           classified = await classifyWithClaude(admin)
           send('log', `  ✅ ${classified} ads classified`)
         } catch (e: any) {
-          send('log', `  ❌ Classification error: ${String(e?.message ?? e)}`)
+          // Non-fatal — crawler already saved ads and embeddings; classification retried next run
+          const detail = e?.error?.message || e?.message || String(e)
+          send('log', `  ⚠️ Classification skipped (will retry next run): ${detail}`)
         }
 
         // ── Update state ──
