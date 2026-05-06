@@ -328,12 +328,12 @@ async function fetchAdsForTerm(
     const pageIds = Array.from(brandPageIds).slice(0, 10)
 
     if (pageIds.length && !isNearDeadline()) {
-      // ── Test both search_page_ids formats on first page ──────────────
-      // Meta's Ads Library API accepts both but some versions differ.
-      // We test both, log counts, and continue paginating with the winner.
-      //   Format A (CSV):  search_page_ids=129669023798560
-      //   Format B (JSON): search_page_ids=["129669023798560"]
-      const makePageParams = (pageIdsParam: string): Record<string, string> => ({
+      // search_page_ids format: use comma-separated numeric IDs (e.g. "123456789").
+      // Both CSV and JSON array work with Meta's API; CSV is the canonical form for
+      // the ids= parameter family and avoids URL-encoding overhead.
+      const pageIdsParam = pageIds.join(',')
+
+      const brandPageParams: Record<string, string> = {
         access_token: token,
         search_page_ids: pageIdsParam,
         ad_reached_countries: JSON.stringify([metaCountry]),
@@ -341,60 +341,34 @@ async function fetchAdsForTerm(
         active_status: 'ALL', // include stopped/paused — historical winners matter
         fields: META_FIELDS,
         limit: String(ADS_PER_TERM),
-      })
+      }
 
-      const csvParam  = pageIds.join(',')
-      const jsonParam = JSON.stringify(pageIds)
-
-      // Parallel test of both formats on page 1
-      const [csvResult, jsonResult] = await Promise.all([
-        fetchOnePage(makePageParams(csvParam), ''),
-        fetchOnePage(makePageParams(jsonParam), ''),
-      ])
-
-      const csvCount  = csvResult.ads.length
-      const jsonCount = jsonResult.ads.length
-      console.log(`[brand-fetch] format test | CSV: ${csvCount} ads | JSON: ${jsonCount} ads | page_ids: ${csvParam}`)
-      if (csvResult.error)  console.log(`[brand-fetch] CSV  error: ${csvResult.error}`)
-      if (jsonResult.error) console.log(`[brand-fetch] JSON error: ${jsonResult.error}`)
-
-      // Prefer CSV on tie (simpler, no extra URL-encoding overhead)
-      const useJson = jsonCount > csvCount
-      const winnerParam = useJson ? jsonParam : csvParam
-      console.log(`[brand-fetch] using ${useJson ? 'JSON' : 'CSV'} format (${Math.max(csvCount, jsonCount)} ads on page 1)`)
-
-      const firstResult = useJson ? jsonResult : csvResult
-      addAds(firstResult.ads)
-
-      // ── Paginate until no new IDs, cursor missing, or deadline ──────
+      // ── Paginate until no new ad_archive_ids, cursor missing, or deadline ──
       const MAX_BRAND_PAGES = 60 // 60 × 50 = 3000 ads max per brand per run
-      let brandCursor = firstResult.nextCursor
-      let hasMore = firstResult.hasMore
-      let pagesTotal = 1
+      let brandCursor = ''
+      let pagesTotal = 0
 
-      for (let p = 1; p < MAX_BRAND_PAGES && hasMore && brandCursor; p++) {
+      for (let p = 0; p < MAX_BRAND_PAGES; p++) {
         if (isNearDeadline()) {
           timedOut = true
-          console.log(`[brand-fetch] deadline reached at page ${p} — saving ${allAds.length} ads so far`)
+          console.log(`[brand-fetch] deadline reached at page ${p} — ${allAds.length} ads saved`)
           break
         }
-        const { ads: pageAds, nextCursor, hasMore: more, error } = await fetchOnePage(makePageParams(winnerParam), brandCursor)
+        const { ads: pageAds, nextCursor, hasMore, error } = await fetchOnePage(brandPageParams, brandCursor)
         if (error) {
-          console.error(`[brand-fetch] page ${p} error:`, error)
+          console.error(`[brand-fetch] page ${p} error for ${pageIdsParam}:`, error)
           break
         }
-        // Stop if this page returned zero NEW ad_archive_ids (cursor looped or exhausted)
+        // Count only genuinely new ad_archive_ids (not already seen from any prior source)
         const newThisPage = addAds(pageAds)
         pagesTotal++
-        if (newThisPage === 0) {
-          console.log(`[brand-fetch] page ${p} returned 0 new IDs — stopping pagination`)
-          break
-        }
-        hasMore = more
+        console.log(`[brand-fetch] p${p} → ${pageAds.length} returned, ${newThisPage} new | total: ${allAds.length} | hasMore: ${hasMore}`)
+        // Stop when no new IDs (cursor loop) or no next page
+        if (newThisPage === 0 || !hasMore || !nextCursor) break
         brandCursor = nextCursor
       }
 
-      console.log(`[brand-fetch] done — ${pagesTotal} pages fetched → ${allAds.length} total ads for ${csvParam}`)
+      console.log(`[brand-fetch] done — ${pagesTotal} pages → ${allAds.length} ads for page_ids: ${pageIdsParam}`)
     }
   }
 
@@ -669,30 +643,31 @@ async function attachCreatives(
   for (const ad of rawAds) {
     const row = transformAd(ad, term, country)
 
-    // For brand crawls: try ScrapingBee to extract real thumbnail/video.
-    // Skip if:
-    //  - not a brand crawl (term/category discovery uses iframes, faster)
-    //  - already have a real thumbnail (not brand logo)
-    //  - no snapshot_url to scrape
-    //  - no ScrapingBee key configured
-    //  - hit the per-crawl cap
-    //  - near route deadline
-    const hasRealThumb = row.thumbnail_url && !row.thumbnail_url.includes('graph.facebook.com')
+    // For brand crawls: try ScrapingBee to extract the real ad creative.
+    // ScrapingBee renders the snapshot_url (Meta's ad preview page) and
+    // extractMediaFromHtml pulls the actual ad image/video from the DOM.
+    // We do NOT fall back to the brand profile pic — that is NOT a creative.
+    // Leave thumbnail_url=null when no real creative found; the Discovery UI
+    // shows the snapshot_url iframe which always renders the actual ad.
     const nearDeadline = deadlineMs ? Date.now() > deadlineMs : false
-    if (isBrandCrawl && !hasRealThumb && row.snapshot_url && process.env.SCRAPINGBEE_KEY && sbCalls < MAX_SB_CALLS_PER_CRAWL && !nearDeadline) {
+    if (isBrandCrawl && row.snapshot_url && process.env.SCRAPINGBEE_KEY && sbCalls < MAX_SB_CALLS_PER_CRAWL && !nearDeadline) {
       const html = await fetchRenderedHtml(row.snapshot_url)
       if (html) {
         const { thumbnail, videoUrl } = extractMediaFromHtml(html)
-        if (thumbnail) row.thumbnail_url = thumbnail
-        if (videoUrl) row.video_url = videoUrl
+        // Reject page-avatar URLs — they are brand logos, not ad creatives.
+        // Real creatives come from scontent / fbcdn CDNs, not graph.facebook.com.
+        const isRealCreative = (url: string | null) =>
+          url && !url.includes('graph.facebook.com') && !url.includes('/picture')
+        if (isRealCreative(thumbnail)) row.thumbnail_url = thumbnail!
+        if (isRealCreative(videoUrl))  row.video_url = videoUrl!
         sbCalls++
       }
     }
 
-    // Fallback: brand profile pic as placeholder (always fast, always works)
-    if (!row.thumbnail_url && row.page_id) {
-      row.thumbnail_url = `https://graph.facebook.com/${row.page_id}/picture?type=large`
-    }
+    // DO NOT fall back to brand profile picture — graph.facebook.com/PAGE/picture
+    // is the page avatar (logo), not an ad creative. Saving it causes the
+    // "0 real creatives, 53 brand logo placeholders" problem.
+    // thumbnail_url stays null; the UI renders the snapshot_url iframe instead.
 
     rows.push(row)
   }
@@ -739,11 +714,11 @@ async function callClaudeWithRetry(prompt: string): Promise<string> {
 
   // Model fallback chain — newest/most capable first, fast model as safety net.
   // If ANTHROPIC_MODEL env var is set and not already in the list, prepend it.
-  // NOTE: claude-3-7-sonnet uses extended_thinking which breaks standard messages API.
-  // NOTE: claude-3-haiku-20240307 was deprecated — use claude-3-5-haiku-20241022 instead.
+  // Claude 4.5 series (as of May 2026 — claude-3-haiku-20240307 retired April 20 2026).
   const DEFAULT_MODELS = [
-    'claude-3-5-sonnet-20241022',  // primary — reliable, fast, widely available
-    'claude-3-5-haiku-20241022',   // fast fallback — still capable for classification
+    'claude-sonnet-4-5-20251001',  // primary — reliable, strong classification
+    'claude-haiku-4-5-20251001',   // fast fallback — 3x cheaper, still great for JSON tasks
+    'claude-3-5-sonnet-20241022',  // legacy safety net in case 4.5 series unavailable
   ]
   const envModel = process.env.ANTHROPIC_MODEL
   const MODELS = envModel && !DEFAULT_MODELS.includes(envModel)
