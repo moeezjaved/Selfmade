@@ -43,6 +43,7 @@ export default function IndexerAdminPage() {
   const [runTerm, setRunTerm] = useState('')
   const [runCountry, setRunCountry] = useState('US')
   const [runTermType, setRunTermType] = useState('adcopy')
+  const [seeding, setSeeding] = useState(false)
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
@@ -146,6 +147,28 @@ export default function IndexerAdminPage() {
     t.term.toLowerCase().includes(termSearch.toLowerCase()) || t.category.toLowerCase().includes(termSearch.toLowerCase())
   )
 
+  const seedDefaultTerms = async () => {
+    setSeeding(true)
+    try {
+      const res = await fetch('/api/admin/indexer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'seed_terms' }),
+      })
+      const data = await res.json()
+      if (data.added > 0) {
+        alert(`✅ Added ${data.added} default terms (10 brand + 10 category + 10 ad copy)`)
+      } else {
+        alert('ℹ️ All seed terms already exist — nothing to add.')
+      }
+      fetchStats()
+    } catch (e: any) {
+      alert('❌ Failed to seed terms: ' + e.message)
+    } finally {
+      setSeeding(false)
+    }
+  }
+
   const card = { background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20 }
   const btn = (color = '#1a3a1a', text = '#dffe95') => ({ padding: '8px 18px', background: color, color: text, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' } as const)
 
@@ -200,6 +223,7 @@ export default function IndexerAdminPage() {
 
       {/* OVERVIEW TAB */}
       {tab === 'overview' && (
+        <>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {/* Manual run */}
           <div style={card}>
@@ -376,6 +400,7 @@ export default function IndexerAdminPage() {
             )}
           </div>
         )}
+        </>
       )}
 
       {/* TERMS TAB */}
@@ -436,9 +461,15 @@ export default function IndexerAdminPage() {
             </div>
           </div>
 
-          <div style={{ marginBottom: 12 }}>
-            <input value={termSearch} onChange={e => setTermSearch(e.target.value)} placeholder="Search terms…" style={{ padding: '8px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: 300 }} />
-            <span style={{ marginLeft: 12, fontSize: 12, color: '#6b7280' }}>{filteredTerms.length} terms</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <input value={termSearch} onChange={e => setTermSearch(e.target.value)} placeholder="Search terms…" style={{ padding: '8px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: 260 }} />
+            <span style={{ fontSize: 12, color: '#6b7280' }}>{filteredTerms.length} terms</span>
+            <div style={{ marginLeft: 'auto' }}>
+              <button onClick={seedDefaultTerms} disabled={seeding} style={{ ...btn('#eff6ff', '#1d4ed8'), border: '1.5px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {seeding ? '⏳ Seeding…' : '📥 Seed Default Terms'}
+              </button>
+              <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textAlign: 'right' }}>30 terms: 10 brand + 10 category + 10 ad copy</div>
+            </div>
           </div>
 
           <div style={card}>
