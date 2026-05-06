@@ -623,7 +623,17 @@ export default function DiscoveryPage() {
   }, [query, sort, status, platforms, country])
 
   // Meta Ads Library API requires search_terms or search_page_ids — only fetch when there's a query
-  useEffect(() => { if (query.trim()) fetchAds(true) }, [query, sort, status, platforms, country])
+  useEffect(() => {
+    if (query.trim()) {
+      fetchAds(true)
+    } else {
+      // Clear error and results when query is emptied
+      setError('')
+      setRawAds([])
+      setHasMore(false)
+      setNextCursor(null)
+    }
+  }, [query, sort, status, platforms, country])
 
   // Collect available languages from loaded ads
   const availableLanguages = useMemo(() => {
@@ -713,8 +723,9 @@ export default function DiscoveryPage() {
               )}
             </div>
           </form>
-          <button onClick={() => fetchAds(true)} disabled={loading}
-            style={{ padding: '8px 10px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', color: '#374151', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <button onClick={() => { if (query.trim()) fetchAds(true) }} disabled={loading || !query.trim()}
+            title={query.trim() ? 'Refresh results' : 'Enter a search term first'}
+            style={{ padding: '8px 10px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, cursor: loading || !query.trim() ? 'not-allowed' : 'pointer', color: query.trim() ? '#374151' : '#9ca3af', display: 'flex', alignItems: 'center', flexShrink: 0, opacity: !query.trim() ? 0.5 : 1 }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
@@ -904,10 +915,11 @@ export default function DiscoveryPage() {
         {/* Ad grid */}
         {filteredAds.length > 0 && (
           <>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span>Showing <strong style={{ color: '#111' }}>{filteredAds.length}</strong>{rawAds.length !== filteredAds.length ? ` of ${rawAds.length}` : ''} ads{query ? ` for "${query}"` : ''}</span>
               {activeFilterCount > 0 && <span style={{ background: '#f0fdf4', color: '#166534', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af' }}>Results powered by Meta Ads Library · relevance determined by Meta</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
               {filteredAds.map(ad => <AdCard key={ad.id} ad={ad} />)}
