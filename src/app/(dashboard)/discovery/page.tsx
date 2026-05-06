@@ -622,7 +622,8 @@ export default function DiscoveryPage() {
     }
   }, [query, sort, status, platforms, country])
 
-  useEffect(() => { fetchAds(true) }, [query, sort, status, platforms, country])
+  // Meta Ads Library API requires search_terms or search_page_ids — only fetch when there's a query
+  useEffect(() => { if (query.trim()) fetchAds(true) }, [query, sort, status, platforms, country])
 
   // Collect available languages from loaded ads
   const availableLanguages = useMemo(() => {
@@ -861,11 +862,32 @@ export default function DiscoveryPage() {
           </div>
         )}
 
-        {/* Empty */}
-        {!loading && !error && rawAds.length === 0 && (
+        {/* Landing state — no search yet */}
+        {!loading && !error && rawAds.length === 0 && !query && (
+          <div style={{ textAlign: 'center', padding: '80px 20px' }}>
+            <div style={{ fontSize: 56, marginBottom: 20 }}>🔍</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#111', marginBottom: 10 }}>Search the Meta Ads Library</div>
+            <div style={{ fontSize: 15, color: '#6b7280', marginBottom: 32, lineHeight: 1.7 }}>
+              Type a brand name, keyword, or product to discover<br />ads currently running on Facebook & Instagram
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {['Nike', 'Skincare', 'Weight loss', 'SAAS', 'Fashion', 'Coffee', 'Gym', 'Travel'].map(term => (
+                <button key={term} onClick={() => { setSearchInput(term); setQuery(term) }}
+                  style={{ padding: '8px 18px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 100, fontSize: 13, fontWeight: 600, color: '#374151', cursor: 'pointer', fontFamily: 'inherit' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#1a3a1a'; e.currentTarget.style.color = '#1a3a1a' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#374151' }}>
+                  {term}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty — searched but no results */}
+        {!loading && !error && rawAds.length === 0 && query && (
           <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6b7280' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#111', marginBottom: 8 }}>No ads found</div>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🤷</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#111', marginBottom: 8 }}>No ads found for "{query}"</div>
             <div style={{ fontSize: 14 }}>Try a different search term or adjust your filters</div>
           </div>
         )}
