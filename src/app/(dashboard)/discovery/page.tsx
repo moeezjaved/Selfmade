@@ -579,6 +579,7 @@ export default function DiscoveryPage() {
   const router = useRouter()
   const [searchInput, setSearchInput] = useState('')
   const [query, setQuery] = useState('')
+  const [searchMode, setSearchMode] = useState<'adcopy' | 'brand' | 'category'>('adcopy')
   const [rawAds, setRawAds] = useState<Ad[]>([])
   const [loading, setLoading] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
@@ -642,7 +643,9 @@ export default function DiscoveryPage() {
     setError('')
     try {
       const params = new URLSearchParams({
-        q: query, sort, status,
+        q: query,
+        mode: searchMode,
+        sort, status,
         ...(country && country !== 'ALL' ? { country } : {}),
         ...(platforms.length ? { platforms: platforms.join(',') } : {}),
         ...(cursor ? { after: cursor } : {}),
@@ -659,20 +662,19 @@ export default function DiscoveryPage() {
     } finally {
       setLoading(false)
     }
-  }, [query, sort, status, platforms, country])
+  }, [query, searchMode, sort, status, platforms, country])
 
   // Meta Ads Library API requires search_terms or search_page_ids — only fetch when there's a query
   useEffect(() => {
     if (query.trim()) {
       fetchAds(true)
     } else {
-      // Clear error and results when query is emptied
       setError('')
       setRawAds([])
       setHasMore(false)
       setNextCursor(null)
     }
-  }, [query, sort, status, platforms, country])
+  }, [query, searchMode, sort, status, platforms, country])
 
   // Collect available languages from loaded ads
   const availableLanguages = useMemo(() => {
@@ -769,14 +771,25 @@ export default function DiscoveryPage() {
 
                 {/* Search type suggestions */}
                 <div style={{ padding: '4px 6px 4px' }}>
-                  {[
-                    { label: 'Ad copy', key: 'adcopy' },
-                    { label: 'Brand', key: 'brand' },
-                    { label: 'Categories', key: 'category' },
-                  ].map(opt => (
+                  {([
+                    { label: 'Ad copy', key: 'adcopy' as const, hint: 'Ads that mention this keyword' },
+                    { label: 'Brand', key: 'brand' as const, hint: 'Brands with this name' },
+                    { label: 'Categories', key: 'category' as const, hint: 'Ads in this industry/niche' },
+                  ]).map(opt => (
                     <button key={opt.key}
-                      onMouseDown={e => { e.preventDefault(); setQuery(searchInput); setShowDropdown(false) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 0, width: '100%', padding: '9px 12px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+                      onMouseDown={e => {
+                        e.preventDefault()
+                        setSearchMode(opt.key)
+                        setQuery(searchInput)
+                        // For category mode, auto-apply matching industry filter
+                        if (opt.key === 'category') {
+                          const q = searchInput.toLowerCase()
+                          const matched = INDUSTRY_LIST.filter(ind => ind.toLowerCase().includes(q) || q.includes(ind.toLowerCase().split(' ')[0]))
+                          if (matched.length) setIndustry(matched.slice(0, 3))
+                        }
+                        setShowDropdown(false)
+                      }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '9px 12px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                     >
@@ -785,6 +798,7 @@ export default function DiscoveryPage() {
                         <span style={{ color: '#9ca3af', fontWeight: 400 }}> contains </span>
                         <span style={{ fontWeight: 600 }}>"{searchInput}"</span>
                       </span>
+                      <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 400, marginLeft: 8, flexShrink: 0 }}>{opt.hint}</span>
                     </button>
                   ))}
                 </div>
@@ -1037,10 +1051,14 @@ export default function DiscoveryPage() {
         {filteredAds.length > 0 && (
           <>
             <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span>Showing <strong style={{ color: '#111' }}>{filteredAds.length}</strong>{rawAds.length !== filteredAds.length ? ` of ${rawAds.length}` : ''} ads{query ? ` for "${query}"` : ''}</span>
+              <span>Showing <strong style={{ color: '#111' }}>{filteredAds.length}</strong>{rawAds.length !== filteredAds.length ? ` of ${rawAds.length}` : ''} ads</span>
+              {/* Search mode badge */}
+              <span style={{ background: searchMode === 'brand' ? '#eff6ff' : searchMode === 'category' ? '#f0fdf4' : '#faf5ff', color: searchMode === 'brand' ? '#1d4ed8' : searchMode === 'category' ? '#166534' : '#7c3aed', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100, border: `1px solid ${searchMode === 'brand' ? '#bfdbfe' : searchMode === 'category' ? '#bbf7d0' : '#e9d5ff'}` }}>
+                {searchMode === 'brand' ? '🏷️ Brand' : searchMode === 'category' ? '📂 Category' : '📝 Ad copy'} · "{query}"
+              </span>
               {activeFilterCount > 0 && <span style={{ background: '#f0fdf4', color: '#166534', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af' }}>Results powered by Meta Ads Library · relevance determined by Meta</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af' }}>Results via Meta Ads Library</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
               {filteredAds.map(ad => <AdCard key={ad.id} ad={ad} />)}
