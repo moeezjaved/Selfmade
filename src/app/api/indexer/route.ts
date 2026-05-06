@@ -86,7 +86,10 @@ async function fetchAdsForTerm(term: string, country: string, token: string): Pr
     }
     if (after) params.after = after
     try {
-      const res = await fetch(`https://graph.facebook.com/${V}/ads_archive?` + new URLSearchParams(params))
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15000) // 15s per page
+      const res = await fetch(`https://graph.facebook.com/${V}/ads_archive?` + new URLSearchParams(params), { signal: controller.signal })
+      clearTimeout(timeout)
       const data = await res.json()
       if (data.error) return { ads: allAds, error: data.error.message }
       if (!data.data?.length) break
@@ -94,7 +97,7 @@ async function fetchAdsForTerm(term: string, country: string, token: string): Pr
       if (!data.paging?.next) break
       after = data.paging.cursors?.after || ''
     } catch (e: any) {
-      return { ads: allAds, error: e.message }
+      return { ads: allAds, error: e.name === 'AbortError' ? 'Timed out after 15s' : e.message }
     }
   }
   return { ads: allAds }
