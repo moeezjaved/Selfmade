@@ -281,8 +281,9 @@ export async function GET(request: NextRequest) {
   const forceCountry = request.nextUrl.searchParams.get('country')
   const onlyEmbed = request.nextUrl.searchParams.get('embed') === '1'
   const onlyClassify = request.nextUrl.searchParams.get('classify') === '1'
+  const stream = request.nextUrl.searchParams.get('stream') === '1'
 
-  // ── Embedding-only or classify-only mode ──
+  // ── Non-streaming modes (cron jobs) ──
   if (onlyEmbed) {
     const count = await generateEmbeddings(admin)
     return NextResponse.json({ success: true, embedded: count })
@@ -292,98 +293,137 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, classified: count })
   }
 
-  // ── Get terms to crawl ──
-  let termsToRun: { term: string; countries: string[]; id: string }[] = []
-
-  if (forceTerm) {
-    termsToRun = [{ term: forceTerm, countries: [forceCountry || 'US'], id: 'manual' }]
-  } else {
-    // Pick least-recently-crawled active terms
-    const { data: terms } = await admin
-      .from('discovery_crawl_terms')
-      .select('id, term, countries')
-      .eq('is_active', true)
-      .order('last_crawled_at', { ascending: true, nullsFirst: true })
-      .limit(TERMS_PER_RUN)
-    termsToRun = terms || []
-  }
-
-  const crawlLog: any[] = []
-  let totalAdsUpserted = 0
-
-  // ── Get Meta access token ──
-  const metaToken = await getMetaToken(admin)
-
-  // ── Crawl each term × country ──
-  for (const { term, countries, id } of termsToRun) {
-    const countriesToCrawl = forceCountry ? [forceCountry] : (countries || ['US'])
-
-    for (const country of countriesToCrawl) {
-      const { ads, error: fetchError } = await fetchAdsForTerm(term, country, metaToken)
-      if (fetchError) {
-        crawlLog.push({ term, country, ads_fetched: 0, ads_new: 0, error: fetchError })
-        await admin.from('discovery_crawl_log').insert({ term, country, ads_fetched: 0, error: fetchError })
-        continue
-      }
-      if (!ads.length) {
-        crawlLog.push({ term, country, ads_fetched: 0, ads_new: 0 })
-        continue
+  // ── Streaming mode (admin dashboard) ──
+  const encoder = new TextEncoder()
+  const readable = new ReadableStream({
+    async start(controller) {
+      const send = (line: string) => {
+        controller.enqueue(encoder.encode(line + '\n'))
       }
 
-      const rows = ads.map((ad: any) => transformAd(ad, term, country))
+      try {
+        // ── Get terms to crawl ──
+        let termsToRun: { term: string; countries: string[]; id: string }[] = []
+        if (forceTerm) {
+          termsToRun = [{ term: forceTerm, countries: [forceCountry || 'US'], id: 'manual' }]
+        } else {
+          const { data: terms } = await admin
+            .from('discovery_crawl_terms')
+            .select('id, term, countries')
+            .eq('is_active', true)
+            .order('last_crawled_at', { ascending: true, nullsFirst: true })
+            .limit(TERMS_PER_RUN)
+          termsToRun = terms || []
+        }
 
-      const { error } = await admin
-        .from('discovery_ads_index')
-        .upsert(rows, { onConflict: 'ad_id', ignoreDuplicates: false })
+        if (!termsToRun.length) {
+          send(JSON.stringify({ type: 'error', msg: '❌ No active terms found. Add terms in the Terms tab first.' }))
+          controller.close()
+          return
+        }
 
-      const logEntry = { term, country, ads_fetched: ads.length, ads_new: error ? 0 : ads.length, error: error?.message }
-      crawlLog.push(logEntry)
+        send(JSON.stringify({ type: 'log', msg: `📋 Found ${termsToRun.length} terms to crawl` }))
 
-      // Log to DB
-      await admin.from('discovery_crawl_log').insert(logEntry)
-      totalAdsUpserted += ads.length
+        // ── Get Meta token ──
+        const metaToken = await getMetaToken(admin)
+        send(JSON.stringify({ type: 'log', msg: '🔑 Meta token acquired' }))
+
+        let totalAdsUpserted = 0
+
+        // ── Crawl each term × country ──
+        for (const { term, countries, id } of termsToRun) {
+          const countriesToCrawl = forceCountry ? [forceCountry] : (countries || ['US'])
+
+          for (const country of countriesToCrawl) {
+            send(JSON.stringify({ type: 'log', msg: `🌐 Crawling "${term}" / ${country}…` }))
+
+            const { ads, error: fetchError } = await fetchAdsForTerm(term, country, metaToken)
+
+            if (fetchError) {
+              send(JSON.stringify({ type: 'log', msg: `  ❌ ${term}/${country}: ${fetchError}` }))
+              await admin.from('discovery_crawl_log').insert({ term, country, ads_fetched: 0, error: fetchError })
+              continue
+            }
+
+            if (!ads.length) {
+              send(JSON.stringify({ type: 'log', msg: `  ⚠️ ${term}/${country}: 0 ads returned` }))
+              continue
+            }
+
+            const rows = ads.map((ad: any) => transformAd(ad, term, country))
+            const { error } = await admin
+              .from('discovery_ads_index')
+              .upsert(rows, { onConflict: 'ad_id', ignoreDuplicates: false })
+
+            await admin.from('discovery_crawl_log').insert({
+              term, country, ads_fetched: ads.length, ads_new: error ? 0 : ads.length, error: error?.message,
+            })
+
+            send(JSON.stringify({ type: 'log', msg: `  ✅ ${term}/${country}: ${ads.length} ads` }))
+            totalAdsUpserted += ads.length
+          }
+
+          if (id !== 'manual') {
+            await admin.from('discovery_crawl_terms').update({
+              last_crawled_at: new Date().toISOString(),
+            }).eq('id', id)
+          }
+        }
+
+        // ── Embeddings ──
+        send(JSON.stringify({ type: 'log', msg: '🔢 Generating embeddings…' }))
+        let embedded = 0
+        try {
+          embedded = await generateEmbeddings(admin)
+          send(JSON.stringify({ type: 'log', msg: `  ✅ ${embedded} embeddings generated` }))
+        } catch (e: any) {
+          send(JSON.stringify({ type: 'log', msg: `  ❌ Embeddings error: ${e.message}` }))
+        }
+
+        // ── Claude classification ──
+        send(JSON.stringify({ type: 'log', msg: '🤖 Running Claude classification…' }))
+        let classified = 0
+        try {
+          classified = await classifyWithClaude(admin)
+          send(JSON.stringify({ type: 'log', msg: `  ✅ ${classified} ads classified` }))
+        } catch (e: any) {
+          send(JSON.stringify({ type: 'log', msg: `  ❌ Classification error: ${e.message}` }))
+        }
+
+        // ── Update state ──
+        const { count: totalInDB } = await admin
+          .from('discovery_ads_index')
+          .select('*', { count: 'exact', head: true })
+
+        await admin.from('discovery_index_state').upsert({
+          id: 'main',
+          last_run_at: new Date().toISOString(),
+          total_ads: totalInDB || 0,
+          terms_processed: termsToRun.map(t => t.term),
+        }, { onConflict: 'id' })
+
+        send(JSON.stringify({
+          type: 'done',
+          msg: `🎉 Done! ${totalAdsUpserted} ads indexed, ${embedded} embeddings, ${classified} classified. Total in DB: ${(totalInDB || 0).toLocaleString()}`,
+          totalAdsUpserted,
+          embedded,
+          classified,
+          totalInDB,
+          termsProcessed: termsToRun.map(t => t.term),
+        }))
+      } catch (e: any) {
+        send(JSON.stringify({ type: 'error', msg: `❌ Fatal error: ${e.message}` }))
+      }
+
+      controller.close()
     }
+  })
 
-    // Update term's crawl timestamp
-    if (id !== 'manual') {
-      await admin.from('discovery_crawl_terms').update({
-        last_crawled_at: new Date().toISOString(),
-        crawl_count: admin.rpc('increment', { row_id: id }),
-      }).eq('id', id)
-    }
-  }
-
-  // ── Generate embeddings for new ads ──
-  let embedded = 0
-  try { embedded = await generateEmbeddings(admin) } catch (e: any) {
-    crawlLog.push({ term: 'embedding', error: e.message })
-  }
-
-  // ── AI classify new ads ──
-  let classified = 0
-  try { classified = await classifyWithClaude(admin) } catch (e: any) {
-    crawlLog.push({ term: 'claude_classify', error: e.message })
-  }
-
-  // ── Update global state ──
-  const { count: totalInDB } = await admin
-    .from('discovery_ads_index')
-    .select('*', { count: 'exact', head: true })
-
-  await admin.from('discovery_index_state').upsert({
-    id: 'main',
-    last_run_at: new Date().toISOString(),
-    total_ads: totalInDB || 0,
-    terms_processed: termsToRun.map(t => t.term),
-  }, { onConflict: 'id' })
-
-  return NextResponse.json({
-    success: true,
-    termsProcessed: termsToRun.map(t => t.term),
-    totalAdsUpserted,
-    embedded,
-    classified,
-    totalInDB,
-    log: crawlLog,
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Transfer-Encoding': 'chunked',
+      'X-Accel-Buffering': 'no',
+    },
   })
 }
