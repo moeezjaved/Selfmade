@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck } from 'lucide-react'
+import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 // ── Types ────────────────────────────────────────────────────
@@ -598,6 +598,44 @@ export default function DiscoveryPage() {
   const [minDaysStr, setMinDaysStr] = useState('')
   const [minBrandAdsStr, setMinBrandAdsStr] = useState('')
 
+  // Search dropdown
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [dropdownBrands, setDropdownBrands] = useState<{ pageId: string; name: string; picture: string | null; category: string }[]>([])
+  const [dropdownLoading, setDropdownLoading] = useState(false)
+  const searchContainerRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Debounced brand search for dropdown
+  useEffect(() => {
+    if (!searchInput.trim() || searchInput.trim().length < 2) {
+      setDropdownBrands([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      setDropdownLoading(true)
+      try {
+        const res = await fetch(`/api/discovery/pages?q=${encodeURIComponent(searchInput.trim())}`)
+        const data = await res.json()
+        setDropdownBrands(data.pages || [])
+      } catch {
+        setDropdownBrands([])
+      } finally {
+        setDropdownLoading(false)
+      }
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
   const fetchAds = useCallback(async (reset = true, cursor?: string) => {
     setLoading(true)
     setError('')
@@ -665,8 +703,6 @@ export default function DiscoveryPage() {
     })
   }, [rawAds, format, industry, language, theme, minDays, minBrandAds, brandAdCounts])
 
-  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); setQuery(searchInput) }
-
   const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (v: string) =>
     setter(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])
 
@@ -706,23 +742,88 @@ export default function DiscoveryPage() {
               </a>
             ))}
           </div>
-          <form onSubmit={handleSearch} style={{ flex: 1, maxWidth: 500 }}>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <Search size={15} style={{ position: 'absolute', left: 12, color: '#9ca3af', pointerEvents: 'none' }} />
-              <input
-                value={searchInput}
-                onChange={e => setSearchInput(e.target.value)}
-                placeholder="Search for ads or brands…"
-                style={{ width: '100%', padding: '9px 36px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#f8fafc', color: '#111', boxSizing: 'border-box' }}
-                onFocus={e => (e.target.style.borderColor = '#1a3a1a')}
-                onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
-              />
-              {searchInput && (
-                <button type="button" onClick={() => { setSearchInput(''); setQuery('') }}
-                  style={{ position: 'absolute', right: 10, background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 16 }}>×</button>
-              )}
-            </div>
-          </form>
+          {/* Search with dropdown */}
+          <div ref={searchContainerRef} style={{ flex: 1, maxWidth: 520, position: 'relative' }}>
+            <form onSubmit={e => { e.preventDefault(); if (searchInput.trim()) { setQuery(searchInput); setShowDropdown(false) } }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <Search size={15} style={{ position: 'absolute', left: 12, color: '#9ca3af', pointerEvents: 'none' }} />
+                <input
+                  value={searchInput}
+                  onChange={e => { setSearchInput(e.target.value); setShowDropdown(true) }}
+                  onFocus={() => { if (searchInput.trim()) setShowDropdown(true) }}
+                  onKeyDown={e => { if (e.key === 'Escape') setShowDropdown(false) }}
+                  placeholder="Search for ads or brands with AI…"
+                  style={{ width: '100%', padding: '9px 36px', border: `1.5px solid ${showDropdown && searchInput ? '#1a3a1a' : '#e2e8f0'}`, borderRadius: showDropdown && searchInput ? '10px 10px 0 0' : 10, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#f8fafc', color: '#111', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                />
+                {searchInput && (
+                  <button type="button" onClick={() => { setSearchInput(''); setQuery(''); setShowDropdown(false) }}
+                    style={{ position: 'absolute', right: 10, background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 16 }}>×</button>
+                )}
+              </div>
+            </form>
+
+            {/* Dropdown */}
+            {showDropdown && searchInput.trim().length >= 1 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1.5px solid #1a3a1a', borderTop: 'none', borderRadius: '0 0 12px 12px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, overflow: 'hidden' }}>
+
+                {/* Search type suggestions */}
+                <div style={{ padding: '6px 8px' }}>
+                  {[
+                    { label: 'Ad copy', icon: '📝', desc: `contains "${searchInput}"` },
+                    { label: 'Brand', icon: '🏷️', desc: `contains "${searchInput}"` },
+                    { label: 'Categories', icon: '📂', desc: `contains "${searchInput}"` },
+                  ].map(opt => (
+                    <button key={opt.label}
+                      onMouseDown={e => { e.preventDefault(); setQuery(searchInput); setShowDropdown(false) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      <span style={{ fontSize: 15 }}>{opt.icon}</span>
+                      <span style={{ fontSize: 13, color: '#374151' }}>
+                        <span style={{ fontWeight: 700 }}>{opt.label}</span>
+                        <span style={{ color: '#6b7280' }}> {opt.desc}</span>
+                      </span>
+                      <ChevronRight size={13} style={{ marginLeft: 'auto', color: '#9ca3af' }} />
+                    </button>
+                  ))}
+                </div>
+
+                {/* Brand results */}
+                {(dropdownLoading || dropdownBrands.length > 0) && (
+                  <>
+                    <div style={{ height: 1, background: '#f1f5f9', margin: '2px 0' }} />
+                    <div style={{ padding: '6px 8px' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.08em', padding: '4px 10px 6px', textTransform: 'uppercase' }}>Brands</div>
+                      {dropdownLoading && (
+                        <div style={{ padding: '10px 14px', fontSize: 12, color: '#9ca3af' }}>Searching brands…</div>
+                      )}
+                      {!dropdownLoading && dropdownBrands.map(brand => (
+                        <button key={brand.pageId}
+                          onMouseDown={e => { e.preventDefault(); router.push(`/discovery/brand/${brand.pageId}?name=${encodeURIComponent(brand.name)}`); setShowDropdown(false) }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '7px 10px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                        >
+                          {brand.picture
+                            ? <img src={brand.picture} alt={brand.name} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }} />
+                            : <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>🏷️</div>
+                          }
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brand.name}</div>
+                            <div style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>📘</span> Meta ad library{brand.category ? ` · ${brand.category}` : ''}
+                            </div>
+                          </div>
+                          <ChevronRight size={13} style={{ marginLeft: 'auto', color: '#9ca3af', flexShrink: 0 }} />
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           <button onClick={() => { if (query.trim()) fetchAds(true) }} disabled={loading || !query.trim()}
             title={query.trim() ? 'Refresh results' : 'Enter a search term first'}
             style={{ padding: '8px 10px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, cursor: loading || !query.trim() ? 'not-allowed' : 'pointer', color: query.trim() ? '#374151' : '#9ca3af', display: 'flex', alignItems: 'center', flexShrink: 0, opacity: !query.trim() ? 0.5 : 1 }}>
