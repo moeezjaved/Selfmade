@@ -40,9 +40,18 @@ async function getMetaToken(admin: any): Promise<string> {
 
 const TERMS_PER_RUN = 10   // terms per cron run
 const ADS_PER_TERM = 50    // ads per Meta API call
-const PAGES_PER_TERM = 2   // pages to fetch (50 × 2 = 100 ads per term×country)
+const PAGES_PER_TERM = 3   // pages to fetch (50 × 3 = 150 ads per term×country)
 const EMBED_BATCH = 200    // embed ALL new ads per run (OpenAI handles large batches fine)
 const CLASSIFY_BATCH = 25  // ads per Claude call — 25 is safe within token limits
+
+// ── Curation threshold ───────────────────────────────────────
+// Only keep ads that have been running at least this many days.
+// 30+ days = brand is profitable on this ad, it's a proven winner.
+// Brand-tier terms can use a lower threshold (7 days) since we
+// specifically want to track known brands closely.
+const MIN_DAYS_ADCOPY   = 30  // broad keyword crawls — only proven winners
+const MIN_DAYS_BRAND    = 7   // brand watchlist — catch winners earlier
+const MIN_DAYS_CATEGORY = 21  // category crawls — balance volume vs quality
 
 const META_FIELDS = [
   'id','ad_creation_time','ad_delivery_start_time','ad_delivery_stop_time',
@@ -282,7 +291,10 @@ function transformAd(ad: any, term: string, country: string) {
   const description = ad.ad_creative_link_descriptions?.[0] || ''
   const fullText = `${body} ${title} ${description} ${caption}`
   const startDate = ad.ad_delivery_start_time
-  const daysRunning = startDate ? Math.floor((Date.now() - new Date(startDate).getTime()) / 86400000) : 0
+  const stopDate = ad.ad_delivery_stop_time
+  // For stopped ads, use actual run duration (stop - start), not time-since-start
+  const endMs = stopDate ? new Date(stopDate).getTime() : Date.now()
+  const daysRunning = startDate ? Math.floor((endMs - new Date(startDate).getTime()) / 86400000) : 0
   return {
     ad_id: ad.id,
     page_id: ad.page_id || '',
@@ -394,18 +406,40 @@ async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> 
 // Uses Browserless (headless Chrome) when configured so the full page renders
 // and image/video URLs are extractable. Every ad gets saved — real creative
 // if we can get it, brand profile picture otherwise.
-async function attachCreatives(rawAds: any[], term: string, country: string): Promise<any[]> {
+//
+// Curation: only keeps ads that have been running at least MIN_DAYS_* days.
+//   brand terms   →  7 days  (track known brands closely, catch rising winners early)
+//   category terms → 21 days  (balance volume vs quality for industry crawls)
+//   adcopy terms  →  30 days  (broad keywords — only proven winners worth storing)
+async function attachCreatives(rawAds: any[], term: string, country: string, termType: string = 'adcopy'): Promise<{ rows: any[]; skipped: number }> {
   const hasBrowserless = !!process.env.BROWSERLESS_TOKEN
   // With Browserless: 5 parallel (each takes ~5s → 25s per chunk, well within 300s limit)
   // Without: 10 parallel plain fetches (fast but mostly fail for Facebook SPA)
   const CONCURRENCY = hasBrowserless ? 5 : 10
+
+  // Pick min-days threshold based on the term's intent
+  const minDays = termType === 'brand'
+    ? MIN_DAYS_BRAND
+    : termType === 'category'
+    ? MIN_DAYS_CATEGORY
+    : MIN_DAYS_ADCOPY
+
   const results: any[] = []
+  let skipped = 0
 
   for (let i = 0; i < rawAds.length; i += CONCURRENCY) {
     const chunk = rawAds.slice(i, i + CONCURRENCY)
     const settled = await Promise.allSettled(
       chunk.map(async (ad: any) => {
         const row = transformAd(ad, term, country)
+
+        // ── Curation gate ─────────────────────────────────────────
+        // Active ads: must have been running for at least minDays to be a proven winner.
+        // Stopped ads: already have a final run duration — keep if they ran long enough
+        //   (shows they were profitable before stopping), discard if they bombed out early.
+        if (row.days_running < minDays) {
+          return null  // too new / too short — not a proven winner yet
+        }
 
         // Snapshot URL has access_token embedded — best chance of seeing the real ad
         const snapshotUrl = ad.ad_snapshot_url || ''
@@ -428,14 +462,20 @@ async function attachCreatives(rawAds: any[], term: string, country: string): Pr
     )
 
     for (const r of settled) {
-      if (r.status === 'fulfilled') results.push(r.value)
+      if (r.status === 'fulfilled') {
+        if (r.value !== null) {
+          results.push(r.value)
+        } else {
+          skipped++
+        }
+      }
     }
 
     // Small delay between chunks to be polite to Facebook
     if (i + CONCURRENCY < rawAds.length) await new Promise(r => setTimeout(r, 300))
   }
 
-  return results
+  return { rows: results, skipped }
 }
 
 // ── Generate OpenAI embeddings ───────────────────────────────
@@ -646,11 +686,14 @@ export async function GET(request: NextRequest) {
         let totalAdsUpserted = 0
 
         // ── Crawl each term × country ──
-        for (const { term, countries, id } of termsToRun) {
+        for (const { term, countries, id, term_type } of termsToRun) {
           const countriesToCrawl = forceCountry ? [forceCountry] : (countries || ['US'])
 
+          // Show the min-days threshold being applied for this term
+          const minDaysLabel = term_type === 'brand' ? `${MIN_DAYS_BRAND}d` : term_type === 'category' ? `${MIN_DAYS_CATEGORY}d` : `${MIN_DAYS_ADCOPY}d`
+
           for (const country of countriesToCrawl) {
-            send('log', `🔍 Crawling "${term}" [ad copy + brand + category] / ${country}…`)
+            send('log', `🔍 Crawling "${term}" [${term_type || 'adcopy'}, min ${minDaysLabel}] / ${country}…`)
 
             const { ads, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, 'all', admin)
 
@@ -665,13 +708,20 @@ export async function GET(request: NextRequest) {
               continue
             }
 
-            // ── Attach creatives then save all ads ─────────────────
-            // Try to scrape real images from snapshot URLs (5 parallel).
-            // Falls back to brand profile picture so every ad has a visual.
-            send('log', `  🖼 Fetching creatives for ${ads.length} ads…`)
-            const rows = await attachCreatives(ads, term, country)
+            // ── Attach creatives then save proven-winner ads ─────────────
+            // Curation filter applied: ads running fewer than min days are skipped.
+            // Real image scraped via Browserless; falls back to brand profile picture.
+            send('log', `  🖼 Filtering & fetching creatives for ${ads.length} raw ads…`)
+            const { rows, skipped } = await attachCreatives(ads, term, country, term_type || 'adcopy')
             const realCreatives = rows.filter(r => r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com')).length
+            send('log', `  ✂️ Kept ${rows.length} proven winners, skipped ${skipped} short-running ads`)
             send('log', `  📸 ${realCreatives} real ad images, ${rows.length - realCreatives} brand logos`)
+
+            if (!rows.length) {
+              send('log', `  ⚠️ ${term}/${country}: no ads passed curation filter`)
+              await admin.from('discovery_crawl_log').insert({ term, country, ads_fetched: ads.length, ads_new: 0 })
+              continue
+            }
 
             const { error } = await admin
               .from('discovery_ads_index')
