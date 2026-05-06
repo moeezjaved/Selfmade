@@ -837,11 +837,11 @@ export async function GET(request: NextRequest) {
         } else {
           const { data: terms } = await admin
             .from('discovery_crawl_terms')
-            .select('id, term, countries, term_type')
+            .select('id, term, countries, term_type, page_id')
             .eq('is_active', true)
             .order('last_crawled_at', { ascending: true, nullsFirst: true })
             .limit(TERMS_PER_RUN)
-          termsToRun = (terms || []).map((t: any) => ({ ...t, term_type: 'all' }))
+          termsToRun = (terms || []).map((t: any) => ({ ...t, term_type: 'all', pageId: t.page_id || undefined }))
         }
 
         if (!termsToRun.length) {
