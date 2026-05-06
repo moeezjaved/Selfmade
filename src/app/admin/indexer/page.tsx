@@ -127,15 +127,31 @@ export default function IndexerAdminPage() {
     setRunning(false)
   }
 
-  const addTerm = async () => {
-    if (!newTerm.trim()) return
+  const addTerm = async (overrides?: { term?: string; page_id?: string; term_type?: string }) => {
+    const t = overrides?.term || newTerm
+    if (!t.trim()) return
     await fetch('/api/admin/indexer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'add_term', term: newTerm, category: newCategory, countries: newCountries, priority: newPriority, term_type: newTermType }),
+      body: JSON.stringify({
+        action: 'add_term',
+        term: t,
+        category: newCategory,
+        countries: newCountries,
+        priority: newPriority,
+        term_type: overrides?.term_type || newTermType,
+        page_id: overrides?.page_id || undefined,
+      }),
     })
     setNewTerm('')
     fetchStats()
+  }
+
+  const saveManualToSchedule = async () => {
+    if (!runTerm.trim()) return
+    const pid = parsePageId(runPageId)
+    await addTerm({ term: runTerm, page_id: pid || undefined, term_type: 'brand' })
+    alert(`✅ "${runTerm}" added to scheduled terms${pid ? ` with page_id ${pid}` : ''} — it will crawl automatically every 6 hours`)
   }
 
   const toggleTerm = async (id: string, is_active: boolean) => {
@@ -202,8 +218,8 @@ export default function IndexerAdminPage() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => fetchStats()} style={btn('#f1f5f9', '#374151')}>🔄 Refresh</button>
-          <button onClick={() => runCrawler()} disabled={running} style={btn()}>
-            {running ? '⏳ Running…' : '▶ Run Crawler Now'}
+          <button onClick={() => runCrawler()} disabled={running} style={btn('#374151', '#fff')}>
+            {running ? '⏳ Running…' : '⏱ Run Scheduled Terms'}
           </button>
         </div>
       </div>
@@ -259,8 +275,13 @@ export default function IndexerAdminPage() {
                 {COUNTRIES.map(c => <option key={c}>{c}</option>)}
               </select>
               <button onClick={() => runCrawler(runTerm || undefined, runCountry, parsePageId(runPageId) || undefined)} disabled={running} style={btn()}>
-                {running ? '⏳' : '▶ Crawl'}
+                {running ? '⏳' : '▶ Crawl Now'}
               </button>
+              {runTerm && (
+                <button onClick={() => saveManualToSchedule()} disabled={running} title="Add to scheduled terms so it crawls automatically every 6 hours" style={btn('#f1f5f9', '#374151')}>
+                  + Schedule
+                </button>
+              )}
             </div>
             {/* Hint */}
             {runPageId && parsePageId(runPageId) ? (
@@ -499,7 +520,7 @@ export default function IndexerAdminPage() {
                 <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, fontWeight: 600 }}>PRIORITY (1-10)</div>
                 <input type="number" value={newPriority} onChange={e => setNewPriority(Number(e.target.value))} min={1} max={10} style={{ padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: 70 }} />
               </div>
-              <button onClick={addTerm} style={btn()}>Add Term</button>
+              <button onClick={() => addTerm()} style={btn()}>Add Term</button>
             </div>
           </div>
 
