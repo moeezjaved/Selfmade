@@ -482,23 +482,21 @@ function AdCard({ ad }: { ad: Ad }) {
   // graph.facebook.com/{pageId}/picture redirects to the actual CDN image
   const brandPicture = ad.pageId ? `https://graph.facebook.com/${ad.pageId}/picture?type=large` : null
 
-  // A "real" creative URL is one we actually scraped (not a graph.facebook.com profile pic)
-  const isRealCreative = (url: string | null | undefined): url is string =>
-    !!url && !url.includes('graph.facebook.com')
+  const isBrandLogo = (url: string | null | undefined) =>
+    !!url && url.includes('graph.facebook.com')
 
-  const [thumbnail, setThumbnail] = useState<string | null>(
-    isRealCreative(ad.thumbnailUrl) ? ad.thumbnailUrl : null
-  )
+  // Start with whatever the DB has (real creative or brand logo)
+  const [thumbnail, setThumbnail] = useState<string | null>(ad.thumbnailUrl ?? null)
   const [videoUrl, setVideoUrl] = useState<string | null>(ad.videoUrl ?? null)
-  // Always try to load a real creative (skip only if we already have a confirmed real one)
-  const [thumbLoading, setThumbLoading] = useState(!isRealCreative(ad.thumbnailUrl) && !ad.videoUrl)
+  // Only show spinner if we have no visual at all yet
+  const [thumbLoading, setThumbLoading] = useState(!ad.thumbnailUrl && !ad.videoUrl)
   const [playing, setPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  // Lazily fetch actual ad creative thumbnail + video URL from Facebook snapshot
+  // Lazily try to upgrade from brand logo → real ad creative
   useEffect(() => {
-    // Skip only if we already have a confirmed real creative (not a brand logo)
-    if (isRealCreative(ad.thumbnailUrl) || ad.videoUrl || !ad.id) return
+    // Skip if we already have a real creative or no snapshot URL to try
+    if (!isBrandLogo(ad.thumbnailUrl) || ad.videoUrl || !ad.id) return
     let cancelled = false
     const load = async () => {
       try {
@@ -508,8 +506,8 @@ function AdCard({ ad }: { ad: Ad }) {
         const res = await fetch(`/api/discovery/thumbnail?${params}`)
         const data = await res.json()
         if (!cancelled) {
-          // Only update thumbnail state if we got a REAL creative (not graph fallback)
-          if (data.thumbnail && isRealCreative(data.thumbnail)) setThumbnail(data.thumbnail)
+          // Only upgrade if we actually got a real creative (not just the logo again)
+          if (data.thumbnail && !isBrandLogo(data.thumbnail)) setThumbnail(data.thumbnail)
           if (data.videoUrl) setVideoUrl(data.videoUrl)
         }
       } catch { /* ignore */ } finally {
@@ -517,7 +515,7 @@ function AdCard({ ad }: { ad: Ad }) {
       }
     }
     // Stagger to avoid hammering server with 40 simultaneous requests
-    const timer = setTimeout(load, Math.random() * 2000)
+    const timer = setTimeout(load, 1000 + Math.random() * 3000)
     return () => { cancelled = true; clearTimeout(timer) }
   }, [ad.id, ad.snapshotUrl, ad.pageId, ad.thumbnailUrl, ad.videoUrl])
 
@@ -577,23 +575,24 @@ function AdCard({ ad }: { ad: Ad }) {
       {/* ── Visual preview ── */}
       <div style={{ position: 'relative', background: '#f1f5f9', overflow: 'hidden', aspectRatio: '4/3', maxHeight: 300 }}>
 
-        {/* ── Base layer: always-visible brand initials on colored bg ── */}
+        {/* ── Layer 1: brand initials — always visible as absolute fallback ── */}
         <div style={{ position: 'absolute', inset: 0, background: avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ fontSize: 48, fontWeight: 800, color: '#dffe95', letterSpacing: -2, opacity: 0.9 }}>{initials}</span>
         </div>
 
-        {/* ── Brand profile picture — fills the whole preview as cover ── */}
-        {/* Loads instantly (public graph URL, no auth needed); real ad creative replaces it below */}
-        {!thumbnail && brandPicture && (
-          <img
-            src={brandPicture}
-            alt={ad.pageName}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-          />
+        {/* ── Layer 2: thumbnail (brand logo or real creative) — covers initials ── */}
+        {thumbnail && !videoUrl && (
+          <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', inset: 0, display: 'block' }}>
+            <img
+              src={thumbnail}
+              alt={ad.pageName}
+              style={{ width: '100%', height: '100%', objectFit: isBrandLogo(thumbnail) ? 'contain' : 'cover', display: 'block', background: isBrandLogo(thumbnail) ? '#fff' : 'transparent', padding: isBrandLogo(thumbnail) ? 24 : 0 }}
+              onError={() => setThumbnail(null)}
+            />
+          </a>
         )}
 
-        {/* ── Spinner overlay while fetching real creative (faint, on top of brand pic) ── */}
+        {/* ── Spinner while no visual yet ── */}
         {thumbLoading && !thumbnail && (
           <div style={{ position: 'absolute', bottom: 8, right: 8 }}>
             <div style={{ width: 16, height: 16, border: '2.5px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -625,19 +624,6 @@ function AdCard({ ad }: { ad: Ad }) {
               </div>
             )}
           </>
-        )}
-
-        {/* ── Static image (actual ad creative, no video) ── */}
-        {thumbnail && !videoUrl && (
-          <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer"
-            style={{ position: 'absolute', inset: 0, display: 'block' }}>
-            <img
-              src={thumbnail}
-              alt={ad.pageName}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              onError={() => setThumbnail(null)}
-            />
-          </a>
         )}
 
         {/* Format badge */}
