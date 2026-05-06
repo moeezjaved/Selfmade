@@ -130,41 +130,74 @@ async function fetchOnePage(
   }
 }
 
-// ── Find a brand's Facebook page_id by slug/username ────────
-// The Graph API lets you look up a page by its username directly:
-//   GET /gymshark?fields=id,name  →  { id: "112543612", name: "Gymshark" }
-// This is far more reliable than the /search?type=page endpoint which is
-// restricted for most app tokens.
-// We try several slug variations: "gymshark", "gymsharkwomen", "gymshark.com", etc.
+// ── Find a brand's Facebook page_id ─────────────────────────
+// Strategy A: Graph API slug lookup (fast, no credits)
+// Strategy B: ScrapingBee scrape of facebook.com/{slug} → extract pageID from HTML
+// Facebook always embeds the numeric page_id in the page source.
 async function findBrandPageIds(brandName: string, token: string): Promise<string[]> {
   const found = new Set<string>()
-
-  // Build slug candidates from the brand name
-  const base = brandName.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const base = brandName.toLowerCase().replace(/[^a-z0-9]/g, '') // "gymshark"
   const slugs = Array.from(new Set([
     base,
     brandName.toLowerCase().replace(/\s+/g, ''),
     brandName.toLowerCase().replace(/\s+/g, '.'),
-    brandName.toLowerCase().replace(/\s+/g, '-'),
   ]))
 
+  // ── Strategy A: Graph API node lookup by slug ────────────────
   await Promise.all(slugs.map(async (slug) => {
     try {
-      const res = await fetch(
-        `https://graph.facebook.com/${V}/${encodeURIComponent(slug)}?fields=id,name&access_token=${encodeURIComponent(token)}`,
-        { signal: AbortSignal.timeout(8000) }
-      )
-      if (!res.ok) return
+      const url = `https://graph.facebook.com/${V}/${slug}?fields=id,name&access_token=${token}`
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
       const data = await res.json() as { id?: string; name?: string; error?: any }
       if (data.error || !data.id) return
-      // Sanity check: page name should loosely match the brand
       const nameLower = (data.name || '').toLowerCase()
-      const termLower = brandName.toLowerCase()
-      if (nameLower.includes(termLower) || termLower.includes(nameLower) || nameLower.includes(base)) {
+      if (nameLower.includes(base) || base.includes(nameLower.replace(/\s/g, ''))) {
         found.add(data.id)
       }
     } catch { /* ignore */ }
   }))
+
+  if (found.size > 0) return Array.from(found)
+
+  // ── Strategy B: ScrapingBee scrape facebook.com/{slug} ──────
+  // Facebook embeds the numeric page_id in the page source as:
+  //   "pageID":"12345678"  or  "page_id":12345678
+  const sbKey = process.env.SCRAPINGBEE_KEY
+  if (sbKey) {
+    for (const slug of slugs) {
+      try {
+        const params = new URLSearchParams({
+          api_key: sbKey,
+          url: `https://www.facebook.com/${slug}`,
+          render_js: 'false',   // don't need JS for page source — saves credits
+          premium_proxy: 'true',
+        })
+        const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params}`, {
+          signal: AbortSignal.timeout(20000),
+        })
+        if (!res.ok) continue
+        const html = await res.text()
+
+        // Extract page_id from various embed patterns
+        const patterns = [
+          /"pageID"\s*:\s*"(\d+)"/,
+          /"page_id"\s*:\s*"(\d+)"/,
+          /"page_id"\s*:\s*(\d+)/,
+          /\\"pageID\\"\s*:\s*\\"(\d+)\\"/,
+          /content_id=(\d{10,})/,
+          /"entity_id"\s*:\s*"(\d{10,})"/,
+        ]
+        for (const pat of patterns) {
+          const m = html.match(pat)
+          if (m?.[1] && m[1].length >= 10) { // FB page IDs are 10-17 digits
+            found.add(m[1])
+            break
+          }
+        }
+        if (found.size > 0) break
+      } catch { /* ignore */ }
+    }
+  }
 
   return Array.from(found)
 }
@@ -272,15 +305,17 @@ async function fetchAdsForTerm(
     const pageIds = Array.from(brandPageIds).slice(0, 10)
 
     if (pageIds.length) {
+      // search_terms is OPTIONAL when search_page_ids is set.
+      // Omitting it returns ALL ads from that page — not just ones mentioning the brand name.
       const brandParams: Record<string, string> = {
         access_token: token,
-        search_terms: term,
         search_page_ids: JSON.stringify(pageIds),
         ad_reached_countries: JSON.stringify([metaCountry]),
         fields: META_FIELDS,
         limit: String(ADS_PER_TERM),
       }
       let brandCursor = ''
+      // Fetch up to 6 pages = 300 ads from brand page
       for (let p = 0; p < PAGES_PER_TERM * 2; p++) {
         const { ads, nextCursor, hasMore, error } = await fetchOnePage(brandParams, brandCursor)
         if (error) break
