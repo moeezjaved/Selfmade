@@ -35,6 +35,11 @@ export async function GET(request: NextRequest) {
     const after = searchParams.get('after') || ''
     const limit = 20
 
+    // Meta Ads Library API requires search_terms OR search_page_ids — refuse without a query
+    if (!q.trim()) {
+      return NextResponse.json({ ads: [], nextCursor: null, hasMore: false })
+    }
+
     const fields = [
       'id',
       'ad_creation_time',
