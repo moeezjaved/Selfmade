@@ -123,6 +123,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, countries })
   }
 
+  // Clear brand logo URLs stored as thumbnail_url so cards retry for real creatives
+  if (action === 'clear_logo_thumbnails') {
+    const { error } = await admin
+      .from('discovery_ads_index')
+      .update({ thumbnail_url: null })
+      .like('thumbnail_url', '%graph.facebook.com%')
+    return NextResponse.json({ success: !error, error: error?.message })
+  }
+
   if (action === 'seed_terms') {
     // Pre-built starter library — covers ad copy, brands, and categories
     const SEED_TERMS = [

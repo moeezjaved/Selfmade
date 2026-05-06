@@ -46,10 +46,63 @@ export async function GET(request: NextRequest) {
 
     let ads: any[] = []
     let total = 0
-    let searchMethod = 'text'
+    let searchMethod = 'keyword'
 
-    // ── Semantic vector search ──────────────────────────────
-    if (q && process.env.OPENAI_API_KEY) {
+    // ── Build base query with ilike keyword search (fast, reliable) ──
+    let baseQuery = admin.from('discovery_ads_index').select('*', { count: 'exact' })
+
+    // Country filter
+    if (country && country !== 'ALL') baseQuery = baseQuery.eq('country', country)
+
+    // Keyword search — OR across body, title, page_name
+    if (q) {
+      if (mode === 'brand') {
+        baseQuery = baseQuery.ilike('page_name', `%${q}%`)
+      } else {
+        // For each significant word, match against body OR title OR page_name
+        const words = q.trim().split(/\s+/).filter(w => w.length > 1).slice(0, 6)
+        if (words.length > 0) {
+          // Build: body.ilike.%word%,title.ilike.%word%,page_name.ilike.%word%
+          const orParts = words.flatMap(w => [
+            `body.ilike.%${w}%`,
+            `title.ilike.%${w}%`,
+            `page_name.ilike.%${w}%`,
+            `description.ilike.%${w}%`,
+          ])
+          baseQuery = baseQuery.or(orParts.join(','))
+        }
+      }
+    }
+
+    // Filters
+    if (status === 'ACTIVE') baseQuery = baseQuery.eq('is_active', true)
+    if (status === 'INACTIVE') baseQuery = baseQuery.eq('is_active', false)
+    if (format) baseQuery = baseQuery.eq('format', format)
+    if (industry) baseQuery = baseQuery.contains('industries', [industry])
+    if (hookType) baseQuery = baseQuery.eq('hook_type', hookType)
+    if (emotion) baseQuery = baseQuery.contains('emotion', [emotion])
+    if (angle) baseQuery = baseQuery.eq('angle', angle)
+    if (platforms) baseQuery = baseQuery.overlaps('platforms', platforms.split(','))
+
+    // Sort
+    if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
+    else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
+    else baseQuery = baseQuery.order('last_seen', { ascending: false })
+
+    baseQuery = baseQuery.range(offset, offset + limit - 1)
+    const { data: keywordData, error: kwErr, count: kwCount } = await baseQuery
+
+    if (kwErr) {
+      // If keyword search errors, return empty rather than crashing
+      return NextResponse.json({ ads: [], total: 0, totalInDB, source: 'indexed', searchMethod: 'error' })
+    }
+
+    ads = keywordData || []
+    total = kwCount || 0
+
+    // ── Semantic re-ranking for multi-word queries (optional, enhances order) ──
+    // Only attempt if we have results and OpenAI key — does NOT reduce result count
+    if (q && q.trim().split(/\s+/).length > 1 && process.env.OPENAI_API_KEY && ads.length > 1) {
       try {
         const embRes = await openai.embeddings.create({
           model: 'text-embedding-3-small',
@@ -57,66 +110,25 @@ export async function GET(request: NextRequest) {
         })
         const queryEmbedding = embRes.data[0].embedding
 
-        // Use pgvector RPC for semantic search
         const { data: vectorResults, error: vecError } = await admin.rpc('search_ads_semantic', {
           query_embedding: queryEmbedding,
-          match_threshold: 0.3,
-          match_count: limit + offset,
+          match_threshold: 0.1,
+          match_count: 200,
           filter_country: country === 'ALL' ? null : country,
           filter_active: status === 'ACTIVE' ? true : status === 'INACTIVE' ? false : null,
           filter_format: format || null,
           filter_industry: industry || null,
         })
 
-        if (!vecError && vectorResults?.length > 0) {
+        if (!vecError && vectorResults?.length >= ads.length) {
+          // Semantic returned more/equal results — use it as primary
           ads = vectorResults.slice(offset, offset + limit)
           total = vectorResults.length
           searchMethod = 'semantic'
         }
-      } catch (e) {
-        // Fall through to text search
+      } catch {
+        // Semantic failed — keep keyword results
       }
-    }
-
-    // ── Full-text / filter search (fallback or no query) ────
-    if (ads.length === 0) {
-      let query = admin.from('discovery_ads_index').select('*', { count: 'exact' })
-
-      // Country filter
-      if (country && country !== 'ALL') query = query.eq('country', country)
-
-      // Search by mode
-      if (q) {
-        if (mode === 'brand') {
-          query = query.ilike('page_name', `%${q}%`)
-        } else {
-          // Full text search
-          query = query.textSearch('search_vector', q.split(' ').join(' & '), { type: 'websearch' })
-        }
-      }
-
-      // Filters
-      if (status === 'ACTIVE') query = query.eq('is_active', true)
-      if (status === 'INACTIVE') query = query.eq('is_active', false)
-      if (format) query = query.eq('format', format)
-      if (industry) query = query.contains('industries', [industry])
-      if (hookType) query = query.eq('hook_type', hookType)
-      if (emotion) query = query.contains('emotion', [emotion])
-      if (angle) query = query.eq('angle', angle)
-      if (platforms) query = query.overlaps('platforms', platforms.split(','))
-
-      // Sort
-      if (sort === 'longest') query = query.order('days_running', { ascending: false })
-      else if (sort === 'oldest') query = query.order('start_date', { ascending: true })
-      else query = query.order('last_seen', { ascending: false })
-
-      query = query.range(offset, offset + limit - 1)
-
-      const { data, error, count } = await query
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      ads = data || []
-      total = count || 0
-      searchMethod = 'fulltext'
     }
 
     // ── Transform results ────────────────────────────────────

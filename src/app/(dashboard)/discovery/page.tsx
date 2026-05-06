@@ -482,15 +482,23 @@ function AdCard({ ad }: { ad: Ad }) {
   // graph.facebook.com/{pageId}/picture redirects to the actual CDN image
   const brandPicture = ad.pageId ? `https://graph.facebook.com/${ad.pageId}/picture?type=large` : null
 
-  const [thumbnail, setThumbnail] = useState<string | null>(ad.thumbnailUrl || null)
-  const [videoUrl, setVideoUrl] = useState<string | null>(ad.videoUrl || null)
-  const [thumbLoading, setThumbLoading] = useState(!ad.thumbnailUrl)
+  // A "real" creative URL is one we actually scraped (not a graph.facebook.com profile pic)
+  const isRealCreative = (url: string | null | undefined): url is string =>
+    !!url && !url.includes('graph.facebook.com')
+
+  const [thumbnail, setThumbnail] = useState<string | null>(
+    isRealCreative(ad.thumbnailUrl) ? ad.thumbnailUrl : null
+  )
+  const [videoUrl, setVideoUrl] = useState<string | null>(ad.videoUrl ?? null)
+  // Always try to load a real creative (skip only if we already have a confirmed real one)
+  const [thumbLoading, setThumbLoading] = useState(!isRealCreative(ad.thumbnailUrl) && !ad.videoUrl)
   const [playing, setPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  // Lazily fetch actual ad creative thumbnail + video URL
+  // Lazily fetch actual ad creative thumbnail + video URL from Facebook snapshot
   useEffect(() => {
-    if (ad.thumbnailUrl || !ad.id) return   // already have it from DB
+    // Skip only if we already have a confirmed real creative (not a brand logo)
+    if (isRealCreative(ad.thumbnailUrl) || ad.videoUrl || !ad.id) return
     let cancelled = false
     const load = async () => {
       try {
@@ -500,17 +508,18 @@ function AdCard({ ad }: { ad: Ad }) {
         const res = await fetch(`/api/discovery/thumbnail?${params}`)
         const data = await res.json()
         if (!cancelled) {
-          if (data.thumbnail) setThumbnail(data.thumbnail)
-          if (data.videoUrl)  setVideoUrl(data.videoUrl)
+          // Only update thumbnail state if we got a REAL creative (not graph fallback)
+          if (data.thumbnail && isRealCreative(data.thumbnail)) setThumbnail(data.thumbnail)
+          if (data.videoUrl) setVideoUrl(data.videoUrl)
         }
       } catch { /* ignore */ } finally {
         if (!cancelled) setThumbLoading(false)
       }
     }
-    // Stagger to avoid hammering server
-    const timer = setTimeout(load, Math.random() * 600)
+    // Stagger to avoid hammering server with 40 simultaneous requests
+    const timer = setTimeout(load, Math.random() * 2000)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [ad.id, ad.snapshotUrl, ad.pageId, ad.thumbnailUrl])
+  }, [ad.id, ad.snapshotUrl, ad.pageId, ad.thumbnailUrl, ad.videoUrl])
 
   const daysText = ad.daysRunning > 365
     ? `${Math.floor(ad.daysRunning / 365)}y ${Math.floor((ad.daysRunning % 365) / 30)}mo`
