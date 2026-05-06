@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       'id', 'ad_creation_time', 'ad_delivery_start_time', 'ad_delivery_stop_time',
       'ad_creative_bodies', 'ad_creative_link_titles', 'ad_creative_link_captions',
       'ad_creative_link_descriptions', 'ad_snapshot_url', 'page_name', 'page_id',
-      'publisher_platforms', 'languages', 'media_type',
+      'publisher_platforms', 'languages',
     ].join(',')
 
     const params: Record<string, string> = {

@@ -49,7 +49,6 @@ export async function GET(request: NextRequest) {
       'page_id',
       'publisher_platforms',
       'languages',
-      'media_type',
     ].join(',')
 
     const params: Record<string, string> = {
@@ -60,17 +59,18 @@ export async function GET(request: NextRequest) {
       limit: String(limit),
     }
 
-    if (q) params.search_terms = q
+    if (q) {
+      params.search_terms = q
+      // search_type only valid when search_terms is present
+      if (sort === 'longest') params.search_type = 'KEYWORD_UNORDERED'
+    }
     if (platforms) params.publisher_platforms = JSON.stringify(platforms.split(','))
     if (status === 'ACTIVE') params.ad_active_status = 'ACTIVE'
     if (status === 'INACTIVE') params.ad_active_status = 'INACTIVE'
     if (after) params.after = after
 
-    // Sorting
-    if (sort === 'longest') {
-      params.ad_active_status = 'ACTIVE'
-      params.search_type = 'KEYWORD_UNORDERED'
-    }
+    // For longest sort: only active ads
+    if (sort === 'longest') params.ad_active_status = 'ACTIVE'
 
     const url = `https://graph.facebook.com/${V}/ads_archive?` + new URLSearchParams(params)
     const res = await fetch(url)
