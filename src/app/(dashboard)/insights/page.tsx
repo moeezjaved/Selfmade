@@ -265,15 +265,15 @@ export default function InsightsPage() {
               {/* First time vs already scaled */}
               {scaleModal && (scaleModal.adset.name.includes('Scale') || scaleModal.adset.name.includes('Duplic')) ? (
                 <div style={{display:'flex',gap:8,marginBottom:16}}>
-                  <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.1)'),background:!isBudgetIncrease?'rgba(223,254,149,0.1)':'transparent',color:!isBudgetIncrease?'#dffe95':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                  <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#1a3a1a':'#e2e8f0'),background:!isBudgetIncrease?'#1a3a1a':'#f8fafc',color:!isBudgetIncrease?'#dffe95':'#6b7280',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
                     Duplicate Again
                   </button>
-                  <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(isBudgetIncrease?'#b8860b':'rgba(255,255,255,0.1)'),background:isBudgetIncrease?'rgba(251,191,36,0.1)':'transparent',color:isBudgetIncrease?'#b8860b':'rgba(255,255,255,0.4)',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                  <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(isBudgetIncrease?'#b45309':'#e2e8f0'),background:isBudgetIncrease?'#fef3c7':'#f8fafc',color:isBudgetIncrease?'#92400e':'#6b7280',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
                     Increase Budget (max 15%)
                   </button>
                 </div>
               ) : (
-                <div style={{marginBottom:16,padding:'10px 14px',background:'rgba(223,254,149,0.05)',border:'1px solid rgba(223,254,149,0.1)',borderRadius:10,fontSize:12,color:'#6b8f6b'}}>
+                <div style={{marginBottom:16,padding:'10px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,fontSize:12,color:'#166534'}}>
                   First time scaling — duplicate will go ACTIVE, original stays untouched.
                 </div>
               )}
@@ -284,7 +284,7 @@ export default function InsightsPage() {
                   <div style={{fontSize:11,fontWeight:700,color:'#6b8f6b',marginBottom:8,textTransform:'uppercase',letterSpacing:'.06em'}}>Budget Multiplier for Duplicate</div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:8}}>
                     {['1.5','2','3','5'].map(x=>(
-                      <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#dffe95':'rgba(255,255,255,0.1)'),background:scaleFactor===x?'rgba(223,254,149,0.1)':'rgba(255,255,255,0.02)',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#dffe95':'rgba(255,255,255,0.5)'}}>
+                      <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#1a3a1a':'#e2e8f0'),background:scaleFactor===x?'#1a3a1a':'#f8fafc',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#dffe95':'#374151'}}>
                         {x}x
                       </div>
                     ))}
