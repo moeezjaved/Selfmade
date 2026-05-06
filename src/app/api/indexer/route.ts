@@ -210,13 +210,14 @@ async function fetchAdsForTerm(
   term: string,
   country: string,
   token: string,
-  _termType: string = 'all', // kept for signature compat, always runs all 3
+  _termType: string = 'all',
   admin?: any,
-): Promise<{ ads: any[], brandPageIds: string[], externalFiltered: number, error?: string }> {
+  preDiscoveredPageIds: string[] = [], // page_ids found by caller before this call
+): Promise<{ ads: any[], externalFiltered: number, error?: string }> {
   const metaCountry = normalizeCountry(country)
   const seenIds = new Set<string>()
   const allAds: any[] = []
-  const discoveredBrandPageIds = new Set<string>()
+  const brandPageIds = new Set<string>(preDiscoveredPageIds)
 
   const addAds = (ads: any[]) => {
     for (const ad of ads) {
@@ -235,68 +236,51 @@ async function fetchAdsForTerm(
     limit: String(ADS_PER_TERM),
   })
 
-  // ── 1. AD COPY: keyword search in ad creative text ───────────
-  // This finds ads whose body/title contains the term. For brand names this
-  // returns ads that MENTION the brand — good for discovery but not complete.
+  // ── 1. AD COPY: keyword search — finds all ads mentioning this term ──
   {
     const params = baseParams(term)
     let cursor = ''
     for (let p = 0; p < PAGES_PER_TERM; p++) {
       const { ads, nextCursor, hasMore, error } = await fetchOnePage(params, cursor)
-      if (error) break  // non-fatal — continue to brand pass
+      if (error) break
       addAds(ads)
       if (!hasMore) break
       cursor = nextCursor
     }
   }
 
-  // ── 2. BRAND: find the brand's page_id, then fetch ALL their ads ──────────────────
-  // Three-source page_id discovery (most reliable first):
-  //  a) Graph page search — searches Facebook pages by name directly (most reliable)
-  //  b) Step-1 ad results — ads whose page_name matches the term
-  //  c) Our DB           — previously indexed ads from matching pages
-  // Once we have page_ids, we fetch ALL their ads via search_page_ids.
+  // ── 2. BRAND: fetch ALL ads directly from brand's own page(s) ───────
+  // Supplement pre-discovered page_ids with:
+  //  a) step-1 results where page_name ≈ term
+  //  b) our DB of previously indexed pages
   {
     const termLower = term.toLowerCase()
 
-    // Source a: Graph /search?type=page — finds the brand's actual Facebook page
-    // This works even when the brand's own ads don't mention their name in the body.
-    const graphPageIds = await findBrandPageIds(term, token)
-    graphPageIds.forEach((id: string) => discoveredBrandPageIds.add(id))
-
-    // Source b: step-1 ad results where page_name ≈ term
     allAds
       .filter((ad: any) => ad.page_name && ad.page_name.toLowerCase().includes(termLower))
-      .map((ad: any) => ad.page_id)
-      .filter(Boolean)
-      .forEach((id: string) => discoveredBrandPageIds.add(id))
+      .forEach((ad: any) => { if (ad.page_id) brandPageIds.add(ad.page_id) })
 
-    // Source c: our DB — previously indexed ads from matching pages
     if (admin) {
       const { data: dbPages } = await admin
         .from('discovery_ads_index')
         .select('page_id')
         .ilike('page_name', `%${term}%`)
         .limit(10)
-      ;(dbPages || []).forEach((p: any) => { if (p.page_id) discoveredBrandPageIds.add(p.page_id) })
+      ;(dbPages || []).forEach((p: any) => { if (p.page_id) brandPageIds.add(p.page_id) })
     }
 
-    const pageIds = Array.from(discoveredBrandPageIds).slice(0, 10) // Meta allows max 10
+    const pageIds = Array.from(brandPageIds).slice(0, 10)
 
     if (pageIds.length) {
-      // Fetch ALL ads from these brand pages using search_page_ids.
-      // search_terms is required by Meta API — use the brand name so it's a valid
-      // query, but search_page_ids restricts results to only those pages.
       const brandParams: Record<string, string> = {
         access_token: token,
-        search_terms: term,            // brand name — valid query, page filter does the work
+        search_terms: term,
         search_page_ids: JSON.stringify(pageIds),
         ad_reached_countries: JSON.stringify([metaCountry]),
         fields: META_FIELDS,
         limit: String(ADS_PER_TERM),
       }
       let brandCursor = ''
-      // Fetch more pages for brand — we want ALL their ads, not just 150
       for (let p = 0; p < PAGES_PER_TERM * 2; p++) {
         const { ads, nextCursor, hasMore, error } = await fetchOnePage(brandParams, brandCursor)
         if (error) break
@@ -333,12 +317,12 @@ async function fetchAdsForTerm(
   let filteredAds = allAds
   let externalFiltered = 0
 
-  if (MIN_EXTERNAL_PAGE_FOLLOWERS > 0 && discoveredBrandPageIds.size > 0) {
+  if (MIN_EXTERNAL_PAGE_FOLLOWERS > 0 && brandPageIds.size > 0) {
     // Find unique external page_ids (ads NOT from the brand's own pages)
     const externalPageIds = Array.from(
       new Set(
         allAds
-          .filter((ad: any) => ad.page_id && !discoveredBrandPageIds.has(ad.page_id))
+          .filter((ad: any) => ad.page_id && !brandPageIds.has(ad.page_id))
           .map((ad: any) => ad.page_id)
       )
     ) as string[]
@@ -348,7 +332,7 @@ async function fetchAdsForTerm(
 
       filteredAds = allAds.filter((ad: any) => {
         // Brand's own ads: always keep
-        if (!ad.page_id || discoveredBrandPageIds.has(ad.page_id)) return true
+        if (!ad.page_id || brandPageIds.has(ad.page_id)) return true
         // External page: check follower count
         const fans = followerMap.get(ad.page_id) ?? 0
         if (fans >= MIN_EXTERNAL_PAGE_FOLLOWERS) return true
@@ -358,7 +342,7 @@ async function fetchAdsForTerm(
     }
   }
 
-  return { ads: filteredAds, brandPageIds: Array.from(discoveredBrandPageIds), externalFiltered }
+  return { ads: filteredAds, externalFiltered }
 }
 
 // ── Classification helpers ───────────────────────────────────
@@ -463,9 +447,11 @@ function extractMediaFromHtml(html: string): { thumbnail: string | null; videoUr
   const imagePatterns = [
     /property="og:image"\s+content="([^"]+)"/,
     /content="([^"]+)"\s+property="og:image"/,
-    /"uri"\s*:\s*"(https:\/\/scontent[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/,
-    /"imageURL"\s*:\s*"(https:\/\/[^"]+fbcdn[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/,
+    /"uri"\s*:\s*"(https:\/\/scontent[^"\\]+\.(?:jpg|jpeg|png|webp)[^"\\]*)"/,
+    /"imageURL"\s*:\s*"(https:\/\/[^"\\]+fbcdn[^"\\]+\.(?:jpg|jpeg|png|webp)[^"\\]*)"/,
     /<img[^>]+src="(https:\/\/scontent[^"]{20,}\.(?:jpg|jpeg|png|webp)[^"]*)"/,
+    /"image"\s*:\s*\{"uri"\s*:\s*"(https:\/\/[^"\\]+fbcdn[^"\\]+)"}/,
+    /fbcdn\.net\/[^"'\s]+\.(?:jpg|jpeg|png|webp)(?:[^"'\s]*)/g,
   ]
   for (const pat of imagePatterns) {
     const m = html.match(pat)
@@ -492,8 +478,10 @@ async function fetchRenderedHtml(url: string): Promise<string | null> {
         url,
         render_js: 'true',
         premium_proxy: 'true',   // residential IP — bypasses Facebook bot detection
-        wait: '3000',            // wait 3s after JS load for lazy images
-        timeout: '30000',
+        wait: '6000',            // wait 6s for React to render ad creative
+        timeout: '45000',
+        block_ads: 'false',      // don't block — we ARE fetching ads
+        return_page_source: 'false',
       })
       const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params}`, {
         signal: AbortSignal.timeout(35000),
@@ -834,7 +822,16 @@ export async function GET(request: NextRequest) {
           for (const country of countriesToCrawl) {
             send('log', `🔍 Crawling "${term}" [${term_type || 'all'}] / ${country}…`)
 
-            const { ads, brandPageIds, externalFiltered, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, 'all', admin)
+            // ── Brand page discovery (logged explicitly so we can debug) ──
+            send('log', `  🔎 Looking up brand page for "${term}" via Graph API…`)
+            const knownBrandPageIds = await findBrandPageIds(term, metaToken)
+            if (knownBrandPageIds.length) {
+              send('log', `  🏷 Brand page_ids found: ${knownBrandPageIds.join(', ')} — will fetch ALL their ads`)
+            } else {
+              send('log', `  ℹ️ No brand page found via slug — using keyword search only`)
+            }
+
+            const { ads, externalFiltered, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, 'all', admin, knownBrandPageIds)
 
             if (fetchError) {
               send('log', `  ❌ ${term}/${country}: ${fetchError}`)
@@ -847,9 +844,6 @@ export async function GET(request: NextRequest) {
               continue
             }
 
-            if (brandPageIds.length) {
-              send('log', `  🏷 Brand page${brandPageIds.length > 1 ? 's' : ''} found: ${brandPageIds.slice(0,3).join(', ')}${brandPageIds.length > 3 ? ` +${brandPageIds.length-3} more` : ''} — fetching ALL their ads directly`)
-            }
             if (externalFiltered > 0) {
               send('log', `  🚫 Skipped ${externalFiltered} ads from small external pages (<${MIN_EXTERNAL_PAGE_FOLLOWERS.toLocaleString()} followers)`)
             }
