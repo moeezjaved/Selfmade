@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, ChevronRight } from 'lucide-react'
+import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 // ── Types ────────────────────────────────────────────────────
@@ -601,7 +601,7 @@ export default function DiscoveryPage() {
 
   // Search dropdown
   const [showDropdown, setShowDropdown] = useState(false)
-  const [dropdownBrands, setDropdownBrands] = useState<{ pageId: string; name: string; picture: string | null; category: string }[]>([])
+  const [dropdownBrands, setDropdownBrands] = useState<{ pageId: string; name: string; picture: string | null; category: string; adCount: number | string }[]>([])
   const [dropdownLoading, setDropdownLoading] = useState(false)
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
@@ -765,63 +765,82 @@ export default function DiscoveryPage() {
 
             {/* Dropdown */}
             {showDropdown && searchInput.trim().length >= 1 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1.5px solid #1a3a1a', borderTop: 'none', borderRadius: '0 0 12px 12px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1.5px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 14px 14px', boxShadow: '0 12px 32px rgba(0,0,0,0.13)', zIndex: 200, overflow: 'hidden' }}>
 
                 {/* Search type suggestions */}
-                <div style={{ padding: '6px 8px' }}>
+                <div style={{ padding: '4px 6px 4px' }}>
                   {[
-                    { label: 'Ad copy', icon: '📝', desc: `contains "${searchInput}"` },
-                    { label: 'Brand', icon: '🏷️', desc: `contains "${searchInput}"` },
-                    { label: 'Categories', icon: '📂', desc: `contains "${searchInput}"` },
+                    { label: 'Ad copy', key: 'adcopy' },
+                    { label: 'Brand', key: 'brand' },
+                    { label: 'Categories', key: 'category' },
                   ].map(opt => (
-                    <button key={opt.label}
+                    <button key={opt.key}
                       onMouseDown={e => { e.preventDefault(); setQuery(searchInput); setShowDropdown(false) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 0, width: '100%', padding: '9px 12px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                     >
-                      <span style={{ fontSize: 15 }}>{opt.icon}</span>
                       <span style={{ fontSize: 13, color: '#374151' }}>
-                        <span style={{ fontWeight: 700 }}>{opt.label}</span>
-                        <span style={{ color: '#6b7280' }}> {opt.desc}</span>
+                        <span style={{ fontWeight: 600 }}>{opt.label}</span>
+                        <span style={{ color: '#9ca3af', fontWeight: 400 }}> contains </span>
+                        <span style={{ fontWeight: 600 }}>"{searchInput}"</span>
                       </span>
-                      <ChevronRight size={13} style={{ marginLeft: 'auto', color: '#9ca3af' }} />
                     </button>
                   ))}
                 </div>
 
+                {/* Divider */}
+                <div style={{ height: 1, background: '#f1f5f9' }} />
+
                 {/* Brand results */}
-                {(dropdownLoading || dropdownBrands.length > 0) && (
-                  <>
-                    <div style={{ height: 1, background: '#f1f5f9', margin: '2px 0' }} />
-                    <div style={{ padding: '6px 8px' }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.08em', padding: '4px 10px 6px', textTransform: 'uppercase' }}>Brands</div>
-                      {dropdownLoading && (
-                        <div style={{ padding: '10px 14px', fontSize: 12, color: '#9ca3af' }}>Searching brands…</div>
-                      )}
-                      {!dropdownLoading && dropdownBrands.map(brand => (
-                        <button key={brand.pageId}
-                          onMouseDown={e => { e.preventDefault(); router.push(`/discovery/brand/${brand.pageId}?name=${encodeURIComponent(brand.name)}`); setShowDropdown(false) }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '7px 10px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                        >
-                          {brand.picture
-                            ? <img src={brand.picture} alt={brand.name} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }} />
-                            : <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>🏷️</div>
-                          }
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brand.name}</div>
-                            <div style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <span>📘</span> Meta ad library{brand.category ? ` · ${brand.category}` : ''}
-                            </div>
-                          </div>
-                          <ChevronRight size={13} style={{ marginLeft: 'auto', color: '#9ca3af', flexShrink: 0 }} />
-                        </button>
-                      ))}
+                <div style={{ padding: '6px 6px 4px' }}>
+                  {dropdownLoading && (
+                    <div style={{ padding: '12px 14px', fontSize: 12, color: '#9ca3af', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 14, height: 14, border: '2px solid #e2e8f0', borderTopColor: '#6b7280', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                      Searching brands…
                     </div>
-                  </>
-                )}
+                  )}
+                  {!dropdownLoading && dropdownBrands.map(brand => (
+                    <button key={brand.pageId}
+                      onMouseDown={e => { e.preventDefault(); router.push(`/discovery/brand/${brand.pageId}?name=${encodeURIComponent(brand.name)}`); setShowDropdown(false) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      {/* Avatar */}
+                      {brand.picture
+                        ? <img src={brand.picture} alt={brand.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }} />
+                        : <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#e2e8f0,#cbd5e1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>🏷️</div>
+                      }
+                      {/* Name + meta */}
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brand.name}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                          {/* Meta icon */}
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073C24 5.404 18.627 0 12 0S0 5.404 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.313 0 2.686.236 2.686.236v2.97h-1.514c-1.491 0-1.956.93-1.956 1.886v2.267h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
+                          <span>Meta ad library</span>
+                          {brand.adCount !== undefined && brand.adCount !== 0 && (
+                            <span style={{ color: '#374151', fontWeight: 600 }}>· {typeof brand.adCount === 'number' ? brand.adCount.toLocaleString() : brand.adCount} Ads</span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {/* See more brands */}
+                  {!dropdownLoading && dropdownBrands.length > 0 && (
+                    <button
+                      onMouseDown={e => { e.preventDefault(); setQuery(searchInput); setShowDropdown(false) }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '9px 12px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#1877F2', marginTop: 2 }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f0f7ff')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      See more brands
+                    </button>
+                  )}
+                  {!dropdownLoading && dropdownBrands.length === 0 && (
+                    <div style={{ padding: '10px 12px', fontSize: 12, color: '#9ca3af' }}>No brands found — try searching by ad copy above</div>
+                  )}
+                </div>
               </div>
             )}
           </div>
