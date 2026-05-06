@@ -316,9 +316,11 @@ async function fetchAdsForTerm(
     if (pageIds.length) {
       // search_terms is OPTIONAL when search_page_ids is set.
       // active_status=ALL gets both running and stopped ads — historical winners are valuable.
+      // NOTE: search_page_ids must be comma-separated numeric IDs, not JSON-stringified —
+      // the Meta API rejects JSON array format (["id"]) for this field.
       const brandParams: Record<string, string> = {
         access_token: token,
-        search_page_ids: JSON.stringify(pageIds),
+        search_page_ids: pageIds.join(','),          // ✅ "123,456" not '["123","456"]'
         ad_reached_countries: JSON.stringify([metaCountry]),
         ad_type: 'ALL',
         active_status: 'ALL',   // include stopped/paused ads — not just currently active
@@ -330,13 +332,20 @@ async function fetchAdsForTerm(
       // With active_status=ALL, major brands can have 500-3000+ ads.
       // attachCreatives is now instant (no ScrapingBee) so we can handle volume.
       const MAX_BRAND_PAGES = 60 // 60 × 50 = 3000 ads max per brand per run
+      let brandPage = 0
       for (let p = 0; p < MAX_BRAND_PAGES; p++) {
         const { ads, nextCursor, hasMore, error } = await fetchOnePage(brandParams, brandCursor)
-        if (error) break
+        if (error) {
+          // Surface the error so we know if search_page_ids format is wrong
+          console.error(`[brand-fetch] page ${p} error for pages ${pageIds.join(',')}:`, error)
+          break
+        }
         addAds(ads)
+        brandPage = p + 1
         if (!hasMore) break
         brandCursor = nextCursor
       }
+      console.log(`[brand-fetch] fetched ${brandPage} pages → ${allAds.length} ads for page_ids: ${pageIds.join(',')}`)
     }
   }
 
@@ -581,18 +590,40 @@ async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> 
   return fetchRenderedHtml(url)
 }
 
-// ── Transform ads and attach brand placeholder thumbnail ─────
-// Creatives are displayed via snapshot_url iframe in the Discovery UI —
-// no scraping needed. We just store the brand profile pic as a placeholder.
+// ── Transform ads and attach creatives ──────────────────────
+// For term/category discovery: iframes (snapshot_url) handle display — brand logo placeholder only.
+// For brand crawls: ScrapingBee is tried as fallback to extract real thumbnail/video URLs,
+// capped at MAX_SB_CALLS per run to stay within Vercel's 300 s route limit.
+// Discovery UI always falls back to iframe if thumbnail is null.
+const MAX_SB_CALLS_PER_CRAWL = 15  // ~15 × 35 s = ~525 s worst-case, but usually much faster
+
 async function attachCreatives(rawAds: any[], term: string, country: string, termType: string = 'adcopy'): Promise<{ rows: any[]; skipped: number }> {
   const rows: any[] = []
+  const isBrandCrawl = termType === 'brand'
+  let sbCalls = 0
+
   for (const ad of rawAds) {
     const row = transformAd(ad, term, country)
+
+    // For brand crawls: try ScrapingBee to extract real thumbnail/video
+    if (isBrandCrawl && !row.thumbnail_url && row.snapshot_url && process.env.SCRAPINGBEE_KEY && sbCalls < MAX_SB_CALLS_PER_CRAWL) {
+      const html = await fetchRenderedHtml(row.snapshot_url)
+      if (html) {
+        const { thumbnail, videoUrl } = extractMediaFromHtml(html)
+        if (thumbnail) row.thumbnail_url = thumbnail
+        if (videoUrl) row.video_url = videoUrl
+        sbCalls++
+      }
+    }
+
+    // Fallback: brand profile pic as placeholder (always fast, always works)
     if (!row.thumbnail_url && row.page_id) {
       row.thumbnail_url = `https://graph.facebook.com/${row.page_id}/picture?type=large`
     }
+
     rows.push(row)
   }
+
   return { rows, skipped: 0 }
 }
 
@@ -848,27 +879,21 @@ export async function GET(request: NextRequest) {
             const realCreatives = rows.filter(r => r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com')).length
             send('log', `  📸 ${realCreatives} real creatives, ${rows.length - realCreatives} brand logo placeholders`)
 
-            // ── Deduplicate by creative content ──────────────────────────
-            // Only deduplicate when we have real content to fingerprint.
-            // Visual-only ads (empty body/title) each get a unique ad_id key —
-            // they may look the same now but represent different creatives.
+            // ── Deduplicate by ad_archive_id ─────────────────────────────
+            // Meta's ad.id IS the ad_archive_id — globally unique per ad creative.
+            // Using body+title as the key was wrong: visual ads with no text all
+            // collapsed into one. Use ad_id always; the DB upsert also uses ad_id.
             const creativeMap = new Map<string, any>()
             for (const row of rows) {
-              const body  = (row.body  || '').trim()
-              const title = (row.title || '').trim()
-              // Only dedup if we have at least some text to distinguish creatives
-              const hasContent = body.length > 20 || title.length > 5
-              const key = hasContent
-                ? `${row.page_id}||${body.slice(0, 120)}||${title.slice(0, 60)}`
-                : row.ad_id // unique per ad — no dedup for text-empty ads
+              const key = row.ad_id  // ad_archive_id — always unique
               const existing = creativeMap.get(key)
-              if (!existing || row.days_running > existing.days_running) {
+              if (!existing || row.days_running > (existing.days_running ?? 0)) {
                 creativeMap.set(key, row)
               }
             }
             const dedupedRows = Array.from(creativeMap.values())
             const dupCount = rows.length - dedupedRows.length
-            if (dupCount > 0) send('log', `  🔄 Deduplicated ${dupCount} duplicate creatives — ${dedupedRows.length} unique ads`)
+            if (dupCount > 0) send('log', `  🔄 ${dupCount} exact duplicate ad_ids collapsed — ${dedupedRows.length} unique ads`)
 
             const { error } = await admin
               .from('discovery_ads_index')
