@@ -463,110 +463,121 @@ function SaveModal({ ad, onClose }: { ad: Ad; onClose: () => void }) {
 }
 
 // ── AdCard ───────────────────────────────────────────────────
+const AVATAR_COLORS = ['#1a3a1a','#1e3a5f','#4a1942','#3a1a1a','#1a3a38','#2d3a1a','#3a2a1a']
+function avatarColor(name: string) {
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
+  return AVATAR_COLORS[h]
+}
+
 function AdCard({ ad }: { ad: Ad }) {
   const router = useRouter()
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   const daysText = ad.daysRunning > 365
     ? `${Math.floor(ad.daysRunning / 365)}y ${Math.floor((ad.daysRunning % 365) / 30)}mo`
     : ad.daysRunning > 30
     ? `${Math.floor(ad.daysRunning / 30)}mo ${ad.daysRunning % 30}d`
-    : ad.daysRunning > 0
-    ? `${ad.daysRunning}d`
-    : 'New'
+    : ad.daysRunning > 0 ? `${ad.daysRunning}d` : 'New'
 
   const initials = ad.pageName?.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
-  const formatIcon = ad.format === 'Video' ? '🎬' : ad.format === 'Carousel' ? '🔁' : '🖼'
+  const avatarBg = avatarColor(ad.pageName || '')
+  const bodyText = ad.body || ''
+  const isLong = bodyText.length > 220
+  const displayBody = expanded || !isLong ? bodyText : bodyText.slice(0, 220) + '…'
 
   return (
     <>
     {showSaveModal && <SaveModal ad={ad} onClose={() => { setShowSaveModal(false); setIsSaved(true) }} />}
     <div
-      style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'box-shadow .2s' }}
-      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.1)')}
+      style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'box-shadow .2s', cursor: 'default' }}
+      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,0.08)')}
       onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
     >
-      {/* Brand header */}
-      <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid #f1f5f9' }}>
-        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#1a3a1a', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
+      {/* ── Brand header ── */}
+      <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 38, height: 38, borderRadius: '50%', background: avatarBg, color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0, letterSpacing: '-0.5px' }}>
           {initials}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <button onClick={() => router.push(`/discovery/brand/${ad.pageId}?name=${encodeURIComponent(ad.pageName)}`)}
-            style={{ fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', display: 'block', width: '100%', textAlign: 'left' }}
-            title={`View ${ad.pageName} brand profile`}>
+            style={{ fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', display: 'block', width: '100%', textAlign: 'left' }}>
             {ad.pageName || 'Unknown Brand'}
           </button>
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#9ca3af', display: 'inline-block', flexShrink: 0 }} />
-            {ad.isActive ? 'Active' : 'Inactive'} · {daysText}
+          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db', display: 'inline-block' }} />
+              {ad.isActive ? 'Active' : 'Inactive'}
+            </span>
+            {ad.daysRunning > 0 && <><span style={{ color: '#d1d5db' }}>·</span><span>🕐 {daysText}</span></>}
+            {ad.platforms.slice(0,2).map(p => (
+              <span key={p} title={PLATFORM_LABELS[p] || p}>{PLATFORM_ICONS[p] || '🌐'}</span>
+            ))}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span title={ad.format} style={{ fontSize: 14 }}>{formatIcon}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button onClick={() => setShowSaveModal(true)} title="Save to board"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#9ca3af', padding: 2 }}>
-            {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#d1d5db', padding: 4, borderRadius: 6, transition: 'color .15s' }}>
+            {isSaved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
           </button>
-          <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer"
-            title="View on Meta Ads Library"
-            style={{ color: '#6b7280', flexShrink: 0 }}
-            onClick={e => e.stopPropagation()}>
-            <ExternalLink size={14} />
+          <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" title="View on Meta Ads Library"
+            style={{ color: '#d1d5db', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}>
+            <ExternalLink size={15} />
           </a>
         </div>
       </div>
 
-      {/* Preview */}
-      <div style={{ position: 'relative', background: '#f8fafc', overflow: 'hidden', height: 280 }}>
-        {ad.snapshotUrl ? (
-          <iframe
-            src={ad.snapshotUrl}
-            style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }}
-            scrolling="no"
-            title={`Ad by ${ad.pageName}`}
-            loading="lazy"
-          />
-        ) : (
-          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 13 }}>
-            No preview
+      {/* ── Ad copy body ── */}
+      <div style={{ padding: '0 14px 12px', flex: 1 }}>
+        {bodyText ? (
+          <div>
+            <div style={{ fontSize: 13, color: '#1f2937', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {displayBody}
+            </div>
+            {isLong && (
+              <button onClick={() => setExpanded(e => !e)}
+                style={{ fontSize: 12, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 0', fontFamily: 'inherit', fontWeight: 600 }}>
+                {expanded ? 'Show less' : 'See more'}
+              </button>
+            )}
           </div>
+        ) : (
+          <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>No ad copy</div>
         )}
-        <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer"
-          style={{ position: 'absolute', inset: 0, zIndex: 2 }} aria-label="View ad" />
       </div>
 
-      {/* Copy */}
-      {(ad.body || ad.title) && (
-        <div style={{ padding: '10px 14px', borderTop: '1px solid #f1f5f9' }}>
-          {ad.title && <div style={{ fontSize: 12, fontWeight: 700, color: '#111', marginBottom: 3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{ad.title}</div>}
-          {ad.body && <div style={{ fontSize: 12, color: '#4b5563', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{ad.body}</div>}
+      {/* ── Headline / CTA bar ── */}
+      {(ad.title || ad.caption) && (
+        <div style={{ margin: '0 14px 12px', background: '#f8fafc', borderRadius: 10, padding: '10px 12px', border: '1px solid #f1f5f9' }}>
+          {ad.title && <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.title}</div>}
+          {ad.caption && <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.caption}</div>}
         </div>
       )}
 
-      {/* Tags — themes + platforms */}
-      <div style={{ padding: '8px 14px 12px', marginTop: 'auto' }}>
+      {/* ── Tags + meta footer ── */}
+      <div style={{ padding: '10px 14px 12px', borderTop: '1px solid #f8fafc', marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Themes */}
         {ad.themes.length > 0 && (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-            {ad.themes.slice(0, 2).map(t => (
-              <span key={t} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', background: '#f0fdf4', color: '#166534', borderRadius: 100, border: '1px solid #bbf7d0' }}>
-                {t}
-              </span>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {ad.themes.slice(0, 3).map(t => (
+              <span key={t} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', background: '#f0fdf4', color: '#166534', borderRadius: 100, border: '1px solid #bbf7d0' }}>{t}</span>
+            ))}
+            {ad.industries.slice(0, 1).map(i => (
+              <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', background: '#eff6ff', color: '#1d4ed8', borderRadius: 100, border: '1px solid #bfdbfe' }}>{i}</span>
             ))}
           </div>
         )}
+        {/* Bottom row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: 4 }}>
-            {ad.platforms.slice(0, 3).map(p => (
-              <span key={p} title={PLATFORM_LABELS[p] || p} style={{ fontSize: 13 }}>{PLATFORM_ICONS[p] || '🌐'}</span>
-            ))}
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', background: ad.format === 'Video' ? '#fef3c7' : ad.format === 'Carousel' ? '#f3e8ff' : '#f1f5f9', color: ad.format === 'Video' ? '#92400e' : ad.format === 'Carousel' ? '#7c3aed' : '#374151', borderRadius: 6 }}>
+              {ad.format === 'Video' ? '🎬' : ad.format === 'Carousel' ? '🔁' : '🖼'} {ad.format}
+            </span>
           </div>
-          {ad.startDate && (
-            <div style={{ fontSize: 11, color: '#9ca3af' }}>
-              {new Date(ad.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </div>
-          )}
+          <div style={{ fontSize: 11, color: '#9ca3af' }}>
+            {ad.startDate ? new Date(ad.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : ''}
+          </div>
         </div>
       </div>
     </div>
