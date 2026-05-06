@@ -180,6 +180,53 @@ function transformAd(ad: any, term: string, country: string) {
   }
 }
 
+// ── Batch thumbnail extraction ───────────────────────────────
+const THUMBNAIL_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml',
+  'Accept-Language': 'en-US,en;q=0.9',
+}
+
+function extractOgImage(html: string): string | null {
+  const m = html.match(/property="og:image"\s+content="([^"]+)"/)?.[1]
+    || html.match(/content="([^"]+)"\s+property="og:image"/)?.[1]
+    || html.match(/"thumbnailUrl"\s*:\s*"(https:[^"]+)"/)?.[1]
+    || html.match(/https:\/\/[a-z0-9-]+\.fbcdn\.net\/[^"'\s>]{40,}/g)?.[0]
+  if (!m) return null
+  return m.replace(/&amp;/g, '&').replace(/&#39;/g, "'")
+}
+
+async function extractThumbnailsForNewAds(admin: any, limit = 20): Promise<number> {
+  const { data: ads } = await admin
+    .from('discovery_ads_index')
+    .select('ad_id, snapshot_url')
+    .is('thumbnail_url', null)
+    .not('snapshot_url', 'eq', '')
+    .limit(limit)
+
+  if (!ads?.length) return 0
+  let count = 0
+
+  await Promise.all(ads.map(async (ad: any) => {
+    try {
+      const url = `https://www.facebook.com/ads/library/?id=${ad.ad_id}&country=ALL`
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), 8000)
+      const res = await fetch(url, { signal: ctrl.signal, headers: THUMBNAIL_HEADERS })
+      clearTimeout(t)
+      if (!res.ok) return
+      const html = await res.text()
+      const thumb = extractOgImage(html)
+      if (thumb) {
+        await admin.from('discovery_ads_index').update({ thumbnail_url: thumb }).eq('ad_id', ad.ad_id)
+        count++
+      }
+    } catch { /* ignore individual failures */ }
+  }))
+
+  return count
+}
+
 // ── Generate OpenAI embeddings ───────────────────────────────
 async function generateEmbeddings(admin: any): Promise<number> {
   const { data: unembedded } = await admin
@@ -379,6 +426,15 @@ export async function GET(request: NextRequest) {
               last_crawled_at: new Date().toISOString(),
             }).eq('id', id)
           }
+        }
+
+        // ── Thumbnail extraction ──
+        send('log', '🖼 Extracting ad thumbnails…')
+        try {
+          const thumbCount = await extractThumbnailsForNewAds(admin, 20)
+          send('log', `  ✅ ${thumbCount} thumbnails extracted`)
+        } catch (e: any) {
+          send('log', `  ⚠️ Thumbnails: ${String(e?.message ?? e)}`)
         }
 
         // ── Embeddings ──
