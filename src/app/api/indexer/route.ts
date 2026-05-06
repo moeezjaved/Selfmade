@@ -41,8 +41,8 @@ async function getMetaToken(admin: any): Promise<string> {
 const TERMS_PER_RUN = 10   // terms per cron run
 const ADS_PER_TERM = 50    // ads per Meta API call
 const PAGES_PER_TERM = 2   // pages to fetch (50 × 2 = 100 ads per term×country)
-const EMBED_BATCH = 50     // ads to embed per batch
-const CLASSIFY_BATCH = 10  // ads to classify per Claude call (smaller = less likely to hit token limits)
+const EMBED_BATCH = 200    // embed ALL new ads per run (OpenAI handles large batches fine)
+const CLASSIFY_BATCH = 25  // ads per Claude call — 25 is safe within token limits
 
 const META_FIELDS = [
   'id','ad_creation_time','ad_delivery_start_time','ad_delivery_stop_time',
@@ -307,12 +307,10 @@ function transformAd(ad: any, term: string, country: string) {
 }
 
 // ── Batch thumbnail extraction ───────────────────────────────
-// Attempts to extract real ad creative thumbnails from the Facebook snapshot URL.
-// We only store REAL creative URLs in thumbnail_url — never the brand profile
-// picture (that's always computed on-the-fly from page_id in the UI).
-// If scraping returns nothing, we leave thumbnail_url null so the card will
-// retry on next load and show brand pic as a placeholder in the meantime.
-async function extractThumbnailsForNewAds(admin: any, limit = 30): Promise<number> {
+// Scrapes real ad creative images from Facebook snapshot pages.
+// Runs up to 10 in parallel for speed. Only stores confirmed real creative
+// URLs — never the brand profile picture (that's a UI-side fallback only).
+async function extractThumbnailsForNewAds(admin: any, limit = 100): Promise<number> {
   const { data: ads } = await admin
     .from('discovery_ads_index')
     .select('ad_id, page_id, snapshot_url')
@@ -324,30 +322,89 @@ async function extractThumbnailsForNewAds(admin: any, limit = 30): Promise<numbe
   if (!ads?.length) return 0
 
   let count = 0
-  // Try to scrape each ad's snapshot page for the real creative image
-  for (const ad of ads as any[]) {
-    try {
-      const params = new URLSearchParams({ ad_id: ad.ad_id })
-      if (ad.snapshot_url) params.set('url', ad.snapshot_url)
-      if (ad.page_id) params.set('page_id', ad.page_id)
-      // Call our own thumbnail API — it handles scraping + caching
-      const origin = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'http://localhost:3000'
-      const res = await fetch(`${origin}/api/discovery/thumbnail?${params}`, { signal: AbortSignal.timeout(8000) })
-      if (res.ok) {
-        const data = await res.json()
-        // Only count if we got a real creative URL (not just the graph fallback)
-        if (data.thumbnail && !data.thumbnail.includes('graph.facebook.com')) {
-          count++
+  const CONCURRENCY = 10  // parallel scrape requests
+
+  for (let i = 0; i < (ads as any[]).length; i += CONCURRENCY) {
+    const chunk = (ads as any[]).slice(i, i + CONCURRENCY)
+    const results = await Promise.allSettled(
+      chunk.map(async (ad: any) => {
+        // Scrape the Facebook snapshot page for the actual ad creative image/video
+        const urls = [
+          `https://www.facebook.com/ads/library/?id=${ad.ad_id}&country=ALL`,
+          ad.snapshot_url,
+        ].filter(Boolean)
+
+        for (const url of urls) {
+          const html = await fetchHtml(url).catch(() => null)
+          if (!html) continue
+          const { thumbnail, videoUrl } = extractMediaFromHtml(html)
+          if (thumbnail || videoUrl) {
+            await admin.from('discovery_ads_index')
+              .update({ thumbnail_url: thumbnail || null, video_url: videoUrl || null })
+              .eq('ad_id', ad.ad_id)
+            return true
+          }
         }
-      }
-    } catch {
-      // Skip — thumbnail extraction is best-effort
-    }
+        return false
+      })
+    )
+    count += results.filter(r => r.status === 'fulfilled' && r.value === true).length
   }
 
   return count
+}
+
+// ── HTML media extractor (shared with thumbnail API) ─────────
+function extractMediaFromHtml(html: string): { thumbnail: string | null; videoUrl: string | null } {
+  let thumbnail: string | null = null
+  let videoUrl: string | null = null
+
+  const dec = (s: string) => s.replace(/\\u0026/g, '&').replace(/\\u0025/g, '%').replace(/&amp;/g, '&').replace(/\\"/g, '"').replace(/\\\//g, '/')
+
+  const videoPatterns = [
+    /["']playable_url["']\s*:\s*["'](https:\/\/video[^"'\\]+)["']/,
+    /["']playable_url_quality_hd["']\s*:\s*["'](https:\/\/video[^"'\\]+)["']/,
+    /"src"\s*:\s*"(https:\/\/video\.xx\.fbcdn\.net[^"]+)"/,
+  ]
+  for (const pat of videoPatterns) {
+    const m = html.match(pat)
+    if (m?.[1]?.includes('fbcdn.net')) { videoUrl = dec(m[1]); break }
+  }
+
+  const imagePatterns = [
+    /property="og:image"\s+content="([^"]+)"/,
+    /content="([^"]+)"\s+property="og:image"/,
+    /"uri"\s*:\s*"(https:\/\/scontent[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/,
+    /"imageURL"\s*:\s*"(https:\/\/[^"]+fbcdn[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/,
+    /<img[^>]+src="(https:\/\/scontent[^"]{20,}\.(?:jpg|jpeg|png|webp)[^"]*)"/,
+  ]
+  for (const pat of imagePatterns) {
+    const m = html.match(pat)
+    const url = (m && m[1]) || null
+    if (url?.startsWith('http') && !url.includes('emoji') && url.length > 30) {
+      thumbnail = dec(url); break
+    }
+  }
+
+  return { thumbnail, videoUrl }
+}
+
+async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> {
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), timeoutMs)
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      }
+    })
+    clearTimeout(t)
+    if (!res.ok) return null
+    return await res.text()
+  } catch { return null }
 }
 
 // ── Generate OpenAI embeddings ───────────────────────────────
@@ -597,35 +654,43 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // ── Thumbnail extraction ──
-        send('log', '🖼 Extracting ad thumbnails…')
+        // ── Thumbnail extraction (parallel scraping, all new ads) ──
+        send('log', `🖼 Extracting thumbnails for new ads…`)
         try {
-          const thumbCount = await extractThumbnailsForNewAds(admin, 20)
-          send('log', `  ✅ ${thumbCount} thumbnails extracted`)
+          const thumbCount = await extractThumbnailsForNewAds(admin, 100)
+          send('log', `  ✅ ${thumbCount} real ad creatives extracted (rest show brand picture until clicked)`)
         } catch (e: any) {
           send('log', `  ⚠️ Thumbnails: ${String(e?.message ?? e)}`)
         }
 
-        // ── Embeddings ──
-        send('log', '🔢 Generating embeddings…')
+        // ── Embeddings (all unembedded ads) ──
+        send('log', '🔢 Generating embeddings for all new ads…')
         let embedded = 0
         try {
-          embedded = await generateEmbeddings(admin)
+          // Loop until all new ads are embedded (EMBED_BATCH = 200 so usually one pass)
+          let batch = 0
+          do {
+            batch = await generateEmbeddings(admin)
+            embedded += batch
+          } while (batch === EMBED_BATCH)
           send('log', `  ✅ ${embedded} embeddings generated`)
         } catch (e: any) {
           send('log', `  ❌ Embeddings error: ${String(e?.message ?? e)}`)
         }
 
-        // ── Claude classification ──
-        send('log', '🤖 Running Claude classification…')
+        // ── Claude classification (loop until all classified) ──
+        send('log', '🤖 Classifying ads with Claude…')
         let classified = 0
         try {
-          classified = await classifyWithClaude(admin)
+          let batch = 0
+          do {
+            batch = await classifyWithClaude(admin)
+            classified += batch
+          } while (batch === CLASSIFY_BATCH)
           send('log', `  ✅ ${classified} ads classified`)
         } catch (e: any) {
-          // Non-fatal — crawler already saved ads and embeddings; classification retried next run
           const detail = e?.error?.message || e?.message || String(e)
-          send('log', `  ⚠️ Classification skipped (will retry next run): ${detail}`)
+          send('log', `  ⚠️ Classification: ${detail}`)
         }
 
         // ── Update state ──
