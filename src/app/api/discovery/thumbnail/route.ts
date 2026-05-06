@@ -1,7 +1,12 @@
 /**
- * Media extractor — fetches the public Facebook Ads Library page server-side
- * and extracts the actual image/video URLs (no login required).
- * facebook.com/ads/library/?id=XXX has the full creative data in its HTML.
+ * Media extractor — three-layer approach for ad creatives:
+ *
+ * 1. DB cache   — instant return if already stored
+ * 2. Scraping   — fetch the render_ad snapshot URL (has access_token embedded)
+ *                 and the public ads/library page; extract og:image + video URLs
+ * 3. Fallback   — graph.facebook.com/{page_id}/picture always works for public
+ *                 pages; returns the brand's profile picture so the card is never
+ *                 blank even when scraping returns nothing
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -11,24 +16,35 @@ export const maxDuration = 30
 
 const cache = new Map<string, { thumbnail: string | null; videoUrl: string | null }>()
 
+// Full browser-like headers — helps bypass simple bot checks
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'Accept-Language': 'en-US,en;q=0.9',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Referer': 'https://www.facebook.com/',
   'Sec-Fetch-Dest': 'document',
   'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'same-origin',
+  'Upgrade-Insecure-Requests': '1',
 }
 
 function dec(s: string) {
-  return s.replace(/&amp;/g, '&').replace(/\\u0025/g, '%').replace(/\\/g, '')
+  try {
+    return s
+      .replace(/\\u0026/g, '&')
+      .replace(/\\u0025/g, '%')
+      .replace(/&amp;/g, '&')
+      .replace(/\\"/g, '"')
+      .replace(/\\\//g, '/')
+  } catch { return s }
 }
 
 function extractMedia(html: string): { thumbnail: string | null; videoUrl: string | null } {
   let thumbnail: string | null = null
   let videoUrl: string | null = null
 
-  // ── VIDEO URLs (highest priority) ──
-  // Facebook embeds video data in JSON inside the page HTML
+  // ── VIDEO (highest priority) ──────────────────────────────
   const videoPatterns = [
     /["']playable_url["']\s*:\s*["'](https:\/\/video[^"'\\]+)["']/,
     /["']playable_url_quality_hd["']\s*:\s*["'](https:\/\/video[^"'\\]+)["']/,
@@ -43,28 +59,35 @@ function extractMedia(html: string): { thumbnail: string | null; videoUrl: strin
     if (m) {
       const url = pat.source.includes('(') ? m[1] : m[0]
       if (url?.includes('fbcdn.net') || url?.includes('facebook.com')) {
-        videoUrl = dec(url)
-        break
+        videoUrl = dec(url); break
       }
     }
   }
 
-  // ── THUMBNAIL / IMAGE ──
-  // og:image is set by Facebook to the actual ad creative
-  const ogPatterns = [
+  // ── THUMBNAIL / IMAGE ─────────────────────────────────────
+  const imagePatterns = [
+    // og:image (set by Facebook for the ad creative on the library page)
     /property="og:image"\s+content="([^"]+)"/,
     /content="([^"]+)"\s+property="og:image"/,
     /property='og:image'\s+content='([^']+)'/,
+    // Facebook CDN images embedded in page JSON (render_ad page)
+    /"uri"\s*:\s*"(https:\/\/scontent[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/,
+    /"imageURL"\s*:\s*"(https:\/\/[^"]+fbcdn[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/,
+    /"image"\s*:\s*\{"uri"\s*:\s*"(https:\/\/[^"]+fbcdn[^"]+)"/,
+    // Img tags in render_ad HTML
+    /<img[^>]+src="(https:\/\/scontent[^"]{20,}\.(?:jpg|jpeg|png|webp)[^"]*)"/,
+    // Any scontent CDN image URL (broad fallback)
+    /https:\/\/scontent[a-z0-9.-]+\.fbcdn\.net\/v\/[^\s"'<>]{30,}/,
   ]
-  for (const pat of ogPatterns) {
+  for (const pat of imagePatterns) {
     const m = html.match(pat)
-    if (m?.[1]?.startsWith('http')) {
-      thumbnail = dec(m[1])
-      break
+    const url = (m && (pat.source.includes('(') ? m[1] : m[0])) || null
+    if (url?.startsWith('http') && !url.includes('emoji') && url.length > 30) {
+      thumbnail = dec(url); break
     }
   }
 
-  // If video found, also look for its poster/thumbnail
+  // Poster for video ads
   if (videoUrl && !thumbnail) {
     const posterPats = [
       /["']thumbnailImage["'][^}]*?["']uri["']\s*:\s*["'](https:\/\/[^"']+fbcdn[^"']+)["']/,
@@ -77,16 +100,26 @@ function extractMedia(html: string): { thumbnail: string | null; videoUrl: strin
     }
   }
 
-  // Fallback: any fbcdn image URL
-  if (!thumbnail) {
-    const fbImgs = html.match(/https:\/\/[a-z0-9-]+\.fbcdn\.net\/v\/[^\s"'<>]{30,}/g)
-    if (fbImgs?.length) {
-      // Prefer non-video, larger images
-      thumbnail = fbImgs.find(u => !u.includes('video') && !u.includes('.mp4')) || fbImgs[0]
-    }
-  }
-
   return { thumbnail, videoUrl }
+}
+
+// ── Page profile picture via Facebook Graph API ───────────────
+// Publicly accessible for all public pages — no auth required.
+// Returns the brand's FB page profile picture URL.
+function pagePictureUrl(pageId: string): string {
+  // The browser's <img> tag follows this redirect automatically to the CDN image
+  return `https://graph.facebook.com/${pageId}/picture?type=large`
+}
+
+async function fetchHtml(url: string, timeoutMs = 10000): Promise<string | null> {
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), timeoutMs)
+    const res = await fetch(url, { signal: ctrl.signal, headers: HEADERS })
+    clearTimeout(t)
+    if (!res.ok) return null
+    return await res.text()
+  } catch { return null }
 }
 
 async function fetchMedia(adId: string, snapshotUrl: string) {
@@ -94,27 +127,23 @@ async function fetchMedia(adId: string, snapshotUrl: string) {
 
   const result = { thumbnail: null as string | null, videoUrl: null as string | null }
 
+  // Try URLs in order of likely success:
+  // 1. Ads Library page  (has og:image for most ads in the server-rendered HTML)
+  // 2. Snapshot/render URL (has access_token embedded — renders the full ad)
   const urls = [
     `https://www.facebook.com/ads/library/?id=${adId}&country=ALL`,
-    `https://www.facebook.com/ads/library/?id=${adId}`,
     snapshotUrl,
   ].filter(Boolean)
 
   for (const url of urls) {
-    try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 10000)
-      const res = await fetch(url, { signal: ctrl.signal, headers: HEADERS })
-      clearTimeout(t)
-      if (!res.ok) continue
-      const html = await res.text()
-      const extracted = extractMedia(html)
-      if (extracted.thumbnail || extracted.videoUrl) {
-        result.thumbnail = extracted.thumbnail
-        result.videoUrl = extracted.videoUrl
-        break
-      }
-    } catch { continue }
+    const html = await fetchHtml(url)
+    if (!html) continue
+    const extracted = extractMedia(html)
+    if (extracted.thumbnail || extracted.videoUrl) {
+      result.thumbnail = extracted.thumbnail
+      result.videoUrl = extracted.videoUrl
+      break
+    }
   }
 
   cache.set(adId, result)
@@ -125,12 +154,13 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const adId = searchParams.get('ad_id')
   const snapshotUrl = searchParams.get('url') || ''
+  const pageId = searchParams.get('page_id') || ''
 
   if (!adId) return NextResponse.json({ thumbnail: null, videoUrl: null }, { status: 400 })
 
   const admin = createAdminClient()
 
-  // Return cached DB values immediately
+  // 1. Return cached DB values immediately (set during crawl or previous fetch)
   const { data: existing } = await admin
     .from('discovery_ads_index')
     .select('thumbnail_url, video_url')
@@ -144,16 +174,22 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  // 2. Try scraping the ad creative from Facebook pages
   const { thumbnail, videoUrl } = await fetchMedia(adId, snapshotUrl)
 
-  if (thumbnail || videoUrl) {
+  // 3. Fallback: brand profile picture — always available for public FB pages
+  //    Returns graph.facebook.com redirect URL; browser follows it to the CDN image.
+  const finalThumbnail = thumbnail || (pageId ? pagePictureUrl(pageId) : null)
+
+  // Persist to DB so subsequent requests are instant
+  if (finalThumbnail || videoUrl) {
     await admin.from('discovery_ads_index')
-      .update({ thumbnail_url: thumbnail, video_url: videoUrl })
+      .update({ thumbnail_url: finalThumbnail, video_url: videoUrl || null })
       .eq('ad_id', adId)
   }
 
   return NextResponse.json(
-    { thumbnail, videoUrl },
+    { thumbnail: finalThumbnail, videoUrl },
     { headers: { 'Cache-Control': 'public, max-age=3600' } }
   )
 }

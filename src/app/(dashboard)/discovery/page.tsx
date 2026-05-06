@@ -478,32 +478,39 @@ function AdCard({ ad }: { ad: Ad }) {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  // Brand profile picture — always available, shown instantly as placeholder
+  // graph.facebook.com/{pageId}/picture redirects to the actual CDN image
+  const brandPicture = ad.pageId ? `https://graph.facebook.com/${ad.pageId}/picture?type=large` : null
+
   const [thumbnail, setThumbnail] = useState<string | null>(ad.thumbnailUrl || null)
   const [videoUrl, setVideoUrl] = useState<string | null>(ad.videoUrl || null)
-  const [thumbLoading, setThumbLoading] = useState(!ad.thumbnailUrl && !!ad.snapshotUrl)
+  const [thumbLoading, setThumbLoading] = useState(!ad.thumbnailUrl)
   const [playing, setPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  // Lazily fetch thumbnail + video URL if not already cached
+  // Lazily fetch actual ad creative thumbnail + video URL
   useEffect(() => {
-    if ((ad.thumbnailUrl && ad.videoUrl !== undefined) || !ad.snapshotUrl || !ad.id) return
+    if (ad.thumbnailUrl || !ad.id) return   // already have it from DB
     let cancelled = false
     const load = async () => {
       try {
-        const res = await fetch(`/api/discovery/thumbnail?ad_id=${encodeURIComponent(ad.id)}&url=${encodeURIComponent(ad.snapshotUrl)}`)
+        const params = new URLSearchParams({ ad_id: ad.id })
+        if (ad.snapshotUrl) params.set('url', ad.snapshotUrl)
+        if (ad.pageId)      params.set('page_id', ad.pageId)
+        const res = await fetch(`/api/discovery/thumbnail?${params}`)
         const data = await res.json()
         if (!cancelled) {
           if (data.thumbnail) setThumbnail(data.thumbnail)
-          if (data.videoUrl) setVideoUrl(data.videoUrl)
+          if (data.videoUrl)  setVideoUrl(data.videoUrl)
         }
       } catch { /* ignore */ } finally {
         if (!cancelled) setThumbLoading(false)
       }
     }
-    // Stagger requests to avoid hammering server
-    const timer = setTimeout(load, Math.random() * 800)
+    // Stagger to avoid hammering server
+    const timer = setTimeout(load, Math.random() * 600)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [ad.id, ad.snapshotUrl, ad.thumbnailUrl, ad.videoUrl])
+  }, [ad.id, ad.snapshotUrl, ad.pageId, ad.thumbnailUrl])
 
   const daysText = ad.daysRunning > 365
     ? `${Math.floor(ad.daysRunning / 365)}y ${Math.floor((ad.daysRunning % 365) / 30)}mo`
@@ -559,62 +566,75 @@ function AdCard({ ad }: { ad: Ad }) {
       </div>
 
       {/* ── Visual preview ── */}
-      {(thumbnail || videoUrl || thumbLoading) && (
-        <div style={{ position: 'relative', background: '#0f0f0f', overflow: 'hidden', aspectRatio: '1/1', maxHeight: 320 }}>
-          {/* ── Video player ── */}
-          {videoUrl ? (
-            <>
-              <video
-                ref={videoRef}
-                src={videoUrl}
-                poster={thumbnail || undefined}
-                controls={playing}
-                preload="metadata"
-                playsInline
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                onEnded={() => setPlaying(false)}
-                onError={() => {
-                  // Video URL expired — fall back to thumbnail only
-                  setVideoUrl(null)
-                  setPlaying(false)
-                }}
-              />
-              {/* Play button overlay — only show when not playing */}
-              {!playing && (
-                <div
-                  onClick={() => {
-                    setPlaying(true)
-                    setTimeout(() => videoRef.current?.play(), 50)
-                  }}
-                  style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)', cursor: 'pointer' }}
-                >
-                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', transition: 'transform 0.15s' }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.08)' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)' }}
-                  >
-                    <span style={{ fontSize: 22, marginLeft: 4 }}>▶</span>
-                  </div>
+      {/* Always show — brand picture is immediate placeholder; real creative loads on top */}
+      <div style={{ position: 'relative', background: '#f1f5f9', overflow: 'hidden', aspectRatio: '4/3', maxHeight: 300 }}>
+
+        {/* ── Brand picture placeholder (always visible while loading) ── */}
+        {!thumbnail && brandPicture && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+            <img
+              src={brandPicture}
+              alt={ad.pageName}
+              style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '3px solid #e2e8f0' }}
+              onError={() => {/* silently hide */}}
+            />
+          </div>
+        )}
+
+        {/* ── Spinner while fetching (no brand picture available) ── */}
+        {thumbLoading && !thumbnail && !brandPicture && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9' }}>
+            <div style={{ width: 22, height: 22, border: '3px solid #e2e8f0', borderTopColor: '#9ca3af', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        )}
+
+        {/* ── Video player (actual ad creative) ── */}
+        {videoUrl && (
+          <>
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              poster={thumbnail || undefined}
+              controls={playing}
+              preload="metadata"
+              playsInline
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              onEnded={() => setPlaying(false)}
+              onError={() => { setVideoUrl(null); setPlaying(false) }}
+            />
+            {!playing && (
+              <div
+                onClick={() => { setPlaying(true); setTimeout(() => videoRef.current?.play(), 50) }}
+                style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer' }}
+              >
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
+                  <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
                 </div>
-              )}
-            </>
-          ) : thumbnail ? (
-            /* ── Static image (no video) ── */
-            <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', height: '100%' }}>
-              <img
-                src={thumbnail}
-                alt={ad.pageName}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                onError={() => setThumbnail(null)}
-              />
-            </a>
-          ) : (
-            /* ── Loading spinner ── */
-            <div style={{ width: '100%', height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: 24, height: 24, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-            </div>
-          )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Static image (actual ad creative, no video) ── */}
+        {thumbnail && !videoUrl && (
+          <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer"
+            style={{ position: 'absolute', inset: 0, display: 'block' }}>
+            <img
+              src={thumbnail}
+              alt={ad.pageName}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              onError={() => setThumbnail(null)}
+            />
+          </a>
+        )}
+
+        {/* Format badge */}
+        <div style={{ position: 'absolute', top: 8, right: 8 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(0,0,0,0.55)', color: '#fff' }}>
+            {ad.format === 'Video' ? '🎬 Video' : ad.format === 'Carousel' ? '🔁 Carousel' : '🖼 Image'}
+          </span>
         </div>
-      )}
+      </div>
 
       {/* ── Ad copy body ── */}
       <div style={{ padding: '0 14px 12px', flex: 1 }}>
