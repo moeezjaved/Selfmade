@@ -17,9 +17,16 @@ export async function GET(request: NextRequest) {
   console.log('CALLBACK - code:', !!code, 'state:', !!state, 'error:', error)
 
   if (error) {
-    return NextResponse.redirect(`${APP_URL}/connect-meta?error=${encodeURIComponent(searchParams.get('error_description') || error)}`)
+    const desc = searchParams.get('error_description') || searchParams.get('error_reason') || error
+    console.log('FACEBOOK ERROR:', error, desc)
+    return NextResponse.redirect(`${APP_URL}/connect-meta?error=${encodeURIComponent(desc)}`)
   }
-  if (!code) return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_code`)
+  if (!code) {
+    // Log all params to debug
+    const allParams = Object.fromEntries(searchParams.entries())
+    console.log('NO CODE - all params:', JSON.stringify(allParams))
+    return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_code`)
+  }
 
   const admin = createAdminClient()
   let userId: string | null = null
