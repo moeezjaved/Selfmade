@@ -130,6 +130,35 @@ async function fetchOnePage(
   }
 }
 
+// ── Search Meta Graph for pages by name → get page_ids ──────
+// Used to find a brand's actual Facebook page_id before fetching their ads.
+// The Graph page search is far more reliable than hoping the brand's own ads
+// appear in a keyword search (many brand ads don't contain their own name).
+async function findBrandPageIds(brandName: string, token: string): Promise<string[]> {
+  try {
+    const params = new URLSearchParams({
+      q: brandName,
+      type: 'page',
+      fields: 'id,name,fan_count',
+      limit: '10',
+      access_token: token,
+    })
+    const res = await fetch(`https://graph.facebook.com/${V}/search?${params}`, {
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) return []
+    const data = await res.json() as { data?: { id: string; name: string; fan_count?: number }[] }
+    const nameLower = brandName.toLowerCase()
+    // Keep pages whose name closely matches — filter out unrelated pages
+    return (data.data || [])
+      .filter(p => p.name.toLowerCase().includes(nameLower) || nameLower.includes(p.name.toLowerCase()))
+      .map(p => p.id)
+      .slice(0, 5) // max 5 matching pages
+  } catch {
+    return []
+  }
+}
+
 // ── Batch-fetch page follower counts from Graph API ─────────
 // Used to quality-gate external pages (influencers, marketplaces, etc.).
 // Returns a Map<page_id, fan_count>. Missing pages default to 0.
@@ -212,21 +241,27 @@ async function fetchAdsForTerm(
   }
 
   // ── 2. BRAND: find the brand's page_id, then fetch ALL their ads ──────────────────
-  // The critical step: after step 1 we have some ads. Among them, find any whose
-  // page_name closely matches our term — those ARE the brand's own ads. Extract their
-  // page_id(s), then fetch ALL ads from those pages using search_page_ids (no
-  // content restriction, so we get every ad the brand has ever run).
+  // Three-source page_id discovery (most reliable first):
+  //  a) Graph page search — searches Facebook pages by name directly (most reliable)
+  //  b) Step-1 ad results — ads whose page_name matches the term
+  //  c) Our DB           — previously indexed ads from matching pages
+  // Once we have page_ids, we fetch ALL their ads via search_page_ids.
   {
     const termLower = term.toLowerCase()
 
-    // Collect page_ids from step-1 results where page_name ≈ term
-    const fromSearch = allAds
+    // Source a: Graph /search?type=page — finds the brand's actual Facebook page
+    // This works even when the brand's own ads don't mention their name in the body.
+    const graphPageIds = await findBrandPageIds(term, token)
+    graphPageIds.forEach((id: string) => discoveredBrandPageIds.add(id))
+
+    // Source b: step-1 ad results where page_name ≈ term
+    allAds
       .filter((ad: any) => ad.page_name && ad.page_name.toLowerCase().includes(termLower))
       .map((ad: any) => ad.page_id)
       .filter(Boolean)
-    fromSearch.forEach((id: string) => discoveredBrandPageIds.add(id))
+      .forEach((id: string) => discoveredBrandPageIds.add(id))
 
-    // Also check our DB for previously crawled matching pages
+    // Source c: our DB — previously indexed ads from matching pages
     if (admin) {
       const { data: dbPages } = await admin
         .from('discovery_ads_index')
@@ -240,11 +275,11 @@ async function fetchAdsForTerm(
 
     if (pageIds.length) {
       // Fetch ALL ads from these brand pages using search_page_ids.
-      // Use a single space for search_terms — Meta requires it but it acts as a wildcard
-      // when search_page_ids is set, so all ads for that page are returned.
+      // search_terms is required by Meta API — use the brand name so it's a valid
+      // query, but search_page_ids restricts results to only those pages.
       const brandParams: Record<string, string> = {
         access_token: token,
-        search_terms: ' ',             // required by API but effectively a wildcard
+        search_terms: term,            // brand name — valid query, page filter does the work
         search_page_ids: JSON.stringify(pageIds),
         ad_reached_countries: JSON.stringify([metaCountry]),
         fields: META_FIELDS,
