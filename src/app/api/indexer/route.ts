@@ -305,48 +305,38 @@ function transformAd(ad: any, term: string, country: string) {
 }
 
 // ── Batch thumbnail extraction ───────────────────────────────
-const THUMBNAIL_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml',
-  'Accept-Language': 'en-US,en;q=0.9',
-}
-
-function extractOgImage(html: string): string | null {
-  const m = html.match(/property="og:image"\s+content="([^"]+)"/)?.[1]
-    || html.match(/content="([^"]+)"\s+property="og:image"/)?.[1]
-    || html.match(/"thumbnailUrl"\s*:\s*"(https:[^"]+)"/)?.[1]
-    || html.match(/https:\/\/[a-z0-9-]+\.fbcdn\.net\/[^"'\s>]{40,}/g)?.[0]
-  if (!m) return null
-  return m.replace(/&amp;/g, '&').replace(/&#39;/g, "'")
-}
-
-async function extractThumbnailsForNewAds(admin: any, limit = 20): Promise<number> {
+// Uses graph.facebook.com/{page_id}/picture — publicly accessible for all
+// public FB pages, no auth required, always returns a real image URL.
+// This gives the brand's profile picture as the card thumbnail, which is
+// far more reliable than scraping the ads/library page (requires JS rendering).
+async function extractThumbnailsForNewAds(admin: any, limit = 50): Promise<number> {
   const { data: ads } = await admin
     .from('discovery_ads_index')
-    .select('ad_id, snapshot_url')
+    .select('ad_id, page_id')
     .is('thumbnail_url', null)
-    .not('snapshot_url', 'eq', '')
+    .not('page_id', 'eq', '')
+    .not('page_id', 'is', null)
     .limit(limit)
 
   if (!ads?.length) return 0
-  let count = 0
 
-  await Promise.all(ads.map(async (ad: any) => {
-    try {
-      const url = `https://www.facebook.com/ads/library/?id=${ad.ad_id}&country=ALL`
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 8000)
-      const res = await fetch(url, { signal: ctrl.signal, headers: THUMBNAIL_HEADERS })
-      clearTimeout(t)
-      if (!res.ok) return
-      const html = await res.text()
-      const thumb = extractOgImage(html)
-      if (thumb) {
-        await admin.from('discovery_ads_index').update({ thumbnail_url: thumb }).eq('ad_id', ad.ad_id)
-        count++
-      }
-    } catch { /* ignore individual failures */ }
+  // Batch-update: use graph.facebook.com/{page_id}/picture directly
+  // The browser's <img src> follows the 302 redirect to the actual CDN image.
+  // We store the redirect URL — it's stable and doesn't expire.
+  const updates = (ads as any[]).map((ad: any) => ({
+    ad_id: ad.ad_id,
+    thumbnail_url: `https://graph.facebook.com/${ad.page_id}/picture?type=large`,
   }))
+
+  let count = 0
+  // Upsert in chunks to avoid hitting Supabase row limits
+  for (let i = 0; i < updates.length; i += 25) {
+    const chunk = updates.slice(i, i + 25)
+    const { error } = await admin
+      .from('discovery_ads_index')
+      .upsert(chunk.map((u: any) => ({ ad_id: u.ad_id, thumbnail_url: u.thumbnail_url })), { onConflict: 'ad_id' })
+    if (!error) count += chunk.length
+  }
 
   return count
 }
@@ -387,17 +377,30 @@ async function generateEmbeddings(admin: any): Promise<number> {
 // ── Claude AI classification ─────────────────────────────────
 async function callClaudeWithRetry(prompt: string, maxRetries = 3): Promise<string> {
   let lastErr: any
+  // Try models in order — fall back if one is deprecated/unavailable
+  const MODELS = [
+    process.env.ANTHROPIC_MODEL,
+    'claude-3-5-sonnet-20241022',
+    'claude-3-5-haiku-20241022',
+    'claude-3-haiku-20240307',
+  ].filter(Boolean) as string[]
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const model = MODELS[Math.min(attempt - 1, MODELS.length - 1)]
     try {
       const msg = await anthropic.messages.create({
-        model: 'claude-3-5-haiku-20241022',
+        model,
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
       })
       return msg.content[0].type === 'text' ? msg.content[0].text : ''
     } catch (e: any) {
       lastErr = e
-      const isRetryable = e?.status >= 500 || e?.message?.includes('overloaded') || e?.message?.includes('Internal server error')
+      const isRetryable = e?.status >= 500
+        || e?.status === 404  // model not found → try next model
+        || e?.message?.includes('overloaded')
+        || e?.message?.includes('Internal server error')
+        || e?.message?.includes('not_found')
       if (!isRetryable || attempt === maxRetries) break
       // Exponential back-off: 2s, 4s
       await new Promise(r => setTimeout(r, 2000 * attempt))
