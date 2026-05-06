@@ -683,11 +683,9 @@ async function callClaudeWithRetry(prompt: string): Promise<string> {
   // Model fallback chain — newest/most capable first, older as safety nets.
   // If ANTHROPIC_MODEL env var is set and not already in the list, prepend it.
   const DEFAULT_MODELS = [
-    'claude-opus-4-5',
-    'claude-sonnet-4-5',
-    'claude-3-7-sonnet-20250219',
-    'claude-3-5-sonnet-20241022',
-    'claude-3-opus-20240229',
+    'claude-3-5-sonnet-20241022',  // most reliable, widely available
+    'claude-3-7-sonnet-20250219',  // extended thinking model
+    'claude-3-haiku-20240307',     // fast fallback
   ]
   const envModel = process.env.ANTHROPIC_MODEL
   const MODELS = envModel && !DEFAULT_MODELS.includes(envModel)
@@ -796,6 +794,7 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient()
   const forceTerm = request.nextUrl.searchParams.get('term')
   const forceCountry = request.nextUrl.searchParams.get('country')
+  const forcePageId = request.nextUrl.searchParams.get('page_id') // optional: skip slug lookup
   const onlyEmbed = request.nextUrl.searchParams.get('embed') === '1'
   const onlyClassify = request.nextUrl.searchParams.get('classify') === '1'
   const stream = request.nextUrl.searchParams.get('stream') === '1'
@@ -823,9 +822,9 @@ export async function GET(request: NextRequest) {
 
       try {
         // ── Get terms to crawl ──
-        let termsToRun: { term: string; countries: string[]; id: string; term_type: string }[] = []
+        let termsToRun: { term: string; countries: string[]; id: string; term_type: string; pageId?: string }[] = []
         if (forceTerm) {
-          termsToRun = [{ term: forceTerm, countries: [forceCountry || 'US'], id: 'manual', term_type: 'all' }]
+          termsToRun = [{ term: forceTerm, countries: [forceCountry || 'US'], id: 'manual', term_type: 'all', pageId: forcePageId || undefined }]
         } else {
           const { data: terms } = await admin
             .from('discovery_crawl_terms')
@@ -851,19 +850,26 @@ export async function GET(request: NextRequest) {
         let totalAdsUpserted = 0
 
         // ── Crawl each term × country ──
-        for (const { term, countries, id, term_type } of termsToRun) {
+        for (const { term, countries, id, term_type, pageId: manualPageId } of termsToRun) {
           const countriesToCrawl = forceCountry ? [forceCountry] : (countries || ['US'])
 
           for (const country of countriesToCrawl) {
             send('log', `🔍 Crawling "${term}" [${term_type || 'all'}] / ${country}…`)
 
-            // ── Brand page discovery (logged explicitly so we can debug) ──
-            send('log', `  🔎 Looking up brand page for "${term}" via Graph API…`)
-            const knownBrandPageIds = await findBrandPageIds(term, metaToken)
-            if (knownBrandPageIds.length) {
-              send('log', `  🏷 Brand page_ids found: ${knownBrandPageIds.join(', ')} — will fetch ALL their ads`)
+            // ── Brand page discovery ──────────────────────────────────────
+            let knownBrandPageIds: string[] = []
+            if (manualPageId) {
+              // Admin provided the page_id directly — skip slug lookup entirely
+              knownBrandPageIds = [manualPageId]
+              send('log', `  🏷 Using provided page_id: ${manualPageId} — fetching ALL their ads`)
             } else {
-              send('log', `  ℹ️ No brand page found via slug — using keyword search only`)
+              send('log', `  🔎 Looking up brand page for "${term}"…`)
+              knownBrandPageIds = await findBrandPageIds(term, metaToken)
+              if (knownBrandPageIds.length) {
+                send('log', `  🏷 Brand page_ids found: ${knownBrandPageIds.join(', ')} — fetching ALL their ads`)
+              } else {
+                send('log', `  ℹ️ No brand page found — keyword search only (tip: paste page_id in admin)`)
+              }
             }
 
             const { ads, externalFiltered, error: fetchError } = await fetchAdsForTerm(term, country, metaToken, 'all', admin, knownBrandPageIds)
