@@ -702,16 +702,34 @@ export default function DiscoveryPage() {
     }
   }, [query, searchMode, sort, status, platforms, country, format, industry, dbPage])
 
-  // Fetch ads when query/filters change
+  // Fetch ads when query/filters change — always load DB ads even without a query
   useEffect(() => {
     if (query.trim()) {
       fetchAds(true)
     } else {
+      // Browse mode: load latest indexed ads from DB without a query
       setError('')
-      setRawAds([])
-      setHasMore(false)
       setNextCursor(null)
       setTopBrands([])
+      setLoading(true)
+      const params = new URLSearchParams({ q: '', sort, status, page: '0', ...(platforms.length ? { platforms: platforms.join(',') } : {}) })
+      fetch(`/api/discovery/db-search?${params}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.ads?.length) {
+            setRawAds(d.ads.map((ad: any) => classifyAd({ ...ad, mediaType: ad.format || '' })))
+            setHasMore(d.hasMore)
+            setDbPage(0)
+            setDbTotal(d.total || 0)
+            setTotalInDB(d.totalInDB || 0)
+            setSearchSource('indexed')
+          } else {
+            setRawAds([])
+            setHasMore(false)
+          }
+        })
+        .catch(() => { setRawAds([]); setHasMore(false) })
+        .finally(() => setLoading(false))
     }
   }, [query, searchMode, sort, status, platforms, country])
 
