@@ -566,25 +566,28 @@ function AdCard({ ad }: { ad: Ad }) {
       </div>
 
       {/* ── Visual preview ── */}
-      {/* Always show — brand picture is immediate placeholder; real creative loads on top */}
       <div style={{ position: 'relative', background: '#f1f5f9', overflow: 'hidden', aspectRatio: '4/3', maxHeight: 300 }}>
 
-        {/* ── Brand picture placeholder (always visible while loading) ── */}
+        {/* ── Base layer: always-visible brand initials on colored bg ── */}
+        <div style={{ position: 'absolute', inset: 0, background: avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 48, fontWeight: 800, color: '#dffe95', letterSpacing: -2, opacity: 0.9 }}>{initials}</span>
+        </div>
+
+        {/* ── Brand profile picture — fills the whole preview as cover ── */}
+        {/* Loads instantly (public graph URL, no auth needed); real ad creative replaces it below */}
         {!thumbnail && brandPicture && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
-            <img
-              src={brandPicture}
-              alt={ad.pageName}
-              style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '3px solid #e2e8f0' }}
-              onError={() => {/* silently hide */}}
-            />
-          </div>
+          <img
+            src={brandPicture}
+            alt={ad.pageName}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
         )}
 
-        {/* ── Spinner while fetching (no brand picture available) ── */}
-        {thumbLoading && !thumbnail && !brandPicture && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9' }}>
-            <div style={{ width: 22, height: 22, border: '3px solid #e2e8f0', borderTopColor: '#9ca3af', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        {/* ── Spinner overlay while fetching real creative (faint, on top of brand pic) ── */}
+        {thumbLoading && !thumbnail && (
+          <div style={{ position: 'absolute', bottom: 8, right: 8 }}>
+            <div style={{ width: 16, height: 16, border: '2.5px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           </div>
         )}
 
