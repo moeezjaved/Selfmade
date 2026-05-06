@@ -576,6 +576,7 @@ function AdCard({ ad }: { ad: Ad }) {
 
 // ── Page ─────────────────────────────────────────────────────
 export default function DiscoveryPage() {
+  const router = useRouter()
   const [searchInput, setSearchInput] = useState('')
   const [query, setQuery] = useState('')
   const [rawAds, setRawAds] = useState<Ad[]>([])
