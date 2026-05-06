@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     const angle = searchParams.get('angle') || ''
     const country = searchParams.get('country') || 'US'
     const sort = searchParams.get('sort') || 'recent'
+    const days = parseInt(searchParams.get('days') || '0')
     const page = parseInt(searchParams.get('page') || '0')
     const limit = 40
     const offset = page * limit
@@ -83,6 +84,11 @@ export async function GET(request: NextRequest) {
     if (emotion) baseQuery = baseQuery.contains('emotion', [emotion])
     if (angle) baseQuery = baseQuery.eq('angle', angle)
     if (platforms) baseQuery = baseQuery.overlaps('platforms', platforms.split(','))
+    // Time filter: only ads started within the last N days
+    if (days > 0) {
+      const sinceDate = new Date(Date.now() - days * 86400000).toISOString()
+      baseQuery = baseQuery.gte('start_date', sinceDate)
+    }
 
     // Sort
     if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
