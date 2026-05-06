@@ -62,6 +62,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ terms: data || [] })
   }
 
+  // Returns ads indexed/updated since a given ISO timestamp — used to
+  // show the crawl results preview after a manual run
+  if (action === 'recent_ads') {
+    const since = request.nextUrl.searchParams.get('since')
+    let query = admin
+      .from('discovery_ads_index')
+      .select('ad_id, page_id, page_name, body, title, platforms, is_active, thumbnail_url, snapshot_url, start_date, days_running, format, industries, last_seen')
+      .order('last_seen', { ascending: false })
+      .limit(120)
+    if (since) query = query.gte('last_seen', since)
+    const { data } = await query
+    return NextResponse.json({ ads: data || [] })
+  }
+
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
 
