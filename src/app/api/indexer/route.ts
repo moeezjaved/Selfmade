@@ -303,58 +303,12 @@ function transformAd(ad: any, term: string, country: string) {
     ai_classified: false,
     indexed_at: new Date().toISOString(),
     last_seen: new Date().toISOString(),
+    thumbnail_url: null as string | null,
+    video_url: null as string | null,
   }
 }
 
-// ── Batch thumbnail extraction ───────────────────────────────
-// Scrapes real ad creative images from Facebook snapshot pages.
-// Runs up to 10 in parallel for speed. Only stores confirmed real creative
-// URLs — never the brand profile picture (that's a UI-side fallback only).
-async function extractThumbnailsForNewAds(admin: any, limit = 100): Promise<number> {
-  const { data: ads } = await admin
-    .from('discovery_ads_index')
-    .select('ad_id, page_id, snapshot_url')
-    .is('thumbnail_url', null)
-    .not('snapshot_url', 'eq', '')
-    .not('snapshot_url', 'is', null)
-    .limit(limit)
-
-  if (!ads?.length) return 0
-
-  let count = 0
-  const CONCURRENCY = 10  // parallel scrape requests
-
-  for (let i = 0; i < (ads as any[]).length; i += CONCURRENCY) {
-    const chunk = (ads as any[]).slice(i, i + CONCURRENCY)
-    const results = await Promise.allSettled(
-      chunk.map(async (ad: any) => {
-        // Scrape the Facebook snapshot page for the actual ad creative image/video
-        const urls = [
-          `https://www.facebook.com/ads/library/?id=${ad.ad_id}&country=ALL`,
-          ad.snapshot_url,
-        ].filter(Boolean)
-
-        for (const url of urls) {
-          const html = await fetchHtml(url).catch(() => null)
-          if (!html) continue
-          const { thumbnail, videoUrl } = extractMediaFromHtml(html)
-          if (thumbnail || videoUrl) {
-            await admin.from('discovery_ads_index')
-              .update({ thumbnail_url: thumbnail || null, video_url: videoUrl || null })
-              .eq('ad_id', ad.ad_id)
-            return true
-          }
-        }
-        return false
-      })
-    )
-    count += results.filter(r => r.status === 'fulfilled' && r.value === true).length
-  }
-
-  return count
-}
-
-// ── HTML media extractor (shared with thumbnail API) ─────────
+// ── HTML media extractor ─────────────────────────────────────
 function extractMediaFromHtml(html: string): { thumbnail: string | null; videoUrl: string | null } {
   let thumbnail: string | null = null
   let videoUrl: string | null = null
@@ -405,6 +359,52 @@ async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> 
     if (!res.ok) return null
     return await res.text()
   } catch { return null }
+}
+
+// ── Filter ads to only those with real creatives ─────────────
+// Scrapes snapshot URLs in parallel (10 at a time), returns only ads
+// where we successfully extracted a real image or video URL.
+// Brand profile pictures (graph.facebook.com) do NOT count.
+async function fetchCreativesAndFilter(rawAds: any[], term: string, country: string): Promise<any[]> {
+  const CONCURRENCY = 10
+  const results: any[] = []
+
+  for (let i = 0; i < rawAds.length; i += CONCURRENCY) {
+    const chunk = rawAds.slice(i, i + CONCURRENCY)
+    const settled = await Promise.allSettled(
+      chunk.map(async (ad: any) => {
+        const row = transformAd(ad, term, country)
+        const snapshotUrl = ad.ad_snapshot_url || ''
+
+        // Try snapshot URL and ads library page for real creative
+        const urls = [
+          snapshotUrl,
+          `https://www.facebook.com/ads/library/?id=${ad.id}&country=ALL`,
+        ].filter(Boolean)
+
+        for (const url of urls) {
+          const html = await fetchHtml(url, 6000).catch(() => null)
+          if (!html) continue
+          const { thumbnail, videoUrl } = extractMediaFromHtml(html)
+          if (thumbnail || videoUrl) {
+            row.thumbnail_url = thumbnail || null
+            row.video_url = videoUrl || null
+            row.format = videoUrl ? 'Video' : 'Image'
+            return row  // ✅ has real creative
+          }
+        }
+        return null  // ❌ no real creative found — discard this ad
+      })
+    )
+
+    for (const r of settled) {
+      if (r.status === 'fulfilled' && r.value !== null) {
+        results.push(r.value)
+      }
+    }
+  }
+
+  return results
 }
 
 // ── Generate OpenAI embeddings ───────────────────────────────
@@ -634,17 +634,27 @@ export async function GET(request: NextRequest) {
               continue
             }
 
-            const rows = ads.map((ad: any) => transformAd(ad, term, country))
+            // ── Fetch real ad creatives BEFORE saving ──────────────
+            // Only keep ads where we can extract an actual image or video.
+            // Ads with no real creative are skipped — brand logos don't count.
+            send('log', `  🖼 Fetching creatives for ${ads.length} ads (10 parallel)…`)
+            const rowsWithCreatives = await fetchCreativesAndFilter(ads, term, country)
+            send('log', `  ✅ ${term}/${country}: ${rowsWithCreatives.length}/${ads.length} ads have real creatives`)
+
+            if (!rowsWithCreatives.length) {
+              await admin.from('discovery_crawl_log').insert({ term, country, ads_fetched: ads.length, ads_new: 0, error: 'No real creatives found' })
+              continue
+            }
+
             const { error } = await admin
               .from('discovery_ads_index')
-              .upsert(rows, { onConflict: 'ad_id', ignoreDuplicates: false })
+              .upsert(rowsWithCreatives, { onConflict: 'ad_id', ignoreDuplicates: false })
 
             await admin.from('discovery_crawl_log').insert({
-              term, country, ads_fetched: ads.length, ads_new: error ? 0 : ads.length, error: error?.message,
+              term, country, ads_fetched: ads.length, ads_new: error ? 0 : rowsWithCreatives.length, error: error?.message,
             })
 
-            send('log', `  ✅ ${term}/${country}: ${ads.length} ads`)
-            totalAdsUpserted += ads.length
+            totalAdsUpserted += rowsWithCreatives.length
           }
 
           if (id !== 'manual') {
@@ -652,15 +662,6 @@ export async function GET(request: NextRequest) {
               last_crawled_at: new Date().toISOString(),
             }).eq('id', id)
           }
-        }
-
-        // ── Thumbnail extraction (parallel scraping, all new ads) ──
-        send('log', `🖼 Extracting thumbnails for new ads…`)
-        try {
-          const thumbCount = await extractThumbnailsForNewAds(admin, 100)
-          send('log', `  ✅ ${thumbCount} real ad creatives extracted (rest show brand picture until clicked)`)
-        } catch (e: any) {
-          send('log', `  ⚠️ Thumbnails: ${String(e?.message ?? e)}`)
         }
 
         // ── Embeddings (all unembedded ads) ──
