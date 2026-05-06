@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import BrandDrawer from './BrandDrawer'
 
 // ── Types ────────────────────────────────────────────────────
 interface Ad {
@@ -473,7 +474,7 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[h]
 }
 
-function AdCard({ ad }: { ad: Ad }) {
+function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, name: string) => void }) {
   const router = useRouter()
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
@@ -545,7 +546,7 @@ function AdCard({ ad }: { ad: Ad }) {
           {initials}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <button onClick={() => router.push(`/discovery/brand/${ad.pageId}?name=${encodeURIComponent(ad.pageName)}`)}
+          <button onClick={() => onBrandClick?.(ad.pageId, ad.pageName)}
             style={{ fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', display: 'block', width: '100%', textAlign: 'left' }}>
             {ad.pageName || 'Unknown Brand'}
           </button>
@@ -759,6 +760,12 @@ export default function DiscoveryPage() {
     return () => clearTimeout(timer)
   }, [searchInput])
 
+  // Time filter (All time, 7d, 30d, 90d, 180d)
+  const [timeDays, setTimeDays] = useState(0)
+
+  // Brand drawer
+  const [selectedBrand, setSelectedBrand] = useState<{ pageId: string; name: string } | null>(null)
+
   const [searchSource, setSearchSource] = useState<'indexed' | 'live'>('indexed')
   const [dbPage, setDbPage] = useState(0)
   const [dbTotal, setDbTotal] = useState(0)
@@ -778,6 +785,7 @@ export default function DiscoveryPage() {
         ...(platforms.length ? { platforms: platforms.join(',') } : {}),
         ...(format.length === 1 ? { format: format[0] } : {}),
         ...(industry.length === 1 ? { industry: industry[0] } : {}),
+        ...(timeDays > 0 ? { days: String(timeDays) } : {}),
       })
       const dbRes = await fetch(`/api/discovery/db-search?${dbParams}`)
       const dbData = await dbRes.json()
@@ -817,7 +825,7 @@ export default function DiscoveryPage() {
     } finally {
       setLoading(false)
     }
-  }, [query, searchMode, sort, status, platforms, country, format, industry, dbPage])
+  }, [query, searchMode, sort, status, platforms, country, format, industry, dbPage, timeDays])
 
   // Fetch ads when query/filters change — always load DB ads even without a query
   useEffect(() => {
@@ -829,7 +837,7 @@ export default function DiscoveryPage() {
       setNextCursor(null)
       setTopBrands([])
       setLoading(true)
-      const params = new URLSearchParams({ q: '', sort, status, page: '0', ...(platforms.length ? { platforms: platforms.join(',') } : {}) })
+      const params = new URLSearchParams({ q: '', sort, status, page: '0', ...(platforms.length ? { platforms: platforms.join(',') } : {}), ...(timeDays > 0 ? { days: String(timeDays) } : {}) })
       fetch(`/api/discovery/db-search?${params}`)
         .then(r => r.json())
         .then(d => {
@@ -848,7 +856,7 @@ export default function DiscoveryPage() {
         .catch(() => { setRawAds([]); setHasMore(false) })
         .finally(() => setLoading(false))
     }
-  }, [query, searchMode, sort, status, platforms, country])
+  }, [query, searchMode, sort, status, platforms, country, timeDays])
 
   // Fetch top brands strip when query changes
   useEffect(() => {
@@ -904,7 +912,16 @@ export default function DiscoveryPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } } .hide-scrollbar::-webkit-scrollbar { display: none } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none }`}</style>
+
+      {/* Brand Drawer */}
+      {selectedBrand && (
+        <BrandDrawer
+          pageId={selectedBrand.pageId}
+          pageName={selectedBrand.name}
+          onClose={() => setSelectedBrand(null)}
+        />
+      )}
 
       {/* ── Header ── */}
       <div style={{ borderBottom: '1px solid #e2e8f0', background: '#fff', padding: '14px 24px', position: 'sticky', top: 0, zIndex: 40 }}>
@@ -1005,7 +1022,7 @@ export default function DiscoveryPage() {
                   )}
                   {!dropdownLoading && dropdownBrands.map(brand => (
                     <button key={brand.pageId}
-                      onMouseDown={e => { e.preventDefault(); router.push(`/discovery/brand/${brand.pageId}?name=${encodeURIComponent(brand.name)}`); setShowDropdown(false) }}
+                      onMouseDown={e => { e.preventDefault(); setSelectedBrand({ pageId: brand.pageId, name: brand.name }); setShowDropdown(false) }}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
@@ -1054,7 +1071,29 @@ export default function DiscoveryPage() {
           </button>
         </div>
 
-        {/* Row 2: filters */}
+        {/* Row 2: Time filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 8 }}>
+          {[
+            { label: 'All time', days: 0 },
+            { label: '7d', days: 7 },
+            { label: '30d', days: 30 },
+            { label: '90d', days: 90 },
+            { label: '180d', days: 180 },
+          ].map(f => (
+            <button key={f.days} onClick={() => setTimeDays(f.days)}
+              style={{
+                padding: '5px 13px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+                background: timeDays === f.days ? '#1a3a1a' : 'transparent',
+                color: timeDays === f.days ? '#dffe95' : '#6b7280',
+                border: `1px solid ${timeDays === f.days ? '#1a3a1a' : 'transparent'}`,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Row 3: filters */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Country — server-side, prominent */}
           <CountryDropdown value={country} onChange={v => { setCountry(v); setRawAds([]) }} />
@@ -1246,7 +1285,7 @@ export default function DiscoveryPage() {
               ))}
               {topBrands.map(brand => (
                 <button key={brand.pageId}
-                  onClick={() => router.push(`/discovery/brand/${brand.pageId}?name=${encodeURIComponent(brand.name)}`)}
+                  onClick={() => setSelectedBrand({ pageId: brand.pageId, name: brand.name })}
                   style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minWidth: 140, maxWidth: 200 }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = '#1a3a1a'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}>
@@ -1285,7 +1324,7 @@ export default function DiscoveryPage() {
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-              {filteredAds.map(ad => <AdCard key={ad.id} ad={ad} />)}
+              {filteredAds.map(ad => <AdCard key={ad.id} ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })} />)}
             </div>
             {hasMore && (
               <div style={{ textAlign: 'center', marginTop: 32 }}>

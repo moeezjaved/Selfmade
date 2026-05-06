@@ -225,17 +225,29 @@ export default function IndexerAdminPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {/* Manual run */}
           <div style={card}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>⚡ Manual Crawl</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
-              Crawls using <strong>all 3 modes</strong> simultaneously: ad copy text search, brand page lookup, and category keyword expansion.
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>⚡ Manual Crawl</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+              Enter a <strong>brand name</strong> (e.g. Gymshark) or a <strong>keyword</strong> (e.g. hair growth serum). Crawls all 3 modes simultaneously.
             </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-              <input value={runTerm} onChange={e => setRunTerm(e.target.value)} placeholder="e.g. Nike, fashion, skincare…" style={{ flex: 1, minWidth: 160, padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+            {/* Input row */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <input value={runTerm} onChange={e => setRunTerm(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !running && runCrawler(runTerm || undefined, runCountry)}
+                placeholder="Brand name or keyword…"
+                style={{ flex: 1, minWidth: 200, padding: '9px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
               <select value={runCountry} onChange={e => setRunCountry(e.target.value)} style={{ padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
                 {COUNTRIES.map(c => <option key={c}>{c}</option>)}
               </select>
-              <button onClick={() => runCrawler(runTerm || undefined, runCountry)} disabled={running} style={btn()}>Run</button>
+              <button onClick={() => runCrawler(runTerm || undefined, runCountry)} disabled={running} style={btn()}>
+                {running ? '⏳' : '▶ Crawl'}
+              </button>
             </div>
+            {/* What will happen */}
+            {runTerm && (
+              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                Will search Meta for: <strong>"{runTerm}"</strong> as ad copy text · as brand name · as category keyword
+              </div>
+            )}
             {runLog.length > 0 && (
               <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, maxHeight: 260, overflowY: 'auto' }}>
                 {runLog.map((l, i) => (
