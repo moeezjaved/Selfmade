@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
   if (action === 'add_country') {
     const { id, country } = body
     const { data: term } = await admin.from('discovery_crawl_terms').select('countries').eq('id', id).single()
-    const countries = [...new Set([...(term?.countries || []), country])]
+    const countries = Array.from(new Set([...(term?.countries || []), country]))
     await admin.from('discovery_crawl_terms').update({ countries }).eq('id', id)
     return NextResponse.json({ success: true, countries })
   }
