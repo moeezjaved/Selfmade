@@ -326,8 +326,11 @@ async function fetchAdsForTerm(
         limit: String(ADS_PER_TERM),
       }
       let brandCursor = ''
-      // Fetch up to 10 pages = 500 ads from brand page
-      for (let p = 0; p < PAGES_PER_TERM * 3; p++) {
+      // Fetch ALL pages for brand — no artificial limit.
+      // With active_status=ALL, major brands can have 500-3000+ ads.
+      // attachCreatives is now instant (no ScrapingBee) so we can handle volume.
+      const MAX_BRAND_PAGES = 60 // 60 × 50 = 3000 ads max per brand per run
+      for (let p = 0; p < MAX_BRAND_PAGES; p++) {
         const { ads, nextCursor, hasMore, error } = await fetchOnePage(brandParams, brandCursor)
         if (error) break
         addAds(ads)
