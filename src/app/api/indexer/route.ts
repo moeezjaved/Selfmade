@@ -315,17 +315,19 @@ async function fetchAdsForTerm(
 
     if (pageIds.length) {
       // search_terms is OPTIONAL when search_page_ids is set.
-      // Omitting it returns ALL ads from that page — not just ones mentioning the brand name.
+      // active_status=ALL gets both running and stopped ads — historical winners are valuable.
       const brandParams: Record<string, string> = {
         access_token: token,
         search_page_ids: JSON.stringify(pageIds),
         ad_reached_countries: JSON.stringify([metaCountry]),
+        ad_type: 'ALL',
+        active_status: 'ALL',   // include stopped/paused ads — not just currently active
         fields: META_FIELDS,
         limit: String(ADS_PER_TERM),
       }
       let brandCursor = ''
-      // Fetch up to 6 pages = 300 ads from brand page
-      for (let p = 0; p < PAGES_PER_TERM * 2; p++) {
+      // Fetch up to 10 pages = 500 ads from brand page
+      for (let p = 0; p < PAGES_PER_TERM * 3; p++) {
         const { ads, nextCursor, hasMore, error } = await fetchOnePage(brandParams, brandCursor)
         if (error) break
         addAds(ads)
@@ -576,80 +578,19 @@ async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> 
   return fetchRenderedHtml(url)
 }
 
-// ── Attach creatives to all ads ──────────────────────────────
-// Uses Browserless (headless Chrome) when configured so the full page renders
-// and image/video URLs are extractable. Every ad gets saved — real creative
-// if we can get it, brand profile picture otherwise.
-//
-// Curation: only keeps ads that have been running at least MIN_DAYS_* days.
-//   brand terms   →  7 days  (track known brands closely, catch rising winners early)
-//   category terms → 21 days  (balance volume vs quality for industry crawls)
-//   adcopy terms  →  30 days  (broad keywords — only proven winners worth storing)
+// ── Transform ads and attach brand placeholder thumbnail ─────
+// Creatives are displayed via snapshot_url iframe in the Discovery UI —
+// no scraping needed. We just store the brand profile pic as a placeholder.
 async function attachCreatives(rawAds: any[], term: string, country: string, termType: string = 'adcopy'): Promise<{ rows: any[]; skipped: number }> {
-  const hasBrowserless = !!process.env.BROWSERLESS_TOKEN
-  // With Browserless: 5 parallel (each takes ~5s → 25s per chunk, well within 300s limit)
-  // Without: 10 parallel plain fetches (fast but mostly fail for Facebook SPA)
-  const CONCURRENCY = hasBrowserless ? 5 : 10
-
-  // Pick min-days threshold based on the term's intent
-  const minDays = termType === 'brand'
-    ? MIN_DAYS_BRAND
-    : termType === 'category'
-    ? MIN_DAYS_CATEGORY
-    : MIN_DAYS_ADCOPY
-
-  const results: any[] = []
-  let skipped = 0
-
-  for (let i = 0; i < rawAds.length; i += CONCURRENCY) {
-    const chunk = rawAds.slice(i, i + CONCURRENCY)
-    const settled = await Promise.allSettled(
-      chunk.map(async (ad: any) => {
-        const row = transformAd(ad, term, country)
-
-        // ── Curation gate ─────────────────────────────────────────
-        // Active ads: must have been running for at least minDays to be a proven winner.
-        // Stopped ads: already have a final run duration — keep if they ran long enough
-        //   (shows they were profitable before stopping), discard if they bombed out early.
-        if (row.days_running < minDays) {
-          return null  // too new / too short — not a proven winner yet
-        }
-
-        // Snapshot URL has access_token embedded — best chance of seeing the real ad
-        const snapshotUrl = ad.ad_snapshot_url || ''
-        if (snapshotUrl) {
-          const html = await fetchRenderedHtml(snapshotUrl).catch(() => null)
-          if (html) {
-            const { thumbnail, videoUrl } = extractMediaFromHtml(html)
-            if (thumbnail) { row.thumbnail_url = thumbnail; row.format = videoUrl ? 'Video' : 'Image' }
-            if (videoUrl)  { row.video_url = videoUrl; row.format = 'Video' }
-          }
-        }
-
-        // Fallback: brand profile picture — always available for public FB pages
-        if (!row.thumbnail_url && row.page_id) {
-          row.thumbnail_url = `https://graph.facebook.com/${row.page_id}/picture?type=large`
-        }
-
-        return row
-      })
-    )
-
-    for (const r of settled) {
-      if (r.status === 'fulfilled') {
-        if (r.value !== null) {
-          results.push(r.value)
-        } else {
-          skipped++
-        }
-      }
+  const rows: any[] = []
+  for (const ad of rawAds) {
+    const row = transformAd(ad, term, country)
+    if (!row.thumbnail_url && row.page_id) {
+      row.thumbnail_url = `https://graph.facebook.com/${row.page_id}/picture?type=large`
     }
-
-    // Small delay between chunks to be polite to Facebook
-    if (i + CONCURRENCY < rawAds.length) await new Promise(r => setTimeout(r, 300))
+    rows.push(row)
   }
-
-  return { rows: results, skipped }
+  return { rows, skipped: 0 }
 }
 
 // ── Generate OpenAI embeddings ───────────────────────────────
@@ -905,15 +846,18 @@ export async function GET(request: NextRequest) {
             send('log', `  📸 ${realCreatives} real creatives, ${rows.length - realCreatives} brand logo placeholders`)
 
             // ── Deduplicate by creative content ──────────────────────────
-            // Meta creates multiple ad_ids for the same creative (split-testing audiences/budgets).
-            // We keep one row per unique creative fingerprint: page + body + title.
-            // When duplicates exist, keep the one with the most days_running (most proven).
+            // Only deduplicate when we have real content to fingerprint.
+            // Visual-only ads (empty body/title) each get a unique ad_id key —
+            // they may look the same now but represent different creatives.
             const creativeMap = new Map<string, any>()
             for (const row of rows) {
-              const body100  = (row.body  || '').slice(0, 100).trim()
-              const title50  = (row.title || '').slice(0, 50).trim()
-              const thumb    = (row.thumbnail_url || '').split('?')[0].slice(-40) // last 40 chars of path (stable)
-              const key = `${row.page_id}||${body100}||${title50}||${thumb}`
+              const body  = (row.body  || '').trim()
+              const title = (row.title || '').trim()
+              // Only dedup if we have at least some text to distinguish creatives
+              const hasContent = body.length > 20 || title.length > 5
+              const key = hasContent
+                ? `${row.page_id}||${body.slice(0, 120)}||${title.slice(0, 60)}`
+                : row.ad_id // unique per ad — no dedup for text-empty ads
               const existing = creativeMap.get(key)
               if (!existing || row.days_running > existing.days_running) {
                 creativeMap.set(key, row)
