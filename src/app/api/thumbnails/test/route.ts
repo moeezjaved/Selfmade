@@ -68,17 +68,21 @@ export default async ({ page }) => {
       }
     }
 
+    // Parse size from Facebook's stp param: s600x600 → 600, s60x60 → 60
+    function fbImgSize(src) {
+      const m = src.match(/stp=dst-jpg[^&]*_s(\d+)x\d+/);
+      return m ? parseInt(m[1]) : 300; // unknown size → assume medium
+    }
     let imageUrl = null;
     const imgs = Array.from(document.querySelectorAll('img'));
     const cdnImgs = imgs.filter(img =>
       img.src &&
       (img.src.includes('fbcdn.net') || img.src.includes('scontent')) &&
       !img.src.includes('/emoji') &&
-      !img.src.includes('profile') &&
-      !img.src.includes('picture') &&
-      img.naturalWidth > 50
+      !img.src.includes('hsts-pixel') &&
+      fbImgSize(img.src) >= 200   // skip tiny icons/thumbnails
     );
-    cdnImgs.sort((a, b) => b.naturalWidth - a.naturalWidth);
+    cdnImgs.sort((a, b) => fbImgSize(b.src) - fbImgSize(a.src));
     if (cdnImgs[0]) imageUrl = cdnImgs[0].src;
 
     const allImgSrcs = imgs.slice(0, 10).map(i => i.src).filter(Boolean);
