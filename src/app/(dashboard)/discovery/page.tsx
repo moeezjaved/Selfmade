@@ -561,30 +561,66 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
       {/* ── Visual preview ── */}
       <div ref={previewRef} style={{ position: 'relative', background: avatarBg, overflow: 'hidden', aspectRatio: '4/3', maxHeight: 320 }}>
 
-        {/* ── Brand initials — always visible behind iframe while it loads ── */}
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: 48, fontWeight: 800, color: '#dffe95', letterSpacing: -2, opacity: 0.9 }}>{initials}</span>
-        </div>
+        {/* ── R2 thumbnail (static image stored from Browserless screenshot) ── */}
+        {ad.thumbnailUrl && !ad.thumbnailUrl.includes('graph.facebook.com') && (
+          <img
+            src={ad.thumbnailUrl}
+            alt={ad.pageName}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        )}
 
-        {/* ── Lazy-loaded snapshot iframe — shows real ad image/video ── */}
-        {/* Only renders when card scrolls into view (Intersection Observer) */}
-        {iframeVisible && ad.snapshotUrl && !videoUrl && (
+        {/* ── Lazy-loaded snapshot iframe (image ads, no stored thumbnail) ── */}
+        {/* Only for image/carousel ads — video ads use the overlay below */}
+        {iframeVisible && ad.snapshotUrl && ad.format !== 'Video' && !ad.thumbnailUrl && (
           <iframe
             src={ad.snapshotUrl}
             title={ad.pageName}
             scrolling="no"
             style={{
               position: 'absolute', inset: 0,
-              width: '200%', height: '200%',          // render at 2× size
+              width: '200%', height: '200%',
               border: 'none', background: 'transparent',
-              transform: 'scale(0.5)', transformOrigin: 'top left', // scale down to fit
-              pointerEvents: 'none',                  // card click-through works normally
+              transform: 'scale(0.5)', transformOrigin: 'top left',
+              pointerEvents: 'none',
             }}
             sandbox="allow-scripts allow-same-origin"
           />
         )}
 
-        {/* ── Video player (if video URL stored) ── */}
+        {/* ── Video ads: stored R2 video OR interactive iframe ── */}
+        {ad.format === 'Video' && !videoUrl && ad.snapshotUrl && (
+          <>
+            {/* Show iframe with pointer events ON so the video player is clickable */}
+            {iframeVisible && (
+              <iframe
+                src={ad.snapshotUrl}
+                title={ad.pageName}
+                scrolling="no"
+                allow="autoplay"
+                style={{
+                  position: 'absolute', inset: 0,
+                  width: '200%', height: '200%',
+                  border: 'none', background: 'transparent',
+                  transform: 'scale(0.5)', transformOrigin: 'top left',
+                  pointerEvents: 'auto',     // ← allow clicks so video player works
+                  zIndex: 2,
+                }}
+                sandbox="allow-scripts allow-same-origin allow-popups"
+              />
+            )}
+            {/* Overlay play button — disappears on click so iframe takes over */}
+            {!iframeVisible && (
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.15)' }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
+                  <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── R2 video player (stored video from Browserless extraction) ── */}
         {videoUrl && (
           <>
             <video
@@ -598,7 +634,7 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
             />
             {!playing && (
               <div onClick={() => { setPlaying(true); setTimeout(() => videoRef.current?.play(), 50) }}
-                style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer' }}>
+                style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer', zIndex: 3 }}>
                 <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
                   <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
                 </div>

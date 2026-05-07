@@ -627,61 +627,26 @@ async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> 
 // ── Transform ads and attach creatives ──────────────────────
 // For term/category discovery: iframes (snapshot_url) handle display — brand logo placeholder only.
 // For brand crawls: ScrapingBee is tried as fallback to extract real thumbnail/video URLs,
-// capped at MAX_SB_CALLS per run to stay within Vercel's 300 s route limit.
-// Discovery UI always falls back to iframe if thumbnail is null.
-// Max ScrapingBee calls per attachCreatives pass.
-// Each call takes ~8–35 s; stay conservative so we don't eat the route timeout.
-const MAX_SB_CALLS_PER_CRAWL = 12
-
+// ── Transform ads — no ScrapingBee in the crawl path ─────────
+// Thumbnails are handled by the dedicated /api/thumbnails background job
+// (Browserless screenshot → R2 upload). The crawl just stores metadata.
+// Discovery UI shows snapshot_url iframes until thumbnails are processed.
 async function attachCreatives(
   rawAds: any[],
   term: string,
   country: string,
   termType: string = 'adcopy',
   deadlineMs?: number,
-  hasBrandPageIds: boolean = false, // true when caller had a known page_id
+  hasBrandPageIds: boolean = false,
 ): Promise<{ rows: any[]; skipped: number }> {
   const rows: any[] = []
-  // Trigger ScrapingBee for brand crawls. A "brand crawl" is when:
-  //  - term_type is explicitly 'brand', OR
-  //  - the crawler had a known page_id (hasBrandPageIds=true), meaning we
-  //    fetched directly from a brand's page, not just keyword search.
-  // We do NOT run ScrapingBee for keyword/category searches — iframes handle those.
-  const isBrandCrawl = termType === 'brand' || hasBrandPageIds
-  let sbCalls = 0
-
   for (const ad of rawAds) {
     const row = transformAd(ad, term, country)
-
-    // For brand crawls: try ScrapingBee to extract the real ad creative.
-    // ScrapingBee renders the snapshot_url (Meta's ad preview page) and
-    // extractMediaFromHtml pulls the actual ad image/video from the DOM.
-    // We do NOT fall back to the brand profile pic — that is NOT a creative.
-    // Leave thumbnail_url=null when no real creative found; the Discovery UI
-    // shows the snapshot_url iframe which always renders the actual ad.
-    const nearDeadline = deadlineMs ? Date.now() > deadlineMs : false
-    if (isBrandCrawl && row.snapshot_url && process.env.SCRAPINGBEE_KEY && sbCalls < MAX_SB_CALLS_PER_CRAWL && !nearDeadline) {
-      const html = await fetchRenderedHtml(row.snapshot_url)
-      if (html) {
-        const { thumbnail, videoUrl } = extractMediaFromHtml(html)
-        // Reject page-avatar URLs — they are brand logos, not ad creatives.
-        // Real creatives come from scontent / fbcdn CDNs, not graph.facebook.com.
-        const isRealCreative = (url: string | null) =>
-          url && !url.includes('graph.facebook.com') && !url.includes('/picture')
-        if (isRealCreative(thumbnail)) row.thumbnail_url = thumbnail!
-        if (isRealCreative(videoUrl))  row.video_url = videoUrl!
-        sbCalls++
-      }
-    }
-
-    // DO NOT fall back to brand profile picture — graph.facebook.com/PAGE/picture
-    // is the page avatar (logo), not an ad creative. Saving it causes the
-    // "0 real creatives, 53 brand logo placeholders" problem.
-    // thumbnail_url stays null; the UI renders the snapshot_url iframe instead.
-
+    // thumbnail_url and video_url stay null here.
+    // /api/thumbnails processes them async via Browserless + R2.
+    // The Discovery UI shows snapshot iframe immediately while thumbnails queue.
     rows.push(row)
   }
-
   return { rows, skipped: 0 }
 }
 
@@ -952,12 +917,8 @@ export async function GET(request: NextRequest) {
             }
 
             // ── Attach creatives then save all ads ───────────────────────
-            send('log', `  🖼 Fetching creatives for ${ads.length} ads…`)
-            const { rows, skipped } = await attachCreatives(ads, term, country, term_type || 'adcopy', crawlDeadline - 15_000, knownBrandPageIds.length > 0)
-            const realCreatives = rows.filter(r => r.thumbnail_url && !r.thumbnail_url.includes('graph.facebook.com') && !r.thumbnail_url.includes('/picture')).length
-            const nullThumbs    = rows.filter(r => !r.thumbnail_url).length
-            const sbStatus = process.env.SCRAPINGBEE_KEY ? `ScrapingBee tried on ${Math.min(rows.length, MAX_SB_CALLS_PER_CRAWL)} ads` : 'no ScrapingBee key'
-            send('log', `  📸 ${realCreatives} real creatives, ${nullThumbs} null (iframe fallback) | ${sbStatus}`)
+            const { rows } = await attachCreatives(ads, term, country, term_type || 'adcopy', crawlDeadline - 15_000, knownBrandPageIds.length > 0)
+            send('log', `  📦 ${rows.length} ads transformed — thumbnails queued for /api/thumbnails (Browserless → R2)`)
 
             // ── Deduplicate by ad_archive_id (fallback chain) ────────────
             // Primary key = ad_id (= ad_archive_id from Meta — globally unique).
