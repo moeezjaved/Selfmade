@@ -1,12 +1,44 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
   const supabase = createClient()
   const router = useRouter()
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (cancelled) return
+      if (!user) { router.push('/login'); return }
+      setEmail(user.email || '')
+      // user_metadata holds whatever was set at signup or via updateUser
+      const meta = (user.user_metadata || {}) as Record<string, string>
+      setFullName(meta.full_name || meta.name || '')
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const saveProfile = async () => {
+    setSaving(true)
+    setSaved(false)
+    const { error } = await supabase.auth.updateUser({
+      data: { full_name: fullName },
+    })
+    setSaving(false)
+    if (!error) {
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    }
+  }
 
   const signOut = async () => {
     await supabase.auth.signOut()
@@ -23,10 +55,30 @@ export default function SettingsPage() {
           <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Profile</div>
         </div>
         <div style={{padding:22,display:'flex',flexDirection:'column',gap:14}}>
-          <div><label style={{display:'block',fontSize:12,fontWeight:700,color:'#6b8f6b',marginBottom:6}}>Full Name</label><input className="input" defaultValue="Moeez Javed" style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'#f8fcf6',color:'#1a3a1a',fontSize:14,fontFamily:'inherit',outline:'none'}}/></div>
-          <div><label style={{display:'block',fontSize:12,fontWeight:700,color:'#6b8f6b',marginBottom:6}}>Email</label><input disabled value="moeez@virginteez.com" style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.06)',background:'#f8fcf6',color:'#7a9a7a',fontSize:14,fontFamily:'inherit',outline:'none',cursor:'not-allowed'}}/></div>
-          <button onClick={() => setSaved(true)} style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'10px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer',alignSelf:'flex-start'}}>
-            {saved ? '✓ Saved!' : 'Save Changes'}
+          <div>
+            <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6b8f6b',marginBottom:6}}>Full Name</label>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              disabled={loading}
+              placeholder={loading ? 'Loading…' : 'Your name'}
+              style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'#f8fcf6',color:'#1a3a1a',fontSize:14,fontFamily:'inherit',outline:'none'}}
+            />
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6b8f6b',marginBottom:6}}>Email</label>
+            <input
+              disabled
+              value={loading ? 'Loading…' : email}
+              style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.06)',background:'#f8fcf6',color:'#7a9a7a',fontSize:14,fontFamily:'inherit',outline:'none',cursor:'not-allowed'}}
+            />
+          </div>
+          <button
+            onClick={saveProfile}
+            disabled={saving || loading}
+            style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'10px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:saving||loading?'not-allowed':'pointer',alignSelf:'flex-start',opacity:saving||loading?0.6:1}}
+          >
+            {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Changes'}
           </button>
         </div>
       </div>
