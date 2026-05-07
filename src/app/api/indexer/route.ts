@@ -984,16 +984,27 @@ export async function GET(request: NextRequest) {
             const dupCount = rows.length - dedupedRows.length
             if (dupCount > 0) send('log', `  🔄 ${dupCount} duplicate ad_ids collapsed — ${dedupedRows.length} unique ads`)
 
-            const { error } = await admin
-              .from('discovery_ads_index')
-              .upsert(dedupedRows, { onConflict: 'ad_id', ignoreDuplicates: false })
+            // ── Batch upsert in chunks of 500 ────────────────────────────
+            // Supabase/PostgREST has a request-body size limit; a single
+            // 3000-row upsert can silently fail or timeout. Chunk it.
+            const UPSERT_CHUNK = 500
+            let upsertError: string | undefined
+            let savedCount = 0
+            for (let i = 0; i < dedupedRows.length; i += UPSERT_CHUNK) {
+              const chunk = dedupedRows.slice(i, i + UPSERT_CHUNK)
+              const { error: chunkErr } = await admin
+                .from('discovery_ads_index')
+                .upsert(chunk, { onConflict: 'ad_id', ignoreDuplicates: false })
+              if (chunkErr) { upsertError = chunkErr.message; break }
+              savedCount += chunk.length
+            }
 
             await admin.from('discovery_crawl_log').insert({
-              term, country, ads_fetched: ads.length, ads_new: error ? 0 : dedupedRows.length, error: error?.message,
+              term, country, ads_fetched: ads.length, ads_new: savedCount, error: upsertError,
             })
 
-            send('log', `  ✅ ${term}/${country}: ${dedupedRows.length} unique ads saved`)
-            totalAdsUpserted += rows.length
+            send('log', `  ✅ ${term}/${country}: ${savedCount} unique ads saved${upsertError ? ` (⚠️ partial: ${upsertError})` : ''}`)
+            totalAdsUpserted += savedCount
           }
 
           if (id !== 'manual') {
@@ -1003,13 +1014,20 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // ── Embeddings (all unembedded ads) ──
-        send('log', '🔢 Generating embeddings for all new ads…')
+        // ── Embeddings ────────────────────────────────────────────
+        // For large brand crawls (3000 ads), all 15 batches × 5 s = 75 s.
+        // Stop if we're within 60 s of the route hard deadline so we don't
+        // get killed mid-batch. The ?embed=1 cron will clean up the rest.
+        const EMBED_DEADLINE = crawlDeadline + 60_000 // crawlDeadline + leftover budget
+        send('log', '🔢 Generating embeddings for new ads…')
         let embedded = 0
         try {
-          // Loop until all new ads are embedded (EMBED_BATCH = 200 so usually one pass)
           let batch = 0
           do {
+            if (Date.now() > EMBED_DEADLINE) {
+              send('log', `  ⏰ Embedding budget used — ${embedded} done, remainder queued for next cron (?embed=1)`)
+              break
+            }
             batch = await generateEmbeddings(admin)
             embedded += batch
           } while (batch === EMBED_BATCH)
@@ -1018,15 +1036,26 @@ export async function GET(request: NextRequest) {
           send('log', `  ❌ Embeddings error: ${String(e?.message ?? e)}`)
         }
 
-        // ── Claude classification (loop until all classified) ──
+        // ── Claude classification ─────────────────────────────────
+        // Classification is the slowest step (Claude API round-trips).
+        // For 3000 newly indexed visual ads with empty body, classifyWithClaude
+        // returns 0 immediately (query filters body=''). For text ads it runs.
+        // Stop after CLASSIFY_BATCH × 3 batches max per run; ?classify=1 handles rest.
+        const CLASS_DEADLINE = crawlDeadline + 90_000
         send('log', '🤖 Classifying ads with Claude…')
         let classified = 0
         try {
           let batch = 0
+          let classRuns = 0
           do {
+            if (Date.now() > CLASS_DEADLINE) {
+              send('log', `  ⏰ Classification budget used — ${classified} done, remainder queued for next cron (?classify=1)`)
+              break
+            }
             batch = await classifyWithClaude(admin)
             classified += batch
-          } while (batch === CLASSIFY_BATCH)
+            classRuns++
+          } while (batch === CLASSIFY_BATCH && classRuns < 10)
           send('log', `  ✅ ${classified} ads classified`)
         } catch (e: any) {
           const detail = e?.error?.message || e?.message || String(e)
