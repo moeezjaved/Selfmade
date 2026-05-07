@@ -26,10 +26,9 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
   return false
 }
 
-// Puppeteer script — extract raw CDN image/video URLs from DOM
+// Browserless v2 uses ES module syntax — export default, not module.exports
 const EXTRACT_SCRIPT = (snapshotUrl: string) => `
-module.exports = async ({ page }) => {
-  // Block fonts/CSS to speed up load
+export default async ({ page }) => {
   await page.setRequestInterception(true);
   page.on('request', (r) => {
     const t = r.resourceType();
@@ -48,7 +47,6 @@ module.exports = async ({ page }) => {
     return { error: 'goto_failed: ' + e.message, httpStatus };
   }
 
-  // Wait up to 6s for an fbcdn image or video to appear
   try {
     await page.waitForFunction(() => {
       const img = document.querySelector('img[src*="fbcdn"]') ||
@@ -57,10 +55,9 @@ module.exports = async ({ page }) => {
                   document.querySelector('video source[src*="fbcdn"]');
       return !!(img || vid);
     }, { timeout: 6000 });
-  } catch (_) { /* didn't appear — still try extraction */ }
+  } catch (_) {}
 
   const result = await page.evaluate(() => {
-    // Video URL
     let videoUrl = null;
     const videoEl = document.querySelector('video');
     if (videoEl) {
@@ -71,7 +68,6 @@ module.exports = async ({ page }) => {
       }
     }
 
-    // Image URL — largest fbcdn img that isn't a profile/icon
     let imageUrl = null;
     const imgs = Array.from(document.querySelectorAll('img'));
     const cdnImgs = imgs.filter(img =>
@@ -85,7 +81,6 @@ module.exports = async ({ page }) => {
     cdnImgs.sort((a, b) => b.naturalWidth - a.naturalWidth);
     if (cdnImgs[0]) imageUrl = cdnImgs[0].src;
 
-    // Debug: all img srcs on the page
     const allImgSrcs = imgs.slice(0, 10).map(i => i.src).filter(Boolean);
     const htmlLen = document.documentElement.outerHTML.length;
     const title = document.title;
@@ -112,7 +107,7 @@ async function callBrowserless(
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: EXTRACT_SCRIPT(snapshotUrl), context: {} }),
+        body: JSON.stringify({ code: EXTRACT_SCRIPT(snapshotUrl) }),
         signal: AbortSignal.timeout(35000),
       })
       const body = await res.text()

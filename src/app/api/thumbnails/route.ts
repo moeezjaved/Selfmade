@@ -154,21 +154,18 @@ async function fetchWithBrowserless(snapshotUrl: string): Promise<{ imageUrl: st
   const token = process.env.BROWSERLESS_TOKEN
   if (!token) return { imageUrl: null, videoUrl: null }
   try {
-    const res = await fetch(`https://chrome.browserless.io/function?token=${token}`, {
+    // Browserless v2 uses ES module syntax (not module.exports)
+    const res = await fetch(`https://production-sfo.browserless.io/function?token=${token}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         code: `
-          module.exports = async ({ page }) => {
-            // Block unnecessary resources to speed up load
+          export default async ({ page }) => {
             await page.setRequestInterception(true);
-            page.on('request', (req) => {
-              const type = req.resourceType();
-              if (['font', 'stylesheet'].includes(type)) {
-                req.abort();
-              } else {
-                req.continue();
-              }
+            page.on('request', (r) => {
+              const t = r.resourceType();
+              if (t === 'font' || t === 'stylesheet') r.abort();
+              else r.continue();
             });
 
             await page.goto(${JSON.stringify(snapshotUrl)}, {
@@ -176,33 +173,29 @@ async function fetchWithBrowserless(snapshotUrl: string): Promise<{ imageUrl: st
               timeout: 15000,
             });
 
-            // Wait up to 5s for images/videos to appear in the DOM
             try {
               await page.waitForFunction(
                 () => {
                   const img = document.querySelector('img[src*="fbcdn"]') ||
                               document.querySelector('img[src*="scontent"]');
-                  const vid = document.querySelector('video[src]') ||
-                              document.querySelector('video source[src]');
+                  const vid = document.querySelector('video[src*="fbcdn"]');
                   return !!(img || vid);
                 },
-                { timeout: 5000 }
+                { timeout: 6000 }
               );
-            } catch (_) { /* timeout — still try to extract below */ }
+            } catch (_) {}
 
             return page.evaluate(() => {
-              // Video: prefer highest quality src
               let videoUrl = null;
               const videoEl = document.querySelector('video');
               if (videoEl) {
                 videoUrl = videoEl.src || videoEl.currentSrc || null;
                 if (!videoUrl) {
                   const src = videoEl.querySelector('source');
-                  if (src) videoUrl = src.src || null;
+                  if (src) videoUrl = src.getAttribute('src');
                 }
               }
 
-              // Image: biggest fbcdn image that isn't a profile pic or icon
               let imageUrl = null;
               const imgs = Array.from(document.querySelectorAll('img'));
               const cdnImgs = imgs.filter(img =>
@@ -211,9 +204,8 @@ async function fetchWithBrowserless(snapshotUrl: string): Promise<{ imageUrl: st
                 !img.src.includes('/emoji') &&
                 !img.src.includes('profile') &&
                 !img.src.includes('picture') &&
-                img.naturalWidth > 100
+                img.naturalWidth > 50
               );
-              // Pick the largest image by width
               cdnImgs.sort((a, b) => b.naturalWidth - a.naturalWidth);
               if (cdnImgs[0]) imageUrl = cdnImgs[0].src;
 
@@ -221,7 +213,6 @@ async function fetchWithBrowserless(snapshotUrl: string): Promise<{ imageUrl: st
             });
           };
         `,
-        context: {},
       }),
       signal: AbortSignal.timeout(30000),
     })
