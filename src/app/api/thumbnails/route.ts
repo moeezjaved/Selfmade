@@ -1,42 +1,41 @@
 /**
- * Thumbnail & Video Extractor — background job
+ * Creative Extractor — background job (scalable, no headless Chrome)
  *
- * Processes ads that have snapshot_url but no thumbnail_url.
- * Uses Browserless (real Chrome) to:
- *   1. Navigate to the Meta ad snapshot page
- *   2. For IMAGE ads: screenshot the creative area → upload JPEG to R2
- *   3. For VIDEO ads: extract the <video> src URL → download MP4 → upload to R2
+ * How it works:
+ *  1. Fetch the Meta ad snapshot page via plain HTTP (free, fast, parallelizable)
+ *  2. Parse the inline JSON/HTML to extract the actual CDN URLs:
+ *       Images: scontent.fbcdn.net / scontent-*.fbcdn.net
+ *       Videos: video-*.fbcdn.net / video.fbcdn.net (playable_url)
+ *  3. Download the raw media file directly from Facebook's CDN
+ *  4. Upload to Cloudflare R2 with immutable cache headers
+ *  5. Update discovery_ads_index with permanent R2 URLs
  *
- * Run via: GET /api/thumbnails?secret=CRON_SECRET
- * Or add a Vercel cron: every 30 min → /api/thumbnails
+ * This scales to millions of ads — each ad is 3 HTTP calls (fetch HTML,
+ * download media, upload to R2). No headless Chrome, no screenshots,
+ * no UI chrome captured. Pure raw creative files.
  *
- * Requires env vars:
- *   BROWSERLESS_TOKEN   — Browserless.io API token (runs real Chrome)
- *   R2_ACCOUNT_ID       — Cloudflare R2 account
- *   R2_ACCESS_KEY_ID
- *   R2_SECRET_ACCESS_KEY
- *   R2_BUCKET_NAME      — e.g. "selfmade-ads"
- *   R2_PUBLIC_URL       — public URL prefix, e.g. "https://cdn.tryselfmade.ai"
+ * Run via: GET /api/thumbnails?secret=CRON_SECRET&batch=100
+ * Add to vercel.json cron every 5 min to continuously drain the queue.
  *
- * Falls back gracefully if Browserless or R2 is not configured.
+ * Requires:
+ *   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+ *   R2_BUCKET_NAME, R2_PUBLIC_URL
+ * Optional (for ads where plain fetch fails):
+ *   BROWSERLESS_TOKEN (fallback for JS-heavy pages)
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
-import { uploadToR2, isR2Configured } from '@/lib/r2'
+import { isR2Configured } from '@/lib/r2'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
-
-const BATCH = 30          // ads to process per run (Browserless ~5s each → 150s total)
-const SCREENSHOT_TIMEOUT = 20_000  // 20s per ad max
 
 // ── Auth ─────────────────────────────────────────────────────
 async function isAuthorized(req: NextRequest): Promise<boolean> {
   const secret = req.nextUrl.searchParams.get('secret')
   const cronSecret = process.env.CRON_SECRET
   if (!cronSecret || secret === cronSecret) return true
-  const header = req.headers.get('authorization')
-  if (header === `Bearer ${cronSecret}`) return true
+  if (req.headers.get('authorization') === `Bearer ${cronSecret}`) return true
   try {
     const sb = await createClient()
     const { data: { user } } = await sb.auth.getUser()
@@ -45,47 +44,112 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
   return false
 }
 
-// ── Browserless screenshot ────────────────────────────────────
-// Renders the Meta snapshot URL with real Chrome and returns a JPEG buffer.
-async function screenshotAd(snapshotUrl: string): Promise<Buffer | null> {
-  const token = process.env.BROWSERLESS_TOKEN
-  if (!token) return null
+// ── Decode Facebook's escaped JSON strings ────────────────────
+function decFb(s: string): string {
+  return s
+    .replace(/\\u0026/g, '&')
+    .replace(/\\u003C/g, '<')
+    .replace(/\\u003E/g, '>')
+    .replace(/\\u0025/g, '%')
+    .replace(/&amp;/g, '&')
+    .replace(/\\"/g, '"')
+    .replace(/\\\//g, '/')
+}
+
+// ── Extract raw CDN URLs from Meta snapshot page HTML ─────────
+// Meta's snapshot pages include the creative data as inline JSON in
+// <script> tags even before JavaScript executes. We parse that data
+// to get the actual scontent/video CDN URLs for the raw creative file.
+function extractCDNUrls(html: string): { imageUrl: string | null; videoUrl: string | null } {
+  let imageUrl: string | null = null
+  let videoUrl: string | null = null
+
+  // ── Video: playable_url is embedded in inline JSON ───────────
+  const videoPatterns: RegExp[] = [
+    /"playable_url"\s*:\s*"(https?:\\?\/\\?\/video[^"\\]{10,})"/,
+    /"playable_url_quality_hd"\s*:\s*"(https?:\\?\/\\?\/video[^"\\]{10,})"/,
+    /"hd_src"\s*:\s*"(https?:\\?\/\\?\/video[^"\\]{10,})"/,
+    /"sd_src"\s*:\s*"(https?:\\?\/\\?\/video[^"\\]{10,})"/,
+    /"browser_native_hd_url"\s*:\s*"(https?:\\?\/\\?\/video[^"\\]{10,})"/,
+    /"browser_native_sd_url"\s*:\s*"(https?:\\?\/\\?\/video[^"\\]{10,})"/,
+  ]
+  for (const pat of videoPatterns) {
+    const m = html.match(pat)
+    if (m?.[1]) {
+      const url = decFb(m[1])
+      if (url.includes('fbcdn.net') || url.includes('facebook.com')) {
+        videoUrl = url
+        break
+      }
+    }
+  }
+
+  // ── Image: scontent CDN URLs in inline JSON or og:image ──────
+  const imagePatterns: RegExp[] = [
+    // og:image meta tag (server-rendered, most reliable)
+    /property="og:image"\s+content="([^"]+)"/,
+    /content="([^"]+)"\s+property="og:image"/,
+    // Inline JSON patterns
+    /"uri"\s*:\s*"(https?:\\?\/\\?\/scontent[^"\\]{20,}\.(?:jpg|jpeg|png|webp)[^"\\]*)"/i,
+    /"image_url"\s*:\s*"(https?:\\?\/\\?\/scontent[^"\\]{20,})"/i,
+    /"resized_image_url"\s*:\s*"(https?:\\?\/\\?\/scontent[^"\\]{20,})"/i,
+    /"thumbnail_url"\s*:\s*"(https?:\\?\/\\?\/scontent[^"\\]{20,})"/i,
+    /"imageURL"\s*:\s*"(https?:\\?\/\\?\/[^"\\]*fbcdn[^"\\]{20,}\.(?:jpg|jpeg|png|webp)[^"\\]*)"/i,
+    // Direct scontent URL in any quoted context
+    /"(https?:\\?\/\\?\/scontent[^"\\]{30,}\.(?:jpg|jpeg|png)[^"\\]*)"/i,
+  ]
+  for (const pat of imagePatterns) {
+    const m = html.match(pat)
+    const raw = m?.[1]
+    if (!raw) continue
+    const url = decFb(raw)
+    // Must be a real CDN URL, not an emoji/icon/avatar
+    if (
+      url.startsWith('http') &&
+      (url.includes('fbcdn.net') || url.includes('scontent')) &&
+      !url.includes('/emoji') &&
+      !url.includes('profile') &&
+      !url.includes('picture') &&
+      url.length > 40
+    ) {
+      imageUrl = url
+      break
+    }
+  }
+
+  return { imageUrl, videoUrl }
+}
+
+// ── Fetch the snapshot page HTML ─────────────────────────────
+// Plain HTTP fetch — no headless Chrome, no cost, parallelizable.
+// Facebook SSR includes creative data in inline <script> JSON for most ads.
+async function fetchSnapshotHtml(snapshotUrl: string): Promise<string | null> {
   try {
-    const res = await fetch(`https://chrome.browserless.io/screenshot?token=${token}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url: snapshotUrl,
-        gotoOptions: { waitUntil: 'networkidle2', timeout: 15000 },
-        waitFor: 3000,           // let ad creative fully render
-        options: {
-          type: 'jpeg',
-          quality: 85,
-          // Clip to the creative area — Meta's snapshot page shows the ad
-          // centered in the viewport. Capture the top portion where the creative is.
-          clip: { x: 0, y: 0, width: 540, height: 540 },
-          fullPage: false,
-        },
-        viewport: { width: 540, height: 800 },
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      }),
-      signal: AbortSignal.timeout(SCREENSHOT_TIMEOUT),
+    const res = await fetch(snapshotUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+      },
+      signal: AbortSignal.timeout(12000),
     })
     if (!res.ok) return null
-    const buf = await res.arrayBuffer()
-    if (buf.byteLength < 5000) return null  // empty/broken screenshot
-    return Buffer.from(buf)
+    return await res.text()
   } catch {
     return null
   }
 }
 
-// ── Browserless video URL extraction ────────────────────────
-// Renders the snapshot page, evaluates JS to find the <video> src,
-// and returns the direct fbcdn.net video URL.
-async function extractVideoUrl(snapshotUrl: string): Promise<string | null> {
+// ── Browserless fallback (JS execution for hard cases) ───────
+// Only used when plain fetch returns no media URLs (video-heavy ads).
+// More expensive but handles dynamic pages.
+async function fetchWithBrowserless(snapshotUrl: string): Promise<{ imageUrl: string | null; videoUrl: string | null }> {
   const token = process.env.BROWSERLESS_TOKEN
-  if (!token) return null
+  if (!token) return { imageUrl: null, videoUrl: null }
   try {
     const res = await fetch(`https://chrome.browserless.io/function?token=${token}`, {
       method: 'POST',
@@ -93,44 +157,65 @@ async function extractVideoUrl(snapshotUrl: string): Promise<string | null> {
       body: JSON.stringify({
         code: `
           module.exports = async ({ page }) => {
-            await page.goto(${JSON.stringify(snapshotUrl)}, { waitUntil: 'networkidle2', timeout: 15000 });
-            await page.waitForTimeout(3000);
-            // Try to find video element src
-            const videoSrc = await page.evaluate(() => {
-              const v = document.querySelector('video');
-              return v ? (v.src || v.currentSrc || null) : null;
+            await page.goto(${JSON.stringify(snapshotUrl)}, {
+              waitUntil: 'networkidle2', timeout: 15000
             });
-            if (videoSrc && videoSrc.includes('fbcdn.net')) return { videoSrc };
-            // Fallback: search in page source for playable_url
-            const html = await page.content();
-            const m = html.match(/"playable_url":"([^"]+)"/);
-            return { videoSrc: m ? m[1].replace(/\\\\u0026/g, '&').replace(/\\\\\//g, '/') : null };
+            await new Promise(r => setTimeout(r, 2500));
+            return await page.evaluate(() => {
+              const video = document.querySelector('video');
+              const img = document.querySelector('img[src*="fbcdn"]') ||
+                          document.querySelector('img[src*="scontent"]');
+              return {
+                videoUrl: video ? (video.src || video.currentSrc) : null,
+                imageUrl: img ? img.src : null,
+              };
+            });
           };
         `,
         context: {},
       }),
-      signal: AbortSignal.timeout(SCREENSHOT_TIMEOUT),
+      signal: AbortSignal.timeout(25000),
     })
-    if (!res.ok) return null
-    const json = await res.json() as { videoSrc?: string | null }
-    const url = json?.videoSrc
-    if (!url || !url.includes('fbcdn.net')) return null
-    return url
+    if (!res.ok) return { imageUrl: null, videoUrl: null }
+    const json = await res.json() as { videoUrl?: string; imageUrl?: string }
+    return {
+      videoUrl: json?.videoUrl?.includes('fbcdn') ? json.videoUrl : null,
+      imageUrl: json?.imageUrl?.includes('fbcdn') ? json.imageUrl : null,
+    }
   } catch {
-    return null
+    return { imageUrl: null, videoUrl: null }
   }
 }
 
-// ── Upload Buffer to R2 ───────────────────────────────────────
-async function uploadBufferToR2(
-  buffer: Buffer,
+// ── Download from CDN and upload to R2 ───────────────────────
+async function downloadAndUploadToR2(
+  cdnUrl: string,
   key: string,
   contentType: string,
 ): Promise<string | null> {
   const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
-  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL } = process.env
+  const {
+    R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+    R2_BUCKET_NAME, R2_PUBLIC_URL,
+  } = process.env
   if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME || !R2_PUBLIC_URL) return null
+
   try {
+    // Download the raw file from Facebook's CDN
+    const mediaRes = await fetch(cdnUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Referer': 'https://www.facebook.com/',
+        'Accept': contentType.startsWith('video') ? 'video/*,*/*;q=0.8' : 'image/*,*/*;q=0.8',
+      },
+      signal: AbortSignal.timeout(30000),
+    })
+    if (!mediaRes.ok) return null
+
+    const buffer = Buffer.from(await mediaRes.arrayBuffer())
+    if (buffer.byteLength < 2000) return null // skip empty/broken files
+
+    // Upload to R2
     const client = new S3Client({
       region: 'auto',
       endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -143,10 +228,47 @@ async function uploadBufferToR2(
       ContentType: contentType,
       CacheControl: 'public, max-age=31536000, immutable',
     }))
+
     return `${R2_PUBLIC_URL.replace(/\/$/, '')}/${key}`
   } catch {
     return null
   }
+}
+
+// ── Process a single ad ───────────────────────────────────────
+async function processAd(ad: {
+  ad_id: string
+  snapshot_url: string
+  format: string | null
+}): Promise<{ thumbnail: string | null; video: string | null; method: string }> {
+  const isVideo = (ad.format || '').toLowerCase().includes('video')
+
+  // Step 1: plain HTTP fetch (free, fast, scales to millions)
+  const html = await fetchSnapshotHtml(ad.snapshot_url)
+  let imageUrl: string | null = null
+  let videoUrl: string | null = null
+
+  if (html) {
+    const extracted = extractCDNUrls(html);
+    ({ imageUrl, videoUrl } = extracted)
+  }
+
+  // Step 2: Browserless fallback only when plain fetch got nothing
+  // (mainly for video ads where playable_url is loaded dynamically)
+  if (isVideo && !videoUrl && process.env.BROWSERLESS_TOKEN) {
+    const blResult = await fetchWithBrowserless(ad.snapshot_url)
+    if (blResult.videoUrl) videoUrl = blResult.videoUrl
+    if (blResult.imageUrl && !imageUrl) imageUrl = blResult.imageUrl
+  }
+
+  // Step 3: download from CDN + upload to R2
+  const [thumbR2, videoR2] = await Promise.all([
+    imageUrl ? downloadAndUploadToR2(imageUrl, `thumbnails/${ad.ad_id}.jpg`, 'image/jpeg') : Promise.resolve(null),
+    videoUrl ? downloadAndUploadToR2(videoUrl, `videos/${ad.ad_id}.mp4`, 'video/mp4')   : Promise.resolve(null),
+  ])
+
+  const method = videoUrl ? (process.env.BROWSERLESS_TOKEN && !html?.includes('playable_url') ? 'browserless' : 'html-parse') : 'html-parse'
+  return { thumbnail: thumbR2, video: videoR2, method }
 }
 
 // ── Main handler ─────────────────────────────────────────────
@@ -155,93 +277,75 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const blToken = process.env.BROWSERLESS_TOKEN
-  const r2Ready = isR2Configured()
-
-  if (!blToken) {
+  if (!isR2Configured()) {
     return NextResponse.json({
-      error: 'BROWSERLESS_TOKEN not set — add it in Vercel env vars',
-      hint: 'Sign up at browserless.io ($29/mo) for real Chrome rendering',
-    }, { status: 501 })
-  }
-  if (!r2Ready) {
-    return NextResponse.json({
-      error: 'R2 not configured — add R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL to Vercel env vars',
+      error: 'R2 not configured',
+      required: ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL'],
+      hint: 'Add these to Vercel env vars. R2 free tier: 10GB storage, unlimited egress.',
     }, { status: 501 })
   }
 
   const admin = createAdminClient()
+  const batchSize = Math.min(parseInt(req.nextUrl.searchParams.get('batch') || '50'), 200)
+  const onlyVideos = req.nextUrl.searchParams.get('videos') === '1'
 
-  // Fetch ads that have snapshot_url but no real thumbnail
-  const { data: ads } = await admin
+  // Fetch ads that need thumbnail processing
+  let query = admin
     .from('discovery_ads_index')
-    .select('ad_id, snapshot_url, format, page_id')
+    .select('ad_id, snapshot_url, format')
     .not('snapshot_url', 'is', null)
     .is('thumbnail_url', null)
     .order('last_seen', { ascending: false })
-    .limit(BATCH)
+    .limit(batchSize)
 
-  if (!ads?.length) {
-    return NextResponse.json({ processed: 0, message: 'No ads need thumbnails' })
-  }
+  if (onlyVideos) query = query.ilike('format', '%video%')
 
-  let thumbnailed = 0
-  let videoed = 0
-  let failed = 0
+  const { data: ads, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!ads?.length) return NextResponse.json({ processed: 0, message: 'No ads need thumbnails' })
 
-  for (const ad of ads) {
-    const isVideo = (ad.format || '').toLowerCase().includes('video')
+  // Process in parallel — concurrency of 10 to avoid CDN rate limits
+  const CONCURRENCY = 10
+  let thumbnailed = 0, videoed = 0, failed = 0
+  const results: { ad_id: string; method: string; ok: boolean }[] = []
 
-    try {
-      if (isVideo) {
-        // ── Video: extract playable URL, download, upload to R2 ──────
-        const videoUrl = await extractVideoUrl(ad.snapshot_url)
-        if (videoUrl) {
-          // Also screenshot for thumbnail
-          const [thumbBuf, videoR2] = await Promise.all([
-            screenshotAd(ad.snapshot_url),
-            uploadToR2(videoUrl, `videos/${ad.ad_id}.mp4`, 'video/mp4'),
-          ])
-          const thumbR2 = thumbBuf
-            ? await uploadBufferToR2(thumbBuf, `thumbnails/${ad.ad_id}.jpg`, 'image/jpeg')
-            : null
+  for (let i = 0; i < ads.length; i += CONCURRENCY) {
+    const batch = ads.slice(i, i + CONCURRENCY)
+    await Promise.all(batch.map(async (ad: { ad_id: string; snapshot_url: string; format: string | null }) => {
+      try {
+        const { thumbnail, video, method } = await processAd(ad)
+        if (thumbnail || video) {
           await admin.from('discovery_ads_index').update({
-            thumbnail_url: thumbR2,
-            video_url: videoR2,
+            ...(thumbnail ? { thumbnail_url: thumbnail } : {}),
+            ...(video    ? { video_url: video }       : {}),
           }).eq('ad_id', ad.ad_id)
-          videoed++
-        } else {
-          // Can't get video URL — just screenshot for thumbnail
-          const thumbBuf = await screenshotAd(ad.snapshot_url)
-          if (thumbBuf) {
-            const thumbR2 = await uploadBufferToR2(thumbBuf, `thumbnails/${ad.ad_id}.jpg`, 'image/jpeg')
-            await admin.from('discovery_ads_index').update({ thumbnail_url: thumbR2 }).eq('ad_id', ad.ad_id)
-            thumbnailed++
-          } else {
-            failed++
-          }
-        }
-      } else {
-        // ── Image: screenshot the rendered ad → upload JPEG to R2 ────
-        const thumbBuf = await screenshotAd(ad.snapshot_url)
-        if (thumbBuf) {
-          const thumbR2 = await uploadBufferToR2(thumbBuf, `thumbnails/${ad.ad_id}.jpg`, 'image/jpeg')
-          await admin.from('discovery_ads_index').update({ thumbnail_url: thumbR2 }).eq('ad_id', ad.ad_id)
-          thumbnailed++
+          if (thumbnail) thumbnailed++
+          if (video) videoed++
+          results.push({ ad_id: ad.ad_id, method, ok: true })
         } else {
           failed++
+          results.push({ ad_id: ad.ad_id, method: 'none', ok: false })
         }
+      } catch {
+        failed++
+        results.push({ ad_id: ad.ad_id, method: 'error', ok: false })
       }
-    } catch {
-      failed++
-    }
+    }))
   }
+
+  // How many still need processing?
+  const { count: remaining } = await admin
+    .from('discovery_ads_index')
+    .select('*', { count: 'exact', head: true })
+    .is('thumbnail_url', null)
+    .not('snapshot_url', 'is', null)
 
   return NextResponse.json({
     processed: ads.length,
     thumbnailed,
     videoed,
     failed,
-    message: `${thumbnailed} image thumbnails + ${videoed} videos uploaded to R2. ${failed} failed.`,
+    remaining: remaining ?? 0,
+    message: `${thumbnailed} images + ${videoed} videos stored on R2. ${failed} failed. ${remaining ?? 0} remaining in queue.`,
   })
 }
