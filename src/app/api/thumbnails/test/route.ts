@@ -134,33 +134,79 @@ export async function GET(req: NextRequest) {
       status: 'pending',
     }
 
+    const browserlessToken = process.env.BROWSERLESS_TOKEN
+
+    if (!browserlessToken) {
+      result.status = '⚠️ BROWSERLESS_TOKEN not set — add it to Vercel env vars'
+      return result
+    }
+
     try {
-      const res = await fetch(ad.snapshot_url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-        signal: AbortSignal.timeout(12000),
+      const res = await fetch(`https://chrome.browserless.io/function?token=${browserlessToken}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: `
+            module.exports = async ({ page }) => {
+              await page.setRequestInterception(true);
+              page.on('request', (req) => {
+                if (['font', 'stylesheet'].includes(req.resourceType())) req.abort();
+                else req.continue();
+              });
+              const resp = await page.goto(${JSON.stringify(ad.snapshot_url)}, {
+                waitUntil: 'domcontentloaded', timeout: 15000,
+              });
+              const status = resp ? resp.status() : 0;
+              try {
+                await page.waitForFunction(
+                  () => {
+                    const img = document.querySelector('img[src*="fbcdn"]') ||
+                                document.querySelector('img[src*="scontent"]');
+                    const vid = document.querySelector('video[src]');
+                    return !!(img || vid);
+                  },
+                  { timeout: 5000 }
+                );
+              } catch (_) {}
+              const data = await page.evaluate(() => {
+                let videoUrl = null;
+                const videoEl = document.querySelector('video');
+                if (videoEl) videoUrl = videoEl.src || videoEl.currentSrc || null;
+                let imageUrl = null;
+                const imgs = Array.from(document.querySelectorAll('img'));
+                const cdnImgs = imgs.filter(img =>
+                  img.src &&
+                  (img.src.includes('fbcdn.net') || img.src.includes('scontent')) &&
+                  !img.src.includes('/emoji') && !img.src.includes('profile') &&
+                  !img.src.includes('picture') && img.naturalWidth > 100
+                );
+                cdnImgs.sort((a, b) => b.naturalWidth - a.naturalWidth);
+                if (cdnImgs[0]) imageUrl = cdnImgs[0].src;
+                return { videoUrl, imageUrl, htmlLen: document.documentElement.outerHTML.length };
+              });
+              return { ...data, httpStatus: status };
+            };
+          `,
+          context: {},
+        }),
+        signal: AbortSignal.timeout(30000),
       })
 
+      result.html_fetched = res.ok
       if (!res.ok) {
-        result.status = `http_${res.status}`
+        result.status = `browserless_error_${res.status}`
         return result
       }
 
-      const html = await res.text()
-      result.html_fetched = true
-      result.html_bytes = html.length
+      const json = await res.json() as { videoUrl?: string; imageUrl?: string; htmlLen?: number; httpStatus?: number }
+      result.html_bytes = json?.htmlLen || 0
+      result.image_url = json?.imageUrl?.includes('fbcdn') ? json.imageUrl : null
+      result.video_url = json?.videoUrl?.includes('fbcdn') ? json.videoUrl : null
 
-      const { imageUrl, videoUrl } = extractCDNUrls(html)
-      result.image_url = imageUrl
-      result.video_url = videoUrl
-
-      if (imageUrl || videoUrl) {
+      if (result.image_url || result.video_url) {
         result.status = '✅ found'
       } else {
-        result.status = '❌ no_cdn_url_found'
+        result.status = `❌ no_cdn_url (page_http=${json?.httpStatus}, html_len=${json?.htmlLen})`
       }
     } catch (e) {
       result.status = `error: ${e instanceof Error ? e.message : String(e)}`
@@ -177,7 +223,9 @@ export async function GET(req: NextRequest) {
     success_rate: `${Math.round((found / results.length) * 100)}%`,
     results,
     next_step: found > 0
-      ? '✅ Extraction works! Add R2 env vars and hit /api/thumbnails to start storing real creatives.'
-      : '⚠️ No CDN URLs found. Meta may be blocking plain fetch for these ads — try different snapshot URLs or check the HTML.',
+      ? '✅ Browserless extraction works! Now add R2 env vars and hit /api/thumbnails to start storing real creatives.'
+      : results[0]?.status?.includes('BROWSERLESS_TOKEN')
+        ? '👉 Add BROWSERLESS_TOKEN to Vercel env vars first, then re-run this test.'
+        : '⚠️ Browserless loaded the pages but found no CDN image/video URLs. The DOM extractor may need adjusting.',
   })
 }

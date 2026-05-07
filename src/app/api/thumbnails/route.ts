@@ -144,9 +144,12 @@ async function fetchSnapshotHtml(snapshotUrl: string): Promise<string | null> {
   }
 }
 
-// ── Browserless fallback (JS execution for hard cases) ───────
-// Only used when plain fetch returns no media URLs (video-heavy ads).
-// More expensive but handles dynamic pages.
+// ── Browserless: real Chrome → extract CDN URLs from DOM ─────
+// Meta's render_ad endpoint requires a real browser (plain HTTP always
+// returns 400). Browserless loads it in actual Chrome, waits for images
+// and videos to appear in the DOM, then extracts the raw fbcdn.net URLs.
+// No screenshots — just DOM attribute extraction. Fast (~2-3s per ad).
+// 10 concurrent = ~200 ads/min = millions per month on $29/mo plan.
 async function fetchWithBrowserless(snapshotUrl: string): Promise<{ imageUrl: string | null; videoUrl: string | null }> {
   const token = process.env.BROWSERLESS_TOKEN
   if (!token) return { imageUrl: null, videoUrl: null }
@@ -157,24 +160,70 @@ async function fetchWithBrowserless(snapshotUrl: string): Promise<{ imageUrl: st
       body: JSON.stringify({
         code: `
           module.exports = async ({ page }) => {
-            await page.goto(${JSON.stringify(snapshotUrl)}, {
-              waitUntil: 'networkidle2', timeout: 15000
+            // Block unnecessary resources to speed up load
+            await page.setRequestInterception(true);
+            page.on('request', (req) => {
+              const type = req.resourceType();
+              if (['font', 'stylesheet'].includes(type)) {
+                req.abort();
+              } else {
+                req.continue();
+              }
             });
-            await new Promise(r => setTimeout(r, 2500));
-            return await page.evaluate(() => {
-              const video = document.querySelector('video');
-              const img = document.querySelector('img[src*="fbcdn"]') ||
-                          document.querySelector('img[src*="scontent"]');
-              return {
-                videoUrl: video ? (video.src || video.currentSrc) : null,
-                imageUrl: img ? img.src : null,
-              };
+
+            await page.goto(${JSON.stringify(snapshotUrl)}, {
+              waitUntil: 'domcontentloaded',
+              timeout: 15000,
+            });
+
+            // Wait up to 5s for images/videos to appear in the DOM
+            try {
+              await page.waitForFunction(
+                () => {
+                  const img = document.querySelector('img[src*="fbcdn"]') ||
+                              document.querySelector('img[src*="scontent"]');
+                  const vid = document.querySelector('video[src]') ||
+                              document.querySelector('video source[src]');
+                  return !!(img || vid);
+                },
+                { timeout: 5000 }
+              );
+            } catch (_) { /* timeout — still try to extract below */ }
+
+            return page.evaluate(() => {
+              // Video: prefer highest quality src
+              let videoUrl = null;
+              const videoEl = document.querySelector('video');
+              if (videoEl) {
+                videoUrl = videoEl.src || videoEl.currentSrc || null;
+                if (!videoUrl) {
+                  const src = videoEl.querySelector('source');
+                  if (src) videoUrl = src.src || null;
+                }
+              }
+
+              // Image: biggest fbcdn image that isn't a profile pic or icon
+              let imageUrl = null;
+              const imgs = Array.from(document.querySelectorAll('img'));
+              const cdnImgs = imgs.filter(img =>
+                img.src &&
+                (img.src.includes('fbcdn.net') || img.src.includes('scontent')) &&
+                !img.src.includes('/emoji') &&
+                !img.src.includes('profile') &&
+                !img.src.includes('picture') &&
+                img.naturalWidth > 100
+              );
+              // Pick the largest image by width
+              cdnImgs.sort((a, b) => b.naturalWidth - a.naturalWidth);
+              if (cdnImgs[0]) imageUrl = cdnImgs[0].src;
+
+              return { videoUrl, imageUrl };
             });
           };
         `,
         context: {},
       }),
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(30000),
     })
     if (!res.ok) return { imageUrl: null, videoUrl: null }
     const json = await res.json() as { videoUrl?: string; imageUrl?: string }
@@ -236,38 +285,36 @@ async function downloadAndUploadToR2(
 }
 
 // ── Process a single ad ───────────────────────────────────────
+// Meta's render_ad endpoint requires a real browser — plain HTTP always
+// returns 400. So Browserless (real Chrome) is the primary path.
+// Each ad = 1 Browserless call (~2-3s) + 1-2 CDN downloads + 1-2 R2 uploads.
 async function processAd(ad: {
   ad_id: string
   snapshot_url: string
   format: string | null
 }): Promise<{ thumbnail: string | null; video: string | null; method: string }> {
-  const isVideo = (ad.format || '').toLowerCase().includes('video')
-
-  // Step 1: plain HTTP fetch (free, fast, scales to millions)
-  const html = await fetchSnapshotHtml(ad.snapshot_url)
   let imageUrl: string | null = null
   let videoUrl: string | null = null
+  let method = 'none'
 
-  if (html) {
-    const extracted = extractCDNUrls(html);
-    ({ imageUrl, videoUrl } = extracted)
-  }
-
-  // Step 2: Browserless fallback only when plain fetch got nothing
-  // (mainly for video ads where playable_url is loaded dynamically)
-  if (isVideo && !videoUrl && process.env.BROWSERLESS_TOKEN) {
+  // Primary: Browserless real Chrome — extracts raw CDN URLs from DOM
+  if (process.env.BROWSERLESS_TOKEN) {
     const blResult = await fetchWithBrowserless(ad.snapshot_url)
-    if (blResult.videoUrl) videoUrl = blResult.videoUrl
-    if (blResult.imageUrl && !imageUrl) imageUrl = blResult.imageUrl
+    imageUrl = blResult.imageUrl
+    videoUrl = blResult.videoUrl
+    if (imageUrl || videoUrl) method = 'browserless'
   }
 
-  // Step 3: download from CDN + upload to R2
+  if (!imageUrl && !videoUrl) {
+    return { thumbnail: null, video: null, method }
+  }
+
+  // Download raw file from fbcdn.net and upload to R2
   const [thumbR2, videoR2] = await Promise.all([
     imageUrl ? downloadAndUploadToR2(imageUrl, `thumbnails/${ad.ad_id}.jpg`, 'image/jpeg') : Promise.resolve(null),
-    videoUrl ? downloadAndUploadToR2(videoUrl, `videos/${ad.ad_id}.mp4`, 'video/mp4')   : Promise.resolve(null),
+    videoUrl ? downloadAndUploadToR2(videoUrl, `videos/${ad.ad_id}.mp4`, 'video/mp4')     : Promise.resolve(null),
   ])
 
-  const method = videoUrl ? (process.env.BROWSERLESS_TOKEN && !html?.includes('playable_url') ? 'browserless' : 'html-parse') : 'html-parse'
   return { thumbnail: thumbR2, video: videoR2, method }
 }
 
