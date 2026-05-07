@@ -352,7 +352,8 @@ export async function GET(req: NextRequest) {
   if (!ads?.length) return NextResponse.json({ processed: 0, message: 'No ads need thumbnails' })
 
   // Process in parallel — concurrency of 10 to avoid CDN rate limits
-  const CONCURRENCY = 10
+  // Match your Browserless concurrency limit (upgrade plan to increase)
+  const CONCURRENCY = parseInt(process.env.BROWSERLESS_CONCURRENCY || '2')
   let thumbnailed = 0, videoed = 0, failed = 0
   const results: { ad_id: string; method: string; ok: boolean }[] = []
 
