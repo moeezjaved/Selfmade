@@ -186,6 +186,7 @@ async function fetchWithBrowserless(snapshotUrl: string): Promise<{ imageUrl: st
             } catch (_) {}
 
             return page.evaluate(() => {
+              // Video
               let videoUrl = null;
               const videoEl = document.querySelector('video');
               if (videoEl) {
@@ -196,23 +197,17 @@ async function fetchWithBrowserless(snapshotUrl: string): Promise<{ imageUrl: st
                 }
               }
 
-              function fbImgSize(src) {
-                const m = src.match(/stp=dst-jpg[^&]*_s(\d+)x\d+/);
-                return m ? parseInt(m[1]) : 300;
-              }
-              let imageUrl = null;
-              const imgs = Array.from(document.querySelectorAll('img'));
-              const cdnImgs = imgs.filter(img =>
-                img.src &&
-                (img.src.includes('fbcdn.net') || img.src.includes('scontent')) &&
-                !img.src.includes('/emoji') &&
-                !img.src.includes('hsts-pixel') &&
-                fbImgSize(img.src) >= 200
-              );
-              cdnImgs.sort((a, b) => fbImgSize(b.src) - fbImgSize(a.src));
-              if (cdnImgs[0]) imageUrl = cdnImgs[0].src;
+              // Return ALL fbcdn image srcs — server picks the largest
+              const allImgSrcs = Array.from(document.querySelectorAll('img'))
+                .map(img => img.src)
+                .filter(src =>
+                  src &&
+                  (src.includes('fbcdn.net') || src.includes('scontent')) &&
+                  !src.includes('hsts-pixel') &&
+                  !src.includes('/emoji')
+                );
 
-              return { videoUrl, imageUrl };
+              return { videoUrl, allImgSrcs };
             });
           };
         `,
@@ -220,10 +215,18 @@ async function fetchWithBrowserless(snapshotUrl: string): Promise<{ imageUrl: st
       signal: AbortSignal.timeout(30000),
     })
     if (!res.ok) return { imageUrl: null, videoUrl: null }
-    const json = await res.json() as { videoUrl?: string; imageUrl?: string }
+    const json = await res.json() as { videoUrl?: string; allImgSrcs?: string[] }
+
+    // Pick the largest image by parsing the stp size param from the URL
+    // e.g. _s600x600 → 600, _s60x60 → 60
+    const stpSize = (url: string): number => { const m = url.match(/_s(\d+)x\d+/); return m ? parseInt(m[1]) : 0 }
+    const imgs = (json?.allImgSrcs || []).filter((u: string) => u.includes('fbcdn'))
+    imgs.sort((a: string, b: string) => stpSize(b) - stpSize(a))
+    const imageUrl = imgs[0] || null
+
     return {
       videoUrl: json?.videoUrl?.includes('fbcdn') ? json.videoUrl : null,
-      imageUrl: json?.imageUrl?.includes('fbcdn') ? json.imageUrl : null,
+      imageUrl,
     }
   } catch {
     return { imageUrl: null, videoUrl: null }

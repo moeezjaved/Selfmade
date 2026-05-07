@@ -68,28 +68,20 @@ export default async ({ page }) => {
       }
     }
 
-    // Parse size from Facebook's stp param: s600x600 → 600, s60x60 → 60
-    function fbImgSize(src) {
-      const m = src.match(/stp=dst-jpg[^&]*_s(\d+)x\d+/);
-      return m ? parseInt(m[1]) : 300; // unknown size → assume medium
-    }
-    let imageUrl = null;
-    const imgs = Array.from(document.querySelectorAll('img'));
-    const cdnImgs = imgs.filter(img =>
-      img.src &&
-      (img.src.includes('fbcdn.net') || img.src.includes('scontent')) &&
-      !img.src.includes('/emoji') &&
-      !img.src.includes('hsts-pixel') &&
-      fbImgSize(img.src) >= 200   // skip tiny icons/thumbnails
-    );
-    cdnImgs.sort((a, b) => fbImgSize(b.src) - fbImgSize(a.src));
-    if (cdnImgs[0]) imageUrl = cdnImgs[0].src;
+    // Return ALL fbcdn srcs — server picks the largest by stp size param
+    const allImgSrcs = Array.from(document.querySelectorAll('img'))
+      .map(img => img.src)
+      .filter(src =>
+        src &&
+        (src.includes('fbcdn.net') || src.includes('scontent')) &&
+        !src.includes('hsts-pixel') &&
+        !src.includes('/emoji')
+      );
 
-    const allImgSrcs = imgs.slice(0, 10).map(i => i.src).filter(Boolean);
     const htmlLen = document.documentElement.outerHTML.length;
     const title = document.title;
 
-    return { videoUrl, imageUrl, allImgSrcs, htmlLen, title };
+    return { videoUrl, allImgSrcs, htmlLen, title };
   });
 
   return { ...result, httpStatus };
@@ -195,7 +187,13 @@ export async function GET(req: NextRequest) {
       result.debug_img_srcs = json.allImgSrcs
       result.goto_error = json.error || null
 
-      const imgUrl = typeof json.imageUrl === 'string' && json.imageUrl.includes('fbcdn') ? json.imageUrl : null
+      // Pick the largest image by stp size param — done server-side
+      // e.g. _s600x600 → 600, _s60x60 → 60
+      const stpSize = (url: string): number => { const m = url.match(/_s(\d+)x\d+/); return m ? parseInt(m[1]) : 0 }
+      const allImgs = (Array.isArray(json.allImgSrcs) ? json.allImgSrcs as string[] : [])
+        .filter((u: string) => u.includes('fbcdn'))
+      allImgs.sort((a: string, b: string) => stpSize(b) - stpSize(a))
+      const imgUrl = allImgs[0] || null
       const vidUrl = typeof json.videoUrl === 'string' && json.videoUrl.includes('fbcdn') ? json.videoUrl : null
 
       result.image_url = imgUrl
