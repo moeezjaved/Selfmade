@@ -47,15 +47,18 @@ export default async ({ page }) => {
     return { error: 'goto_failed: ' + e.message, httpStatus };
   }
 
+  // Wait for ad creative to load — videos load slower than images
   try {
     await page.waitForFunction(() => {
-      const img = document.querySelector('img[src*="fbcdn"]') ||
-                  document.querySelector('img[src*="scontent"]');
-      const vid = document.querySelector('video[src*="fbcdn"]') ||
-                  document.querySelector('video source[src*="fbcdn"]');
+      const img = Array.from(document.querySelectorAll('img'))
+        .some(i => i.src && i.src.includes('fbcdn') && /_s\d{3,}x\d{3,}/.test(i.src));
+      const vid = document.querySelector('video[src]') ||
+                  document.querySelector('video source[src]');
       return !!(img || vid);
-    }, { timeout: 6000 });
+    }, { timeout: 10000 });
   } catch (_) {}
+  // Extra delay for video element to fully attach src
+  await new Promise(r => setTimeout(r, 1500));
 
   const result = await page.evaluate(() => {
     let videoUrl = null;
@@ -134,14 +137,20 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
   const limit = Math.min(parseInt(req.nextUrl.searchParams.get('limit') || '2'), 5)
+  const formatFilter = req.nextUrl.searchParams.get('format') // 'video' or 'image'
 
-  const { data: ads, error } = await admin
+  let query = admin
     .from('discovery_ads_index')
     .select('ad_id, snapshot_url, format, page_name')
     .not('snapshot_url', 'is', null)
     .is('thumbnail_url', null)
     .order('last_seen', { ascending: false })
     .limit(limit)
+
+  if (formatFilter === 'video') query = query.ilike('format', '%video%')
+  else if (formatFilter === 'image') query = query.ilike('format', '%image%')
+
+  const { data: ads, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!ads?.length) return NextResponse.json({ message: 'No ads found with snapshot URLs' })
