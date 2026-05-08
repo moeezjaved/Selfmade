@@ -68,3 +68,32 @@ export async function getQueueDepth(): Promise<number> {
   if (error) return -1
   return count ?? 0
 }
+
+export interface HeartbeatPayload {
+  worker_id: string
+  hostname: string
+  session_started_at: string  // ISO
+  session_processed: number
+  session_succeeded: number
+  session_failed: number
+  last_batch_size: number
+  last_batch_seconds: number
+  ads_per_min: number
+}
+
+/**
+ * Upsert this worker's heartbeat. Idempotent on worker_id.
+ * Failures are logged but don't break the loop — heartbeats are best-effort.
+ */
+export async function writeHeartbeat(payload: HeartbeatPayload): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('worker_heartbeats')
+    .upsert(
+      {
+        ...payload,
+        last_active_at: new Date().toISOString(),
+      },
+      { onConflict: 'worker_id' },
+    )
+  if (error) console.warn('  ⚠️  heartbeat write failed:', error.message)
+}

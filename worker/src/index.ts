@@ -15,10 +15,15 @@
  *
  * Env vars: see config.ts
  */
+import os from 'node:os'
 import { config } from './config.js'
-import { claimAds, updateAdCreative, getQueueDepth, AdRow } from './db.js'
+import { claimAds, updateAdCreative, getQueueDepth, writeHeartbeat, AdRow } from './db.js'
 import { extractCreative, getBrowser, closeBrowser } from './extract.js'
 import { downloadAndUploadToR2 } from './r2.js'
+
+const WORKER_ID = process.env.WORKER_ID || `worker-${os.hostname()}`
+const HOSTNAME = os.hostname()
+const SESSION_STARTED_AT = new Date().toISOString()
 
 let totalProcessed = 0
 let totalSuccess = 0
@@ -137,6 +142,19 @@ async function loop() {
 
   console.log(`\n✅ Batch done in ${dt.toFixed(1)}s — ${ok} ok, ${fail} failed`)
   console.log(`📊 Lifetime: ${totalSuccess}/${totalProcessed} ok (${((totalSuccess / totalProcessed) * 100).toFixed(0)}%) | ${adsPerMin.toFixed(1)} ads/min | queue: ${remaining} | ETA: ${etaMin.toFixed(0)} min\n`)
+
+  // Best-effort heartbeat for the dashboard
+  await writeHeartbeat({
+    worker_id: WORKER_ID,
+    hostname: HOSTNAME,
+    session_started_at: SESSION_STARTED_AT,
+    session_processed: totalProcessed,
+    session_succeeded: totalSuccess,
+    session_failed: totalFailed,
+    last_batch_size: results.length,
+    last_batch_seconds: parseFloat(dt.toFixed(2)),
+    ads_per_min: parseFloat(adsPerMin.toFixed(2)),
+  })
 
   await sleep(config.batchSleep)
 }
