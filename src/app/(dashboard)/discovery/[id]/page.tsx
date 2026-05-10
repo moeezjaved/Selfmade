@@ -113,7 +113,7 @@ export default function AdDetailPage() {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, background: 'linear-gradient(90deg, #f97316, #ea580c)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, background: '#dffe95', color: '#1a3a1a', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Bookmark size={14} /> Save
           </button>
           <button onClick={copyLink}
@@ -202,7 +202,7 @@ export default function AdDetailPage() {
             <select style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', marginBottom: 14, background: '#fff' }}>
               <option>Select boards</option>
             </select>
-            <button style={{ width: '100%', padding: '10px', background: 'linear-gradient(90deg, #f97316, #ea580c)', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button style={{ width: '100%', padding: '10px', background: '#dffe95', color: '#1a3a1a', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
               Confirm
             </button>
           </div>
@@ -216,8 +216,9 @@ export default function AdDetailPage() {
             </div>
             <button style={{
               width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              background: 'linear-gradient(135deg, #2d1b4e 0%, #4a1a3a 50%, #1a3a1a 100%)',
-              color: '#fff', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              background: 'linear-gradient(135deg, #1a3a1a 0%, #2d5a2d 50%, #dffe95 100%)',
+              color: '#fff', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              boxShadow: '0 4px 14px rgba(26, 58, 26, 0.3)',
             }}>
               <Sparkles size={16} /> Clone ad
             </button>
