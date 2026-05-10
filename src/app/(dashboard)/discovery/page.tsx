@@ -1,10 +1,17 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck } from 'lucide-react'
+import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import BrandDrawer from './BrandDrawer'
 
 // ── Types ────────────────────────────────────────────────────
+interface Creative {
+  position: number
+  asset_type: 'image' | 'video'
+  r2_url: string
+  hash: string | null
+}
+
 interface Ad {
   id: string
   pageId: string
@@ -15,6 +22,7 @@ interface Ad {
   snapshotUrl: string
   thumbnailUrl?: string | null
   videoUrl?: string | null
+  creatives?: Creative[]    // carousel slides (multi-image ads)
   startDate: string
   stopDate: string | null
   platforms: string[]
@@ -96,6 +104,7 @@ function classifyAd(raw: any): Ad {
     ...raw,
     thumbnailUrl: raw.thumbnailUrl || raw.thumbnail_url || null,
     videoUrl: raw.videoUrl || raw.video_url || null,
+    creatives: raw.creatives || [],
     format: detectFormat(raw.mediaType),
     industries: detectIndustries(text),
     themes: detectThemes(text),
@@ -474,6 +483,218 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[h]
 }
 
+// ── 3-dots menu (Atria-style: Ad details, Copy link, Download) ──
+function MoreMenu({ ad }: { ad: Ad }) {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [open])
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(ad.snapshotUrl)
+      setCopied(true)
+      setTimeout(() => { setCopied(false); setOpen(false) }, 1200)
+    } catch { /* clipboard unavailable */ }
+  }
+
+  // Download primary asset (first carousel slide, else thumbnail/video)
+  const downloadAsset = () => {
+    const firstImage = ad.creatives?.find(c => c.asset_type === 'image')?.r2_url || ad.thumbnailUrl
+    const firstVideo = ad.creatives?.find(c => c.asset_type === 'video')?.r2_url || ad.videoUrl
+    const url = firstVideo || firstImage
+    if (!url) return
+    // Open in new tab — browser handles save
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${ad.pageName || 'creative'}-${ad.id}.${url.endsWith('.mp4') ? 'mp4' : 'jpg'}`
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(o => !o)} title="More"
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}>
+        <MoreHorizontal size={16} />
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 160, zIndex: 100, padding: 4, fontFamily: 'inherit' }}>
+          <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 13, color: '#1f2937', textDecoration: 'none', borderRadius: 6, cursor: 'pointer' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <Info size={14} /> Ad details
+          </a>
+          <button onClick={copyLink}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 13, color: '#1f2937', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <LinkIcon size={14} /> {copied ? 'Copied!' : 'Copy link'}
+          </button>
+          <button onClick={downloadAsset}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 13, color: '#1f2937', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <Download size={14} /> Download
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── CarouselViewer ─ swipeable preview for multi-image ads ──
+function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: string; iframeVisible: boolean }) {
+  // Build slide list: prefer creatives[] (full carousel), fall back to legacy single image/video
+  type Slide = { type: 'image' | 'video'; url: string }
+  const slides: Slide[] = useMemo(() => {
+    if (ad.creatives && ad.creatives.length > 0) {
+      const sorted = [...ad.creatives].sort((a, b) => {
+        if (a.asset_type !== b.asset_type) return a.asset_type === 'image' ? -1 : 1
+        return a.position - b.position
+      })
+      return sorted.map((c) => ({ type: c.asset_type, url: c.r2_url }))
+    }
+    const fallback: Slide[] = []
+    if (ad.thumbnailUrl && !ad.thumbnailUrl.includes('graph.facebook.com')) {
+      fallback.push({ type: 'image', url: ad.thumbnailUrl })
+    }
+    if (ad.videoUrl) fallback.push({ type: 'video', url: ad.videoUrl })
+    return fallback
+  }, [ad])
+
+  const [idx, setIdx] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const total = slides.length
+  const slide = slides[idx]
+
+  const next = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i + 1) % total); setPlaying(false) }
+  const prev = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i - 1 + total) % total); setPlaying(false) }
+
+  // No stored creative → fall back to iframe (snapshot)
+  if (!slide && ad.snapshotUrl) {
+    return (
+      <div style={{ position: 'relative', background: avatarBg, overflow: 'hidden', aspectRatio: '4/3', maxHeight: 320 }}>
+        {iframeVisible && (
+          <iframe
+            src={ad.snapshotUrl}
+            title={ad.pageName}
+            scrolling="no"
+            allow="autoplay"
+            style={{
+              position: 'absolute', inset: 0,
+              width: '200%', height: '200%',
+              border: 'none', background: 'transparent',
+              transform: 'scale(0.5)', transformOrigin: 'top left',
+              pointerEvents: ad.format === 'Video' ? 'auto' : 'none',
+            }}
+            sandbox="allow-scripts allow-same-origin allow-popups"
+          />
+        )}
+        {(!iframeVisible || ad.format === 'Video') && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.15)', pointerEvents: 'none' }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
+              <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (!slide) return null
+
+  return (
+    <div style={{ position: 'relative', background: avatarBg, overflow: 'hidden', aspectRatio: '4/3', maxHeight: 320 }}>
+      {slide.type === 'image' ? (
+        <img
+          src={slide.url}
+          alt={ad.pageName}
+          loading="lazy"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : (
+        <>
+          <video
+            ref={videoRef}
+            key={slide.url}
+            src={slide.url}
+            controls={playing}
+            preload="metadata"
+            playsInline
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            onEnded={() => setPlaying(false)}
+          />
+          {!playing && (
+            <div onClick={() => { setPlaying(true); setTimeout(() => videoRef.current?.play(), 50) }}
+              style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer', zIndex: 3 }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
+                <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Carousel arrows + dots */}
+      {total > 1 && (
+        <>
+          <button onClick={prev} aria-label="Previous"
+            style={{
+              position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+              background: 'rgba(255,255,255,0.92)', color: '#111', border: 'none',
+              width: 30, height: 30, borderRadius: '50%', cursor: 'pointer',
+              fontSize: 16, fontWeight: 700, padding: 0, zIndex: 4,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}>‹</button>
+          <button onClick={next} aria-label="Next"
+            style={{
+              position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+              background: 'rgba(255,255,255,0.92)', color: '#111', border: 'none',
+              width: 30, height: 30, borderRadius: '50%', cursor: 'pointer',
+              fontSize: 16, fontWeight: 700, padding: 0, zIndex: 4,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}>›</button>
+          <div style={{ position: 'absolute', bottom: 10, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 5, zIndex: 4 }}>
+            {slides.map((_, i) => (
+              <span key={i} style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: i === idx ? '#fff' : 'rgba(255,255,255,0.5)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.4)',
+              }} />
+            ))}
+          </div>
+          {/* Slide counter */}
+          <div style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', zIndex: 4 }}>
+            {idx + 1} / {total}
+          </div>
+        </>
+      )}
+
+      {/* Format badge (top-right) */}
+      <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 5 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', color: '#fff' }}>
+          {slide.type === 'video' ? '🎬 Video' : total > 1 ? '🔁 Carousel' : '🖼 Image'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, name: string) => void }) {
   const router = useRouter()
   const [showSaveModal, setShowSaveModal] = useState(false)
@@ -527,8 +748,20 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
     >
       {/* ── Brand header ── */}
       <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 38, height: 38, borderRadius: '50%', background: avatarBg, color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0, letterSpacing: '-0.5px' }}>
-          {initials}
+        <div style={{ width: 38, height: 38, borderRadius: '50%', background: avatarBg, color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0, letterSpacing: '-0.5px', overflow: 'hidden', position: 'relative' }}>
+          {brandPicture ? (
+            <>
+              <span style={{ position: 'absolute' }}>{initials}</span>
+              <img
+                src={brandPicture}
+                alt={ad.pageName}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </>
+          ) : (
+            initials
+          )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <button onClick={() => onBrandClick?.(ad.pageId, ad.pageName)}
@@ -546,109 +779,18 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
             ))}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, position: 'relative' }}>
           <button onClick={() => setShowSaveModal(true)} title="Save to board"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#d1d5db', padding: 4, borderRadius: 6, transition: 'color .15s' }}>
-            {isSaved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#9ca3af', padding: 4, borderRadius: 6, transition: 'color .15s' }}>
+            {isSaved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
           </button>
-          <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" title="View on Meta Ads Library"
-            style={{ color: '#d1d5db', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}>
-            <ExternalLink size={15} />
-          </a>
+          <MoreMenu ad={ad} />
         </div>
       </div>
 
-      {/* ── Visual preview ── */}
-      <div ref={previewRef} style={{ position: 'relative', background: avatarBg, overflow: 'hidden', aspectRatio: '4/3', maxHeight: 320 }}>
-
-        {/* ── R2 thumbnail (static image stored from Browserless screenshot) ── */}
-        {ad.thumbnailUrl && !ad.thumbnailUrl.includes('graph.facebook.com') && (
-          <img
-            src={ad.thumbnailUrl}
-            alt={ad.pageName}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        )}
-
-        {/* ── Lazy-loaded snapshot iframe (image ads, no stored thumbnail) ── */}
-        {/* Only for image/carousel ads — video ads use the overlay below */}
-        {iframeVisible && ad.snapshotUrl && ad.format !== 'Video' && !ad.thumbnailUrl && (
-          <iframe
-            src={ad.snapshotUrl}
-            title={ad.pageName}
-            scrolling="no"
-            style={{
-              position: 'absolute', inset: 0,
-              width: '200%', height: '200%',
-              border: 'none', background: 'transparent',
-              transform: 'scale(0.5)', transformOrigin: 'top left',
-              pointerEvents: 'none',
-            }}
-            sandbox="allow-scripts allow-same-origin"
-          />
-        )}
-
-        {/* ── Video ads: stored R2 video OR interactive iframe ── */}
-        {ad.format === 'Video' && !videoUrl && ad.snapshotUrl && (
-          <>
-            {/* Show iframe with pointer events ON so the video player is clickable */}
-            {iframeVisible && (
-              <iframe
-                src={ad.snapshotUrl}
-                title={ad.pageName}
-                scrolling="no"
-                allow="autoplay"
-                style={{
-                  position: 'absolute', inset: 0,
-                  width: '200%', height: '200%',
-                  border: 'none', background: 'transparent',
-                  transform: 'scale(0.5)', transformOrigin: 'top left',
-                  pointerEvents: 'auto',     // ← allow clicks so video player works
-                  zIndex: 2,
-                }}
-                sandbox="allow-scripts allow-same-origin allow-popups"
-              />
-            )}
-            {/* Overlay play button — disappears on click so iframe takes over */}
-            {!iframeVisible && (
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.15)' }}>
-                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
-                  <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ── R2 video player (stored video from Browserless extraction) ── */}
-        {videoUrl && (
-          <>
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              controls={playing}
-              preload="metadata"
-              playsInline
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              onEnded={() => setPlaying(false)}
-            />
-            {!playing && (
-              <div onClick={() => { setPlaying(true); setTimeout(() => videoRef.current?.play(), 50) }}
-                style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer', zIndex: 3 }}>
-                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
-                  <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Format badge */}
-        <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 5 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(0,0,0,0.55)', color: '#fff' }}>
-            {ad.format === 'Video' ? '🎬 Video' : ad.format === 'Carousel' ? '🔁 Carousel' : '🖼 Image'}
-          </span>
-        </div>
+      {/* ── Visual preview (carousel-aware) ── */}
+      <div ref={previewRef}>
+        <CarouselViewer ad={ad} avatarBg={avatarBg} iframeVisible={iframeVisible} />
       </div>
 
       {/* ── Ad copy body ── */}

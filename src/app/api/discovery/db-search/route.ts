@@ -137,6 +137,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // ── Fetch carousel creatives for these ads in one batched call ─────
+    const adIds = ads.map((a: any) => a.ad_id).filter(Boolean)
+    let creativesByAd: Record<string, Array<{ position: number; asset_type: 'image' | 'video'; r2_url: string; hash: string | null }>> = {}
+    if (adIds.length > 0) {
+      const { data: creativesData } = await admin
+        .from('discovery_creatives')
+        .select('ad_id, position, asset_type, r2_url, hash')
+        .in('ad_id', adIds)
+        .order('asset_type', { ascending: true })  // images first, then videos
+        .order('position', { ascending: true })
+      creativesByAd = ((creativesData || []) as any[]).reduce((acc: any, c: any) => {
+        if (!acc[c.ad_id]) acc[c.ad_id] = []
+        acc[c.ad_id].push({
+          position: c.position,
+          asset_type: c.asset_type,
+          r2_url: c.r2_url,
+          hash: c.hash,
+        })
+        return acc
+      }, {})
+    }
+
     // ── Transform results ────────────────────────────────────
     const transformed = ads.map((ad: any) => ({
       id: ad.ad_id,
@@ -149,6 +171,7 @@ export async function GET(request: NextRequest) {
       snapshotUrl: ad.snapshot_url,
       thumbnailUrl: ad.thumbnail_url || null,
       videoUrl: ad.video_url || null,
+      creatives: creativesByAd[ad.ad_id] || [],
       startDate: ad.start_date,
       stopDate: ad.stop_date,
       platforms: ad.platforms || [],
