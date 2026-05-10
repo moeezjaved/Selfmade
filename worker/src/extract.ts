@@ -124,21 +124,32 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
       return { allVideos, allImgSrcs }
     })
 
-    // Filter images: keep only "creative-sized" (stp param ≥ 200) — drops
-    // profile pic icons (s60x60), keeps actual ad slides (s600x600+).
     function stpSize(url: string): number {
       const m = url.match(/_s(\d+)x\d+/)
       return m ? parseInt(m[1], 10) : 0
     }
-    const creativeImages = (data.allImgSrcs || [])
-      .filter((u) => u.includes('fbcdn'))
-      .filter((u) => {
-        const sz = stpSize(u)
-        // No stp param = original (no resize), keep it
-        // s200+ = real creative slide, keep it
-        // smaller = profile/icon, drop
-        return sz === 0 || sz >= 200
-      })
+
+    // Strict filter — only KEEP images that look like real ad creatives.
+    // Reject Meta UI placeholders (static.xx.fbcdn.net + /v/t1.* paths).
+    const isAdCreative = (u: string): boolean => {
+      if (!u) return false
+      // 🚨 Reject Meta static UI assets (cause of placeholder bug)
+      if (u.includes('static.xx.fbcdn')) return false
+      if (u.includes('static.fbcdn')) return false
+      if (u.match(/\/v\/t1\.\d+/)) return false
+      // ✅ Known ad creative paths in Meta CDN
+      if (u.match(/\/v\/t39\.\d+-6\//)) return true
+      if (u.match(/\/v\/t45\.\d+-4\//)) return true
+      // Profile / page picture / cover paths — reject
+      if (u.match(/\/v\/t39\.\d+-1\//)) return false
+      if (u.match(/profile_pic|cover_photo/i)) return false
+      // For unknown paths: only accept if it's clearly large (likely a creative)
+      const sz = stpSize(u)
+      if (sz >= 600) return true
+      // Otherwise reject — too risky to assume
+      return false
+    }
+    const creativeImages = (data.allImgSrcs || []).filter(isAdCreative)
 
     // Dedup by URL — same image sometimes appears multiple times in DOM
     const uniqueImages = Array.from(new Set(creativeImages))
