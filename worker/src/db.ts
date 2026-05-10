@@ -21,12 +21,15 @@ export interface AdRow {
  * Race-safe enough since we update thumbnail_url to a sentinel right after fetching.
  */
 export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<AdRow[]> {
-  // Use `any` to dodge Supabase's overly-deep generic chain
+  // Need ads that have NEITHER an R2 thumbnail NOR an R2 video.
+  // Otherwise video-only ads (where the s60x60 thumb is too small to keep)
+  // get reprocessed forever.
   let query: any = supabase
     .from('discovery_ads_index')
     .select('ad_id, snapshot_url, format, page_name')
     .not('snapshot_url', 'is', null)
     .is('thumbnail_url', null)
+    .is('video_url', null)
     .order('last_seen', { ascending: false })
     .limit(batchSize)
 
@@ -64,6 +67,7 @@ export async function getQueueDepth(): Promise<number> {
     .from('discovery_ads_index')
     .select('*', { count: 'exact', head: true })
     .is('thumbnail_url', null)
+    .is('video_url', null)
     .not('snapshot_url', 'is', null)
   if (error) return -1
   return count ?? 0
