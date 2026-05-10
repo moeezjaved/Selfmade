@@ -37,20 +37,32 @@ interface BackfillStats {
 async function backfillType(
   type: 'image' | 'video',
   stats: BackfillStats,
+  force: boolean,
 ): Promise<void> {
   const urlCol = type === 'image' ? 'thumbnail_url' : 'video_url'
   const hashCol = type === 'image' ? 'image_hash' : 'video_hash'
 
-  console.log(`\n🔄 Backfilling ${type} hashes...`)
+  console.log(`\n🔄 Backfilling ${type} hashes${force ? ' (FORCE re-hash all)' : ''}...`)
+
+  // Cursor for FORCE mode (so we don't re-claim same rows since their hash gets overwritten).
+  let cursorLastSeen: string | null = null
 
   while (true) {
-    // Claim a batch of ads with R2 URL but no hash
-    const { data: ads, error } = await (supabase as any)
+    let q: any = (supabase as any)
       .from('discovery_ads_index')
-      .select(`ad_id, ${urlCol}`)
+      .select(`ad_id, last_seen, ${urlCol}`)
       .like(urlCol, '%r2.dev%')
-      .is(hashCol, null)
+      .order('last_seen', { ascending: false })
       .limit(BATCH_SIZE)
+
+    if (force) {
+      // Walk the table top-down; cursor on last_seen avoids infinite loop
+      if (cursorLastSeen) q = q.lt('last_seen', cursorLastSeen)
+    } else {
+      q = q.is(hashCol, null)
+    }
+
+    const { data: ads, error } = await q
 
     if (error) {
       console.error(`❌ DB error: ${error.message}`)
@@ -106,19 +118,25 @@ async function backfillType(
     await Promise.all(workers)
     console.log(`📊 Lifetime ${type}: ${stats.hashed} hashed, ${stats.failed} failed, ${stats.processed} total`)
 
+    // Advance the cursor for FORCE mode (else infinite loop, since hash is now set)
+    if (force) {
+      cursorLastSeen = (ads[ads.length - 1] as any).last_seen
+    }
+
     // If we got fewer than BATCH_SIZE, we're done
     if (ads.length < BATCH_SIZE) break
   }
 }
 
 async function main() {
-  console.log('🚀 Hash backfill starting…')
+  const force = process.argv.includes('--force') || process.env.BACKFILL_FORCE === '1'
+  console.log(`🚀 Hash backfill starting…${force ? ' (FORCE re-hash all)' : ''}`)
   console.log(`   batch=${BATCH_SIZE} concurrency=${CONCURRENCY}`)
 
   const stats: BackfillStats = { processed: 0, hashed: 0, failed: 0 }
 
-  await backfillType('image', stats)
-  await backfillType('video', stats)
+  await backfillType('image', stats, force)
+  await backfillType('video', stats, force)
 
   console.log('\n🎉 Backfill complete')
   console.log(`   Total processed: ${stats.processed}`)

@@ -11,32 +11,36 @@ import { createHash } from 'node:crypto'
 import sharp from 'sharp'
 
 /**
- * Compute a 64-bit average-hash (a pHash variant) of an image.
- * Resize to 8x8 grayscale, then 1 bit per pixel based on whether
+ * Compute a 256-bit average-hash (pHash variant) of an image.
+ * Resize to 16x16 grayscale, then 1 bit per pixel based on whether
  * the pixel is above or below the mean.
  *
- * Returns 16-char lowercase hex (e.g. "ff00ee2a994c1ed3").
+ * 64-char lowercase hex. 256 bits = ~10^77 possible values, so distinct
+ * creatives are extremely unlikely to accidentally collide. Two visually
+ * identical re-encodes still produce the same/similar hash.
  */
 export async function imageHash(buffer: Buffer): Promise<string | null> {
   try {
+    const SIZE = 16
+    const PX = SIZE * SIZE  // 256
     const { data } = await sharp(buffer, { failOn: 'none' })
-      .resize(8, 8, { fit: 'fill' })
+      .resize(SIZE, SIZE, { fit: 'fill' })
       .grayscale()
       .raw()
       .toBuffer({ resolveWithObject: true })
 
-    if (data.length < 64) return null
+    if (data.length < PX) return null
 
     let total = 0
-    for (let i = 0; i < 64; i++) total += data[i]
-    const avg = total / 64
+    for (let i = 0; i < PX; i++) total += data[i]
+    const avg = total / PX
 
     let bits = ''
-    for (let i = 0; i < 64; i++) bits += data[i] >= avg ? '1' : '0'
+    for (let i = 0; i < PX; i++) bits += data[i] >= avg ? '1' : '0'
 
-    // Convert binary to 16-char hex
+    // Convert binary to 64-char hex (256 bits / 4 bits per hex char)
     let hex = ''
-    for (let i = 0; i < 64; i += 4) {
+    for (let i = 0; i < PX; i += 4) {
       hex += parseInt(bits.slice(i, i + 4), 2).toString(16)
     }
     return hex
