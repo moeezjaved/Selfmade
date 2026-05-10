@@ -564,8 +564,8 @@ function ScriptsMenu() {
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          background: 'linear-gradient(90deg, #f97316, #ea580c)',
-          color: '#fff',
+          background: '#dffe95',
+          color: '#1a3a1a',
           border: 'none',
           padding: '7px 14px',
           borderRadius: 8,
