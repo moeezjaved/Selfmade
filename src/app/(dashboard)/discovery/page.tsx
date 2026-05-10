@@ -789,35 +789,74 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
         </div>
       </div>
 
+      {/* ── Date range (Atria-style) ── */}
+      <div style={{ padding: '0 14px 8px', fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db' }} />
+        <span>
+          {ad.startDate ? new Date(ad.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+          {' – '}
+          {ad.stopDate ? new Date(ad.stopDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Present'}
+        </span>
+      </div>
+
+      {/* ── Ad copy body (above image, Atria-style) ── */}
+      {bodyText && (
+        <div style={{ padding: '0 14px 10px', fontSize: 13, color: '#1f2937', lineHeight: 1.5 }}>
+          <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{displayBody}</div>
+          {isLong && (
+            <button onClick={() => setExpanded(e => !e)}
+              style={{ fontSize: 12, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 0', fontFamily: 'inherit', fontWeight: 600 }}>
+              {expanded ? 'Show less' : 'See more'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Visual preview (carousel-aware) ── */}
       <div ref={previewRef}>
         <CarouselViewer ad={ad} avatarBg={avatarBg} iframeVisible={iframeVisible} />
       </div>
 
-      {/* ── Ad copy body ── */}
-      <div style={{ padding: '0 14px 12px', flex: 1 }}>
-        {bodyText ? (
-          <div>
-            <div style={{ fontSize: 13, color: '#1f2937', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {displayBody}
-            </div>
-            {isLong && (
-              <button onClick={() => setExpanded(e => !e)}
-                style={{ fontSize: 12, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 0', fontFamily: 'inherit', fontWeight: 600 }}>
-                {expanded ? 'Show less' : 'See more'}
-              </button>
+      {/* ── Destination card (Atria-style: domain · headline · description · CTA) ── */}
+      {(ad.caption || ad.title) && (
+        <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {ad.caption && (
+              <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'lowercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {ad.caption}
+              </div>
+            )}
+            {ad.title && (
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {ad.title}
+              </div>
+            )}
+            {(ad as any).description && (
+              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {(ad as any).description}
+              </div>
             )}
           </div>
-        ) : (
-          <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>No ad copy</div>
-        )}
-      </div>
-
-      {/* ── Headline / CTA bar ── */}
-      {(ad.title || ad.caption) && (
-        <div style={{ margin: '0 14px 12px', background: '#f8fafc', borderRadius: 10, padding: '10px 12px', border: '1px solid #f1f5f9' }}>
-          {ad.title && <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.title}</div>}
-          {ad.caption && <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.caption}</div>}
+          <a
+            href={ad.snapshotUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              flexShrink: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              padding: '7px 14px',
+              borderRadius: 8,
+              background: '#fff',
+              border: '1px solid #e2e8f0',
+              color: '#111',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            {(ad as any).cta || 'Learn More'}
+          </a>
         </div>
       )}
 
