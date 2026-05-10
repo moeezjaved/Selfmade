@@ -747,9 +747,9 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
       onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)')}
       onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
     >
-      {/* ── Brand header ── */}
-      <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 38, height: 38, borderRadius: '50%', background: avatarBg, color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0, letterSpacing: '-0.5px', overflow: 'hidden', position: 'relative' }}>
+      {/* ── Brand header (compact) ── */}
+      <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 7 }}>
+        <div style={{ width: 22, height: 22, borderRadius: '50%', background: avatarBg, color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0, letterSpacing: '-0.3px', overflow: 'hidden', position: 'relative' }}>
           {brandPicture ? (
             <>
               <span style={{ position: 'absolute' }}>{initials}</span>
@@ -764,49 +764,37 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
             initials
           )}
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <button onClick={() => onBrandClick?.(ad.pageId, ad.pageName)}
-            style={{ fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', display: 'block', width: '100%', textAlign: 'left' }}>
-            {ad.pageName || 'Unknown Brand'}
-          </button>
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db', display: 'inline-block' }} />
-              {ad.isActive ? 'Active' : 'Inactive'}
-            </span>
-            {ad.daysRunning > 0 && <><span style={{ color: '#d1d5db' }}>·</span><span>🕐 {daysText}</span></>}
-            {ad.platforms.slice(0,2).map(p => (
-              <span key={p} title={PLATFORM_LABELS[p] || p}>{PLATFORM_ICONS[p] || '🌐'}</span>
-            ))}
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, position: 'relative' }}>
+        <button onClick={() => onBrandClick?.(ad.pageId, ad.pageName)}
+          style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', textAlign: 'left' }}>
+          {ad.pageName || 'Unknown Brand'}
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, position: 'relative' }}>
           <button onClick={() => setShowSaveModal(true)} title="Save to board"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#9ca3af', padding: 4, borderRadius: 6, transition: 'color .15s' }}>
-            {isSaved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#9ca3af', padding: 3, borderRadius: 4, transition: 'color .15s' }}>
+            {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
           </button>
           <MoreMenu ad={ad} />
         </div>
       </div>
 
-      {/* ── Date range (Atria-style) ── */}
-      <div style={{ padding: '0 14px 8px', fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db' }} />
+      {/* ── Date range (compact) ── */}
+      <div style={{ padding: '0 10px 6px', fontSize: 10, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db' }} />
         <span>
           {ad.startDate ? new Date(ad.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-          {' – '}
+          {' - '}
           {ad.stopDate ? new Date(ad.stopDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Present'}
         </span>
       </div>
 
-      {/* ── Ad copy body (above image, Atria-style) ── */}
+      {/* ── Ad copy body (compact) ── */}
       {bodyText && (
-        <div style={{ padding: '0 14px 10px', fontSize: 13, color: '#1f2937', lineHeight: 1.5 }}>
-          <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{displayBody}</div>
+        <div style={{ padding: '0 10px 8px', fontSize: 12, color: '#1f2937', lineHeight: 1.4 }}>
+          <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: expanded ? 'none' : 2, WebkitBoxOrient: 'vertical' }}>{bodyText}</div>
           {isLong && (
             <button onClick={() => setExpanded(e => !e)}
-              style={{ fontSize: 12, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 0', fontFamily: 'inherit', fontWeight: 600 }}>
-              {expanded ? 'Show less' : 'See more'}
+              style={{ fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0', fontFamily: 'inherit', fontWeight: 600 }}>
+              {expanded ? 'less' : 'more'}
             </button>
           )}
         </div>
@@ -817,23 +805,18 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
         <CarouselViewer ad={ad} avatarBg={avatarBg} iframeVisible={iframeVisible} />
       </div>
 
-      {/* ── Destination card (Atria-style: domain · headline · description · CTA) ── */}
+      {/* ── Destination card (Atria-style, compact) ── */}
       {(ad.caption || ad.title) && (
-        <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+        <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, background: '#fff' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {ad.caption && (
-              <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'lowercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'lowercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {ad.caption}
               </div>
             )}
             {ad.title && (
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#111', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {ad.title}
-              </div>
-            )}
-            {(ad as any).description && (
-              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {(ad as any).description}
               </div>
             )}
           </div>
@@ -843,11 +826,11 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
             rel="noopener noreferrer"
             style={{
               flexShrink: 0,
-              fontSize: 12,
-              fontWeight: 700,
-              padding: '7px 14px',
-              borderRadius: 8,
-              background: '#fff',
+              fontSize: 10,
+              fontWeight: 600,
+              padding: '5px 10px',
+              borderRadius: 6,
+              background: '#f1f5f9',
               border: '1px solid #e2e8f0',
               color: '#111',
               textDecoration: 'none',
@@ -855,36 +838,12 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
               fontFamily: 'inherit',
             }}
           >
-            {(ad as any).cta || 'Learn More'}
+            {(ad as any).cta || 'Learn more'}
           </a>
         </div>
       )}
 
-      {/* ── Tags + meta footer ── */}
-      <div style={{ padding: '10px 14px 12px', borderTop: '1px solid #f8fafc', marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {/* Themes */}
-        {ad.themes.length > 0 && (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {ad.themes.slice(0, 3).map(t => (
-              <span key={t} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', background: '#f0fdf4', color: '#166534', borderRadius: 100, border: '1px solid #bbf7d0' }}>{t}</span>
-            ))}
-            {ad.industries.slice(0, 1).map(i => (
-              <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', background: '#eff6ff', color: '#1d4ed8', borderRadius: 100, border: '1px solid #bfdbfe' }}>{i}</span>
-            ))}
-          </div>
-        )}
-        {/* Bottom row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', background: ad.format === 'Video' ? '#fef3c7' : ad.format === 'Carousel' ? '#f3e8ff' : '#f1f5f9', color: ad.format === 'Video' ? '#92400e' : ad.format === 'Carousel' ? '#7c3aed' : '#374151', borderRadius: 6 }}>
-              {ad.format === 'Video' ? '🎬' : ad.format === 'Carousel' ? '🔁' : '🖼'} {ad.format}
-            </span>
-          </div>
-          <div style={{ fontSize: 11, color: '#9ca3af' }}>
-            {ad.startDate ? new Date(ad.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : ''}
-          </div>
-        </div>
-      </div>
+      {/* No bottom tags — Atria keeps cards minimal. Format/industry shown in filters. */}
     </div>
     </>
   )
@@ -1521,10 +1480,10 @@ export default function DiscoveryPage() {
               {activeFilterCount > 0 && <span style={{ background: '#f0fdf4', color: '#166534', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
             </div>
-            {/* Masonry layout — variable card heights, image natural aspect */}
-            <div style={{ columnWidth: 280, columnGap: 14, columnFill: 'balance' }}>
+            {/* Masonry layout — Atria-style compact cards */}
+            <div style={{ columnWidth: 215, columnGap: 10, columnFill: 'balance' }}>
               {filteredAds.map(ad => (
-                <div key={ad.id} style={{ breakInside: 'avoid', marginBottom: 14, display: 'inline-block', width: '100%' }}>
+                <div key={ad.id} style={{ breakInside: 'avoid', marginBottom: 10, display: 'inline-block', width: '100%' }}>
                   <AdCard ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })} />
                 </div>
               ))}
