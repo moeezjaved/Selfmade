@@ -65,35 +65,49 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
       return route.continue()
     })
 
-    // Tight timeouts so dead ads (which never load a creative) fail fast.
-    // Live ads usually render fbcdn in 1-3s after domcontentloaded.
+    // Page load — Meta snapshot pages are slow; need 12s headroom.
     let pageStatus = 0
     const resp = await page.goto(snapshotUrl, {
       waitUntil: 'domcontentloaded',
-      timeout: 8_000,
+      timeout: 12_000,
     })
     pageStatus = resp ? resp.status() : 0
 
+    // Wait for an ACTUAL ad creative — not Meta's static UI bundle.
+    // Real ad media is on /v/t39.*-6/ or /v/t45.*-4/ paths and loads
+    // via JS after the initial page shell. Old code proceeded as soon
+    // as any fbcdn image appeared (= the static UI bundle), missing the
+    // real creative entirely.
     let creativeFound = false
     try {
       await page.waitForFunction(
         () => {
+          const isRealCreative = (s: string) =>
+            !!s &&
+            !s.includes('static.xx.fbcdn') &&
+            !s.includes('static.fbcdn') &&
+            !!(s.match(/\/v\/t39\.\d+-6\//) ||
+               s.match(/\/v\/t45\.\d+-4\//))
           const img = Array.from(document.querySelectorAll('img'))
-            .some((i) => i.src && i.src.includes('fbcdn') && /_s\d{3,}x\d{3,}/.test(i.src))
-          const vid = !!document.querySelector('video[src]') ||
-                      !!document.querySelector('video source[src]')
+            .some((i) => isRealCreative((i as HTMLImageElement).src))
+          const vid = Array.from(document.querySelectorAll('video'))
+            .some((v) => {
+              const ve = v as HTMLVideoElement
+              const src = ve.src || ve.currentSrc
+              return !!src && src.includes('fbcdn')
+            })
           return img || vid
         },
-        { timeout: 4_000 } // dead ads fail in 4s instead of 8s
+        { timeout: 10_000 } // longer wait — JS-rendered creatives can take 5-8s
       )
       creativeFound = true
     } catch {
-      /* timeout — almost certainly a dead ad, skip extra wait */
+      /* timeout — likely a dead ad with no real creative ever loading */
     }
 
-    // Only wait extra time if creative showed up (give video src time to attach)
+    // Give video src + carousel slides time to fully attach
     if (creativeFound) {
-      await new Promise(r => setTimeout(r, 1000))
+      await new Promise(r => setTimeout(r, 1500))
     }
 
     const data = await page.evaluate(() => {
