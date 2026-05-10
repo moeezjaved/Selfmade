@@ -124,9 +124,16 @@ export async function GET(request: NextRequest) {
     }
 
     ads = dedupedAds
-    // total reflects unique creatives — approximate by scaling kwCount by dedup ratio
-    const dedupRatio = (keywordData?.length || 1) / Math.max(dedupedAds.length, 1)
-    total = Math.round((kwCount || 0) / dedupRatio)
+    // For accurate "X unique creatives" count, fetch distinct hashes.
+    // Cap at 50K to keep query fast.
+    const { data: hashSample } = await admin
+      .from('discovery_ads_index')
+      .select('image_hash')
+      .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
+      .not('image_hash', 'is', null)
+      .limit(50_000)
+    const uniqueHashCount = new Set((hashSample || []).map((r: any) => r.image_hash)).size
+    total = uniqueHashCount || dedupedAds.length
 
     // ── Semantic re-ranking for multi-word queries (optional, enhances order) ──
     // Only attempt if we have results and OpenAI key — does NOT reduce result count
