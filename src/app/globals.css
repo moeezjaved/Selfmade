@@ -295,3 +295,6 @@
 @keyframes shimmer { from{transform:translateX(-100%);} to{transform:translateX(100%);} }
 @keyframes livepulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(45,122,45,0.4);} 50%{opacity:0.8;box-shadow:0 0 0 4px rgba(45,122,45,0);} }
 @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+
+/* Discovery card hover overlay — show Clone/Scripts button on hover */
+.ad-card-visual:hover .hover-overlay { opacity: 1 !important; }

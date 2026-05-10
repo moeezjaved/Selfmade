@@ -556,6 +556,58 @@ function MoreMenu({ ad }: { ad: Ad }) {
   )
 }
 
+// ── ScriptsMenu (video hover overlay) ──
+function ScriptsMenu() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'linear-gradient(90deg, #f97316, #ea580c)',
+          color: '#fff',
+          border: 'none',
+          padding: '7px 14px',
+          borderRadius: 8,
+          fontSize: 12,
+          fontWeight: 700,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+        }}
+      >
+        Scripts ▾
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, marginTop: 6,
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)', minWidth: 180,
+          padding: 4, zIndex: 100,
+        }}>
+          <button
+            onClick={() => { setOpen(false) }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 12, color: '#1f2937', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            📝 Transcribe Script
+          </button>
+          <button
+            onClick={() => { setOpen(false) }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 12, color: '#1f2937', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            ✨ Create similar scripts
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── CarouselViewer ─ swipeable preview for multi-image ads ──
 function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: string; iframeVisible: boolean }) {
   // Build slide list: prefer creatives[] (full carousel), fall back to legacy single image/video
@@ -620,7 +672,10 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
 
   // Natural aspect ratio — image/video sets the height, no cropping (Atria-style)
   return (
-    <div style={{ position: 'relative', background: '#000', overflow: 'hidden', lineHeight: 0 }}>
+    <div
+      className="ad-card-visual"
+      style={{ position: 'relative', background: '#000', overflow: 'hidden', lineHeight: 0 }}
+    >
       {slide.type === 'image' ? (
         <img
           src={slide.url}
@@ -691,6 +746,50 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', color: '#fff' }}>
           {slide.type === 'video' ? '🎬 Video' : total > 1 ? '🔁 Carousel' : '🖼 Image'}
         </span>
+      </div>
+
+      {/* Hover overlay — Clone ad (image) or Scripts (video) */}
+      <div
+        className="hover-overlay"
+        style={{
+          position: 'absolute', inset: 0,
+          background: 'rgba(0,0,0,0.35)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: 0,
+          transition: 'opacity .15s',
+          pointerEvents: 'none',
+          zIndex: 6,
+        }}
+      >
+        {slide.type === 'video' ? (
+          <div style={{ pointerEvents: 'auto' }}>
+            <ScriptsMenu />
+          </div>
+        ) : (
+          <button
+            onClick={(e) => { e.stopPropagation(); /* Clone wired up later */ }}
+            style={{
+              pointerEvents: 'auto',
+              background: 'linear-gradient(90deg, #f97316, #ea580c)',
+              color: '#fff',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+            }}
+          >
+            <span style={{ fontSize: 14 }}>✨</span> Clone ad
+          </button>
+        )}
       </div>
     </div>
   )
@@ -800,8 +899,17 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
         </div>
       )}
 
-      {/* ── Visual preview (carousel-aware) ── */}
-      <div ref={previewRef}>
+      {/* ── Visual preview (carousel-aware) — clickable to detail page ── */}
+      <div
+        ref={previewRef}
+        onClick={(e) => {
+          // Don't navigate if user clicked an interactive child (button, video controls, etc.)
+          const target = e.target as HTMLElement
+          if (target.closest('button, a, video')) return
+          router.push(`/discovery/${ad.id}`)
+        }}
+        style={{ cursor: 'pointer' }}
+      >
         <CarouselViewer ad={ad} avatarBg={avatarBg} iframeVisible={iframeVisible} />
       </div>
 
