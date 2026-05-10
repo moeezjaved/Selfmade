@@ -37,8 +37,11 @@ interface Sample {
   page_name: string | null
   thumbnail_url: string | null
   video_url: string | null
+  image_hash: string | null
+  video_hash: string | null
   format: string | null
   last_seen: string
+  ad_count: number
 }
 
 interface Data {
@@ -220,31 +223,68 @@ export default function WorkersPage() {
         )}
       </Section>
 
-      {/* Recent processed creatives */}
-      <Section title={`Recently processed (${recent_samples.length})`}>
+      {/* Recent unique creatives (grouped by hash) */}
+      <Section title={`Recent creatives (${recent_samples.length} unique)`}>
         {recent_samples.length === 0 ? (
           <Empty>No creatives stored on R2 yet.</Empty>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
             {recent_samples.map((s) => (
-              <div key={s.ad_id} style={{ background: '#fff', border: '1px solid #e5e5e5', borderRadius: 6, overflow: 'hidden' }}>
+              <div key={s.ad_id} style={{ background: '#fff', border: '1px solid #e5e5e5', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+                {/* Visual: image, or video, or fallback */}
                 {s.thumbnail_url ? (
                   <img
                     src={s.thumbnail_url}
                     alt={s.page_name || s.ad_id}
                     loading="lazy"
-                    style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', background: '#f5f5f5' }}
+                    style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', background: '#000' }}
+                  />
+                ) : s.video_url ? (
+                  <video
+                    src={s.video_url}
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play().catch(() => {})}
+                    onMouseLeave={(e) => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
+                    style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', background: '#000' }}
                   />
                 ) : (
                   <div style={{ width: '100%', aspectRatio: '1/1', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 11 }}>
-                    no image
+                    no media
                   </div>
                 )}
-                <div style={{ padding: '6px 8px', fontSize: 11 }}>
+
+                {/* Ad-count badge: how many ads share this exact creative */}
+                {s.ad_count > 1 && (
+                  <div style={{
+                    position: 'absolute', top: 6, right: 6,
+                    background: 'rgba(0,0,0,0.75)', color: '#fff',
+                    fontSize: 11, fontWeight: 700,
+                    padding: '3px 7px', borderRadius: 12,
+                  }}>
+                    ×{s.ad_count}
+                  </div>
+                )}
+
+                {/* Video icon badge */}
+                {s.video_url && (
+                  <div style={{
+                    position: 'absolute', top: 6, left: 6,
+                    background: 'rgba(0,0,0,0.75)', color: '#fff',
+                    fontSize: 10, fontWeight: 700,
+                    padding: '2px 6px', borderRadius: 8,
+                  }}>
+                    ▶ vid
+                  </div>
+                )}
+
+                <div style={{ padding: '8px 10px', fontSize: 12 }}>
                   <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {s.page_name || '—'}
                   </div>
-                  <div style={{ color: '#999', fontSize: 10 }}>
+                  <div style={{ color: '#999', fontSize: 10, marginTop: 2 }}>
                     {s.format || '—'} · {timeAgo(s.last_seen)}
                   </div>
                 </div>
