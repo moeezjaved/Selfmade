@@ -21,6 +21,10 @@ interface Summary {
   queue_remaining: number
   images_processed: number
   videos_processed: number
+  unique_images: number
+  unique_videos: number
+  dedup_ratio_images: number
+  dedup_ratio_videos: number
   progress_pct: number
   live_worker_count: number
   total_workers_seen: number
@@ -131,14 +135,14 @@ export default function WorkersPage() {
           sub={summary.eta_minutes != null ? `ETA ${formatDuration(summary.eta_minutes * 60)}` : '—'}
         />
         <KPI
-          label="Images on R2"
-          value={formatNum(summary.images_processed)}
-          sub={`of ${formatNum(summary.total_ads)} ads`}
+          label="Image Creatives"
+          value={formatNum(summary.unique_images)}
+          sub={`${formatNum(summary.images_processed)} ads · ${summary.dedup_ratio_images}× dedup`}
         />
         <KPI
-          label="Videos on R2"
-          value={formatNum(summary.videos_processed)}
-          sub="permanent storage"
+          label="Video Creatives"
+          value={formatNum(summary.unique_videos)}
+          sub={`${formatNum(summary.videos_processed)} ads · ${summary.dedup_ratio_videos}× dedup`}
         />
       </div>
 
