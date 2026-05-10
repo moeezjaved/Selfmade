@@ -1,6 +1,6 @@
 # Selfmade Creative Worker — Playwright + Chromium on Debian
 # Use the official Playwright image to skip the painful system-deps install.
-FROM mcr.microsoft.com/playwright:v1.49.0-jammy
+FROM mcr.microsoft.com/playwright:v1.59.1-jammy
 
 WORKDIR /app
 
