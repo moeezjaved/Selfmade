@@ -67,13 +67,24 @@ export async function updateAdCreative(
 }
 
 /**
- * Look up an existing R2 URL for a given hash. If found, we can skip
- * re-uploading the same creative.
+ * Look up an existing R2 URL for a given hash. Checks both the new
+ * discovery_creatives table (carousels) and the legacy main-table columns.
  */
 export async function findExistingByHash(
   hash: string,
   type: 'image' | 'video',
 ): Promise<string | null> {
+  // Check new creatives table first
+  const { data: creative } = await (supabase as any)
+    .from('discovery_creatives')
+    .select('r2_url')
+    .eq('hash', hash)
+    .eq('asset_type', type)
+    .limit(1)
+    .maybeSingle()
+  if (creative?.r2_url) return creative.r2_url
+
+  // Fall back to legacy columns
   const hashCol = type === 'image' ? 'image_hash' : 'video_hash'
   const urlCol = type === 'image' ? 'thumbnail_url' : 'video_url'
   const { data, error } = await (supabase as any)
@@ -85,6 +96,25 @@ export async function findExistingByHash(
     .maybeSingle()
   if (error || !data) return null
   return (data as any)[urlCol] || null
+}
+
+export interface CreativeInsert {
+  ad_id: string
+  position: number
+  asset_type: 'image' | 'video'
+  r2_url: string
+  hash: string | null
+}
+
+/**
+ * Save all creatives for an ad. Idempotent on (ad_id, position, asset_type).
+ */
+export async function saveCreatives(rows: CreativeInsert[]): Promise<void> {
+  if (rows.length === 0) return
+  const { error } = await (supabase as any)
+    .from('discovery_creatives')
+    .upsert(rows, { onConflict: 'ad_id,position,asset_type' })
+  if (error) console.warn(`  ⚠️  saveCreatives failed:`, error.message)
 }
 
 export async function getQueueDepth(): Promise<number> {
