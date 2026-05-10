@@ -68,11 +68,13 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
     let pageStatus = 0
     const resp = await page.goto(snapshotUrl, {
       waitUntil: 'domcontentloaded',
-      timeout: timeoutMs,
+      timeout: 12_000,
     })
     pageStatus = resp ? resp.status() : 0
 
-    // Wait up to 8s for an actual ad creative to appear
+    // Wait for an actual ad creative to appear (8s for live ads).
+    // For dead ads this just times out and we move on quickly.
+    let creativeFound = false
     try {
       await page.waitForFunction(
         () => {
@@ -84,12 +86,16 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
         },
         { timeout: 8_000 }
       )
+      creativeFound = true
     } catch {
-      /* timeout — still try to extract whatever's in DOM */
+      /* timeout — we'll extract what's there but probably nothing */
     }
 
-    // Extra delay so video src has time to attach
-    await page.waitForTimeout(1500)
+    // Only wait extra time if a creative actually showed up (gives video src time to attach).
+    // For dead ads, skip this wait entirely.
+    if (creativeFound) {
+      await page.waitForTimeout(1200)
+    }
 
     const data = await page.evaluate(() => {
       // ALL videos (multi-video carousels are rare but possible)

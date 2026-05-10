@@ -37,6 +37,7 @@ export async function GET(_request: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .is('thumbnail_url', null)
       .is('video_url', null)
+      .is('creative_extraction_failed_at', null)
       .not('snapshot_url', 'is', null),
     admin
       .from('discovery_ads_index')
