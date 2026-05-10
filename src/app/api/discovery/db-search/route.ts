@@ -50,7 +50,12 @@ export async function GET(request: NextRequest) {
     let searchMethod = 'keyword'
 
     // ── Build base query with ilike keyword search (fast, reliable) ──
-    let baseQuery = admin.from('discovery_ads_index').select('*', { count: 'exact' })
+    // Only show ads where the worker has processed creatives (has a hash).
+    // Prevents broken thumbnails / "no media" cards from appearing.
+    let baseQuery = admin
+      .from('discovery_ads_index')
+      .select('*', { count: 'exact' })
+      .or('image_hash.not.is.null,video_hash.not.is.null')
 
     // Country filter
     if (country && country !== 'ALL') baseQuery = baseQuery.eq('country', country)
