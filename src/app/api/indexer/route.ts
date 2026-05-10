@@ -376,6 +376,8 @@ async function fetchAdsForTerm(
       let pagesTotal = 0
       let resumedFromCursor = false
       let brandExhausted = false
+      // Re-crawl brands that were exhausted more than 7 days ago to catch new ads
+      const RECRAWL_INTERVAL_DAYS = 7
       try {
         const { data: state } = await admin
           .from('discovery_brand_crawl_state')
@@ -383,14 +385,28 @@ async function fetchAdsForTerm(
           .eq('page_id', firstPageIdForState)
           .maybeSingle()
         if (state?.exhausted_at) {
-          log(`  ✅ Brand ${firstPageIdForState} already exhausted (${state.ads_indexed} ads total) — skipping`)
-          brandExhausted = true
+          const daysSinceExhausted = (Date.now() - new Date(state.exhausted_at).getTime()) / 86_400_000
+          if (daysSinceExhausted < RECRAWL_INTERVAL_DAYS) {
+            log(`  ✅ Brand ${firstPageIdForState} exhausted ${daysSinceExhausted.toFixed(1)}d ago (${state.ads_indexed} ads) — next recheck in ${(RECRAWL_INTERVAL_DAYS - daysSinceExhausted).toFixed(1)}d`)
+            brandExhausted = true
+          } else {
+            log(`  🔄 Brand ${firstPageIdForState} exhausted ${daysSinceExhausted.toFixed(1)}d ago — re-crawling for new ads`)
+            // Clear state so we start fresh from page 1
+            await admin
+              .from('discovery_brand_crawl_state')
+              .update({ cursor: null, exhausted_at: null } as any)
+              .eq('page_id', firstPageIdForState)
+          }
         } else if (state?.cursor) {
           brandCursor = state.cursor
           resumedFromCursor = true
           log(`  ↪️  Resuming brand ${firstPageIdForState} from saved cursor (already ${state.ads_indexed} ads)`)
         }
       } catch { /* state table may not exist on first run */ }
+
+      // Track consecutive 0-new pages — stops re-crawls early when caught up
+      let consecZeroNew = 0
+      const STOP_AFTER_ZERO_NEW_PAGES = 5
 
       for (let p = 0; !brandExhausted && p < MAX_BRAND_PAGES; p++) {
         if (isNearDeadline()) {
@@ -406,6 +422,25 @@ async function fetchAdsForTerm(
         const newThisPage = addAds(pageAds)
         pagesTotal++
         log(`  📄 Brand page ${p + 1}${resumedFromCursor ? ' (resumed)' : ''}: ${pageAds.length} returned, ${newThisPage} new | running total: ${allAds.length}`)
+
+        // Track consecutive 0-new pages so re-crawls stop early when caught up
+        if (newThisPage === 0) consecZeroNew++
+        else consecZeroNew = 0
+        if (consecZeroNew >= STOP_AFTER_ZERO_NEW_PAGES) {
+          log(`  ⏭  ${STOP_AFTER_ZERO_NEW_PAGES} consecutive pages with 0 new ads — caught up, marking exhausted`)
+          try {
+            await admin.from('discovery_brand_crawl_state').upsert({
+              page_id: firstPageIdForState,
+              brand_name: term,
+              cursor: null,
+              exhausted_at: new Date().toISOString(),
+              last_run_at: new Date().toISOString(),
+              last_run_added: 0,
+            } as any)
+          } catch { /* ignore */ }
+          break
+        }
+
         if (!hasMore || !nextCursor) {
           // Only mark exhausted if we actually GOT ads. If we got zero on the
           // very first page we're probably hitting an API issue — leave state
