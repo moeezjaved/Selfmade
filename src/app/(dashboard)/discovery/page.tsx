@@ -585,10 +585,10 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   const next = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i + 1) % total); setPlaying(false) }
   const prev = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i - 1 + total) % total); setPlaying(false) }
 
-  // No stored creative → fall back to iframe (snapshot)
+  // No stored creative → fall back to iframe (snapshot, fixed aspect — can't know real one)
   if (!slide && ad.snapshotUrl) {
     return (
-      <div style={{ position: 'relative', background: avatarBg, overflow: 'hidden', aspectRatio: '4/3', maxHeight: 320 }}>
+      <div style={{ position: 'relative', background: avatarBg, overflow: 'hidden', aspectRatio: '4/5' }}>
         {iframeVisible && (
           <iframe
             src={ad.snapshotUrl}
@@ -618,14 +618,15 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
 
   if (!slide) return null
 
+  // Natural aspect ratio — image/video sets the height, no cropping (Atria-style)
   return (
-    <div style={{ position: 'relative', background: avatarBg, overflow: 'hidden', aspectRatio: '4/3', maxHeight: 320 }}>
+    <div style={{ position: 'relative', background: avatarBg, overflow: 'hidden' }}>
       {slide.type === 'image' ? (
         <img
           src={slide.url}
           alt={ad.pageName}
           loading="lazy"
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          style={{ width: '100%', height: 'auto', display: 'block' }}
         />
       ) : (
         <>
@@ -636,7 +637,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             controls={playing}
             preload="metadata"
             playsInline
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            style={{ width: '100%', height: 'auto', display: 'block', maxHeight: 600 }}
             onEnded={() => setPlaying(false)}
           />
           {!playing && (
@@ -742,8 +743,8 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
     <>
     {showSaveModal && <SaveModal ad={ad} onClose={() => { setShowSaveModal(false); setIsSaved(true) }} />}
     <div
-      style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'box-shadow .2s', cursor: 'default' }}
-      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,0.08)')}
+      style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'box-shadow .2s', cursor: 'default' }}
+      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)')}
       onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
     >
       {/* ── Brand header ── */}
@@ -1481,8 +1482,13 @@ export default function DiscoveryPage() {
               {activeFilterCount > 0 && <span style={{ background: '#f0fdf4', color: '#166534', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-              {filteredAds.map(ad => <AdCard key={ad.id} ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })} />)}
+            {/* Masonry layout — variable card heights, image natural aspect */}
+            <div style={{ columnWidth: 280, columnGap: 14, columnFill: 'balance' }}>
+              {filteredAds.map(ad => (
+                <div key={ad.id} style={{ breakInside: 'avoid', marginBottom: 14, display: 'inline-block', width: '100%' }}>
+                  <AdCard ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })} />
+                </div>
+              ))}
             </div>
             {hasMore && (
               <div style={{ textAlign: 'center', marginTop: 32 }}>
