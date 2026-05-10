@@ -57,8 +57,14 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
       .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
 
-    // Country filter
-    if (country && country !== 'ALL') baseQuery = baseQuery.eq('country', country)
+    // Country filter — match against the ARRAY of countries the ad targeted
+    // (covers multi-country ads correctly). Falls back to legacy 'country'
+    // column for ads indexed before targeted_countries was added.
+    if (country && country !== 'ALL') {
+      baseQuery = baseQuery.or(
+        `targeted_countries.cs.{${country}},country.eq.${country}`
+      )
+    }
 
     // Keyword search — OR across body, title, page_name
     if (q) {

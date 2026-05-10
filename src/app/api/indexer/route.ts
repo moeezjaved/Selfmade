@@ -61,6 +61,8 @@ const META_FIELDS = [
   'ad_creative_bodies','ad_creative_link_titles','ad_creative_link_captions',
   'ad_creative_link_descriptions','ad_snapshot_url','page_name','page_id',
   'publisher_platforms','languages',
+  // Per-ad list of countries the ad reached (powers proper country filter)
+  'ad_reached_countries',
 ].join(',')
 
 // ── Auth ────────────────────────────────────────────────────
@@ -594,6 +596,10 @@ function transformAd(ad: any, term: string, country: string) {
   // For stopped ads, use actual run duration (stop - start), not time-since-start
   const endMs = stopDate ? new Date(stopDate).getTime() : Date.now()
   const daysRunning = startDate ? Math.floor((endMs - new Date(startDate).getTime()) / 86400000) : 0
+  // Normalize the country list — Meta returns codes like 'US', 'GB', etc.
+  const reached: string[] = Array.isArray(ad.ad_reached_countries) ? ad.ad_reached_countries : []
+  const targetedCountries = reached.length > 0 ? reached.map(c => String(c).toUpperCase()) : [country]
+
   return {
     ad_id: ad.id,
     page_id: ad.page_id || '',
@@ -605,6 +611,7 @@ function transformAd(ad: any, term: string, country: string) {
     platforms: ad.publisher_platforms || [],
     languages: ad.languages || [],
     country,
+    targeted_countries: targetedCountries,
     is_active: !ad.ad_delivery_stop_time,
     days_running: daysRunning,
     format: detectFormat(ad),
