@@ -699,7 +699,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             onEnded={() => setPlaying(false)}
           />
           {!playing && (
-            <div onClick={() => { setPlaying(true); setTimeout(() => videoRef.current?.play(), 50) }}
+            <div onClick={(e) => { e.stopPropagation(); setPlaying(true); setTimeout(() => videoRef.current?.play(), 50) }}
               style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer', zIndex: 3 }}>
               <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
                 <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
