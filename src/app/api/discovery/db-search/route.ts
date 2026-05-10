@@ -100,16 +100,33 @@ export async function GET(request: NextRequest) {
     else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
     else baseQuery = baseQuery.order('last_seen', { ascending: false })
 
-    baseQuery = baseQuery.range(offset, offset + limit - 1)
+    // Over-fetch so server-side dedup can return `limit` UNIQUE creatives per page
+    const overFetchMultiplier = 5  // ~5x dedup ratio observed for popular brands
+    const fetchLimit = limit * overFetchMultiplier
+    const fetchOffset = offset * overFetchMultiplier
+    baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
     const { data: keywordData, error: kwErr, count: kwCount } = await baseQuery
 
     if (kwErr) {
-      // If keyword search errors, return empty rather than crashing
       return NextResponse.json({ ads: [], total: 0, totalInDB, source: 'indexed', searchMethod: 'error' })
     }
 
-    ads = keywordData || []
-    total = kwCount || 0
+    // Server-side dedup by image_hash / video_hash so the discovery grid
+    // shows one card per unique creative instead of repeating same image.
+    const seenHashes = new Set<string>()
+    const dedupedAds: any[] = []
+    for (const ad of (keywordData || []) as any[]) {
+      const key = ad.image_hash || ad.video_hash || `_${ad.ad_id}`
+      if (seenHashes.has(key)) continue
+      seenHashes.add(key)
+      dedupedAds.push(ad)
+      if (dedupedAds.length >= limit) break
+    }
+
+    ads = dedupedAds
+    // total reflects unique creatives — approximate by scaling kwCount by dedup ratio
+    const dedupRatio = (keywordData?.length || 1) / Math.max(dedupedAds.length, 1)
+    total = Math.round((kwCount || 0) / dedupRatio)
 
     // ── Semantic re-ranking for multi-word queries (optional, enhances order) ──
     // Only attempt if we have results and OpenAI key — does NOT reduce result count
