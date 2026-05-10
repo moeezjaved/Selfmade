@@ -63,23 +63,41 @@ async function main() {
   }
 
   // 3. Clear thumbnail_url + image_hash + creative_extraction_failed_at
-  // for all ads with these hashes — worker will re-process them
+  // for all ads with these hashes — worker will re-process them.
+  // Batch by ad_id (100 per update) to avoid Supabase statement timeout.
   let totalCleaned = 0
+  const CHUNK = 100
   for (const [hash] of suspectHashes) {
-    const { error, count } = await (supabase as any)
+    // First fetch all ad_ids matching this hash
+    const { data: matches, error: selErr } = await (supabase as any)
       .from('discovery_ads_index')
-      .update({
-        thumbnail_url: null,
-        image_hash: null,
-        creative_extraction_failed_at: null,  // allow retry
-      } as any, { count: 'exact' })
+      .select('ad_id')
       .eq('image_hash', hash)
-    if (error) {
-      console.error(`  ❌ Failed clearing hash ${hash.slice(0, 16)}…:`, error.message)
-    } else {
-      console.log(`  ✅ Cleared ${count} ads with hash ${hash.slice(0, 16)}…`)
-      totalCleaned += count || 0
+    if (selErr) {
+      console.error(`  ❌ Failed listing hash ${hash.slice(0, 16)}…:`, selErr.message)
+      continue
     }
+    const ids = (matches || []).map((r: any) => r.ad_id)
+    let cleanedForHash = 0
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK)
+      const { error: updErr } = await (supabase as any)
+        .from('discovery_ads_index')
+        .update({
+          thumbnail_url: null,
+          image_hash: null,
+          creative_extraction_failed_at: null,
+        } as any)
+        .in('ad_id', chunk)
+      if (updErr) {
+        console.error(`     ⚠️  Chunk ${i / CHUNK + 1} failed:`, updErr.message)
+      } else {
+        cleanedForHash += chunk.length
+        process.stdout.write('.')
+      }
+    }
+    console.log(`\n  ✅ Cleared ${cleanedForHash}/${ids.length} ads with hash ${hash.slice(0, 16)}…`)
+    totalCleaned += cleanedForHash
   }
 
   // 4. Also delete the bad rows in discovery_creatives table
