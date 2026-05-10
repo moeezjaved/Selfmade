@@ -339,13 +339,14 @@ async function fetchAdsForTerm(
       // returns the full 2000+ ad library. We include all term countries + standard
       // brand markets. Meta's ad_reached_countries is an OR filter — ads that
       // targeted ANY of the listed countries are returned.
-      const BRAND_COUNTRIES = ['US', 'GB', 'CA', 'AU', 'NZ', 'IE', 'IN', 'ZA', 'SG']
-      const brandCountries = Array.from(new Set([metaCountry, ...BRAND_COUNTRIES]))
+      // Use 'ALL' to capture EVERY country since global brands like Gymshark
+      // have ads in 50+ markets. Falls back to country list if 'ALL' rejected.
+      const BRAND_COUNTRIES = ['ALL']
 
       const brandPageParams: Record<string, string> = {
         access_token: token,
         search_page_ids: pageIdsParam,
-        ad_reached_countries: JSON.stringify(brandCountries),
+        ad_reached_countries: JSON.stringify(BRAND_COUNTRIES),
         ad_type: 'ALL',
         active_status: 'ALL', // include stopped/paused — historical winners matter
         fields: META_FIELDS,
@@ -353,14 +354,36 @@ async function fetchAdsForTerm(
       }
 
       // ── Paginate until no new ad_archive_ids, cursor missing, or deadline ──
-      const MAX_BRAND_PAGES = 60 // 60 × 50 = 3000 ads max per brand per run
+      // Meta caps results around 50K per query; allow enough pages to drain it.
+      const MAX_BRAND_PAGES = 1000 // 1000 × 50 = 50,000 ads max per brand per run
+
+      // Resume from previously saved cursor (so we don't re-fetch pages 1-60
+      // every cron tick when the brand has 50K ads). One state row per page_id.
+      const firstPageIdForState = pageIds[0]
       let brandCursor = ''
       let pagesTotal = 0
+      let resumedFromCursor = false
+      let brandExhausted = false
+      try {
+        const { data: state } = await admin
+          .from('discovery_brand_crawl_state')
+          .select('cursor, ads_indexed, exhausted_at')
+          .eq('page_id', firstPageIdForState)
+          .maybeSingle()
+        if (state?.exhausted_at) {
+          log(`  ✅ Brand ${firstPageIdForState} already exhausted (${state.ads_indexed} ads total) — skipping`)
+          brandExhausted = true
+        } else if (state?.cursor) {
+          brandCursor = state.cursor
+          resumedFromCursor = true
+          log(`  ↪️  Resuming brand ${firstPageIdForState} from saved cursor (already ${state.ads_indexed} ads)`)
+        }
+      } catch { /* state table may not exist on first run */ }
 
-      for (let p = 0; p < MAX_BRAND_PAGES; p++) {
+      for (let p = 0; !brandExhausted && p < MAX_BRAND_PAGES; p++) {
         if (isNearDeadline()) {
           timedOut = true
-          log(`  ⏰ Brand fetch deadline at page ${p + 1} — ${allAds.length} ads saved so far`)
+          log(`  ⏰ Brand fetch deadline at page ${p + 1} — ${allAds.length} ads saved so far. Cursor saved for next run.`)
           break
         }
         const { ads: pageAds, nextCursor, hasMore, error } = await fetchOnePage(brandPageParams, brandCursor)
@@ -368,17 +391,41 @@ async function fetchAdsForTerm(
           log(`  ❌ Brand page ${p + 1} error: ${error}`)
           break
         }
-        // Count only genuinely new ad_archive_ids (not already seen from any prior source)
         const newThisPage = addAds(pageAds)
         pagesTotal++
-        // This goes to both Vercel console AND the admin stream log
-        log(`  📄 Brand page ${p + 1}: ${pageAds.length} returned, ${newThisPage} new | running total: ${allAds.length}`)
-        // Stop when no new IDs (cursor loop) or no next page
-        if (newThisPage === 0 || !hasMore || !nextCursor) break
+        log(`  📄 Brand page ${p + 1}${resumedFromCursor ? ' (resumed)' : ''}: ${pageAds.length} returned, ${newThisPage} new | running total: ${allAds.length}`)
+        if (!hasMore || !nextCursor) {
+          // Genuinely exhausted — mark so we don't keep trying
+          try {
+            await admin.from('discovery_brand_crawl_state').upsert({
+              page_id: firstPageIdForState,
+              brand_name: term,
+              cursor: null,
+              exhausted_at: new Date().toISOString(),
+              last_run_at: new Date().toISOString(),
+              last_run_added: newThisPage,
+            } as any)
+          } catch { /* ignore */ }
+          break
+        }
         brandCursor = nextCursor
       }
 
-      log(`  ✅ Brand fetch done — ${pagesTotal} pages → ${allAds.length} ads for page_ids: ${pageIdsParam}`)
+      // Save the cursor so next run resumes here (only if we didn't fully exhaust)
+      if (brandCursor) {
+        try {
+          await admin.from('discovery_brand_crawl_state').upsert({
+            page_id: firstPageIdForState,
+            brand_name: term,
+            cursor: brandCursor,
+            last_run_at: new Date().toISOString(),
+            last_run_added: allAds.length,
+          } as any, { onConflict: 'page_id' })
+          log(`  💾 Saved cursor for brand ${firstPageIdForState} — next run resumes here`)
+        } catch { /* ignore */ }
+      }
+
+      log(`  ✅ Brand fetch this run — ${pagesTotal} pages → ${allAds.length} ads`)
     }
   }
 
