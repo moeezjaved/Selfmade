@@ -333,12 +333,15 @@ export async function GET(req: NextRequest) {
   const batchSize = Math.min(parseInt(req.nextUrl.searchParams.get('batch') || '50'), 200)
   const onlyVideos = req.nextUrl.searchParams.get('videos') === '1'
 
-  // Fetch ads that need thumbnail processing
+  // Fetch ads that have NEITHER R2 thumbnail NOR R2 video — otherwise
+  // video-only ads (where the s60x60 thumb is too small to keep) get
+  // reprocessed forever.
   let query = admin
     .from('discovery_ads_index')
     .select('ad_id, snapshot_url, format')
     .not('snapshot_url', 'is', null)
     .is('thumbnail_url', null)
+    .is('video_url', null)
     .order('last_seen', { ascending: false })
     .limit(batchSize)
 
@@ -383,6 +386,7 @@ export async function GET(req: NextRequest) {
     .from('discovery_ads_index')
     .select('*', { count: 'exact', head: true })
     .is('thumbnail_url', null)
+    .is('video_url', null)
     .not('snapshot_url', 'is', null)
 
   return NextResponse.json({
