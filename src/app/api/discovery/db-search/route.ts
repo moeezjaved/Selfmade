@@ -50,12 +50,12 @@ export async function GET(request: NextRequest) {
     let searchMethod = 'keyword'
 
     // ── Build base query with ilike keyword search (fast, reliable) ──
-    // Only show ads where the worker has processed creatives (has a hash).
-    // Prevents broken thumbnails / "no media" cards from appearing.
+    // Only show ads where we actually have a working R2 creative.
+    // Hash alone is not enough — R2 upload may have failed even when hash exists.
     let baseQuery = admin
       .from('discovery_ads_index')
       .select('*', { count: 'exact' })
-      .or('image_hash.not.is.null,video_hash.not.is.null')
+      .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
 
     // Country filter
     if (country && country !== 'ALL') baseQuery = baseQuery.eq('country', country)

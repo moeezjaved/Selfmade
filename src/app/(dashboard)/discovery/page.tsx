@@ -637,37 +637,8 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   const next = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i + 1) % total); setPlaying(false) }
   const prev = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i - 1 + total) % total); setPlaying(false) }
 
-  // No stored creative → fall back to iframe (snapshot, fixed aspect — can't know real one)
-  if (!slide && ad.snapshotUrl) {
-    return (
-      <div style={{ position: 'relative', background: avatarBg, overflow: 'hidden', aspectRatio: '4/5' }}>
-        {iframeVisible && (
-          <iframe
-            src={ad.snapshotUrl}
-            title={ad.pageName}
-            scrolling="no"
-            allow="autoplay"
-            style={{
-              position: 'absolute', inset: 0,
-              width: '200%', height: '200%',
-              border: 'none', background: 'transparent',
-              transform: 'scale(0.5)', transformOrigin: 'top left',
-              pointerEvents: ad.format === 'Video' ? 'auto' : 'none',
-            }}
-            sandbox="allow-scripts allow-same-origin allow-popups"
-          />
-        )}
-        {(!iframeVisible || ad.format === 'Video') && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.15)', pointerEvents: 'none' }}>
-            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
-              <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
+  // No real creative on R2 → don't render anything.
+  // Discovery API already filters these out, but defense in depth.
   if (!slide) return null
 
   // Natural aspect ratio — image/video sets the height, no cropping (Atria-style)
