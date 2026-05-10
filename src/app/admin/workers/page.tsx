@@ -32,6 +32,13 @@ interface Summary {
   eta_minutes: number | null
 }
 
+interface Creative {
+  position: number
+  asset_type: 'image' | 'video'
+  r2_url: string
+  hash: string | null
+}
+
 interface Sample {
   ad_id: string
   page_name: string | null
@@ -42,6 +49,7 @@ interface Sample {
   format: string | null
   last_seen: string
   ad_count: number
+  creatives?: Creative[]
 }
 
 interface Data {
@@ -228,71 +236,150 @@ export default function WorkersPage() {
         {recent_samples.length === 0 ? (
           <Empty>No creatives stored on R2 yet.</Empty>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
-            {recent_samples.map((s) => (
-              <div key={s.ad_id} style={{ background: '#fff', border: '1px solid #e5e5e5', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
-                {/* Visual: image, or video, or fallback */}
-                {s.thumbnail_url ? (
-                  <img
-                    src={s.thumbnail_url}
-                    alt={s.page_name || s.ad_id}
-                    loading="lazy"
-                    style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', background: '#000' }}
-                  />
-                ) : s.video_url ? (
-                  <video
-                    src={s.video_url}
-                    muted
-                    loop
-                    playsInline
-                    preload="metadata"
-                    onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play().catch(() => {})}
-                    onMouseLeave={(e) => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
-                    style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', background: '#000' }}
-                  />
-                ) : (
-                  <div style={{ width: '100%', aspectRatio: '1/1', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 11 }}>
-                    no media
-                  </div>
-                )}
-
-                {/* Ad-count badge: how many ads share this exact creative */}
-                {s.ad_count > 1 && (
-                  <div style={{
-                    position: 'absolute', top: 6, right: 6,
-                    background: 'rgba(0,0,0,0.75)', color: '#fff',
-                    fontSize: 11, fontWeight: 700,
-                    padding: '3px 7px', borderRadius: 12,
-                  }}>
-                    ×{s.ad_count}
-                  </div>
-                )}
-
-                {/* Video icon badge */}
-                {s.video_url && (
-                  <div style={{
-                    position: 'absolute', top: 6, left: 6,
-                    background: 'rgba(0,0,0,0.75)', color: '#fff',
-                    fontSize: 10, fontWeight: 700,
-                    padding: '2px 6px', borderRadius: 8,
-                  }}>
-                    ▶ vid
-                  </div>
-                )}
-
-                <div style={{ padding: '8px 10px', fontSize: 12 }}>
-                  <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {s.page_name || '—'}
-                  </div>
-                  <div style={{ color: '#999', fontSize: 10, marginTop: 2 }}>
-                    {s.format || '—'} · {timeAgo(s.last_seen)}
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+            {recent_samples.map((s) => <CreativeCard key={s.ad_id} sample={s} />)}
           </div>
         )}
       </Section>
+    </div>
+  )
+}
+
+/**
+ * Carousel-aware creative card. If the ad has multiple slides
+ * (from discovery_creatives), shows arrow buttons + "1/4" indicator.
+ */
+function CreativeCard({ sample: s }: { sample: Sample }) {
+  // Build list of slides: prefer the new creatives array, fall back
+  // to legacy single thumbnail/video.
+  type Slide = { type: 'image' | 'video'; url: string }
+  const slides: Slide[] = (() => {
+    if (s.creatives && s.creatives.length > 0) {
+      // images first (sorted by position), then videos
+      const sorted = [...s.creatives].sort((a, b) => {
+        if (a.asset_type !== b.asset_type) return a.asset_type === 'image' ? -1 : 1
+        return a.position - b.position
+      })
+      return sorted.map((c) => ({ type: c.asset_type, url: c.r2_url }))
+    }
+    const fallback: Slide[] = []
+    if (s.thumbnail_url) fallback.push({ type: 'image', url: s.thumbnail_url })
+    if (s.video_url) fallback.push({ type: 'video', url: s.video_url })
+    return fallback
+  })()
+
+  const [idx, setIdx] = useState(0)
+  const slide = slides[idx]
+  const total = slides.length
+  const next = () => setIdx((i) => (i + 1) % total)
+  const prev = () => setIdx((i) => (i - 1 + total) % total)
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e5e5', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+      {/* Visual area */}
+      <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', background: '#000' }}>
+        {!slide ? (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 11, background: '#f5f5f5' }}>
+            no media
+          </div>
+        ) : slide.type === 'image' ? (
+          <img
+            src={slide.url}
+            alt={s.page_name || s.ad_id}
+            loading="lazy"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : (
+          <video
+            src={slide.url}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play().catch(() => {})}
+            onMouseLeave={(e) => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        )}
+
+        {/* Carousel nav arrows */}
+        {total > 1 && (
+          <>
+            <button
+              onClick={prev}
+              aria-label="Previous slide"
+              style={{
+                position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
+                background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none',
+                width: 24, height: 24, borderRadius: '50%', cursor: 'pointer',
+                fontSize: 14, lineHeight: 1, padding: 0,
+              }}
+            >‹</button>
+            <button
+              onClick={next}
+              aria-label="Next slide"
+              style={{
+                position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
+                background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none',
+                width: 24, height: 24, borderRadius: '50%', cursor: 'pointer',
+                fontSize: 14, lineHeight: 1, padding: 0,
+              }}
+            >›</button>
+            {/* Dots */}
+            <div style={{ position: 'absolute', bottom: 6, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 4 }}>
+              {slides.map((_, i) => (
+                <span key={i} style={{
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: i === idx ? '#fff' : 'rgba(255,255,255,0.4)',
+                }} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Top-right: ad-count badge */}
+        {s.ad_count > 1 && (
+          <div style={{
+            position: 'absolute', top: 6, right: 6,
+            background: 'rgba(0,0,0,0.75)', color: '#fff',
+            fontSize: 11, fontWeight: 700,
+            padding: '3px 7px', borderRadius: 12,
+          }}>
+            ×{s.ad_count}
+          </div>
+        )}
+
+        {/* Top-left: type indicators */}
+        <div style={{ position: 'absolute', top: 6, left: 6, display: 'flex', gap: 4 }}>
+          {total > 1 && (
+            <div style={{
+              background: 'rgba(0,0,0,0.75)', color: '#fff',
+              fontSize: 10, fontWeight: 700,
+              padding: '2px 6px', borderRadius: 8,
+            }}>
+              {idx + 1}/{total}
+            </div>
+          )}
+          {slide?.type === 'video' && (
+            <div style={{
+              background: 'rgba(0,0,0,0.75)', color: '#fff',
+              fontSize: 10, fontWeight: 700,
+              padding: '2px 6px', borderRadius: 8,
+            }}>
+              ▶ vid
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ padding: '8px 10px', fontSize: 12 }}>
+        <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {s.page_name || '—'}
+        </div>
+        <div style={{ color: '#999', fontSize: 10, marginTop: 2 }}>
+          {s.format || '—'} · {timeAgo(s.last_seen)}
+        </div>
+      </div>
     </div>
   )
 }

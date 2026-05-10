@@ -57,10 +57,14 @@ export async function GET(_request: NextRequest) {
       .select('video_hash')
       .not('video_hash', 'is', null)
       .limit(50_000),
-    // Pull a larger pool of recent processed ads — we'll dedupe by hash below
+    // Pull a larger pool of recent processed ads — we'll dedupe by hash below.
+    // Include carousel creatives via a join.
     admin
       .from('discovery_ads_index')
-      .select('ad_id, page_name, thumbnail_url, video_url, image_hash, video_hash, format, last_seen')
+      .select(`
+        ad_id, page_name, thumbnail_url, video_url, image_hash, video_hash, format, last_seen,
+        creatives:discovery_creatives(position, asset_type, r2_url, hash)
+      `)
       .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
       .order('last_seen', { ascending: false })
       .limit(400),
@@ -70,16 +74,20 @@ export async function GET(_request: NextRequest) {
   const uniqueImages = new Set((uniqueImageHashes || []).map((r: any) => r.image_hash)).size
   const uniqueVideos = new Set((uniqueVideoHashes || []).map((r: any) => r.video_hash)).size
 
-  // Group recent samples by hash so the visual grid shows unique creatives
-  // (not 50 cards for the same image). Each entry includes ad_count.
+  // Group recent samples by hash so the visual grid shows unique creatives.
+  // Fallbacks: hash → R2 URL (catches deduped videos before backfill completes)
+  // → ad_id (no dedup possible).
   const groups = new Map<string, any>()
   for (const ad of (recentSamples || []) as any[]) {
-    // Prefer image_hash, fall back to video_hash, fall back to ad_id (no dedup)
-    const key = ad.image_hash || ad.video_hash || `_${ad.ad_id}`
+    const key =
+      ad.image_hash ||
+      ad.video_hash ||
+      ad.thumbnail_url ||
+      ad.video_url ||
+      `_${ad.ad_id}`
     const existing = groups.get(key)
     if (existing) {
       existing.ad_count++
-      // Keep most recent per group (first one is already most recent due to order)
     } else {
       groups.set(key, { ...ad, ad_count: 1 })
     }

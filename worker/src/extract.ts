@@ -35,8 +35,8 @@ export async function closeBrowser() {
 }
 
 export interface ExtractResult {
-  imageUrl: string | null
-  videoUrl: string | null
+  imageUrls: string[]      // ALL fbcdn images (carousel slides), largest first
+  videoUrls: string[]      // ALL videos (rare to have multiple)
   pageStatus: number
   error?: string
 }
@@ -92,18 +92,20 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
     await page.waitForTimeout(1500)
 
     const data = await page.evaluate(() => {
-      // Video URL
-      let videoUrl: string | null = null
-      const videoEl = document.querySelector('video') as HTMLVideoElement | null
-      if (videoEl) {
-        videoUrl = videoEl.src || videoEl.currentSrc || null
-        if (!videoUrl) {
-          const src = videoEl.querySelector('source') as HTMLSourceElement | null
-          if (src) videoUrl = src.getAttribute('src')
+      // ALL videos (multi-video carousels are rare but possible)
+      const allVideos: string[] = []
+      const videoEls = document.querySelectorAll('video')
+      videoEls.forEach((v) => {
+        const ve = v as HTMLVideoElement
+        let url = ve.src || ve.currentSrc || ''
+        if (!url) {
+          const src = ve.querySelector('source') as HTMLSourceElement | null
+          if (src) url = src.getAttribute('src') || ''
         }
-      }
+        if (url) allVideos.push(url)
+      })
 
-      // All fbcdn image srcs (server picks largest by stp param)
+      // ALL fbcdn image URLs in DOM order (carousel slide order)
       const allImgSrcs = Array.from(document.querySelectorAll('img'))
         .map((img) => (img as HTMLImageElement).src)
         .filter(
@@ -114,27 +116,44 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
             !src.includes('/emoji'),
         )
 
-      return { videoUrl, allImgSrcs }
+      return { allVideos, allImgSrcs }
     })
 
-    // Pick largest image by stp size param: _s600x600 → 600, _s60x60 → 60
+    // Filter images: keep only "creative-sized" (stp param ≥ 200) — drops
+    // profile pic icons (s60x60), keeps actual ad slides (s600x600+).
     function stpSize(url: string): number {
       const m = url.match(/_s(\d+)x\d+/)
       return m ? parseInt(m[1], 10) : 0
     }
-    const fbImgs = (data.allImgSrcs || []).filter((u) => u.includes('fbcdn'))
-    fbImgs.sort((a, b) => stpSize(b) - stpSize(a))
-    const imageUrl = fbImgs[0] || null
+    const creativeImages = (data.allImgSrcs || [])
+      .filter((u) => u.includes('fbcdn'))
+      .filter((u) => {
+        const sz = stpSize(u)
+        // No stp param = original (no resize), keep it
+        // s200+ = real creative slide, keep it
+        // smaller = profile/icon, drop
+        return sz === 0 || sz >= 200
+      })
+
+    // Dedup by URL — same image sometimes appears multiple times in DOM
+    const uniqueImages = Array.from(new Set(creativeImages))
+
+    // Sort: largest first (so carousel position 0 = main hero image)
+    uniqueImages.sort((a, b) => stpSize(b) - stpSize(a))
+
+    const uniqueVideos = Array.from(new Set(
+      (data.allVideos || []).filter((u) => u.includes('fbcdn')),
+    ))
 
     return {
-      imageUrl: imageUrl && imageUrl.includes('fbcdn') ? imageUrl : null,
-      videoUrl: data.videoUrl && data.videoUrl.includes('fbcdn') ? data.videoUrl : null,
+      imageUrls: uniqueImages,
+      videoUrls: uniqueVideos,
       pageStatus,
     }
   } catch (err) {
     return {
-      imageUrl: null,
-      videoUrl: null,
+      imageUrls: [],
+      videoUrls: [],
       pageStatus: 0,
       error: err instanceof Error ? err.message : String(err),
     }

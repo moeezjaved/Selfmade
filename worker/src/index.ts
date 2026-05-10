@@ -23,7 +23,9 @@ import {
   getQueueDepth,
   writeHeartbeat,
   findExistingByHash,
+  saveCreatives,
   AdRow,
+  CreativeInsert,
 } from './db.js'
 import { extractCreative, getBrowser, closeBrowser } from './extract.js'
 import { downloadFromCDN, uploadBufferToR2 } from './r2.js'
@@ -41,10 +43,9 @@ const startTime = Date.now()
 interface ProcessResult {
   ad_id: string
   ok: boolean
-  hasImage: boolean
-  hasVideo: boolean
-  imageDeduped: boolean
-  videoDeduped: boolean
+  imageCount: number       // total images saved (carousel)
+  videoCount: number       // total videos saved
+  dedupedCount: number     // assets that hit dedup
   error?: string
 }
 
@@ -52,13 +53,14 @@ interface ProcessResult {
  * Process a single asset (image or video):
  *   1. Download from FB CDN
  *   2. Hash it
- *   3. Check if any existing ad already has this hash → reuse R2 URL (skip upload)
+ *   3. Check if any existing creative has this hash → reuse R2 URL (skip upload)
  *   4. Otherwise upload to R2 and return new URL + hash
  */
 async function processAsset(
   cdnUrl: string,
   type: 'image' | 'video',
   adId: string,
+  position: number,
 ): Promise<{ url: string | null; hash: string | null; deduped: boolean }> {
   const contentType = type === 'image' ? 'image/jpeg' : 'video/mp4'
   const buf = await downloadFromCDN(cdnUrl, contentType)
@@ -66,71 +68,90 @@ async function processAsset(
 
   const hash = type === 'image' ? await imageHash(buf) : videoHash(buf)
   if (!hash) {
-    // hashing failed (e.g. corrupt image) — still upload, just no dedup
-    const key = type === 'image' ? `thumbnails/${adId}.jpg` : `videos/${adId}.mp4`
+    const key = type === 'image'
+      ? `thumbnails/${adId}_${position}.jpg`
+      : `videos/${adId}_${position}.mp4`
     const url = await uploadBufferToR2(buf, key, contentType)
     return { url, hash: null, deduped: false }
   }
 
-  // Already have this creative? Reuse the existing R2 URL.
   const existing = await findExistingByHash(hash, type)
   if (existing) {
     return { url: existing, hash, deduped: true }
   }
 
-  // First time we see this creative — upload it
-  const key = type === 'image' ? `thumbnails/${adId}.jpg` : `videos/${adId}.mp4`
+  // Use position in key so carousels don't overwrite each other
+  const key = type === 'image'
+    ? `thumbnails/${adId}_${position}.jpg`
+    : `videos/${adId}_${position}.mp4`
   const url = await uploadBufferToR2(buf, key, contentType)
   return { url, hash, deduped: false }
 }
 
 async function processAd(ad: AdRow): Promise<ProcessResult> {
   try {
-    const { imageUrl, videoUrl, pageStatus, error } = await extractCreative(
+    const { imageUrls, videoUrls, pageStatus, error } = await extractCreative(
       ad.snapshot_url,
       config.adTimeoutMs - 10_000,
     )
 
     if (error) {
-      return { ad_id: ad.ad_id, ok: false, hasImage: false, hasVideo: false, imageDeduped: false, videoDeduped: false, error: `extract: ${error}` }
+      return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: `extract: ${error}` }
     }
-    if (!imageUrl && !videoUrl) {
-      return { ad_id: ad.ad_id, ok: false, hasImage: false, hasVideo: false, imageDeduped: false, videoDeduped: false, error: `no_creative_found (page=${pageStatus})` }
+    if (imageUrls.length === 0 && videoUrls.length === 0) {
+      return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: `no_creative_found (page=${pageStatus})` }
     }
 
-    // Process image + video in parallel
-    const [imgResult, vidResult] = await Promise.all([
-      imageUrl ? processAsset(imageUrl, 'image', ad.ad_id) : Promise.resolve({ url: null, hash: null, deduped: false }),
-      videoUrl ? processAsset(videoUrl, 'video', ad.ad_id) : Promise.resolve({ url: null, hash: null, deduped: false }),
+    // Process all images + all videos in parallel
+    const imagePromises = imageUrls.map((url, i) => processAsset(url, 'image', ad.ad_id, i))
+    const videoPromises = videoUrls.map((url, i) => processAsset(url, 'video', ad.ad_id, i))
+
+    const [imageResults, videoResults] = await Promise.all([
+      Promise.all(imagePromises),
+      Promise.all(videoPromises),
     ])
 
-    if (!imgResult.url && !vidResult.url) {
-      return { ad_id: ad.ad_id, ok: false, hasImage: false, hasVideo: false, imageDeduped: false, videoDeduped: false, error: 'r2_upload_failed' }
+    // Build creatives table rows — one per asset that uploaded successfully
+    const creatives: CreativeInsert[] = []
+    imageResults.forEach((r, i) => {
+      if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'image', r2_url: r.url, hash: r.hash })
+    })
+    videoResults.forEach((r, i) => {
+      if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'video', r2_url: r.url, hash: r.hash })
+    })
+
+    if (creatives.length === 0) {
+      return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'r2_upload_failed' }
     }
 
-    await updateAdCreative(
-      ad.ad_id,
-      imgResult.url,
-      vidResult.url,
-      imgResult.hash,
-      vidResult.hash,
-    )
-    return {
-      ad_id: ad.ad_id,
-      ok: true,
-      hasImage: !!imgResult.url,
-      hasVideo: !!vidResult.url,
-      imageDeduped: imgResult.deduped,
-      videoDeduped: vidResult.deduped,
-    }
+    // Save all creatives + update legacy columns (first image, first video)
+    const firstImage = imageResults.find((r) => r.url)
+    const firstVideo = videoResults.find((r) => r.url)
+    await Promise.all([
+      saveCreatives(creatives),
+      updateAdCreative(
+        ad.ad_id,
+        firstImage?.url ?? null,
+        firstVideo?.url ?? null,
+        firstImage?.hash ?? null,
+        firstVideo?.hash ?? null,
+      ),
+    ])
+
+    const imageCount = imageResults.filter((r) => r.url).length
+    const videoCount = videoResults.filter((r) => r.url).length
+    const dedupedCount =
+      imageResults.filter((r) => r.deduped).length +
+      videoResults.filter((r) => r.deduped).length
+
+    return { ad_id: ad.ad_id, ok: true, imageCount, videoCount, dedupedCount }
   } catch (err) {
     return {
       ad_id: ad.ad_id,
       ok: false,
-      hasImage: false,
-      hasVideo: false,
-      imageDeduped: false,
-      videoDeduped: false,
+      imageCount: 0,
+      videoCount: 0,
+      dedupedCount: 0,
       error: err instanceof Error ? err.message : String(err),
     }
   }
@@ -154,16 +175,16 @@ async function processBatch(ads: AdRow[]): Promise<ProcessResult[]> {
         processAd(ad),
         new Promise<ProcessResult>((resolve) =>
           setTimeout(
-            () => resolve({ ad_id: ad.ad_id, ok: false, hasImage: false, hasVideo: false, imageDeduped: false, videoDeduped: false, error: 'timeout' }),
+            () => resolve({ ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'timeout' }),
             config.adTimeoutMs,
           ),
         ),
       ])
       const dt = ((Date.now() - t0) / 1000).toFixed(1)
       const tag = result.ok ? '✅' : '❌'
-      const dedupTag = (result.imageDeduped || result.videoDeduped) ? ' ♻️ dedup' : ''
+      const dedupTag = result.dedupedCount > 0 ? ` ♻️${result.dedupedCount}` : ''
       const detail = result.ok
-        ? `${result.hasImage ? 'img' : ''}${result.hasImage && result.hasVideo ? '+' : ''}${result.hasVideo ? 'vid' : ''}${dedupTag}`
+        ? `${result.imageCount}img+${result.videoCount}vid${dedupTag}`
         : result.error || 'unknown'
       console.log(`  ${tag} [${idx + 1}/${total}] ${ad.ad_id} (${dt}s) ${detail}`)
       results.push(result)
@@ -193,8 +214,9 @@ async function loop() {
 
   const ok = results.filter((r) => r.ok).length
   const fail = results.length - ok
-  const dedupedImg = results.filter((r) => r.imageDeduped).length
-  const dedupedVid = results.filter((r) => r.videoDeduped).length
+  const totalImages = results.reduce((s, r) => s + r.imageCount, 0)
+  const totalVideos = results.reduce((s, r) => s + r.videoCount, 0)
+  const totalDeduped = results.reduce((s, r) => s + r.dedupedCount, 0)
   totalProcessed += results.length
   totalSuccess += ok
   totalFailed += fail
@@ -204,7 +226,7 @@ async function loop() {
   const remaining = await getQueueDepth()
   const etaMin = remaining / Math.max(adsPerMin, 1)
 
-  console.log(`\n✅ Batch done in ${dt.toFixed(1)}s — ${ok} ok, ${fail} failed, ${dedupedImg + dedupedVid} ♻️ deduped`)
+  console.log(`\n✅ Batch done in ${dt.toFixed(1)}s — ${ok} ok, ${fail} failed | ${totalImages} imgs + ${totalVideos} vids saved, ${totalDeduped} ♻️ deduped`)
   console.log(`📊 Lifetime: ${totalSuccess}/${totalProcessed} ok (${((totalSuccess / totalProcessed) * 100).toFixed(0)}%) | ${adsPerMin.toFixed(1)} ads/min | queue: ${remaining} | ETA: ${etaMin.toFixed(0)} min\n`)
 
   // Best-effort heartbeat for the dashboard
