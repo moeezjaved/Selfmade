@@ -1061,7 +1061,23 @@ export default function DiscoveryPage() {
         const classified = dbData.ads.map((ad: any) => classifyAd({
           ...ad, mediaType: ad.format || '',
         }))
-        setRawAds(prev => reset ? classified : [...prev, ...classified])
+        // Cross-page dedup: drop ads whose hash was already shown
+        setRawAds(prev => {
+          if (reset) return classified
+          const seen = new Set<string>()
+          for (const a of prev) {
+            const k = (a as any).image_hash || (a as any).video_hash
+            if (k) seen.add(k)
+          }
+          const newOnes = classified.filter((a: Ad) => {
+            const k = (a as any).image_hash || (a as any).video_hash
+            if (!k) return true
+            if (seen.has(k)) return false
+            seen.add(k)
+            return true
+          })
+          return [...prev, ...newOnes]
+        })
         setHasMore(dbData.hasMore)
         setDbPage(page)
         setDbTotal(dbData.total || 0)
