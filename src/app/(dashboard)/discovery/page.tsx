@@ -620,13 +620,13 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
 
   // Natural aspect ratio — image/video sets the height, no cropping (Atria-style)
   return (
-    <div style={{ position: 'relative', background: avatarBg, overflow: 'hidden' }}>
+    <div style={{ position: 'relative', background: '#000', overflow: 'hidden', lineHeight: 0 }}>
       {slide.type === 'image' ? (
         <img
           src={slide.url}
           alt={ad.pageName}
           loading="lazy"
-          style={{ width: '100%', height: 'auto', display: 'block' }}
+          style={{ width: '100%', height: 'auto', display: 'block', verticalAlign: 'top' }}
         />
       ) : (
         <>
@@ -637,7 +637,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             controls={playing}
             preload="metadata"
             playsInline
-            style={{ width: '100%', height: 'auto', display: 'block', maxHeight: 600 }}
+            style={{ width: '100%', height: 'auto', display: 'block', maxHeight: 600, verticalAlign: 'top', outline: 'none', border: 'none', background: '#000' }}
             onEnded={() => setPlaying(false)}
           />
           {!playing && (
