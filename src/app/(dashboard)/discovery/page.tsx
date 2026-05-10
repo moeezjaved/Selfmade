@@ -477,7 +477,8 @@ function SaveModal({ ad, onClose }: { ad: Ad; onClose: () => void }) {
 }
 
 // ── InfiniteScrollSentinel ─────────────────────────────────────
-// Full-width loading row — triggers onLoad when scrolled near.
+// Invisible — silently triggers onLoad when scrolled near.
+// Preloads early so cards appear seamlessly with no spinner.
 function InfiniteScrollSentinel({ loading, onLoad }: { loading: boolean; onLoad: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const onLoadRef = useRef(onLoad)
@@ -490,46 +491,14 @@ function InfiniteScrollSentinel({ loading, onLoad }: { loading: boolean; onLoad:
       ([entry]) => {
         if (entry.isIntersecting && !loading) onLoadRef.current()
       },
-      { rootMargin: '800px' } // start fetching well before the user reaches bottom
+      { rootMargin: '1500px' } // pre-load WAY before user reaches bottom
     )
     obs.observe(el)
     return () => obs.disconnect()
   }, [loading])
 
-  return (
-    <div
-      ref={ref}
-      style={{
-        width: '100%',
-        height: 80,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 16,
-        // Always reserve space so layout doesn't jump when spinner shows/hides
-      }}
-    >
-      <span style={{
-        fontSize: 13,
-        color: '#6b7280',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        opacity: loading ? 1 : 0,
-        transition: 'opacity .2s',
-      }}>
-        <span style={{
-          width: 16,
-          height: 16,
-          border: '2px solid #1a3a1a',
-          borderTopColor: 'transparent',
-          borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite',
-        }} />
-        Loading more…
-      </span>
-    </div>
-  )
+  // Zero-height invisible sentinel — no spinner, no layout shift
+  return <div ref={ref} style={{ width: '100%', height: 1 }} />
 }
 
 // ── AdCard ───────────────────────────────────────────────────
