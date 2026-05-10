@@ -24,6 +24,7 @@ import {
   writeHeartbeat,
   findExistingByHash,
   saveCreatives,
+  markExtractionFailed,
   AdRow,
   CreativeInsert,
 } from './db.js'
@@ -96,10 +97,14 @@ async function processAd(ad: AdRow): Promise<ProcessResult> {
     )
 
     if (error) {
+      // Network/timeout — leave for retry, don't mark failed
       return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: `extract: ${error}` }
     }
     if (imageUrls.length === 0 && videoUrls.length === 0) {
-      return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: `no_creative_found (page=${pageStatus})` }
+      // Page loaded but no creative — ad likely deactivated or token expired.
+      // Mark so we never retry it.
+      await markExtractionFailed(ad.ad_id)
+      return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: `no_creative_found (page=${pageStatus}) → marked failed` }
     }
 
     // Process all images + all videos in parallel

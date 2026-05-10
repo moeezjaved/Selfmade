@@ -21,15 +21,15 @@ export interface AdRow {
  * Race-safe enough since we update thumbnail_url to a sentinel right after fetching.
  */
 export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<AdRow[]> {
-  // Need ads that have NEITHER an R2 thumbnail NOR an R2 video.
-  // Otherwise video-only ads (where the s60x60 thumb is too small to keep)
-  // get reprocessed forever.
+  // Need ads that have NEITHER an R2 thumbnail NOR an R2 video,
+  // AND haven't already been marked as un-extractable.
   let query: any = supabase
     .from('discovery_ads_index')
     .select('ad_id, snapshot_url, format, page_name')
     .not('snapshot_url', 'is', null)
     .is('thumbnail_url', null)
     .is('video_url', null)
+    .is('creative_extraction_failed_at', null)
     .order('last_seen', { ascending: false })
     .limit(batchSize)
 
@@ -118,14 +118,27 @@ export async function saveCreatives(rows: CreativeInsert[]): Promise<void> {
 }
 
 export async function getQueueDepth(): Promise<number> {
-  const { count, error } = await supabase
+  const { count, error } = await (supabase as any)
     .from('discovery_ads_index')
     .select('*', { count: 'exact', head: true })
     .is('thumbnail_url', null)
     .is('video_url', null)
+    .is('creative_extraction_failed_at', null)
     .not('snapshot_url', 'is', null)
   if (error) return -1
   return count ?? 0
+}
+
+/**
+ * Mark an ad as failed-to-extract so we stop retrying it forever.
+ * Common reasons: ad deactivated, snapshot access token expired.
+ */
+export async function markExtractionFailed(adId: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('discovery_ads_index')
+    .update({ creative_extraction_failed_at: new Date().toISOString() })
+    .eq('ad_id', adId)
+  if (error) console.warn(`  ⚠️  markExtractionFailed for ${adId}:`, error.message)
 }
 
 export interface HeartbeatPayload {
