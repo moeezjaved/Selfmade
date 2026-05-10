@@ -476,6 +476,38 @@ function SaveModal({ ad, onClose }: { ad: Ad; onClose: () => void }) {
   )
 }
 
+// ── InfiniteScrollSentinel ─────────────────────────────────────
+// Tiny invisible div that triggers onLoad when it scrolls into view.
+function InfiniteScrollSentinel({ loading, onLoad }: { loading: boolean; onLoad: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const onLoadRef = useRef(onLoad)
+  onLoadRef.current = onLoad
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loading) onLoadRef.current()
+      },
+      { rootMargin: '600px' } // start loading well before user reaches bottom
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [loading])
+
+  return (
+    <div ref={ref} style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 24 }}>
+      {loading && (
+        <span style={{ fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 14, height: 14, border: '2px solid #1a3a1a', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          Loading more…
+        </span>
+      )}
+    </div>
+  )
+}
+
 // ── AdCard ───────────────────────────────────────────────────
 const AVATAR_COLORS = ['#1a3a1a','#1e3a5f','#4a1942','#3a1a1a','#1a3a38','#2d3a1a','#3a2a1a']
 function avatarColor(name: string) {
@@ -1570,15 +1602,16 @@ export default function DiscoveryPage() {
                 </div>
               ))}
             </div>
+            {/* Infinite scroll sentinel — auto-loads next page when in view */}
             {hasMore && (
-              <div style={{ textAlign: 'center', marginTop: 32 }}>
-                <button
-                  onClick={() => searchSource === 'indexed' ? fetchAds(false, undefined, dbPage + 1) : fetchAds(false, nextCursor || undefined)}
-                  disabled={loading}
-                  style={{ padding: '12px 32px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: loading ? 0.7 : 1 }}>
-                  {loading ? 'Loading…' : 'Load more ads'}
-                </button>
-              </div>
+              <InfiniteScrollSentinel
+                loading={loading}
+                onLoad={() =>
+                  searchSource === 'indexed'
+                    ? fetchAds(false, undefined, dbPage + 1)
+                    : fetchAds(false, nextCursor || undefined)
+                }
+              />
             )}
           </>
         )}
