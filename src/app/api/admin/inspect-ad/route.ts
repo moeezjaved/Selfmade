@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
           return document.querySelectorAll('img').length > 5;
         }, { timeout: 5000 });
       } catch (_) {}
-      await page.waitForTimeout(2000);
+      await new Promise(r => setTimeout(r, 2000));
       return page.evaluate(() => {
         const allImgs = Array.from(document.querySelectorAll('img')).map(img => ({
           src: img.src,

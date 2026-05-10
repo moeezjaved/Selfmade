@@ -93,7 +93,7 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
 
     // Only wait extra time if creative showed up (give video src time to attach)
     if (creativeFound) {
-      await page.waitForTimeout(1000)
+      await new Promise(r => setTimeout(r, 1000))
     }
 
     const data = await page.evaluate(() => {
