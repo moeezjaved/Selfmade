@@ -100,13 +100,17 @@ const LANG_NAMES: Record<string, string> = {
 
 function classifyAd(raw: any): Ad {
   const text = `${raw.body} ${raw.title} ${raw.caption} ${raw.pageName}`
+  // Prefer the format already saved in DB by the indexer; fall back to local detection
+  const format = raw.format || detectFormat(raw.mediaType)
+  // Prefer DB industries (set by indexer/AI classifier), fall back to local detection
+  const industries = (raw.industries && raw.industries.length > 0) ? raw.industries : detectIndustries(text)
   return {
     ...raw,
     thumbnailUrl: raw.thumbnailUrl || raw.thumbnail_url || null,
     videoUrl: raw.videoUrl || raw.video_url || null,
     creatives: raw.creatives || [],
-    format: detectFormat(raw.mediaType),
-    industries: detectIndustries(text),
+    format,
+    industries,
     themes: detectThemes(text),
     langNames: (raw.languages || []).map((c: string) => LANG_NAMES[c] || c.toUpperCase()),
   }
@@ -352,12 +356,12 @@ function NumberInput({ label, value, onChange, placeholder, suffix }: {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
+        display: 'flex', alignItems: 'center', gap: 4,
         border: `1px solid ${isActive ? '#1a3a1a' : '#e2e8f0'}`,
         borderRadius: 8, background: isActive ? '#1a3a1a' : '#fff',
-        padding: '0 10px 0 10px', height: 34,
+        padding: '0 8px', height: 30,
       }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? '#dffe95' : '#6b7280', whiteSpace: 'nowrap' }}>{label}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#dffe95' : '#6b7280', whiteSpace: 'nowrap' }}>{label}</span>
         <input
           type="number"
           value={value}
@@ -365,7 +369,7 @@ function NumberInput({ label, value, onChange, placeholder, suffix }: {
           placeholder={placeholder}
           min={0}
           style={{
-            width: 60, border: 'none', outline: 'none', fontSize: 13, fontWeight: 600,
+            width: 36, border: 'none', outline: 'none', fontSize: 12, fontWeight: 600,
             background: 'transparent', color: isActive ? '#dffe95' : '#111',
             fontFamily: 'inherit', padding: 0,
           }}
@@ -1406,22 +1410,20 @@ export default function DiscoveryPage() {
 
           <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
 
-          {/* Runtime minimum */}
+          {/* Runtime minimum (compact) */}
           <NumberInput
-            label="Min Runtime"
+            label="Min days"
             value={minDaysStr}
             onChange={setMinDaysStr}
             placeholder="0"
-            suffix="days"
           />
 
-          {/* Brand active ads minimum */}
+          {/* Brand active ads minimum (compact) */}
           <NumberInput
-            label="Brand Ads ≥"
+            label="Brand ads ≥"
             value={minBrandAdsStr}
             onChange={setMinBrandAdsStr}
             placeholder="0"
-            suffix="ads"
           />
 
           {/* Clear all */}
