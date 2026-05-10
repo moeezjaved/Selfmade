@@ -751,15 +751,16 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         </span>
       </div>
 
-      {/* Hover overlay — Clone ad (image) or Scripts (video) */}
+      {/* Hover overlay — Clone ad (image, centered) or Scripts (video, top-left so it doesn't cover play button) */}
       <div
         className="hover-overlay"
         style={{
           position: 'absolute', inset: 0,
-          background: 'rgba(0,0,0,0.35)',
+          background: slide.type === 'video' ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.35)',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: slide.type === 'video' ? 'flex-start' : 'center',
+          justifyContent: slide.type === 'video' ? 'flex-start' : 'center',
+          padding: slide.type === 'video' ? 10 : 0,
           opacity: 0,
           transition: 'opacity .15s',
           pointerEvents: 'none',
