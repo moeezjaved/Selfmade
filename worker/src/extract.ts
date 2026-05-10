@@ -65,15 +65,15 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
       return route.continue()
     })
 
+    // Tight timeouts so dead ads (which never load a creative) fail fast.
+    // Live ads usually render fbcdn in 1-3s after domcontentloaded.
     let pageStatus = 0
     const resp = await page.goto(snapshotUrl, {
       waitUntil: 'domcontentloaded',
-      timeout: 12_000,
+      timeout: 8_000,
     })
     pageStatus = resp ? resp.status() : 0
 
-    // Wait for an actual ad creative to appear (8s for live ads).
-    // For dead ads this just times out and we move on quickly.
     let creativeFound = false
     try {
       await page.waitForFunction(
@@ -84,17 +84,16 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
                       !!document.querySelector('video source[src]')
           return img || vid
         },
-        { timeout: 8_000 }
+        { timeout: 4_000 } // dead ads fail in 4s instead of 8s
       )
       creativeFound = true
     } catch {
-      /* timeout — we'll extract what's there but probably nothing */
+      /* timeout — almost certainly a dead ad, skip extra wait */
     }
 
-    // Only wait extra time if a creative actually showed up (gives video src time to attach).
-    // For dead ads, skip this wait entirely.
+    // Only wait extra time if creative showed up (give video src time to attach)
     if (creativeFound) {
-      await page.waitForTimeout(1200)
+      await page.waitForTimeout(1000)
     }
 
     const data = await page.evaluate(() => {
