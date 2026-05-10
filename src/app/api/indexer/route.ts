@@ -339,14 +339,26 @@ async function fetchAdsForTerm(
       // returns the full 2000+ ad library. We include all term countries + standard
       // brand markets. Meta's ad_reached_countries is an OR filter — ads that
       // targeted ANY of the listed countries are returned.
-      // Use 'ALL' to capture EVERY country since global brands like Gymshark
-      // have ads in 50+ markets. Falls back to country list if 'ALL' rejected.
-      const BRAND_COUNTRIES = ['ALL']
+      // Comprehensive list of major markets where global DTC brands run ads.
+      // Meta accepts up to ~30 countries per request reliably.
+      const BRAND_COUNTRIES = [
+        // North America
+        'US', 'CA', 'MX',
+        // Europe
+        'GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'SE', 'DK', 'PL', 'IE', 'PT',
+        // Asia-Pacific
+        'AU', 'NZ', 'IN', 'JP', 'SG', 'HK', 'TH', 'PH', 'ID',
+        // Middle East / Africa
+        'AE', 'SA', 'KW', 'ZA',
+        // Latin America
+        'BR', 'AR',
+      ]
+      const brandCountries = Array.from(new Set([metaCountry, ...BRAND_COUNTRIES]))
 
       const brandPageParams: Record<string, string> = {
         access_token: token,
         search_page_ids: pageIdsParam,
-        ad_reached_countries: JSON.stringify(BRAND_COUNTRIES),
+        ad_reached_countries: JSON.stringify(brandCountries),
         ad_type: 'ALL',
         active_status: 'ALL', // include stopped/paused — historical winners matter
         fields: META_FIELDS,
@@ -395,17 +407,23 @@ async function fetchAdsForTerm(
         pagesTotal++
         log(`  📄 Brand page ${p + 1}${resumedFromCursor ? ' (resumed)' : ''}: ${pageAds.length} returned, ${newThisPage} new | running total: ${allAds.length}`)
         if (!hasMore || !nextCursor) {
-          // Genuinely exhausted — mark so we don't keep trying
-          try {
-            await admin.from('discovery_brand_crawl_state').upsert({
-              page_id: firstPageIdForState,
-              brand_name: term,
-              cursor: null,
-              exhausted_at: new Date().toISOString(),
-              last_run_at: new Date().toISOString(),
-              last_run_added: newThisPage,
-            } as any)
-          } catch { /* ignore */ }
+          // Only mark exhausted if we actually GOT ads. If we got zero on the
+          // very first page we're probably hitting an API issue — leave state
+          // alone so a re-run can try again.
+          if (allAds.length > 0) {
+            try {
+              await admin.from('discovery_brand_crawl_state').upsert({
+                page_id: firstPageIdForState,
+                brand_name: term,
+                cursor: null,
+                exhausted_at: new Date().toISOString(),
+                last_run_at: new Date().toISOString(),
+                last_run_added: newThisPage,
+              } as any)
+            } catch { /* ignore */ }
+          } else {
+            log(`  ⚠️  No ads returned on first page — likely API issue. Not marking exhausted.`)
+          }
           break
         }
         brandCursor = nextCursor
