@@ -477,7 +477,7 @@ function SaveModal({ ad, onClose }: { ad: Ad; onClose: () => void }) {
 }
 
 // ── InfiniteScrollSentinel ─────────────────────────────────────
-// Tiny invisible div that triggers onLoad when it scrolls into view.
+// Full-width loading row — triggers onLoad when scrolled near.
 function InfiniteScrollSentinel({ loading, onLoad }: { loading: boolean; onLoad: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const onLoadRef = useRef(onLoad)
@@ -490,20 +490,44 @@ function InfiniteScrollSentinel({ loading, onLoad }: { loading: boolean; onLoad:
       ([entry]) => {
         if (entry.isIntersecting && !loading) onLoadRef.current()
       },
-      { rootMargin: '600px' } // start loading well before user reaches bottom
+      { rootMargin: '800px' } // start fetching well before the user reaches bottom
     )
     obs.observe(el)
     return () => obs.disconnect()
   }, [loading])
 
   return (
-    <div ref={ref} style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 24 }}>
-      {loading && (
-        <span style={{ fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 14, height: 14, border: '2px solid #1a3a1a', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          Loading more…
-        </span>
-      )}
+    <div
+      ref={ref}
+      style={{
+        width: '100%',
+        height: 80,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 16,
+        // Always reserve space so layout doesn't jump when spinner shows/hides
+      }}
+    >
+      <span style={{
+        fontSize: 13,
+        color: '#6b7280',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        opacity: loading ? 1 : 0,
+        transition: 'opacity .2s',
+      }}>
+        <span style={{
+          width: 16,
+          height: 16,
+          border: '2px solid #1a3a1a',
+          borderTopColor: 'transparent',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        Loading more…
+      </span>
     </div>
   )
 }
@@ -1598,7 +1622,14 @@ export default function DiscoveryPage() {
             {/* Masonry layout — Atria-style compact cards */}
             <div style={{ columnWidth: 215, columnGap: 10, columnFill: 'balance' }}>
               {filteredAds.map(ad => (
-                <div key={ad.id} style={{ breakInside: 'avoid', marginBottom: 10, display: 'inline-block', width: '100%' }}>
+                <div key={ad.id}
+                  style={{
+                    breakInside: 'avoid',
+                    marginBottom: 10,
+                    display: 'inline-block',
+                    width: '100%',
+                    animation: 'fadeUp 0.35s ease-out both',
+                  }}>
                   <AdCard ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })} />
                 </div>
               ))}
