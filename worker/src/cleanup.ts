@@ -64,11 +64,13 @@ async function main() {
 
   // 3. Clear thumbnail_url + image_hash + creative_extraction_failed_at
   // for all ads with these hashes — worker will re-process them.
-  // Batch by ad_id (100 per update) to avoid Supabase statement timeout.
+  // Tiny chunks + retries to survive lock contention if worker is running.
   let totalCleaned = 0
-  const CHUNK = 100
+  const CHUNK = 25
+  const MAX_RETRIES = 5
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
   for (const [hash] of suspectHashes) {
-    // First fetch all ad_ids matching this hash
     const { data: matches, error: selErr } = await (supabase as any)
       .from('discovery_ads_index')
       .select('ad_id')
@@ -79,22 +81,35 @@ async function main() {
     }
     const ids = (matches || []).map((r: any) => r.ad_id)
     let cleanedForHash = 0
+
     for (let i = 0; i < ids.length; i += CHUNK) {
       const chunk = ids.slice(i, i + CHUNK)
-      const { error: updErr } = await (supabase as any)
-        .from('discovery_ads_index')
-        .update({
-          thumbnail_url: null,
-          image_hash: null,
-          creative_extraction_failed_at: null,
-        } as any)
-        .in('ad_id', chunk)
-      if (updErr) {
-        console.error(`     ⚠️  Chunk ${i / CHUNK + 1} failed:`, updErr.message)
-      } else {
+      let success = false
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        const { error: updErr } = await (supabase as any)
+          .from('discovery_ads_index')
+          .update({
+            thumbnail_url: null,
+            image_hash: null,
+            creative_extraction_failed_at: null,
+          } as any)
+          .in('ad_id', chunk)
+        if (!updErr) {
+          success = true
+          break
+        }
+        if (attempt === MAX_RETRIES) {
+          console.error(`\n     ⚠️  Chunk ${Math.floor(i / CHUNK) + 1} permanently failed after ${MAX_RETRIES} retries:`, updErr.message)
+        } else {
+          await sleep(500 * attempt) // exponential backoff
+        }
+      }
+      if (success) {
         cleanedForHash += chunk.length
         process.stdout.write('.')
       }
+      // Tiny breath between chunks to release locks
+      await sleep(50)
     }
     console.log(`\n  ✅ Cleared ${cleanedForHash}/${ids.length} ads with hash ${hash.slice(0, 16)}…`)
     totalCleaned += cleanedForHash
