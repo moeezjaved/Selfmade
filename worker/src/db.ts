@@ -49,17 +49,42 @@ export async function updateAdCreative(
   adId: string,
   thumbnailUrl: string | null,
   videoUrl: string | null,
+  imageHash?: string | null,
+  videoHash?: string | null,
 ): Promise<void> {
-  if (!thumbnailUrl && !videoUrl) return
+  if (!thumbnailUrl && !videoUrl && !imageHash && !videoHash) return
   const update: Record<string, string> = {}
   if (thumbnailUrl) update.thumbnail_url = thumbnailUrl
   if (videoUrl) update.video_url = videoUrl
+  if (imageHash) update.image_hash = imageHash
+  if (videoHash) update.video_hash = videoHash
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('discovery_ads_index')
     .update(update)
     .eq('ad_id', adId)
   if (error) console.warn(`  ⚠️  DB update failed for ${adId}:`, error.message)
+}
+
+/**
+ * Look up an existing R2 URL for a given hash. If found, we can skip
+ * re-uploading the same creative.
+ */
+export async function findExistingByHash(
+  hash: string,
+  type: 'image' | 'video',
+): Promise<string | null> {
+  const hashCol = type === 'image' ? 'image_hash' : 'video_hash'
+  const urlCol = type === 'image' ? 'thumbnail_url' : 'video_url'
+  const { data, error } = await (supabase as any)
+    .from('discovery_ads_index')
+    .select(urlCol)
+    .eq(hashCol, hash)
+    .not(urlCol, 'is', null)
+    .limit(1)
+    .maybeSingle()
+  if (error || !data) return null
+  return (data as any)[urlCol] || null
 }
 
 export async function getQueueDepth(): Promise<number> {
