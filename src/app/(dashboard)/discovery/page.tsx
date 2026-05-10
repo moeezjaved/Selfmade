@@ -1336,30 +1336,32 @@ export default function DiscoveryPage() {
           </button>
         </div>
 
-        {/* Row 2: Time filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 8 }}>
-          {[
-            { label: 'All time', days: 0 },
-            { label: '7d', days: 7 },
-            { label: '30d', days: 30 },
-            { label: '90d', days: 90 },
-            { label: '180d', days: 180 },
-          ].map(f => (
-            <button key={f.days} onClick={() => setTimeDays(f.days)}
-              style={{
-                padding: '5px 13px', borderRadius: 7, fontSize: 12, fontWeight: 600,
-                background: timeDays === f.days ? '#1a3a1a' : 'transparent',
-                color: timeDays === f.days ? '#dffe95' : '#6b7280',
-                border: `1px solid ${timeDays === f.days ? '#1a3a1a' : 'transparent'}`,
-                cursor: 'pointer', fontFamily: 'inherit',
-              }}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Row 3: filters */}
+        {/* Row 2: filters — time buttons + country + format etc all on one line */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Time filter (inline) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '2px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', flexShrink: 0 }}>
+            {[
+              { label: 'All time', days: 0 },
+              { label: '7d', days: 7 },
+              { label: '30d', days: 30 },
+              { label: '90d', days: 90 },
+              { label: '180d', days: 180 },
+            ].map(f => (
+              <button key={f.days} onClick={() => setTimeDays(f.days)}
+                style={{
+                  padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                  background: timeDays === f.days ? '#1a3a1a' : 'transparent',
+                  color: timeDays === f.days ? '#dffe95' : '#6b7280',
+                  border: 'none',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
+
           {/* Country — server-side, prominent */}
           <CountryDropdown value={country} onChange={v => { setCountry(v); setRawAds([]) }} />
 
