@@ -53,6 +53,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Hard timeout helper — middleware MUST finish in <25s or Vercel returns 504.
+  // When Supabase is under load (heavy worker writes, big index builds, etc.)
+  // a single getUser() call can stall for 30s+. Better to fail open (let the
+  // page render and rely on per-route auth) than 504 the whole site.
+  const withTimeout = <T,>(p: Promise<T>, ms = 4000): Promise<T | null> =>
+    Promise.race([
+      p,
+      new Promise<null>(r => setTimeout(() => r(null), ms)),
+    ])
+
   try {
     const { createServerClient } = await import('@supabase/ssr')
     let response = NextResponse.next({ request })
@@ -74,7 +84,13 @@ export async function middleware(request: NextRequest) {
       }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const userRes = await withTimeout(supabase.auth.getUser())
+    if (!userRes) {
+      // Supabase didn't answer in 4s — fail open. Per-page server components
+      // will still re-check auth using their own (non-edge) Supabase clients.
+      return response
+    }
+    const user = userRes.data.user
 
     if (PROTECTED.some(p => pathname.startsWith(p)) && !user) {
       return NextResponse.redirect(new URL('/login', request.url))
@@ -86,13 +102,16 @@ export async function middleware(request: NextRequest) {
 
     // ── Subscription gate ────────────────────────────────────────
     if (user && REQUIRES_SUBSCRIPTION.some(p => pathname.startsWith(p))) {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('subscription_status, trial_ends_at')
-        .eq('user_id', user.id)
-        .single()
+      const profileRes = await withTimeout(
+        supabase
+          .from('user_profiles')
+          .select('subscription_status, trial_ends_at')
+          .eq('user_id', user.id)
+          .single()
+      )
 
-      if (profile) {
+      if (profileRes?.data) {
+        const profile = profileRes.data
         const status = profile.subscription_status
         const trialEnded = profile.trial_ends_at && new Date(profile.trial_ends_at) < new Date()
         const isLocked = status === 'canceled' || status === 'past_due' || status === 'incomplete'
@@ -102,6 +121,9 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL('/billing?expired=1', request.url))
         }
       }
+      // If profileRes is null (timeout), fail open — let user through.
+      // Worst case: someone with an expired sub gets one extra page load before
+      // the gate kicks in on the next request when DB is responsive.
     }
 
     return response
