@@ -52,21 +52,19 @@ export async function GET(_req: NextRequest) {
     if (r.page_name && !adCountByPage[k].name) adCountByPage[k].name = r.page_name
   }
 
-  // Get ACCURATE per-brand ad counts via parallel COUNT queries.
-  // For each tracked brand with a page_id, run a HEAD count query.
+  // Get per-brand ad counts. Run sequentially (parallel times out) and
+  // use 'estimated' count which is much faster than 'exact' on big tables.
   const tracked = (terms || []).filter((t: any) => t.page_id)
-  const countResults = await Promise.all(
-    tracked.map(async (t: any) => {
-      const { count } = await admin
+  for (const t of tracked) {
+    try {
+      const { count, error } = await admin
         .from('discovery_ads_index')
-        .select('*', { count: 'exact', head: true })
+        .select('*', { count: 'estimated', head: true })
         .eq('page_id', t.page_id)
-      return { page_id: t.page_id, count: count || 0 }
-    })
-  )
-  for (const { page_id, count } of countResults) {
-    if (!adCountByPage[page_id]) adCountByPage[page_id] = { count: 0, name: '' }
-    adCountByPage[page_id].count = count
+      if (error) continue
+      if (!adCountByPage[t.page_id]) adCountByPage[t.page_id] = { count: 0, name: '' }
+      adCountByPage[t.page_id].count = count || 0
+    } catch { /* skip on failure */ }
   }
 
   // Build a map: page_id → state
