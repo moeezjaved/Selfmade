@@ -141,7 +141,10 @@ export async function POST(req: NextRequest) {
     term: term.trim().toLowerCase(),
     term_type: term_type || 'brand',
     category: category || 'General',
-    countries: countries || ['US'],
+    // Global default — many brands target outside US even if HQ'd there (e.g. Hims).
+    // Meta's ad_reached_countries is an OR filter, so listing many countries just
+    // returns more ads, not duplicates. Per-brand budget keeps cron tick fair.
+    countries: countries || ['US','GB','CA','AU','DE','FR','IT','ES','NL','SE','PL','MX','BR','IN','JP','SG','AE','ZA'],
     priority: priority || 5,
     is_active: true,
   }

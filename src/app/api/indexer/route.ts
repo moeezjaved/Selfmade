@@ -1083,6 +1083,13 @@ export async function GET(request: NextRequest) {
 
             send('log', `  ✅ ${term}/${country}: ${savedCount} unique ads saved${upsertError ? ` (⚠️ partial: ${upsertError})` : ''}`)
             totalAdsUpserted += savedCount
+
+            // Brand-page mode already queries ALL 30+ brand countries in a single
+            // Meta call (see brandPageParams.ad_reached_countries in fetchAdsForTerm).
+            // Iterating further `countriesToCrawl` entries just re-hits the same
+            // cursor (or skips as exhausted) and wastes ~1s per country. Break out
+            // so the next term gets its share of the cron budget.
+            if (manualPageId || knownBrandPageIds.length > 0) break
           }
 
           if (id !== 'manual') {
