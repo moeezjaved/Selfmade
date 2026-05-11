@@ -66,20 +66,22 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Keyword search — OR across body, title, page_name
+    // Keyword search — OR across body, title, page_name, brand_categories
     if (q) {
       if (mode === 'brand') {
         baseQuery = baseQuery.ilike('page_name', `%${q}%`)
       } else {
-        // For each significant word, match against body OR title OR page_name
         const words = q.trim().split(/\s+/).filter(w => w.length > 1).slice(0, 6)
         if (words.length > 0) {
-          // Build: body.ilike.%word%,title.ilike.%word%,page_name.ilike.%word%
+          // Match: text fields (ilike) + brand_categories array (contains)
+          // Searching "gymwear" finds ads where brand_categories has "gymwear"
+          // even if the ad copy doesn't mention it.
           const orParts = words.flatMap(w => [
             `body.ilike.%${w}%`,
             `title.ilike.%${w}%`,
             `page_name.ilike.%${w}%`,
             `description.ilike.%${w}%`,
+            `brand_categories.cs.{${w.toLowerCase()}}`,
           ])
           baseQuery = baseQuery.or(orParts.join(','))
         }
@@ -90,7 +92,13 @@ export async function GET(request: NextRequest) {
     if (status === 'ACTIVE') baseQuery = baseQuery.eq('is_active', true)
     if (status === 'INACTIVE') baseQuery = baseQuery.eq('is_active', false)
     if (format) baseQuery = baseQuery.eq('format', format)
-    if (industry) baseQuery = baseQuery.contains('industries', [industry])
+    // Industry/category filter — match against either the AI-detected industries
+    // OR the brand's explicit categories (set by indexer).
+    if (industry) {
+      baseQuery = baseQuery.or(
+        `industries.cs.{${industry}},brand_categories.cs.{${industry}}`
+      )
+    }
     if (hookType) baseQuery = baseQuery.eq('hook_type', hookType)
     if (emotion) baseQuery = baseQuery.contains('emotion', [emotion])
     if (angle) baseQuery = baseQuery.eq('angle', angle)
