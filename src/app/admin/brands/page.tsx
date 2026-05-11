@@ -70,6 +70,11 @@ export default function BrandsPage() {
   const [error, setError] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [showUrlLookup, setShowUrlLookup] = useState(false)
+  const [urlInput, setUrlInput] = useState('')
+  const [urlLookupLoading, setUrlLookupLoading] = useState(false)
+  const [urlLookupResult, setUrlLookupResult] = useState<any>(null)
+  const [editableCats, setEditableCats] = useState<string[]>([])
   const [importCsv, setImportCsv] = useState('')
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<any>(null)
@@ -170,6 +175,64 @@ export default function BrandsPage() {
     }
   }
 
+  const lookupFromUrl = async () => {
+    if (!urlInput.trim()) return
+    setUrlLookupLoading(true)
+    setUrlLookupResult(null)
+    setEditableCats([])
+    try {
+      const res = await fetch('/api/admin/brands/from-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlInput }),
+      })
+      const j = await res.json()
+      if (!res.ok) {
+        setUrlLookupResult({ error: j.error })
+      } else {
+        setUrlLookupResult(j)
+        setEditableCats(j.suggested_categories || [])
+      }
+    } catch (e) {
+      setUrlLookupResult({ error: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setUrlLookupLoading(false)
+    }
+  }
+
+  const confirmAddFromUrl = async () => {
+    if (!urlLookupResult?.page_id) return
+    await fetch('/api/admin/brands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        term: urlLookupResult.name?.toLowerCase() || '',
+        page_id: urlLookupResult.page_id,
+        term_type: 'brand',
+        category: editableCats[0] || 'General',
+        countries: ['US'],
+        priority: 5,
+      }),
+    })
+    // Also save the categories array (POST only stores the first one as "category")
+    // Need to find the new id then patch categories
+    const refreshRes = await fetch('/api/admin/brands')
+    const refreshJ = await refreshRes.json()
+    const newRow = refreshJ.terms?.find((t: any) => t.page_id === urlLookupResult.page_id)
+    if (newRow && editableCats.length > 0) {
+      await fetch('/api/admin/brands', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_categories', id: newRow.id, categories: editableCats }),
+      })
+    }
+    setUrlInput('')
+    setUrlLookupResult(null)
+    setEditableCats([])
+    setShowUrlLookup(false)
+    load()
+  }
+
   const openPreview = async (page_id: string, brand_name: string) => {
     setPreviewBrand({ page_id, brand_name })
     setPreviewData(null)
@@ -206,11 +269,15 @@ export default function BrandsPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => { setShowImport(s => !s); setShowAdd(false) }}
+          <button onClick={() => { setShowUrlLookup(s => !s); setShowAdd(false); setShowImport(false) }}
+            style={{ padding: '9px 18px', background: '#fff', color: '#1a3a1a', border: '1px solid #1a3a1a', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {showUrlLookup ? '× Cancel' : '🔗 Add by URL'}
+          </button>
+          <button onClick={() => { setShowImport(s => !s); setShowAdd(false); setShowUrlLookup(false) }}
             style={{ padding: '9px 18px', background: '#fff', color: '#1a3a1a', border: '1px solid #1a3a1a', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             {showImport ? '× Cancel import' : '📥 Bulk import CSV'}
           </button>
-          <button onClick={() => { setShowAdd(s => !s); setShowImport(false) }}
+          <button onClick={() => { setShowAdd(s => !s); setShowImport(false); setShowUrlLookup(false) }}
             style={{ padding: '9px 18px', background: '#dffe95', color: '#1a3a1a', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
             {showAdd ? '× Cancel' : '+ Add brand'}
           </button>
@@ -223,6 +290,94 @@ export default function BrandsPage() {
         <KPI label="Brands indexed" value={data.summary.brands_indexed} />
         <KPI label="Total ads in DB" value={data.summary.total_ads.toLocaleString()} />
       </div>
+
+      {/* URL Lookup Panel */}
+      {showUrlLookup && (
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 18, marginBottom: 18 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>🔗 Add brand by URL</div>
+          <p style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
+            Paste a Meta Ads Library URL (with <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>view_all_page_id=…</code>) or a Facebook page URL. We&apos;ll auto-extract the page_id, fetch brand info, and suggest categories.
+          </p>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <input
+              value={urlInput}
+              onChange={e => setUrlInput(e.target.value)}
+              placeholder="https://www.facebook.com/ads/library/?...view_all_page_id=355136938262536..."
+              onKeyDown={e => e.key === 'Enter' && lookupFromUrl()}
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button onClick={lookupFromUrl} disabled={!urlInput.trim() || urlLookupLoading}
+              style={{ padding: '8px 16px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: urlLookupLoading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
+              {urlLookupLoading ? '⏳ Looking up…' : '🔍 Lookup'}
+            </button>
+          </div>
+
+          {urlLookupResult && (
+            <div style={{ padding: 14, background: '#f8fafc', borderRadius: 8 }}>
+              {urlLookupResult.error ? (
+                <div style={{ color: '#c0392b' }}>❌ {urlLookupResult.error}</div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+                    {urlLookupResult.picture && (
+                      <img src={urlLookupResult.picture} alt="" style={{ width: 48, height: 48, borderRadius: '50%' }} />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {urlLookupResult.name}
+                        {urlLookupResult.verified && <span style={{ color: '#1d4ed8' }}>✓</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#666' }}>
+                        {urlLookupResult.follower_count?.toLocaleString() || '?'} followers · {urlLookupResult.category}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#888', fontFamily: 'ui-monospace, monospace', marginTop: 2 }}>
+                        Page ID: {urlLookupResult.page_id}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#666', marginBottom: 6 }}>
+                      🏷 Suggested categories (Claude AI) — click × to remove, type to add
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, minHeight: 36 }}>
+                      {editableCats.map((c, i) => (
+                        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '3px 8px', background: '#eff6ff', color: '#1d4ed8', borderRadius: 4, border: '1px solid #bfdbfe' }}>
+                          {c}
+                          <button onClick={() => setEditableCats(s => s.filter((_, idx) => idx !== i))}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#1d4ed8', fontSize: 14, lineHeight: 1 }}>×</button>
+                        </span>
+                      ))}
+                      <input
+                        placeholder="add category…"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            const v = (e.currentTarget.value || '').trim().toLowerCase()
+                            if (v && !editableCats.includes(v)) setEditableCats(s => [...s, v])
+                            e.currentTarget.value = ''
+                          }
+                        }}
+                        style={{ border: 'none', outline: 'none', fontSize: 12, fontFamily: 'inherit', flex: 1, minWidth: 100, padding: '3px 6px' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={confirmAddFromUrl}
+                      style={{ padding: '9px 18px', background: '#dffe95', color: '#1a3a1a', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      ✓ Add this brand
+                    </button>
+                    <button onClick={() => { setUrlLookupResult(null); setUrlInput(''); setEditableCats([]) }}
+                      style={{ padding: '9px 18px', background: '#fff', color: '#666', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Bulk Import Modal */}
       {showImport && (
