@@ -17,33 +17,43 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
   const brand = req.nextUrl.searchParams.get('brand') || 'Gymshark'
 
-  const [
-    { count: totalAds },
-    { count: brandAds },
-    { count: brandActive },
-    { count: brandInactive },
-    { count: brandWithImage },
-    { count: brandWithVideo },
-    { count: brandWithAnyR2 },
-    { count: brandWithImageHash },
-    { data: hashSample },
-    { data: countryBreakdown },
-    { data: pageBreakdown },
-  ] = await Promise.all([
-    admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }),
-    admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`),
-    admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).eq('is_active', true),
-    admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).eq('is_active', false),
-    admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).like('thumbnail_url', '%r2.dev%'),
-    admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).like('video_url', '%r2.dev%'),
-    admin.from('discovery_ads_index').select('*', { count: 'exact', head: true })
-      .ilike('page_name', `%${brand}%`)
-      .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%'),
-    admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).not('image_hash', 'is', null),
-    admin.from('discovery_ads_index').select('image_hash, video_hash, ad_id').ilike('page_name', `%${brand}%`).not('image_hash', 'is', null).limit(2000),
-    admin.from('discovery_ads_index').select('country').ilike('page_name', `%${brand}%`).limit(50000),
-    admin.from('discovery_ads_index').select('page_name, page_id').ilike('page_name', `%${brand}%`).limit(50000),
-  ])
+  // Run counts sequentially with error handling — parallel + exact COUNT
+  // can time out on big tables. Use 'planned' (fast estimate) where possible.
+  async function countQuery(builder: any): Promise<{ count: number | null; error: string | null }> {
+    try {
+      const { count, error } = await builder
+      return { count: count ?? null, error: error?.message || null }
+    } catch (e) {
+      return { count: null, error: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  const totalAdsRes = await countQuery(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }))
+  const brandAdsRes = await countQuery(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`))
+  const brandActiveRes = await countQuery(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).eq('is_active', true))
+  const brandInactiveRes = await countQuery(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).eq('is_active', false))
+  const brandWithImageRes = await countQuery(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).like('thumbnail_url', '%r2.dev%'))
+  const brandWithVideoRes = await countQuery(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).like('video_url', '%r2.dev%'))
+  const brandWithAnyR2Res = await countQuery(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%'))
+  const brandWithImageHashRes = await countQuery(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).ilike('page_name', `%${brand}%`).not('image_hash', 'is', null))
+
+  const totalAds = totalAdsRes.count
+  const brandAds = brandAdsRes.count
+  const brandActive = brandActiveRes.count
+  const brandInactive = brandInactiveRes.count
+  const brandWithImage = brandWithImageRes.count
+  const brandWithVideo = brandWithVideoRes.count
+  const brandWithAnyR2 = brandWithAnyR2Res.count
+  const brandWithImageHash = brandWithImageHashRes.count
+
+  const errors = [totalAdsRes, brandAdsRes, brandActiveRes, brandInactiveRes, brandWithImageRes, brandWithVideoRes, brandWithAnyR2Res, brandWithImageHashRes]
+    .map((r, i) => r.error ? { query: i, error: r.error } : null)
+    .filter(Boolean)
+
+  // Lightweight data samples
+  const { data: hashSample } = await admin.from('discovery_ads_index').select('image_hash').ilike('page_name', `%${brand}%`).not('image_hash', 'is', null).limit(2000)
+  const { data: countryBreakdown } = await admin.from('discovery_ads_index').select('country').ilike('page_name', `%${brand}%`).limit(2000)
+  const { data: pageBreakdown } = await admin.from('discovery_ads_index').select('page_name, page_id').ilike('page_name', `%${brand}%`).limit(2000)
 
   // Count unique image hashes for this brand
   const uniqueImageHashes = new Set((hashSample || []).map((r: any) => r.image_hash).filter(Boolean))
@@ -76,6 +86,7 @@ export async function GET(req: NextRequest) {
       brand_with_image_hash: brandWithImageHash,
       unique_image_hashes_for_brand: uniqueImageHashes.size,
     },
+    query_errors: errors.length > 0 ? errors : undefined,
     diagnosis: brandAds === 0
       ? `🚨 ZERO ads for "${brand}" in DB — crawler never indexed this brand`
       : (brandAds || 0) < 5000
