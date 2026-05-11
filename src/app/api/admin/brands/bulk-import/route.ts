@@ -101,12 +101,20 @@ async function lookupPageId(name: string, website: string | undefined, token: st
     const candidates = (data?.data || []) as any[]
     if (candidates.length === 0) return { candidates: [] }
 
-    // High confidence match: exact name + (verified or 100K+ fans)
-    const best = candidates.find(c => {
-      const nameMatch = c.name?.toLowerCase() === name.toLowerCase()
-      const verified = c.verification_status === 'blue_verified' || c.verification_status === 'gray_verified'
-      return nameMatch && (verified || (c.fan_count || 0) > 100_000)
-    }) || candidates.find(c => c.name?.toLowerCase() === name.toLowerCase())
+    // Match strategies (best → fallback):
+    //   1. Exact name + (verified or 100K+ fans)            → high confidence, save active
+    //   2. Exact name (any followers)                       → medium confidence, save active
+    //   3. Top result by followers                          → low confidence, save inactive
+    const verified = (c: any) => c.verification_status === 'blue_verified' || c.verification_status === 'gray_verified'
+    const nameMatch = (c: any) => c.name?.toLowerCase() === name.toLowerCase()
+
+    const high = candidates.find(c => nameMatch(c) && (verified(c) || (c.fan_count || 0) > 100_000))
+    const medium = candidates.find(c => nameMatch(c))
+    const sorted = [...candidates].sort((a, b) => (b.fan_count || 0) - (a.fan_count || 0))
+    const fallback = sorted[0]
+
+    const best = high || medium || fallback
+    const confidence: 'high' | 'medium' | 'low' = high ? 'high' : medium ? 'medium' : 'low'
 
     if (best?.id) {
       return {
@@ -114,8 +122,9 @@ async function lookupPageId(name: string, website: string | undefined, token: st
         page_name: best.name,
         follower_count: best.fan_count,
         picture: best.picture?.data?.url,
+        confidence,
         candidates,
-      }
+      } as any
     }
     return { candidates }
   } catch {
@@ -133,10 +142,15 @@ async function processRow(
 
   let pageId = row.page_id?.trim()
   let lookupResult: any = {}
+  const userProvidedPageId = !!pageId
   if (!pageId) {
     lookupResult = await lookupPageId(row.brand_name, row.website, token)
     pageId = lookupResult.page_id
   }
+
+  // Auto-active only if user provided page_id OR lookup was high confidence.
+  // Low/medium confidence → save inactive so admin can preview + approve.
+  const highConfidence = userProvidedPageId || lookupResult?.confidence === 'high'
 
   const insert: Record<string, any> = {
     term,
@@ -145,7 +159,7 @@ async function processRow(
     categories: row.category ? [row.category] : [],
     countries: ['US'],
     priority: row.priority || 5,
-    is_active: !!pageId,    // active only if we have a page_id
+    is_active: !!pageId && highConfidence,
     follower_count: lookupResult?.follower_count,
     picture: lookupResult?.picture,
     website: row.website,
@@ -169,7 +183,18 @@ async function processRow(
       page_id: undefined,
       category: row.category,
       status: 'needs_manual',
-      message: 'No high-confidence page_id found',
+      message: 'No page found via Meta search or website scrape',
+      candidates: lookupResult.candidates?.slice(0, 3),
+    }
+  }
+
+  if (!highConfidence) {
+    return {
+      brand_name: row.brand_name,
+      page_id: pageId,
+      category: row.category,
+      status: 'needs_manual',
+      message: `Saved as INACTIVE (low confidence: ${lookupResult?.page_name}). Preview in admin to verify, then activate.`,
       candidates: lookupResult.candidates?.slice(0, 3),
     }
   }
