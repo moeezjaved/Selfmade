@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest) {
   ] = await Promise.all([
     admin
       .from('discovery_crawl_terms')
-      .select('id, term, term_type, page_id, category, countries, priority, is_active, created_at')
+      .select('id, term, term_type, page_id, category, categories, countries, priority, is_active, follower_count, picture, website, notes, created_at')
       .order('created_at', { ascending: false }),
     admin
       .from('discovery_brand_crawl_state')
@@ -158,15 +158,22 @@ export async function PATCH(req: NextRequest) {
 
   const admin = createAdminClient()
   const body = await req.json()
-  const { action, id, page_id, is_active } = body
+  const { action, id, page_id, is_active, categories } = body
 
   if (action === 'toggle' && id != null) {
     await admin.from('discovery_crawl_terms').update({ is_active }).eq('id', id)
     return NextResponse.json({ success: true })
   }
 
+  if (action === 'update_categories' && id != null && Array.isArray(categories)) {
+    await (admin as any)
+      .from('discovery_crawl_terms')
+      .update({ categories: categories.map(c => String(c).trim().toLowerCase()).filter(Boolean) })
+      .eq('id', id)
+    return NextResponse.json({ success: true })
+  }
+
   if (action === 'force_recrawl' && page_id) {
-    // Clear cursor + exhausted_at so the next cron run starts fresh from page 1
     await (admin as any)
       .from('discovery_brand_crawl_state')
       .update({ cursor: null, exhausted_at: null })

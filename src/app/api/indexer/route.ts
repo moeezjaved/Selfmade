@@ -585,7 +585,7 @@ function detectThemes(text: string): string[] {
 }
 
 // ── Transform raw Meta ad → DB row ──────────────────────────
-function transformAd(ad: any, term: string, country: string) {
+function transformAd(ad: any, term: string, country: string, brandCategories: string[] = []) {
   const body = ad.ad_creative_bodies?.[0] || ''
   const title = ad.ad_creative_link_titles?.[0] || ''
   const caption = ad.ad_creative_link_captions?.[0] || ''
@@ -612,6 +612,7 @@ function transformAd(ad: any, term: string, country: string) {
     languages: ad.languages || [],
     country,
     targeted_countries: targetedCountries,
+    brand_categories: brandCategories,
     is_active: !ad.ad_delivery_stop_time,
     days_running: daysRunning,
     format: detectFormat(ad),
@@ -745,13 +746,11 @@ async function attachCreatives(
   termType: string = 'adcopy',
   deadlineMs?: number,
   hasBrandPageIds: boolean = false,
+  brandCategories: string[] = [],
 ): Promise<{ rows: any[]; skipped: number }> {
   const rows: any[] = []
   for (const ad of rawAds) {
-    const row = transformAd(ad, term, country)
-    // thumbnail_url and video_url stay null here.
-    // /api/thumbnails processes them async via Browserless + R2.
-    // The Discovery UI shows snapshot iframe immediately while thumbnails queue.
+    const row = transformAd(ad, term, country, brandCategories)
     rows.push(row)
   }
   return { rows, skipped: 0 }
@@ -943,11 +942,11 @@ export async function GET(request: NextRequest) {
         } else {
           const { data: terms } = await admin
             .from('discovery_crawl_terms')
-            .select('id, term, countries, term_type, page_id')
+            .select('id, term, countries, term_type, page_id, categories')
             .eq('is_active', true)
             .order('last_crawled_at', { ascending: true, nullsFirst: true })
             .limit(TERMS_PER_RUN)
-          termsToRun = (terms || []).map((t: any) => ({ ...t, term_type: 'all', pageId: t.page_id || undefined }))
+          termsToRun = (terms || []).map((t: any) => ({ ...t, term_type: 'all', pageId: t.page_id || undefined, categories: t.categories || [] }))
         }
 
         if (!termsToRun.length) {
@@ -971,7 +970,7 @@ export async function GET(request: NextRequest) {
         const crawlDeadline = Date.now() + ROUTE_BUDGET_MS
 
         // ── Crawl each term × country ──
-        for (const { term, countries, id, term_type, pageId: manualPageId } of termsToRun) {
+        for (const { term, countries, id, term_type, pageId: manualPageId, categories: termCategories } of termsToRun as any[]) {
           if (Date.now() > crawlDeadline) {
             send('log', '⏰ Crawl budget exhausted — saving partial results, embeddings & classification will run next tick')
             break
@@ -1024,7 +1023,7 @@ export async function GET(request: NextRequest) {
             }
 
             // ── Attach creatives then save all ads ───────────────────────
-            const { rows } = await attachCreatives(ads, term, country, term_type || 'adcopy', crawlDeadline - 15_000, knownBrandPageIds.length > 0)
+            const { rows } = await attachCreatives(ads, term, country, term_type || 'adcopy', crawlDeadline - 15_000, knownBrandPageIds.length > 0, termCategories || [])
             send('log', `  📦 ${rows.length} ads transformed — thumbnails queued for /api/thumbnails (Browserless → R2)`)
 
             // ── Deduplicate by ad_archive_id (fallback chain) ────────────
