@@ -248,8 +248,14 @@ export default function BrandsPage() {
                     <span style={{ color: '#f59e0b' }}>⚠️ Needs manual: {importResult.summary.needs_manual}</span>
                     <span style={{ color: '#c0392b' }}>❌ Errors: {importResult.summary.errors}</span>
                   </div>
+                  {/* Show errors first */}
+                  {importResult.results?.filter((r: any) => r.status === 'error').slice(0, 20).map((r: any, i: number) => (
+                    <div key={`e${i}`} style={{ fontSize: 11, color: '#c0392b', marginTop: 4 }}>
+                      ❌ <b>{r.brand_name}</b>: {r.message}
+                    </div>
+                  ))}
                   {importResult.results?.filter((r: any) => r.status === 'needs_manual').slice(0, 10).map((r: any, i: number) => (
-                    <div key={i} style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+                    <div key={`n${i}`} style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>
                       ⚠️ <b>{r.brand_name}</b>: {r.message}
                       {r.candidates?.length > 0 && (
                         <div style={{ marginLeft: 16 }}>
