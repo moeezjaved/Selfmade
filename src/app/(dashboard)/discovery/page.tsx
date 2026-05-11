@@ -1305,7 +1305,18 @@ export default function DiscoveryPage() {
                   )}
                   {!dropdownLoading && dropdownBrands.map(brand => (
                     <button key={brand.pageId}
-                      onMouseDown={e => { e.preventDefault(); setSelectedBrand({ pageId: brand.pageId, name: brand.name }); setShowDropdown(false) }}
+                      onMouseDown={e => {
+                        e.preventDefault()
+                        // Atria-style: filter main feed to this brand's ads AND open the drawer.
+                        // setSearchMode('brand') ensures the search runs as page_name match,
+                        // so the main grid shows only Gymshark's creatives instead of any ad
+                        // mentioning "gym" in the body.
+                        setSearchInput(brand.name)
+                        setQuery(brand.name)
+                        setSearchMode('brand')
+                        setSelectedBrand({ pageId: brand.pageId, name: brand.name })
+                        setShowDropdown(false)
+                      }}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
