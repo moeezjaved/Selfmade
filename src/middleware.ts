@@ -103,11 +103,13 @@ export async function middleware(request: NextRequest) {
     // ── Subscription gate ────────────────────────────────────────
     if (user && REQUIRES_SUBSCRIPTION.some(p => pathname.startsWith(p))) {
       const profileRes = await withTimeout(
-        supabase
-          .from('user_profiles')
-          .select('subscription_status, trial_ends_at')
-          .eq('user_id', user.id)
-          .single()
+        Promise.resolve(
+          supabase
+            .from('user_profiles')
+            .select('subscription_status, trial_ends_at')
+            .eq('user_id', user.id)
+            .single()
+        )
       )
 
       if (profileRes?.data) {
