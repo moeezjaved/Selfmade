@@ -383,7 +383,9 @@ export default function BrandsPage() {
                   </td>
                   <td style={{ padding: '10px 12px', color: '#666' }}>{timeAgo(t.state?.last_run_at || null)}</td>
                   <td style={{ padding: '10px 12px', color: '#666' }}>
-                    {t.status === 'in_progress' ? 'next cron tick' : timeUntil(t.next_recrawl_at)}
+                    {t.status === 'in_progress' || t.status === 'queued' || t.status === 'ready_to_recrawl'
+                      ? 'next cron tick (≤15m)'
+                      : timeUntil(t.next_recrawl_at)}
                   </td>
                   <td style={{ padding: '10px 12px' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
