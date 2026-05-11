@@ -38,7 +38,7 @@ async function getMetaToken(admin: any): Promise<string> {
   return APP_TOKEN
 }
 
-const TERMS_PER_RUN = 10   // terms per cron run
+const TERMS_PER_RUN = 20   // terms per cron run (each gets 45s budget = ~15min for 20 brands)
 const ADS_PER_TERM = 50    // ads per Meta API call
 const PAGES_PER_TERM = 3   // pages to fetch (50 × 3 = 150 ads per term×country)
 const EMBED_BATCH = 200    // embed ALL new ads per run (OpenAI handles large batches fine)
@@ -369,7 +369,13 @@ async function fetchAdsForTerm(
 
       // ── Paginate until no new ad_archive_ids, cursor missing, or deadline ──
       // Meta caps results around 50K per query; allow enough pages to drain it.
+      // PER-BRAND TIME BUDGET: ensures fair time-sharing across all active brands.
+      // Without this, a single big brand would eat the entire cron tick and
+      // other brands would never get crawled.
       const MAX_BRAND_PAGES = 1000 // 1000 × 50 = 50,000 ads max per brand per run
+      const BRAND_TIME_BUDGET_MS = 45_000  // 45s per brand per cron tick
+      const brandStartMs = Date.now()
+      const isBrandBudgetExhausted = () => (Date.now() - brandStartMs) > BRAND_TIME_BUDGET_MS
 
       // Resume from previously saved cursor (so we don't re-fetch pages 1-60
       // every cron tick when the brand has 50K ads). One state row per page_id.
@@ -413,7 +419,12 @@ async function fetchAdsForTerm(
       for (let p = 0; !brandExhausted && p < MAX_BRAND_PAGES; p++) {
         if (isNearDeadline()) {
           timedOut = true
-          log(`  ⏰ Brand fetch deadline at page ${p + 1} — ${allAds.length} ads saved so far. Cursor saved for next run.`)
+          log(`  ⏰ Cron deadline at page ${p + 1} — ${allAds.length} ads saved so far. Cursor saved for next run.`)
+          break
+        }
+        // Per-brand time budget — give other brands a fair share
+        if (isBrandBudgetExhausted()) {
+          log(`  ⏱  Brand budget (${BRAND_TIME_BUDGET_MS / 1000}s) used at page ${p + 1} — ${allAds.length} ads. Moving to next brand. Cursor saved.`)
           break
         }
         const { ads: pageAds, nextCursor, hasMore, error } = await fetchOnePage(brandPageParams, brandCursor)
