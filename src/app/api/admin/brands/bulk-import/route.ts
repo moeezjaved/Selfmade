@@ -19,6 +19,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import Anthropic from '@anthropic-ai/sdk'
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+async function suggestCategories(brand: { name: string; category?: string; website?: string }): Promise<string[]> {
+  if (!process.env.ANTHROPIC_API_KEY) return []
+  try {
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      messages: [{ role: 'user', content: `Suggest 4-7 lowercase search categories for this DTC brand. Return ONLY a JSON array, no markdown.\n\nBrand: ${brand.name}\nMeta category: ${brand.category || '(none)'}\nWebsite: ${brand.website || '(none)'}\n\nExample: ["gymwear", "athleisure", "fitness"]` }],
+    })
+    const text = (msg.content[0] as any)?.text?.trim() || '[]'
+    const cleaned = text.replace(/^```json\s*|\s*```$/g, '').replace(/^```\s*|\s*```$/g, '')
+    const arr = JSON.parse(cleaned)
+    return Array.isArray(arr) ? arr.map(c => String(c).toLowerCase().trim()).filter(Boolean).slice(0, 7) : []
+  } catch {
+    return []
+  }
+}
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -149,14 +169,25 @@ async function processRow(
   }
 
   // Auto-active only if user provided page_id OR lookup was high confidence.
-  // Low/medium confidence → save inactive so admin can preview + approve.
   const highConfidence = userProvidedPageId || lookupResult?.confidence === 'high'
+
+  // AI-suggest categories — runs in parallel for the import
+  const aiCategories = await suggestCategories({
+    name: row.brand_name,
+    category: lookupResult?.page_name ? undefined : undefined,
+    website: row.website,
+  })
+  // Merge user-provided category with AI suggestions, dedupe
+  const finalCategories = Array.from(new Set([
+    ...(row.category ? [row.category.toLowerCase()] : []),
+    ...aiCategories,
+  ]))
 
   const insert: Record<string, any> = {
     term,
     term_type: 'brand',
     category: row.category || 'General',
-    categories: row.category ? [row.category] : [],
+    categories: finalCategories,
     countries: ['US'],
     priority: row.priority || 5,
     is_active: !!pageId && highConfidence,
