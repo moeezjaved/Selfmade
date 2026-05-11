@@ -188,7 +188,8 @@ async function processRow(
     term_type: 'brand',
     category: row.category || 'General',
     categories: finalCategories,
-    countries: ['US'],
+    // Global default — see comment in /api/admin/brands/route.ts
+    countries: ['US','GB','CA','AU','DE','FR','IT','ES','NL','SE','PL','MX','BR','IN','JP','SG','AE','ZA'],
     priority: row.priority || 5,
     is_active: !!pageId && highConfidence,
     follower_count: lookupResult?.follower_count,
