@@ -20,6 +20,7 @@ interface BrandTerm {
   website: string | null
   brand_name: string
   ad_count: number
+  created_at: string
   status: 'queued' | 'in_progress' | 'exhausted_waiting' | 'ready_to_recrawl'
   next_recrawl_at: string | null
   state: {
@@ -182,9 +183,12 @@ export default function BrandsPage() {
   if (error && !data) return <div style={{ padding: 32, color: '#c0392b' }}>Error: {error}</div>
   if (!data) return null
 
-  const filtered = data.terms.filter(t =>
-    !filter || t.term.toLowerCase().includes(filter.toLowerCase()) || t.brand_name?.toLowerCase().includes(filter.toLowerCase())
-  )
+  // Sort newest first so just-imported brands appear at top
+  const filtered = data.terms
+    .filter(t =>
+      !filter || t.term.toLowerCase().includes(filter.toLowerCase()) || t.brand_name?.toLowerCase().includes(filter.toLowerCase())
+    )
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
@@ -341,7 +345,23 @@ export default function BrandsPage() {
                         <img src={t.picture} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                       )}
                       <div>
-                        <div style={{ fontWeight: 700, color: '#111' }}>{t.brand_name || t.term}</div>
+                        <div style={{ fontWeight: 700, color: '#111', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {t.brand_name || t.term}
+                          {(Date.now() - new Date(t.created_at).getTime()) < 86_400_000 && (
+                            <span style={{
+                              fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100,
+                              background: '#dffe95', color: '#1a3a1a',
+                              textTransform: 'uppercase', letterSpacing: 0.5,
+                            }}>NEW</span>
+                          )}
+                          {t.page_id && t.ad_count === 0 && (
+                            <span title="Verify by clicking Preview" style={{
+                              fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100,
+                              background: '#fef3c7', color: '#92400e',
+                              textTransform: 'uppercase', letterSpacing: 0.5,
+                            }}>UNVERIFIED</span>
+                          )}
+                        </div>
                         {t.page_id && <div style={{ fontSize: 11, color: '#888', fontFamily: 'ui-monospace, monospace' }}>{t.page_id}</div>}
                         {t.follower_count != null && (
                           <div style={{ fontSize: 10, color: '#666' }}>{t.follower_count.toLocaleString()} followers</div>
