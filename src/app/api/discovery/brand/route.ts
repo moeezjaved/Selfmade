@@ -25,13 +25,34 @@ export async function GET(request: NextRequest) {
       ? new Date(Date.now() - days * 86400000).toISOString()
       : null
 
-    // Cap at 500 rows — enough for AI aggregation, fast under Supabase's 8s timeout.
-    // Big brands like Gymshark have 20K+ ads but the most recent 500 give an
-    // accurate read of current creative themes / hooks / angles.
+    // ── Aggregate stats (cheap, indexed on page_id) ─────────────
+    // These need to reflect the FULL ad set, not the 500-row sample below.
+    // Run as parallel HEAD count queries — each ~50ms with the new index.
+    const [
+      totalRes,
+      activeRes,
+      withCreativeRes,
+      videoRes,
+    ] = await Promise.all([
+      admin.from('discovery_ads_index').select('*', { count: 'estimated', head: true }).eq('page_id', pageId),
+      admin.from('discovery_ads_index').select('*', { count: 'estimated', head: true }).eq('page_id', pageId).eq('is_active', true),
+      admin.from('discovery_ads_index').select('*', { count: 'estimated', head: true }).eq('page_id', pageId).not('thumbnail_url', 'is', null),
+      admin.from('discovery_ads_index').select('*', { count: 'estimated', head: true }).eq('page_id', pageId).eq('format', 'Video'),
+    ])
+    const totalCount = totalRes.count ?? 0
+    const activeCount = activeRes.count ?? 0
+    const withCreativeCount = withCreativeRes.count ?? 0
+    const videoCount = videoRes.count ?? 0
+
+    // Cap detail rows at 500 — enough for AI aggregation under Supabase's 8s timeout.
+    // Most-recent first by last_seen so the AI insights reflect current creative trends.
+    // Prefer ads that already have a thumbnail so the Creatives grid isn't all logo
+    // placeholders for fresh-but-unprocessed brands like Gymshark on day 1.
     let query = admin
       .from('discovery_ads_index')
       .select('ad_id, page_id, page_name, body, title, snapshot_url, start_date, stop_date, is_active, days_running, format, thumbnail_url, video_url, hook_type, emotion, angle, persona, desire, usp, themes, last_seen')
       .eq('page_id', pageId)
+      .order('thumbnail_url', { ascending: false, nullsFirst: false })  // ads with creatives first
       .order('last_seen', { ascending: false })
       .limit(500)
 
@@ -50,21 +71,19 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // ── Brand stats ──────────────────────────────────────────────
-    const activeAds = allAds.filter((a: any) => a.is_active)
-    const withCreative = allAds.filter((a: any) => a.thumbnail_url || a.video_url)
-    const videoAds = allAds.filter((a: any) => a.format === 'Video' || a.video_url)
+    // ── Brand stats — use the full-table COUNT queries above (accurate),
+    // not allAds.length (only the 500-row sample).
     const dates = allAds.map((a: any) => a.start_date).filter(Boolean).sort()
 
     const brand = {
       page_id: pageId,
       page_name: allAds[0]?.page_name || '',
-      total_ads: allAds.length,
-      active_ads: activeAds.length,
+      total_ads: totalCount,
+      active_ads: activeCount,
       first_seen: dates[0] || null,
       last_seen: allAds[0]?.last_seen || null,
-      with_creative: withCreative.length,
-      video_ads: videoAds.length,
+      with_creative: withCreativeCount,
+      video_ads: videoCount,
       avg_days_running: Math.round(allAds.reduce((s: number, a: any) => s + (a.days_running || 0), 0) / allAds.length),
     }
 
