@@ -65,11 +65,11 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
       return route.continue()
     })
 
-    // Page load — Meta snapshot pages are slow; need 12s headroom.
+    // Page load — aggressive timeout. Most live ads load in 3-5s.
     let pageStatus = 0
     const resp = await page.goto(snapshotUrl, {
       waitUntil: 'domcontentloaded',
-      timeout: 12_000,
+      timeout: 8_000,
     })
     pageStatus = resp ? resp.status() : 0
 
@@ -98,16 +98,16 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): 
             })
           return img || vid
         },
-        { timeout: 10_000 } // longer wait — JS-rendered creatives can take 5-8s
+        { timeout: 6_000 } // 6s wait for JS-rendered creative
       )
       creativeFound = true
     } catch {
-      /* timeout — likely a dead ad with no real creative ever loading */
+      /* timeout — dead ad, skip */
     }
 
     // Give video src + carousel slides time to fully attach
     if (creativeFound) {
-      await new Promise(r => setTimeout(r, 1500))
+      await new Promise(r => setTimeout(r, 800))
     }
 
     const data = await page.evaluate(() => {
