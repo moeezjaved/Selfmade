@@ -177,11 +177,23 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (action === 'force_recrawl' && page_id) {
+    // Upsert so brands without state rows (never-crawled) also get queued.
+    // Also flip the term's last_crawled_at to null so it floats to top
+    // of the priority queue (next cron picks it first).
     await (admin as any)
       .from('discovery_brand_crawl_state')
-      .update({ cursor: null, exhausted_at: null })
+      .upsert({
+        page_id,
+        cursor: null,
+        exhausted_at: null,
+        last_run_at: new Date().toISOString(),
+      }, { onConflict: 'page_id' })
+    // Reset last_crawled_at on the term so cron picks it first
+    await (admin as any)
+      .from('discovery_crawl_terms')
+      .update({ last_crawled_at: null })
       .eq('page_id', page_id)
-    return NextResponse.json({ success: true, message: 'Will re-crawl on next cron tick (within 15 min)' })
+    return NextResponse.json({ success: true, message: 'Queued — will crawl on next cron tick (within 15 min)' })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
