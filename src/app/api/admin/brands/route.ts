@@ -25,9 +25,12 @@ export async function GET(_req: NextRequest) {
     { data: states },
     { data: adCounts },
   ] = await Promise.all([
+    // Show only BRAND-type terms (not category/adcopy seeds).
+    // A row counts as a brand if term_type='brand' OR it has a page_id.
     admin
       .from('discovery_crawl_terms')
       .select('id, term, term_type, page_id, category, categories, countries, priority, is_active, follower_count, picture, website, notes, created_at')
+      .or('term_type.eq.brand,page_id.not.is.null')
       .order('created_at', { ascending: false }),
     admin
       .from('discovery_brand_crawl_state')
