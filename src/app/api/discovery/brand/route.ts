@@ -25,12 +25,15 @@ export async function GET(request: NextRequest) {
       ? new Date(Date.now() - days * 86400000).toISOString()
       : null
 
+    // Cap at 500 rows — enough for AI aggregation, fast under Supabase's 8s timeout.
+    // Big brands like Gymshark have 20K+ ads but the most recent 500 give an
+    // accurate read of current creative themes / hooks / angles.
     let query = admin
       .from('discovery_ads_index')
-      .select('ad_id, page_id, page_name, body, title, caption, description, snapshot_url, start_date, stop_date, is_active, days_running, format, thumbnail_url, video_url, platforms, hook_type, emotion, angle, cta, tone, persona, desire, usp, themes, industries, country, last_seen, ai_classified')
+      .select('ad_id, page_id, page_name, body, title, snapshot_url, start_date, stop_date, is_active, days_running, format, thumbnail_url, video_url, hook_type, emotion, angle, persona, desire, usp, themes, last_seen')
       .eq('page_id', pageId)
       .order('last_seen', { ascending: false })
-      .limit(1000)
+      .limit(500)
 
     if (sinceDate) query = query.gte('start_date', sinceDate)
 
