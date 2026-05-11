@@ -23,6 +23,7 @@ export interface AdRow {
 export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<AdRow[]> {
   // Need ads that have NEITHER an R2 thumbnail NOR an R2 video,
   // AND haven't already been marked as un-extractable.
+  // Prioritize ACTIVE ads first (they extract successfully much more often).
   let query: any = supabase
     .from('discovery_ads_index')
     .select('ad_id, snapshot_url, format, page_name')
@@ -30,6 +31,7 @@ export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<
     .is('thumbnail_url', null)
     .is('video_url', null)
     .is('creative_extraction_failed_at', null)
+    .order('is_active', { ascending: false })  // active first
     .order('last_seen', { ascending: false })
     .limit(batchSize)
 
