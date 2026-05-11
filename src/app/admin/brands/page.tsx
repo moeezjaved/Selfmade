@@ -120,12 +120,18 @@ export default function BrandsPage() {
     load()
   }
 
-  const forceRecrawl = async (page_id: string) => {
-    await fetch('/api/admin/brands', {
+  const forceRecrawl = async (page_id: string, brand_name?: string) => {
+    const res = await fetch('/api/admin/brands', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'force_recrawl', page_id }),
     })
+    const j = await res.json()
+    if (res.ok) {
+      alert(`✅ ${brand_name || 'Brand'} queued — crawl starts in next ≤15 min cron tick.`)
+    } else {
+      alert(`❌ Failed: ${j.error || 'Unknown error'}`)
+    }
     load()
   }
 
@@ -396,7 +402,7 @@ export default function BrandsPage() {
                         </button>
                       )}
                       {t.page_id && (
-                        <button onClick={() => forceRecrawl(t.page_id!)}
+                        <button onClick={() => forceRecrawl(t.page_id!, t.brand_name)}
                           style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#1a3a1a', fontFamily: 'inherit' }}>
                           Re-crawl now
                         </button>
