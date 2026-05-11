@@ -1021,11 +1021,17 @@ export async function GET(request: NextRequest) {
             if (fetchError) {
               send('log', `  ❌ ${term}/${country}: ${fetchError}`)
               await admin.from('discovery_crawl_log').insert({ term, country, ads_fetched: 0, error: fetchError })
+              // Brand-page mode queries all 30+ countries in one Meta call; no
+              // point iterating remaining countriesToCrawl entries on error.
+              if (manualPageId || knownBrandPageIds.length > 0) break
               continue
             }
 
             if (!ads.length) {
               send('log', `  ⚠️ ${term}/${country}: 0 ads returned`)
+              // Same reasoning — brand-page mode already covered all countries.
+              // Common cause: brand was marked exhausted_at on a previous run.
+              if (manualPageId || knownBrandPageIds.length > 0) break
               continue
             }
 
