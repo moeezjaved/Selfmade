@@ -66,15 +66,20 @@ function parseInput(input: string): { page_id?: string; slug?: string } {
 }
 
 async function fetchPageInfo(idOrSlug: string, token: string): Promise<any> {
-  const params = new URLSearchParams({
-    fields: 'id,name,fan_count,picture.type(large),link,category,verification_status,website,about,description',
-    access_token: token,
-  })
-  const res = await fetch(`https://graph.facebook.com/v19.0/${idOrSlug}?${params}`, {
-    signal: AbortSignal.timeout(10_000),
-  })
-  if (!res.ok) return null
-  return await res.json()
+  // Try full fields first, fall back to basic fields if API rejects (some
+  // pages restrict metadata access)
+  const fullFields = 'id,name,fan_count,picture.type(large),link,category,verification_status,website,about,description'
+  const basicFields = 'id,name,picture.type(large)'
+
+  for (const fields of [fullFields, basicFields]) {
+    const params = new URLSearchParams({ fields, access_token: token })
+    const res = await fetch(`https://graph.facebook.com/v19.0/${idOrSlug}?${params}`, {
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (res.ok) return await res.json()
+    // Continue to next attempt with fewer fields
+  }
+  return null
 }
 
 /**
@@ -146,8 +151,26 @@ export async function POST(req: NextRequest) {
 
   const idOrSlug = parsed.page_id || parsed.slug!
   const page = await fetchPageInfo(idOrSlug, token)
+
+  // If Meta won't return metadata BUT we have a numeric page_id from the
+  // URL, allow user to add it anyway (they'll verify via Preview later)
   if (!page?.id) {
-    return NextResponse.json({ error: `Could not fetch page info for "${idOrSlug}". Page may not exist or be private.` }, { status: 404 })
+    if (parsed.page_id) {
+      return NextResponse.json({
+        page_id: parsed.page_id,
+        name: `Brand ${parsed.page_id}`,
+        follower_count: null,
+        picture: null,
+        category: null,
+        verified: false,
+        website: null,
+        about: null,
+        link: null,
+        suggested_categories: [],
+        warning: 'Meta did not return brand metadata (private/restricted page). The page_id is extracted — click Preview after adding to verify it has real ads.',
+      })
+    }
+    return NextResponse.json({ error: `Could not fetch page info for "${idOrSlug}". Page may not exist, be private, or token lacks access.` }, { status: 404 })
   }
 
   // Suggest categories via Claude (in parallel — non-blocking)
