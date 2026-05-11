@@ -318,6 +318,11 @@ export default function BrandsPage() {
                 <div style={{ color: '#c0392b' }}>❌ {urlLookupResult.error}</div>
               ) : (
                 <>
+                  {urlLookupResult.warning && (
+                    <div style={{ marginBottom: 12, padding: 10, background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, color: '#92400e', fontSize: 12 }}>
+                      ⚠️ {urlLookupResult.warning}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
                     {urlLookupResult.picture && (
                       <img src={urlLookupResult.picture} alt="" style={{ width: 48, height: 48, borderRadius: '50%' }} />
