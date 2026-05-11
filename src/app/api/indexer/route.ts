@@ -430,6 +430,13 @@ async function fetchAdsForTerm(
         const { ads: pageAds, nextCursor, hasMore, error } = await fetchOnePage(brandPageParams, brandCursor)
         if (error) {
           log(`  ❌ Brand page ${p + 1} error: ${error}`)
+          // Rate-limit hit (#613) — bubble up so the entire indexer run aborts.
+          // Continuing to hit Meta after a 613 makes the block window longer.
+          // Throwing here is caught in the outer try/catch and reported to the
+          // crawl log so the next cron tick can retry once the window resets.
+          if (error.includes('#613') || error.toLowerCase().includes('rate limit')) {
+            throw new Error(`META_RATE_LIMIT: ${error}`)
+          }
           break
         }
         const newThisPage = addAds(pageAds)
@@ -980,8 +987,13 @@ export async function GET(request: NextRequest) {
         const ROUTE_BUDGET_MS = 240_000
         const crawlDeadline = Date.now() + ROUTE_BUDGET_MS
 
+        // Set when Meta returns #613 — short-circuits all remaining brands so we
+        // don't hammer the API and extend the block window.
+        let rateLimitAbort = false
+
         // ── Crawl each term × country ──
         for (const { term, countries, id, term_type, pageId: manualPageId, categories: termCategories } of termsToRun as any[]) {
+          if (rateLimitAbort) break
           if (Date.now() > crawlDeadline) {
             send('log', '⏰ Crawl budget exhausted — saving partial results, embeddings & classification will run next tick')
             break
@@ -1008,11 +1020,27 @@ export async function GET(request: NextRequest) {
               }
             }
 
-            const { ads, externalFiltered, timedOut: fetchTimedOut, error: fetchError } = await fetchAdsForTerm(
-              term, country, metaToken, 'all', admin, knownBrandPageIds,
-              crawlDeadline - 30_000,                 // hand over deadline 30 s early for buffer
-              (msg) => send('log', msg),              // stream brand-fetch progress to admin UI
-            )
+            let fetchResult: any
+            try {
+              fetchResult = await fetchAdsForTerm(
+                term, country, metaToken, 'all', admin, knownBrandPageIds,
+                crawlDeadline - 30_000,                 // hand over deadline 30 s early for buffer
+                (msg) => send('log', msg),              // stream brand-fetch progress to admin UI
+              )
+            } catch (err: any) {
+              const msg = String(err?.message ?? err)
+              if (msg.startsWith('META_RATE_LIMIT')) {
+                send('log', `🛑 Meta rate limit hit — aborting entire indexer run to let the window reset. ${msg}`)
+                await admin.from('discovery_crawl_log').insert({
+                  term, country, ads_fetched: 0,
+                  error: 'META_RATE_LIMIT — entire run aborted',
+                })
+                rateLimitAbort = true
+                break
+              }
+              throw err  // unknown errors keep the existing crash behaviour
+            }
+            const { ads, externalFiltered, timedOut: fetchTimedOut, error: fetchError } = fetchResult
 
             if (fetchTimedOut) {
               send('log', `  ⏰ Deadline reached mid-crawl — saving ${ads.length} partial ads for "${term}"`)
