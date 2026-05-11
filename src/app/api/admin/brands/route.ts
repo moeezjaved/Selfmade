@@ -36,20 +36,37 @@ export async function GET(_req: NextRequest) {
       .from('discovery_brand_crawl_state')
       .select('page_id, brand_name, cursor, ads_indexed, last_run_at, last_run_added, exhausted_at')
       .order('last_run_at', { ascending: false }),
-    // Per-brand ad count
+    // Lightweight: just need brand names from ads. Pagination would be slow,
+    // and we'll count via per-brand HEAD count below.
     admin
       .from('discovery_ads_index')
       .select('page_id, page_name')
-      .limit(50_000),
+      .limit(2000),
   ])
 
-  // Build per-page_id ad counts
+  // Build per-page_id name map (just for brand_name display)
   const adCountByPage: Record<string, { count: number; name: string }> = {}
   for (const r of (adCounts || []) as any[]) {
     const k = r.page_id
     if (!adCountByPage[k]) adCountByPage[k] = { count: 0, name: r.page_name || '' }
-    adCountByPage[k].count++
     if (r.page_name && !adCountByPage[k].name) adCountByPage[k].name = r.page_name
+  }
+
+  // Get ACCURATE per-brand ad counts via parallel COUNT queries.
+  // For each tracked brand with a page_id, run a HEAD count query.
+  const tracked = (terms || []).filter((t: any) => t.page_id)
+  const countResults = await Promise.all(
+    tracked.map(async (t: any) => {
+      const { count } = await admin
+        .from('discovery_ads_index')
+        .select('*', { count: 'exact', head: true })
+        .eq('page_id', t.page_id)
+      return { page_id: t.page_id, count: count || 0 }
+    })
+  )
+  for (const { page_id, count } of countResults) {
+    if (!adCountByPage[page_id]) adCountByPage[page_id] = { count: 0, name: '' }
+    adCountByPage[page_id].count = count
   }
 
   // Build a map: page_id → state
@@ -105,7 +122,7 @@ export async function GET(_req: NextRequest) {
     summary: {
       total_terms: terms?.length || 0,
       active_terms: (terms || []).filter((t: any) => t.is_active).length,
-      brands_indexed: Object.keys(adCountByPage).length,
+      brands_indexed: Object.keys(adCountByPage).filter(k => adCountByPage[k].count > 0).length,
       total_ads: Object.values(adCountByPage).reduce((s, x) => s + x.count, 0),
     },
   })
