@@ -48,4 +48,24 @@ export const config = {
   // success rate than inactive ads (where Meta often serves placeholders).
   // Inactive ads are still in the queue, just deprioritized.
   activeOnly: process.env.WORKER_ACTIVE_ONLY === '1',
+
+  // ── Residential proxy (IPRoyal) ─────────────────────────────────
+  // Required to avoid Meta IP bans on the droplet. Each ad gets a
+  // STICKY session (one IP for the duration of that ad's processing)
+  // so all sub-requests (HTML load, JS execution, CDN download) come
+  // from the same residential IP — looks like a normal user session.
+  // Leave empty/unset to disable proxy (worker hits Meta direct = will
+  // get blocked at scale).
+  proxy: {
+    host: process.env.WORKER_PROXY_HOST || '',
+    port: parseInt(process.env.WORKER_PROXY_PORT || '12321', 10),
+    user: process.env.WORKER_PROXY_USER || '',
+    pass: process.env.WORKER_PROXY_PASS || '',
+    country: (process.env.WORKER_PROXY_COUNTRY || 'us').toLowerCase(),
+  },
 }
+
+/** True when all 4 proxy fields are set. */
+export const proxyEnabled = !!(
+  config.proxy.host && config.proxy.port && config.proxy.user && config.proxy.pass
+)
