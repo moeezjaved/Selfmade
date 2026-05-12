@@ -29,6 +29,7 @@ let _browser: Browser | null = null
 // require multiple browsers, which is overkill for our scale right now.
 let _sharedContext: BrowserContext | null = null
 let _adsHandledByContext = 0
+let _contextCreationLock: Promise<BrowserContext> | null = null  // serializes concurrent context creation
 const MAX_ADS_PER_CONTEXT = 200   // Recycle context every 200 ads to avoid memory bloat / cookie buildup
 
 export async function getBrowser(): Promise<Browser> {
@@ -113,42 +114,55 @@ export interface ExtractResult {
  * Recycled every MAX_ADS_PER_CONTEXT ads to avoid memory bloat.
  */
 async function getSharedContext(): Promise<BrowserContext> {
-  const browser = await getBrowser()
+  // Fast path — context exists and still has capacity
   if (_sharedContext && _adsHandledByContext < MAX_ADS_PER_CONTEXT) {
     return _sharedContext
   }
-  // Close stale context (memory cleanup) before creating fresh one
-  if (_sharedContext) {
-    await _sharedContext.close().catch(() => {})
-    _sharedContext = null
-    console.log(`♻️  Recycled BrowserContext after ${_adsHandledByContext} ads`)
+  // If another caller is already creating the context, await its result instead
+  // of creating a duplicate. Prevents the "12 concurrent ads → 12 orphaned
+  // contexts" race condition that would happen on cold start.
+  if (_contextCreationLock) {
+    return _contextCreationLock
   }
-  _sharedContext = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-    viewport: { width: 1280, height: 720 },
-    ignoreHTTPSErrors: true,
-  })
-  _adsHandledByContext = 0
-
-  // Block heavy/unnecessary resource types globally for this context.
-  // CRITICAL FIX: blocking 'image' on static.xx.fbcdn.net saves ~9 GB/10K ads
-  // (icons, sprites, UI imagery — none needed for our DOM extraction).
-  // We DON'T block the script type because Metas React app needs to run to
-  // populate the ad creative URLs into the DOM.
-  await _sharedContext.route('**/*', (route) => {
-    const req = route.request()
-    const url = req.url()
-    const t = req.resourceType()
-    // Always block fonts + stylesheets (DOM doesn't need them)
-    if (t === 'font' || t === 'stylesheet') return route.abort()
-    // Block static UI imagery from Metas static CDN (NOT the real ad creatives,
-    // which come from scontent.fbcdn.net or video.fbcdn.net)
-    if (t === 'image' && url.includes('static.xx.fbcdn.net')) return route.abort()
-    // Block tracking / analytics requests
-    if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
-    return route.continue()
-  })
-  return _sharedContext
+  // We're the first caller to need a new context — claim the lock and create it.
+  _contextCreationLock = (async () => {
+    const browser = await getBrowser()
+    // Close stale context (memory cleanup) before creating fresh one.
+    // Double-check after the await — another path might have completed.
+    if (_sharedContext) {
+      const old = _sharedContext
+      _sharedContext = null
+      await old.close().catch(() => {})
+      console.log(`♻️  Recycled BrowserContext after ${_adsHandledByContext} ads`)
+    }
+    const ctx = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+      viewport: { width: 1280, height: 720 },
+      ignoreHTTPSErrors: true,
+    })
+    // Block heavy/unnecessary resource types globally for this context.
+    // CRITICAL: blocking 'image' on static.xx.fbcdn.net saves ~9 GB/10K ads
+    // (icons, sprites, UI imagery — none needed for our DOM extraction).
+    // We DO NOT block 'script' because Metas React app needs to run to
+    // populate the ad creative URLs into the DOM.
+    await ctx.route('**/*', (route) => {
+      const req = route.request()
+      const url = req.url()
+      const t = req.resourceType()
+      if (t === 'font' || t === 'stylesheet') return route.abort()
+      if (t === 'image' && url.includes('static.xx.fbcdn.net')) return route.abort()
+      if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
+      return route.continue()
+    })
+    _sharedContext = ctx
+    _adsHandledByContext = 0
+    return ctx
+  })()
+  try {
+    return await _contextCreationLock
+  } finally {
+    _contextCreationLock = null  // Release lock so future recycles can re-acquire
+  }
 }
 
 export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, adId?: string): Promise<ExtractResult> {
