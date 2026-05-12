@@ -1,10 +1,10 @@
 /**
  * Shared proxy fetch helper for routes that hit Meta from Vercel.
  *
- * Why: Vercel's egress IPs get rate-limited / IP-blocked by Meta the same way
- * our droplet did. Routing every Meta call through IPRoyal residential
- * distributes traffic across the 32M-IP pool so no single IP accumulates
- * enough volume to flag.
+ * IMPLEMENTATION: Uses undici.fetch with undici.ProxyAgent. We tried
+ * https-proxy-agent first but Vercels Edge runtime occasionally has issues
+ * with native http.Agent integration. undici is what Next.js uses internally
+ * for fetch on Vercel, so it's the most compatible.
  *
  * Auto-rotating: each fetch() call uses IPRoyal's plain rotating endpoint,
  * which assigns a different residential IP per request. Different from the
@@ -13,15 +13,11 @@
  *
  * Falls back to direct fetch if env vars aren't set, so local dev still works.
  *
- * Env vars (set on Vercel + droplet for parity):
+ * Env vars:
  *   META_PROXY_HOST   = geo.iproyal.com
  *   META_PROXY_PORT   = 12321
  *   META_PROXY_USER   = ...
  *   META_PROXY_PASS   = ...
- *   META_PROXY_COUNTRY = us  (optional, used in IPRoyal username modifier)
- *
- * Note: keep META_PROXY_* separate from WORKER_PROXY_* so we can tune them
- * independently — different rate limits, different per-request retry policies.
  */
 import { fetch as undiciFetch, ProxyAgent } from 'undici'
 
@@ -33,45 +29,41 @@ const PASS = process.env.META_PROXY_PASS || ''
 export const metaProxyEnabled = !!(HOST && USER && PASS)
 
 let _agent: ProxyAgent | undefined
+
 function getAgent(): ProxyAgent | undefined {
   if (!metaProxyEnabled) return undefined
   if (_agent) return _agent
-  // Use explicit token option instead of URL-embedded auth. Special chars in
-  // IPRoyal passwords (e.g. uppercase/lowercase mix, digits) sometimes don't
-  // survive undicis URL parser cleanly, even with encodeURIComponent. The
-  // `token` option bypasses URL parsing entirely — it goes straight into the
-  // Proxy-Authorization header as Basic auth.
-  const basicAuth = Buffer.from(`${USER}:${PASS}`).toString('base64')
-  _agent = new ProxyAgent({
-    uri: `http://${HOST}:${PORT}`,
-    token: `Basic ${basicAuth}`,
-    requestTls: { rejectUnauthorized: false },
-  } as any)
+
+  // ProxyAgent constructor accepts a string URL (with embedded auth) OR options.
+  // String form is the most compatible across undici versions. Encode credentials
+  // to handle any special chars cleanly.
+  const proxyUrl = `http://${encodeURIComponent(USER)}:${encodeURIComponent(PASS)}@${HOST}:${PORT}`
+  _agent = new ProxyAgent(proxyUrl)
   return _agent
 }
 
 /**
  * Drop-in fetch replacement that routes through IPRoyal residential when
  * env vars are set, falls back to direct fetch otherwise.
- *
- * Returns the same Response shape as global fetch, so existing callers
- * that do `await res.json()` etc. work unchanged.
- *
- * On proxy errors, logs the error with context so we can diagnose without
- * leaking the full error to the user.
  */
 export async function proxyFetch(url: string, init?: any): Promise<Response> {
   const agent = getAgent()
   if (!agent) {
-    // No proxy configured — direct fetch (local dev / fallback)
     return fetch(url, init)
   }
+
   try {
     const res = await undiciFetch(url, { ...init, dispatcher: agent } as any)
     return res as unknown as Response
   } catch (err: any) {
-    // Diagnostic: log proxy errors so we can see what's failing in Vercel logs
-    console.error(`[proxyFetch] failed for ${url.split('?')[0]}:`, err?.code, err?.message)
+    // Diagnostic logging — surfaces underlying error code to Vercel logs.
+    // err.cause is where undici stuffs the real socket-level error.
+    const code = err?.code || err?.cause?.code || 'UNKNOWN'
+    const msg = err?.message || err?.cause?.message || String(err)
+    console.error(`[proxyFetch] FAILED url=${url.split('?')[0]} code=${code} msg=${msg.slice(0, 200)}`)
+    if (err?.cause) {
+      console.error(`[proxyFetch] cause:`, err.cause)
+    }
     throw err
   }
 }
