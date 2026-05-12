@@ -16,6 +16,21 @@ import { config, proxyEnabled } from './config.js'
 
 let _browser: Browser | null = null
 
+// Shared BrowserContext across all ads in this worker process.
+//
+// PERFORMANCE WIN: Facebook's static.xx.fbcdn.net JS bundle (~500KB) loads
+// from cache after the first page. Without a shared context, every ad would
+// fresh-download the same JS over the proxy — verified to be 94% of total
+// proxy bandwidth (~9.4 GB / 10 GB in one usage report).
+//
+// Trade-off: all ads share the same browser-level proxy URL. With IPRoyal's
+// plain rotating endpoint, each REQUEST still gets a different residential
+// IP — so we lose nothing on IP diversity. Sticky-per-ad sessions would
+// require multiple browsers, which is overkill for our scale right now.
+let _sharedContext: BrowserContext | null = null
+let _adsHandledByContext = 0
+const MAX_ADS_PER_CONTEXT = 200   // Recycle context every 200 ads to avoid memory bloat / cookie buildup
+
 export async function getBrowser(): Promise<Browser> {
   if (_browser && _browser.isConnected()) return _browser
 
@@ -93,30 +108,64 @@ export interface ExtractResult {
  * @param adId         ad_archive_id — used as the IPRoyal sticky session key
  *                      so each ad gets its own dedicated IP
  */
-export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, adId?: string): Promise<ExtractResult> {
+/**
+ * Get (or create) the shared BrowserContext for this worker process.
+ * Recycled every MAX_ADS_PER_CONTEXT ads to avoid memory bloat.
+ */
+async function getSharedContext(): Promise<BrowserContext> {
   const browser = await getBrowser()
-  let context: BrowserContext | null = null
+  if (_sharedContext && _adsHandledByContext < MAX_ADS_PER_CONTEXT) {
+    return _sharedContext
+  }
+  // Close stale context (memory cleanup) before creating fresh one
+  if (_sharedContext) {
+    await _sharedContext.close().catch(() => {})
+    _sharedContext = null
+    console.log(`♻️  Recycled BrowserContext after ${_adsHandledByContext} ads`)
+  }
+  _sharedContext = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 720 },
+    ignoreHTTPSErrors: true,
+  })
+  _adsHandledByContext = 0
+
+  // Block heavy/unnecessary resource types globally for this context.
+  // CRITICAL FIX: blocking 'image' on static.xx.fbcdn.net saves ~9 GB/10K ads
+  // (icons, sprites, UI imagery — none needed for our DOM extraction).
+  // We DON'T block the script type because Metas React app needs to run to
+  // populate the ad creative URLs into the DOM.
+  await _sharedContext.route('**/*', (route) => {
+    const req = route.request()
+    const url = req.url()
+    const t = req.resourceType()
+    // Always block fonts + stylesheets (DOM doesn't need them)
+    if (t === 'font' || t === 'stylesheet') return route.abort()
+    // Block static UI imagery from Metas static CDN (NOT the real ad creatives,
+    // which come from scontent.fbcdn.net or video.fbcdn.net)
+    if (t === 'image' && url.includes('static.xx.fbcdn.net')) return route.abort()
+    // Block tracking / analytics requests
+    if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
+    return route.continue()
+  })
+  return _sharedContext
+}
+
+export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, adId?: string): Promise<ExtractResult> {
   let page: Page | null = null
 
   try {
     // Per-ad sticky proxy session — same IP for the full ad lifecycle.
     // Falls back to no proxy if env vars aren't set.
-    const proxy = buildProxyForAd(adId || `noid-${Date.now()}`)
+    // NOTE: with shared BrowserContext, the per-ad proxy isn't actually used
+    // (Playwright applies proxy at context level, not page level). The
+    // launch-level proxy in getBrowser() handles all routing — with IPRoyal's
+    // rotating endpoint, each request still gets a different IP.
+    const _proxy = buildProxyForAd(adId || `noid-${Date.now()}`)
 
-    context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-      viewport: { width: 1280, height: 720 },
-      ignoreHTTPSErrors: true,
-      ...(proxy ? { proxy } : {}),
-    })
+    const context = await getSharedContext()
+    _adsHandledByContext++
     page = await context.newPage()
-
-    // Block fonts/CSS for speed (we only need DOM, not rendering quality)
-    await page.route('**/*', (route) => {
-      const t = route.request().resourceType()
-      if (t === 'font' || t === 'stylesheet') return route.abort()
-      return route.continue()
-    })
 
     // Page load — residential proxies add 2-5s of routing latency on top of
     // Meta's render time, so the budget needs to be generous. Most live ads
@@ -243,7 +292,17 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, a
       error: err instanceof Error ? err.message : String(err),
     }
   } finally {
+    // Close only the per-ad PAGE — context is shared across ads
+    // (closing context here would defeat the JS caching that saves bandwidth).
+    // Context recycles itself every MAX_ADS_PER_CONTEXT ads in getSharedContext().
     await page?.close().catch(() => {})
-    await context?.close().catch(() => {})
+  }
+}
+
+/** Called when worker shuts down — frees memory cleanly. */
+export async function closeSharedContext() {
+  if (_sharedContext) {
+    await _sharedContext.close().catch(() => {})
+    _sharedContext = null
   }
 }
