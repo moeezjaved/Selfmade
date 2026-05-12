@@ -94,6 +94,7 @@ async function processAd(ad: AdRow): Promise<ProcessResult> {
     const { imageUrls, videoUrls, pageStatus, error } = await extractCreative(
       ad.snapshot_url,
       config.adTimeoutMs - 10_000,
+      ad.ad_id,                       // sticky proxy session key — same IP for full ad lifecycle
     )
 
     if (error) {

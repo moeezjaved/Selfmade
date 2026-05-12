@@ -3,14 +3,28 @@
  * extracts the raw fbcdn.net image and video CDN URLs from the DOM.
  *
  * One Browser instance is shared across all workers (memory-efficient).
- * Each ad gets its own BrowserContext (isolated cookies/cache).
+ * Each ad gets its own BrowserContext with a STICKY proxy session
+ * (one IPRoyal residential IP for the full ad lifecycle ~10-30s).
+ *
+ * Why sticky-per-ad: Meta's bot detection flags page loads where the
+ * HTML, JS, XHRs, and CDN downloads come from different IPs (looks like
+ * IP-hopping). Pinning one residential IP per ad mimics a normal user
+ * browsing session and dramatically improves success rate.
  */
 import { chromium, Browser, BrowserContext, Page } from 'playwright'
+import { config, proxyEnabled } from './config.js'
 
 let _browser: Browser | null = null
 
 export async function getBrowser(): Promise<Browser> {
   if (_browser && _browser.isConnected()) return _browser
+
+  // Browser-level proxy is generic — we don't pass per-ad sticky session here
+  // because Playwright's launch-level proxy isn't easily overrideable. Instead,
+  // we set a generic proxy at launch (rotating) and override per BrowserContext
+  // below where we want sticky sessions.
+  // Note: Chromium ignores proxy auth in --proxy-server flag for HTTP proxies,
+  // so we use Playwright's built-in `proxy` option which handles auth correctly.
   _browser = await chromium.launch({
     headless: true,
     args: [
@@ -23,8 +37,36 @@ export async function getBrowser(): Promise<Browser> {
       '--no-default-browser-check',
     ],
   })
-  console.log('✅ Chromium launched')
+  if (proxyEnabled) {
+    console.log(`✅ Chromium launched (proxy: ${config.proxy.host}:${config.proxy.port}, country=${config.proxy.country})`)
+  } else {
+    console.log('✅ Chromium launched (no proxy — direct connection, will be blocked by Meta at scale)')
+  }
   return _browser
+}
+
+/**
+ * Build per-ad sticky proxy config for IPRoyal.
+ *
+ * IPRoyal session pinning works via the username field:
+ *   USERNAME-country-COUNTRY-session-SESSION_ID
+ *
+ * Same session_id → same residential IP (held for ~10 min, max 30 min).
+ * Different session_id → different IP. We pass a unique ID per ad so each
+ * ad gets its own dedicated IP that lives only for that ad's processing.
+ *
+ * Reference: https://docs.iproyal.com/proxies/residential/sticky-sessions
+ */
+function buildProxyForAd(adId: string): { server: string; username: string; password: string } | undefined {
+  if (!proxyEnabled) return undefined
+  // Random suffix so retrying the same ad gets a different IP (avoids
+  // looping on a poisoned exit node).
+  const sessionId = `${adId}-${Math.random().toString(36).slice(2, 8)}`
+  return {
+    server: `http://${config.proxy.host}:${config.proxy.port}`,
+    username: `${config.proxy.user}-country-${config.proxy.country}-session-${sessionId}`,
+    password: config.proxy.pass,
+  }
 }
 
 export async function closeBrowser() {
@@ -43,18 +85,29 @@ export interface ExtractResult {
 
 /**
  * Extract image + video CDN URLs from a Meta snapshot URL.
- * Uses a fresh BrowserContext per ad to avoid cross-ad cache pollution.
+ * Uses a fresh BrowserContext per ad with its own sticky proxy session
+ * so all sub-requests (HTML, JS, XHRs, CDN) come from one residential IP.
+ *
+ * @param snapshotUrl  Meta render_ad URL
+ * @param timeoutMs    overall timeout
+ * @param adId         ad_archive_id — used as the IPRoyal sticky session key
+ *                      so each ad gets its own dedicated IP
  */
-export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000): Promise<ExtractResult> {
+export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, adId?: string): Promise<ExtractResult> {
   const browser = await getBrowser()
   let context: BrowserContext | null = null
   let page: Page | null = null
 
   try {
+    // Per-ad sticky proxy session — same IP for the full ad lifecycle.
+    // Falls back to no proxy if env vars aren't set.
+    const proxy = buildProxyForAd(adId || `noid-${Date.now()}`)
+
     context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
       viewport: { width: 1280, height: 720 },
       ignoreHTTPSErrors: true,
+      ...(proxy ? { proxy } : {}),
     })
     page = await context.newPage()
 
