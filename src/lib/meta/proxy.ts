@@ -36,9 +36,17 @@ let _agent: ProxyAgent | undefined
 function getAgent(): ProxyAgent | undefined {
   if (!metaProxyEnabled) return undefined
   if (_agent) return _agent
-  // ProxyAgent supports auth in the URL: http://user:pass@host:port
-  const auth = `${encodeURIComponent(USER)}:${encodeURIComponent(PASS)}`
-  _agent = new ProxyAgent(`http://${auth}@${HOST}:${PORT}`)
+  // Use explicit token option instead of URL-embedded auth. Special chars in
+  // IPRoyal passwords (e.g. uppercase/lowercase mix, digits) sometimes don't
+  // survive undicis URL parser cleanly, even with encodeURIComponent. The
+  // `token` option bypasses URL parsing entirely — it goes straight into the
+  // Proxy-Authorization header as Basic auth.
+  const basicAuth = Buffer.from(`${USER}:${PASS}`).toString('base64')
+  _agent = new ProxyAgent({
+    uri: `http://${HOST}:${PORT}`,
+    token: `Basic ${basicAuth}`,
+    requestTls: { rejectUnauthorized: false },
+  } as any)
   return _agent
 }
 
@@ -48,6 +56,9 @@ function getAgent(): ProxyAgent | undefined {
  *
  * Returns the same Response shape as global fetch, so existing callers
  * that do `await res.json()` etc. work unchanged.
+ *
+ * On proxy errors, logs the error with context so we can diagnose without
+ * leaking the full error to the user.
  */
 export async function proxyFetch(url: string, init?: any): Promise<Response> {
   const agent = getAgent()
@@ -55,7 +66,12 @@ export async function proxyFetch(url: string, init?: any): Promise<Response> {
     // No proxy configured — direct fetch (local dev / fallback)
     return fetch(url, init)
   }
-  // Route through residential proxy. undici's fetch returns a web-spec Response.
-  const res = await undiciFetch(url, { ...init, dispatcher: agent } as any)
-  return res as unknown as Response
+  try {
+    const res = await undiciFetch(url, { ...init, dispatcher: agent } as any)
+    return res as unknown as Response
+  } catch (err: any) {
+    // Diagnostic: log proxy errors so we can see what's failing in Vercel logs
+    console.error(`[proxyFetch] failed for ${url.split('?')[0]}:`, err?.code, err?.message)
+    throw err
+  }
 }
