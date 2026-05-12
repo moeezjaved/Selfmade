@@ -106,17 +106,40 @@ export async function POST(req: NextRequest) {
   }
 
   // Step 2 — get REAL expiry via /debug_token endpoint.
-  // This works regardless of which Meta app issued the token (unlike the
-  // fb_exchange_token which requires matching app credentials and silently
-  // fails when contributors generate tokens from their own apps like
-  // Babar's "research-and-dev" app).
   //
-  // /debug_token tells us the token's actual `expires_at` and `data_access_
-  // expires_at`. If the contributor extended their token to 60-day already
-  // via their own app's Token Tool, we'll see that expiry here.
+  // CROSS-APP GOTCHA: When contributor's token is from THEIR app (e.g. Babar's
+  // "research-and-dev"), calling /debug_token with OUR app's credentials returns
+  // partial data — expires_at is often omitted. The trick: pass the input_token
+  // ITSELF as the access_token. Meta allows self-debug, and you get full info
+  // regardless of which app issued the token. This is the documented pattern
+  // for debugging tokens cross-app.
+  //
+  // Strategy: try self-debug first (works for any app), fall back to app-creds
+  // debug as backup, fall back to fb_exchange_token as last resort.
   let longLivedToken = rawToken
   let expiresAt: Date | null = null
-  if (META_APP_ID && META_APP_SECRET) {
+  let debugSource = 'none'
+
+  // Try 1: self-debug (input_token == access_token) — works cross-app
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${V}/debug_token?` + new URLSearchParams({
+        input_token: rawToken,
+        access_token: rawToken,
+      }),
+      { signal: AbortSignal.timeout(10_000) },
+    )
+    const data = await res.json()
+    if (data?.data?.expires_at && Number(data.data.expires_at) > 0) {
+      expiresAt = new Date(Number(data.data.expires_at) * 1000)
+      debugSource = 'self_debug'
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Try 2: app-creds debug (works only if input_token was issued by our app)
+  if (!expiresAt && META_APP_ID && META_APP_SECRET) {
     try {
       const appAccess = `${META_APP_ID}|${META_APP_SECRET}`
       const res = await fetch(
@@ -127,15 +150,15 @@ export async function POST(req: NextRequest) {
         { signal: AbortSignal.timeout(10_000) },
       )
       const data = await res.json()
-      // debug_token response: { data: { expires_at, data_access_expires_at, scopes, app_id, ... } }
       if (data?.data?.expires_at && Number(data.data.expires_at) > 0) {
-        // expires_at is unix seconds
         expiresAt = new Date(Number(data.data.expires_at) * 1000)
+        debugSource = 'app_creds_debug'
       }
     } catch {
-      // /debug_token call failed — fall through to fb_exchange_token attempt
+      /* fall through */
     }
   }
+  console.log(`[admin/tokens POST] expiry detected via ${debugSource}: ${expiresAt?.toISOString() || 'none'}`)
 
   // Step 2b — only attempt the fb_exchange_token swap if we don't already have
   // a long expiry. If contributor's token is already 60-day (visible from
