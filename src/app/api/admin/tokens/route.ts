@@ -105,12 +105,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Meta /me call failed: ${e.message ?? e}` }, { status: 500 })
   }
 
-  // Step 2 — exchange short-lived → long-lived token (60 days).
-  // If the token is already long-lived, Meta returns the same token + new expiry.
-  // If app credentials missing, we skip and store the raw token (will expire sooner).
+  // Step 2 — get REAL expiry via /debug_token endpoint.
+  // This works regardless of which Meta app issued the token (unlike the
+  // fb_exchange_token which requires matching app credentials and silently
+  // fails when contributors generate tokens from their own apps like
+  // Babar's "research-and-dev" app).
+  //
+  // /debug_token tells us the token's actual `expires_at` and `data_access_
+  // expires_at`. If the contributor extended their token to 60-day already
+  // via their own app's Token Tool, we'll see that expiry here.
   let longLivedToken = rawToken
   let expiresAt: Date | null = null
   if (META_APP_ID && META_APP_SECRET) {
+    try {
+      const appAccess = `${META_APP_ID}|${META_APP_SECRET}`
+      const res = await fetch(
+        `https://graph.facebook.com/${V}/debug_token?` + new URLSearchParams({
+          input_token: rawToken,
+          access_token: appAccess,
+        }),
+        { signal: AbortSignal.timeout(10_000) },
+      )
+      const data = await res.json()
+      // debug_token response: { data: { expires_at, data_access_expires_at, scopes, app_id, ... } }
+      if (data?.data?.expires_at && Number(data.data.expires_at) > 0) {
+        // expires_at is unix seconds
+        expiresAt = new Date(Number(data.data.expires_at) * 1000)
+      }
+    } catch {
+      // /debug_token call failed — fall through to fb_exchange_token attempt
+    }
+  }
+
+  // Step 2b — only attempt the fb_exchange_token swap if we don't already have
+  // a long expiry. If contributor's token is already 60-day (visible from
+  // debug_token), skip the exchange — it would either fail or do nothing useful.
+  const hasLongExpiry = expiresAt && (expiresAt.getTime() - Date.now()) > 7 * 86400_000
+  if (!hasLongExpiry && META_APP_ID && META_APP_SECRET) {
     try {
       const res = await fetch(
         `https://graph.facebook.com/${V}/oauth/access_token?` + new URLSearchParams({
@@ -124,17 +155,17 @@ export async function POST(req: NextRequest) {
       const data = await res.json()
       if (!data.error && data.access_token) {
         longLivedToken = data.access_token
-        // expires_in is seconds; default 60 days if not provided
         const seconds = Number(data.expires_in) || 60 * 86400
         expiresAt = new Date(Date.now() + seconds * 1000)
       }
     } catch {
-      // Exchange failed — keep raw token, no expires_at recorded
+      // Exchange failed — keep raw token + whatever expiry debug_token gave us
     }
   }
+
   if (!expiresAt) {
-    // Conservative default — assume 1 hour if exchange failed (admin will see "expires soon" warning)
-    expiresAt = new Date(Date.now() + 60 * 60 * 1000)
+    // Conservative default — 1 day if both probes failed (admin sees warning)
+    expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
   }
 
   // Step 3 — encrypt and insert
