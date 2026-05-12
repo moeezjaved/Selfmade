@@ -46,24 +46,24 @@ export async function getBrowser(): Promise<Browser> {
 }
 
 /**
- * Build per-ad proxy config for IPRoyal.
+ * Build per-ad proxy config for IPRoyal — uses SOCKS5 not HTTP.
  *
- * Phase 1 (current): plain rotating residential — each request from a
- * different IP. Verified to work with the Chromium auth flow.
+ * Why SOCKS5: Chromium returns ERR_PROXY_AUTH_UNSUPPORTED on every HTTPS
+ * request when using HTTP proxies that require Basic Auth. This is a
+ * documented Chromium bug — the HTTP CONNECT proxy handshake doesn't
+ * negotiate Basic Auth cleanly for HTTPS upgrades. SOCKS5 has its own
+ * auth protocol that Chromium handles correctly.
  *
- * Phase 2 (later, after we confirm rotating works): add sticky sessions
- * via IPRoyal's username modifiers. Their docs vary on the exact format
- * (some say `username_country-us_session-X`, others `username-country-us
- * -session-X`). We'll experiment after baseline rotating is stable.
+ * IPRoyal serves both HTTP and SOCKS5 on the same endpoint:port; only
+ * the URL scheme changes. No extra cost, no different credentials.
  *
- * Note: Chromium can return ERR_PROXY_AUTH_UNSUPPORTED if the username
- * contains characters Chrome doesn't expect during HTTPS-over-HTTP-proxy
- * auth negotiation. Plain alphanumeric username works reliably.
+ * Phase 1 (current): plain rotating residential via SOCKS5.
+ * Phase 2 (later): add IPRoyal sticky session modifiers once verified.
  */
 function buildProxyForAd(_adId: string): { server: string; username: string; password: string } | undefined {
   if (!proxyEnabled) return undefined
   return {
-    server: `http://${config.proxy.host}:${config.proxy.port}`,
+    server: `socks5://${config.proxy.host}:${config.proxy.port}`,
     username: config.proxy.user,
     password: config.proxy.pass,
   }
