@@ -39,11 +39,13 @@ export async function GET(_req: NextRequest) {
     result.direct_fetch = { ok: false, error: e?.message || String(e), code: e?.code }
   }
 
-  // Test 2: proxy fetch to icanhazip — should return a DIFFERENT IP if proxy works
+  // Test 2: proxy fetch to icanhazip — should return a DIFFERENT IP if proxy works.
+  // Use a generous 45s timeout because residential proxy handshake from cloud
+  // egress IPs can take 5-20s for the first connection.
   if (metaProxyEnabled) {
     try {
       const t0 = Date.now()
-      const res = await proxyFetch('https://ipv4.icanhazip.com', { signal: AbortSignal.timeout(15000) })
+      const res = await proxyFetch('https://ipv4.icanhazip.com', { signal: AbortSignal.timeout(45000) })
       const ip = (await res.text()).trim()
       result.proxy_fetch = {
         ok: true,
@@ -56,11 +58,31 @@ export async function GET(_req: NextRequest) {
         ok: false,
         error: e?.message || String(e),
         code: e?.code || e?.cause?.code,
-        cause: e?.cause ? { message: e.cause.message, code: e.cause.code } : undefined,
+        cause: e?.cause ? { message: e.cause.message, code: e.cause.code, errno: e.cause.errno, syscall: e.cause.syscall } : undefined,
       }
     }
   } else {
     result.proxy_fetch = { skipped: 'env vars not set' }
+  }
+
+  // Test 3: also try via http (some IPRoyal endpoints support HTTP not HTTPS for the test)
+  if (metaProxyEnabled) {
+    try {
+      const t0 = Date.now()
+      const res = await proxyFetch('http://ipv4.icanhazip.com', { signal: AbortSignal.timeout(45000) })
+      const ip = (await res.text()).trim()
+      result.proxy_fetch_http = {
+        ok: true,
+        latency_ms: Date.now() - t0,
+        proxy_ip: ip,
+      }
+    } catch (e: any) {
+      result.proxy_fetch_http = {
+        ok: false,
+        error: e?.message,
+        code: e?.code || e?.cause?.code,
+      }
+    }
   }
 
   return NextResponse.json(result, { status: 200 })
