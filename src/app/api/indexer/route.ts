@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import { loadTokenPool, type TokenPool, type PoolToken } from '@/lib/meta/token-pool'
+import { proxyFetch, metaProxyEnabled } from '@/lib/meta/proxy'
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 
@@ -23,8 +25,22 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
 // ── Get best available Meta access token ─────────────────────
+// Legacy single-token getter — kept for routes that don't need rotation
+// (slug lookup, follower count batch). For ads_archive scraping the indexer
+// uses loadTokenPool() directly so it can rotate on rate limit.
 async function getMetaToken(admin: any): Promise<string> {
-  // Try to get a real user access token from any connected account
+  // Prefer pool token if any are configured (avoids depleting personal account)
+  const { data: pooled } = await admin
+    .from('meta_accounts')
+    .select('access_token')
+    .eq('is_indexer_pool', true)
+    .order('last_used_at', { ascending: true, nullsFirst: true })
+    .limit(1)
+  if (pooled?.[0]?.access_token) {
+    const t = decryptToken(pooled[0].access_token)
+    if (t) return t
+  }
+  // Fall back to user's primary connected account
   const { data: accounts } = await admin
     .from('meta_accounts')
     .select('access_token')
@@ -34,7 +50,6 @@ async function getMetaToken(admin: any): Promise<string> {
     const userToken = decryptToken(accounts[0].access_token)
     if (userToken) return userToken
   }
-  // Fallback to app token
   return APP_TOKEN
 }
 
@@ -53,8 +68,9 @@ const MIN_DAYS_CATEGORY = 0
 // External page quality gate: when a keyword search returns ads from pages that are
 // NOT the target brand (influencers, marketplaces, review accounts), only keep ads
 // from pages with at least this many followers. Filters out micro accounts and junk.
-// Set to 0 to disable. Atria-like platforms typically use ~50k as the cutoff.
-const MIN_EXTERNAL_PAGE_FOLLOWERS = 50_000
+// Set to 0 to disable. Lowered from 50K → 30K to capture mid-tier influencers and
+// affiliate marketers who often promote DTC brands but don't quite hit 50K following.
+const MIN_EXTERNAL_PAGE_FOLLOWERS = 30_000
 
 const META_FIELDS = [
   'id','ad_creation_time','ad_delivery_start_time','ad_delivery_stop_time',
@@ -110,26 +126,57 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
 }
 
 // ── Single-page Meta fetch helper ───────────────────────────
+// When `pool` is provided, on a #613 rate-limit error this helper marks the
+// current token cool, swaps to the next available pool token, and retries
+// the SAME request once. The caller's `params.access_token` is updated in
+// place so subsequent paginated calls keep using the new token until it too
+// is rate-limited.
 async function fetchOnePage(
   params: Record<string, string>,
-  after = ''
-): Promise<{ ads: any[]; nextCursor: string; hasMore: boolean; error?: string }> {
+  after = '',
+  pool?: TokenPool,
+  currentToken?: PoolToken,
+): Promise<{ ads: any[]; nextCursor: string; hasMore: boolean; error?: string; rotatedTo?: PoolToken }> {
   if (after) params = { ...params, after }
-  try {
-    const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), 15000)
-    const res = await fetch(`https://graph.facebook.com/${V}/ads_archive?` + new URLSearchParams(params), { signal: ctrl.signal })
-    clearTimeout(t)
-    const data = await res.json()
-    if (data.error) return { ads: [], nextCursor: '', hasMore: false, error: data.error.message }
-    return {
-      ads: data.data || [],
-      nextCursor: data.paging?.cursors?.after || '',
-      hasMore: !!data.paging?.next,
+  let attempts = 0
+  let activeToken = currentToken
+  while (attempts < 2) {
+    attempts++
+    try {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), 15000)
+      // Through residential proxy if META_PROXY_* env vars set, else direct.
+      const res = await proxyFetch(`https://graph.facebook.com/${V}/ads_archive?` + new URLSearchParams(params), { signal: ctrl.signal })
+      clearTimeout(t)
+      const data = await res.json()
+      if (data.error) {
+        const msg = data.error.message || ''
+        // Rotate on rate limit if we have a pool
+        const isRateLimit = msg.includes('#613') || msg.toLowerCase().includes('rate limit')
+        if (isRateLimit && pool && activeToken && attempts === 1) {
+          await pool.markCool(activeToken.id, msg)
+          const nextTok = pool.next()
+          if (nextTok && nextTok.id !== activeToken.id) {
+            params = { ...params, access_token: nextTok.token }
+            activeToken = nextTok
+            continue   // retry the SAME page with the new token
+          }
+        }
+        return { ads: [], nextCursor: '', hasMore: false, error: msg, rotatedTo: activeToken !== currentToken ? activeToken : undefined }
+      }
+      // Success — record usage so the picker knows when this token was last hit
+      if (pool && activeToken) await pool.markUsed(activeToken.id).catch(() => {})
+      return {
+        ads: data.data || [],
+        nextCursor: data.paging?.cursors?.after || '',
+        hasMore: !!data.paging?.next,
+        rotatedTo: activeToken !== currentToken ? activeToken : undefined,
+      }
+    } catch (e: any) {
+      return { ads: [], nextCursor: '', hasMore: false, error: e.name === 'AbortError' ? 'Timed out after 15s' : e.message }
     }
-  } catch (e: any) {
-    return { ads: [], nextCursor: '', hasMore: false, error: e.name === 'AbortError' ? 'Timed out after 15s' : e.message }
   }
+  return { ads: [], nextCursor: '', hasMore: false, error: 'all_tokens_cooling' }
 }
 
 // ── Find a brand's Facebook page_id ─────────────────────────
@@ -143,7 +190,7 @@ async function findBrandPageIds(brandName: string, token: string): Promise<strin
   const base = brandName.toLowerCase().replace(/[^a-z0-9]/g, '')
   try {
     const url = `https://graph.facebook.com/${V}/${base}?fields=id,name&access_token=${token}`
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+    const res = await proxyFetch(url, { signal: AbortSignal.timeout(8000) })
     const data = await res.json() as { id?: string; name?: string; error?: any }
     if (!data.error && data.id) {
       const nameLower = (data.name || '').toLowerCase()
@@ -224,7 +271,7 @@ async function getPageFollowers(pageIds: string[], token: string): Promise<Map<s
   for (let i = 0; i < pageIds.length; i += BATCH) {
     const batch = pageIds.slice(i, i + BATCH)
     try {
-      const res = await fetch(
+      const res = await proxyFetch(
         `https://graph.facebook.com/${V}/?ids=${batch.join(',')}&fields=fan_count&access_token=${encodeURIComponent(token)}`,
         { signal: AbortSignal.timeout(10000) }
       )
@@ -259,6 +306,8 @@ async function fetchAdsForTerm(
   preDiscoveredPageIds: string[] = [], // page_ids found by caller before this call
   deadlineMs?: number,                 // absolute epoch ms — stop before this to avoid 300 s timeout
   onLog?: (msg: string) => void,       // stream-visible progress callback
+  pool?: TokenPool,                    // optional rotation pool — on 613 swap token instead of failing
+  initialPoolToken?: PoolToken,        // the PoolToken that owns `token` (so we can mark it used/cool)
 ): Promise<{ ads: any[], externalFiltered: number, timedOut: boolean, error?: string }> {
   const log = (msg: string) => { console.log(msg); onLog?.(msg) }
   const metaCountry = normalizeCountry(country)
@@ -296,12 +345,20 @@ async function fetchAdsForTerm(
   // then the brand page pagination stops early (0 new IDs per page), even
   // though there are 2000+ more ads to fetch from pages 3–60.
   // When page_id is known, brand fetch (step 2) is comprehensive on its own.
+  // Token currently in use — rotates inside fetchOnePage on #613 if a pool is given.
+  let activeToken = initialPoolToken
+
   if (preDiscoveredPageIds.length === 0) {
     const params = baseParams(term)
     let cursor = ''
     for (let p = 0; p < PAGES_PER_TERM; p++) {
       if (isNearDeadline()) { timedOut = true; break }
-      const { ads, nextCursor, hasMore, error } = await fetchOnePage(params, cursor)
+      const { ads, nextCursor, hasMore, error, rotatedTo } = await fetchOnePage(params, cursor, pool, activeToken)
+      if (rotatedTo) {
+        activeToken = rotatedTo
+        params.access_token = rotatedTo.token
+        log(`  ↻ Rotated to fresh token after rate limit`)
+      }
       if (error) break
       addAds(ads)
       if (!hasMore) break
@@ -427,14 +484,20 @@ async function fetchAdsForTerm(
           log(`  ⏱  Brand budget (${BRAND_TIME_BUDGET_MS / 1000}s) used at page ${p + 1} — ${allAds.length} ads. Moving to next brand. Cursor saved.`)
           break
         }
-        const { ads: pageAds, nextCursor, hasMore, error } = await fetchOnePage(brandPageParams, brandCursor)
+        const { ads: pageAds, nextCursor, hasMore, error, rotatedTo } = await fetchOnePage(brandPageParams, brandCursor, pool, activeToken)
+        if (rotatedTo) {
+          activeToken = rotatedTo
+          brandPageParams.access_token = rotatedTo.token
+          log(`  ↻ Rotated to fresh pool token after rate limit (${pool?.cooling}/${pool?.size} cooling)`)
+        }
         if (error) {
           log(`  ❌ Brand page ${p + 1} error: ${error}`)
-          // Rate-limit hit (#613) — bubble up so the entire indexer run aborts.
-          // Continuing to hit Meta after a 613 makes the block window longer.
-          // Throwing here is caught in the outer try/catch and reported to the
-          // crawl log so the next cron tick can retry once the window resets.
-          if (error.includes('#613') || error.toLowerCase().includes('rate limit')) {
+          // Rate-limit hit AND pool either absent or fully cooling — abort the run.
+          // The retry logic inside fetchOnePage already tried rotating; if we still
+          // got a #613 here it means every pool token is parked. Continuing would
+          // extend the block windows further, so we bail and let the next cron tick
+          // retry once at least one token's 65min cooldown expires.
+          if (error.includes('#613') || error.toLowerCase().includes('rate limit') || error === 'all_tokens_cooling') {
             throw new Error(`META_RATE_LIMIT: ${error}`)
           }
           break
@@ -975,9 +1038,20 @@ export async function GET(request: NextRequest) {
 
         send('log', `📋 Found ${termsToRun.length} terms to crawl (ad copy + brand + category for each)`)
 
-        // ── Get Meta token ──
-        const metaToken = await getMetaToken(admin)
-        send('log', '🔑 Meta token acquired')
+        // ── Load token pool (rotates across multiple Meta accounts on #613) ──
+        const tokenPool = await loadTokenPool(admin)
+        let activePoolToken = tokenPool.next()
+        let metaToken: string
+        if (activePoolToken) {
+          metaToken = activePoolToken.token
+          send('log', `🔑 Token pool loaded — ${tokenPool.size} accounts (${tokenPool.cooling} cooling)`)
+        } else {
+          // No pool configured (or all cooling) — fall back to legacy single-token getter
+          metaToken = await getMetaToken(admin)
+          send('log', tokenPool.size === 0
+            ? '🔑 Single-token mode (no pool configured — add accounts at /admin/tokens to scale)'
+            : '⚠️ All pool tokens cooling — using fallback. Wait ~60min for first reset.')
+        }
 
         let totalAdsUpserted = 0
 
@@ -1026,6 +1100,8 @@ export async function GET(request: NextRequest) {
                 term, country, metaToken, 'all', admin, knownBrandPageIds,
                 crawlDeadline - 30_000,                 // hand over deadline 30 s early for buffer
                 (msg) => send('log', msg),              // stream brand-fetch progress to admin UI
+                tokenPool,                              // rotation pool — fetchOnePage swaps tokens on #613
+                activePoolToken || undefined,           // current PoolToken (matches metaToken above)
               )
             } catch (err: any) {
               const msg = String(err?.message ?? err)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import { proxyFetch } from '@/lib/meta/proxy'
 
 export const dynamic = 'force-dynamic'
 
@@ -109,7 +110,7 @@ export async function GET(request: NextRequest) {
         access_token: token,
         limit: '10',
       })
-      const pagesRes = await fetch(pagesUrl)
+      const pagesRes = await proxyFetch(pagesUrl)
       const pagesData = await pagesRes.json()
       const ids = (pagesData.data || []).map((p: any) => p.id)
 
@@ -124,7 +125,7 @@ export async function GET(request: NextRequest) {
     }
 
     const url = `https://graph.facebook.com/${V}/ads_archive?` + new URLSearchParams(params)
-    const res = await fetch(url)
+    const res = await proxyFetch(url)
     const data = await res.json()
 
     if (data.error) {
