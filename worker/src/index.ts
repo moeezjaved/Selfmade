@@ -127,7 +127,12 @@ async function processAd(ad: AdRow): Promise<ProcessResult> {
     })
 
     if (creatives.length === 0) {
-      return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'r2_upload_failed' }
+      // All assets failed to upload — usually means Meta returned only placeholder
+      // images (1334-1507 bytes) because the ad was removed/deactivated/violates
+      // ad standards. Mark failed so we never retry it (otherwise these placeholder
+      // ads loop in the queue forever, burning proxy bandwidth).
+      await markExtractionFailed(ad.ad_id)
+      return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'r2_upload_failed → marked failed (placeholder only)' }
     }
 
     // Save all creatives + update legacy columns (first image, first video)
