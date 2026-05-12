@@ -19,13 +19,20 @@ let _browser: Browser | null = null
 export async function getBrowser(): Promise<Browser> {
   if (_browser && _browser.isConnected()) return _browser
 
-  // Browser-level proxy is generic — we don't pass per-ad sticky session here
-  // because Playwright's launch-level proxy isn't easily overrideable. Instead,
-  // we set a generic proxy at launch (rotating) and override per BrowserContext
-  // below where we want sticky sessions.
-  // Note: Chromium ignores proxy auth in --proxy-server flag for HTTP proxies,
-  // so we use Playwright's built-in `proxy` option which handles auth correctly.
-  _browser = await chromium.launch({
+  // ── Proxy set at BROWSER LAUNCH (not per-context) ──
+  // Why launch-level: Playwright + Chromium has a documented bug where
+  // per-context HTTP proxy auth fails with ERR_PROXY_AUTH_UNSUPPORTED on
+  // HTTPS targets. Setting auth at launch time (chromium.launch({ proxy }))
+  // pre-authenticates the browser process so subsequent context creation
+  // doesn't renegotiate. Also the only path that works reliably with
+  // Chromium — SOCKS5 with auth is NOT supported by Chromium at all.
+  //
+  // Trade-off: ALL contexts share the same proxy URL, so sticky-per-ad
+  // sessions aren't possible at this layer. With IPRoyal's plain rotating
+  // residential pool (32M IPs), each request gets a different IP anyway.
+  // For true sticky-per-ad we'd need to launch multiple browsers, each
+  // pre-authenticated to a different IPRoyal session — Phase 2 work.
+  const launchOpts: Parameters<typeof chromium.launch>[0] = {
     headless: true,
     args: [
       '--no-sandbox',
@@ -36,9 +43,17 @@ export async function getBrowser(): Promise<Browser> {
       '--no-first-run',
       '--no-default-browser-check',
     ],
-  })
+  }
   if (proxyEnabled) {
-    console.log(`✅ Chromium launched (proxy: ${config.proxy.host}:${config.proxy.port}, country=${config.proxy.country})`)
+    launchOpts.proxy = {
+      server: `http://${config.proxy.host}:${config.proxy.port}`,
+      username: config.proxy.user,
+      password: config.proxy.pass,
+    }
+  }
+  _browser = await chromium.launch(launchOpts)
+  if (proxyEnabled) {
+    console.log(`✅ Chromium launched (proxy: ${config.proxy.host}:${config.proxy.port}, country=${config.proxy.country}, rotating)`)
   } else {
     console.log('✅ Chromium launched (no proxy — direct connection, will be blocked by Meta at scale)')
   }
@@ -46,27 +61,12 @@ export async function getBrowser(): Promise<Browser> {
 }
 
 /**
- * Build per-ad proxy config for IPRoyal — uses SOCKS5 not HTTP.
- *
- * Why SOCKS5: Chromium returns ERR_PROXY_AUTH_UNSUPPORTED on every HTTPS
- * request when using HTTP proxies that require Basic Auth. This is a
- * documented Chromium bug — the HTTP CONNECT proxy handshake doesn't
- * negotiate Basic Auth cleanly for HTTPS upgrades. SOCKS5 has its own
- * auth protocol that Chromium handles correctly.
- *
- * IPRoyal serves both HTTP and SOCKS5 on the same endpoint:port; only
- * the URL scheme changes. No extra cost, no different credentials.
- *
- * Phase 1 (current): plain rotating residential via SOCKS5.
- * Phase 2 (later): add IPRoyal sticky session modifiers once verified.
+ * NO-OP — proxy is now set at browser launch, not per-context.
+ * Kept for compatibility with the extractCreative call site; returns undefined
+ * so newContext() doesn't override the launch-level proxy.
  */
-function buildProxyForAd(_adId: string): { server: string; username: string; password: string } | undefined {
-  if (!proxyEnabled) return undefined
-  return {
-    server: `socks5://${config.proxy.host}:${config.proxy.port}`,
-    username: config.proxy.user,
-    password: config.proxy.pass,
-  }
+function buildProxyForAd(_adId: string): undefined {
+  return undefined
 }
 
 export async function closeBrowser() {
