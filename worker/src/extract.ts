@@ -118,11 +118,13 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, a
       return route.continue()
     })
 
-    // Page load — aggressive timeout. Most live ads load in 3-5s.
+    // Page load — residential proxies add 2-5s of routing latency on top of
+    // Meta's render time, so the budget needs to be generous. Most live ads
+    // load in 6-10s through a proxy (was 3-5s direct).
     let pageStatus = 0
     const resp = await page.goto(snapshotUrl, {
       waitUntil: 'domcontentloaded',
-      timeout: 8_000,
+      timeout: 15_000,
     })
     pageStatus = resp ? resp.status() : 0
 
@@ -151,7 +153,7 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, a
             })
           return img || vid
         },
-        { timeout: 6_000 } // 6s wait for JS-rendered creative
+        { timeout: 9_000 } // 9s wait for JS-rendered creative (proxy adds latency)
       )
       creativeFound = true
     } catch {
