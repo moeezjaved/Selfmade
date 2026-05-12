@@ -46,25 +46,25 @@ export async function getBrowser(): Promise<Browser> {
 }
 
 /**
- * Build per-ad sticky proxy config for IPRoyal.
+ * Build per-ad proxy config for IPRoyal.
  *
- * IPRoyal session pinning works via the username field:
- *   USERNAME-country-COUNTRY-session-SESSION_ID
+ * Phase 1 (current): plain rotating residential — each request from a
+ * different IP. Verified to work with the Chromium auth flow.
  *
- * Same session_id → same residential IP (held for ~10 min, max 30 min).
- * Different session_id → different IP. We pass a unique ID per ad so each
- * ad gets its own dedicated IP that lives only for that ad's processing.
+ * Phase 2 (later, after we confirm rotating works): add sticky sessions
+ * via IPRoyal's username modifiers. Their docs vary on the exact format
+ * (some say `username_country-us_session-X`, others `username-country-us
+ * -session-X`). We'll experiment after baseline rotating is stable.
  *
- * Reference: https://docs.iproyal.com/proxies/residential/sticky-sessions
+ * Note: Chromium can return ERR_PROXY_AUTH_UNSUPPORTED if the username
+ * contains characters Chrome doesn't expect during HTTPS-over-HTTP-proxy
+ * auth negotiation. Plain alphanumeric username works reliably.
  */
-function buildProxyForAd(adId: string): { server: string; username: string; password: string } | undefined {
+function buildProxyForAd(_adId: string): { server: string; username: string; password: string } | undefined {
   if (!proxyEnabled) return undefined
-  // Random suffix so retrying the same ad gets a different IP (avoids
-  // looping on a poisoned exit node).
-  const sessionId = `${adId}-${Math.random().toString(36).slice(2, 8)}`
   return {
     server: `http://${config.proxy.host}:${config.proxy.port}`,
-    username: `${config.proxy.user}-country-${config.proxy.country}-session-${sessionId}`,
+    username: config.proxy.user,
     password: config.proxy.pass,
   }
 }
