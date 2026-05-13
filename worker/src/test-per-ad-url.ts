@@ -12,6 +12,7 @@
 import { chromium } from 'playwright-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import { startProxyChain } from './proxy-chain.js'
+import { randomBytes } from 'node:crypto'
 
 chromium.use(StealthPlugin())
 
@@ -24,7 +25,8 @@ async function main() {
 
   console.log(`Testing per-ad URL for ad_id ${adId}...`)
 
-  const proxy = await startProxyChain({ sessionId: 'testpera', lifetime: '10m', country: 'us' })
+  const sessionId = randomBytes(4).toString('hex').slice(0, 8)
+  const proxy = await startProxyChain({ sessionId, lifetime: '10m', country: 'us' })
   console.log(`Proxy: ${proxy.url}`)
 
   const browser = await chromium.launch({
