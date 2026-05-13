@@ -33,17 +33,22 @@ const PROXY_PASS = process.env.WORKER_PROXY_PASS || ''
 export const proxyChainEnabled = !!(PROXY_HOST && PROXY_USER && PROXY_PASS)
 
 /**
- * Build IPRoyal sticky session username.
- * Format per IPRoyal docs:
- *   USERNAME_session-<8 chars>_lifetime-<duration>_country-<cc>
+ * Build IPRoyal sticky session PASSWORD (not username — verified via curl tests).
+ *
+ * IPRoyal expects the session modifiers in the PASSWORD field:
+ *   USER:PASS_session-<8 chars>_lifetime-<duration>_country-<cc>
+ *
+ * This is counterintuitive but confirmed by their endpoint:
+ *   - Modifier in username (USER_session-XXX:PASS)           → REJECTED
+ *   - Modifier in password (USER:PASS_session-XXX)           → ACCEPTED
  *
  * @param sessionId  Any 8-character hex/alphanumeric string. Same id within
  *                   lifetime window = same residential IP.
  * @param lifetime   "1h" / "30m" / "1d" / etc. Max "7d".
  * @param country    Lowercase 2-char code (us/gb/ca/etc). Optional.
  */
-export function buildStickyUsername(opts: { sessionId: string; lifetime?: string; country?: string }): string {
-  const parts = [PROXY_USER, `session-${opts.sessionId}`]
+export function buildStickyPassword(opts: { sessionId: string; lifetime?: string; country?: string }): string {
+  const parts = [PROXY_PASS, `session-${opts.sessionId}`]
   if (opts.lifetime) parts.push(`lifetime-${opts.lifetime}`)
   if (opts.country) parts.push(`country-${opts.country}`)
   return parts.join('_')
@@ -67,12 +72,12 @@ export async function startProxyChain(opts: {
   if (!proxyChainEnabled) {
     throw new Error('proxy-chain: WORKER_PROXY_* env vars not set')
   }
-  const username = buildStickyUsername({
+  const stickyPass = buildStickyPassword({
     sessionId: opts.sessionId,
     lifetime: opts.lifetime ?? '1h',
     country: opts.country ?? 'us',
   })
-  const upstreamUrl = `http://${encodeURIComponent(username)}:${encodeURIComponent(PROXY_PASS)}@${PROXY_HOST}:${PROXY_PORT}`
+  const upstreamUrl = `http://${encodeURIComponent(PROXY_USER)}:${encodeURIComponent(stickyPass)}@${PROXY_HOST}:${PROXY_PORT}`
   const localhostUrl = await anonymizeProxy(upstreamUrl)
   return {
     url: localhostUrl,
@@ -95,12 +100,12 @@ export async function startProxyServer(opts: {
   if (!proxyChainEnabled) {
     throw new Error('proxy-chain: WORKER_PROXY_* env vars not set')
   }
-  const username = buildStickyUsername({
+  const stickyPass = buildStickyPassword({
     sessionId: opts.sessionId,
     lifetime: opts.lifetime ?? '1h',
     country: opts.country ?? 'us',
   })
-  const upstreamUrl = `http://${encodeURIComponent(username)}:${encodeURIComponent(PROXY_PASS)}@${PROXY_HOST}:${PROXY_PORT}`
+  const upstreamUrl = `http://${encodeURIComponent(PROXY_USER)}:${encodeURIComponent(stickyPass)}@${PROXY_HOST}:${PROXY_PORT}`
   const server = new Server({
     port: opts.port ?? 0,  // 0 = random free port
     verbose: false,
