@@ -27,10 +27,16 @@ let _browser: Browser | null = null
 // plain rotating endpoint, each REQUEST still gets a different residential
 // IP — so we lose nothing on IP diversity. Sticky-per-ad sessions would
 // require multiple browsers, which is overkill for our scale right now.
-let _sharedContext: BrowserContext | null = null
-let _adsHandledByContext = 0
-let _contextCreationLock: Promise<BrowserContext> | null = null  // serializes concurrent context creation
-const MAX_ADS_PER_CONTEXT = 200   // Recycle context every 200 ads to avoid memory bloat / cookie buildup
+// REMOVED shared context — was 0% success because Meta detects
+// the "one user opening many ads in sequence" pattern as a scraper.
+// Per-ad fresh BrowserContext is what gave us 80% success rate yesterday.
+//
+// We keep the bandwidth optimizations that DON'T affect fingerprinting:
+//   - Block static.xx.fbcdn.net images (UI assets, not real creatives)
+//   - Block fonts/stylesheets (not needed for DOM)
+//   - Block tracking pixels
+// These save ~20-30% bandwidth without compromising the per-ad isolation
+// that makes us look like distinct users.
 
 export async function getBrowser(): Promise<Browser> {
   if (_browser && _browser.isConnected()) return _browser
@@ -113,72 +119,44 @@ export interface ExtractResult {
  * Get (or create) the shared BrowserContext for this worker process.
  * Recycled every MAX_ADS_PER_CONTEXT ads to avoid memory bloat.
  */
-async function getSharedContext(): Promise<BrowserContext> {
-  // Fast path — context exists and still has capacity
-  if (_sharedContext && _adsHandledByContext < MAX_ADS_PER_CONTEXT) {
-    return _sharedContext
-  }
-  // If another caller is already creating the context, await its result instead
-  // of creating a duplicate. Prevents the "12 concurrent ads → 12 orphaned
-  // contexts" race condition that would happen on cold start.
-  if (_contextCreationLock) {
-    return _contextCreationLock
-  }
-  // We're the first caller to need a new context — claim the lock and create it.
-  _contextCreationLock = (async () => {
-    const browser = await getBrowser()
-    // Close stale context (memory cleanup) before creating fresh one.
-    // Double-check after the await — another path might have completed.
-    if (_sharedContext) {
-      const old = _sharedContext
-      _sharedContext = null
-      await old.close().catch(() => {})
-      console.log(`♻️  Recycled BrowserContext after ${_adsHandledByContext} ads`)
-    }
-    const ctx = await browser.newContext({
+/**
+ * Apply request blocking rules to a fresh BrowserContext.
+ * Saves ~20-30% bandwidth without compromising per-ad isolation.
+ */
+async function applyBlockingRules(ctx: BrowserContext) {
+  await ctx.route('**/*', (route) => {
+    const req = route.request()
+    const url = req.url()
+    const t = req.resourceType()
+    // Fonts and stylesheets — never needed for DOM extraction
+    if (t === 'font' || t === 'stylesheet') return route.abort()
+    // Static UI imagery (icons, sprites) — NOT the real ad creatives
+    if (t === 'image' && url.includes('static.xx.fbcdn.net')) return route.abort()
+    // Tracking / analytics requests
+    if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
+    return route.continue()
+  })
+}
+
+export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, adId?: string): Promise<ExtractResult> {
+  const browser = await getBrowser()
+  let context: BrowserContext | null = null
+  let page: Page | null = null
+
+  try {
+    // FRESH BrowserContext per ad — this is what gave us 80% success rate.
+    // Each ad has clean cookies, fresh TLS session, looks like a distinct
+    // user visiting one ad. Shared contexts trigger Metas scraper detection
+    // because Meta sees "one user opening hundreds of ads in sequence."
+    //
+    // Bandwidth cost: ~500-600 KB per ad (JS bundle re-downloaded each time).
+    // Worth it — 0% success at 50 KB/ad is infinitely worse than 80% at 500 KB.
+    context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
       viewport: { width: 1280, height: 720 },
       ignoreHTTPSErrors: true,
     })
-    // Block heavy/unnecessary resource types globally for this context.
-    // CRITICAL: blocking 'image' on static.xx.fbcdn.net saves ~9 GB/10K ads
-    // (icons, sprites, UI imagery — none needed for our DOM extraction).
-    // We DO NOT block 'script' because Metas React app needs to run to
-    // populate the ad creative URLs into the DOM.
-    await ctx.route('**/*', (route) => {
-      const req = route.request()
-      const url = req.url()
-      const t = req.resourceType()
-      if (t === 'font' || t === 'stylesheet') return route.abort()
-      if (t === 'image' && url.includes('static.xx.fbcdn.net')) return route.abort()
-      if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
-      return route.continue()
-    })
-    _sharedContext = ctx
-    _adsHandledByContext = 0
-    return ctx
-  })()
-  try {
-    return await _contextCreationLock
-  } finally {
-    _contextCreationLock = null  // Release lock so future recycles can re-acquire
-  }
-}
-
-export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, adId?: string): Promise<ExtractResult> {
-  let page: Page | null = null
-
-  try {
-    // Per-ad sticky proxy session — same IP for the full ad lifecycle.
-    // Falls back to no proxy if env vars aren't set.
-    // NOTE: with shared BrowserContext, the per-ad proxy isn't actually used
-    // (Playwright applies proxy at context level, not page level). The
-    // launch-level proxy in getBrowser() handles all routing — with IPRoyal's
-    // rotating endpoint, each request still gets a different IP.
-    const _proxy = buildProxyForAd(adId || `noid-${Date.now()}`)
-
-    const context = await getSharedContext()
-    _adsHandledByContext++
+    await applyBlockingRules(context)
     page = await context.newPage()
 
     // Page load — residential proxies add 2-5s of routing latency on top of
@@ -306,17 +284,9 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, a
       error: err instanceof Error ? err.message : String(err),
     }
   } finally {
-    // Close only the per-ad PAGE — context is shared across ads
-    // (closing context here would defeat the JS caching that saves bandwidth).
-    // Context recycles itself every MAX_ADS_PER_CONTEXT ads in getSharedContext().
+    // Close BOTH page AND context after every ad. This gives each ad fresh
+    // cookies + TLS session = looks like a distinct user to Meta.
     await page?.close().catch(() => {})
-  }
-}
-
-/** Called when worker shuts down — frees memory cleanly. */
-export async function closeSharedContext() {
-  if (_sharedContext) {
-    await _sharedContext.close().catch(() => {})
-    _sharedContext = null
+    await context?.close().catch(() => {})
   }
 }
