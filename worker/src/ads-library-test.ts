@@ -35,6 +35,7 @@ import { writeFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { randomBytes } from 'node:crypto'
+import { startProxyChain, proxyChainEnabled } from './proxy-chain.js'
 
 // Apply stealth plugin to Chromium — masks automation flags Meta uses to
 // detect Playwright/Puppeteer (navigator.webdriver, plugin mismatch, etc).
@@ -114,10 +115,10 @@ async function main() {
 
   if (!existsSync(OUTPUT_DIR)) await mkdir(OUTPUT_DIR, { recursive: true })
 
-  // IPRoyal sticky session — same residential IP for entire crawl (~1 hour).
-  // Per support docs: USERNAME_session-<8 chars>_lifetime-<duration>_country-<cc>
+  // Sticky session via local proxy-chain — Chromium connects to localhost
+  // (no auth needed), proxy-chain forwards to IPRoyal with the full
+  // sticky-session credentials. Same residential IP for entire run.
   const sessionId = randomBytes(4).toString('hex').slice(0, 8)
-  const stickyUser = `${PROXY_USER}_session-${sessionId}_lifetime-1h_country-us`
 
   console.log(`🚀 Ads Library Scraper MVP`)
   console.log(`   Run ID: ${RUN_TS}`)
@@ -126,14 +127,16 @@ async function main() {
   console.log(`   Output: ${OUTPUT_DIR}`)
   console.log()
 
-  const proxyConfig = (PROXY_HOST && PROXY_USER && PROXY_PASS) ? {
-    server: `http://${PROXY_HOST}:${PROXY_PORT}`,
-    username: stickyUser,
-    password: PROXY_PASS,
-  } : undefined
+  let localProxyHandle: { url: string; close: () => Promise<void> } | null = null
+  let proxyConfig: { server: string } | undefined
 
-  if (proxyConfig) console.log(`✅ Proxy: ${PROXY_HOST}:${PROXY_PORT}`)
-  else console.log(`⚠️  No proxy configured — using direct connection`)
+  if (proxyChainEnabled) {
+    localProxyHandle = await startProxyChain({ sessionId, lifetime: '1h', country: 'us' })
+    proxyConfig = { server: localProxyHandle.url }
+    console.log(`✅ Proxy chain: ${localProxyHandle.url} → IPRoyal (sticky session ${sessionId})`)
+  } else {
+    console.log(`⚠️  No proxy configured — using direct connection`)
+  }
 
   const browser = await chromium.launch({
     headless: true,
@@ -282,6 +285,7 @@ async function main() {
 
   await context.close()
   await browser.close()
+  if (localProxyHandle) await localProxyHandle.close()
 
   // ========== Analysis ==========
   console.log(`\n${'='.repeat(72)}`)
