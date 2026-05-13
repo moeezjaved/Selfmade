@@ -1,6 +1,11 @@
 /**
- * Playwright extractor — loads Meta's render_ad URL in real Chrome,
+ * Playwright extractor — loads Meta's public Ads Library per-ad URL
+ * (https://www.facebook.com/ads/library/?id=AD_ID) in real Chrome,
  * extracts the raw fbcdn.net image and video CDN URLs from the DOM.
+ *
+ * Per-ad URL was verified (test-per-ad-url.ts) to render full creatives
+ * without an access_token — same DOM structure as the old render_ad path,
+ * so the t39.*-6 / t45.*-4 selectors below still apply unchanged.
  *
  * One Browser instance is shared across all workers (memory-efficient).
  * Each ad gets its own BrowserContext with a STICKY proxy session
@@ -110,7 +115,7 @@ export interface ExtractResult {
  * Uses a fresh BrowserContext per ad with its own sticky proxy session
  * so all sub-requests (HTML, JS, XHRs, CDN) come from one residential IP.
  *
- * @param snapshotUrl  Meta render_ad URL
+ * @param snapshotUrl  Meta Ads Library per-ad URL (?id=AD_ID)
  * @param timeoutMs    overall timeout
  * @param adId         ad_archive_id — used as the IPRoyal sticky session key
  *                      so each ad gets its own dedicated IP
