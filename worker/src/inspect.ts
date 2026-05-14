@@ -6,7 +6,8 @@
  *   docker exec worker node dist/inspect.js <ad_id>
  */
 import { supabase } from './db.js'
-import { getBrowser, closeBrowser } from './extract.js'
+import { chromium } from 'playwright'
+import type { Route } from 'playwright'
 
 function stpSize(url: string): number {
   const m = url?.match(/_s(\d+)x\d+/)
@@ -52,14 +53,14 @@ async function main() {
   console.log(`📋 Currently stored thumb: ${ad.thumbnail_url || '(none)'}`)
   console.log(`📋 Currently stored video: ${ad.video_url || '(none)'}\n`)
 
-  const browser = await getBrowser()
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] })
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
     userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   })
   const page = await context.newPage()
 
-  await page.route('**/*', (route) => {
+  await page.route('**/*', (route: Route) => {
     const t = route.request().resourceType()
     if (t === 'font' || t === 'stylesheet') return route.abort()
     return route.continue()
@@ -126,7 +127,7 @@ async function main() {
 
   await page.close()
   await context.close()
-  await closeBrowser()
+  await browser.close()
   process.exit(0)
 }
 
