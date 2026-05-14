@@ -42,10 +42,10 @@ const MIN_SUCCESS_RATE = 0.30
 const SUCCESS_RATE_WINDOW = 50  // last N ads checked
 
 // Per-brand budget
-const PER_BRAND_TIME_BUDGET_MS = 60_000   // 60s of scrolling per brand per run
-const MAX_SCROLLS_PER_BRAND = 30          // hard cap
-const SCROLL_DELAY_MIN_MS = 2_000
-const SCROLL_DELAY_MAX_MS = 8_000
+const PER_BRAND_TIME_BUDGET_MS = 240_000  // 4 min — we hit this often during pagination
+const MAX_SCROLLS_PER_BRAND = 60          // hard cap (was 30 — most listings have ~1500 ads)
+const SCROLL_DELAY_MIN_MS = 2_500
+const SCROLL_DELAY_MAX_MS = 5_000         // tighter range — we want pagination to fire faster
 
 // Pagination
 const TARGET_ADS_PER_BRAND = 200          // stop early if we got enough new ads
@@ -601,9 +601,39 @@ async function crawlBrand(opts: {
         console.log(`  🎯 Reached target of ${TARGET_ADS_PER_BRAND} ads`)
         break
       }
-      await page.evaluate(() => window.scrollBy(0, 1500)).catch(() => {})
+      // ── Multi-strategy scroll ──
+      // Window-level scroll often doesn't trigger Meta's IntersectionObserver
+      // because the ad list uses an inner scrollable container. We try every
+      // strategy in sequence so at least one fires Meta's pagination loader.
+      await page.evaluate(() => {
+        // 1. Outer window scroll — works when body is the scrollable element
+        window.scrollTo(0, document.body.scrollHeight)
+        // 2. Walk every scrollable element and push to bottom
+        const all = document.querySelectorAll<HTMLElement>('*')
+        for (let i = 0; i < all.length; i++) {
+          const el = all[i]
+          const cs = getComputedStyle(el)
+          if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 100) {
+            el.scrollTop = el.scrollHeight
+          }
+        }
+        // 3. Dispatch a wheel event in case Meta listens for that
+        window.dispatchEvent(new WheelEvent('wheel', { deltaY: 2000 }))
+      }).catch(() => {})
+
+      // 4. Keyboard End-key fallback (also triggers focus-based scroll)
+      await page.keyboard.press('End').catch(() => {})
+
       metrics.scrollCount++
       await sleep(randomDelay())
+
+      // 5. Bounce-scroll: scroll up a bit then back to bottom — many lazy-loaders
+      // fire on direction-change rather than absolute position.
+      if (scrollIdx % 3 === 0) {
+        await page.evaluate(() => window.scrollBy(0, -800)).catch(() => {})
+        await sleep(500)
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => {})
+      }
     }
   } catch (e: any) {
     console.error(`  ❌ Crawl error: ${e?.message}`)
