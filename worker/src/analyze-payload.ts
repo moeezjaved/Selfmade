@@ -81,22 +81,25 @@ async function main() {
     console.log(`   ${row.url?.slice(0, 100) ?? '(no url)'}`)
     console.log(`   captured: ${row.captured_at}`)
 
-    let parsed: any
-    try { parsed = JSON.parse(row.body_text) }
-    catch {
-      // Sometimes Meta wraps responses in `for (;;);` or other prefixes
-      const cleaned = row.body_text.replace(/^for\s*\(;;\);/, '').trim()
-      try { parsed = JSON.parse(cleaned) }
-      catch (e: any) {
-        console.log(`   ⚠️  Not valid JSON: ${e.message?.slice(0, 80)}`)
-        // Still try regex extraction on the raw text below
+    // Meta embeds ad JSON inside HTML <script> tags; extract each ad object
+    // via brace-matching (matches the indexer's proven extractAdsFromText).
+    const adObjects = extractAdsBraceMatched(row.body_text)
+    console.log(`   📦 brace-matched ${adObjects.length} ad objects`)
+
+    if (adObjects.length === 0) {
+      // Fallback: try whole-body JSON parse for non-HTML payloads
+      try {
+        const parsed = JSON.parse(row.body_text.replace(/^for\s*\(;;\);/, '').trim())
+        analyzeTree(parsed, stats, row.brand_page_id)
+      } catch {
         analyzeAsText(row.body_text, stats, row.brand_page_id)
-        continue
       }
+      continue
     }
 
-    // Walk the parsed tree
-    analyzeTree(parsed, stats, row.brand_page_id)
+    for (const ad of adObjects) {
+      analyzeAd(ad, stats, row.brand_page_id)
+    }
   }
 
   // ───────────────── REPORT ─────────────────
@@ -186,8 +189,36 @@ function urlSizePattern(url: string): string {
   return m ? `s${m[1]}` : 'no-size-tag'
 }
 
+/**
+ * Brace-match every ad_archive_id occurrence to its enclosing JSON object.
+ * Mirrors playwright-indexer.ts extractAdsFromText.
+ */
+function extractAdsBraceMatched(text: string): any[] {
+  const found: any[] = []
+  const adIdRegex = /"ad_archive_id"\s*:\s*"(\d{10,})"/g
+  const positions: number[] = []
+  let m: RegExpExecArray | null
+  while ((m = adIdRegex.exec(text)) !== null) {
+    positions.push(m.index)
+  }
+  for (const pos of positions) {
+    let start = pos
+    while (start > 0 && text[start] !== '{') start--
+    let depth = 0, end = start
+    for (let i = start; i < text.length && i < start + 250_000; i++) {
+      if (text[i] === '{') depth++
+      else if (text[i] === '}') { depth--; if (depth === 0) { end = i + 1; break } }
+    }
+    if (end === start) continue
+    try {
+      const obj = JSON.parse(text.slice(start, end))
+      if (obj.ad_archive_id) found.push(obj)
+    } catch { /* malformed slice — skip */ }
+  }
+  return found
+}
+
 function analyzeTree(root: any, stats: any, brandId: string | null) {
-  // Find every ad_archive_id in the tree, then analyze its parent object
   const ads: any[] = []
   function findAds(node: any) {
     if (!node) return
@@ -198,57 +229,52 @@ function analyzeTree(root: any, stats: any, brandId: string | null) {
     }
   }
   findAds(root)
+  for (const ad of ads) analyzeAd(ad, stats, brandId)
+}
 
-  for (const ad of ads) {
-    stats.totalAds += 1
-    const brandKey = brandId || 'unknown'
-    const cur = stats.samplesByBrand.get(brandKey) || { ads: 0, withMedia: 0 }
-    cur.ads += 1
+function analyzeAd(ad: any, stats: any, brandId: string | null) {
+  stats.totalAds += 1
+  const brandKey = brandId || 'unknown'
+  const cur = stats.samplesByBrand.get(brandKey) || { ads: 0, withMedia: 0 }
+  cur.ads += 1
 
-    // Walk just THIS ad's subtree to find media URLs + their JSON paths
-    const mediaUrls: string[] = []
-    const mediaPaths: string[] = []
+  const mediaUrls: string[] = []
+  const mediaPaths: string[] = []
 
-    function walk(node: any, path: string) {
-      if (typeof node === 'string') {
-        if (isMediaUrl(node)) {
-          mediaUrls.push(node)
-          if (!stats.sampleAdSchema) mediaPaths.push(path)
-        }
-        return
+  function walk(node: any, path: string) {
+    if (typeof node === 'string') {
+      if (isMediaUrl(node)) {
+        mediaUrls.push(node)
+        if (!stats.sampleAdSchema) mediaPaths.push(`${path}  →  ${node.slice(0, 80)}`)
       }
-      if (Array.isArray(node)) { node.forEach((n, i) => walk(n, `${path}[${i}]`)); return }
-      if (typeof node === 'object' && node) Object.entries(node).forEach(([k, v]) => walk(v, `${path}.${k}`))
+      return
     }
-    walk(ad, '$')
+    if (Array.isArray(node)) { node.forEach((n, i) => walk(n, `${path}[${i}]`)); return }
+    if (typeof node === 'object' && node) Object.entries(node).forEach(([k, v]) => walk(v, `${path}.${k}`))
+  }
+  walk(ad, '$')
 
-    let hasImage = false, hasVideo = false, hasReal = false
-    for (const u of mediaUrls) {
-      if (/\.(mp4|webm)/i.test(u)) hasVideo = true
-      else if (/\.(jpg|jpeg|png|webp)/i.test(u) || u.includes('/v/t')) hasImage = true
-      if (!isPlaceholder(u)) hasReal = true
-      stats.urlSizeHistogram.set(urlSizePattern(u), (stats.urlSizeHistogram.get(urlSizePattern(u)) || 0) + 1)
-      stats.urlPathHistogram.set(urlPathPattern(u), (stats.urlPathHistogram.get(urlPathPattern(u)) || 0) + 1)
-    }
+  let hasImage = false, hasVideo = false, hasReal = false
+  for (const u of mediaUrls) {
+    if (/\.(mp4|webm)/i.test(u)) hasVideo = true
+    else if (/\.(jpg|jpeg|png|webp)/i.test(u) || u.includes('/v/t')) hasImage = true
+    if (!isPlaceholder(u)) hasReal = true
+    stats.urlSizeHistogram.set(urlSizePattern(u), (stats.urlSizeHistogram.get(urlSizePattern(u)) || 0) + 1)
+    stats.urlPathHistogram.set(urlPathPattern(u), (stats.urlPathHistogram.get(urlPathPattern(u)) || 0) + 1)
+  }
 
-    if (mediaUrls.length > 0) {
-      stats.adsWithMedia += 1
-      cur.withMedia += 1
-    } else {
-      stats.adsNoMedia += 1
-    }
-    if (hasReal) stats.adsWithRealMedia += 1
-    if (hasImage && hasVideo) stats.adsImageAndVideo += 1
-    else if (hasImage) stats.adsImageOnly += 1
-    else if (hasVideo) stats.adsVideoOnly += 1
+  if (mediaUrls.length > 0) { stats.adsWithMedia += 1; cur.withMedia += 1 }
+  else stats.adsNoMedia += 1
+  if (hasReal) stats.adsWithRealMedia += 1
+  if (hasImage && hasVideo) stats.adsImageAndVideo += 1
+  else if (hasImage) stats.adsImageOnly += 1
+  else if (hasVideo) stats.adsVideoOnly += 1
 
-    stats.samplesByBrand.set(brandKey, cur)
+  stats.samplesByBrand.set(brandKey, cur)
 
-    // Save the first ad's schema + media paths for the report
-    if (!stats.sampleAdSchema && mediaUrls.length > 0) {
-      stats.sampleAdSchema = ad
-      stats.sampleAdMediaPaths = mediaPaths
-    }
+  if (!stats.sampleAdSchema && mediaUrls.length > 0) {
+    stats.sampleAdSchema = ad
+    stats.sampleAdMediaPaths = mediaPaths
   }
 }
 
