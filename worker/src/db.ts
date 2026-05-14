@@ -39,6 +39,15 @@ export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<
     query = query.not('format', 'ilike', '%video%')
   }
 
+  // Optional brand scoping for testing or focused crawls.
+  // Set WORKER_PAGE_ID=355136938262536 to drain only one brand at a time.
+  // Comma-separated list also supported.
+  const pageIdFilter = process.env.WORKER_PAGE_ID
+  if (pageIdFilter) {
+    const ids = pageIdFilter.split(',').map(s => s.trim()).filter(Boolean)
+    query = ids.length === 1 ? query.eq('page_id', ids[0]) : query.in('page_id', ids)
+  }
+
   const { data, error } = await query
   if (error) {
     console.error('❌ DB claim error:', error.message)
