@@ -264,7 +264,7 @@ async function archiveRawResponse(args: {
       status_code: args.status,
       bytes: args.body.length,
       body_sha256: bodyHash,
-      body_text: args.body.slice(0, 200_000),  // truncate to 200KB
+      body_text: args.body.slice(0, 1_500_000),  // truncate to 1.5MB (most Meta ad-library responses are 600-900KB; need full body for offline analysis of media fields)
       ad_ids_count: args.adIdsCount,
       cursors: args.cursors.slice(0, 5),
     })
