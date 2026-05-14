@@ -62,9 +62,13 @@ async function processAsset(
   type: 'image' | 'video',
   adId: string,
   position: number,
+  prefetchedBuf?: Buffer | null,
 ): Promise<{ url: string | null; hash: string | null; deduped: boolean }> {
   const contentType = type === 'image' ? 'image/jpeg' : 'video/mp4'
-  const buf = await downloadFromCDN(cdnUrl, contentType)
+  // Prefer the buffer downloaded inside the extract.ts browser context
+  // (carries proxy + session cookies). Fall back to direct fetch only if
+  // the extractor didn't supply one.
+  const buf = prefetchedBuf ?? (await downloadFromCDN(cdnUrl, contentType))
   if (!buf) return { url: null, hash: null, deduped: false }
 
   const hash = type === 'image' ? await imageHash(buf) : videoHash(buf)
@@ -91,11 +95,15 @@ async function processAsset(
 
 async function processAd(ad: AdRow): Promise<ProcessResult> {
   try {
-    const { imageUrls, videoUrls, pageStatus, error } = await extractCreative(
+    const { imageUrls, videoUrls, imageAssets, videoAssets, pageStatus, error } = await extractCreative(
       ad.snapshot_url,
       config.adTimeoutMs - 10_000,
       ad.ad_id,                       // sticky proxy session key — same IP for full ad lifecycle
     )
+
+    // Map URL → prefetched buffer (downloaded inside browser context)
+    const imageBufByUrl = new Map(imageAssets.map(a => [a.url, a.buffer]))
+    const videoBufByUrl = new Map(videoAssets.map(a => [a.url, a.buffer]))
 
     if (error) {
       // Network/timeout — leave for retry, don't mark failed
@@ -108,9 +116,11 @@ async function processAd(ad: AdRow): Promise<ProcessResult> {
       return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: `no_creative_found (page=${pageStatus}) → marked failed` }
     }
 
-    // Process all images + all videos in parallel
-    const imagePromises = imageUrls.map((url, i) => processAsset(url, 'image', ad.ad_id, i))
-    const videoPromises = videoUrls.map((url, i) => processAsset(url, 'video', ad.ad_id, i))
+    // Process all images + all videos in parallel.
+    // Pass the prefetched buffers so processAsset can skip the bare-IP fetch
+    // (which would get 1087-byte placeholders from Meta's CDN).
+    const imagePromises = imageUrls.map((url, i) => processAsset(url, 'image', ad.ad_id, i, imageBufByUrl.get(url)))
+    const videoPromises = videoUrls.map((url, i) => processAsset(url, 'video', ad.ad_id, i, videoBufByUrl.get(url)))
 
     const [imageResults, videoResults] = await Promise.all([
       Promise.all(imagePromises),
