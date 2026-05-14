@@ -48,7 +48,8 @@ const SCROLL_DELAY_MIN_MS = 2_500
 const SCROLL_DELAY_MAX_MS = 5_000         // tighter range — we want pagination to fire faster
 
 // Pagination
-const TARGET_ADS_PER_BRAND = 200          // stop early if we got enough new ads
+const TARGET_ADS_PER_BRAND = 1500         // bumped after fixing pagination scroll — Hims has ~2800 visible ads
+                                          // and crawls now ingest ~10/scroll, so 1500 is reachable in ~3-5 min
 const MAX_AD_BYTES_TO_STORE = 800_000     // truncate huge responses for archive
 
 // ========== Types ==========
