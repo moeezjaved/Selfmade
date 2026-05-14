@@ -34,6 +34,8 @@ const brandFilter = args.find(a => /^\d+$/.test(a))
 const hoursArg = args.find(a => a.startsWith('--hours='))
 const hours = hoursArg ? parseInt(hoursArg.split('=')[1], 10) : 24
 const limit = args.find(a => a.startsWith('--limit=')) ? parseInt(args.find(a => a.startsWith('--limit='))!.split('=')[1], 10) : 5
+const dumpFirst = args.includes('--dump-first')           // prints full JSON of the first ad with REAL media
+const dumpAll = args.includes('--dump-all-paths')         // prints media-URL paths for EVERY ad, not just first
 
 async function main() {
   console.log(`\n🔬 GraphQL Payload Analyzer`)
@@ -123,14 +125,24 @@ async function main() {
   for (const [p, c] of paths) console.log(`   ${p.padEnd(30)} ${c}`)
 
   if (stats.sampleAdMediaPaths.length > 0) {
-    console.log(`\n🗺️  Sample ad — JSON paths where media URLs live (first 20):`)
-    stats.sampleAdMediaPaths.slice(0, 20).forEach(p => console.log(`   ${p}`))
+    console.log(`\n🗺️  Sample ad ${stats.sampleAdId ?? ''} (${stats.sampleHasReal ? 'has REAL creative' : 'placeholder/profile only'}) — JSON paths where media URLs live (first 25):`)
+    stats.sampleAdMediaPaths.slice(0, 25).forEach((p: string) => console.log(`   ${p}`))
   }
 
   if (stats.sampleAdSchema) {
     console.log(`\n📋 Sample ad — top-level keys on the ad/snapshot object:`)
     const keys = Object.keys(stats.sampleAdSchema)
     console.log(`   ${keys.join(', ')}`)
+    if (stats.sampleAdSchema.snapshot) {
+      console.log(`\n📋 Sample ad — keys INSIDE snapshot:`)
+      console.log(`   ${Object.keys(stats.sampleAdSchema.snapshot).join(', ')}`)
+    }
+  }
+
+  if (dumpFirst && stats.sampleAdSchema) {
+    console.log(`\n📜 FULL JSON of sample ad ${stats.sampleAdId} (truncated to 5000 chars):`)
+    const json = JSON.stringify(stats.sampleAdSchema, null, 2)
+    console.log(json.length > 5000 ? json.slice(0, 5000) + '\n...[truncated]' : json)
   }
 
   console.log(`\n══════════════════════════════════════════`)
@@ -245,7 +257,7 @@ function analyzeAd(ad: any, stats: any, brandId: string | null) {
     if (typeof node === 'string') {
       if (isMediaUrl(node)) {
         mediaUrls.push(node)
-        if (!stats.sampleAdSchema) mediaPaths.push(`${path}  →  ${node.slice(0, 80)}`)
+        mediaPaths.push(`${path}  →  ${node.slice(0, 80)}`)
       }
       return
     }
@@ -272,9 +284,19 @@ function analyzeAd(ad: any, stats: any, brandId: string | null) {
 
   stats.samplesByBrand.set(brandKey, cur)
 
-  if (!stats.sampleAdSchema && mediaUrls.length > 0) {
+  // Capture sample ad: prefer one with REAL non-placeholder URLs over a profile-pic-only ad
+  if ((!stats.sampleAdSchema || (!stats.sampleHasReal && hasReal)) && mediaUrls.length > 0) {
     stats.sampleAdSchema = ad
     stats.sampleAdMediaPaths = mediaPaths
+    stats.sampleHasReal = hasReal
+    stats.sampleAdId = ad.ad_archive_id
+  }
+
+  // --dump-all-paths: print every ad's media paths
+  if (dumpAll) {
+    const realCount = mediaUrls.filter(u => !isPlaceholder(u)).length
+    console.log(`\n   📍 Ad ${ad.ad_archive_id} — ${mediaUrls.length} URLs (${realCount} real):`)
+    mediaPaths.slice(0, 6).forEach(p => console.log(`      ${p}`))
   }
 }
 
