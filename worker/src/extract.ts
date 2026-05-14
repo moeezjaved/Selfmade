@@ -72,18 +72,25 @@ export interface ExtractResult {
 }
 
 /**
- * Apply request blocking to a context. Saves ~20-30% bandwidth without
- * affecting fingerprinting (these are static UI assets, never the real
- * ad creative).
+ * Apply MINIMAL request blocking — only requests that absolutely cannot
+ * affect Meta's bot detection.
+ *
+ * Earlier version blocked fonts + stylesheets + static.xx.fbcdn images for
+ * ~30% bandwidth savings. That broke us: Meta's frontend appears to detect
+ * "did the browser load the fonts/stylesheets a real user would?" and gates
+ * the page when it sees a stripped-down loader. Verified by side-by-side
+ * test of test-per-ad-url.ts (no blocking, 100% success) vs extract.ts
+ * (blocking, 0% success) on the same ads with the same proxy + stealth.
+ *
+ * Only kept: tracking beacon aborts that are POST-render (don't affect what
+ * Meta serves us, just save us from echoing telemetry back).
  */
 async function applyBlockingRules(ctx: BrowserContext) {
   await ctx.route('**/*', (route) => {
-    const req = route.request()
-    const url = req.url()
-    const t = req.resourceType()
-    if (t === 'font' || t === 'stylesheet') return route.abort()
-    if (t === 'image' && url.includes('static.xx.fbcdn.net')) return route.abort()
-    if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
+    const url = route.request().url()
+    if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) {
+      return route.abort()
+    }
     return route.continue()
   })
 }
@@ -145,39 +152,15 @@ export async function extractCreative(
     })
     pageStatus = resp ? resp.status() : 0
 
-    // Wait for an ACTUAL ad creative — not Meta's static UI bundle.
-    // Real ad media is on /v/t39.*-6/ or /v/t45.*-4/ paths and loads
-    // via JS after the initial page shell.
-    let creativeFound = false
-    try {
-      await page.waitForFunction(
-        () => {
-          const isRealCreative = (s: string) =>
-            !!s &&
-            !s.includes('static.xx.fbcdn') &&
-            !s.includes('static.fbcdn') &&
-            !!(s.match(/\/v\/t39\.\d+-6\//) || s.match(/\/v\/t45\.\d+-4\//))
-          const img = Array.from(document.querySelectorAll('img')).some((i) =>
-            isRealCreative((i as HTMLImageElement).src),
-          )
-          const vid = Array.from(document.querySelectorAll('video')).some((v) => {
-            const ve = v as HTMLVideoElement
-            const src = ve.src || ve.currentSrc
-            return !!src && src.includes('fbcdn')
-          })
-          return img || vid
-        },
-        { timeout: Math.min(12_000, timeoutMs - 8_000) },
-      )
-      creativeFound = true
-    } catch {
-      /* timeout — dead ad, gated, or bot-detected; skip */
-    }
-
-    if (creativeFound) {
-      // Give carousel slides + video src time to fully attach
-      await new Promise((r) => setTimeout(r, 800))
-    }
+    // Always wait a fixed window for Meta's React frontend to hydrate +
+    // load the creative bundle. Matches the proven test-per-ad-url.ts pattern.
+    //
+    // Why not waitForFunction? Empirically, polling for a specific selector
+    // appears to interact with Meta's bot detection (or just trips it before
+    // the creative is fully attached). The 12s sleep gives identical real-
+    // user timing to test-per-ad-url.ts which extracts 30+ creatives/ad.
+    const waitMs = Math.min(12_000, Math.max(8_000, timeoutMs - 8_000))
+    await new Promise((r) => setTimeout(r, waitMs))
 
     const data = await page.evaluate(() => {
       const allVideos: string[] = []
