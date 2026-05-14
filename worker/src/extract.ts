@@ -54,9 +54,17 @@ export async function closeBrowser(): Promise<void> {
   // No global browser to close — each extractCreative call manages its own.
 }
 
+export interface ExtractedAsset {
+  url: string
+  buffer: Buffer
+  contentType: string
+}
+
 export interface ExtractResult {
-  imageUrls: string[]      // ALL fbcdn images (carousel slides), largest first
-  videoUrls: string[]      // ALL videos (rare to have multiple)
+  imageUrls: string[]              // ALL fbcdn images (carousel slides), largest first
+  videoUrls: string[]              // ALL videos (rare to have multiple)
+  imageAssets: ExtractedAsset[]    // already downloaded inside browser context (proxy+cookies carried)
+  videoAssets: ExtractedAsset[]
   pageStatus: number
   error?: string
 }
@@ -192,15 +200,52 @@ export async function extractCreative(
       new Set((data.allVideos || []).filter((u) => u.includes('fbcdn'))),
     )
 
+    // ── Download creatives INSIDE the browser context ──
+    // Critical: bare Node fetch() from the droplet's direct IP gets a 1087-byte
+    // placeholder from Meta's CDN ("not authorized to view this image"). Using
+    // page.context().request inherits the per-ad sticky proxy + session cookies
+    // that were used to load the page in the first place, so the CDN serves
+    // the real bytes.
+    const ctxRequest = context.request
+    async function fetchAsset(url: string, contentType: string): Promise<ExtractedAsset | null> {
+      try {
+        const r = await ctxRequest.fetch(url, {
+          timeout: 25_000,
+          headers: {
+            'Referer': 'https://www.facebook.com/',
+            'Accept': contentType.startsWith('video') ? 'video/*,*/*;q=0.8' : 'image/*,*/*;q=0.8',
+          },
+        })
+        if (!r.ok()) return null
+        const buf = Buffer.from(await r.body())
+        if (buf.byteLength < 2000) return null  // placeholder
+        return { url, buffer: buf, contentType }
+      } catch {
+        return null
+      }
+    }
+
+    const imageAssets = (
+      await Promise.all(uniqueImages.map((u) => fetchAsset(u, 'image/jpeg')))
+    ).filter((a): a is ExtractedAsset => a !== null)
+
+    const videoAssets = (
+      await Promise.all(uniqueVideos.map((u) => fetchAsset(u, 'video/mp4')))
+    ).filter((a): a is ExtractedAsset => a !== null)
+
     return {
       imageUrls: uniqueImages,
       videoUrls: uniqueVideos,
+      imageAssets,
+      videoAssets,
       pageStatus,
     }
   } catch (err) {
     return {
       imageUrls: [],
       videoUrls: [],
+      imageAssets: [],
+      videoAssets: [],
       pageStatus: 0,
       error: err instanceof Error ? err.message : String(err),
     }
