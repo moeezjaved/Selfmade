@@ -77,6 +77,7 @@ async function main() {
     sampleAdId: null,
     sampleHasReal: false,
     samplesByBrand: new Map<string, { ads: number; withMedia: number }>(),
+    allAds: [] as any[],   // every ad object — used for structural inspection at end
   }
 
   for (const row of rows) {
@@ -147,6 +148,65 @@ async function main() {
     console.log(`\n📜 FULL JSON of sample ad ${stats.sampleAdId} (truncated to 5000 chars):`)
     const json = JSON.stringify(stats.sampleAdSchema, null, 2)
     console.log(json.length > 5000 ? json.slice(0, 5000) + '\n...[truncated]' : json)
+  }
+
+  // ── Format-specific structural inspection ──
+  // Walk every saved ad and report on the shape of snapshot.images/videos/cards
+  // so we know exactly which fields the GraphQL extractor needs to read.
+  if (stats.allAds && stats.allAds.length > 0) {
+    console.log(`\n══════════════════════════════════════════`)
+    console.log(`🔬 STRUCTURAL INSPECTION — snapshot.images / videos / cards across all ads`)
+    console.log(`══════════════════════════════════════════\n`)
+
+    const formatCounts = new Map<string, number>()
+    const imageFieldKeys = new Set<string>()
+    const videoFieldKeys = new Set<string>()
+    const cardFieldKeys = new Set<string>()
+
+    let videoSample: any = null
+    let cardsSample: any = null
+
+    for (const ad of stats.allAds) {
+      const snap = ad.snapshot || {}
+      const fmt = snap.display_format || 'UNKNOWN'
+      formatCounts.set(fmt, (formatCounts.get(fmt) || 0) + 1)
+
+      if (Array.isArray(snap.images) && snap.images.length > 0) {
+        Object.keys(snap.images[0]).forEach(k => imageFieldKeys.add(k))
+      }
+      if (Array.isArray(snap.videos) && snap.videos.length > 0) {
+        Object.keys(snap.videos[0]).forEach(k => videoFieldKeys.add(k))
+        if (!videoSample) videoSample = { ad_archive_id: ad.ad_archive_id, format: fmt, videos: snap.videos }
+      }
+      if (Array.isArray(snap.cards) && snap.cards.length > 0) {
+        Object.keys(snap.cards[0]).forEach(k => cardFieldKeys.add(k))
+        if (!cardsSample) cardsSample = { ad_archive_id: ad.ad_archive_id, format: fmt, cards: snap.cards }
+      }
+    }
+
+    console.log(`📊 display_format distribution:`)
+    for (const [f, c] of Array.from(formatCounts.entries()).sort((a, b) => b[1] - a[1])) {
+      console.log(`   ${f.padEnd(20)} ${c}`)
+    }
+
+    console.log(`\n🖼️  Fields seen on snapshot.images[0]:`)
+    console.log(`   ${Array.from(imageFieldKeys).join(', ') || '(none — no ad had images)'}`)
+
+    console.log(`\n🎬 Fields seen on snapshot.videos[0]:`)
+    console.log(`   ${Array.from(videoFieldKeys).join(', ') || '(none — no ad had videos)'}`)
+
+    console.log(`\n🎠 Fields seen on snapshot.cards[0]:`)
+    console.log(`   ${Array.from(cardFieldKeys).join(', ') || '(none — no ad had cards)'}`)
+
+    if (videoSample) {
+      console.log(`\n📺 Sample VIDEO ad ${videoSample.ad_archive_id} (format=${videoSample.format}) — videos[0]:`)
+      console.log(JSON.stringify(videoSample.videos[0], null, 2).slice(0, 2000))
+    }
+
+    if (cardsSample) {
+      console.log(`\n🎯 Sample CAROUSEL ad ${cardsSample.ad_archive_id} (format=${cardsSample.format}) — cards[0]:`)
+      console.log(JSON.stringify(cardsSample.cards[0], null, 2).slice(0, 2000))
+    }
   }
 
   console.log(`\n══════════════════════════════════════════`)
@@ -250,6 +310,7 @@ function analyzeTree(root: any, stats: any, brandId: string | null) {
 
 function analyzeAd(ad: any, stats: any, brandId: string | null) {
   stats.totalAds += 1
+  stats.allAds.push(ad)
   const brandKey = brandId || 'unknown'
   const cur = stats.samplesByBrand.get(brandKey) || { ads: 0, withMedia: 0 }
   cur.ads += 1
