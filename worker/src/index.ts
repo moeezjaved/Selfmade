@@ -29,6 +29,7 @@ import {
   CreativeInsert,
 } from './db.js'
 import { extractCreative, getBrowser, closeBrowser } from './extract.js'
+import { downloadAssetsForAd } from './proxied-fetch.js'
 import { downloadFromCDN, uploadBufferToR2 } from './r2.js'
 import { imageHash, videoHash } from './hash.js'
 
@@ -93,8 +94,108 @@ async function processAsset(
   return { url, hash, deduped: false }
 }
 
+/**
+ * FAST PATH — used when the indexer pre-extracted raw fbcdn URLs from the
+ * GraphQL listing payload (post-migration 013). No browser launch required.
+ *
+ * Steps:
+ *   1. Spin up a per-ad sticky residential session (matches indexer behavior)
+ *   2. Download every raw_image_url + raw_video_url through that proxy
+ *   3. Hash + dedup against existing R2 objects
+ *   4. Upload survivors to R2
+ *
+ * Performance: ~3-5s per ad vs ~15-25s for the legacy DOM path. Bandwidth
+ * usage drops because we don't load Meta's React shell + JS bundles.
+ */
+async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
+  const imageUrls = ad.raw_image_urls || []
+  const videoUrls = ad.raw_video_urls || []
+
+  if (imageUrls.length === 0 && videoUrls.length === 0) {
+    await markExtractionFailed(ad.ad_id)
+    return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: empty raw URL arrays' }
+  }
+
+  const { images, videos } = await downloadAssetsForAd({
+    adId: ad.ad_id,
+    imageUrls,
+    videoUrls,
+    timeoutMs: 30_000,
+  })
+
+  if (images.length === 0 && videos.length === 0) {
+    // All raw URLs returned placeholders — could be: ad expired between
+    // indexing and download, IPRoyal session blocked by Meta, or the ad
+    // is in a state where Meta now gates everything. Mark failed.
+    await markExtractionFailed(ad.ad_id)
+    return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: all placeholders → marked failed' }
+  }
+
+  // Map URL → buffer so processAsset can skip its own download
+  const imageBufByUrl = new Map(images.map(a => [a.url, a.buffer]))
+  const videoBufByUrl = new Map(videos.map(a => [a.url, a.buffer]))
+
+  // Process all assets through hash+dedup+upload pipeline
+  const imagePromises = imageUrls.map((url, i) => processAsset(url, 'image', ad.ad_id, i, imageBufByUrl.get(url)))
+  const videoPromises = videoUrls.map((url, i) => processAsset(url, 'video', ad.ad_id, i, videoBufByUrl.get(url)))
+  const [imageResults, videoResults] = await Promise.all([
+    Promise.all(imagePromises),
+    Promise.all(videoPromises),
+  ])
+
+  const creatives: CreativeInsert[] = []
+  imageResults.forEach((r, i) => {
+    if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'image', r2_url: r.url, hash: r.hash })
+  })
+  videoResults.forEach((r, i) => {
+    if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'video', r2_url: r.url, hash: r.hash })
+  })
+
+  if (creatives.length === 0) {
+    await markExtractionFailed(ad.ad_id)
+    return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: r2 upload failed' }
+  }
+
+  const firstImage = imageResults.find((r) => r.url)
+  const firstVideo = videoResults.find((r) => r.url)
+  await Promise.all([
+    saveCreatives(creatives),
+    updateAdCreative(
+      ad.ad_id,
+      firstImage?.url ?? null,
+      firstVideo?.url ?? null,
+      firstImage?.hash ?? null,
+      firstVideo?.hash ?? null,
+    ),
+  ])
+
+  const imageCount = imageResults.filter((r) => r.url).length
+  const videoCount = videoResults.filter((r) => r.url).length
+  const dedupedCount =
+    imageResults.filter((r) => r.deduped).length +
+    videoResults.filter((r) => r.deduped).length
+
+  return { ad_id: ad.ad_id, ok: true, imageCount, videoCount, dedupedCount }
+}
+
 async function processAd(ad: AdRow): Promise<ProcessResult> {
   try {
+    // ── FAST PATH ──
+    // If the indexer extracted raw fbcdn URLs from the GraphQL payload,
+    // skip Playwright entirely — just download via proxy. This is the
+    // dominant case for any ad indexed after migration 013.
+    const hasRawUrls =
+      (ad.raw_image_urls && ad.raw_image_urls.length > 0) ||
+      (ad.raw_video_urls && ad.raw_video_urls.length > 0)
+
+    if (hasRawUrls) {
+      return await processAdFastPath(ad)
+    }
+
+    // ── LEGACY PATH ──
+    // Pre-migration ad (raw_*_urls NULL). Open the ad's public page in
+    // Playwright, extract URLs from rendered DOM, download via browser
+    // context. Slower + lower success rate but covers the existing queue.
     const { imageUrls, videoUrls, imageAssets, videoAssets, pageStatus, error } = await extractCreative(
       ad.snapshot_url,
       config.adTimeoutMs - 10_000,
