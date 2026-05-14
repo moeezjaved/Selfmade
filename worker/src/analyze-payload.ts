@@ -62,18 +62,20 @@ async function main() {
   console.log(`Found ${rows.length} responses. Analyzing...\n`)
 
   // Aggregate stats across all rows
-  const stats = {
+  const stats: any = {
     totalAds: 0,
     adsWithMedia: 0,
-    adsWithRealMedia: 0,    // at least one non-placeholder URL
+    adsWithRealMedia: 0,
     adsImageOnly: 0,
     adsVideoOnly: 0,
     adsImageAndVideo: 0,
     adsNoMedia: 0,
-    urlSizeHistogram: new Map<string, number>(),  // size pattern (e.g. "s60x60") → count
-    urlPathHistogram: new Map<string, number>(),  // path pattern (e.g. "t39.35426-6") → count
-    sampleAdSchema: null as any,                  // first ad object — lets us see all keys
-    sampleAdMediaPaths: [] as string[],           // JSON paths to media within first ad
+    urlSizeHistogram: new Map<string, number>(),
+    urlPathHistogram: new Map<string, number>(),
+    sampleAdSchema: null,
+    sampleAdMediaPaths: [],
+    sampleAdId: null,
+    sampleHasReal: false,
     samplesByBrand: new Map<string, { ads: number; withMedia: number }>(),
   }
 
@@ -117,11 +119,13 @@ async function main() {
   console.log(`  NO media at all:             ${stats.adsNoMedia}`)
 
   console.log(`\n🔍 URL size pattern histogram (top 15) — placeholders are tiny (s60x60, s148x148):`)
-  const sizes = Array.from(stats.urlSizeHistogram.entries()).sort((a, b) => b[1] - a[1]).slice(0, 15)
+  const sizes = (Array.from(stats.urlSizeHistogram.entries()) as [string, number][])
+    .sort((a, b) => b[1] - a[1]).slice(0, 15)
   for (const [s, c] of sizes) console.log(`   ${s.padEnd(20)} ${c}`)
 
   console.log(`\n🔍 URL path pattern histogram (top 10) — t39.*-6 = creative, t39.*-1 = profile:`)
-  const paths = Array.from(stats.urlPathHistogram.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10)
+  const paths = (Array.from(stats.urlPathHistogram.entries()) as [string, number][])
+    .sort((a, b) => b[1] - a[1]).slice(0, 10)
   for (const [p, c] of paths) console.log(`   ${p.padEnd(30)} ${c}`)
 
   if (stats.sampleAdMediaPaths.length > 0) {
