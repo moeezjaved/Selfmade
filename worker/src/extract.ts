@@ -1,65 +1,40 @@
 /**
  * Playwright extractor — loads Meta's public Ads Library per-ad URL
- * (https://www.facebook.com/ads/library/?id=AD_ID) in real Chrome,
- * extracts the raw fbcdn.net image and video CDN URLs from the DOM.
+ * (https://www.facebook.com/ads/library/?id=AD_ID) in real Chrome with
+ * stealth, extracts the raw fbcdn.net image and video CDN URLs from the DOM.
  *
- * Per-ad URL was verified (test-per-ad-url.ts) to render full creatives
- * without an access_token — same DOM structure as the old render_ad path,
- * so the t39.*-6 / t45.*-4 selectors below still apply unchanged.
+ * Architecture (matches the indexer's bot-detection posture):
+ *   1. ONE shared chromium browser launched WITHOUT a proxy (cheap to keep alive)
+ *   2. PER-AD: spin up a proxy-chain sticky session keyed on ad_id → localhost URL
+ *   3. PER-AD: fresh BrowserContext that points to that localhost proxy
+ *   4. After extraction: close context AND close the proxy-chain server
  *
- * One Browser instance is shared across all workers (memory-efficient).
- * Each ad gets its own BrowserContext with a STICKY proxy session
- * (one IPRoyal residential IP for the full ad lifecycle ~10-30s).
+ * Why this works (and why the old version didn't):
+ *   - StealthPlugin masks navigator.webdriver, plugins, languages, WebGL, etc.
+ *   - Sticky session per ad = HTML, JS, CDN all egress from one residential IP
+ *     (Meta's bot heuristics flag IP-hopping within a single page load)
+ *   - Fresh context per ad = clean cookies + TLS = looks like a distinct user
+ *   - Localhost proxy URL has no auth → bypasses Chromium's per-context auth bug
  *
- * Why sticky-per-ad: Meta's bot detection flags page loads where the
- * HTML, JS, XHRs, and CDN downloads come from different IPs (looks like
- * IP-hopping). Pinning one residential IP per ad mimics a normal user
- * browsing session and dramatically improves success rate.
+ * Verified by `test-per-ad-url.ts`: this exact pattern returned 11 images +
+ * 13 videos for a Hims ad in 14 seconds. Production worker now mirrors it.
  */
-import { chromium, Browser, BrowserContext, Page } from 'playwright'
-import { config, proxyEnabled } from './config.js'
+import { chromium as chromiumExtra } from 'playwright-extra'
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
+import type { Browser, BrowserContext, Page } from 'playwright'
+import { startProxyChain, proxyChainEnabled } from './proxy-chain.js'
+import { proxyEnabled } from './config.js'
+
+chromiumExtra.use(StealthPlugin())
 
 let _browser: Browser | null = null
-
-// Shared BrowserContext across all ads in this worker process.
-//
-// PERFORMANCE WIN: Facebook's static.xx.fbcdn.net JS bundle (~500KB) loads
-// from cache after the first page. Without a shared context, every ad would
-// fresh-download the same JS over the proxy — verified to be 94% of total
-// proxy bandwidth (~9.4 GB / 10 GB in one usage report).
-//
-// Trade-off: all ads share the same browser-level proxy URL. With IPRoyal's
-// plain rotating endpoint, each REQUEST still gets a different residential
-// IP — so we lose nothing on IP diversity. Sticky-per-ad sessions would
-// require multiple browsers, which is overkill for our scale right now.
-// REMOVED shared context — was 0% success because Meta detects
-// the "one user opening many ads in sequence" pattern as a scraper.
-// Per-ad fresh BrowserContext is what gave us 80% success rate yesterday.
-//
-// We keep the bandwidth optimizations that DON'T affect fingerprinting:
-//   - Block static.xx.fbcdn.net images (UI assets, not real creatives)
-//   - Block fonts/stylesheets (not needed for DOM)
-//   - Block tracking pixels
-// These save ~20-30% bandwidth without compromising the per-ad isolation
-// that makes us look like distinct users.
 
 export async function getBrowser(): Promise<Browser> {
   if (_browser && _browser.isConnected()) return _browser
 
-  // ── Proxy set at BROWSER LAUNCH (not per-context) ──
-  // Why launch-level: Playwright + Chromium has a documented bug where
-  // per-context HTTP proxy auth fails with ERR_PROXY_AUTH_UNSUPPORTED on
-  // HTTPS targets. Setting auth at launch time (chromium.launch({ proxy }))
-  // pre-authenticates the browser process so subsequent context creation
-  // doesn't renegotiate. Also the only path that works reliably with
-  // Chromium — SOCKS5 with auth is NOT supported by Chromium at all.
-  //
-  // Trade-off: ALL contexts share the same proxy URL, so sticky-per-ad
-  // sessions aren't possible at this layer. With IPRoyal's plain rotating
-  // residential pool (32M IPs), each request gets a different IP anyway.
-  // For true sticky-per-ad we'd need to launch multiple browsers, each
-  // pre-authenticated to a different IPRoyal session — Phase 2 work.
-  const launchOpts: Parameters<typeof chromium.launch>[0] = {
+  // No launch-level proxy. Each context gets its own per-ad sticky-session
+  // proxy via proxy-chain (localhost URL, no auth needed at this layer).
+  _browser = await chromiumExtra.launch({
     headless: true,
     args: [
       '--no-sandbox',
@@ -70,30 +45,16 @@ export async function getBrowser(): Promise<Browser> {
       '--no-first-run',
       '--no-default-browser-check',
     ],
-  }
-  if (proxyEnabled) {
-    launchOpts.proxy = {
-      server: `http://${config.proxy.host}:${config.proxy.port}`,
-      username: config.proxy.user,
-      password: config.proxy.pass,
-    }
-  }
-  _browser = await chromium.launch(launchOpts)
-  if (proxyEnabled) {
-    console.log(`✅ Chromium launched (proxy: ${config.proxy.host}:${config.proxy.port}, country=${config.proxy.country}, rotating)`)
+  }) as unknown as Browser
+
+  if (proxyChainEnabled) {
+    console.log('✅ Chromium launched with stealth (per-ad proxy-chain sticky sessions)')
+  } else if (proxyEnabled) {
+    console.log('⚠️ Chromium launched with stealth — proxy-chain DISABLED (set WORKER_PROXY_HOST/USER/PASS), falling back to direct')
   } else {
-    console.log('✅ Chromium launched (no proxy — direct connection, will be blocked by Meta at scale)')
+    console.log('✅ Chromium launched with stealth (no proxy — direct connection, will be blocked at scale)')
   }
   return _browser
-}
-
-/**
- * NO-OP — proxy is now set at browser launch, not per-context.
- * Kept for compatibility with the extractCreative call site; returns undefined
- * so newContext() doesn't override the launch-level proxy.
- */
-function buildProxyForAd(_adId: string): undefined {
-  return undefined
 }
 
 export async function closeBrowser() {
@@ -111,74 +72,82 @@ export interface ExtractResult {
 }
 
 /**
- * Extract image + video CDN URLs from a Meta snapshot URL.
- * Uses a fresh BrowserContext per ad with its own sticky proxy session
- * so all sub-requests (HTML, JS, XHRs, CDN) come from one residential IP.
- *
- * @param snapshotUrl  Meta Ads Library per-ad URL (?id=AD_ID)
- * @param timeoutMs    overall timeout
- * @param adId         ad_archive_id — used as the IPRoyal sticky session key
- *                      so each ad gets its own dedicated IP
- */
-/**
- * Get (or create) the shared BrowserContext for this worker process.
- * Recycled every MAX_ADS_PER_CONTEXT ads to avoid memory bloat.
- */
-/**
- * Apply request blocking rules to a fresh BrowserContext.
- * Saves ~20-30% bandwidth without compromising per-ad isolation.
+ * Apply request blocking to a context. Saves ~20-30% bandwidth without
+ * affecting fingerprinting (these are static UI assets, never the real
+ * ad creative).
  */
 async function applyBlockingRules(ctx: BrowserContext) {
   await ctx.route('**/*', (route) => {
     const req = route.request()
     const url = req.url()
     const t = req.resourceType()
-    // Fonts and stylesheets — never needed for DOM extraction
     if (t === 'font' || t === 'stylesheet') return route.abort()
-    // Static UI imagery (icons, sprites) — NOT the real ad creatives
     if (t === 'image' && url.includes('static.xx.fbcdn.net')) return route.abort()
-    // Tracking / analytics requests
     if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
     return route.continue()
   })
 }
 
-export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, adId?: string): Promise<ExtractResult> {
+/**
+ * Build a sessionId from the ad_id. Same ad always gets the same residential
+ * IP within the proxy lifetime window (good for retries — same IP tried
+ * again won't look like fresh probing).
+ *
+ * IPRoyal session IDs need 8 alphanumeric chars; ad_ids are numeric and
+ * usually 16+ digits, so we slice the last 8.
+ */
+function sessionIdFor(adId: string): string {
+  const clean = adId.replace(/\D/g, '')
+  return clean.length >= 8 ? clean.slice(-8) : clean.padStart(8, '0')
+}
+
+/**
+ * Extract image + video CDN URLs from a Meta per-ad URL.
+ *
+ * @param snapshotUrl  Meta Ads Library per-ad URL (?id=AD_ID)
+ * @param timeoutMs    overall timeout (default 25s, increased to 35s for proxy latency)
+ * @param adId         ad_archive_id — used as the proxy-chain sticky session key
+ */
+export async function extractCreative(
+  snapshotUrl: string,
+  timeoutMs = 35_000,
+  adId?: string,
+): Promise<ExtractResult> {
   const browser = await getBrowser()
   let context: BrowserContext | null = null
   let page: Page | null = null
+  let proxy: { url: string; close: () => Promise<void> } | null = null
 
   try {
-    // FRESH BrowserContext per ad — this is what gave us 80% success rate.
-    // Each ad has clean cookies, fresh TLS session, looks like a distinct
-    // user visiting one ad. Shared contexts trigger Metas scraper detection
-    // because Meta sees "one user opening hundreds of ads in sequence."
-    //
-    // Bandwidth cost: ~500-600 KB per ad (JS bundle re-downloaded each time).
-    // Worth it — 0% success at 50 KB/ad is infinitely worse than 80% at 500 KB.
-    context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-      viewport: { width: 1280, height: 720 },
+    // Per-ad sticky session — same residential IP for HTML + JS + CDN of this ad.
+    if (proxyChainEnabled) {
+      const sid = adId ? sessionIdFor(adId) : Math.random().toString(36).slice(2, 10)
+      proxy = await startProxyChain({ sessionId: sid, lifetime: '10m', country: 'us' })
+    }
+
+    const contextOpts: Parameters<Browser['newContext']>[0] = {
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+      viewport: { width: 1440, height: 900 },
       ignoreHTTPSErrors: true,
-    })
+    }
+    if (proxy) {
+      contextOpts.proxy = { server: proxy.url }
+    }
+    context = await browser.newContext(contextOpts)
     await applyBlockingRules(context)
     page = await context.newPage()
 
-    // Page load — residential proxies add 2-5s of routing latency on top of
-    // Meta's render time, so the budget needs to be generous. Most live ads
-    // load in 6-10s through a proxy (was 3-5s direct).
     let pageStatus = 0
     const resp = await page.goto(snapshotUrl, {
       waitUntil: 'domcontentloaded',
-      timeout: 15_000,
+      timeout: Math.min(20_000, timeoutMs - 5_000),
     })
     pageStatus = resp ? resp.status() : 0
 
     // Wait for an ACTUAL ad creative — not Meta's static UI bundle.
     // Real ad media is on /v/t39.*-6/ or /v/t45.*-4/ paths and loads
-    // via JS after the initial page shell. Old code proceeded as soon
-    // as any fbcdn image appeared (= the static UI bundle), missing the
-    // real creative entirely.
+    // via JS after the initial page shell.
     let creativeFound = false
     try {
       await page.waitForFunction(
@@ -187,35 +156,32 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, a
             !!s &&
             !s.includes('static.xx.fbcdn') &&
             !s.includes('static.fbcdn') &&
-            !!(s.match(/\/v\/t39\.\d+-6\//) ||
-               s.match(/\/v\/t45\.\d+-4\//))
-          const img = Array.from(document.querySelectorAll('img'))
-            .some((i) => isRealCreative((i as HTMLImageElement).src))
-          const vid = Array.from(document.querySelectorAll('video'))
-            .some((v) => {
-              const ve = v as HTMLVideoElement
-              const src = ve.src || ve.currentSrc
-              return !!src && src.includes('fbcdn')
-            })
+            !!(s.match(/\/v\/t39\.\d+-6\//) || s.match(/\/v\/t45\.\d+-4\//))
+          const img = Array.from(document.querySelectorAll('img')).some((i) =>
+            isRealCreative((i as HTMLImageElement).src),
+          )
+          const vid = Array.from(document.querySelectorAll('video')).some((v) => {
+            const ve = v as HTMLVideoElement
+            const src = ve.src || ve.currentSrc
+            return !!src && src.includes('fbcdn')
+          })
           return img || vid
         },
-        { timeout: 9_000 } // 9s wait for JS-rendered creative (proxy adds latency)
+        { timeout: Math.min(12_000, timeoutMs - 8_000) },
       )
       creativeFound = true
     } catch {
-      /* timeout — dead ad, skip */
+      /* timeout — dead ad, gated, or bot-detected; skip */
     }
 
-    // Give video src + carousel slides time to fully attach
     if (creativeFound) {
-      await new Promise(r => setTimeout(r, 800))
+      // Give carousel slides + video src time to fully attach
+      await new Promise((r) => setTimeout(r, 800))
     }
 
     const data = await page.evaluate(() => {
-      // ALL videos (multi-video carousels are rare but possible)
       const allVideos: string[] = []
-      const videoEls = document.querySelectorAll('video')
-      videoEls.forEach((v) => {
+      document.querySelectorAll('video').forEach((v) => {
         const ve = v as HTMLVideoElement
         let url = ve.src || ve.currentSrc || ''
         if (!url) {
@@ -225,7 +191,6 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, a
         if (url) allVideos.push(url)
       })
 
-      // ALL fbcdn image URLs in DOM order (carousel slide order)
       const allImgSrcs = Array.from(document.querySelectorAll('img'))
         .map((img) => (img as HTMLImageElement).src)
         .filter(
@@ -244,37 +209,27 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, a
       return m ? parseInt(m[1], 10) : 0
     }
 
-    // Strict filter — only KEEP images that look like real ad creatives.
-    // Reject Meta UI placeholders (static.xx.fbcdn.net + /v/t1.* paths).
     const isAdCreative = (u: string): boolean => {
       if (!u) return false
-      // 🚨 Reject Meta static UI assets (cause of placeholder bug)
       if (u.includes('static.xx.fbcdn')) return false
       if (u.includes('static.fbcdn')) return false
       if (u.match(/\/v\/t1\.\d+/)) return false
-      // ✅ Known ad creative paths in Meta CDN
       if (u.match(/\/v\/t39\.\d+-6\//)) return true
       if (u.match(/\/v\/t45\.\d+-4\//)) return true
-      // Profile / page picture / cover paths — reject
       if (u.match(/\/v\/t39\.\d+-1\//)) return false
       if (u.match(/profile_pic|cover_photo/i)) return false
-      // For unknown paths: only accept if it's clearly large (likely a creative)
       const sz = stpSize(u)
       if (sz >= 600) return true
-      // Otherwise reject — too risky to assume
       return false
     }
+
     const creativeImages = (data.allImgSrcs || []).filter(isAdCreative)
-
-    // Dedup by URL — same image sometimes appears multiple times in DOM
     const uniqueImages = Array.from(new Set(creativeImages))
-
-    // Sort: largest first (so carousel position 0 = main hero image)
     uniqueImages.sort((a, b) => stpSize(b) - stpSize(a))
 
-    const uniqueVideos = Array.from(new Set(
-      (data.allVideos || []).filter((u) => u.includes('fbcdn')),
-    ))
+    const uniqueVideos = Array.from(
+      new Set((data.allVideos || []).filter((u) => u.includes('fbcdn'))),
+    )
 
     return {
       imageUrls: uniqueImages,
@@ -289,9 +244,8 @@ export async function extractCreative(snapshotUrl: string, timeoutMs = 25_000, a
       error: err instanceof Error ? err.message : String(err),
     }
   } finally {
-    // Close BOTH page AND context after every ad. This gives each ad fresh
-    // cookies + TLS session = looks like a distinct user to Meta.
     await page?.close().catch(() => {})
     await context?.close().catch(() => {})
+    if (proxy) await proxy.close().catch(() => {})
   }
 }
