@@ -608,38 +608,48 @@ async function crawlBrand(opts: {
         console.log(`  🎯 Reached target of ${TARGET_ADS_PER_BRAND} ads`)
         break
       }
-      // ── Multi-strategy scroll ──
-      // Window-level scroll often doesn't trigger Meta's IntersectionObserver
-      // because the ad list uses an inner scrollable container. We try every
-      // strategy in sequence so at least one fires Meta's pagination loader.
+      // ── Multi-strategy scroll (verified 2026-05-15 against Arhaus failure) ──
+      // Programmatic scrolls (element.scrollTop = X, window.scrollTo) are
+      // INVISIBLE to IntersectionObserver in some Meta page layouts (furniture
+      // brands, certain DTC). We must use real mouse wheel events, which
+      // simulate input the browser dispatches identically to a real user.
+      //
+      // Strategy: 3 real wheel events at random viewport positions, then
+      // fallback programmatic scroll, then keyboard End. The wheel events
+      // are what fire pagination on layouts that ignored our previous code.
+
+      // 1. Real mouse wheel events — most effective for IntersectionObserver
+      const viewport = page.viewportSize() ?? { width: 1440, height: 900 }
+      for (let w = 0; w < 3; w++) {
+        await page.mouse.move(
+          Math.floor(viewport.width * (0.3 + Math.random() * 0.4)),
+          Math.floor(viewport.height * (0.4 + Math.random() * 0.3)),
+        ).catch(() => {})
+        await page.mouse.wheel(0, 1500 + Math.floor(Math.random() * 800)).catch(() => {})
+        await sleep(150 + Math.random() * 200)
+      }
+
+      // 2. Programmatic fallbacks (cheap, run anyway)
       await page.evaluate(() => {
-        // 1. Outer window scroll — works when body is the scrollable element
         window.scrollTo(0, document.body.scrollHeight)
-        // 2. Walk every scrollable element and push to bottom
-        const all = document.querySelectorAll<HTMLElement>('*')
-        for (let i = 0; i < all.length; i++) {
-          const el = all[i]
-          const cs = getComputedStyle(el)
-          if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 100) {
-            el.scrollTop = el.scrollHeight
-          }
-        }
-        // 3. Dispatch a wheel event in case Meta listens for that
-        window.dispatchEvent(new WheelEvent('wheel', { deltaY: 2000 }))
+        // Walk visible scrollable containers and push to bottom
+        document.querySelectorAll<HTMLElement>('[role="feed"], [role="main"], [role="list"]').forEach(el => {
+          if (el.scrollHeight > el.clientHeight + 100) el.scrollTop = el.scrollHeight
+        })
       }).catch(() => {})
 
-      // 4. Keyboard End-key fallback (also triggers focus-based scroll)
+      // 3. Keyboard End — focus-based scroll
       await page.keyboard.press('End').catch(() => {})
 
       metrics.scrollCount++
       await sleep(randomDelay())
 
-      // 5. Bounce-scroll: scroll up a bit then back to bottom — many lazy-loaders
-      // fire on direction-change rather than absolute position.
+      // 4. Every 3rd iteration: bounce-scroll up then real wheel down again.
+      // Many lazy-loaders fire on direction-change rather than absolute position.
       if (scrollIdx % 3 === 0) {
-        await page.evaluate(() => window.scrollBy(0, -800)).catch(() => {})
-        await sleep(500)
-        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => {})
+        await page.mouse.wheel(0, -1200).catch(() => {})
+        await sleep(800)
+        await page.mouse.wheel(0, 2000).catch(() => {})
       }
     }
   } catch (e: any) {
