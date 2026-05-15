@@ -96,6 +96,9 @@ export async function GET(req: NextRequest) {
   // 403'd because Meta fingerprints TLS handshake + missing browser cookies.
   const dropletUrl = process.env.DROPLET_PREVIEW_URL          // e.g. http://24.199.113.41:8787
   const dropletSecret = process.env.PREVIEW_SECRET
+  let dropletError: string | null = null
+  let dropletStatus: number | null = null
+
   if (dropletUrl && dropletSecret) {
     try {
       const u = new URL('/preview', dropletUrl)
@@ -103,17 +106,34 @@ export async function GET(req: NextRequest) {
       u.searchParams.set('limit', String(limit))
       const dRes = await undiciFetch(u.toString(), {
         headers: { 'X-Preview-Secret': dropletSecret },
-        signal: AbortSignal.timeout(45_000),  // droplet preview takes ~12s, generous margin
+        signal: AbortSignal.timeout(45_000),
       })
+      dropletStatus = dRes.status
       if (dRes.ok) {
         const data = await dRes.json()
         return NextResponse.json(data)
       }
-      // If droplet is down or returned an error, fall through to direct-fetch fallback.
-      console.warn('[preview] droplet returned', dRes.status, '— falling back to direct fetch')
+      const txt = await dRes.text().catch(() => '')
+      dropletError = `HTTP ${dRes.status}: ${txt.slice(0, 300)}`
+      console.warn('[preview] droplet returned', dropletError)
     } catch (err: any) {
-      console.warn('[preview] droplet unreachable:', err?.message, '— falling back')
+      dropletError = `${err?.name ?? 'Error'}: ${err?.message ?? String(err)}`
+      console.warn('[preview] droplet unreachable:', dropletError)
     }
+  }
+
+  // If droplet is configured but failed, surface the exact error rather than
+  // silently falling through (the fallback also 403s, so we'd just hide the
+  // real cause).
+  if (dropletUrl && dropletSecret && dropletError) {
+    return NextResponse.json({
+      error: 'Droplet preview-server unreachable or returned error',
+      droplet_configured: true,
+      droplet_url: dropletUrl,
+      droplet_status: dropletStatus,
+      droplet_error: dropletError,
+      hint: 'Curl the droplet directly to verify it works. Common causes: firewall blocks Vercel outbound, droplet container crashed, secret mismatch.',
+    }, { status: 502 })
   }
 
   // ── FALLBACK PATH: direct Vercel fetch via residential proxy ──
