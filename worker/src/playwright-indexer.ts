@@ -504,9 +504,15 @@ async function crawlBrand(opts: {
   await context.route('**/*', (route) => {
     const t = route.request().resourceType()
     const url = route.request().url()
+    // Aggressive blocking — these are pure overhead, none affect ad data
+    // extraction. Verified after 2026-05-15 incident where static.xx.fbcdn.net
+    // alone consumed 12 GB of IPRoyal bandwidth during one debug session.
     if (t === 'font' || t === 'stylesheet') return route.abort()
-    if (t === 'image' && url.includes('static.xx.fbcdn.net')) return route.abort()
+    if (t === 'image') return route.abort()                          // no images via indexer browser — worker handles those
+    if (t === 'media') return route.abort()                          // no videos either
+    if (url.includes('static.xx.fbcdn.net')) return route.abort()    // all of Meta's UI bundles
     if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
+    if (url.includes('/groups/') || url.includes('/messenger/')) return route.abort()
     return route.continue()
   })
 
