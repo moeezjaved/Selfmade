@@ -148,18 +148,23 @@ async function main() {
 
       const newAdIds = extractAdIds(text)
       const newCursor = extractEndCursor(text)
+      const moreAvailable = hasNextPage(text)
       let added = 0
       for (const id of newAdIds) {
         if (!allAdIds.has(id)) { allAdIds.add(id); added++ }
       }
-      console.log(`📄 Page ${pageNum}: HTTP ${r.status} | ${(text.length / 1024).toFixed(1)} KB | ${newAdIds.length} ads (${added} new) | next cursor: ${newCursor ? newCursor.slice(0, 30) + '...' : 'NONE'} | ${dt}ms`)
+      console.log(`📄 Page ${pageNum}: HTTP ${r.status} | ${(text.length / 1024).toFixed(1)} KB | ${newAdIds.length} ads (${added} new) | has_next: ${moreAvailable} | ${dt}ms`)
 
       if (!r.ok || newAdIds.length === 0) {
         console.warn(`   ⚠️ Stopping — non-OK status or no ads in response`)
         break
       }
+      if (!moreAvailable) {
+        console.log(`   ✅ Reached end of pagination (has_next_page=false)`)
+        break
+      }
       if (added === 0) {
-        console.warn(`   ⚠️ Stopping — no NEW ads (cursor may have looped or hit end)`)
+        console.warn(`   ⚠️ Stopping — no NEW ads (cursor may have looped)`)
         break
       }
       if (!newCursor) {
@@ -191,10 +196,19 @@ async function main() {
 }
 
 function extractEndCursor(body: string): string | null {
-  // Match either "endCursor":"..." or "end_cursor":"..."
-  const m = body.match(/"end[Cc][\s\S]?cursor"\s*:\s*"([^"]+)"/) ||
+  // Verified 2026-05-16: Meta returns "end_cursor" (snake_case, with underscore)
+  // inside "page_info" object. The endCursor (camelCase) variant doesn't appear
+  // in this endpoint's responses but kept as fallback for other endpoints.
+  const m = body.match(/"end_cursor"\s*:\s*"([^"]+)"/) ||
             body.match(/"endCursor"\s*:\s*"([^"]+)"/)
   return m ? m[1] : null
+}
+
+function hasNextPage(body: string): boolean {
+  // Meta also includes "has_next_page": true|false in page_info — gives us a
+  // clean stop signal without needing to detect "no new ads".
+  const m = body.match(/"has_next_page"\s*:\s*(true|false)/)
+  return m ? m[1] === 'true' : true   // assume more if unknown
 }
 
 function extractAdIds(body: string): string[] {
