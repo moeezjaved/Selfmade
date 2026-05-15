@@ -30,7 +30,7 @@ import {
 } from './db.js'
 import { extractCreative, getBrowser, closeBrowser } from './extract.js'
 import { downloadAssetsForAd } from './proxied-fetch.js'
-import { downloadFromCDN, uploadBufferToR2 } from './r2.js'
+import { uploadBufferToR2 } from './r2.js'
 import { imageHash, videoHash } from './hash.js'
 
 const WORKER_ID = process.env.WORKER_ID || `worker-${os.hostname()}`
@@ -66,11 +66,12 @@ async function processAsset(
   prefetchedBuf?: Buffer | null,
 ): Promise<{ url: string | null; hash: string | null; deduped: boolean }> {
   const contentType = type === 'image' ? 'image/jpeg' : 'video/mp4'
-  // Prefer the buffer downloaded inside the extract.ts browser context
-  // (carries proxy + session cookies). Fall back to direct fetch only if
-  // the extractor didn't supply one.
-  const buf = prefetchedBuf ?? (await downloadFromCDN(cdnUrl, contentType))
-  if (!buf) return { url: null, hash: null, deduped: false }
+  // Use the buffer downloaded via the proxied browser/undici path.
+  // The bare-IP downloadFromCDN fallback used to live here, but it ALWAYS
+  // returns 1087-byte placeholders against Meta's CDN — it was just
+  // generating noise. We now silently skip URLs the proxied path rejected.
+  if (!prefetchedBuf) return { url: null, hash: null, deduped: false }
+  const buf = prefetchedBuf
 
   const hash = type === 'image' ? await imageHash(buf) : videoHash(buf)
   if (!hash) {
