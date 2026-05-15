@@ -537,6 +537,31 @@ async function crawlBrand(opts: {
   const page = await context.newPage()
   const allAds = new Map<string, ExtractedAd>()
 
+  // ========== Pagination template capture ==========
+  // Capture the FIRST AdLibrarySearchPaginationQuery POST that fires after
+  // initial page load. We use it as a template to splice cursors into via
+  // in-browser fetch (page.evaluate) — bypasses Meta's session-binding
+  // rejection that breaks external replay (verified 2026-05-16: 169 Arhaus
+  // ads captured in one cursor-walked run vs 30 from scroll-only).
+  type PaginationTemplate = { url: string; headers: Record<string, string>; parsedBody: Record<string, string> }
+  const tplState: { template: PaginationTemplate | null } = { template: null }
+  page.on('request', (req) => {
+    if (tplState.template) return
+    if (req.method() !== 'POST') return
+    if (!req.url().includes('/api/graphql/')) return
+    const body = req.postData() ?? ''
+    if (!body.includes('variables=')) return
+    const parsed: Record<string, string> = {}
+    for (const pair of body.split('&')) {
+      const [k, ...v] = pair.split('=')
+      if (k) parsed[decodeURIComponent(k)] = decodeURIComponent(v.join('=') ?? '')
+    }
+    if (!parsed.variables) return
+    const friendly = parsed.fb_api_req_friendly_name ?? ''
+    if (!friendly.includes('PaginationQuery') && !friendly.includes('SearchResults')) return
+    tplState.template = { url: req.url(), headers: req.headers(), parsedBody: parsed }
+  })
+
   // ========== Response interception ==========
   page.on('response', async (response: Response) => {
     try {
@@ -661,6 +686,84 @@ async function crawlBrand(opts: {
 
       metrics.scrollCount++
       await sleep(randomDelay())
+
+      // ── Once we've captured a pagination template, switch to cursor-walk ──
+      // Scroll-only pagination caps at 30 ads (Meta gates non-scroll-triggered
+      // pagination from automation sessions). In-browser cursor walk via
+      // page.evaluate sidesteps this — verified 2026-05-16: 169 ads/run.
+      if (tplState.template) {
+        console.log(`  🔁 Template captured — switching to cursor-walk pagination`)
+        const adsCountBefore = allAds.size
+        try {
+          // Find latest end_cursor from already-captured responses. The response
+          // listener above feeds extractAdsFromText which also finds cursors —
+          // but we need the cursor from the most-recent pagination response,
+          // not from the initial HTML. We let page.evaluate just run from the
+          // template's current cursor (same one the template carried).
+          const tpl = tplState.template
+          const initialCursor: string | null = (() => {
+            try { return JSON.parse(tpl.parsedBody.variables ?? '{}').cursor ?? null }
+            catch { return null }
+          })()
+          if (!initialCursor) {
+            console.warn(`  ⚠️ Template has no initial cursor — falling back to scroll-only`)
+            continue
+          }
+
+          const evalScript = `
+            (async () => {
+              const tpl = ${JSON.stringify(tpl)};
+              const startCursor = ${JSON.stringify(initialCursor)};
+              const maxPages = ${TARGET_ADS_PER_BRAND / 10 + 5};   // ~10 ads per page
+
+              const out = { pages: 0, fetched: 0, lastCursor: null, hasNext: true };
+              let cursor = startCursor;
+              let reqCounter = parseInt(tpl.parsedBody.__req || '0', 10);
+
+              const hasNextRe = (s) => { const m = s.match(/"has_next_page"\\s*:\\s*(true|false)/); return m ? m[1] === 'true' : false; };
+              const cursorRe = (s) => { const m = s.match(/"end_cursor"\\s*:\\s*"([^"]+)"/); return m ? m[1] : null; };
+
+              for (let p = 0; p < maxPages && cursor; p++) {
+                const params = Object.assign({}, tpl.parsedBody);
+                try {
+                  const v = JSON.parse(params.variables);
+                  v.cursor = cursor;
+                  params.variables = JSON.stringify(v);
+                } catch (e) { break; }
+                reqCounter++;
+                params.__req = String(reqCounter);
+                params.__spin_t = String(Math.floor(Date.now() / 1000));
+                const body = Object.entries(params).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
+                try {
+                  const r = await fetch(tpl.url, { method: 'POST', credentials: 'include', headers: tpl.headers, body });
+                  if (!r.ok) break;
+                  const text = await r.text();
+                  out.fetched += text.length;
+                  out.pages++;
+                  cursor = cursorRe(text);
+                  out.lastCursor = cursor;
+                  out.hasNext = hasNextRe(text);
+                  if (!out.hasNext || !cursor) break;
+                  await new Promise(res => setTimeout(res, 800 + Math.random() * 700));
+                } catch (e) { break; }
+              }
+              return out;
+            })()
+          `
+          const result = await page.evaluate<{ pages: number; fetched: number; lastCursor: string | null; hasNext: boolean }>(evalScript)
+          metrics.bytesThroughProxy += result.fetched
+          // Wait briefly for response listener to drain final responses
+          await sleep(2_000)
+          const adsCountAfter = allAds.size
+          console.log(`  🔁 Cursor-walk: ${result.pages} pages, ${(result.fetched / 1024).toFixed(1)} KB, ${adsCountAfter - adsCountBefore} new ads captured (total: ${adsCountAfter}) | has_next=${result.hasNext}`)
+
+          // Cursor walk replaces the scroll loop — break out
+          abortReason = result.hasNext ? 'cursor_walk_ended_with_more' : 'cursor_walk_complete'
+          break
+        } catch (e: any) {
+          console.warn(`  ⚠️ Cursor-walk error: ${e?.message?.slice(0, 200)} — continuing with scroll-only`)
+        }
+      }
 
       // 4. Every 3rd iteration: bounce-scroll up then real wheel down again.
       // Many lazy-loaders fire on direction-change rather than absolute position.
