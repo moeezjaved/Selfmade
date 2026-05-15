@@ -25,6 +25,7 @@ import {
   findExistingByHash,
   saveCreatives,
   markExtractionFailed,
+  supabase,
   AdRow,
   CreativeInsert,
 } from './db.js'
@@ -287,6 +288,32 @@ async function loop() {
   console.log(`💾 Bandwidth (batch): ${batchProxyMB.toFixed(2)} MB proxy + ${batchDropletMB.toFixed(2)} MB droplet`)
   console.log(`📊 Lifetime: ${totalSuccess}/${totalProcessed} ok (${((totalSuccess / totalProcessed) * 100).toFixed(0)}%) | ${adsPerMin.toFixed(1)} ads/min | queue: ${remaining} | ETA: ${etaMin.toFixed(0)} min`)
   console.log(`💰 Lifetime bandwidth: ${lifetimeProxyMB.toFixed(1)} MB proxy ($${(lifetimeProxyMB * 0.0035).toFixed(3)} approx) + ${lifetimeDropletMB.toFixed(1)} MB droplet (free)\n`)
+
+  // Persist batch metrics to DB so the admin /admin/health dashboard can
+  // sum total bandwidth (worker + indexer) — was previously only logging
+  // to stdout, causing dashboard to underreport actual IPRoyal usage by
+  // ~50× (only indexer was tracked).
+  try {
+    const totalBytesProxy = results.reduce((s, r) => s + (r.bytes_proxy ?? 0), 0)
+    const totalBytesDroplet = results.reduce((s, r) => s + (r.bytes_droplet ?? 0), 0)
+    await (supabase as any).from('worker_runs').insert({
+      worker_id: WORKER_ID,
+      hostname: HOSTNAME,
+      batch_size: results.length,
+      ads_ok: ok,
+      ads_failed: fail,
+      images_saved: totalImages,
+      videos_saved: totalVideos,
+      deduped_count: totalDeduped,
+      bytes_proxy: totalBytesProxy,
+      bytes_droplet: totalBytesDroplet,
+      duration_ms: Math.round(dt * 1000),
+    })
+  } catch (e: any) {
+    // Non-fatal — telemetry only. If worker_runs table doesn't exist
+    // (migration 014 not applied), just continue.
+    console.warn(`[worker_runs] write failed: ${e?.message ?? e}`)
+  }
 
   // Best-effort heartbeat for the dashboard
   await writeHeartbeat({
