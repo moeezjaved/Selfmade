@@ -388,24 +388,30 @@ function CountdownCard({ title, emptyText, isCountdown, running, next }: {
 }) {
   const isEmpty = !running && !next
 
+  let brandText = ''
   let bigText = emptyText
   let subText = ''
   let bg = '#fff'
   let border = '#e5e7eb'
   let color = '#9ca3af'
+  let timerLabel = ''
 
   if (running) {
     const elapsed = Math.max(0, Math.round((running.tickNow - new Date(running.started_at).getTime()) / 1000))
+    brandText = running.brand
+    timerLabel = 'elapsed'
     bigText = formatHMS(elapsed)
-    subText = `${running.brand} · started ${humanAgo(running.started_at)} ago`
+    subText = `started ${humanAgo(running.started_at)} ago`
     bg = '#eff6ff'
     border = '#bfdbfe'
     color = '#1e40af'
   } else if (next) {
     const eligibleMs = new Date(next.eligible_at).getTime()
     const remaining = Math.max(0, Math.round((eligibleMs - next.tickNow) / 1000))
+    brandText = next.brand
+    timerLabel = remaining > 0 ? 'eligible in' : 'eligible'
     bigText = remaining > 0 ? formatHMS(remaining) : 'now'
-    subText = `${next.brand} · ${next.reason}`
+    subText = next.reason
     bg = remaining > 0 ? '#fffbeb' : '#f0fdf4'
     border = remaining > 0 ? '#fde68a' : '#bbf7d0'
     color = remaining > 0 ? '#92400e' : '#166534'
@@ -413,8 +419,16 @@ function CountdownCard({ title, emptyText, isCountdown, running, next }: {
 
   return (
     <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: '14px 16px' }}>
-      <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{title}</div>
-      <div style={{ fontSize: 26, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color, lineHeight: 1.1 }}>{bigText}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</div>
+        {timerLabel && <div style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>{timerLabel}</div>}
+      </div>
+      {brandText && (
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#111', marginBottom: 2 }}>
+          {brandText}
+        </div>
+      )}
+      <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color, lineHeight: 1.1 }}>{bigText}</div>
       {subText && <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{subText}</div>}
     </div>
   )
