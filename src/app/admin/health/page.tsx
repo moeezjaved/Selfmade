@@ -134,61 +134,80 @@ export default function HealthDashboard() {
           )}
 
           {/* ───── Daemons row ───── */}
-          <Section title="Daemons">
+          <Section
+            title="Daemons"
+            hint="The 3 background processes that keep the system running. preview-server powers the admin Preview button. scheduler crawls brands every ~3 min in rotation. worker downloads creative images/videos to R2. All three should be GREEN."
+          >
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-              <DaemonCard
-                name="preview-server"
-                status={data.daemons.preview_server.status}
-                detail={data.daemons.preview_server.url
-                  ? `${data.daemons.preview_server.url} · ${data.daemons.preview_server.latency_ms ?? '?'}ms`
-                  : 'DROPLET_PREVIEW_URL not set'}
-              />
-              <DaemonCard
-                name="scheduler"
-                status={data.daemons.scheduler.status}
-                detail={data.daemons.scheduler.note}
-              />
-              <DaemonCard
-                name="worker"
-                status={data.daemons.worker.status}
-                detail={`+${data.daemons.worker.recent_thumbnails_added} thumbnails in last hour`}
-              />
+              <div title="The HTTP server on the droplet that powers the admin Preview button. If this is DOWN, the Preview button stops working but the rest of the system keeps running.">
+                <DaemonCard
+                  name="preview-server"
+                  status={data.daemons.preview_server.status}
+                  detail={data.daemons.preview_server.url
+                    ? `${data.daemons.preview_server.url} · ${data.daemons.preview_server.latency_ms ?? '?'}ms`
+                    : 'DROPLET_PREVIEW_URL not set'}
+                />
+              </div>
+              <div title="The background loop that crawls brands every ~3 min. Picks the oldest-crawled active brand each cycle, with a 45-min minimum gap per brand to avoid Meta throttling.">
+                <DaemonCard
+                  name="scheduler"
+                  status={data.daemons.scheduler.status}
+                  detail={data.daemons.scheduler.note}
+                />
+              </div>
+              <div title="The background worker that takes ad URLs the indexer found and downloads the actual images/videos to R2. Status 'up' = thumbnails added in last hour. 'idle' = running but nothing new to process right now.">
+                <DaemonCard
+                  name="worker"
+                  status={data.daemons.worker.status}
+                  detail={`+${data.daemons.worker.recent_thumbnails_added} thumbnails in last hour`}
+                />
+              </div>
             </div>
           </Section>
 
           {/* ───── Queue ───── */}
-          <Section title="Ad queue">
+          <Section
+            title="Ad queue"
+            hint="Snapshot of every ad ever discovered, broken down by processing state. Total includes ads from all brands ever crawled (even inactive ones)."
+          >
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
-              <KPI label="Total" value={data.queue.total.toLocaleString()} />
-              <KPI label="With thumbnails" value={data.queue.thumbed.toLocaleString()} sub={`${data.queue.thumbed_pct}%`} />
-              <KPI label="Fast-path ready" value={data.queue.fast_path_ready.toLocaleString()} sub="raw URLs populated" tone={data.queue.fast_path_ready > 0 ? 'good' : 'warn'} />
-              <KPI label="Missing" value={data.queue.missing.toLocaleString()} />
-              <KPI label="Marked failed" value={data.queue.failed.toLocaleString()} tone={data.queue.failed > 1000 ? 'warn' : 'neutral'} />
+              <KPI label="Total" value={data.queue.total.toLocaleString()} hint="Every ad ID in the database across all brands. New ads land here when the indexer crawls a brand." />
+              <KPI label="With thumbnails" value={data.queue.thumbed.toLocaleString()} sub={`${data.queue.thumbed_pct}%`} hint="Ads where the worker successfully downloaded a creative to R2. These are visible in your discovery section." />
+              <KPI label="Fast-path ready" value={data.queue.fast_path_ready.toLocaleString()} sub="raw URLs populated" tone={data.queue.fast_path_ready > 0 ? 'good' : 'warn'} hint="Ads where the indexer extracted creative URLs directly from Meta's GraphQL response. The worker processes these in ~5s each (vs ~25s for the legacy DOM path). >0 = healthy." />
+              <KPI label="Missing" value={data.queue.missing.toLocaleString()} hint="Ads with no thumbnail yet. Worker will eventually process them, fast-path-ready first then legacy." />
+              <KPI label="Marked failed" value={data.queue.failed.toLocaleString()} tone={data.queue.failed > 1000 ? 'warn' : 'neutral'} hint="Ads the worker tried 3 times and gave up on (usually because Meta returned a 1087-byte placeholder = ad expired/deleted before we could grab it). Reset by setting creative_extraction_failed_at = NULL in SQL." />
             </div>
           </Section>
 
           {/* ───── Activity ───── */}
-          <Section title="Crawler activity (last 24h)">
+          <Section
+            title="Crawler activity (last 24h)"
+            hint="What the indexer (scheduler) has done in the last 24 hours. Each 'run' = one crawl of one brand."
+          >
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               <KPI
                 label="Runs (24h)"
                 value={data.activity.runs_24h}
                 sub={data.activity.runs_1h !== null ? `${data.activity.runs_1h} in last hour` : ''}
+                hint="Number of brand crawls the scheduler completed. Each cycle picks one brand, runs the indexer, sleeps 3 min, picks next."
               />
               <KPI
                 label="Success rate"
                 value={data.activity.success_rate_24h_pct !== null ? `${data.activity.success_rate_24h_pct}%` : '—'}
                 sub={data.activity.success_rate_1h_pct !== null ? `${data.activity.success_rate_1h_pct}% in last hour` : ''}
                 tone={data.activity.success_rate_24h_pct === null ? 'neutral' : data.activity.success_rate_24h_pct >= 70 ? 'good' : 'warn'}
+                hint="Percentage of crawls that finished cleanly. <70% = something is wrong (Meta throttling, proxy issues). Investigate via the recent runs table below."
               />
               <KPI
                 label="Ads discovered"
                 value={data.activity.ads_discovered_24h.toLocaleString()}
+                hint="Total ad IDs the indexer pulled from Meta's GraphQL responses in the last 24h. Includes duplicates from earlier runs."
               />
               <KPI
                 label="Proxy bandwidth"
                 value={`${data.activity.bandwidth_24h_mb} MB`}
                 sub="last 24h via IPRoyal"
+                hint="Bandwidth consumed through your IPRoyal residential proxy. Indexer ~3-5 MB per crawl, worker ~300 KB per ad. Watch this against your IPRoyal monthly cap."
               />
             </div>
             <div style={{ marginTop: 10, fontSize: 12, color: '#666' }}>
@@ -200,16 +219,19 @@ export default function HealthDashboard() {
           </Section>
 
           {/* ───── Brands ───── */}
-          <Section title="Active brands (oldest crawl first)">
+          <Section
+            title="Active brands (oldest crawl first)"
+            hint="Your is_active=true brands, sorted by which one was crawled longest ago (the next one the scheduler will pick)."
+          >
             <table style={tableStyle}>
               <thead>
                 <tr style={tableHeaderRow}>
-                  <th style={th}>brand</th>
-                  <th style={thRight}>thumbed</th>
-                  <th style={thRight}>fast-path</th>
-                  <th style={thRight}>missing</th>
-                  <th style={thRight}>failed</th>
-                  <th style={th}>last crawl</th>
+                  <th style={th} title="Brand name + Facebook page_id">brand</th>
+                  <th style={thRight} title="Ads with thumbnails downloaded to R2 (visible in discovery section).">thumbed</th>
+                  <th style={thRight} title="Ads where indexer found creative URLs in GraphQL — worker will process at ~5s each.">fast-path</th>
+                  <th style={thRight} title="Ads still awaiting worker processing.">missing</th>
+                  <th style={thRight} title="Ads worker tried and gave up on (Meta returned placeholders = ad expired).">failed</th>
+                  <th style={th} title="When the scheduler last crawled this brand. Min 45 min between crawls.">last crawl</th>
                 </tr>
               </thead>
               <tbody>
@@ -277,20 +299,29 @@ export default function HealthDashboard() {
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 24 }}>
-      <h2 style={{ fontSize: 13, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 0 }}>{title}</h2>
+      <h2 style={{ fontSize: 13, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+        {title}
+        {hint && (
+          <span title={hint} style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 14, height: 14, borderRadius: '50%', background: '#e5e7eb', color: '#6b7280',
+            fontSize: 10, fontWeight: 700, cursor: 'help', userSelect: 'none',
+          }}>?</span>
+        )}
+      </h2>
       {children}
     </div>
   )
 }
 
-function KPI({ label, value, sub, tone = 'neutral' }: { label: string; value: string | number; sub?: string; tone?: 'good' | 'warn' | 'neutral' }) {
+function KPI({ label, value, sub, tone = 'neutral', hint }: { label: string; value: string | number; sub?: string; tone?: 'good' | 'warn' | 'neutral'; hint?: string }) {
   const color = tone === 'good' ? '#166534' : tone === 'warn' ? '#92400e' : '#111'
   const bg = tone === 'good' ? '#f0fdf4' : tone === 'warn' ? '#fffbeb' : '#fff'
   return (
-    <div style={{ background: bg, border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 14px' }}>
+    <div title={hint} style={{ background: bg, border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 14px', cursor: hint ? 'help' : 'default' }}>
       <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{sub}</div>}
