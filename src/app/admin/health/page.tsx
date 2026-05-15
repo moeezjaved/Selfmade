@@ -18,6 +18,19 @@ import { useEffect, useState, useCallback } from 'react'
 
 interface HealthData {
   timestamp: string
+  currently_running: {
+    brand: string | null
+    page_id: string | null
+    started_at: string
+    elapsed_seconds: number
+  } | null
+  next_crawl: {
+    brand: string
+    page_id: string
+    eligible_at: string
+    eta_seconds: number
+    reason: string
+  } | null
   queue: {
     total: number
     thumbed: number
@@ -60,6 +73,13 @@ export default function HealthDashboard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  // Tick once per second so the next-crawl countdown updates live
+  // without re-fetching the API every time.
+  const [tickNow, setTickNow] = useState(Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setTickNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -162,6 +182,36 @@ export default function HealthDashboard() {
                   detail={`+${data.daemons.worker.recent_thumbnails_added} thumbnails in last hour`}
                 />
               </div>
+            </div>
+          </Section>
+
+          {/* ───── Currently running / next crawl ───── */}
+          <Section
+            title="Crawler schedule"
+            hint="What the indexer is doing right now and which brand is up next. Scheduler picks oldest-crawled brand first, with 45-min minimum gap between crawls of the same brand."
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+              <CountdownCard
+                title="Currently crawling"
+                emptyText="(idle — no crawl running)"
+                isCountdown={false}
+                running={data.currently_running ? {
+                  brand: data.currently_running.brand ?? `page_id ${data.currently_running.page_id ?? '?'}`,
+                  started_at: data.currently_running.started_at,
+                  tickNow,
+                } : null}
+              />
+              <CountdownCard
+                title="Next crawl"
+                emptyText="(no eligible brands — add active brands)"
+                isCountdown={true}
+                next={data.next_crawl ? {
+                  brand: data.next_crawl.brand || `page_id ${data.next_crawl.page_id}`,
+                  eligible_at: data.next_crawl.eligible_at,
+                  reason: data.next_crawl.reason,
+                  tickNow,
+                } : null}
+              />
             </div>
           </Section>
 
@@ -327,6 +377,59 @@ function KPI({ label, value, sub, tone = 'neutral', hint }: { label: string; val
       {sub && <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{sub}</div>}
     </div>
   )
+}
+
+function CountdownCard({ title, emptyText, isCountdown, running, next }: {
+  title: string
+  emptyText: string
+  isCountdown: boolean
+  running?: { brand: string; started_at: string; tickNow: number } | null
+  next?: { brand: string; eligible_at: string; reason: string; tickNow: number } | null
+}) {
+  const isEmpty = !running && !next
+
+  let bigText = emptyText
+  let subText = ''
+  let bg = '#fff'
+  let border = '#e5e7eb'
+  let color = '#9ca3af'
+
+  if (running) {
+    const elapsed = Math.max(0, Math.round((running.tickNow - new Date(running.started_at).getTime()) / 1000))
+    bigText = formatHMS(elapsed)
+    subText = `${running.brand} · started ${humanAgo(running.started_at)} ago`
+    bg = '#eff6ff'
+    border = '#bfdbfe'
+    color = '#1e40af'
+  } else if (next) {
+    const eligibleMs = new Date(next.eligible_at).getTime()
+    const remaining = Math.max(0, Math.round((eligibleMs - next.tickNow) / 1000))
+    bigText = remaining > 0 ? formatHMS(remaining) : 'now'
+    subText = `${next.brand} · ${next.reason}`
+    bg = remaining > 0 ? '#fffbeb' : '#f0fdf4'
+    border = remaining > 0 ? '#fde68a' : '#bbf7d0'
+    color = remaining > 0 ? '#92400e' : '#166534'
+  }
+
+  return (
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: '14px 16px' }}>
+      <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{title}</div>
+      <div style={{ fontSize: 26, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color, lineHeight: 1.1 }}>{bigText}</div>
+      {subText && <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{subText}</div>}
+    </div>
+  )
+}
+
+function formatHMS(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  if (seconds < 3600) {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}m ${s.toString().padStart(2, '0')}s`
+  }
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  return `${h}h ${m.toString().padStart(2, '0')}m`
 }
 
 function DaemonCard({ name, status, detail }: { name: string; status: string; detail: string }) {
