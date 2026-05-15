@@ -72,10 +72,24 @@ export async function GET() {
   const successRate1h = successPct(runs1h ?? [])
   const successRate24h = successPct(runs24h ?? [])
 
-  const bandwidth24h = (runs24h ?? []).reduce((s: number, r: any) => s + (r.bytes_through_proxy ?? 0), 0)
+  const indexerBandwidth24h = (runs24h ?? []).reduce((s: number, r: any) => s + (r.bytes_through_proxy ?? 0), 0)
   const adsDiscovered24h = (runs24h ?? []).reduce((s: number, r: any) => s + (r.ads_discovered ?? 0), 0)
   const lastSuccessAt = (runs24h ?? []).find((r: any) => r.status === 'success')?.started_at ?? null
   const lastRunAt = (runs24h ?? [])[0]?.started_at ?? null
+
+  // ── Worker bandwidth (24h) — newly tracked per migration 014 ──
+  const { data: workerRuns24h } = await admin
+    .from('worker_runs')
+    .select('bytes_proxy, bytes_droplet, ads_ok, ads_failed, finished_at')
+    .gte('finished_at', dayAgo)
+    .limit(2000)
+  const workerBytesProxy24h = (workerRuns24h ?? []).reduce((s: number, r: any) => s + Number(r.bytes_proxy ?? 0), 0)
+  const workerBytesDroplet24h = (workerRuns24h ?? []).reduce((s: number, r: any) => s + Number(r.bytes_droplet ?? 0), 0)
+
+  // Total IPRoyal bandwidth = indexer (page loads) + worker (image downloads).
+  // Videos go via droplet so they do NOT count here.
+  const totalProxyBytes24h = indexerBandwidth24h + workerBytesProxy24h
+  const bandwidth24h = totalProxyBytes24h   // keep variable name for back-compat
 
   // ── Per-brand snapshot (top 10 oldest-first active brands) ──
   const { data: brandList } = await admin
@@ -124,6 +138,42 @@ export async function GET() {
       countWhere(admin, ['page_id', 'eq', b.page_id], ['thumbnail_url', 'is', null]),
       countWhere(admin, ['page_id', 'eq', b.page_id], ['creative_extraction_failed_at', 'not.is', null]),
     ])
+
+    // ── Per-brand "fully crawled" ETA ──
+    // Pull the brand's last 5 successful crawler_runs. Count avg new ads
+    // per crawl. If recent crawls return ~0 new ads → brand is fully crawled.
+    // Otherwise estimate remaining crawls + multiply by 45-min cooldown.
+    const { data: brandRecentRuns } = await admin
+      .from('crawler_runs')
+      .select('ads_new, started_at')
+      .eq('brand_page_id', b.page_id)
+      .eq('status', 'success')
+      .order('started_at', { ascending: false })
+      .limit(5)
+    const recent = (brandRecentRuns ?? []) as any[]
+    let crawl_eta: any = null
+    if (recent.length === 0) {
+      crawl_eta = { status: 'no_data', label: 'never crawled', avg_new_per_crawl: null, est_minutes: null }
+    } else if (recent.length === 1) {
+      crawl_eta = { status: 'estimating', label: `need 2+ crawls (${recent[0].ads_new} on first)`, avg_new_per_crawl: recent[0].ads_new, est_minutes: null }
+    } else {
+      const avgNew = recent.reduce((s, r) => s + (r.ads_new ?? 0), 0) / recent.length
+      const lastCrawlNew = recent[0].ads_new ?? 0
+      const SCHEDULER_GAP_MIN = parseInt(process.env.SCHEDULER_MIN_BRAND_GAP_MIN ?? '45', 10)
+      if (lastCrawlNew === 0 || (lastCrawlNew <= 2 && avgNew <= 5)) {
+        crawl_eta = { status: 'caught_up', label: 'fully crawled', avg_new_per_crawl: Math.round(avgNew * 10) / 10, est_minutes: 0 }
+      } else if (avgNew >= 25) {
+        // Pagination still going strong — many more crawls likely
+        crawl_eta = { status: 'progressing', label: 'still discovering — many crawls left', avg_new_per_crawl: Math.round(avgNew * 10) / 10, est_minutes: null }
+      } else {
+        // Trending toward 0 new — extrapolate. Each successive crawl finds
+        // half as many new ads (rough heuristic). Sum geometric series.
+        const remainingCrawls = Math.max(1, Math.ceil(Math.log2(Math.max(1, avgNew))))
+        const estMinutes = remainingCrawls * SCHEDULER_GAP_MIN
+        crawl_eta = { status: 'estimating', label: `~${remainingCrawls} more crawl${remainingCrawls === 1 ? '' : 's'}`, avg_new_per_crawl: Math.round(avgNew * 10) / 10, est_minutes: estMinutes }
+      }
+    }
+
     brandStats.push({
       term: b.term,
       page_id: b.page_id,
@@ -132,6 +182,7 @@ export async function GET() {
       fastReady,
       missing,
       failed,
+      crawl_eta,
     })
   }
 
@@ -203,6 +254,10 @@ export async function GET() {
       success_rate_24h_pct: successRate24h,
       bandwidth_24h_bytes: bandwidth24h,
       bandwidth_24h_mb: Math.round(bandwidth24h / 1024 / 1024 * 10) / 10,
+      // ── Bandwidth split (24h) — accurate accounting per migration 014 ──
+      bandwidth_indexer_proxy_mb: Math.round(indexerBandwidth24h / 1024 / 1024 * 10) / 10,
+      bandwidth_worker_proxy_mb: Math.round(workerBytesProxy24h / 1024 / 1024 * 10) / 10,
+      bandwidth_worker_droplet_mb: Math.round(workerBytesDroplet24h / 1024 / 1024 * 10) / 10,
       ads_discovered_24h: adsDiscovered24h,
       last_run_at: lastRunAt,
       last_success_at: lastSuccessAt,
