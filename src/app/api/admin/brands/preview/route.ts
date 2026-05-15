@@ -90,6 +90,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'page_id required (numeric)' }, { status: 400 })
   }
 
+  // ── PRIMARY PATH: call the droplet's preview-server ──
+  // The droplet uses real Playwright + IPRoyal sticky session, which Meta
+  // accepts. Vercel-side bare fetches (even through residential proxy) get
+  // 403'd because Meta fingerprints TLS handshake + missing browser cookies.
+  const dropletUrl = process.env.DROPLET_PREVIEW_URL          // e.g. http://24.199.113.41:8787
+  const dropletSecret = process.env.PREVIEW_SECRET
+  if (dropletUrl && dropletSecret) {
+    try {
+      const u = new URL('/preview', dropletUrl)
+      u.searchParams.set('page_id', pageId)
+      u.searchParams.set('limit', String(limit))
+      const dRes = await undiciFetch(u.toString(), {
+        headers: { 'X-Preview-Secret': dropletSecret },
+        signal: AbortSignal.timeout(45_000),  // droplet preview takes ~12s, generous margin
+      })
+      if (dRes.ok) {
+        const data = await dRes.json()
+        return NextResponse.json(data)
+      }
+      // If droplet is down or returned an error, fall through to direct-fetch fallback.
+      console.warn('[preview] droplet returned', dRes.status, '— falling back to direct fetch')
+    } catch (err: any) {
+      console.warn('[preview] droplet unreachable:', err?.message, '— falling back')
+    }
+  }
+
+  // ── FALLBACK PATH: direct Vercel fetch via residential proxy ──
+  // Often 403's (Meta gates bare cloud-origin requests even through residential
+  // proxy because of TLS fingerprinting), but kept as a safety net for when
+  // the droplet endpoint is misconfigured or down.
   const url = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&view_all_page_id=${encodeURIComponent(pageId)}`
   const dispatcher = buildProxyAgent()
   const usingProxy = !!dispatcher
@@ -114,11 +144,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         error: `Meta returned HTTP ${res.status}`,
         proxy_used: usingProxy,
-        hint: !usingProxy
-          ? 'Set WORKER_PROXY_HOST/USER/PASS env vars on Vercel — Meta blocks bare cloud IPs.'
-          : res.status === 429 || res.status === 403
-            ? 'Rate-limited or proxy IP flagged. Try again in 30s — each preview rotates session.'
-            : 'Unexpected response from Meta. The page_id may be wrong.',
+        droplet_configured: !!(dropletUrl && dropletSecret),
+        hint: !dropletUrl
+          ? 'Set DROPLET_PREVIEW_URL + PREVIEW_SECRET on Vercel to use the droplet preview server (recommended — Meta blocks bare-fetch from cloud IPs).'
+          : !usingProxy
+            ? 'Droplet preview unavailable + WORKER_PROXY_* not set. Add proxy env vars or fix droplet.'
+            : 'Bare-fetch through proxy is unreliable. Make sure droplet preview-server container is running.',
       }, { status: 502 })
     }
 
