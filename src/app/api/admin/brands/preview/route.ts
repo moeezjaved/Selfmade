@@ -27,10 +27,38 @@
  * GET /api/admin/brands/preview?page_id=129669023798560&limit=10
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { ProxyAgent, fetch as undiciFetch } from 'undici'
 import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
+export const runtime = 'nodejs'   // ProxyAgent needs Node runtime, not Edge
+
+/**
+ * Build a residential proxy URL from env vars (matches the droplet's
+ * IPRoyal sticky-session format — same credentials).
+ *
+ * Required env on Vercel for preview to work past Meta's IP gating:
+ *   WORKER_PROXY_HOST  (e.g. "geo.iproyal.com")
+ *   WORKER_PROXY_PORT  (default 12321)
+ *   WORKER_PROXY_USER
+ *   WORKER_PROXY_PASS
+ */
+function buildProxyAgent(): ProxyAgent | undefined {
+  const host = process.env.WORKER_PROXY_HOST
+  const user = process.env.WORKER_PROXY_USER
+  const pass = process.env.WORKER_PROXY_PASS
+  if (!host || !user || !pass) return undefined
+  const port = process.env.WORKER_PROXY_PORT || '12321'
+  // Random short session ID so each preview call rotates IP. No need for
+  // sticky here — we make exactly one request per preview.
+  const sid = Math.random().toString(36).slice(2, 10)
+  const country = (process.env.WORKER_PROXY_COUNTRY || 'us').toLowerCase()
+  // IPRoyal expects modifiers in the password field (verified format)
+  const stickyPass = `${pass}_session-${sid}_lifetime-5m_country-${country}`
+  const url = `http://${encodeURIComponent(user)}:${encodeURIComponent(stickyPass)}@${host}:${port}`
+  return new ProxyAgent(url)
+}
 
 interface PreviewAd {
   ad_id: string
@@ -63,9 +91,12 @@ export async function GET(req: NextRequest) {
   }
 
   const url = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&view_all_page_id=${encodeURIComponent(pageId)}`
+  const dispatcher = buildProxyAgent()
+  const usingProxy = !!dispatcher
 
   try {
-    const res = await fetch(url, {
+    const res = await undiciFetch(url, {
+      dispatcher,
       headers: {
         'User-Agent': UA,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -76,15 +107,18 @@ export async function GET(req: NextRequest) {
         'Sec-Fetch-User': '?1',
         'Upgrade-Insecure-Requests': '1',
       },
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(25_000),
     })
 
     if (!res.ok) {
       return NextResponse.json({
         error: `Meta returned HTTP ${res.status}`,
-        hint: res.status === 429 || res.status === 403
-          ? 'Rate-limited or blocked. Try again in a few minutes.'
-          : 'Unexpected response from Meta. The page_id may be wrong.',
+        proxy_used: usingProxy,
+        hint: !usingProxy
+          ? 'Set WORKER_PROXY_HOST/USER/PASS env vars on Vercel — Meta blocks bare cloud IPs.'
+          : res.status === 429 || res.status === 403
+            ? 'Rate-limited or proxy IP flagged. Try again in 30s — each preview rotates session.'
+            : 'Unexpected response from Meta. The page_id may be wrong.',
       }, { status: 502 })
     }
 
