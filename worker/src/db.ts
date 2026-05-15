@@ -13,6 +13,12 @@ export interface AdRow {
   snapshot_url: string
   format: string | null
   page_name: string | null
+  // Populated by the indexer from snapshot.images / videos / cards.
+  // When set, the worker's fast path downloads these directly via proxy
+  // and skips Playwright entirely.
+  raw_image_urls: string[] | null
+  raw_video_urls: string[] | null
+  raw_video_preview_urls: string[] | null
 }
 
 /**
@@ -26,7 +32,7 @@ export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<
   // Prioritize ACTIVE ads first (they extract successfully much more often).
   let query: any = supabase
     .from('discovery_ads_index')
-    .select('ad_id, snapshot_url, format, page_name')
+    .select('ad_id, snapshot_url, format, page_name, raw_image_urls, raw_video_urls, raw_video_preview_urls')
     .not('snapshot_url', 'is', null)
     .is('thumbnail_url', null)
     .is('video_url', null)
@@ -37,6 +43,15 @@ export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<
 
   if (imagesOnly) {
     query = query.not('format', 'ilike', '%video%')
+  }
+
+  // Optional brand scoping for testing or focused crawls.
+  // Set WORKER_PAGE_ID=355136938262536 to drain only one brand at a time.
+  // Comma-separated list also supported.
+  const pageIdFilter = process.env.WORKER_PAGE_ID
+  if (pageIdFilter) {
+    const ids = pageIdFilter.split(',').map(s => s.trim()).filter(Boolean)
+    query = ids.length === 1 ? query.eq('page_id', ids[0]) : query.in('page_id', ids)
   }
 
   const { data, error } = await query

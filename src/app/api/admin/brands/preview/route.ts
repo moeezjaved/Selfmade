@@ -1,30 +1,55 @@
 /**
  * Brand Preview — fetch first N ads for a page_id WITHOUT saving anywhere.
- * Lets the admin verify it's the right brand before approving.
+ *
+ * Migrated 2026-05-15 from the deprecated Meta Graph API path (which
+ * required access_tokens that have expired) to the same token-free public
+ * Ads Library URL the droplet indexer uses.
+ *
+ * Approach:
+ *   1. GET https://www.facebook.com/ads/library/?view_all_page_id={pageId}
+ *      with a browser-like User-Agent. Meta server-renders the first ~30
+ *      ads as embedded JSON inside <script> tags.
+ *   2. Brace-match every "ad_archive_id":"..." occurrence to its
+ *      enclosing JSON object (same parser the droplet's playwright-indexer
+ *      uses — verified against Hims/Nike/Gymshark schema 2026-05-14).
+ *   3. Extract structured creative URLs from snapshot.images / videos /
+ *      cards (full-resolution original_image_url + video_hd_url).
+ *   4. Return { page, ads } so the admin UI can show samples.
+ *
+ * Trade-offs vs the old Graph-API path:
+ *   + No tokens to manage / refresh
+ *   + Returns full-resolution image URLs (Graph returned only snapshot links)
+ *   + Future-proof — same path our scraper uses, so if it works the brand
+ *     will index successfully too
+ *   - May rate-limit if previewed too aggressively from one Vercel region
+ *     (acceptable for occasional admin use)
  *
  * GET /api/admin/brands/preview?page_id=129669023798560&limit=10
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { decryptToken } from '@/lib/meta/client'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
-async function getMetaToken(admin: any): Promise<string | null> {
-  const { data: accounts } = await admin
-    .from('meta_accounts')
-    .select('access_token')
-    .eq('is_primary', true)
-    .limit(1)
-  if (accounts?.[0]?.access_token) {
-    try {
-      const t = decryptToken(accounts[0].access_token)
-      if (t) return t
-    } catch { /* ignore */ }
-  }
-  return process.env.META_APP_TOKEN || process.env.META_ACCESS_TOKEN || null
+interface PreviewAd {
+  ad_id: string
+  body: string
+  title: string
+  page_name: string
+  snapshot_url: string
+  start_date: string | null
+  stop_date: string | null
+  is_active: boolean
+  display_format: string | null
+  image_urls: string[]      // raw fbcdn image URLs (full resolution)
+  video_urls: string[]      // raw fbcdn video URLs (HD preferred)
+  video_preview_urls: string[]
 }
+
+const UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -32,73 +57,185 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const pageId = req.nextUrl.searchParams.get('page_id')?.trim()
-  const limit = Math.min(parseInt(req.nextUrl.searchParams.get('limit') || '10'), 25)
-  if (!pageId) return NextResponse.json({ error: 'page_id required' }, { status: 400 })
+  const limit = Math.min(parseInt(req.nextUrl.searchParams.get('limit') || '10'), 30)
+  if (!pageId || !/^\d+$/.test(pageId)) {
+    return NextResponse.json({ error: 'page_id required (numeric)' }, { status: 400 })
+  }
 
-  const admin = createAdminClient()
-  const token = await getMetaToken(admin)
-  if (!token) return NextResponse.json({ error: 'No Meta token' }, { status: 503 })
+  const url = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&view_all_page_id=${encodeURIComponent(pageId)}`
 
   try {
-    // Fetch page info first
-    const pageParams = new URLSearchParams({
-      fields: 'id,name,fan_count,picture.type(large),link,category,verification_status,website',
-      access_token: token,
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': UA,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+      },
+      signal: AbortSignal.timeout(20_000),
     })
-    const pageRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}?${pageParams}`, {
-      signal: AbortSignal.timeout(8_000),
-    })
-    const page = pageRes.ok ? await pageRes.json() as any : null
 
-    // Fetch sample ads
-    const adsParams = new URLSearchParams({
-      access_token: token,
-      search_page_ids: pageId,
-      ad_reached_countries: JSON.stringify(['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'IN', 'BR', 'MX']),
-      ad_type: 'ALL',
-      active_status: 'ALL',
-      fields: 'id,ad_creative_bodies,ad_creative_link_titles,ad_snapshot_url,page_name,ad_delivery_start_time,ad_delivery_stop_time',
-      limit: String(limit),
-    })
-    const adsRes = await fetch(`https://graph.facebook.com/v19.0/ads_archive?${adsParams}`, {
-      signal: AbortSignal.timeout(15_000),
-    })
-    if (!adsRes.ok) {
-      const detail = await adsRes.text()
+    if (!res.ok) {
       return NextResponse.json({
-        error: `Meta API error: ${adsRes.status}`,
-        detail: detail.slice(0, 500),
+        error: `Meta returned HTTP ${res.status}`,
+        hint: res.status === 429 || res.status === 403
+          ? 'Rate-limited or blocked. Try again in a few minutes.'
+          : 'Unexpected response from Meta. The page_id may be wrong.',
       }, { status: 502 })
     }
-    const adsData = await adsRes.json() as any
-    const ads = (adsData?.data || []).map((a: any) => ({
-      ad_id: a.id,
-      body: a.ad_creative_bodies?.[0] || '',
-      title: a.ad_creative_link_titles?.[0] || '',
-      page_name: a.page_name,
-      snapshot_url: a.ad_snapshot_url,
-      start_date: a.ad_delivery_start_time,
-      stop_date: a.ad_delivery_stop_time,
-      is_active: !a.ad_delivery_stop_time,
-    }))
+
+    const html = await res.text()
+    const adObjects = extractAdsBraceMatched(html)
+
+    if (adObjects.length === 0) {
+      return NextResponse.json({
+        page: null,
+        ads: [],
+        total_returned: 0,
+        warning: 'No ads found in Meta response. Either the page_id is wrong, this brand has no ads, or Meta is currently gating the request from this server.',
+      })
+    }
+
+    // Build a "page" summary from the first ad's snapshot.
+    // Field names (picture, follower_count, etc.) match the keys the
+    // existing PreviewDrawer in admin/brands/page.tsx already reads.
+    const firstSnap = adObjects[0]?.snapshot || {}
+    const page = {
+      page_id: pageId,
+      name: firstSnap.page_name || null,
+      category: Array.isArray(firstSnap.page_categories) ? firstSnap.page_categories[0] : null,
+      follower_count: typeof firstSnap.page_like_count === 'number' ? firstSnap.page_like_count : null,
+      picture: firstSnap.page_profile_picture_url || null,
+      website: firstSnap.page_profile_uri || null,
+      link: firstSnap.page_profile_uri || null,
+      verified: false, // not exposed in this payload — would need a separate page_info request to determine
+    }
+
+    const ads: PreviewAd[] = adObjects.slice(0, limit).map((obj: any) => {
+      const snap = obj.snapshot || {}
+      const media = extractMediaUrls(snap)
+      return {
+        ad_id: String(obj.ad_archive_id),
+        body: snap.body?.text || '',
+        title: snap.title || snap.link_description || '',
+        page_name: snap.page_name || '',
+        snapshot_url: `https://www.facebook.com/ads/library/?id=${obj.ad_archive_id}`,
+        start_date: obj.start_date_string || (obj.start_date ? new Date(obj.start_date * 1000).toISOString() : null),
+        stop_date: obj.end_date_string || (obj.end_date ? new Date(obj.end_date * 1000).toISOString() : null),
+        is_active: !!obj.is_active,
+        display_format: snap.display_format || null,
+        image_urls: media.images,
+        video_urls: media.videos,
+        video_preview_urls: media.videoPreviews,
+      }
+    })
 
     return NextResponse.json({
-      page: page ? {
-        page_id: page.id,
-        name: page.name,
-        follower_count: page.fan_count,
-        picture: page.picture?.data?.url,
-        category: page.category,
-        verified: page.verification_status === 'blue_verified' || page.verification_status === 'gray_verified',
-        website: page.website,
-        link: page.link,
-      } : null,
+      page,
       ads,
       total_returned: ads.length,
+      total_found: adObjects.length,
     })
-  } catch (err) {
+  } catch (err: any) {
     return NextResponse.json({
-      error: err instanceof Error ? err.message : String(err),
+      error: err?.name === 'TimeoutError'
+        ? 'Meta took too long to respond (20s timeout). Try again.'
+        : err?.message || String(err),
     }, { status: 500 })
+  }
+}
+
+/**
+ * Brace-match every ad_archive_id occurrence to its enclosing JSON object.
+ * Mirrors playwright-indexer.ts extractAdsFromText (verified parser).
+ */
+function extractAdsBraceMatched(text: string): any[] {
+  const found: any[] = []
+  const adIdRegex = /"ad_archive_id"\s*:\s*"(\d{10,})"/g
+  const positions: number[] = []
+  let m: RegExpExecArray | null
+  while ((m = adIdRegex.exec(text)) !== null) {
+    positions.push(m.index)
+  }
+  for (const pos of positions) {
+    let start = pos
+    while (start > 0 && text[start] !== '{') start--
+    let depth = 0, end = start
+    for (let i = start; i < text.length && i < start + 250_000; i++) {
+      if (text[i] === '{') depth++
+      else if (text[i] === '}') { depth--; if (depth === 0) { end = i + 1; break } }
+    }
+    if (end === start) continue
+    try {
+      const obj = JSON.parse(text.slice(start, end))
+      if (obj.ad_archive_id) found.push(obj)
+    } catch { /* malformed slice — skip */ }
+  }
+  return found
+}
+
+/**
+ * Pull creative URLs out of a snapshot using the verified GraphQL schema.
+ * Mirrors worker/src/playwright-indexer.ts extractMediaUrls().
+ */
+function extractMediaUrls(snap: any): {
+  images: string[]
+  videos: string[]
+  videoPreviews: string[]
+} {
+  const images = new Set<string>()
+  const videos = new Set<string>()
+  const videoPreviews = new Set<string>()
+
+  const pushImg = (...candidates: any[]) => {
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.startsWith('http') && c.includes('fbcdn')) {
+        images.add(c); return
+      }
+    }
+  }
+  const pushVid = (...candidates: any[]) => {
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.startsWith('http') && c.includes('fbcdn')) {
+        videos.add(c); return
+      }
+    }
+  }
+  const pushPrev = (...candidates: any[]) => {
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.startsWith('http') && c.includes('fbcdn')) {
+        videoPreviews.add(c); return
+      }
+    }
+  }
+
+  if (Array.isArray(snap?.images)) for (const i of snap.images) {
+    pushImg(i?.original_image_url, i?.resized_image_url)
+  }
+  if (Array.isArray(snap?.videos)) for (const v of snap.videos) {
+    pushVid(v?.video_hd_url, v?.video_sd_url)
+    pushPrev(v?.video_preview_image_url)
+  }
+  if (Array.isArray(snap?.cards)) for (const c of snap.cards) {
+    pushImg(c?.original_image_url, c?.resized_image_url)
+    pushVid(c?.video_hd_url, c?.video_sd_url)
+    pushPrev(c?.video_preview_image_url)
+  }
+  if (Array.isArray(snap?.extra_images)) for (const i of snap.extra_images) {
+    pushImg(i?.original_image_url, i?.resized_image_url)
+  }
+  if (Array.isArray(snap?.extra_videos)) for (const v of snap.extra_videos) {
+    pushVid(v?.video_hd_url, v?.video_sd_url)
+    pushPrev(v?.video_preview_image_url)
+  }
+
+  return {
+    images: Array.from(images),
+    videos: Array.from(videos),
+    videoPreviews: Array.from(videoPreviews),
   }
 }
