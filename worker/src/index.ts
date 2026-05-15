@@ -40,6 +40,8 @@ const SESSION_STARTED_AT = new Date().toISOString()
 let totalProcessed = 0
 let totalSuccess = 0
 let totalFailed = 0
+let lifetimeProxyMB = 0    // bytes via IPRoyal (paid)
+let lifetimeDropletMB = 0  // bytes via droplet direct (free)
 const startTime = Date.now()
 
 interface ProcessResult {
@@ -48,6 +50,8 @@ interface ProcessResult {
   imageCount: number       // total images saved (carousel)
   videoCount: number       // total videos saved
   dedupedCount: number     // assets that hit dedup
+  bytes_proxy?: number     // bytes consumed via IPRoyal (images only)
+  bytes_droplet?: number   // bytes consumed via droplet direct (videos only)
   error?: string
 }
 
@@ -117,11 +121,11 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
     return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: empty raw URL arrays' }
   }
 
-  const { images, videos } = await downloadAssetsForAd({
+  const { images, videos, bytes_proxy_total, bytes_droplet_total } = await downloadAssetsForAd({
     adId: ad.ad_id,
     imageUrls,
     videoUrls,
-    timeoutMs: 30_000,
+    timeoutMs: 60_000,
   })
 
   if (images.length === 0 && videos.length === 0) {
@@ -176,98 +180,24 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
     imageResults.filter((r) => r.deduped).length +
     videoResults.filter((r) => r.deduped).length
 
-  return { ad_id: ad.ad_id, ok: true, imageCount, videoCount, dedupedCount }
+  return {
+    ad_id: ad.ad_id,
+    ok: true,
+    imageCount,
+    videoCount,
+    dedupedCount,
+    bytes_proxy: bytes_proxy_total,
+    bytes_droplet: bytes_droplet_total,
+  }
 }
 
 async function processAd(ad: AdRow): Promise<ProcessResult> {
   try {
-    // ── FAST PATH ──
-    // If the indexer extracted raw fbcdn URLs from the GraphQL payload,
-    // skip Playwright entirely — just download via proxy. This is the
-    // dominant case for any ad indexed after migration 013.
-    const hasRawUrls =
-      (ad.raw_image_urls && ad.raw_image_urls.length > 0) ||
-      (ad.raw_video_urls && ad.raw_video_urls.length > 0)
-
-    if (hasRawUrls) {
-      return await processAdFastPath(ad)
-    }
-
-    // ── LEGACY PATH ──
-    // Pre-migration ad (raw_*_urls NULL). Open the ad's public page in
-    // Playwright, extract URLs from rendered DOM, download via browser
-    // context. Slower + lower success rate but covers the existing queue.
-    const { imageUrls, videoUrls, imageAssets, videoAssets, pageStatus, error } = await extractCreative(
-      ad.snapshot_url,
-      config.adTimeoutMs - 10_000,
-      ad.ad_id,                       // sticky proxy session key — same IP for full ad lifecycle
-    )
-
-    // Map URL → prefetched buffer (downloaded inside browser context)
-    const imageBufByUrl = new Map(imageAssets.map(a => [a.url, a.buffer]))
-    const videoBufByUrl = new Map(videoAssets.map(a => [a.url, a.buffer]))
-
-    if (error) {
-      // Network/timeout — leave for retry, don't mark failed
-      return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: `extract: ${error}` }
-    }
-    if (imageUrls.length === 0 && videoUrls.length === 0) {
-      // Page loaded but no creative — ad likely deactivated or token expired.
-      // Mark so we never retry it.
-      await markExtractionFailed(ad.ad_id)
-      return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: `no_creative_found (page=${pageStatus}) → marked failed` }
-    }
-
-    // Process all images + all videos in parallel.
-    // Pass the prefetched buffers so processAsset can skip the bare-IP fetch
-    // (which would get 1087-byte placeholders from Meta's CDN).
-    const imagePromises = imageUrls.map((url, i) => processAsset(url, 'image', ad.ad_id, i, imageBufByUrl.get(url)))
-    const videoPromises = videoUrls.map((url, i) => processAsset(url, 'video', ad.ad_id, i, videoBufByUrl.get(url)))
-
-    const [imageResults, videoResults] = await Promise.all([
-      Promise.all(imagePromises),
-      Promise.all(videoPromises),
-    ])
-
-    // Build creatives table rows — one per asset that uploaded successfully
-    const creatives: CreativeInsert[] = []
-    imageResults.forEach((r, i) => {
-      if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'image', r2_url: r.url, hash: r.hash })
-    })
-    videoResults.forEach((r, i) => {
-      if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'video', r2_url: r.url, hash: r.hash })
-    })
-
-    if (creatives.length === 0) {
-      // All assets failed to upload — usually means Meta returned only placeholder
-      // images (1334-1507 bytes) because the ad was removed/deactivated/violates
-      // ad standards. Mark failed so we never retry it (otherwise these placeholder
-      // ads loop in the queue forever, burning proxy bandwidth).
-      await markExtractionFailed(ad.ad_id)
-      return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'r2_upload_failed → marked failed (placeholder only)' }
-    }
-
-    // Save all creatives + update legacy columns (first image, first video)
-    const firstImage = imageResults.find((r) => r.url)
-    const firstVideo = videoResults.find((r) => r.url)
-    await Promise.all([
-      saveCreatives(creatives),
-      updateAdCreative(
-        ad.ad_id,
-        firstImage?.url ?? null,
-        firstVideo?.url ?? null,
-        firstImage?.hash ?? null,
-        firstVideo?.hash ?? null,
-      ),
-    ])
-
-    const imageCount = imageResults.filter((r) => r.url).length
-    const videoCount = videoResults.filter((r) => r.url).length
-    const dedupedCount =
-      imageResults.filter((r) => r.deduped).length +
-      videoResults.filter((r) => r.deduped).length
-
-    return { ad_id: ad.ad_id, ok: true, imageCount, videoCount, dedupedCount }
+    // FAST-PATH ONLY. The legacy DOM-extraction path (Playwright per ad)
+    // was retired 2026-05-15 — it consumed 2-3 MB IPRoyal per ad. We now
+    // require every ad in the worker queue to have raw URLs from the
+    // indexer (db.ts claimAds enforces this with a SQL filter).
+    return await processAdFastPath(ad)
   } catch (err) {
     return {
       ad_id: ad.ad_id,
@@ -340,9 +270,13 @@ async function loop() {
   const totalImages = results.reduce((s, r) => s + r.imageCount, 0)
   const totalVideos = results.reduce((s, r) => s + r.videoCount, 0)
   const totalDeduped = results.reduce((s, r) => s + r.dedupedCount, 0)
+  const batchProxyMB = results.reduce((s, r) => s + (r.bytes_proxy ?? 0), 0) / 1024 / 1024
+  const batchDropletMB = results.reduce((s, r) => s + (r.bytes_droplet ?? 0), 0) / 1024 / 1024
   totalProcessed += results.length
   totalSuccess += ok
   totalFailed += fail
+  lifetimeProxyMB += batchProxyMB
+  lifetimeDropletMB += batchDropletMB
 
   const elapsedMin = (Date.now() - startTime) / 1000 / 60
   const adsPerMin = totalProcessed / elapsedMin
@@ -350,7 +284,9 @@ async function loop() {
   const etaMin = remaining / Math.max(adsPerMin, 1)
 
   console.log(`\n✅ Batch done in ${dt.toFixed(1)}s — ${ok} ok, ${fail} failed | ${totalImages} imgs + ${totalVideos} vids saved, ${totalDeduped} ♻️ deduped`)
-  console.log(`📊 Lifetime: ${totalSuccess}/${totalProcessed} ok (${((totalSuccess / totalProcessed) * 100).toFixed(0)}%) | ${adsPerMin.toFixed(1)} ads/min | queue: ${remaining} | ETA: ${etaMin.toFixed(0)} min\n`)
+  console.log(`💾 Bandwidth (batch): ${batchProxyMB.toFixed(2)} MB proxy + ${batchDropletMB.toFixed(2)} MB droplet`)
+  console.log(`📊 Lifetime: ${totalSuccess}/${totalProcessed} ok (${((totalSuccess / totalProcessed) * 100).toFixed(0)}%) | ${adsPerMin.toFixed(1)} ads/min | queue: ${remaining} | ETA: ${etaMin.toFixed(0)} min`)
+  console.log(`💰 Lifetime bandwidth: ${lifetimeProxyMB.toFixed(1)} MB proxy ($${(lifetimeProxyMB * 0.0035).toFixed(3)} approx) + ${lifetimeDropletMB.toFixed(1)} MB droplet (free)\n`)
 
   // Best-effort heartbeat for the dashboard
   await writeHeartbeat({
