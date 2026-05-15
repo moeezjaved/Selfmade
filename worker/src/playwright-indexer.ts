@@ -481,9 +481,23 @@ async function crawlBrand(opts: {
     ? await startProxyChain({ sessionId, lifetime: '1h', country: 'us' })
     : null
 
+  // Chromium "new headless" mode (--headless=new). The OLD headless mode is
+  // detectable by Meta — verified 2026-05-15: Arhaus pagination XHR never
+  // fires in old headless even with stealth + real mouse.wheel events. New
+  // headless behaves much closer to a real Chrome window: full DOM event
+  // pipeline, real IntersectionObserver triggers, viewport rendering.
+  // headless: false tells Playwright not to add its own --headless flag;
+  // we set --headless=new ourselves.
   const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled'],
+    headless: false,
+    args: [
+      '--headless=new',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled',
+      '--disable-gpu',
+    ],
     proxy: proxy ? { server: proxy.url } : undefined,
   })
 
