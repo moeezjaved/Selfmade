@@ -509,9 +509,13 @@ async function crawlBrand(opts: {
     locale: 'en-US',
     timezoneId: 'America/New_York',
   }
-  if (existsSync(STORAGE_STATE_FILE)) {
-    try { ctxOpts.storageState = STORAGE_STATE_FILE } catch { /* ignore corrupted */ }
-  }
+  // Skip storage state — cookies accumulated across many crawls may be
+  // flagged by Meta's session fingerprinting (verified 2026-05-16: same
+  // code with no storage state captured 169 ads via cursor walk; with
+  // stale cookies, ZERO GraphQL POSTs fired during crawl).
+  // if (existsSync(STORAGE_STATE_FILE)) {
+  //   try { ctxOpts.storageState = STORAGE_STATE_FILE } catch { /* ignore corrupted */ }
+  // }
   const context = await browser.newContext(ctxOpts)
 
   // Block static UI assets to save bandwidth
@@ -660,41 +664,25 @@ async function crawlBrand(opts: {
         console.log(`  🎯 Reached target of ${TARGET_ADS_PER_BRAND} ads`)
         break
       }
-      // ── Multi-strategy scroll (verified 2026-05-15 against Arhaus failure) ──
-      // Programmatic scrolls (element.scrollTop = X, window.scrollTo) are
-      // INVISIBLE to IntersectionObserver in some Meta page layouts (furniture
-      // brands, certain DTC). We must use real mouse wheel events, which
-      // simulate input the browser dispatches identically to a real user.
-      //
-      // Strategy: 3 real wheel events at random viewport positions, then
-      // fallback programmatic scroll, then keyboard End. The wheel events
-      // are what fire pagination on layouts that ignored our previous code.
-
-      // 1. Real mouse wheel events — most effective for IntersectionObserver
+      // ── Single discrete wheel per iteration (matches standalone tool that captured 169 ads) ──
+      // Earlier rapid 3× wheels per iteration didn't register as discrete user
+      // events — Meta's IntersectionObserver only saw clustered scrolls.
+      // ONE wheel + longer wait works (verified by in-browser-paginate.ts).
       const viewport = page.viewportSize() ?? { width: 1440, height: 900 }
-      for (let w = 0; w < 3; w++) {
-        await page.mouse.move(
-          Math.floor(viewport.width * (0.3 + Math.random() * 0.4)),
-          Math.floor(viewport.height * (0.4 + Math.random() * 0.3)),
-        ).catch(() => {})
-        await page.mouse.wheel(0, 1500 + Math.floor(Math.random() * 800)).catch(() => {})
-        await sleep(150 + Math.random() * 200)
-      }
-
-      // 2. Programmatic fallbacks (cheap, run anyway)
-      await page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight)
-        // Walk visible scrollable containers and push to bottom
-        document.querySelectorAll<HTMLElement>('[role="feed"], [role="main"], [role="list"]').forEach(el => {
-          if (el.scrollHeight > el.clientHeight + 100) el.scrollTop = el.scrollHeight
-        })
-      }).catch(() => {})
-
-      // 3. Keyboard End — focus-based scroll
-      await page.keyboard.press('End').catch(() => {})
+      await page.mouse.move(
+        Math.floor(viewport.width * (0.3 + Math.random() * 0.4)),
+        Math.floor(viewport.height * (0.4 + Math.random() * 0.3)),
+      ).catch(() => {})
+      await page.mouse.wheel(0, 1500 + Math.floor(Math.random() * 800)).catch(() => {})
 
       metrics.scrollCount++
-      await sleep(randomDelay())
+      await sleep(1500 + Math.random() * 1000)   // 1.5-2.5 sec — match standalone
+
+      // Direction-change bounce on iterations 6 + 11 (also from standalone)
+      if (scrollIdx === 5 || scrollIdx === 10) {
+        await page.mouse.wheel(0, -1200).catch(() => {})
+        await sleep(800)
+      }
 
       // ── Once we've captured a pagination template, switch to cursor-walk ──
       // Scroll-only pagination caps at 30 ads (Meta gates non-scroll-triggered
