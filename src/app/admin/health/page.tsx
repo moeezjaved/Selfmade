@@ -46,6 +46,9 @@ interface HealthData {
     success_rate_24h_pct: number | null
     bandwidth_24h_bytes: number
     bandwidth_24h_mb: number
+    bandwidth_indexer_proxy_mb?: number
+    bandwidth_worker_proxy_mb?: number
+    bandwidth_worker_droplet_mb?: number
     ads_discovered_24h: number
     last_run_at: string | null
     last_success_at: string | null
@@ -59,6 +62,12 @@ interface HealthData {
   brands: Array<{
     term: string; page_id: string; last_crawled_at: string | null
     thumbed: number; fastReady: number; missing: number; failed: number
+    crawl_eta?: {
+      status: 'no_data' | 'estimating' | 'progressing' | 'caught_up'
+      label: string
+      avg_new_per_crawl: number | null
+      est_minutes: number | null
+    }
   }>
   recent_runs: Array<{
     brand_name: string; started_at: string; finished_at: string | null
@@ -256,8 +265,12 @@ export default function HealthDashboard() {
               <KPI
                 label="Proxy bandwidth"
                 value={`${data.activity.bandwidth_24h_mb} MB`}
-                sub="last 24h via IPRoyal"
-                hint="Bandwidth consumed through your IPRoyal residential proxy. Indexer ~3-5 MB per crawl, worker ~300 KB per ad. Watch this against your IPRoyal monthly cap."
+                sub={
+                  data.activity.bandwidth_indexer_proxy_mb !== undefined
+                    ? `indexer ${data.activity.bandwidth_indexer_proxy_mb} MB · worker ${data.activity.bandwidth_worker_proxy_mb} MB`
+                    : 'last 24h via IPRoyal'
+                }
+                hint="TOTAL IPRoyal bandwidth in last 24h = indexer (page crawls) + worker (image downloads). Videos are downloaded direct from droplet (free, not counted here). This number should match your IPRoyal dashboard balance change."
               />
             </div>
             <div style={{ marginTop: 10, fontSize: 12, color: '#666' }}>
@@ -282,10 +295,11 @@ export default function HealthDashboard() {
                   <th style={thRight} title="Ads still awaiting worker processing.">missing</th>
                   <th style={thRight} title="Ads worker tried and gave up on (Meta returned placeholders = ad expired).">failed</th>
                   <th style={th} title="When the scheduler last crawled this brand. Min 45 min between crawls.">last crawl</th>
+                  <th style={th} title="Estimated time until brand is fully crawled. Computed from average new ads found in last 5 crawls — if recent crawls return ~0 new ads, brand is caught up. Otherwise extrapolates based on diminishing-returns curve.">crawl ETA</th>
                 </tr>
               </thead>
               <tbody>
-                {data.brands.length === 0 && <tr><td colSpan={6} style={{ ...td, color: '#888' }}>No active brands.</td></tr>}
+                {data.brands.length === 0 && <tr><td colSpan={7} style={{ ...td, color: '#888' }}>No active brands.</td></tr>}
                 {data.brands.map(b => (
                   <tr key={b.page_id} style={tableRow}>
                     <td style={td}>
@@ -297,6 +311,36 @@ export default function HealthDashboard() {
                     <td style={tdRight}>{b.missing.toLocaleString()}</td>
                     <td style={{ ...tdRight, color: b.failed > 0 ? '#b91c1c' : '#888' }}>{b.failed.toLocaleString()}</td>
                     <td style={{ ...td, color: '#666', fontSize: 12 }}>{b.last_crawled_at ? `${humanAgo(b.last_crawled_at)} ago` : 'never'}</td>
+                    <td style={{ ...td, fontSize: 12 }}>
+                      {b.crawl_eta ? (() => {
+                        const e = b.crawl_eta!
+                        const colorMap: Record<string, { bg: string; fg: string }> = {
+                          caught_up:   { bg: '#dcfce7', fg: '#166534' },
+                          progressing: { bg: '#dbeafe', fg: '#1e40af' },
+                          estimating:  { bg: '#fef3c7', fg: '#92400e' },
+                          no_data:     { bg: '#f3f4f6', fg: '#6b7280' },
+                        }
+                        const c = colorMap[e.status] ?? colorMap.no_data
+                        return (
+                          <div>
+                            <span style={{
+                              padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                              background: c.bg, color: c.fg,
+                            }}>{e.label}</span>
+                            {e.est_minutes !== null && e.est_minutes > 0 && (
+                              <div style={{ fontSize: 10, color: '#666', marginTop: 2 }}>
+                                ~{Math.round(e.est_minutes / 60 * 10) / 10}h to catch up
+                              </div>
+                            )}
+                            {e.avg_new_per_crawl !== null && (
+                              <div style={{ fontSize: 10, color: '#999', marginTop: 1 }}>
+                                avg {e.avg_new_per_crawl} new/crawl
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })() : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
