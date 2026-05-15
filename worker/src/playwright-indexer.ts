@@ -639,6 +639,7 @@ async function crawlBrand(opts: {
   } catch (e: any) {
     console.error(`  ❌ Crawl error: ${e?.message}`)
     abortReason = `crawl_error: ${e?.message?.slice(0, 100)}`
+    aborted = true   // mark as aborted so status='aborted' (was incorrectly staying 'success')
   }
 
   // Save cookies for next run
@@ -716,13 +717,19 @@ async function main() {
   for (const brand of brands) {
     const runId = randomBytes(16).toString('hex').slice(0, 32).replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
     try {
-      await crawlBrand({
+      const m = await crawlBrand({
         pageId: brand.page_id,
         brandName: brand.term,
         runId,
         maxScrolls,
       })
-      // Update last_crawled_at
+      // Only update last_crawled_at when the crawl actually discovered ads.
+      // If the crawl errored at page.goto (proxy tunnel down, Meta 403'd, etc)
+      // we want the scheduler to retry on the next cycle, not wait 45 min.
+      if (m.adsDiscovered === 0) {
+        console.warn(`  ⚠️ ${brand.term || brand.page_id}: 0 ads discovered — NOT updating last_crawled_at, will retry next cycle`)
+        continue
+      }
       await (supabase as any).from('discovery_crawl_terms')
         .update({ last_crawled_at: new Date().toISOString() })
         .eq('page_id', brand.page_id)
