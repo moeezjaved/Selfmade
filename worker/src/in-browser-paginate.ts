@@ -201,18 +201,20 @@ async function main() {
       let cursor: string | null = startCursor
       let reqCounter = parseInt(tpl.parsedBody.__req || '0', 10)
 
-      function extractAdIdsB(body: string): string[] {
+      // Use arrow consts (not function declarations) to avoid tsx's
+      // __name helper injection which doesn't exist in browser context.
+      const extractAdIdsB = (body: string) => {
         const ids: string[] = []
         const re = /"ad_archive_id"\s*:\s*"(\d{10,})"/g
         let m: RegExpExecArray | null
         while ((m = re.exec(body)) !== null) ids.push(m[1])
         return ids
       }
-      function extractEndCursorB(body: string): string | null {
+      const extractEndCursorB = (body: string) => {
         const m = body.match(/"end_cursor"\s*:\s*"([^"]+)"/)
         return m ? m[1] : null
       }
-      function hasNextB(body: string): boolean {
+      const hasNextB = (body: string) => {
         const m = body.match(/"has_next_page"\s*:\s*(true|false)/)
         return m ? m[1] === 'true' : false
       }
