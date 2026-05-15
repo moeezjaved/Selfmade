@@ -677,24 +677,46 @@ function PreviewDrawer({ brand, data, loading, onClose }: {
           {data?.ads?.length > 0 && (
             <>
               <div style={{ fontSize: 12, color: '#666', marginBottom: 10 }}>{data.ads.length} sample ads from Meta:</div>
-              {data.ads.map((ad: any) => (
-                <div key={ad.ad_id} style={{ padding: 12, marginBottom: 10, border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: ad.is_active ? '#22c55e' : '#d1d5db', display: 'inline-block', marginRight: 6 }} />
-                      {ad.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                    <span>{ad.ad_id}</span>
+              {data.ads.map((ad: any) => {
+                // The token-free preview API now returns raw fbcdn URLs
+                // for images + videos. Show the first image (or video poster)
+                // inline so the admin can visually verify the brand at a glance.
+                const heroImage = ad.image_urls?.[0] || ad.video_preview_urls?.[0] || null
+                const heroVideo = ad.video_urls?.[0] || null
+                return (
+                  <div key={ad.ad_id} style={{ padding: 12, marginBottom: 10, border: '1px solid #e2e8f0', borderRadius: 8 }}>
+                    <div style={{ fontSize: 12, color: '#666', marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: ad.is_active ? '#22c55e' : '#d1d5db', display: 'inline-block', marginRight: 6 }} />
+                        {ad.is_active ? 'Active' : 'Inactive'}
+                        {ad.display_format && <span style={{ marginLeft: 8, color: '#94a3b8' }}>· {ad.display_format}</span>}
+                      </span>
+                      <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10 }}>{ad.ad_id}</span>
+                    </div>
+                    {heroImage && (
+                      <img src={heroImage} alt="" loading="lazy" referrerPolicy="no-referrer"
+                        style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 6, marginBottom: 8, background: '#f1f5f9' }} />
+                    )}
+                    {ad.title && <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{ad.title}</div>}
+                    {ad.body && <div style={{ fontSize: 12, color: '#333', lineHeight: 1.4 }}>{ad.body.slice(0, 200)}{ad.body.length > 200 ? '…' : ''}</div>}
+                    <div style={{ marginTop: 8, fontSize: 11, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {ad.snapshot_url && (
+                        <a href={ad.snapshot_url} target="_blank" rel="noreferrer" style={{ color: '#1d4ed8' }}>
+                          View on Meta Ads Library →
+                        </a>
+                      )}
+                      {heroVideo && (
+                        <a href={heroVideo} target="_blank" rel="noreferrer" style={{ color: '#1d4ed8' }}>
+                          ▶ Video
+                        </a>
+                      )}
+                      {ad.image_urls?.length > 1 && (
+                        <span style={{ color: '#666' }}>+{ad.image_urls.length - 1} more image{ad.image_urls.length - 1 === 1 ? '' : 's'}</span>
+                      )}
+                    </div>
                   </div>
-                  {ad.title && <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{ad.title}</div>}
-                  {ad.body && <div style={{ fontSize: 12, color: '#333', lineHeight: 1.4 }}>{ad.body.slice(0, 200)}{ad.body.length > 200 ? '…' : ''}</div>}
-                  {ad.snapshot_url && (
-                    <a href={ad.snapshot_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#1d4ed8', display: 'inline-block', marginTop: 6 }}>
-                      View in Meta Ads Library →
-                    </a>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </>
           )}
           {data && !loading && data.ads?.length === 0 && (
