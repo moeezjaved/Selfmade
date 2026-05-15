@@ -135,8 +135,17 @@ async function fetchPreview(pageId: string, limit: number) {
     }
 
     browser = await chromiumExtra.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      // Chromium new-headless (--headless=new) — much harder for Meta to
+      // detect than old headless. See playwright-indexer.ts for context.
+      headless: false,
+      args: [
+        '--headless=new',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-gpu',
+      ],
       proxy: proxy ? { server: proxy.url } : undefined,
     }) as unknown as Browser
 
