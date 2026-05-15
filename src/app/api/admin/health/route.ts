@@ -157,18 +157,26 @@ export async function GET() {
     } else if (recent.length === 1) {
       crawl_eta = { status: 'estimating', label: `need 2+ crawls (${recent[0].ads_new} on first)`, avg_new_per_crawl: recent[0].ads_new, est_minutes: null }
     } else {
-      const avgNew = recent.reduce((s, r) => s + (r.ads_new ?? 0), 0) / recent.length
+      // Use only the last 3 crawls for avg (recency-weighted) so the first
+      // crawl's "all 30 are new" outlier doesn't pollute the estimate after
+      // the brand is actually caught up.
+      const recentForAvg = recent.slice(0, 3)
+      const avgNew = recentForAvg.reduce((s, r) => s + (r.ads_new ?? 0), 0) / recentForAvg.length
       const lastCrawlNew = recent[0].ads_new ?? 0
+      const lastTwoNew = (recent[0].ads_new ?? 0) + (recent[1]?.ads_new ?? 0)
       const SCHEDULER_GAP_MIN = parseInt(process.env.SCHEDULER_MIN_BRAND_GAP_MIN ?? '45', 10)
-      if (lastCrawlNew === 0 || (lastCrawlNew <= 2 && avgNew <= 5)) {
+
+      // Caught-up rule: last crawl returned ≤2 new OR last two crawls combined ≤5 new.
+      // Doesn't care about the average — earlier first-crawl outliers shouldn't
+      // override evidence that the brand is now stable.
+      if (lastCrawlNew <= 2 || lastTwoNew <= 5) {
         crawl_eta = { status: 'caught_up', label: 'fully crawled', avg_new_per_crawl: Math.round(avgNew * 10) / 10, est_minutes: 0 }
-      } else if (avgNew >= 25) {
-        // Pagination still going strong — many more crawls likely
+      } else if (lastCrawlNew >= 25) {
+        // Last crawl still finding lots of new ads — many crawls left
         crawl_eta = { status: 'progressing', label: 'still discovering — many crawls left', avg_new_per_crawl: Math.round(avgNew * 10) / 10, est_minutes: null }
       } else {
-        // Trending toward 0 new — extrapolate. Each successive crawl finds
-        // half as many new ads (rough heuristic). Sum geometric series.
-        const remainingCrawls = Math.max(1, Math.ceil(Math.log2(Math.max(1, avgNew))))
+        // 3-24 new on last crawl — extrapolate using diminishing-returns curve.
+        const remainingCrawls = Math.max(1, Math.ceil(Math.log2(Math.max(1, lastCrawlNew))))
         const estMinutes = remainingCrawls * SCHEDULER_GAP_MIN
         crawl_eta = { status: 'estimating', label: `~${remainingCrawls} more crawl${remainingCrawls === 1 ? '' : 's'}`, avg_new_per_crawl: Math.round(avgNew * 10) / 10, est_minutes: estMinutes }
       }
