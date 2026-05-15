@@ -155,15 +155,15 @@ async function fetchPreview(pageId: string, limit: number) {
       locale: 'en-US',
     })
 
-    // Aggressive blocking — preview only needs the JSON in the initial HTML.
-    // Loading Meta's full UI (JS bundles, fonts, images, videos) would burn
-    // ~3-5 MB IPRoyal per preview call. With blocking: ~150 KB per preview.
+    // Targeted blocking — kill bandwidth hogs but allow Meta's React to
+    // render properly. Preview doesn't need pagination so blocking images
+    // is safer here than in the indexer, but we still allow them just in
+    // case future preview improvements need to scroll.
     await context.route('**/*', (route) => {
-      const t = route.request().resourceType()
       const url = route.request().url()
-      if (t === 'font' || t === 'stylesheet' || t === 'image' || t === 'media') return route.abort()
       if (url.includes('static.xx.fbcdn.net')) return route.abort()
       if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
+      if (url.includes('/groups/') || url.includes('/messenger/') || url.includes('/marketplace/')) return route.abort()
       return route.continue()
     })
 

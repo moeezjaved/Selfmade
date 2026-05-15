@@ -518,15 +518,19 @@ async function crawlBrand(opts: {
   await context.route('**/*', (route) => {
     const t = route.request().resourceType()
     const url = route.request().url()
-    // Aggressive blocking — these are pure overhead, none affect ad data
-    // extraction. Verified after 2026-05-15 incident where static.xx.fbcdn.net
-    // alone consumed 12 GB of IPRoyal bandwidth during one debug session.
-    if (t === 'font' || t === 'stylesheet') return route.abort()
-    if (t === 'image') return route.abort()                          // no images via indexer browser — worker handles those
-    if (t === 'media') return route.abort()                          // no videos either
-    if (url.includes('static.xx.fbcdn.net')) return route.abort()    // all of Meta's UI bundles
+    // Targeted blocking — kill the bandwidth hogs but DO NOT break Meta's
+    // React rendering. After 2026-05-15 we learned the hard way:
+    //   - Blocking static.xx.fbcdn.net saves the 12 GB UI-bundle waste
+    //   - Blocking ALL images/media broke pagination! Meta's ad grid needs
+    //     thumbnails to render → IntersectionObserver doesn't initialize →
+    //     pagination XHR never fires (verified with Arhaus: 30 ads, no
+    //     graphql_pagination responses across 2 crawls).
+    // Allow: images, fonts, stylesheets — small files, but React needs them
+    // Block: static UI bundles + tracking — pure overhead
+    if (url.includes('static.xx.fbcdn.net')) return route.abort()    // UI bundles (login, messenger, etc) — not needed
     if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
-    if (url.includes('/groups/') || url.includes('/messenger/')) return route.abort()
+    if (url.includes('/groups/') || url.includes('/messenger/') || url.includes('/marketplace/')) return route.abort()
+    if (t === 'media' && !url.includes('/v/t39') && !url.includes('/v/t45')) return route.abort()  // block non-creative videos
     return route.continue()
   })
 
