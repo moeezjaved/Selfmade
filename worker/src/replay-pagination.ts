@@ -155,6 +155,13 @@ async function main() {
       }
       console.log(`📄 Page ${pageNum}: HTTP ${r.status} | ${(text.length / 1024).toFixed(1)} KB | ${newAdIds.length} ads (${added} new) | has_next: ${moreAvailable} | ${dt}ms`)
 
+      // If response is suspiciously small (likely an error from Meta) OR no ads,
+      // dump the body so we can debug what Meta is saying.
+      if (text.length < 5000 || newAdIds.length === 0) {
+        console.warn(`   ⚠️ Small/empty response — body content (first 1500 chars):`)
+        console.warn(`   ${text.slice(0, 1500)}`)
+      }
+
       if (!r.ok || newAdIds.length === 0) {
         console.warn(`   ⚠️ Stopping — non-OK status or no ads in response`)
         break
