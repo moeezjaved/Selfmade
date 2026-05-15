@@ -687,7 +687,15 @@ async function main() {
 
   let brands: { page_id: string; term: string }[] = []
   if (arg && /^\d+$/.test(arg)) {
-    brands = [{ page_id: arg, term: '' }]
+    // Look up the brand name from DB so crawler_runs.brand_name is populated
+    // (otherwise the admin /admin/health dashboard shows "—" for these runs).
+    const { data } = await (supabase as any)
+      .from('discovery_crawl_terms')
+      .select('term')
+      .eq('page_id', arg)
+      .limit(1)
+      .maybeSingle()
+    brands = [{ page_id: arg, term: data?.term ?? '' }]
   } else {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
