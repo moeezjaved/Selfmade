@@ -39,20 +39,14 @@ async function gatherStats() {
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
 
   // ── Queue overview ──
-  const { data: qOverall } = await (supabase as any).rpc('count_queue_states').catch(() => ({ data: null }))
-  // RPC may not exist — fall back to plain queries
-  let queue: any
-  if (qOverall) queue = qOverall
-  else {
-    const [thumbed, fastReady, missing, marked, total] = await Promise.all([
-      countWhere('thumbnail_url', 'not.is', null),
-      countWhere('raw_image_urls', 'not.is', null, 'thumbnail_url', 'is', null),
-      countWhere('thumbnail_url', 'is', null),
-      countWhere('creative_extraction_failed_at', 'not.is', null),
-      countAll(),
-    ])
-    queue = { thumbed, fastReady, missing, marked, total }
-  }
+  const [thumbed, fastReady, missing, marked, total] = await Promise.all([
+    countWhere('thumbnail_url', 'not.is', null),
+    countWhere('raw_image_urls', 'not.is', null, 'thumbnail_url', 'is', null),
+    countWhere('thumbnail_url', 'is', null),
+    countWhere('creative_extraction_failed_at', 'not.is', null),
+    countAll(),
+  ])
+  const queue = { thumbed, fastReady, missing, marked, total }
 
   // ── Per-brand snapshot (top 10 active brands by remaining work) ──
   const { data: brands } = await (supabase as any)
