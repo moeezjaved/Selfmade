@@ -92,24 +92,24 @@ async function main() {
     const page = await context.newPage()
 
     // ── Capture the first GraphQL pagination POST ──
-    let template: CapturedTemplate | null = null
+    // Wrapped in object so closures can mutate without TS narrowing weirdness
+    const state: { template: CapturedTemplate | null } = { template: null }
+
     page.on('request', (req: PWRequest) => {
-      if (template) return
+      if (state.template) return
       if (req.method() !== 'POST') return
       if (!req.url().includes('/api/graphql/')) return
       const body = req.postData() ?? ''
       if (!body.includes('variables=')) return
-      // Parse body
       const parsed: Record<string, string> = {}
       for (const pair of body.split('&')) {
         const [k, ...v] = pair.split('=')
         if (k) parsed[decodeURIComponent(k)] = decodeURIComponent(v.join('=') ?? '')
       }
-      // Only accept if it has cursor or is the AdLibrarySearch query
       if (!parsed.variables) return
       if (!parsed.fb_api_req_friendly_name?.includes('AdLibrary') && !parsed.variables.includes('viewAllPageID')) return
 
-      template = {
+      state.template = {
         url: req.url(),
         headers: req.headers(),
         body,
@@ -120,17 +120,17 @@ async function main() {
       console.log(`📡 Captured pagination request template (${parsed.fb_api_req_friendly_name ?? 'unknown query'})`)
     })
 
-    // Also collect ad_ids + cursor from the FIRST pagination response
     page.on('response', async (resp) => {
-      if (!template || template.initialCursor) return
+      const t = state.template
+      if (!t || t.initialCursor) return
       if (!resp.url().includes('/api/graphql/')) return
       try {
         const body = await resp.text()
         const ids = extractAdIds(body)
         const cur = extractEndCursor(body)
         if (ids.length > 0 || cur) {
-          template.initialAdIds = ids
-          template.initialCursor = cur
+          t.initialAdIds = ids
+          t.initialCursor = cur
         }
       } catch { /* ignore */ }
     })
@@ -144,7 +144,7 @@ async function main() {
     // ── Trigger initial pagination via mouse wheel (so we capture template) ──
     console.log(`🖱️  Triggering initial pagination via scrolls...`)
     const viewport = page.viewportSize() ?? { width: 1440, height: 900 }
-    for (let i = 0; i < 8 && !template; i++) {
+    for (let i = 0; i < 8 && !state.template; i++) {
       await page.mouse.move(
         Math.floor(viewport.width * (0.3 + Math.random() * 0.4)),
         Math.floor(viewport.height * (0.4 + Math.random() * 0.3)),
@@ -154,6 +154,7 @@ async function main() {
     }
     await new Promise(r => setTimeout(r, 3_000))
 
+    const template = state.template
     if (!template) {
       console.error('❌ No pagination POST captured. Meta did not paginate from this session.')
       console.error('   This might mean Meta is gating us at the scroll-trigger level.')
