@@ -545,6 +545,7 @@ async function crawlBrand(opts: {
   // ads captured in one cursor-walked run vs 30 from scroll-only).
   type PaginationTemplate = { url: string; headers: Record<string, string>; parsedBody: Record<string, string> }
   const tplState: { template: PaginationTemplate | null } = { template: null }
+  const debugSeenGraphqlNames: string[] = []     // for diagnostic logging if no template found
   page.on('request', (req) => {
     if (tplState.template) return
     if (req.method() !== 'POST') return
@@ -558,8 +559,16 @@ async function crawlBrand(opts: {
     }
     if (!parsed.variables) return
     const friendly = parsed.fb_api_req_friendly_name ?? ''
-    if (!friendly.includes('PaginationQuery') && !friendly.includes('SearchResults')) return
+    debugSeenGraphqlNames.push(friendly || '(no name)')
+    // Accept any AdLibrary-related POST that has cursor-style pagination params.
+    // The exact friendly name varies (PaginationQuery, SearchResultsQuery, etc).
+    const isAdLib = friendly.toLowerCase().includes('adlibrary')
+    const hasCursor = parsed.variables.includes('cursor') || parsed.variables.includes('"first"')
+    const hasPageId = parsed.variables.includes('viewAllPageID') || parsed.variables.includes('pageID')
+    if (!isAdLib && !hasPageId) return
+    if (!hasCursor) return
     tplState.template = { url: req.url(), headers: req.headers(), parsedBody: parsed }
+    console.log(`  📡 Captured pagination template (friendly="${friendly}", has cursor: yes)`)
   })
 
   // ========== Response interception ==========
@@ -777,6 +786,15 @@ async function crawlBrand(opts: {
     console.error(`  ❌ Crawl error: ${e?.message}`)
     abortReason = `crawl_error: ${e?.message?.slice(0, 100)}`
     aborted = true   // mark as aborted so status='aborted' (was incorrectly staying 'success')
+  }
+
+  // Diagnostic: if we never captured a template, log what GraphQL POSTs we DID see
+  if (!tplState.template && debugSeenGraphqlNames.length > 0) {
+    const counts: Record<string, number> = {}
+    for (const n of debugSeenGraphqlNames) counts[n] = (counts[n] ?? 0) + 1
+    console.log(`  🔍 No template captured. GraphQL POSTs observed: ${JSON.stringify(counts)}`)
+  } else if (!tplState.template) {
+    console.log(`  🔍 No template captured. ZERO GraphQL POSTs observed during entire crawl — Meta is gating us.`)
   }
 
   // Save cookies for next run
