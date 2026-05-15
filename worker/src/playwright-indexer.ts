@@ -518,25 +518,11 @@ async function crawlBrand(opts: {
   // }
   const context = await browser.newContext(ctxOpts)
 
-  // Block static UI assets to save bandwidth
-  await context.route('**/*', (route) => {
-    const t = route.request().resourceType()
-    const url = route.request().url()
-    // Targeted blocking — kill the bandwidth hogs but DO NOT break Meta's
-    // React rendering. After 2026-05-15 we learned the hard way:
-    //   - Blocking static.xx.fbcdn.net saves the 12 GB UI-bundle waste
-    //   - Blocking ALL images/media broke pagination! Meta's ad grid needs
-    //     thumbnails to render → IntersectionObserver doesn't initialize →
-    //     pagination XHR never fires (verified with Arhaus: 30 ads, no
-    //     graphql_pagination responses across 2 crawls).
-    // Allow: images, fonts, stylesheets — small files, but React needs them
-    // Block: static UI bundles + tracking — pure overhead
-    if (url.includes('static.xx.fbcdn.net')) return route.abort()    // UI bundles (login, messenger, etc) — not needed
-    if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
-    if (url.includes('/groups/') || url.includes('/messenger/') || url.includes('/marketplace/')) return route.abort()
-    if (t === 'media' && !url.includes('/v/t39') && !url.includes('/v/t45')) return route.abort()  // block non-creative videos
-    return route.continue()
-  })
+  // ROUTE BLOCKING DISABLED 2026-05-16. Standalone tool with NO blocking
+  // captured 169 ads. Production with blocking gets 30 + zero GraphQL POSTs.
+  // Some blocked URL is preventing Meta's pagination loader from initializing.
+  // Cost trade-off: ~3 MB more bandwidth per crawl, but we get 5-7× more ads
+  // captured. Net better value per MB.
 
   const page = await context.newPage()
   const allAds = new Map<string, ExtractedAd>()
