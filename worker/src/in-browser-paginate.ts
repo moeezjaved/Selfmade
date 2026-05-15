@@ -107,7 +107,13 @@ async function main() {
         if (k) parsed[decodeURIComponent(k)] = decodeURIComponent(v.join('=') ?? '')
       }
       if (!parsed.variables) return
-      if (!parsed.fb_api_req_friendly_name?.includes('AdLibrary') && !parsed.variables.includes('viewAllPageID')) return
+      // Be SPECIFIC about which GraphQL query — pagination, not filter context.
+      // Verified via capture: friendly_name = "AdLibrarySearchPaginationQuery"
+      // is the one that returns the actual ad list with cursor pagination.
+      const friendly = parsed.fb_api_req_friendly_name ?? ''
+      if (!friendly.includes('PaginationQuery') && !friendly.includes('SearchResults')) return
+      // Extra safety: variables must contain the cursor-style pagination params
+      if (!parsed.variables.includes('cursor') && !parsed.variables.includes('"first"')) return
 
       state.template = {
         url: req.url(),
@@ -142,15 +148,20 @@ async function main() {
     await new Promise(r => setTimeout(r, 5_000))
 
     // ── Trigger initial pagination via mouse wheel (so we capture template) ──
-    console.log(`🖱️  Triggering initial pagination via scrolls...`)
+    console.log(`🖱️  Triggering initial pagination via scrolls (will scroll up to 20× until pagination XHR fires)...`)
     const viewport = page.viewportSize() ?? { width: 1440, height: 900 }
-    for (let i = 0; i < 8 && !state.template; i++) {
+    for (let i = 0; i < 20 && !state.template; i++) {
       await page.mouse.move(
         Math.floor(viewport.width * (0.3 + Math.random() * 0.4)),
         Math.floor(viewport.height * (0.4 + Math.random() * 0.3)),
       ).catch(() => {})
       await page.mouse.wheel(0, 1500 + Math.floor(Math.random() * 800)).catch(() => {})
       await new Promise(r => setTimeout(r, 1500 + Math.random() * 1000))
+      if (i === 5 || i === 10) {
+        // Bounce up then down — some lazy-loaders fire on direction change
+        await page.mouse.wheel(0, -1200).catch(() => {})
+        await new Promise(r => setTimeout(r, 800))
+      }
     }
     await new Promise(r => setTimeout(r, 3_000))
 
