@@ -183,103 +183,98 @@ async function main() {
     // ── Replay pagination INSIDE the browser ──
     const allIds = new Set<string>(template.initialAdIds)
 
-    const result = await page.evaluate(async ({ tpl, startCursor, maxPages }) => {
-      const out: Array<{
-        page: number
-        status: number
-        bodySize: number
-        ads: number
-        newAds: number
-        cursor: string | null
-        hasNext: boolean
-        elapsedMs: number
-        error?: string
-        bodyPreview?: string
-      }> = []
+    // Pass the pagination logic as a STRING to avoid tsx __name helper
+    // injection, which doesn't exist in browser context. The body executes
+    // as plain JS in the page, with credentials: 'include' attaching
+    // cookies automatically.
+    const evalScript = `
+      (async () => {
+        const tpl = ${JSON.stringify(template)};
+        const maxPages = ${MAX_PAGES};
+        const out = [];
+        const seenIds = new Set(tpl.initialAdIds);
+        let cursor = tpl.initialCursor;
+        let reqCounter = parseInt(tpl.parsedBody.__req || '0', 10);
 
-      const seenIds = new Set<string>(tpl.initialAdIds)
-      let cursor: string | null = startCursor
-      let reqCounter = parseInt(tpl.parsedBody.__req || '0', 10)
+        const extractAdIds = (body) => {
+          const ids = [];
+          const re = /"ad_archive_id"\\s*:\\s*"(\\d{10,})"/g;
+          let m;
+          while ((m = re.exec(body)) !== null) ids.push(m[1]);
+          return ids;
+        };
+        const extractEndCursor = (body) => {
+          const m = body.match(/"end_cursor"\\s*:\\s*"([^"]+)"/);
+          return m ? m[1] : null;
+        };
+        const hasNext = (body) => {
+          const m = body.match(/"has_next_page"\\s*:\\s*(true|false)/);
+          return m ? m[1] === 'true' : false;
+        };
 
-      // Use arrow consts (not function declarations) to avoid tsx's
-      // __name helper injection which doesn't exist in browser context.
-      const extractAdIdsB = (body: string) => {
-        const ids: string[] = []
-        const re = /"ad_archive_id"\s*:\s*"(\d{10,})"/g
-        let m: RegExpExecArray | null
-        while ((m = re.exec(body)) !== null) ids.push(m[1])
-        return ids
-      }
-      const extractEndCursorB = (body: string) => {
-        const m = body.match(/"end_cursor"\s*:\s*"([^"]+)"/)
-        return m ? m[1] : null
-      }
-      const hasNextB = (body: string) => {
-        const m = body.match(/"has_next_page"\s*:\s*(true|false)/)
-        return m ? m[1] === 'true' : false
-      }
+        for (let pageNum = 1; pageNum <= maxPages && cursor; pageNum++) {
+          const t0 = performance.now();
+          const params = Object.assign({}, tpl.parsedBody);
+          try {
+            const v = JSON.parse(params.variables);
+            v.cursor = cursor;
+            params.variables = JSON.stringify(v);
+          } catch (e) {
+            out.push({ page: pageNum, status: 0, bodySize: 0, ads: 0, newAds: 0, cursor: null, hasNext: false, elapsedMs: 0, error: 'parse_vars: ' + e.message });
+            break;
+          }
+          reqCounter++;
+          params.__req = String(reqCounter);
+          params.__spin_t = String(Math.floor(Date.now() / 1000));
 
-      for (let pageNum = 1; pageNum <= maxPages && cursor; pageNum++) {
-        const t0 = performance.now()
+          const newBody = Object.entries(params)
+            .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
+            .join('&');
 
-        // Build new body — splice cursor, increment __req, refresh __spin_t
-        const params: Record<string, string> = { ...tpl.parsedBody }
-        try {
-          const v = JSON.parse(params.variables)
-          v.cursor = cursor
-          params.variables = JSON.stringify(v)
-        } catch (e: any) {
-          out.push({ page: pageNum, status: 0, bodySize: 0, ads: 0, newAds: 0, cursor: null, hasNext: false, elapsedMs: 0, error: 'cant parse variables: ' + e.message })
-          break
+          try {
+            const r = await fetch(tpl.url, {
+              method: 'POST',
+              credentials: 'include',
+              headers: tpl.headers,
+              body: newBody,
+            });
+            const text = await r.text();
+            const ids = extractAdIds(text);
+            const nextCursor = extractEndCursor(text);
+            const more = hasNext(text);
+            let added = 0;
+            for (const id of ids) if (!seenIds.has(id)) { seenIds.add(id); added++; }
+
+            const entry = {
+              page: pageNum,
+              status: r.status,
+              bodySize: text.length,
+              ads: ids.length,
+              newAds: added,
+              cursor: nextCursor,
+              hasNext: more,
+              elapsedMs: Math.round(performance.now() - t0),
+            };
+            if (text.length < 5000) entry.bodyPreview = text.slice(0, 800);
+            out.push(entry);
+
+            if (!r.ok || ids.length === 0) break;
+            if (!more || !nextCursor) break;
+            cursor = nextCursor;
+            await new Promise(res => setTimeout(res, 1200 + Math.random() * 800));
+          } catch (e) {
+            out.push({ page: pageNum, status: 0, bodySize: 0, ads: 0, newAds: 0, cursor: null, hasNext: false, elapsedMs: Math.round(performance.now() - t0), error: (e && e.message) || String(e) });
+            break;
+          }
         }
-        reqCounter++
-        params.__req = String(reqCounter)
-        params.__spin_t = String(Math.floor(Date.now() / 1000))
 
-        const newBody = Object.entries(params)
-          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-          .join('&')
-
-        try {
-          const r = await fetch(tpl.url, {
-            method: 'POST',
-            credentials: 'include',
-            headers: tpl.headers,
-            body: newBody,
-          })
-          const text = await r.text()
-          const ids = extractAdIdsB(text)
-          const nextCursor = extractEndCursorB(text)
-          const more = hasNextB(text)
-          let added = 0
-          for (const id of ids) if (!seenIds.has(id)) { seenIds.add(id); added++ }
-
-          out.push({
-            page: pageNum,
-            status: r.status,
-            bodySize: text.length,
-            ads: ids.length,
-            newAds: added,
-            cursor: nextCursor,
-            hasNext: more,
-            elapsedMs: Math.round(performance.now() - t0),
-            ...(text.length < 5000 ? { bodyPreview: text.slice(0, 800) } : {}),
-          })
-
-          if (!r.ok || ids.length === 0) break
-          if (!more || !nextCursor) break
-          cursor = nextCursor
-
-          // Polite spacing — match user-like cadence
-          await new Promise(res => setTimeout(res, 1200 + Math.random() * 800))
-        } catch (e: any) {
-          out.push({ page: pageNum, status: 0, bodySize: 0, ads: 0, newAds: 0, cursor: null, hasNext: false, elapsedMs: Math.round(performance.now() - t0), error: e?.message ?? String(e) })
-          break
-        }
-      }
-
-      return { pages: out, totalUnique: seenIds.size }
-    }, { tpl: template, startCursor: template.initialCursor, maxPages: MAX_PAGES })
+        return { pages: out, totalUnique: seenIds.size };
+      })()
+    `
+    const result = await page.evaluate<{
+      pages: Array<{ page: number; status: number; bodySize: number; ads: number; newAds: number; cursor: string | null; hasNext: boolean; elapsedMs: number; error?: string; bodyPreview?: string }>
+      totalUnique: number
+    }>(evalScript)
 
     // ── Print results ──
     console.log()
