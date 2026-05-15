@@ -30,14 +30,20 @@ export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<
   // Need ads that have NEITHER an R2 thumbnail NOR an R2 video,
   // AND haven't already been marked as un-extractable.
   // Prioritize ACTIVE ads first (they extract successfully much more often).
+  // FAST-PATH ONLY: only claim ads where the indexer has already extracted
+  // raw fbcdn URLs from the GraphQL listing payload. Legacy DOM extraction
+  // through Playwright is removed entirely — it cost ~2-3 MB per ad through
+  // proxy and we proved at scale (2026-05-15) it burns through bandwidth
+  // catastrophically. Brands with ads that lack raw_image_urls AND
+  // raw_video_urls just sit until the indexer re-crawls them.
   let query: any = supabase
     .from('discovery_ads_index')
     .select('ad_id, snapshot_url, format, page_name, raw_image_urls, raw_video_urls, raw_video_preview_urls')
-    .not('snapshot_url', 'is', null)
     .is('thumbnail_url', null)
     .is('video_url', null)
     .is('creative_extraction_failed_at', null)
-    .order('is_active', { ascending: false })  // active first
+    .or('raw_image_urls.not.is.null,raw_video_urls.not.is.null')   // require at least one raw URL set
+    .order('is_active', { ascending: false })
     .order('last_seen', { ascending: false })
     .limit(batchSize)
 
