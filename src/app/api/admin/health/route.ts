@@ -54,6 +54,15 @@ export async function GET() {
       .limit(50),
   ])
 
+  // ── Currently-running crawler (if any) ──
+  const { data: runningRows } = await admin
+    .from('crawler_runs')
+    .select('brand_name, brand_page_id, started_at')
+    .eq('status', 'running')
+    .order('started_at', { ascending: false })
+    .limit(1)
+  const currentlyRunning = runningRows?.[0] ?? null
+
   const successPct = (rows: any[] | null) => {
     if (!rows || rows.length === 0) return null
     const ok = rows.filter(r => r.status === 'success').length
@@ -76,6 +85,36 @@ export async function GET() {
     .not('page_id', 'is', null)
     .order('last_crawled_at', { ascending: true, nullsFirst: true })
     .limit(20)
+
+  // ── Next-crawl ETA computation ──
+  // Scheduler picks oldest last_crawled_at first, with 45-min min gap per brand
+  // (SCHEDULER_MIN_BRAND_GAP_MIN). Scheduler also pauses 3 min between brand runs
+  // (SCHEDULER_BETWEEN_PAUSE_MIN). We approximate "when will the next crawl start".
+  const SCHEDULER_GAP_MIN = parseInt(process.env.SCHEDULER_MIN_BRAND_GAP_MIN ?? '45', 10)
+  const nextBrand = (brandList ?? [])[0] as any
+  let nextCrawl: any = null
+  if (nextBrand) {
+    if (nextBrand.last_crawled_at === null) {
+      nextCrawl = {
+        brand: nextBrand.term,
+        page_id: nextBrand.page_id,
+        eligible_at: now.toISOString(),
+        eta_seconds: 0,
+        reason: 'never crawled — picked next cycle',
+      }
+    } else {
+      const lastMs = new Date(nextBrand.last_crawled_at).getTime()
+      const eligibleMs = lastMs + SCHEDULER_GAP_MIN * 60_000
+      const etaSeconds = Math.max(0, Math.round((eligibleMs - Date.now()) / 1000))
+      nextCrawl = {
+        brand: nextBrand.term,
+        page_id: nextBrand.page_id,
+        eligible_at: new Date(eligibleMs).toISOString(),
+        eta_seconds: etaSeconds,
+        reason: etaSeconds > 0 ? `cooldown — ${SCHEDULER_GAP_MIN}m gap per brand` : 'eligible — waiting for scheduler tick',
+      }
+    }
+  }
 
   const brandStats: any[] = []
   for (const b of (brandList ?? []).slice(0, 10) as any[]) {
@@ -185,6 +224,13 @@ export async function GET() {
         note: 'Inferred from new thumbnails added in last 60 min',
       },
     },
+    currently_running: currentlyRunning ? {
+      brand: (currentlyRunning as any).brand_name ?? null,
+      page_id: (currentlyRunning as any).brand_page_id ?? null,
+      started_at: (currentlyRunning as any).started_at,
+      elapsed_seconds: Math.round((Date.now() - new Date((currentlyRunning as any).started_at).getTime()) / 1000),
+    } : null,
+    next_crawl: nextCrawl,
     brands: brandStats,
     recent_runs: (runs24h ?? []).slice(0, 10).map((r: any) => ({
       brand_name: r.brand_name,
