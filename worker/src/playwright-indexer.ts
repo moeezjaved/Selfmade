@@ -42,13 +42,14 @@ const MIN_SUCCESS_RATE = 0.30
 const SUCCESS_RATE_WINDOW = 50  // last N ads checked
 
 // Per-brand budget
-const PER_BRAND_TIME_BUDGET_MS = 60_000   // 60s of scrolling per brand per run
-const MAX_SCROLLS_PER_BRAND = 30          // hard cap
-const SCROLL_DELAY_MIN_MS = 2_000
-const SCROLL_DELAY_MAX_MS = 8_000
+const PER_BRAND_TIME_BUDGET_MS = 240_000  // 4 min — we hit this often during pagination
+const MAX_SCROLLS_PER_BRAND = 60          // hard cap (was 30 — most listings have ~1500 ads)
+const SCROLL_DELAY_MIN_MS = 2_500
+const SCROLL_DELAY_MAX_MS = 5_000         // tighter range — we want pagination to fire faster
 
 // Pagination
-const TARGET_ADS_PER_BRAND = 200          // stop early if we got enough new ads
+const TARGET_ADS_PER_BRAND = 1500         // bumped after fixing pagination scroll — Hims has ~2800 visible ads
+                                          // and crawls now ingest ~10/scroll, so 1500 is reachable in ~3-5 min
 const MAX_AD_BYTES_TO_STORE = 800_000     // truncate huge responses for archive
 
 // ========== Types ==========
@@ -79,9 +80,15 @@ interface ExtractedAd {
   cta_text?: string
   caption?: string
   link_url?: string
-  image_urls: string[]
-  video_urls: string[]
-  raw: any   // keep raw object for debugging / future field additions
+  image_urls: string[]               // ALL image URLs found (includes placeholders) — kept for backwards compat
+  video_urls: string[]               // ALL video URLs found
+  // Structured extraction from snapshot.images / videos / cards (verified
+  // schema 2026-05-14, see analyze-payload.ts output). These are the URLs
+  // the worker's fast path downloads directly via proxy.
+  raw_image_urls: string[]           // snapshot.images[].original_image_url + cards[].original_image_url
+  raw_video_urls: string[]           // snapshot.videos[].video_hd_url||video_sd_url + cards[].video_hd_url||video_sd_url
+  raw_video_preview_urls: string[]   // snapshot.videos[].video_preview_image_url + cards[].video_preview_image_url
+  raw: any                           // keep raw object for debugging / future field additions
 }
 
 // ========== Utilities ==========
@@ -189,24 +196,7 @@ function extractAdsFromText(text: string): ExtractedAd[] {
     if (!obj.ad_archive_id) continue
 
     const snap = obj.snapshot || {}
-    const imgs: string[] = []
-    const vids: string[] = []
-
-    // Walk snapshot for any fbcdn-looking URLs (covers many shapes:
-    // images[], videos[], cards[].image_url, etc).
-    const collectMedia = (node: any, depth = 0) => {
-      if (depth > 6 || node === null || node === undefined) return
-      if (typeof node === 'string') {
-        if (node.includes('fbcdn.net') || node.includes('scontent')) {
-          if (/\.(mp4|webm)/i.test(node)) vids.push(node)
-          else if (/\.(jpg|jpeg|png|webp)/i.test(node)) imgs.push(node)
-        }
-        return
-      }
-      if (Array.isArray(node)) { node.forEach(n => collectMedia(n, depth + 1)); return }
-      if (typeof node === 'object') Object.values(node).forEach(v => collectMedia(v, depth + 1))
-    }
-    collectMedia(snap)
+    const media = extractMediaUrls(snap)
 
     found.push({
       ad_archive_id: obj.ad_archive_id,
@@ -220,12 +210,132 @@ function extractAdsFromText(text: string): ExtractedAd[] {
       cta_text: snap.cta_text,
       caption: snap.caption,
       link_url: snap.link_url,
-      image_urls: Array.from(new Set(imgs)),
-      video_urls: Array.from(new Set(vids)),
+      image_urls: media.allImages,
+      video_urls: media.allVideos,
+      raw_image_urls: media.rawImages,
+      raw_video_urls: media.rawVideos,
+      raw_video_preview_urls: media.rawVideoPreviews,
       raw: obj,
     })
   }
   return found
+}
+
+/**
+ * Pull creative URLs out of a snapshot using the verified GraphQL schema.
+ *
+ * Sources (in priority order — first non-empty wins):
+ *   - snapshot.images[].original_image_url           (full-resolution image)
+ *   - snapshot.images[].resized_image_url            (s600x600 fallback)
+ *   - snapshot.videos[].video_hd_url                 (HD MP4)
+ *   - snapshot.videos[].video_sd_url                 (SD fallback)
+ *   - snapshot.videos[].video_preview_image_url      (poster frame)
+ *   - snapshot.cards[].original_image_url            (carousel slides)
+ *   - snapshot.cards[].video_hd_url || video_sd_url  (carousel video slides)
+ *   - snapshot.extra_images[] / extra_videos[]       (variant cuts)
+ *
+ * The "raw" buckets contain ONLY structured creative URLs we trust. The
+ * "all" buckets retain the legacy fbcdn-walking behaviour for backwards
+ * compatibility (and to capture profile pictures etc. for debugging).
+ */
+function extractMediaUrls(snap: any): {
+  rawImages: string[]
+  rawVideos: string[]
+  rawVideoPreviews: string[]
+  allImages: string[]
+  allVideos: string[]
+} {
+  const rawImages = new Set<string>()
+  const rawVideos = new Set<string>()
+  const rawVideoPreviews = new Set<string>()
+
+  function pushImage(...candidates: any[]) {
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.startsWith('http') && c.includes('fbcdn')) {
+        rawImages.add(c)
+        return            // first non-empty wins per call
+      }
+    }
+  }
+  function pushVideo(...candidates: any[]) {
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.startsWith('http') && c.includes('fbcdn')) {
+        rawVideos.add(c)
+        return
+      }
+    }
+  }
+  function pushPreview(...candidates: any[]) {
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.startsWith('http') && c.includes('fbcdn')) {
+        rawVideoPreviews.add(c)
+        return
+      }
+    }
+  }
+
+  // images[] → prefer original (no size tag = full res), fallback to resized
+  if (Array.isArray(snap?.images)) {
+    for (const img of snap.images) {
+      pushImage(img?.original_image_url, img?.resized_image_url)
+    }
+  }
+  // videos[] → prefer HD, fallback to SD; also grab poster frame
+  if (Array.isArray(snap?.videos)) {
+    for (const v of snap.videos) {
+      pushVideo(v?.video_hd_url, v?.video_sd_url)
+      pushPreview(v?.video_preview_image_url)
+    }
+  }
+  // cards[] → carousel slides; each card may have BOTH image and video fields
+  if (Array.isArray(snap?.cards)) {
+    for (const card of snap.cards) {
+      pushImage(card?.original_image_url, card?.resized_image_url)
+      pushVideo(card?.video_hd_url, card?.video_sd_url)
+      pushPreview(card?.video_preview_image_url)
+    }
+  }
+  // extra_images[] / extra_videos[] — variant cuts (less common)
+  if (Array.isArray(snap?.extra_images)) {
+    for (const img of snap.extra_images) {
+      pushImage(img?.original_image_url, img?.resized_image_url)
+    }
+  }
+  if (Array.isArray(snap?.extra_videos)) {
+    for (const v of snap.extra_videos) {
+      pushVideo(v?.video_hd_url, v?.video_sd_url)
+      pushPreview(v?.video_preview_image_url)
+    }
+  }
+
+  // Legacy walker — captures profile pics etc. Kept for diagnostic completeness;
+  // worker's fast path uses only the rawImages/rawVideos sets above.
+  const allImages = new Set<string>()
+  const allVideos = new Set<string>()
+  function walk(node: any, depth = 0) {
+    if (depth > 6 || node === null || node === undefined) return
+    if (typeof node === 'string') {
+      if (node.includes('fbcdn.net') || node.includes('scontent')) {
+        if (/\.(mp4|webm)/i.test(node) || node.includes('video.xx') || node.includes('/v/t2/')) {
+          allVideos.add(node)
+        } else if (/\.(jpg|jpeg|png|webp)/i.test(node)) {
+          allImages.add(node)
+        }
+      }
+      return
+    }
+    if (Array.isArray(node)) { node.forEach(n => walk(n, depth + 1)); return }
+    if (typeof node === 'object') Object.values(node).forEach(v => walk(v, depth + 1))
+  }
+  walk(snap)
+
+  return {
+    rawImages: Array.from(rawImages),
+    rawVideos: Array.from(rawVideos),
+    rawVideoPreviews: Array.from(rawVideoPreviews),
+    allImages: Array.from(allImages),
+    allVideos: Array.from(allVideos),
+  }
 }
 
 function extractCursors(text: string): string[] {
@@ -264,7 +374,7 @@ async function archiveRawResponse(args: {
       status_code: args.status,
       bytes: args.body.length,
       body_sha256: bodyHash,
-      body_text: args.body.slice(0, 200_000),  // truncate to 200KB
+      body_text: args.body.slice(0, 1_500_000),  // truncate to 1.5MB (most Meta ad-library responses are 600-900KB; need full body for offline analysis of media fields)
       ad_ids_count: args.adIdsCount,
       cursors: args.cursors.slice(0, 5),
     })
@@ -277,8 +387,10 @@ async function archiveRawResponse(args: {
 async function saveAdsToIndex(ads: ExtractedAd[]): Promise<{ inserted: number; existed: number }> {
   if (ads.length === 0) return { inserted: 0, existed: 0 }
 
-  // Build snapshot URLs for the worker (using public web URL, no token!)
-  // Worker will load this to extract creatives, then save to R2.
+  // Build rows with structured raw URLs lifted from GraphQL payload.
+  // Worker's fast path uses raw_image_urls / raw_video_urls instead of
+  // launching Playwright per-ad. Falls back to snapshot_url + DOM only
+  // when these arrays are NULL (legacy ads from before migration 013).
   const rows = ads.map(ad => ({
     ad_id: ad.ad_archive_id,
     page_id: ad.page_id,
@@ -293,25 +405,48 @@ async function saveAdsToIndex(ads: ExtractedAd[]): Promise<{ inserted: number; e
     start_date: ad.start_date_string || null,
     stop_date: ad.end_date_string || null,
     last_seen: new Date().toISOString(),
+    raw_image_urls:         ad.raw_image_urls.length         > 0 ? ad.raw_image_urls         : null,
+    raw_video_urls:         ad.raw_video_urls.length         > 0 ? ad.raw_video_urls         : null,
+    raw_video_preview_urls: ad.raw_video_preview_urls.length > 0 ? ad.raw_video_preview_urls : null,
   }))
 
-  // Detect new vs existing — count via upsert without on conflict do nothing
+  // Split into NEW (insert) and EXISTING (update raw URLs only — keep
+  // existing thumbnails/etc untouched).
   const adIds = ads.map(a => a.ad_archive_id)
   const { data: existing } = await (supabase as any)
     .from('discovery_ads_index')
     .select('ad_id')
     .in('ad_id', adIds)
   const existingIds = new Set((existing || []).map((r: any) => r.ad_id))
-  const newRows = rows.filter(r => !existingIds.has(r.ad_id))
-  const existed = rows.length - newRows.length
+  const newRows      = rows.filter(r => !existingIds.has(r.ad_id))
+  const existedRows  = rows.filter(r =>  existingIds.has(r.ad_id))
 
   if (newRows.length > 0) {
     const { error } = await (supabase as any)
       .from('discovery_ads_index')
       .upsert(newRows, { onConflict: 'ad_id' })
-    if (error) console.warn(`[save-ads] upsert error: ${error.message}`)
+    if (error) console.warn(`[save-ads] insert error: ${error.message}`)
   }
-  return { inserted: newRows.length, existed }
+
+  // Backfill raw URLs onto existing rows. Critical for the migration: most
+  // discovered ads predate migration 013 and have raw_*_urls = NULL. As
+  // soon as the indexer re-sees them, we populate the columns and the
+  // worker's fast path picks them up.
+  for (const row of existedRows) {
+    if (!row.raw_image_urls && !row.raw_video_urls) continue  // nothing to backfill
+    const { error } = await (supabase as any)
+      .from('discovery_ads_index')
+      .update({
+        raw_image_urls: row.raw_image_urls,
+        raw_video_urls: row.raw_video_urls,
+        raw_video_preview_urls: row.raw_video_preview_urls,
+        last_seen: row.last_seen,
+      })
+      .eq('ad_id', row.ad_id)
+    if (error) console.warn(`[save-ads] backfill error ${row.ad_id}: ${error.message}`)
+  }
+
+  return { inserted: newRows.length, existed: existedRows.length }
 }
 
 // ========== Main per-brand crawl ==========
@@ -467,9 +602,39 @@ async function crawlBrand(opts: {
         console.log(`  🎯 Reached target of ${TARGET_ADS_PER_BRAND} ads`)
         break
       }
-      await page.evaluate(() => window.scrollBy(0, 1500)).catch(() => {})
+      // ── Multi-strategy scroll ──
+      // Window-level scroll often doesn't trigger Meta's IntersectionObserver
+      // because the ad list uses an inner scrollable container. We try every
+      // strategy in sequence so at least one fires Meta's pagination loader.
+      await page.evaluate(() => {
+        // 1. Outer window scroll — works when body is the scrollable element
+        window.scrollTo(0, document.body.scrollHeight)
+        // 2. Walk every scrollable element and push to bottom
+        const all = document.querySelectorAll<HTMLElement>('*')
+        for (let i = 0; i < all.length; i++) {
+          const el = all[i]
+          const cs = getComputedStyle(el)
+          if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 100) {
+            el.scrollTop = el.scrollHeight
+          }
+        }
+        // 3. Dispatch a wheel event in case Meta listens for that
+        window.dispatchEvent(new WheelEvent('wheel', { deltaY: 2000 }))
+      }).catch(() => {})
+
+      // 4. Keyboard End-key fallback (also triggers focus-based scroll)
+      await page.keyboard.press('End').catch(() => {})
+
       metrics.scrollCount++
       await sleep(randomDelay())
+
+      // 5. Bounce-scroll: scroll up a bit then back to bottom — many lazy-loaders
+      // fire on direction-change rather than absolute position.
+      if (scrollIdx % 3 === 0) {
+        await page.evaluate(() => window.scrollBy(0, -800)).catch(() => {})
+        await sleep(500)
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => {})
+      }
     }
   } catch (e: any) {
     console.error(`  ❌ Crawl error: ${e?.message}`)
