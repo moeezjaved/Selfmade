@@ -22,6 +22,7 @@
 import { ProxyAgent } from 'undici'
 import { fetch as undiciFetch } from 'undici'
 import { startProxyChain, proxyChainEnabled } from './proxy-chain.js'
+import { pickProxy, openProxyChain, recordEvent, proxyPoolEnabled } from './proxy-pool.js'
 
 const PLACEHOLDER_BYTES = 2_000   // anything smaller is the gated 1087-byte placeholder
 
@@ -70,13 +71,25 @@ export async function downloadAssetsForAd(opts: {
 
   let proxy: { url: string; close: () => Promise<void> } | null = null
   let proxyDispatcher: ProxyAgent | null = null
+  let pickedPoolProxyId: string | null = null
 
   try {
     // Only set up proxy if we have images to fetch (videos go direct)
-    if (imageUrls.length > 0 && proxyChainEnabled) {
-      const sid = sessionIdFor(opts.adId)
-      proxy = await startProxyChain({ sessionId: sid, lifetime: '10m', country: 'us' })
-      proxyDispatcher = new ProxyAgent(proxy.url)
+    if (imageUrls.length > 0) {
+      // Pool first (USE_PROXY_POOL=true + DB has rows), IPRoyal fallback
+      if (proxyPoolEnabled) {
+        const p = await pickProxy()
+        if (p) {
+          proxy = await openProxyChain(p)
+          proxyDispatcher = new ProxyAgent(proxy.url)
+          pickedPoolProxyId = p.id
+        }
+      }
+      if (!proxy && proxyChainEnabled) {
+        const sid = sessionIdFor(opts.adId)
+        proxy = await startProxyChain({ sessionId: sid, lifetime: '10m', country: 'us' })
+        proxyDispatcher = new ProxyAgent(proxy.url)
+      }
     }
 
     async function fetchOne(url: string, contentType: string, useProxy: boolean): Promise<DownloadedAsset | null> {
@@ -120,11 +133,22 @@ export async function downloadAssetsForAd(opts: {
 
     const successfulImages = images.filter((a): a is DownloadedAsset => a !== null)
     const successfulVideos = videos.filter((a): a is DownloadedAsset => a !== null)
+    const bytesProxyTotal = successfulImages.reduce((s, a) => s + a.bytes_proxy, 0)
+
+    // Log per-ad asset event to the pool if we used a pool proxy
+    if (pickedPoolProxyId) {
+      recordEvent({
+        proxyId: pickedPoolProxyId,
+        kind: 'asset',
+        bytes: bytesProxyTotal,
+        brandPageId: opts.adId,
+      })
+    }
 
     return {
       images: successfulImages,
       videos: successfulVideos,
-      bytes_proxy_total: successfulImages.reduce((s, a) => s + a.bytes_proxy, 0),
+      bytes_proxy_total: bytesProxyTotal,
       bytes_droplet_total: successfulVideos.reduce((s, a) => s + a.bytes_droplet, 0),
     }
   } finally {
