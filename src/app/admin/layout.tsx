@@ -15,6 +15,7 @@ const NAV = [
   { href: '/admin/workers', label: 'Workers', icon: '⚙️' },
   { href: '/admin/health', label: 'System Health', icon: '🏥' },
   { href: '/admin/tokens', label: 'Token Pool', icon: '🔑' },
+  { href: '/admin/proxy-pool', label: 'Proxy Pool', icon: '🔀' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
