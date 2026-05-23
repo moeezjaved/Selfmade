@@ -179,10 +179,10 @@ async function main() {
             break;
           }
         }
-        return { pages: out, totalUnique: seenIds.size };
+        return { pages: out, totalUnique: seenIds.size, ids: Array.from(seenIds) };
       })()
     `
-    const result = await page.evaluate<{ pages: any[]; totalUnique: number }>(evalScript)
+    const result = await page.evaluate<{ pages: any[]; totalUnique: number; ids: string[] }>(evalScript)
 
     console.log(`\n══════════════════════════════════════════`)
     console.log(`📊 PAGINATION RESULTS`)
@@ -193,6 +193,10 @@ async function main() {
       } else {
         console.log(`📄 Page ${p.page}: HTTP ${p.status} | ${p.kb} KB | ${p.ads} ads (${p.newAds} new) | has_next=${p.hasNext} | ${p.ms}ms`)
       }
+    }
+    console.log(`\n🔗 Ad Library URLs (spot-check these):`)
+    for (const id of result.ids) {
+      console.log(`   https://www.facebook.com/ads/library/?id=${id}`)
     }
     console.log(`\nTotal unique ads: ${result.totalUnique}`)
     console.log(`Pages requested:  ${result.pages.length}`)
