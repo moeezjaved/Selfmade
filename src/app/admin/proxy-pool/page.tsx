@@ -166,13 +166,19 @@ export default function ProxyPoolPage() {
         <form
           onSubmit={(e) => { e.preventDefault(); addProxy(new FormData(e.currentTarget)) }}
           style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginTop: 12 }}
+          autoComplete="off"
         >
+          {/* Honeypot fields to deter Chrome's password autofill heuristic
+              from filling the real username/password fields below. */}
+          <input type="text" name="prevent_autofill" autoComplete="off" style={{ display: 'none' }} />
+          <input type="password" name="password_fake" autoComplete="new-password" style={{ display: 'none' }} />
+
           <Field name="label" label="Label" placeholder="PC-comcast-1" required />
           <Field name="provider" label="Provider" defaultValue="proxycheap" />
           <Field name="host" label="Host (IP)" placeholder="48.45.152.95" required />
           <Field name="port" label="Port" placeholder="41968" required />
-          <Field name="username" label="Username" required />
-          <Field name="password" label="Password" type="password" required />
+          <Field name="username" label="Proxy username" autoComplete="off" required />
+          <Field name="password" label="Proxy password" type="text" autoComplete="off" required />
           <Field name="country" label="Country" placeholder="US" />
           <Field name="isp" label="ISP" placeholder="Comcast" />
           <div style={{ gridColumn: 'span 2' }}>
