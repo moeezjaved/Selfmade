@@ -29,6 +29,7 @@ import path from 'node:path'
 import { randomBytes, createHash } from 'node:crypto'
 import { supabase } from './db.js'
 import { startProxyChain, proxyChainEnabled } from './proxy-chain.js'
+import { pickProxy, openProxyChain, recordEvent, proxyPoolEnabled, type PoolProxy } from './proxy-pool.js'
 
 chromium.use(StealthPlugin())
 
@@ -477,9 +478,22 @@ async function crawlBrand(opts: {
     status: 'running',
   })
 
-  const proxy = proxyChainEnabled
-    ? await startProxyChain({ sessionId, lifetime: '1h', country: 'us' })
-    : null
+  // Try the proxy pool first (USE_PROXY_POOL=true + DB has enabled rows).
+  // If pool returns nothing, fall back to legacy IPRoyal sticky session.
+  // This keeps IPRoyal as a zero-config fallback during rollout.
+  let pickedPoolProxy: PoolProxy | null = null
+  let proxy: { url: string; close: () => Promise<void> } | null = null
+  if (proxyPoolEnabled) {
+    pickedPoolProxy = await pickProxy()
+    if (pickedPoolProxy) {
+      proxy = await openProxyChain(pickedPoolProxy)
+      console.log(`  🔀 proxy-pool: ${pickedPoolProxy.label} (${pickedPoolProxy.host}:${pickedPoolProxy.port})`)
+    }
+  }
+  if (!proxy && proxyChainEnabled) {
+    proxy = await startProxyChain({ sessionId, lifetime: '1h', country: 'us' })
+    console.log(`  🔀 iproyal-fallback (session ${sessionId})`)
+  }
 
   // Chromium "new headless" mode (--headless=new). The OLD headless mode is
   // detectable by Meta — verified 2026-05-15: Arhaus pagination XHR never
@@ -780,6 +794,20 @@ async function crawlBrand(opts: {
   await context.close().catch(() => {})
   await browser.close().catch(() => {})
   if (proxy) await proxy.close().catch(() => {})
+
+  // Log crawl outcome to proxy pool (one event per brand crawl).
+  // Drives the per-IP latency / error-rate stats on the admin dashboard.
+  if (pickedPoolProxy) {
+    const durMs = Date.now() - metrics.startedAt
+    recordEvent({
+      proxyId: pickedPoolProxy.id,
+      kind: aborted ? 'error' : 'crawl',
+      latencyMs: durMs,
+      bytes: metrics.bytesThroughProxy,
+      brandPageId: opts.pageId,
+      errorMessage: aborted ? (abortReason || 'aborted') : null,
+    })
+  }
 
   // ========== Save to DB ==========
   metrics.adsDiscovered = allAds.size
