@@ -613,12 +613,22 @@ async function crawlBrand(opts: {
         cursors,
       })
 
-      // Add to in-memory map (dedupe by ad_id)
+      // Add to in-memory map (dedupe by ad_id).
+      // IMPORTANT: ad_archive_id appears multiple times per ad in Meta's
+      // responses — once in a lightweight collation wrapper (no snapshot/media)
+      // and once in the full object (with snapshot media). "First wins" would
+      // let a media-less wrapper permanently block the media-rich copy, leaving
+      // ~60% of ads with no raw_image_urls. So we UPGRADE: a later copy that
+      // carries media replaces an earlier media-less one.
       let newCount = 0
+      const hasMedia = (a: ExtractedAd) => (a.raw_image_urls?.length ?? 0) > 0 || (a.raw_video_urls?.length ?? 0) > 0
       for (const ad of ads) {
-        if (!allAds.has(ad.ad_archive_id)) {
+        const existing = allAds.get(ad.ad_archive_id)
+        if (!existing) {
           allAds.set(ad.ad_archive_id, ad)
           newCount++
+        } else if (!hasMedia(existing) && hasMedia(ad)) {
+          allAds.set(ad.ad_archive_id, ad)   // upgrade media-less → media-rich
         }
       }
       metrics.successWindow.push(ads.length > 0)
