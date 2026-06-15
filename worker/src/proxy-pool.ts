@@ -42,9 +42,8 @@ function sb(): SupabaseClient {
   return _sb
 }
 
-// In-memory cache + round-robin cursor
+// In-memory cache (used by debugPool only — pickProxy queries fresh for LRU ordering)
 let _cache: { proxies: PoolProxy[]; ts: number } | null = null
-let _rrIndex = 0
 const CACHE_TTL_MS = 60_000
 
 async function loadPool(): Promise<PoolProxy[]> {
@@ -65,17 +64,35 @@ async function loadPool(): Promise<PoolProxy[]> {
 }
 
 /**
- * Pick the next proxy from the pool (round-robin).
+ * Pick the least-recently-used enabled proxy, then immediately mark it used.
+ *
+ * Why LRU-via-DB and not an in-memory round-robin: each crawl runs as a SEPARATE
+ * process (the scheduler spawns a fresh `tsx playwright-indexer` per brand), so an
+ * in-memory cursor resets to 0 every process and always picks the first IP —
+ * leaving the other IPs idle while the first gets throttled. Selecting the proxy
+ * with the oldest `last_used_at` and AWAITING the update distributes load evenly
+ * across all IPs regardless of process boundaries.
+ *
  * Returns null if pool is disabled or empty — caller should fall back to IPRoyal.
  */
 export async function pickProxy(): Promise<PoolProxy | null> {
   if (!proxyPoolEnabled) return null
-  const proxies = await loadPool()
-  if (proxies.length === 0) return null
-  const p = proxies[_rrIndex % proxies.length]
-  _rrIndex = (_rrIndex + 1) % proxies.length
-  // Fire-and-forget last_used_at touch (don't block crawl)
-  sb().from('proxy_pool').update({ last_used_at: new Date().toISOString() }).eq('id', p.id).then(() => {}, () => {})
+  const { data, error } = await sb()
+    .from('proxy_pool')
+    .select('id,label,provider,host,port,username,password,country,isp')
+    .eq('enabled', true)
+    .order('last_used_at', { ascending: true, nullsFirst: true })
+    .limit(1)
+  if (error) {
+    console.warn(`[proxy-pool] pick failed: ${error.message} — returning null`)
+    return null
+  }
+  if (!data || data.length === 0) return null
+  const p = data[0] as PoolProxy
+  // AWAIT the touch so the NEXT process (next crawl) sees the updated timestamp
+  // and rotates to a different IP. Fire-and-forget would let concurrent picks
+  // race onto the same IP.
+  await sb().from('proxy_pool').update({ last_used_at: new Date().toISOString() }).eq('id', p.id)
   return p
 }
 
