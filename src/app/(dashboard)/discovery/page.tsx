@@ -682,8 +682,8 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
       className="ad-card-visual"
       style={{
         position: 'relative', background: '#f1f3f5', overflow: 'hidden', lineHeight: 0,
-        // reserve space while the image is loading so the card doesn't collapse/jump
-        minHeight: slide.type === 'image' && !imgLoaded ? 300 : undefined,
+        // reserve space while the creative loads so the card doesn't collapse/jump
+        minHeight: !imgLoaded ? 300 : undefined,
       }}
     >
       {slide.type === 'image' ? (
@@ -713,6 +713,9 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         </>
       ) : (
         <>
+          {!imgLoaded && (
+            <div className="thumb-skeleton" style={{ position: 'absolute', inset: 0, zIndex: 1 }} />
+          )}
           <video
             ref={videoRef}
             key={slide.url}
@@ -720,10 +723,11 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             controls={playing}
             preload="metadata"
             playsInline
-            style={{ width: '100%', height: 'auto', display: 'block', maxHeight: 600, verticalAlign: 'top', outline: 'none', border: 'none', background: '#000' }}
+            onLoadedData={() => setImgLoaded(true)}
+            style={{ width: '100%', height: 'auto', display: 'block', maxHeight: 600, verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
             onEnded={() => setPlaying(false)}
           />
-          {!playing && (
+          {imgLoaded && !playing && (
             <div onClick={(e) => { e.stopPropagation(); setPlaying(true); setTimeout(() => videoRef.current?.play(), 50) }}
               style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer', zIndex: 3 }}>
               <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
