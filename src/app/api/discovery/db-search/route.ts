@@ -74,8 +74,10 @@ export async function GET(request: NextRequest) {
     if (q) {
       if (mode === 'brand') {
         // Exact page_id when we have it (captures every display name on that page);
-        // otherwise fall back to a fuzzy page_name match for typed brand searches.
-        if (pageId) baseQuery = baseQuery.eq('page_id', pageId)
+        // PLUS affiliate ads — different pages whose ads drive to this brand's site,
+        // tagged "aff:<pageId>" in seed_terms by the affiliate-discovery crawl.
+        // Otherwise fall back to a fuzzy page_name match for typed brand searches.
+        if (pageId) baseQuery = baseQuery.or(`page_id.eq.${pageId},seed_terms.cs.{aff:${pageId}}`)
         else baseQuery = baseQuery.ilike('page_name', `%${q}%`)
       } else {
         const words = q.trim().split(/\s+/).filter(w => w.length > 1).slice(0, 6)
@@ -164,7 +166,7 @@ export async function GET(request: NextRequest) {
         .range(off, off + 999)
       if (country && country !== 'ALL') cq = cq.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
       if (q && mode === 'brand') {
-        if (pageId) cq = cq.eq('page_id', pageId)
+        if (pageId) cq = cq.or(`page_id.eq.${pageId},seed_terms.cs.{aff:${pageId}}`)
         else cq = cq.ilike('page_name', `%${q}%`)
       }
       return cq
@@ -244,9 +246,16 @@ export async function GET(request: NextRequest) {
     const transformed = ads.map((ad: any) => ({
       id: ad.ad_id,
       pageId: ad.page_id,
-      // Normalize the display name when browsing a single brand by page_id, so
-      // partnership ads captured under a partner's name still read as the brand.
-      pageName: (pageId && brandName) ? brandName : ad.page_name,
+      // When browsing a single brand by page_id:
+      //  • the brand's OWN ads (same page_id) → normalize to the canonical brand
+      //    name, so partnership ads captured under a partner's display name read
+      //    as the brand (e.g. the stale "Chuck Liddell" name on Mars Men's page).
+      //  • AFFILIATE ads (a DIFFERENT page driving to the brand's site) → keep
+      //    their real page name (e.g. "New York Post") and flag them, so the card
+      //    can badge "promotes <brand>".
+      pageName: (pageId && brandName && ad.page_id === pageId) ? brandName : ad.page_name,
+      isAffiliate: !!(pageId && ad.page_id !== pageId),
+      affiliateOf: (pageId && ad.page_id !== pageId) ? (brandName || null) : null,
       body: ad.body,
       title: ad.title,
       caption: ad.caption,
