@@ -298,3 +298,18 @@
 
 /* Discovery card hover overlay — show Clone/Scripts button on hover */
 .ad-card-visual:hover .hover-overlay { opacity: 1 !important; }
+
+/* Discovery thumbnail loading skeleton — soft shimmer while the creative loads,
+   so cards don't flash collapsed/black then pop to full size. */
+.thumb-skeleton {
+  background: #e9edf1;
+  overflow: hidden;
+}
+.thumb-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent);
+  animation: shimmer 1.3s infinite;
+}

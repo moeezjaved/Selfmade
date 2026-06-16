@@ -659,9 +659,14 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
 
   const [idx, setIdx] = useState(0)
   const [playing, setPlaying] = useState(false)
+  const [imgLoaded, setImgLoaded] = useState(false)
+  const [imgError, setImgError] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const total = slides.length
   const slide = slides[idx]
+
+  // Reset load state whenever the visible slide changes (carousel nav)
+  useEffect(() => { setImgLoaded(false); setImgError(false) }, [slide?.url])
 
   const next = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i + 1) % total); setPlaying(false) }
   const prev = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i - 1 + total) % total); setPlaying(false) }
@@ -674,15 +679,36 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   return (
     <div
       className="ad-card-visual"
-      style={{ position: 'relative', background: '#000', overflow: 'hidden', lineHeight: 0 }}
+      style={{
+        position: 'relative', background: '#f1f3f5', overflow: 'hidden', lineHeight: 0,
+        // reserve space while the image is loading so the card doesn't collapse/jump
+        minHeight: slide.type === 'image' && !imgLoaded ? 300 : undefined,
+      }}
     >
       {slide.type === 'image' ? (
-        <img
-          src={slide.url}
-          alt={ad.pageName}
-          loading="lazy"
-          style={{ width: '100%', height: 'auto', display: 'block', verticalAlign: 'top' }}
-        />
+        <>
+          {/* skeleton shimmer while the image loads */}
+          {!imgLoaded && !imgError && (
+            <div className="thumb-skeleton" style={{ position: 'absolute', inset: 0, zIndex: 1 }} />
+          )}
+          {imgError ? (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#adb5bd', fontSize: 13 }}>
+              image unavailable
+            </div>
+          ) : (
+            <img
+              src={slide.url}
+              alt={ad.pageName}
+              loading="lazy"
+              onLoad={() => setImgLoaded(true)}
+              onError={() => setImgError(true)}
+              style={{
+                width: '100%', height: 'auto', display: 'block', verticalAlign: 'top',
+                opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2,
+              }}
+            />
+          )}
+        </>
       ) : (
         <>
           <video
