@@ -46,7 +46,8 @@ export interface DownloadedAsset {
 /**
  * Download a list of raw fbcdn URLs (images and/or videos) for a single ad.
  *
- * - Images: through IPRoyal residential proxy (one shared sticky session per ad)
+ * - Images: direct from droplet (fbcdn serves signed image URLs to any IP);
+ *   falls back to a pool proxy only if a direct fetch fails (rare).
  * - Videos: direct from droplet, no proxy (Meta video CDN doesn't gate cloud IPs)
  *
  * Returns only assets that came back as non-placeholder content, plus a
@@ -69,27 +70,34 @@ export async function downloadAssetsForAd(opts: {
     return { images: [], videos: [], bytes_proxy_total: 0, bytes_droplet_total: 0 }
   }
 
-  let proxy: { url: string; close: () => Promise<void> } | null = null
-  let proxyDispatcher: ProxyAgent | null = null
-  let pickedPoolProxyId: string | null = null
+  // Held in an object so TS keeps the union type across the nested ensureProxy
+  // closure (a bare `let` reassigned only inside a closure narrows to `never`).
+  const st: {
+    proxy: { url: string; close: () => Promise<void> } | null
+    dispatcher: ProxyAgent | null
+    poolId: string | null
+  } = { proxy: null, dispatcher: null, poolId: null }
 
   try {
-    // Only set up proxy if we have images to fetch (videos go direct)
-    if (imageUrls.length > 0) {
-      // Pool first (USE_PROXY_POOL=true + DB has rows), IPRoyal fallback
+    // Lazily acquire a proxy ONLY if a direct image fetch fails. fbcdn serves
+    // signed image URLs to the droplet IP directly (verified 2026-06-16: 200 OK,
+    // 0.4-0.7s), so images normally cost ZERO pool budget — freeing the 4 crawl
+    // IPs for actual crawling. The proxy stays as a safety net for the rare URL
+    // that 403s direct.
+    let proxyTried = false
+    async function ensureProxy(): Promise<boolean> {
+      if (proxyTried) return !!st.dispatcher
+      proxyTried = true
       if (proxyPoolEnabled) {
         const p = await pickProxy()
-        if (p) {
-          proxy = await openProxyChain(p)
-          proxyDispatcher = new ProxyAgent(proxy.url)
-          pickedPoolProxyId = p.id
-        }
+        if (p) { st.proxy = await openProxyChain(p); st.dispatcher = new ProxyAgent(st.proxy.url); st.poolId = p.id }
       }
-      if (!proxy && proxyChainEnabled) {
+      if (!st.proxy && proxyChainEnabled) {
         const sid = sessionIdFor(opts.adId)
-        proxy = await startProxyChain({ sessionId: sid, lifetime: '10m', country: 'us' })
-        proxyDispatcher = new ProxyAgent(proxy.url)
+        st.proxy = await startProxyChain({ sessionId: sid, lifetime: '10m', country: 'us' })
+        st.dispatcher = new ProxyAgent(st.proxy.url)
       }
+      return !!st.dispatcher
     }
 
     async function fetchOne(url: string, contentType: string, useProxy: boolean): Promise<DownloadedAsset | null> {
@@ -97,7 +105,7 @@ export async function downloadAssetsForAd(opts: {
         const ctrl = new AbortController()
         const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 60_000)
         const r = await undiciFetch(url, {
-          dispatcher: useProxy ? (proxyDispatcher ?? undefined) : undefined,
+          dispatcher: useProxy ? (st.dispatcher ?? undefined) : undefined,
           signal: ctrl.signal,
           headers: {
             'User-Agent': UA,
@@ -126,8 +134,17 @@ export async function downloadAssetsForAd(opts: {
       }
     }
 
+    // Images: direct from droplet first; only fall back to a pool proxy if the
+    // direct fetch fails (rare). Videos: always direct.
+    async function fetchImage(url: string): Promise<DownloadedAsset | null> {
+      const direct = await fetchOne(url, 'image/jpeg', false)
+      if (direct) return direct
+      if (await ensureProxy()) return fetchOne(url, 'image/jpeg', true)
+      return null
+    }
+
     const [images, videos] = await Promise.all([
-      Promise.all(imageUrls.map((u) => fetchOne(u, 'image/jpeg', true))),    // IPRoyal proxy
+      Promise.all(imageUrls.map(fetchImage)),                                 // direct, proxy fallback
       Promise.all(videoUrls.map((u) => fetchOne(u, 'video/mp4', false))),    // droplet direct
     ])
 
@@ -136,9 +153,9 @@ export async function downloadAssetsForAd(opts: {
     const bytesProxyTotal = successfulImages.reduce((s, a) => s + a.bytes_proxy, 0)
 
     // Log per-ad asset event to the pool if we used a pool proxy
-    if (pickedPoolProxyId) {
+    if (st.poolId) {
       recordEvent({
-        proxyId: pickedPoolProxyId,
+        proxyId: st.poolId,
         kind: 'asset',
         bytes: bytesProxyTotal,
         brandPageId: opts.adId,
@@ -149,9 +166,11 @@ export async function downloadAssetsForAd(opts: {
       images: successfulImages,
       videos: successfulVideos,
       bytes_proxy_total: bytesProxyTotal,
-      bytes_droplet_total: successfulVideos.reduce((s, a) => s + a.bytes_droplet, 0),
+      bytes_droplet_total:
+        successfulVideos.reduce((s, a) => s + a.bytes_droplet, 0) +
+        successfulImages.reduce((s, a) => s + a.bytes_droplet, 0),  // direct image bytes
     }
   } finally {
-    if (proxy) await proxy.close().catch(() => {})
+    if (st.proxy) await st.proxy.close().catch(() => {})
   }
 }
