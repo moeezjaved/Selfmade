@@ -138,23 +138,38 @@ export async function GET(request: NextRequest) {
     }
 
     ads = dedupedAds
-    // For accurate "X unique creatives" count, count distinct image AND video
-    // hashes matching the SAME filter as the search (was: global image-only,
-    // which both ignored videos and ignored the brand/keyword filter).
-    let countQuery = admin
-      .from('discovery_ads_index')
-      .select('image_hash,video_hash')
-      .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
-      .limit(50_000)
-    if (country && country !== 'ALL') {
-      countQuery = countQuery.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
-    }
-    if (q && mode === 'brand') countQuery = countQuery.ilike('page_name', `%${q}%`)
-    const { data: hashSample } = await countQuery
+    // Count distinct image AND video hashes matching the SAME filter as the search.
+    // PostgREST caps each request at ~1000 rows, so for brand searches (bounded to
+    // one advertiser's ads) we PAGINATE to count the full set — otherwise the total
+    // undercounts (e.g. Mars Men showed 242 of its real ~331 unique creatives).
     const uniqSet = new Set<string>()
-    for (const r of (hashSample || []) as any[]) {
-      if (r.image_hash) uniqSet.add('i:' + r.image_hash)
-      if (r.video_hash) uniqSet.add('v:' + r.video_hash)
+    const addHashes = (rows: any[]) => {
+      for (const r of rows) {
+        if (r.image_hash) uniqSet.add('i:' + r.image_hash)
+        if (r.video_hash) uniqSet.add('v:' + r.video_hash)
+      }
+    }
+    const countChunk = (off: number) => {
+      let cq = admin
+        .from('discovery_ads_index')
+        .select('image_hash,video_hash')
+        .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
+        .range(off, off + 999)
+      if (country && country !== 'ALL') cq = cq.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
+      if (q && mode === 'brand') cq = cq.ilike('page_name', `%${q}%`)
+      return cq
+    }
+    if (q && mode === 'brand') {
+      // bounded to one brand → paginate fully for an exact count
+      for (let off = 0; off < 50_000; off += 1000) {
+        const { data: chunk } = await countChunk(off)
+        const rows = (chunk || []) as any[]
+        addHashes(rows)
+        if (rows.length < 1000) break
+      }
+    } else {
+      const { data: chunk } = await countChunk(0)
+      addHashes((chunk || []) as any[])
     }
     const uniqueHashCount = uniqSet.size
     total = uniqueHashCount || dedupedAds.length
