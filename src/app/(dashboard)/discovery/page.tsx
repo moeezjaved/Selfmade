@@ -495,7 +495,8 @@ function InfiniteScrollSentinel({ loading, onLoad }: { loading: boolean; onLoad:
       ([entry]) => {
         if (entry.isIntersecting && !loading) onLoadRef.current()
       },
-      { rootMargin: '1500px' } // pre-load WAY before user reaches bottom
+      { rootMargin: '2500px' } // pre-load the next page ~2.5 screens early so its
+                               // eager-loaded images finish before the user scrolls there
     )
     obs.observe(el)
     return () => obs.disconnect()
@@ -699,7 +700,8 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             <img
               src={slide.url}
               alt={ad.pageName}
-              loading="lazy"
+              loading="eager"
+              decoding="async"
               onLoad={() => setImgLoaded(true)}
               onError={() => setImgError(true)}
               style={{
