@@ -22,6 +22,10 @@ export async function GET(request: NextRequest) {
 
     const q = (searchParams.get('q') || '').trim()
     const mode = searchParams.get('mode') || 'adcopy'
+    // When a brand is selected we filter on its exact page_id (a single Meta page
+    // can run ads under several display names — partnership/branded-content ads).
+    const pageId = (searchParams.get('pageId') || '').trim()
+    const brandName = (searchParams.get('brandName') || '').trim()
     const status = searchParams.get('status') || 'ALL'
     const platforms = searchParams.get('platforms') || ''
     const format = searchParams.get('format') || ''
@@ -69,7 +73,10 @@ export async function GET(request: NextRequest) {
     // Keyword search — OR across body, title, page_name, brand_categories
     if (q) {
       if (mode === 'brand') {
-        baseQuery = baseQuery.ilike('page_name', `%${q}%`)
+        // Exact page_id when we have it (captures every display name on that page);
+        // otherwise fall back to a fuzzy page_name match for typed brand searches.
+        if (pageId) baseQuery = baseQuery.eq('page_id', pageId)
+        else baseQuery = baseQuery.ilike('page_name', `%${q}%`)
       } else {
         const words = q.trim().split(/\s+/).filter(w => w.length > 1).slice(0, 6)
         if (words.length > 0) {
@@ -156,7 +163,10 @@ export async function GET(request: NextRequest) {
         .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
         .range(off, off + 999)
       if (country && country !== 'ALL') cq = cq.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
-      if (q && mode === 'brand') cq = cq.ilike('page_name', `%${q}%`)
+      if (q && mode === 'brand') {
+        if (pageId) cq = cq.eq('page_id', pageId)
+        else cq = cq.ilike('page_name', `%${q}%`)
+      }
       return cq
     }
     if (q && mode === 'brand') {
@@ -234,7 +244,9 @@ export async function GET(request: NextRequest) {
     const transformed = ads.map((ad: any) => ({
       id: ad.ad_id,
       pageId: ad.page_id,
-      pageName: ad.page_name,
+      // Normalize the display name when browsing a single brand by page_id, so
+      // partnership ads captured under a partner's name still read as the brand.
+      pageName: (pageId && brandName) ? brandName : ad.page_name,
       body: ad.body,
       title: ad.title,
       caption: ad.caption,

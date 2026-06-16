@@ -1082,6 +1082,13 @@ export default function DiscoveryPage() {
       const dbParams = new URLSearchParams({
         q: query, mode: searchMode, sort, status,
         page: String(page),
+        // When a brand is selected, filter by its exact page_id (not page_name).
+        // A single Meta page can run partnership/branded-content ads under several
+        // display names (e.g. Mars Men's page also shows "Chuck Liddell", "Thrillist").
+        // Keying on page_id captures ALL of the brand's ads and avoids name drift.
+        ...(searchMode === 'brand' && selectedBrand?.pageId
+          ? { pageId: selectedBrand.pageId, brandName: selectedBrand.name }
+          : {}),
         ...(platforms.length ? { platforms: platforms.join(',') } : {}),
         ...(format.length === 1 ? { format: format[0] } : {}),
         ...(industry.length === 1 ? { industry: industry[0] } : {}),
@@ -1141,7 +1148,7 @@ export default function DiscoveryPage() {
     } finally {
       setLoading(false)
     }
-  }, [query, searchMode, sort, status, platforms, country, format, industry, dbPage, timeDays])
+  }, [query, searchMode, sort, status, platforms, country, format, industry, dbPage, timeDays, selectedBrand?.pageId])
 
   // Fetch ads when query/filters change — always load DB ads even without a query
   useEffect(() => {
