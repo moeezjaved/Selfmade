@@ -33,7 +33,11 @@
 import { spawn } from 'node:child_process'
 import { supabase } from './db.js'
 
-const MIN_BRAND_GAP_MIN = parseInt(process.env.SCHEDULER_MIN_BRAND_GAP_MIN ?? '45', 10)
+// Re-crawl cadence. Raised from 45 min → 6 h: incremental crawls make re-crawls
+// cheap (they stop once they hit already-indexed ads), so re-crawling a covered
+// brand every 6 h is plenty and spreads scarce IP budget across many brands.
+// Gated brands set a shorter backoff themselves (see indexer GATE_RETRY_MIN).
+const MIN_BRAND_GAP_MIN = parseInt(process.env.SCHEDULER_MIN_BRAND_GAP_MIN ?? '360', 10)
 const BETWEEN_PAUSE_MIN = parseInt(process.env.SCHEDULER_BETWEEN_PAUSE_MIN ?? '3', 10)
 const MAX_PAGES_PER_BRAND = parseInt(process.env.SCHEDULER_MAX_PAGES ?? '40', 10)
 

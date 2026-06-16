@@ -50,6 +50,12 @@ const SCROLL_DELAY_MAX_MS = 5_000         // tighter range — we want paginatio
 
 // Pagination
 const TARGET_ADS_PER_BRAND = 1500         // bumped after fixing pagination scroll — Hims has ~2800 visible ads
+// Re-crawl cadence. A successful crawl marks the brand crawled "now" → not
+// re-crawled for SCHED_GAP_MIN. A GATED crawl (0 ads, IP soft-blocked) backs
+// off only GATE_RETRY_MIN so a different IP can retry soon — without the old
+// behaviour of hammering the same blocked brand every cycle.
+const SCHED_GAP_MIN = parseInt(process.env.SCHEDULER_MIN_BRAND_GAP_MIN ?? '360', 10)  // 6h between full re-crawls
+const GATE_RETRY_MIN = parseInt(process.env.SCHEDULER_GATE_RETRY_MIN ?? '15', 10)     // retry a gated brand in 15m
                                           // and crawls now ingest ~10/scroll, so 1500 is reachable in ~3-5 min
 const MAX_AD_BYTES_TO_STORE = 800_000     // truncate huge responses for archive
 
@@ -499,6 +505,26 @@ async function crawlBrand(opts: {
     status: 'running',
   })
 
+  // ── Incremental crawl: load the ad IDs we already have for this brand ──
+  // Meta lists a page's ads newest-first, so on a re-crawl we hit known ads
+  // after a few pages. We stop the cursor-walk once a page is mostly-known,
+  // turning a ~100-request full crawl into a ~10-request "just the new ads"
+  // crawl. New brands (no known IDs) still crawl fully. Skipped in affiliate
+  // mode (we want every affiliate, not just new ones).
+  let knownIds: string[] = []
+  if (!opts.searchTerm) {
+    try {
+      const { data } = await (supabase as any)
+        .from('discovery_ads_index')
+        .select('ad_id')
+        .eq('page_id', opts.pageId)
+        .order('last_seen', { ascending: false })
+        .limit(2000)
+      knownIds = ((data || []) as any[]).map(r => r.ad_id)
+      if (knownIds.length > 0) console.log(`  ♻️ incremental: ${knownIds.length} ads already indexed — will stop early on known inventory`)
+    } catch { /* full crawl on error */ }
+  }
+
   // Try the proxy pool first (USE_PROXY_POOL=true + DB has enabled rows).
   // If pool returns nothing, fall back to legacy IPRoyal sticky session.
   // This keeps IPRoyal as a zero-config fallback during rollout.
@@ -746,13 +772,16 @@ async function crawlBrand(opts: {
               const tpl = ${JSON.stringify(tpl)};
               const startCursor = ${JSON.stringify(initialCursor)};
               const maxPages = ${TARGET_ADS_PER_BRAND / 10 + 5};   // ~10 ads per page
+              const knownSet = new Set(${JSON.stringify(knownIds)});  // incremental: ads we already have
 
-              const out = { pages: 0, fetched: 0, lastCursor: null, hasNext: true };
+              const out = { pages: 0, fetched: 0, lastCursor: null, hasNext: true, stoppedEarly: false };
               let cursor = startCursor;
               let reqCounter = parseInt(tpl.parsedBody.__req || '0', 10);
+              let knownStreak = 0;
 
               const hasNextRe = (s) => { const m = s.match(/"has_next_page"\\s*:\\s*(true|false)/); return m ? m[1] === 'true' : false; };
               const cursorRe = (s) => { const m = s.match(/"end_cursor"\\s*:\\s*"([^"]+)"/); return m ? m[1] : null; };
+              const adIdRe = /"ad_archive_id"\\s*:\\s*"(\\d{10,})"/g;
 
               for (let p = 0; p < maxPages && cursor; p++) {
                 const params = Object.assign({}, tpl.parsedBody);
@@ -774,6 +803,21 @@ async function crawlBrand(opts: {
                   cursor = cursorRe(text);
                   out.lastCursor = cursor;
                   out.hasNext = hasNextRe(text);
+                  // ── Incremental early-stop ──
+                  // If this page is mostly ads we already have (newest-first
+                  // listing), we've reached known inventory. Two such pages in a
+                  // row → stop; nothing new beyond here.
+                  if (knownSet.size > 0) {
+                    const ids = [];
+                    let mm; adIdRe.lastIndex = 0;
+                    while ((mm = adIdRe.exec(text)) !== null) ids.push(mm[1]);
+                    const uniq = Array.from(new Set(ids));
+                    if (uniq.length > 0) {
+                      const knownCount = uniq.filter(id => knownSet.has(id)).length;
+                      knownStreak = (knownCount / uniq.length >= 0.9) ? knownStreak + 1 : 0;
+                      if (knownStreak >= 2 && p >= 1) { out.stoppedEarly = true; break; }
+                    }
+                  }
                   if (!out.hasNext || !cursor) break;
                   await new Promise(res => setTimeout(res, 800 + Math.random() * 700));
                 } catch (e) { break; }
@@ -781,15 +825,15 @@ async function crawlBrand(opts: {
               return out;
             })()
           `
-          const result = await page.evaluate<{ pages: number; fetched: number; lastCursor: string | null; hasNext: boolean }>(evalScript)
+          const result = await page.evaluate<{ pages: number; fetched: number; lastCursor: string | null; hasNext: boolean; stoppedEarly: boolean }>(evalScript)
           metrics.bytesThroughProxy += result.fetched
           // Wait briefly for response listener to drain final responses
           await sleep(2_000)
           const adsCountAfter = allAds.size
-          console.log(`  🔁 Cursor-walk: ${result.pages} pages, ${(result.fetched / 1024).toFixed(1)} KB, ${adsCountAfter - adsCountBefore} new ads captured (total: ${adsCountAfter}) | has_next=${result.hasNext}`)
+          console.log(`  🔁 Cursor-walk: ${result.pages} pages, ${(result.fetched / 1024).toFixed(1)} KB, ${adsCountAfter - adsCountBefore} new ads captured (total: ${adsCountAfter}) | has_next=${result.hasNext}${result.stoppedEarly ? ' | ♻️ stopped early (reached known ads)' : ''}`)
 
           // Cursor walk replaces the scroll loop — break out
-          abortReason = result.hasNext ? 'cursor_walk_ended_with_more' : 'cursor_walk_complete'
+          abortReason = result.stoppedEarly ? 'incremental_known' : (result.hasNext ? 'cursor_walk_ended_with_more' : 'cursor_walk_complete')
           break
         } catch (e: any) {
           console.warn(`  ⚠️ Cursor-walk error: ${e?.message?.slice(0, 200)} — continuing with scroll-only`)
@@ -983,15 +1027,19 @@ async function main() {
         runId,
         maxScrolls,
       })
-      // Only update last_crawled_at when the crawl actually discovered ads.
-      // If the crawl errored at page.goto (proxy tunnel down, Meta 403'd, etc)
-      // we want the scheduler to retry on the next cycle, not wait 45 min.
+      // Always advance last_crawled_at so we never hammer the same brand every
+      // cycle. Success → full cadence (SCHED_GAP_MIN). Gated (0 ads, IP soft-
+      // blocked) → short backoff (GATE_RETRY_MIN) so another IP retries soon
+      // without burning the whole pool on a blocked brand.
+      const now = Date.now()
+      const lastCrawled = m.adsDiscovered > 0
+        ? new Date(now).toISOString()
+        : new Date(now - Math.max(0, SCHED_GAP_MIN - GATE_RETRY_MIN) * 60_000).toISOString()
       if (m.adsDiscovered === 0) {
-        console.warn(`  ⚠️ ${brand.term || brand.page_id}: 0 ads discovered — NOT updating last_crawled_at, will retry next cycle`)
-        continue
+        console.warn(`  ⚠️ ${brand.term || brand.page_id}: 0 ads (gated) — backing off ${GATE_RETRY_MIN} min before retry`)
       }
       await (supabase as any).from('discovery_crawl_terms')
-        .update({ last_crawled_at: new Date().toISOString() })
+        .update({ last_crawled_at: lastCrawled })
         .eq('page_id', brand.page_id)
     } catch (e: any) {
       console.error(`💥 Brand ${brand.page_id} crashed: ${e?.message}`)
