@@ -138,20 +138,33 @@ export async function GET(request: NextRequest) {
     }
 
     ads = dedupedAds
-    // For accurate "X unique creatives" count, fetch distinct hashes.
-    // Cap at 50K to keep query fast.
-    const { data: hashSample } = await admin
+    // For accurate "X unique creatives" count, count distinct image AND video
+    // hashes matching the SAME filter as the search (was: global image-only,
+    // which both ignored videos and ignored the brand/keyword filter).
+    let countQuery = admin
       .from('discovery_ads_index')
-      .select('image_hash')
+      .select('image_hash,video_hash')
       .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
-      .not('image_hash', 'is', null)
       .limit(50_000)
-    const uniqueHashCount = new Set((hashSample || []).map((r: any) => r.image_hash)).size
+    if (country && country !== 'ALL') {
+      countQuery = countQuery.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
+    }
+    if (q && mode === 'brand') countQuery = countQuery.ilike('page_name', `%${q}%`)
+    const { data: hashSample } = await countQuery
+    const uniqSet = new Set<string>()
+    for (const r of (hashSample || []) as any[]) {
+      if (r.image_hash) uniqSet.add('i:' + r.image_hash)
+      if (r.video_hash) uniqSet.add('v:' + r.video_hash)
+    }
+    const uniqueHashCount = uniqSet.size
     total = uniqueHashCount || dedupedAds.length
 
     // ── Semantic re-ranking for multi-word queries (optional, enhances order) ──
-    // Only attempt if we have results and OpenAI key — does NOT reduce result count
-    if (q && q.trim().split(/\s+/).length > 1 && process.env.OPENAI_API_KEY && ads.length > 1) {
+    // Only attempt if we have results and OpenAI key — does NOT reduce result count.
+    // SKIP for brand searches: semantic content-similarity wrongly drops most of a
+    // brand's ads (e.g. "Mars Men" matched only 84 of 331 unique creatives) because
+    // many ad copies don't semantically resemble the brand name.
+    if (q && mode !== 'brand' && q.trim().split(/\s+/).length > 1 && process.env.OPENAI_API_KEY && ads.length > 1) {
       try {
         const embRes = await openai.embeddings.create({
           model: 'text-embedding-3-small',
