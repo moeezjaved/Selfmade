@@ -152,9 +152,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </aside>
 
       {/* ── MAIN ── */}
-      <div style={{flex:1,marginLeft:232,display:"flex",flexDirection:"column",minHeight:"100vh",background:"#eef5eb"}}>
+      <div style={{flex:1,marginLeft:232,display:"flex",flexDirection:"column",minHeight:"100vh",background:"#eef5eb",minWidth:0,maxWidth:"calc(100vw - 232px)",overflowX:"hidden"}}>
         <div id="topbar-portal"/>
-        <main className="flex-1">
+        <main className="flex-1" style={{minWidth:0,overflowX:"hidden"}}>
           {children}
         </main>
       </div>
