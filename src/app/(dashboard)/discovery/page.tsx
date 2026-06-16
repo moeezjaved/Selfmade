@@ -1178,7 +1178,7 @@ export default function DiscoveryPage() {
   useEffect(() => {
     if (!query.trim()) { setTopBrands([]); return }
     setBrandsLoading(true)
-    const params = new URLSearchParams({ q: query, country: country !== 'ALL' ? country : '' })
+    const params = new URLSearchParams({ q: query, mode: searchMode, country: country !== 'ALL' ? country : '' })
     if (industry.length === 1) params.set('industry', industry[0])
     if (status !== 'ALL') params.set('status', status)
     fetch(`/api/discovery/top-brands?${params}`)
@@ -1186,7 +1186,7 @@ export default function DiscoveryPage() {
       .then(d => setTopBrands(d.brands || []))
       .catch(() => {})
       .finally(() => setBrandsLoading(false))
-  }, [query, country, industry, status])
+  }, [query, searchMode, country, industry, status])
 
   // Collect available languages from loaded ads
   const availableLanguages = useMemo(() => {
