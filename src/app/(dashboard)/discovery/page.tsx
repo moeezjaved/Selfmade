@@ -724,6 +724,8 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             preload="metadata"
             playsInline
             onLoadedData={() => setImgLoaded(true)}
+            onLoadedMetadata={() => setImgLoaded(true)}
+            onCanPlay={() => setImgLoaded(true)}
             style={{ width: '100%', height: 'auto', display: 'block', maxHeight: 600, verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
             onEnded={() => setPlaying(false)}
           />
@@ -1505,7 +1507,7 @@ export default function DiscoveryPage() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ padding: '24px' }}>
+      <div style={{ padding: '24px', overflowX: 'hidden', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>
 
         {/* Permission error */}
         {isPermError && (
@@ -1650,7 +1652,7 @@ export default function DiscoveryPage() {
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
             </div>
             {/* Masonry layout — Atria-style compact cards */}
-            <div style={{ columnWidth: 215, columnGap: 10, columnFill: 'balance' }}>
+            <div style={{ columnWidth: 215, columnGap: 10, columnFill: 'balance', maxWidth: '100%', overflowX: 'hidden' }}>
               {filteredAds.map(ad => (
                 <div key={ad.id}
                   style={{
