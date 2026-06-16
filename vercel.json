@@ -12,10 +12,6 @@
   },
   "crons": [
     {
-      "path": "/api/indexer",
-      "schedule": "*/15 * * * *"
-    },
-    {
       "path": "/api/indexer?embed=1",
       "schedule": "30 */2 * * *"
     },
