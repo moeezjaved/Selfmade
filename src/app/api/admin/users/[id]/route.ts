@@ -47,3 +47,38 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     errors: errorsRes.data || [],
   })
 }
+
+// PATCH — admin actions on a user. Currently: extend trial.
+//   body: { action: 'extend_trial', days: number }
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  if (!verifyAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = createAdminClient()
+  const userId = params.id
+  const body = await request.json().catch(() => ({}))
+
+  if (body.action === 'extend_trial') {
+    const days = parseInt(String(body.days), 10)
+    if (!days || days < 1 || days > 365) {
+      return NextResponse.json({ error: 'days must be between 1 and 365' }, { status: 400 })
+    }
+    // Extend from the LATER of now or the current trial end, so extending an
+    // active trial adds time, and extending an expired one starts fresh from now.
+    const { data: prof } = await admin
+      .from('user_profiles').select('trial_ends_at').eq('user_id', userId).single()
+    const now = Date.now()
+    const currentEnd = prof?.trial_ends_at ? new Date(prof.trial_ends_at).getTime() : now
+    const base = Math.max(now, currentEnd)
+    const newEnd = new Date(base + days * 86_400_000).toISOString()
+
+    const { error } = await admin
+      .from('user_profiles')
+      .update({ trial_ends_at: newEnd, subscription_status: 'trialing' })
+      .eq('user_id', userId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    return NextResponse.json({ success: true, trial_ends_at: newEnd, days_added: days })
+  }
+
+  return NextResponse.json({ error: 'unknown action' }, { status: 400 })
+}
