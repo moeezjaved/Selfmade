@@ -385,7 +385,13 @@ async function archiveRawResponse(args: {
 }
 
 // ========== DB writes ==========
-async function saveAdsToIndex(ads: ExtractedAd[]): Promise<{ inserted: number; existed: number }> {
+async function saveAdsToIndex(
+  ads: ExtractedAd[],
+  // When set (affiliate-discovery mode), tag every saved ad with this marker in
+  // seed_terms (e.g. "aff:184711951390377") so the brand's Discovery grid can
+  // surface affiliate ads alongside the brand's own ads, without a schema change.
+  seedTag?: string,
+): Promise<{ inserted: number; existed: number }> {
   if (ads.length === 0) return { inserted: 0, existed: 0 }
 
   // Build rows with structured raw URLs lifted from GraphQL payload.
@@ -406,6 +412,7 @@ async function saveAdsToIndex(ads: ExtractedAd[]): Promise<{ inserted: number; e
     start_date: ad.start_date_string || null,
     stop_date: ad.end_date_string || null,
     last_seen: new Date().toISOString(),
+    ...(seedTag ? { seed_terms: [seedTag] } : {}),
     raw_image_urls:         ad.raw_image_urls.length         > 0 ? ad.raw_image_urls         : null,
     raw_video_urls:         ad.raw_video_urls.length         > 0 ? ad.raw_video_urls         : null,
     raw_video_preview_urls: ad.raw_video_preview_urls.length > 0 ? ad.raw_video_preview_urls : null,
@@ -416,9 +423,12 @@ async function saveAdsToIndex(ads: ExtractedAd[]): Promise<{ inserted: number; e
   const adIds = ads.map(a => a.ad_archive_id)
   const { data: existing } = await (supabase as any)
     .from('discovery_ads_index')
-    .select('ad_id')
+    .select('ad_id, seed_terms')
     .in('ad_id', adIds)
   const existingIds = new Set((existing || []).map((r: any) => r.ad_id))
+  const existingSeeds = new Map<string, string[]>(
+    (existing || []).map((r: any) => [r.ad_id, Array.isArray(r.seed_terms) ? r.seed_terms : []])
+  )
   const newRows      = rows.filter(r => !existingIds.has(r.ad_id))
   const existedRows  = rows.filter(r =>  existingIds.has(r.ad_id))
 
@@ -434,15 +444,17 @@ async function saveAdsToIndex(ads: ExtractedAd[]): Promise<{ inserted: number; e
   // soon as the indexer re-sees them, we populate the columns and the
   // worker's fast path picks them up.
   for (const row of existedRows) {
-    if (!row.raw_image_urls && !row.raw_video_urls) continue  // nothing to backfill
+    // Affiliate mode: make sure the tag lands even on ads we'd already indexed.
+    const needsTag = !!seedTag && !(existingSeeds.get(row.ad_id) || []).includes(seedTag)
+    if (!row.raw_image_urls && !row.raw_video_urls && !needsTag) continue  // nothing to do
+    const update: any = { last_seen: row.last_seen }
+    if (row.raw_image_urls)         update.raw_image_urls = row.raw_image_urls
+    if (row.raw_video_urls)         update.raw_video_urls = row.raw_video_urls
+    if (row.raw_video_preview_urls) update.raw_video_preview_urls = row.raw_video_preview_urls
+    if (needsTag) update.seed_terms = [...(existingSeeds.get(row.ad_id) || []), seedTag!]
     const { error } = await (supabase as any)
       .from('discovery_ads_index')
-      .update({
-        raw_image_urls: row.raw_image_urls,
-        raw_video_urls: row.raw_video_urls,
-        raw_video_preview_urls: row.raw_video_preview_urls,
-        last_seen: row.last_seen,
-      })
+      .update(update)
       .eq('ad_id', row.ad_id)
     if (error) console.warn(`[save-ads] backfill error ${row.ad_id}: ${error.message}`)
   }
@@ -456,6 +468,15 @@ async function crawlBrand(opts: {
   brandName?: string
   maxScrolls?: number
   runId: string
+  // ── Affiliate-discovery mode ──
+  // When set, crawl a KEYWORD search (across all advertisers) instead of a
+  // single page. Keep only ads whose page_id differs from `pageId` (the brand's
+  // own page) AND whose caption/link/body references `affiliateDomain` — i.e.
+  // OTHER pages running ads that drive to the brand's site. `probeOnly` logs the
+  // affiliate pages found without writing them to the index.
+  searchTerm?: string
+  affiliateDomain?: string
+  probeOnly?: boolean
 }): Promise<RunMetrics> {
   const sessionId = randomBytes(4).toString('hex').slice(0, 8)
   const metrics: RunMetrics = {
@@ -642,7 +663,10 @@ async function crawlBrand(opts: {
   })
 
   // ========== Navigate + scroll ==========
-  const url = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&view_all_page_id=${opts.pageId}`
+  // Affiliate mode: keyword search across ALL advertisers. Otherwise: single page.
+  const url = opts.searchTerm
+    ? `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=US&q=${encodeURIComponent(opts.searchTerm)}&search_type=keyword_unordered&media_type=all`
+    : `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&view_all_page_id=${opts.pageId}`
   let aborted = false
   let abortReason = ''
   try {
@@ -821,8 +845,47 @@ async function crawlBrand(opts: {
 
   // ========== Save to DB ==========
   metrics.adsDiscovered = allAds.size
-  const adsArray = Array.from(allAds.values())
-  const { inserted, existed } = await saveAdsToIndex(adsArray)
+  let adsArray = Array.from(allAds.values())
+
+  // ── Affiliate filtering ──
+  // In affiliate mode the keyword search returns ads from MANY pages. Keep only
+  // genuine affiliates: a DIFFERENT page_id that references the brand's domain in
+  // its caption, link, or body. This excludes the brand's own page and unrelated
+  // ads that merely matched the keyword.
+  if (opts.searchTerm && opts.affiliateDomain) {
+    const dom = opts.affiliateDomain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '')
+    const refsDomain = (a: ExtractedAd) =>
+      [a.caption, a.link_url, a.body_text].some(f => (f || '').toLowerCase().includes(dom))
+    const before = adsArray.length
+    const affiliates = adsArray.filter(a => a.page_id && a.page_id !== opts.pageId && refsDomain(a))
+
+    // Distinct affiliate pages, with counts — this is the headline result.
+    const byPage = new Map<string, { name: string; count: number }>()
+    for (const a of affiliates) {
+      const e = byPage.get(a.page_id) || { name: a.page_name || '(unknown)', count: 0 }
+      e.count++; byPage.set(a.page_id, e)
+    }
+    console.log(`\n  🔗 Affiliate scan for "${dom}": ${affiliates.length}/${before} ads from ${byPage.size} OTHER page(s):`)
+    for (const [pid, { name, count }] of [...byPage.entries()].sort((a, b) => b[1].count - a[1].count)) {
+      console.log(`     ${String(count).padStart(4)}  ${pid}  ${name}`)
+    }
+
+    if (opts.probeOnly) {
+      console.log(`  🧪 probe-only — not saving. (${affiliates.length} affiliate ads would be indexed)`)
+      metrics.adsDiscovered = affiliates.length
+      await (supabase as any).from('crawler_runs').update({
+        finished_at: new Date().toISOString(),
+        ads_discovered: affiliates.length,
+        status: 'success', abort_reason: 'probe_only',
+      }).eq('id', opts.runId)
+      return metrics
+    }
+    adsArray = affiliates
+  }
+
+  // Tag affiliate ads so the brand's grid can surface them (mixed-in display).
+  const seedTag = (opts.searchTerm && opts.affiliateDomain) ? `aff:${opts.pageId}` : undefined
+  const { inserted, existed } = await saveAdsToIndex(adsArray, seedTag)
   metrics.adsNew = inserted
   metrics.adsAlreadySeen = existed
 
@@ -852,6 +915,36 @@ async function main() {
   const arg = process.argv[2]
   const maxScrollsArg = process.argv.find(a => a.startsWith('--max-pages='))
   const maxScrolls = maxScrollsArg ? parseInt(maxScrollsArg.split('=')[1], 10) : undefined
+
+  // ── Affiliate-discovery mode ──
+  //   npx tsx src/playwright-indexer.ts --affiliates=<domain> --own=<pageId> [--name="Brand"] [--probe] [--max-pages=N]
+  // Crawls a keyword search for <domain> and reports/saves ads from OTHER pages
+  // that drive to that domain (genuine affiliates).
+  const affArg = process.argv.find(a => a.startsWith('--affiliates='))
+  if (affArg) {
+    const domain = affArg.split('=')[1]
+    const ownArg = process.argv.find(a => a.startsWith('--own='))
+    const nameArg = process.argv.find(a => a.startsWith('--name='))
+    const searchArg = process.argv.find(a => a.startsWith('--search='))
+    const probe = process.argv.includes('--probe')
+    const ownPageId = ownArg ? ownArg.split('=')[1] : ''
+    const brandName = nameArg ? nameArg.split('=')[1].replace(/^"|"$/g, '') : ''
+    // What to TYPE into Meta's keyword search (recall). Defaults to the domain,
+    // but you can search the brand NAME for broader recall and still filter by domain.
+    const searchTerm = searchArg ? searchArg.split('=')[1].replace(/^"|"$/g, '') : domain
+    if (!domain) { console.error('Usage: --affiliates=<domain> --own=<pageId> [--search="Brand Name"] [--probe]'); process.exit(1) }
+    console.log(`🔗 Affiliate discovery — search="${searchTerm}" filter-domain="${domain}" own_page=${ownPageId || '(none)'} ${probe ? '[PROBE]' : '[SAVE]'}`)
+    const runId = randomBytes(16).toString('hex').slice(0, 32).replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
+    await crawlBrand({
+      pageId: ownPageId || domain,
+      brandName: brandName || `affiliates:${domain}`,
+      runId, maxScrolls,
+      searchTerm,
+      affiliateDomain: domain,
+      probeOnly: probe,
+    })
+    process.exit(0)
+  }
 
   let brands: { page_id: string; term: string }[] = []
   if (arg && /^\d+$/.test(arg)) {

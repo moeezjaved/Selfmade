@@ -30,6 +30,8 @@ interface Ad {
   mediaType: string
   isActive: boolean
   daysRunning: number
+  isAffiliate?: boolean       // ad from another page driving to this brand's site
+  affiliateOf?: string | null // canonical brand name this affiliate promotes
   // classified client-side
   format: string
   industries: string[]
@@ -902,6 +904,12 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
           style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', textAlign: 'left' }}>
           {ad.pageName || 'Unknown Brand'}
         </button>
+        {ad.isAffiliate && (
+          <span title={ad.affiliateOf ? `Affiliate ad promoting ${ad.affiliateOf}` : 'Affiliate ad'}
+            style={{ flexShrink: 0, fontSize: 9, fontWeight: 800, letterSpacing: '.02em', color: '#9a3412', background: '#ffedd5', border: '1px solid #fed7aa', padding: '2px 6px', borderRadius: 100, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            ↗ Affiliate
+          </span>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, position: 'relative' }}>
           <button onClick={() => setShowSaveModal(true)} title="Save to board"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#9ca3af', padding: 3, borderRadius: 4, transition: 'color .15s' }}>
