@@ -1099,7 +1099,12 @@ export default function DiscoveryPage() {
           : {}),
         ...(platforms.length ? { platforms: platforms.join(',') } : {}),
         ...(format.length === 1 ? { format: format[0] } : {}),
-        ...(industry.length === 1 ? { industry: industry[0] } : {}),
+        // Multi-select filters now applied SERVER-side (was browser-only → only
+        // filtered the 40 loaded ads). Send all selected so they cover the full set.
+        ...(industry.length ? { industry: industry.join(',') } : {}),
+        ...(theme.length ? { theme: theme.join(',') } : {}),
+        // (language stays client-side until language-detection lands — DB stores
+        //  ISO codes but the UI picker uses display names.)
         ...(timeDays > 0 ? { days: String(timeDays) } : {}),
       })
       const dbRes = await fetch(`/api/discovery/db-search?${dbParams}`)
@@ -1156,7 +1161,7 @@ export default function DiscoveryPage() {
     } finally {
       setLoading(false)
     }
-  }, [query, searchMode, sort, status, platforms, country, format, industry, dbPage, timeDays, selectedBrand?.pageId])
+  }, [query, searchMode, sort, status, platforms, country, format, industry, theme, dbPage, timeDays, selectedBrand?.pageId])
 
   // Fetch ads when query/filters change — always load DB ads even without a query
   useEffect(() => {
@@ -1187,7 +1192,7 @@ export default function DiscoveryPage() {
         .catch(() => { setRawAds([]); setHasMore(false) })
         .finally(() => setLoading(false))
     }
-  }, [query, searchMode, sort, status, platforms, country, timeDays])
+  }, [query, searchMode, sort, status, platforms, country, timeDays, industry, theme])
 
   // Fetch top brands strip when query changes
   useEffect(() => {
