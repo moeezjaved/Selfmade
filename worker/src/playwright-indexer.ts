@@ -1058,9 +1058,13 @@ async function crawlBrandCountries(opts: {
     return { adsDiscovered: m.adsDiscovered, adsNew: m.adsNew }
   }
 
-  // Multi-country: pick the countries to crawl (skip-empty).
-  const fullSweep = opts.activeCountries.length === 0 || Math.random() < 0.2
-  const toCrawl = fullSweep ? opts.config.countries : opts.activeCountries
+  // Multi-country: pick the countries to crawl (skip-empty). Intersect the
+  // brand's active list with the CONFIGURED countries — brands can carry a stale
+  // `countries` column (old data) with countries no longer in the admin list.
+  const configured = new Set(opts.config.countries)
+  const activeInConfig = opts.activeCountries.filter(c => configured.has(c))
+  const fullSweep = activeInConfig.length === 0 || Math.random() < 0.2
+  const toCrawl = fullSweep ? opts.config.countries : activeInConfig
   console.log(`  🌍 multi-country (${fullSweep ? 'full sweep' : 'active only'}): ${toCrawl.join(', ')}`)
 
   let totalDiscovered = 0, totalNew = 0
