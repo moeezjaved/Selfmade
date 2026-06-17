@@ -1141,21 +1141,17 @@ export default function DiscoveryPage() {
         return
       }
 
-      // ── Fallback to live Meta API if DB has no results ──
-      setSearchSource('live')
-      const params = new URLSearchParams({
-        q: query, mode: searchMode, sort, status,
-        ...(country && country !== 'ALL' ? { country } : {}),
-        ...(platforms.length ? { platforms: platforms.join(',') } : {}),
-        ...(cursor ? { after: cursor } : {}),
-      })
-      const res = await fetch(`/api/discovery?${params}`)
-      const data = await res.json()
-      if (data.error) { setError(data.error); setLoading(false); return }
-      const classified = (data.ads || []).map(classifyAd)
-      setRawAds(prev => reset ? classified : [...prev, ...classified])
-      setNextCursor(data.nextCursor)
-      setHasMore(data.hasMore)
+      // No indexed results. Do NOT fall back to the live Meta Ads Library — its
+      // results ignore our filters and are full of spam/arbitrage ads (cloaked
+      // domains, fake "surveys", unrelated niches). Discovery only ever shows our
+      // own curated, crawled ads. Empty search → clean empty state; exhausted
+      // scroll → just stop. (Use admin → Brands → Preview to vet uncrawled brands.)
+      if (reset) setRawAds([])
+      setHasMore(false)
+      setNextCursor(null)
+      setDbTotal(dbData.total || 0)
+      setTotalInDB(dbData.totalInDB || 0)
+      setSearchSource('indexed')
     } catch (e: any) {
       setError(e.message)
     } finally {
