@@ -1094,21 +1094,17 @@ async function crawlBrandCountries(opts: {
 }
 
 // Stamp a brand's MANUAL admin categories onto all its ads (brand_categories),
-// and keep the brand's industry consistent by setting every ad to the brand's
-// dominant existing industry — so manual corrections (e.g. apparel brands the
-// auto-detector mislabels as Health) propagate to newly-crawled ads instead of
-// drifting back. Only runs for brands that actually have manual categories.
-async function stampBrandMetadata(pageId: string, categories: string[]) {
-  if (!categories.length) return
-  // Stamp the manual category onto all the brand's ads. Do NOT touch industries:
-  // earlier we recomputed the "dominant" industry from the ads, but for brands the
-  // auto-detector mislabels (apparel brands keyword-match as "Health & Fitness"),
-  // that wiped manual corrections. Industry stays whatever it's set to (manual
-  // corrections persist; per-ad auto-detect only fills NEW ads).
-  await (supabase as any).from('discovery_ads_index')
-    .update({ brand_categories: categories })
-    .eq('page_id', pageId)
-  console.log(`  🏷️ stamped categories [${categories.join(', ')}]`)
+// Apply a brand's MANUAL admin metadata to all its ads: the category tag, and —
+// if the admin set a manual industry — that industry (overriding the keyword
+// auto-detector, which mislabels e.g. apparel brands as "Health & Fitness").
+// The manual industry is authoritative and applies to new + existing ads.
+async function stampBrandMetadata(pageId: string, categories: string[], industry?: string | null) {
+  const update: any = {}
+  if (categories.length) update.brand_categories = categories
+  if (industry) update.industries = [industry]
+  if (Object.keys(update).length === 0) return
+  await (supabase as any).from('discovery_ads_index').update(update).eq('page_id', pageId)
+  console.log(`  🏷️ stamped${categories.length ? ` categories [${categories.join(', ')}]` : ''}${industry ? ` industry [${industry}]` : ''}`)
 }
 
 // ========== Main ==========
@@ -1159,24 +1155,24 @@ async function main() {
     ...(b?.category && b.category !== 'General' ? [b.category] : []),
   ].map(c => String(c).trim().toLowerCase()).filter(Boolean)))
 
-  let brands: { page_id: string; term: string; countries: string[]; categories: string[] }[] = []
+  let brands: { page_id: string; term: string; countries: string[]; categories: string[]; industry: string | null }[] = []
   if (arg && /^\d+$/.test(arg)) {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('term, countries, category, categories')
+      .select('term, countries, category, categories, industry')
       .eq('page_id', arg)
       .limit(1)
       .maybeSingle()
-    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [], categories: manualCats(data) }]
+    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [], categories: manualCats(data), industry: data?.industry || null }]
   } else {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('page_id, term, countries, category, categories')
+      .select('page_id, term, countries, category, categories, industry')
       .eq('is_active', true)
       .not('page_id', 'is', null)
       .order('last_crawled_at', { ascending: true, nullsFirst: true })
       .limit(20)
-    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [], categories: manualCats(b) }))
+    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [], categories: manualCats(b), industry: b.industry || null }))
   }
 
   if (brands.length === 0) {
@@ -1194,8 +1190,8 @@ async function main() {
         config: countryConfig,
         activeCountries: brand.countries,
       })
-      // Propagate the brand's manual admin categories + keep its industry stable.
-      await stampBrandMetadata(brand.page_id, brand.categories)
+      // Propagate the brand's manual admin categories + industry override.
+      await stampBrandMetadata(brand.page_id, brand.categories, brand.industry)
       // Decide when this brand is eligible to crawl again by setting
       // last_crawled_at into the past so `now - last_crawled_at >= SCHED_GAP_MIN`
       // fires after `backoffMin`. Three cases:
