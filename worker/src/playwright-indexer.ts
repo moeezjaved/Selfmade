@@ -1090,6 +1090,26 @@ async function crawlBrandCountries(opts: {
   return { adsDiscovered: totalDiscovered, adsNew: totalNew }
 }
 
+// Stamp a brand's MANUAL admin categories onto all its ads (brand_categories),
+// and keep the brand's industry consistent by setting every ad to the brand's
+// dominant existing industry — so manual corrections (e.g. apparel brands the
+// auto-detector mislabels as Health) propagate to newly-crawled ads instead of
+// drifting back. Only runs for brands that actually have manual categories.
+async function stampBrandMetadata(pageId: string, categories: string[]) {
+  if (!categories.length) return
+  const update: any = { brand_categories: categories }
+  try {
+    const { data } = await (supabase as any)
+      .from('discovery_ads_index').select('industries').eq('page_id', pageId).limit(400)
+    const freq: Record<string, number> = {}
+    for (const r of (data || []) as any[]) for (const ind of (r.industries || [])) freq[ind] = (freq[ind] || 0) + 1
+    const top = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 1).map(([n]) => n)
+    if (top.length) update.industries = top
+  } catch { /* keep categories-only update */ }
+  await (supabase as any).from('discovery_ads_index').update(update).eq('page_id', pageId)
+  console.log(`  🏷️ stamped categories [${categories.join(', ')}]${update.industries ? ` + industry ${update.industries[0]}` : ''}`)
+}
+
 // ========== Main ==========
 async function main() {
   await ensureDirs()
@@ -1131,26 +1151,31 @@ async function main() {
   const countryConfig = await readCountryConfig()
   if (countryConfig.enabled) console.log(`🌍 Multi-country crawling ON: ${countryConfig.countries.join(', ')}`)
 
-  let brands: { page_id: string; term: string; countries: string[] }[] = []
+  // Manual categories the user set in admin live in either `categories` (array)
+  // or `category` (singular) — merge both, lowercased, for stamping onto ads.
+  const manualCats = (b: any): string[] => Array.from(new Set([
+    ...((Array.isArray(b?.categories) ? b.categories : []) as string[]),
+    ...(b?.category && b.category !== 'General' ? [b.category] : []),
+  ].map(c => String(c).trim().toLowerCase()).filter(Boolean)))
+
+  let brands: { page_id: string; term: string; countries: string[]; categories: string[] }[] = []
   if (arg && /^\d+$/.test(arg)) {
-    // Look up the brand name from DB so crawler_runs.brand_name is populated
-    // (otherwise the admin /admin/health dashboard shows "—" for these runs).
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('term, countries')
+      .select('term, countries, category, categories')
       .eq('page_id', arg)
       .limit(1)
       .maybeSingle()
-    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [] }]
+    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [], categories: manualCats(data) }]
   } else {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('page_id, term, countries')
+      .select('page_id, term, countries, category, categories')
       .eq('is_active', true)
       .not('page_id', 'is', null)
       .order('last_crawled_at', { ascending: true, nullsFirst: true })
       .limit(20)
-    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [] }))
+    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [], categories: manualCats(b) }))
   }
 
   if (brands.length === 0) {
@@ -1168,6 +1193,8 @@ async function main() {
         config: countryConfig,
         activeCountries: brand.countries,
       })
+      // Propagate the brand's manual admin categories + keep its industry stable.
+      await stampBrandMetadata(brand.page_id, brand.categories)
       // Decide when this brand is eligible to crawl again by setting
       // last_crawled_at into the past so `now - last_crawled_at >= SCHED_GAP_MIN`
       // fires after `backoffMin`. Three cases:
