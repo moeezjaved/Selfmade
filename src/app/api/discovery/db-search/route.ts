@@ -242,7 +242,7 @@ export async function GET(request: NextRequest) {
         })
         const { data: vectorResults } = await admin.rpc('search_ads_semantic', {
           query_embedding: embRes.data[0].embedding,
-          match_threshold: 0.3,          // related-by-meaning, not loose noise
+          match_threshold: 0.22,         // loose absolute floor; relative floor applied below
           match_count: 240,
           filter_country: country === 'ALL' ? null : country,
           filter_active: status === 'ACTIVE' ? true : status === 'INACTIVE' ? false : null,
@@ -250,6 +250,16 @@ export async function GET(request: NextRequest) {
           filter_industry: industry || null,
         })
         if (vectorResults?.length) {
+          const rows = vectorResults as any[]
+          // RELATIVE relevance floor: a fixed cosine cutoff is fragile across queries —
+          // 0.3 is tight for "gym wear" but noise for "anti-aging serum". Anchor to the
+          // best match for THIS query and keep only neighbours within `delta` of it.
+          // (Falls back to the absolute RPC floor if the RPC doesn't return similarity.)
+          const sims = rows.map(r => (typeof r.similarity === 'number' ? r.similarity : null))
+                           .filter((s): s is number => s != null)
+          const topSim = sims.length ? Math.max(...sims) : null
+          const floor = topSim != null ? Math.max(0.27, topSim - 0.1) : null
+
           const haveIds = new Set(ads.map((a: any) => a.ad_id))
           const haveHashes = new Set(
             ads.map((a: any) => a.image_hash || a.video_hash).filter(Boolean)
@@ -257,14 +267,15 @@ export async function GET(request: NextRequest) {
           // Slice by page offset so deeper pages get DIFFERENT semantic fillers
           // (results are similarity-ranked & stable for the same query → no repeats).
           let added = 0
-          for (const v of (vectorResults as any[]).slice(offset)) {
+          for (const v of rows.slice(offset)) {
             if (ads.length >= limit) break
+            if (floor != null && typeof v.similarity === 'number' && v.similarity < floor) continue
             if (haveIds.has(v.ad_id)) continue
             const h = v.image_hash || v.video_hash
             if (h && haveHashes.has(h)) continue
             if (h) haveHashes.add(h)
             haveIds.add(v.ad_id)
-            ads.push({ ...v, _semantic: true })
+            ads.push({ ...v, _semantic: true, _sim: v.similarity ?? null })
             added++
           }
           if (added > 0) {
@@ -299,9 +310,29 @@ export async function GET(request: NextRequest) {
       }, {})
     }
 
+    // ── Provenance: why did each ad match? ───────────────────
+    // Tag every result with the tier it came from — useful for debugging ranking
+    // and for a future "related by meaning" UI label. Semantic fillers are flagged
+    // at insert time; for lexical hits we reconstruct the reason cheaply from the row.
+    const lc = q.toLowerCase()
+    const matchReason = (ad: any): 'brand' | 'exact_keyword' | 'topic_tag' | 'semantic' | 'keyword' => {
+      if (ad._semantic) return 'semantic'
+      if (mode === 'brand') return 'brand'
+      if (!lc) return 'keyword'
+      const inText = [ad.body, ad.title, ad.description, ad.page_name]
+        .some((f: any) => String(f || '').toLowerCase().includes(lc))
+      if (inText) return 'exact_keyword'
+      const tags = [...(ad.topics || []), ...(ad.brand_categories || []), ...(ad.industries || [])]
+        .map((t: any) => String(t).toLowerCase())
+      if (tags.some((t: string) => t.includes(lc) || lc.includes(t))) return 'topic_tag'
+      return 'keyword'
+    }
+
     // ── Transform results ────────────────────────────────────
     const transformed = ads.map((ad: any) => ({
       id: ad.ad_id,
+      matchReason: matchReason(ad),
+      similarity: ad._sim ?? null,
       pageId: ad.page_id,
       // When browsing a single brand by page_id:
       //  • the brand's OWN ads (same page_id) → normalize to the canonical brand

@@ -841,14 +841,17 @@ async function attachCreatives(
 async function generateEmbeddings(admin: any): Promise<number> {
   const { data: unembedded } = await admin
     .from('discovery_ads_index')
-    .select('ad_id, page_name, body, title, description, industries, themes')
+    .select('ad_id, page_name, body, title, description, industries, themes, topics, brand_categories')
     .is('embedding', null)
     .limit(EMBED_BATCH)
 
   if (!unembedded?.length) return 0
 
+  // Enrich the embedding text with the AI concept tags (topics) + brand categories,
+  // not just copy. Visual ads often have thin/generic copy ("Shop now 🔥") — their
+  // meaning lives in the tags, so embedding those makes semantic search find them.
   const texts = unembedded.map((ad: any) =>
-    `${ad.page_name} ${ad.title} ${ad.body} ${ad.description} ${(ad.industries || []).join(' ')} ${(ad.themes || []).join(' ')}`.slice(0, 8000)
+    `${ad.page_name} ${ad.title} ${ad.body} ${ad.description} ${(ad.industries || []).join(' ')} ${(ad.themes || []).join(' ')} ${(ad.topics || []).join(' ')} ${(ad.brand_categories || []).join(' ')}`.slice(0, 8000)
   )
 
   const response = await openai.embeddings.create({
