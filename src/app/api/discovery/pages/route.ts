@@ -28,10 +28,12 @@ export async function GET(request: NextRequest) {
 
     const admin = createAdminClient()
     const term = q.trim()
+    // Accent/diacritic-insensitive normalize: "gruns" ⇄ "Grüns", "cafe" ⇄ "café".
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+    const nq = norm(term)
 
     // ── 1. Search our own indexed DB ──────────────────────────────
-    // Pull a sample of matching ads to identify distinct brands. Limit 500 is
-    // enough to surface ~6 unique brand names without scanning the full table.
+    // Source A — ad index by page_name (handles exact + accented matches).
     const { data: rows } = await (admin as any)
       .from('discovery_ads_index')
       .select('page_id, page_name')
@@ -40,24 +42,27 @@ export async function GET(request: NextRequest) {
       .not('page_name', 'is', null)
       .limit(500)
 
-    if (rows && rows.length > 0) {
-      // Group by page_id, count partial sample, keep name
-      const byPage = new Map<string, { name: string; partial: number }>()
-      for (const r of rows as any[]) {
-        const pid = r.page_id
-        if (!pid) continue
-        const existing = byPage.get(pid)
-        if (existing) existing.partial++
-        else byPage.set(pid, { name: r.page_name, partial: 1 })
-      }
+    // Source B — tracked brands by the name the USER typed when adding them
+    // (discovery_crawl_terms.term). This is accent-insensitive: a brand added as
+    // "gruns" is found even though its page_name is "Grüns". Bounded table, so we
+    // fetch and match in JS with the normalize() above.
+    const { data: trackedAll } = await (admin as any)
+      .from('discovery_crawl_terms')
+      .select('page_id, term')
+      .not('page_id', 'is', null)
+      .limit(5000)
+    const trackedHits: string[] = ((trackedAll || []) as any[])
+      .filter((t) => t.term && norm(t.term).includes(nq))
+      .map((t) => t.page_id)
 
-      // Top 6 by partial count (best guess at "most relevant" before exact count)
-      const candidates = Array.from(byPage.entries())
-        .sort((a, b) => b[1].partial - a[1].partial)
-        .slice(0, 6)
-      const candidatePageIds = candidates.map(([pid]) => pid)
+    // Union candidate page_ids from both sources.
+    const candidatePageIds = Array.from(new Set<string>([
+      ...((rows || []) as any[]).map((r) => r.page_id),
+      ...trackedHits,
+    ])).slice(0, 12)
 
-      // Lookup pictures from discovery_crawl_terms in one batched query
+    if (candidatePageIds.length > 0) {
+      // Pictures from discovery_crawl_terms in one batched query
       const { data: termRows } = await (admin as any)
         .from('discovery_crawl_terms')
         .select('page_id, picture')
@@ -67,30 +72,34 @@ export async function GET(request: NextRequest) {
         if (t.page_id && t.picture) pictureByPage.set(t.page_id, t.picture)
       }
 
-      // Exact ad counts per page in parallel — estimated count is fast on big tables
+      // Per page: canonical name (most common page_name = real brand, not a
+      // partnership ad's name) + estimated ad count.
       const withCounts = await Promise.all(
-        candidates.map(async ([pid, info]) => {
-          let adCount: number | string = info.partial
+        candidatePageIds.map(async (pid) => {
+          let adCount: number | string = 0
+          let name = ''
           try {
-            const { count } = await (admin as any)
+            const { data: sample, count } = await (admin as any)
               .from('discovery_ads_index')
-              .select('*', { count: 'estimated', head: true })
+              .select('page_name', { count: 'estimated' })
               .eq('page_id', pid)
+              .not('page_name', 'is', null)
+              .limit(400)
             if (count != null) adCount = count
-          } catch { /* keep partial */ }
-          return {
-            pageId: pid,
-            name: info.name,
-            picture: pictureByPage.get(pid) || null,
-            category: '',
-            adCount,
-          }
+            const freq: Record<string, number> = {}
+            for (const r of (sample || []) as any[]) {
+              const n = (r.page_name || '').trim()
+              if (n) freq[n] = (freq[n] || 0) + 1
+            }
+            name = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || ''
+          } catch { /* keep defaults */ }
+          return { pageId: pid, name, picture: pictureByPage.get(pid) || null, category: '', adCount }
         })
       )
 
-      // Re-sort by accurate ad count, biggest brands first
+      // Biggest brands first
       withCounts.sort((a, b) => (Number(b.adCount) || 0) - (Number(a.adCount) || 0))
-      return NextResponse.json({ pages: withCounts })
+      return NextResponse.json({ pages: withCounts.filter((b) => b.name).slice(0, 6) })
     }
 
     // ── 2. Fallback: Meta pages/search ────────────────────────────
