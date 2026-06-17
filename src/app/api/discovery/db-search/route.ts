@@ -397,6 +397,7 @@ export async function GET(request: NextRequest) {
       format: ad.format,
       industries: ad.industries || [],
       themes: ad.themes || [],
+      topics: ad.topics || [],
       hookType: ad.hook_type,
       emotion: ad.emotion || [],
       angle: ad.angle,
