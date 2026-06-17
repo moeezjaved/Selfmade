@@ -33,17 +33,19 @@ export const CONCEPTS: Record<string, Concept> = {
   'hair growth':  { synonyms: ['regrow', 'regrowth', 'hair regrowth', 'thicker hair'] },
   'activewear':   { synonyms: ['active wear', 'gym wear', 'gymwear', 'athleisure', 'workout clothes', 'athletic wear', 'athleticwear', 'sportswear'], related: ['leggings'] },
   'leggings':     { synonyms: ['legging', 'yoga pants'] },
-  'weight loss':  { synonyms: ['fat loss', 'slimming', 'lose weight', 'weight management', 'glp-1'], related: ['fitness'] },
-  'testosterone': { synonyms: ['low testosterone', 'low t', 'test booster', 'testosterone booster'], related: ['energy'] },
-  'erectile dysfunction': { synonyms: ['ed', 'erectile', 'sexual performance'], related: ['testosterone', 'intimacy'] },
+  'weight loss':  { synonyms: ['fat loss', 'slimming', 'lose weight', 'weight management', 'glp-1'] },
+  'testosterone': { synonyms: ['low testosterone', 'low t', 'test booster', 'testosterone booster'] },
+  'erectile dysfunction': { synonyms: ['ed', 'erectile', 'sexual performance'], related: ['testosterone'] },
   'supplement':   { synonyms: ['supplements', 'vitamins', 'vitamin', 'capsules', 'gummies'] },
-  'sleep':        { synonyms: ['insomnia', 'sleep aid', 'better sleep'], related: ['recovery'] },
-  'skincare':     { synonyms: ['skin care', 'serum', 'moisturizer', 'skin routine'], related: ['collagen', 'anti-aging'] },
-  'anti-aging':   { synonyms: ['antiaging', 'wrinkles', 'fine lines', 'aging skin'], related: ['collagen'] },
+  'sleep':        { synonyms: ['insomnia', 'sleep aid', 'better sleep'] },
+  // skincare → anti-aging only (collagen is an ingestible supplement, not skincare —
+  // that link flooded "skincare" with collagen brands). Keep related links DEFENSIBLE.
+  'skincare':     { synonyms: ['skin care', 'serum', 'moisturizer', 'skin routine'], related: ['anti-aging'] },
+  'anti-aging':   { synonyms: ['antiaging', 'wrinkles', 'fine lines', 'aging skin'] },
   "men's health": { synonyms: ['mens health'], related: ['testosterone', 'hair loss', 'erectile dysfunction'] },
-  "women's health": { synonyms: ['womens health'], related: ['intimacy'] },
+  "women's health": { synonyms: ['womens health'] },
   'protein':      { synonyms: ['protein powder', 'protein shake'] },
-  'gut health':   { synonyms: ['bloating', 'digestion', 'digestive'], related: ['supplement'] },
+  'gut health':   { synonyms: ['bloating', 'digestion', 'digestive'] },
 }
 
 // Reverse index: any synonym OR canonical key → its canonical concept name.
