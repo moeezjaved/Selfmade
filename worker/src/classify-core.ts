@@ -59,9 +59,15 @@ ${text}
 Return only the JSON array.`
 }
 
-const HOOKS = new Set(['Question','Before & After','Testimonial','Story','Announcement','Educational','Urgency','Discount','Unboxing','Us vs Them','Social Proof','Pain Point'])
-const ANGLES = new Set(['Pain Point','Aspiration','Social Proof','Authority','Scarcity','Curiosity','Value','Story','Comparison'])
-const TONES = new Set(['Casual','Professional','Urgent','Inspirational','Humorous','Educational','Emotional'])
+// Shared vocab — exported so the OpenAI Structured-Output schema constrains to the
+// SAME enums the Anthropic path validates against (one source of truth).
+export const HOOKS = ['Question','Before & After','Testimonial','Story','Announcement','Educational','Urgency','Discount','Unboxing','Us vs Them','Social Proof','Pain Point'] as const
+export const ANGLES = ['Pain Point','Aspiration','Social Proof','Authority','Scarcity','Curiosity','Value','Story','Comparison'] as const
+export const TONES = ['Casual','Professional','Urgent','Inspirational','Humorous','Educational','Emotional'] as const
+export const EMOTIONS = ['curiosity','fear','desire','trust','urgency','hope','excitement','relatability','aspiration','guilt','pride'] as const
+const HOOK_SET = new Set<string>(HOOKS)
+const ANGLE_SET = new Set<string>(ANGLES)
+const TONE_SET = new Set<string>(TONES)
 
 export function normalizeTopics(arr: any): string[] {
   if (!Array.isArray(arr)) return []
@@ -84,11 +90,11 @@ export function parseClassification(text: string): any[] {
  */
 export async function propagateClassification(copySig: string, c: any): Promise<number> {
   const update: Record<string, any> = {
-    hook_type: HOOKS.has(c.hook_type) ? c.hook_type : null,
+    hook_type: HOOK_SET.has(c.hook_type) ? c.hook_type : null,
     emotion: Array.isArray(c.emotion) ? c.emotion.slice(0, 3) : [],
-    angle: ANGLES.has(c.angle) ? c.angle : null,
+    angle: ANGLE_SET.has(c.angle) ? c.angle : null,
     cta: c.cta ? String(c.cta).slice(0, 120) : 'Shop Now',
-    tone: TONES.has(c.tone) ? c.tone : null,
+    tone: TONE_SET.has(c.tone) ? c.tone : null,
     persona: c.persona ? String(c.persona).slice(0, 80) : null,
     desire: c.desire ? String(c.desire).slice(0, 80) : null,
     usp: c.usp ? String(c.usp).slice(0, 120) : null,
