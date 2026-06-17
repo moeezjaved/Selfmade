@@ -13,9 +13,18 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Eval-harness bypass — ONLY active when SEARCH_EVAL_TOKEN is set in the env
+    // (unset in production → this is dead code) AND the request carries the matching
+    // token. Lets the search-eval harness measure precision@10 against the real route
+    // without a user session. Never weakens prod auth: no token env, no bypass.
+    const evalToken = process.env.SEARCH_EVAL_TOKEN
+    const isEval = !!evalToken && request.headers.get('x-eval-token') === evalToken
+
+    if (!isEval) {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const admin = createAdminClient()
     const { searchParams } = request.nextUrl
@@ -54,6 +63,10 @@ export async function GET(request: NextRequest) {
     let ads: any[] = []
     let total = 0
     let searchMethod = 'keyword'
+    // Reusable keyword OR-filter (non-brand mode) so the SAME match logic feeds
+    // both the result query and the count query — otherwise the displayed total
+    // drifts from what's actually shown.
+    let keywordOr: string | null = null
 
     // ── Build base query with ilike keyword search (fast, reliable) ──
     // Only show ads where we actually have a working R2 creative.
@@ -87,22 +100,38 @@ export async function GET(request: NextRequest) {
         // every ad with "hair" OR "loss"), plus the phrase/words as category tags
         // (so a "hair loss"-tagged ad surfaces even if those exact words aren't in
         // its copy). Phrase-first = precise, topic-relevant results.
-        const phrase = q.trim()
-        const words = phrase.split(/\s+/).filter(w => w.length > 1).slice(0, 6)
+        // Normalize the query into MATCH VARIANTS so multi-word and compound
+        // forms are equivalent: "active wear" ⇄ "activewear". Topic/category tags
+        // are stored as single lowercased tokens (e.g. "activewear"), and array
+        // contains (`cs`) needs an EXACT element — so a two-word query must also
+        // test its space-collapsed form or it misses the topic dimension entirely.
+        // That was the "active wear → 40, activewear → 879" bug.
+        // `clean` also strips chars that would break PostgREST or()/array syntax.
+        const clean = (s: string) => s.replace(/[,(){}]/g, ' ').replace(/\s+/g, ' ').trim()
+        const lcPhrase = clean(q).toLowerCase()
+        const compound = lcPhrase.replace(/\s+/g, '')   // "active wear" → "activewear"
+        const words = lcPhrase.split(/\s+/).filter(w => w.length > 1).slice(0, 6)
+        // Text dimensions: phrase AND compound form against the copy.
+        const textVariants = Array.from(new Set([lcPhrase, compound].filter(Boolean)))
+        // Tag dimensions: phrase, compound, and each significant word as a tag.
+        const tagVariants = Array.from(new Set([lcPhrase, compound, ...words].filter(Boolean)))
         const orParts = [
-          `body.ilike.%${phrase}%`,
-          `title.ilike.%${phrase}%`,
-          `description.ilike.%${phrase}%`,
-          `page_name.ilike.%${phrase}%`,
-          `brand_categories.cs.{${phrase.toLowerCase()}}`,
-          `industries.cs.{${phrase}}`,
-          // AI topical tags — "hair loss" matches ads tagged hair loss even when the
-          // copy says thinning/regrow/balding (4th search dimension).
-          `topics.cs.{${phrase.toLowerCase()}}`,
-          // each significant word as a category/topic tag too
-          ...words.flatMap(w => [`brand_categories.cs.{${w.toLowerCase()}}`, `topics.cs.{${w.toLowerCase()}}`]),
+          ...textVariants.flatMap(v => [
+            `body.ilike.%${v}%`,
+            `title.ilike.%${v}%`,
+            `description.ilike.%${v}%`,
+            `page_name.ilike.%${v}%`,
+          ]),
+          // AI topical/category tags (4th search dimension) — "active wear" now
+          // hits the "activewear" topic via the compound variant.
+          ...tagVariants.flatMap(v => [
+            `brand_categories.cs.{${v}}`,
+            `topics.cs.{${v}}`,
+            `industries.cs.{${v}}`,
+          ]),
         ]
-        if (orParts.length > 0) baseQuery = baseQuery.or(orParts.join(','))
+        keywordOr = orParts.join(',')
+        if (keywordOr) baseQuery = baseQuery.or(keywordOr)
       }
     }
 
@@ -206,12 +235,18 @@ export async function GET(request: NextRequest) {
       if (q && mode === 'brand') {
         if (pageId) cq = cq.or(`page_id.eq.${pageId},seed_terms.cs.{aff:${pageId}}`)
         else cq = cq.ilike('page_name', `%${q}%`)
+      } else if (q && keywordOr) {
+        // Same keyword match as the result query → the count reflects the search.
+        cq = cq.or(keywordOr)
       }
       return cq
     }
-    if (q && mode === 'brand') {
-      // bounded to one brand → paginate fully for an exact count
-      for (let off = 0; off < 50_000; off += 1000) {
+    if (q) {
+      // Bounded pagination for an accurate unique-creative count. Brand mode is
+      // one advertiser; keyword mode can be large, so cap the scan (≤10k rows)
+      // to keep latency sane — deeper totals are an estimate floor, not exact.
+      const maxScan = mode === 'brand' ? 50_000 : 10_000
+      for (let off = 0; off < maxScan; off += 1000) {
         const { data: chunk } = await countChunk(off)
         const rows = (chunk || []) as any[]
         addHashes(rows)
@@ -371,7 +406,6 @@ export async function GET(request: NextRequest) {
       desire: ad.desire,
       usp: ad.usp,
       aiClassified: ad.ai_classified,
-      similarity: ad.similarity,
     }))
 
     return NextResponse.json({

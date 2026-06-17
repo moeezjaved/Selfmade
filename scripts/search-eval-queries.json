@@ -1,0 +1,31 @@
+{
+  "_README": "Golden set for search eval. Each case: q (query), mode ('adcopy' concept search or 'brand'), and a relevance rule — expectBrands (result.pageName contains ANY, case-insensitive) and/or expectIndustryAny (result.industries OR result.topics intersects ANY). A result counts relevant if EITHER rule matches. Curate this to your real crawled brands; it's the source of truth for precision@10. Add/remove freely.",
+  "cases": [
+    { "q": "ag1", "mode": "brand", "expectBrands": ["ag1", "athletic greens"], "note": "brand exact — must not get capped" },
+    { "q": "athletic greens", "mode": "brand", "expectBrands": ["athletic greens", "ag1"], "note": "brand by full name" },
+    { "q": "gymshark", "mode": "brand", "expectBrands": ["gymshark"], "note": "apparel brand exact" },
+    { "q": "lululemon", "mode": "brand", "expectBrands": ["lululemon"] },
+    { "q": "vuori", "mode": "brand", "expectBrands": ["vuori"] },
+    { "q": "alo yoga", "mode": "brand", "expectBrands": ["alo"] },
+    { "q": "mars", "mode": "brand", "expectBrands": ["mars"], "note": "canonical-name resolution (was 'Chuck Liddell')" },
+
+    { "q": "activewear", "mode": "adcopy", "expectBrands": ["gymshark", "vuori", "lululemon", "alo"], "expectIndustryAny": ["apparel", "activewear", "athleisure"], "note": "concept → apparel brands" },
+    { "q": "gym wear", "mode": "adcopy", "expectBrands": ["gymshark", "vuori", "lululemon", "alo"], "expectIndustryAny": ["apparel", "activewear", "athleisure"], "note": "synonym of activewear — semantic stress" },
+    { "q": "workout clothes", "mode": "adcopy", "expectBrands": ["gymshark", "vuori", "lululemon", "alo"], "expectIndustryAny": ["apparel", "activewear", "athleisure"], "note": "phrase synonym — semantic stress" },
+    { "q": "athleisure", "mode": "adcopy", "expectBrands": ["gymshark", "vuori", "lululemon", "alo"], "expectIndustryAny": ["apparel", "activewear", "athleisure"] },
+    { "q": "leggings", "mode": "adcopy", "expectBrands": ["gymshark", "vuori", "lululemon", "alo"], "expectIndustryAny": ["apparel", "activewear"] },
+    { "q": "gym clothes for women", "mode": "adcopy", "expectBrands": ["gymshark", "vuori", "lululemon", "alo"], "expectIndustryAny": ["apparel", "activewear"], "note": "long-tail concept" },
+
+    { "q": "greens powder", "mode": "adcopy", "expectBrands": ["athletic greens", "ag1", "gruns", "grüns"], "expectIndustryAny": ["health", "supplement", "nutrition"], "note": "supplement concept" },
+    { "q": "supplement", "mode": "adcopy", "expectBrands": ["athletic greens", "ag1", "gruns", "david"], "expectIndustryAny": ["health", "supplement", "nutrition"] },
+    { "q": "protein", "mode": "adcopy", "expectBrands": ["david"], "expectIndustryAny": ["health", "supplement", "nutrition", "food"], "note": "David Protein" },
+    { "q": "daily vitamins", "mode": "adcopy", "expectIndustryAny": ["health", "supplement", "nutrition"], "note": "concept, no specific brand" },
+
+    { "q": "men's health", "mode": "adcopy", "expectBrands": ["mars", "hims"], "expectIndustryAny": ["health", "men", "wellness"], "note": "Mars Men / Hims" },
+    { "q": "hair loss", "mode": "adcopy", "expectIndustryAny": ["health", "hair", "men", "wellness"], "note": "topic — should match thinning/regrow ads too" },
+    { "q": "thinning hair", "mode": "adcopy", "expectIndustryAny": ["health", "hair", "men", "wellness"], "note": "synonym of hair loss — semantic stress" },
+
+    { "q": "skincare", "mode": "adcopy", "expectIndustryAny": ["beauty", "skincare", "cosmetics", "health"], "note": "may be empty if no skincare brand crawled — tracks coverage" },
+    { "q": "anti-aging serum", "mode": "adcopy", "expectIndustryAny": ["beauty", "skincare", "cosmetics"], "note": "tight semantic query — threshold-fragility check" }
+  ]
+}
