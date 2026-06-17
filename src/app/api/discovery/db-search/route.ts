@@ -11,6 +11,31 @@ export const dynamic = 'force-dynamic'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
+// ── Quality score for the Atria-style "Recommended" sort ──────────────────
+// A flat ORDER BY can't BLEND signals — it just tiers them. This blends the
+// signals that make a feed feel curated: longevity dominates (a long-running ad
+// is a proven winner — the strongest signal), then active status, recency, and
+// format. Applied in-process to the candidate window so we need no stored column
+// or refresh cron yet; promote to a materialized score if the eval proves it out.
+// Weights are deliberately at the top so they're tunable against precision@10.
+const RANK_W = { longevity: 1.0, active: 3.0, recency: 2.0, video: 0.6 }
+function qualityScore(ad: any): number {
+  const days = Math.max(0, Number(ad.days_running) || 0)
+  const longevity = Math.log1p(days)                 // 0..~5.9 (365 days)
+  const active = ad.is_active ? 1 : 0
+  let recency = 0                                     // 30-day half-life decay, 0..1
+  const ls = ad.last_seen ? Date.parse(ad.last_seen) : NaN
+  if (!Number.isNaN(ls)) {
+    const ageDays = Math.max(0, (Date.now() - ls) / 86_400_000)
+    recency = Math.exp(-ageDays / 30)
+  }
+  const hasVideo = (ad.format === 'Video' || ad.video_url || ad.video_hash) ? 1 : 0
+  return RANK_W.longevity * longevity
+       + RANK_W.active * active
+       + RANK_W.recency * recency
+       + RANK_W.video * hasVideo
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Eval-harness bypass — ONLY active when SEARCH_EVAL_TOKEN is set in the env
@@ -191,11 +216,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ads: [], total: 0, totalInDB, source: 'indexed', searchMethod: 'error' })
     }
 
+    // 'recommended' sort = BLEND quality signals in-process (longevity-led) across
+    // the over-fetched candidate window, before we dedup down to the page. The DB
+    // pre-sorts the window (is_active → days_running → last_seen) to pick a good
+    // pool; this smooths it into a single curated score. Other sorts keep the exact
+    // DB order the user asked for (recent/oldest/longest). Brand mode also benefits —
+    // a brand's best ads surface first.
+    let candidateRows = (keywordData || []) as any[]
+    if (sort === 'recommended') {
+      candidateRows = candidateRows
+        .map(a => ({ a, s: qualityScore(a) }))
+        .sort((x, y) => y.s - x.s)
+        .map(x => x.a)
+    }
+
     // Server-side dedup by image_hash / video_hash so the discovery grid
     // shows one card per unique creative instead of repeating same image.
     const seenHashes = new Set<string>()
     const dedupedAds: any[] = []
-    for (const ad of (keywordData || []) as any[]) {
+    for (const ad of candidateRows) {
       const key = ad.image_hash || ad.video_hash || `_${ad.ad_id}`
       if (seenHashes.has(key)) continue
       seenHashes.add(key)
