@@ -226,37 +226,54 @@ export async function GET(request: NextRequest) {
     // Most common page_name among the brand's own ads = the real brand name.
     const canonicalName = Object.entries(nameFreq).sort((a, b) => b[1] - a[1])[0]?.[0] || brandName || ''
 
-    // ── Semantic re-ranking for multi-word queries (optional, enhances order) ──
-    // Only attempt if we have results and OpenAI key — does NOT reduce result count.
-    // SKIP for brand searches: semantic content-similarity wrongly drops most of a
-    // brand's ads (e.g. "Mars Men" matched only 84 of 331 unique creatives) because
-    // many ad copies don't semantically resemble the brand name.
-    if (q && mode !== 'brand' && q.trim().split(/\s+/).length > 1 && process.env.OPENAI_API_KEY && ads.length > 1) {
+    // ── Semantic GAP-FILL for concept searches (additive, never replaces) ──
+    // The literal keyword/topic match above is PRECISE but word-bound: "gym wear"
+    // won't match an ad tagged "activewear"/"athleisure". So when the literal match
+    // leaves the page short of a full screen, we top it up with ads that are CLOSE
+    // BY MEANING (pgvector cosine on the query embedding). This is purely additive —
+    // every exact match keeps its place; semantic only fills the empty slots. That
+    // avoids the old replace-mode bug that capped "Mars Men" at 84 of 331 creatives.
+    // SKIP brand mode (a brand's ad copy rarely resembles its own name semantically).
+    if (q && mode !== 'brand' && ads.length < limit && process.env.OPENAI_API_KEY) {
       try {
         const embRes = await openai.embeddings.create({
           model: 'text-embedding-3-small',
           input: q.slice(0, 8000),
         })
-        const queryEmbedding = embRes.data[0].embedding
-
-        const { data: vectorResults, error: vecError } = await admin.rpc('search_ads_semantic', {
-          query_embedding: queryEmbedding,
-          match_threshold: 0.1,
-          match_count: 200,
+        const { data: vectorResults } = await admin.rpc('search_ads_semantic', {
+          query_embedding: embRes.data[0].embedding,
+          match_threshold: 0.3,          // related-by-meaning, not loose noise
+          match_count: 240,
           filter_country: country === 'ALL' ? null : country,
           filter_active: status === 'ACTIVE' ? true : status === 'INACTIVE' ? false : null,
           filter_format: format || null,
           filter_industry: industry || null,
         })
-
-        if (!vecError && vectorResults?.length >= ads.length) {
-          // Semantic returned more/equal results — use it as primary
-          ads = vectorResults.slice(offset, offset + limit)
-          total = vectorResults.length
-          searchMethod = 'semantic'
+        if (vectorResults?.length) {
+          const haveIds = new Set(ads.map((a: any) => a.ad_id))
+          const haveHashes = new Set(
+            ads.map((a: any) => a.image_hash || a.video_hash).filter(Boolean)
+          )
+          // Slice by page offset so deeper pages get DIFFERENT semantic fillers
+          // (results are similarity-ranked & stable for the same query → no repeats).
+          let added = 0
+          for (const v of (vectorResults as any[]).slice(offset)) {
+            if (ads.length >= limit) break
+            if (haveIds.has(v.ad_id)) continue
+            const h = v.image_hash || v.video_hash
+            if (h && haveHashes.has(h)) continue
+            if (h) haveHashes.add(h)
+            haveIds.add(v.ad_id)
+            ads.push({ ...v, _semantic: true })
+            added++
+          }
+          if (added > 0) {
+            total += added
+            searchMethod = 'hybrid'
+          }
         }
       } catch {
-        // Semantic failed — keep keyword results
+        // Semantic failed (no key / RPC error) — keep the precise keyword results.
       }
     }
 
