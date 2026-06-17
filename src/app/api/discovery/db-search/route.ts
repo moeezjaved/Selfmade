@@ -152,16 +152,26 @@ export async function GET(request: NextRequest) {
     // one advertiser's ads) we PAGINATE to count the full set — otherwise the total
     // undercounts (e.g. Mars Men showed 242 of its real ~331 unique creatives).
     const uniqSet = new Set<string>()
+    // Canonical brand name = most common page_name among the brand's OWN ads
+    // (page_id === pageId). A page runs partnership/affiliate ads under other
+    // names (e.g. Grüns's page also shows "Chelsea Handler"); the dominant name
+    // is the real brand. Computed here so the grid labels every card with the
+    // real name users search by — not whichever partnership ad sorted first.
+    const nameFreq: Record<string, number> = {}
     const addHashes = (rows: any[]) => {
       for (const r of rows) {
         if (r.image_hash) uniqSet.add('i:' + r.image_hash)
         if (r.video_hash) uniqSet.add('v:' + r.video_hash)
+        if (pageId && r.page_id === pageId && r.page_name) {
+          const n = String(r.page_name).trim()
+          if (n) nameFreq[n] = (nameFreq[n] || 0) + 1
+        }
       }
     }
     const countChunk = (off: number) => {
       let cq = admin
         .from('discovery_ads_index')
-        .select('image_hash,video_hash')
+        .select('image_hash,video_hash,page_id,page_name')
         .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
         .range(off, off + 999)
       if (country && country !== 'ALL') cq = cq.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
@@ -185,6 +195,8 @@ export async function GET(request: NextRequest) {
     }
     const uniqueHashCount = uniqSet.size
     total = uniqueHashCount || dedupedAds.length
+    // Most common page_name among the brand's own ads = the real brand name.
+    const canonicalName = Object.entries(nameFreq).sort((a, b) => b[1] - a[1])[0]?.[0] || brandName || ''
 
     // ── Semantic re-ranking for multi-word queries (optional, enhances order) ──
     // Only attempt if we have results and OpenAI key — does NOT reduce result count.
@@ -253,9 +265,9 @@ export async function GET(request: NextRequest) {
       //  • AFFILIATE ads (a DIFFERENT page driving to the brand's site) → keep
       //    their real page name (e.g. "New York Post") and flag them, so the card
       //    can badge "promotes <brand>".
-      pageName: (pageId && brandName && ad.page_id === pageId) ? brandName : ad.page_name,
+      pageName: (pageId && ad.page_id === pageId) ? (canonicalName || ad.page_name) : ad.page_name,
       isAffiliate: !!(pageId && ad.page_id !== pageId),
-      affiliateOf: (pageId && ad.page_id !== pageId) ? (brandName || null) : null,
+      affiliateOf: (pageId && ad.page_id !== pageId) ? (canonicalName || brandName || null) : null,
       body: ad.body,
       title: ad.title,
       caption: ad.caption,

@@ -23,7 +23,6 @@ export async function GET(_req: NextRequest) {
   const [
     { data: terms },
     { data: states },
-    { data: adCounts },
   ] = await Promise.all([
     // Show only BRAND-type terms (not category/adcopy seeds).
     // A row counts as a brand if term_type='brand' OR it has a page_id.
@@ -36,34 +35,32 @@ export async function GET(_req: NextRequest) {
       .from('discovery_brand_crawl_state')
       .select('page_id, brand_name, cursor, ads_indexed, last_run_at, last_run_added, exhausted_at')
       .order('last_run_at', { ascending: false }),
-    // Lightweight: just need brand names from ads. Pagination would be slow,
-    // and we'll count via per-brand HEAD count below.
-    admin
-      .from('discovery_ads_index')
-      .select('page_id, page_name')
-      .limit(2000),
   ])
 
-  // Build per-page_id name map (just for brand_name display)
+  // Per-brand ad count + canonical display name. A single Meta page runs ads
+  // under several names (its own + partnership/affiliate ads, e.g. Grüns's page
+  // also shows "Chelsea Handler"). The real brand name is the MOST COMMON
+  // page_name on that page — not whichever ad we happen to sample first. We
+  // fetch a sample of page_names per brand and take the mode. Run sequentially
+  // (parallel times out) with 'estimated' count (fast on big tables).
   const adCountByPage: Record<string, { count: number; name: string }> = {}
-  for (const r of (adCounts || []) as any[]) {
-    const k = r.page_id
-    if (!adCountByPage[k]) adCountByPage[k] = { count: 0, name: r.page_name || '' }
-    if (r.page_name && !adCountByPage[k].name) adCountByPage[k].name = r.page_name
-  }
-
-  // Get per-brand ad counts. Run sequentially (parallel times out) and
-  // use 'estimated' count which is much faster than 'exact' on big tables.
   const tracked = (terms || []).filter((t: any) => t.page_id)
   for (const t of tracked) {
     try {
-      const { count, error } = await admin
+      const { data: sample, count, error } = await admin
         .from('discovery_ads_index')
-        .select('*', { count: 'estimated', head: true })
+        .select('page_name', { count: 'estimated' })
         .eq('page_id', t.page_id)
+        .not('page_name', 'is', null)
+        .limit(400)
       if (error) continue
-      if (!adCountByPage[t.page_id]) adCountByPage[t.page_id] = { count: 0, name: '' }
-      adCountByPage[t.page_id].count = count || 0
+      const freq: Record<string, number> = {}
+      for (const r of (sample || []) as any[]) {
+        const n = (r.page_name || '').trim()
+        if (n) freq[n] = (freq[n] || 0) + 1
+      }
+      const canonical = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || ''
+      adCountByPage[t.page_id] = { count: count || 0, name: canonical }
     } catch { /* skip on failure */ }
   }
 
