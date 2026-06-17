@@ -96,9 +96,11 @@ export async function GET(request: NextRequest) {
           `page_name.ilike.%${phrase}%`,
           `brand_categories.cs.{${phrase.toLowerCase()}}`,
           `industries.cs.{${phrase}}`,
-          // each significant word as a category tag (e.g. "hair loss" → a "hairloss"
-          // or "hair" category still matches)
-          ...words.map(w => `brand_categories.cs.{${w.toLowerCase()}}`),
+          // AI topical tags — "hair loss" matches ads tagged hair loss even when the
+          // copy says thinning/regrow/balding (4th search dimension).
+          `topics.cs.{${phrase.toLowerCase()}}`,
+          // each significant word as a category/topic tag too
+          ...words.flatMap(w => [`brand_categories.cs.{${w.toLowerCase()}}`, `topics.cs.{${w.toLowerCase()}}`]),
         ]
         if (orParts.length > 0) baseQuery = baseQuery.or(orParts.join(','))
       }
