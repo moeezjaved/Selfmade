@@ -90,6 +90,9 @@ interface ExtractedAd {
   is_active: boolean
   start_date_string?: string
   end_date_string?: string
+  start_date_epoch?: number      // Meta's start_date (unix seconds) — present ~always
+  end_date_epoch?: number
+  targeted_countries?: string[]  // targeted_or_reached_countries (empty in country=ALL crawls)
   display_format?: string
   body_text?: string
   cta_text?: string
@@ -220,6 +223,9 @@ function extractAdsFromText(text: string): ExtractedAd[] {
       is_active: !!obj.is_active,
       start_date_string: obj.start_date_string,
       end_date_string: obj.end_date_string,
+      start_date_epoch: typeof obj.start_date === 'number' ? obj.start_date : undefined,
+      end_date_epoch: typeof obj.end_date === 'number' ? obj.end_date : undefined,
+      targeted_countries: Array.isArray(obj.targeted_or_reached_countries) ? obj.targeted_or_reached_countries : undefined,
       display_format: snap.display_format,
       body_text: snap.body?.text,
       cta_text: snap.cta_text,
@@ -398,6 +404,23 @@ async function archiveRawResponse(args: {
   }
 }
 
+// Normalize Meta's messy display_format (VIDEO/IMAGE/Image/DCO/DPA/CAROUSEL…)
+// into the 3 values the Discovery UI filters on: Image / Video / Carousel.
+// Prefer the actual media (video present = Video), then explicit format, then
+// infer (multiple distinct images = Carousel). Fixes the format filter, which
+// returned 0 for "Video"/"Carousel" due to the case/taxonomy mismatch.
+function normalizeFormat(ad: ExtractedAd): string {
+  const df = (ad.display_format || '').toUpperCase()
+  if ((ad.raw_video_urls?.length ?? 0) > 0 || df === 'VIDEO') return 'Video'
+  if (df === 'CAROUSEL') return 'Carousel'
+  if (df === 'IMAGE') return 'Image'
+  if ((ad.raw_image_urls?.length ?? 0) > 1) return 'Carousel'
+  return 'Image'
+}
+function epochToIso(sec?: number): string | null {
+  return (typeof sec === 'number' && sec > 0) ? new Date(sec * 1000).toISOString() : null
+}
+
 // ========== DB writes ==========
 async function saveAdsToIndex(
   ads: ExtractedAd[],
@@ -422,10 +445,12 @@ async function saveAdsToIndex(
     caption: ad.caption || null,
     cta: ad.cta_text || null,
     is_active: ad.is_active,
-    format: ad.display_format || null,
-    start_date: ad.start_date_string || null,
-    stop_date: ad.end_date_string || null,
+    format: normalizeFormat(ad),
+    // Meta usually omits the *_string dates but always sends epoch start_date.
+    start_date: ad.start_date_string || epochToIso(ad.start_date_epoch),
+    stop_date: ad.end_date_string || epochToIso(ad.end_date_epoch),
     last_seen: new Date().toISOString(),
+    ...(ad.targeted_countries && ad.targeted_countries.length > 0 ? { targeted_countries: ad.targeted_countries } : {}),
     ...(seedTag ? { seed_terms: [seedTag] } : {}),
     raw_image_urls:         ad.raw_image_urls.length         > 0 ? ad.raw_image_urls         : null,
     raw_video_urls:         ad.raw_video_urls.length         > 0 ? ad.raw_video_urls         : null,
