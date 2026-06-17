@@ -1071,6 +1071,25 @@ async function main() {
       await (supabase as any).from('discovery_crawl_terms')
         .update({ last_crawled_at: lastCrawled })
         .eq('page_id', brand.page_id)
+
+      // Keep the admin Brands view in sync. It reads discovery_brand_crawl_state
+      // (exhausted_at) to show "✅ Done — re-crawl in Nd" vs "Queued". The droplet
+      // crawler is the real engine, so mirror our outcome there:
+      //   • stable (settled to full cadence) → exhausted_at = now → "Done".
+      //   • verify-recrawl (still filling) → exhausted_at = null → "Queued/in-progress".
+      //   • gated (0 ads) → leave the row untouched (transient, will retry).
+      if (m.adsDiscovered > 0) {
+        const doneStable = backoffMin === SCHED_GAP_MIN
+        await (supabase as any).from('discovery_brand_crawl_state').upsert({
+          page_id: brand.page_id,
+          brand_name: brand.term || null,
+          last_run_at: new Date(now).toISOString(),
+          last_run_added: m.adsNew,
+          ads_indexed: m.adsDiscovered,
+          exhausted_at: doneStable ? new Date(now).toISOString() : null,
+          cursor: null,
+        }, { onConflict: 'page_id' })
+      }
     } catch (e: any) {
       console.error(`💥 Brand ${brand.page_id} crashed: ${e?.message}`)
     }
