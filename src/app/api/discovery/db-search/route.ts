@@ -82,20 +82,25 @@ export async function GET(request: NextRequest) {
         if (pageId) baseQuery = baseQuery.or(`page_id.eq.${pageId},seed_terms.cs.{aff:${pageId}}`)
         else baseQuery = baseQuery.ilike('page_name', `%${q}%`)
       } else {
-        const words = q.trim().split(/\s+/).filter(w => w.length > 1).slice(0, 6)
-        if (words.length > 0) {
-          // Match: text fields (ilike) + brand_categories array (contains)
-          // Searching "gymwear" finds ads where brand_categories has "gymwear"
-          // even if the ad copy doesn't mention it.
-          const orParts = words.flatMap(w => [
-            `body.ilike.%${w}%`,
-            `title.ilike.%${w}%`,
-            `page_name.ilike.%${w}%`,
-            `description.ilike.%${w}%`,
-            `brand_categories.cs.{${w.toLowerCase()}}`,
-          ])
-          baseQuery = baseQuery.or(orParts.join(','))
-        }
+        // Topic/keyword search across 3 dimensions: ad copy, brand name, category.
+        // Match the FULL PHRASE in text (so "hair loss" finds hair-loss ads, not
+        // every ad with "hair" OR "loss"), plus the phrase/words as category tags
+        // (so a "hair loss"-tagged ad surfaces even if those exact words aren't in
+        // its copy). Phrase-first = precise, topic-relevant results.
+        const phrase = q.trim()
+        const words = phrase.split(/\s+/).filter(w => w.length > 1).slice(0, 6)
+        const orParts = [
+          `body.ilike.%${phrase}%`,
+          `title.ilike.%${phrase}%`,
+          `description.ilike.%${phrase}%`,
+          `page_name.ilike.%${phrase}%`,
+          `brand_categories.cs.{${phrase.toLowerCase()}}`,
+          `industries.cs.{${phrase}}`,
+          // each significant word as a category tag (e.g. "hair loss" → a "hairloss"
+          // or "hair" category still matches)
+          ...words.map(w => `brand_categories.cs.{${w.toLowerCase()}}`),
+        ]
+        if (orParts.length > 0) baseQuery = baseQuery.or(orParts.join(','))
       }
     }
 
@@ -133,7 +138,16 @@ export async function GET(request: NextRequest) {
     // Sort
     if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
     else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
-    else baseQuery = baseQuery.order('last_seen', { ascending: false })
+    else if (sort === 'recent') baseQuery = baseQuery.order('last_seen', { ascending: false })
+    else {
+      // 'recommended' (default, Atria-style): proven winners first — active ads
+      // that have run the longest, then recency. Makes the feed feel curated
+      // instead of a raw chronological dump.
+      baseQuery = baseQuery
+        .order('is_active', { ascending: false })
+        .order('days_running', { ascending: false, nullsFirst: false })
+        .order('last_seen', { ascending: false })
+    }
 
     // Over-fetch so server-side dedup can return `limit` UNIQUE creatives per page
     const overFetchMultiplier = 5  // ~5x dedup ratio observed for popular brands
