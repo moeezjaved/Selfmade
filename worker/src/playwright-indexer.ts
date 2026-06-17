@@ -568,16 +568,19 @@ async function crawlBrand(opts: {
   // crawl. New brands (no known IDs) still crawl fully. Skipped in affiliate
   // mode (we want every affiliate, not just new ones).
   let knownIds: string[] = []
-  // Skip incremental for per-country crawls: we must enumerate ALL of that
-  // country's ads to tag each with the country (early-stop would miss some).
-  if (!opts.searchTerm && !opts.country) {
+  // Incremental: load ads we already have. For a PER-COUNTRY crawl the known set
+  // is ads already TAGGED with that country (targeted_countries contains it) — so
+  // a re-crawl of country=GB stops once it hits ads already known-in-GB, fetching
+  // only NEW ads instead of re-pulling all 1,580 every week. First crawl of a
+  // country has 0 tagged → full enumeration (one-time). Skipped in affiliate mode.
+  if (!opts.searchTerm) {
     try {
-      const { data } = await (supabase as any)
+      let q = (supabase as any)
         .from('discovery_ads_index')
         .select('ad_id')
         .eq('page_id', opts.pageId)
-        .order('last_seen', { ascending: false })
-        .limit(2000)
+      if (opts.country) q = q.contains('targeted_countries', [opts.country])
+      const { data } = await q.order('last_seen', { ascending: false }).limit(2000)
       const loaded = ((data || []) as any[]).map(r => r.ad_id)
       // Only enable early-stop for WELL-COVERED brands. A brand with few indexed
       // ads may have been soft-gate-truncated (e.g. ag1 stuck at 30) — early-
