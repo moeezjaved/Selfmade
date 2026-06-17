@@ -168,6 +168,7 @@ const COUNTRIES = [
 ]
 
 const SORT_OPTS = [
+  { value: 'recommended', label: '✨ Recommended' },
   { value: 'recent', label: 'Most Recent' },
   { value: 'longest', label: 'Longest Running' },
   { value: 'oldest', label: 'Oldest First' },
@@ -1013,7 +1014,7 @@ export default function DiscoveryPage() {
   const [error, setError] = useState('')
 
   // Server-side filters (trigger re-fetch)
-  const [sort, setSort] = useState('recent')
+  const [sort, setSort] = useState('recommended')
   const [status, setStatus] = useState('ALL')
   const [platforms, setPlatforms] = useState<string[]>([])
   const [country, setCountry] = useState('US')
