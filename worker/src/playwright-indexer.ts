@@ -56,6 +56,14 @@ const TARGET_ADS_PER_BRAND = 1500         // bumped after fixing pagination scro
 // behaviour of hammering the same blocked brand every cycle.
 const SCHED_GAP_MIN = parseInt(process.env.SCHEDULER_MIN_BRAND_GAP_MIN ?? '360', 10)  // 6h between full re-crawls
 const GATE_RETRY_MIN = parseInt(process.env.SCHEDULER_GATE_RETRY_MIN ?? '15', 10)     // retry a gated brand in 15m
+// After a crawl that added >= this many ads, re-crawl soon to verify we got the
+// FULL inventory (Meta soft-gates can truncate a big brand to ~30 and mark it
+// "complete"). The verify pass is cheap thanks to incremental early-stop.
+const GROWTH_VERIFY_THRESHOLD = parseInt(process.env.SCHEDULER_GROWTH_VERIFY ?? '20', 10)
+const VERIFY_RETRY_MIN = parseInt(process.env.SCHEDULER_VERIFY_RETRY_MIN ?? '30', 10) // verify-recrawl in 30m
+// Below this many already-indexed ads, skip incremental early-stop and crawl
+// fully — guards under-covered / soft-gated brands from being cemented low.
+const INCREMENTAL_MIN_KNOWN = parseInt(process.env.SCHEDULER_INCREMENTAL_MIN_KNOWN ?? '100', 10)
                                           // and crawls now ingest ~10/scroll, so 1500 is reachable in ~3-5 min
 const MAX_AD_BYTES_TO_STORE = 800_000     // truncate huge responses for archive
 
@@ -520,8 +528,17 @@ async function crawlBrand(opts: {
         .eq('page_id', opts.pageId)
         .order('last_seen', { ascending: false })
         .limit(2000)
-      knownIds = ((data || []) as any[]).map(r => r.ad_id)
-      if (knownIds.length > 0) console.log(`  ♻️ incremental: ${knownIds.length} ads already indexed — will stop early on known inventory`)
+      const loaded = ((data || []) as any[]).map(r => r.ad_id)
+      // Only enable early-stop for WELL-COVERED brands. A brand with few indexed
+      // ads may have been soft-gate-truncated (e.g. ag1 stuck at 30) — early-
+      // stopping there would cement the partial count. Below the threshold we
+      // crawl fully (cheap anyway) so under-covered brands always get a real shot.
+      if (loaded.length >= INCREMENTAL_MIN_KNOWN) {
+        knownIds = loaded
+        console.log(`  ♻️ incremental: ${knownIds.length} ads already indexed — will stop early on known inventory`)
+      } else if (loaded.length > 0) {
+        console.log(`  🌱 ${loaded.length} ads indexed (< ${INCREMENTAL_MIN_KNOWN}) — full crawl to ensure coverage`)
+      }
     } catch { /* full crawl on error */ }
   }
 
@@ -1027,17 +1044,30 @@ async function main() {
         runId,
         maxScrolls,
       })
-      // Always advance last_crawled_at so we never hammer the same brand every
-      // cycle. Success → full cadence (SCHED_GAP_MIN). Gated (0 ads, IP soft-
-      // blocked) → short backoff (GATE_RETRY_MIN) so another IP retries soon
-      // without burning the whole pool on a blocked brand.
+      // Decide when this brand is eligible to crawl again by setting
+      // last_crawled_at into the past so `now - last_crawled_at >= SCHED_GAP_MIN`
+      // fires after `backoffMin`. Three cases:
+      //   • Gated (0 ads, IP soft-blocked) → GATE_RETRY_MIN, another IP retries.
+      //   • Substantial new ads (>= GROWTH_VERIFY_THRESHOLD) → VERIFY_RETRY_MIN.
+      //     A truncated "soft-gate" crawl returns a partial set but is marked
+      //     complete (e.g. ag1 returned 30 of hundreds). We can't tell a soft-gate
+      //     from a real small brand in one crawl — so after ANY big haul we
+      //     re-crawl soon to verify. Incremental makes the verify cheap: a fully
+      //     covered brand finds ~0 new and settles to full cadence; a soft-gated
+      //     one keeps finding new ads and keeps recovering until it stabilises.
+      //   • Otherwise (little/no growth → stable) → full SCHED_GAP_MIN cadence.
       const now = Date.now()
-      const lastCrawled = m.adsDiscovered > 0
-        ? new Date(now).toISOString()
-        : new Date(now - Math.max(0, SCHED_GAP_MIN - GATE_RETRY_MIN) * 60_000).toISOString()
+      let backoffMin: number
       if (m.adsDiscovered === 0) {
-        console.warn(`  ⚠️ ${brand.term || brand.page_id}: 0 ads (gated) — backing off ${GATE_RETRY_MIN} min before retry`)
+        backoffMin = GATE_RETRY_MIN
+        console.warn(`  ⚠️ ${brand.term || brand.page_id}: 0 ads (gated) — retry in ${GATE_RETRY_MIN} min`)
+      } else if (m.adsNew >= GROWTH_VERIFY_THRESHOLD) {
+        backoffMin = VERIFY_RETRY_MIN
+        console.log(`  🔎 ${brand.term || brand.page_id}: +${m.adsNew} new — verify-recrawl in ${VERIFY_RETRY_MIN} min (guards against soft-gate truncation)`)
+      } else {
+        backoffMin = SCHED_GAP_MIN
       }
+      const lastCrawled = new Date(now - Math.max(0, SCHED_GAP_MIN - backoffMin) * 60_000).toISOString()
       await (supabase as any).from('discovery_crawl_terms')
         .update({ last_crawled_at: lastCrawled })
         .eq('page_id', brand.page_id)
