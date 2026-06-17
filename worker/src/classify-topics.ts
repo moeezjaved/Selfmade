@@ -39,12 +39,20 @@ ${adsText}
 
 Return only the JSON array.`
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
-  })
-  const data: any = await res.json()
+  let data: any
+  while (true) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: MODEL, max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
+    })
+    data = await res.json()
+    // Rate limit / transient → wait and retry (don't count as a failure).
+    if (data.error && /rate.?limit|overloaded|429|529/i.test(data.error.message || '')) {
+      await new Promise(r => setTimeout(r, 20000)); continue
+    }
+    break
+  }
   if (data.error) { console.warn('  anthropic error:', data.error.message); return 0 }
   tIn += data.usage?.input_tokens || 0; tOut += data.usage?.output_tokens || 0
 

@@ -17,9 +17,13 @@ const MAX_BATCHES = maxArg ? parseInt(maxArg.split('=')[1], 10) : Infinity
 
 let totalTokensIn = 0, totalTokensOut = 0
 
+// Strip lone/unpaired surrogates (corrupted emoji etc.) — they make JSON.stringify
+// emit invalid JSON that the Anthropic API rejects, stalling the whole batch.
+const clean = (s: any) => String(s || '').replace(/[\uD800-\uDFFF]/g, '')
+
 async function classifyBatch(ads: any[]): Promise<number> {
   const adsText = ads.map((ad, i) =>
-    `AD ${i + 1} [${ad.ad_id}]:\nBrand: ${ad.page_name}\nHeadline: ${ad.title || ''}\nBody: ${(ad.body || '').slice(0, 400)}`
+    `AD ${i + 1} [${ad.ad_id}]:\nBrand: ${clean(ad.page_name)}\nHeadline: ${clean(ad.title)}\nBody: ${clean(ad.body).slice(0, 400)}`
   ).join('\n\n---\n\n')
 
   const prompt = `Analyze these ${ads.length} ads and classify each one. Return a JSON array only, no explanation.
@@ -42,12 +46,19 @@ ${adsText}
 
 Return only the JSON array.`
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
-  })
-  const data: any = await res.json()
+  let data: any
+  while (true) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: MODEL, max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+    })
+    data = await res.json()
+    if (data.error && /rate.?limit|overloaded|429|529/i.test(data.error.message || '')) {
+      await new Promise(r => setTimeout(r, 20000)); continue
+    }
+    break
+  }
   if (data.error) { console.warn('  anthropic error:', data.error.message); return 0 }
   totalTokensIn += data.usage?.input_tokens || 0
   totalTokensOut += data.usage?.output_tokens || 0
@@ -70,7 +81,7 @@ Return only the JSON array.`
 
 async function main() {
   console.log(`AI classify — model=${MODEL}, batch=${BATCH}, maxBatches=${MAX_BATCHES}`)
-  let done = 0, batches = 0
+  let done = 0, batches = 0, fails = 0
   while (batches < MAX_BATCHES) {
     const { data: ads } = await (supabase as any)
       .from('discovery_ads_index')
@@ -82,6 +93,14 @@ async function main() {
     if (!ads?.length) { console.log('  no more unclassified ads.'); break }
     const n = await classifyBatch(ads)
     done += n; batches++
+    // Breaker: if a batch makes no progress (API/parse failure), don't loop on the
+    // same ads forever. Log the offending ids and stop after a few consecutive misses.
+    if (n === 0) {
+      fails++
+      console.warn(`  ⚠️ batch ${batches} classified 0 — ad_ids: ${ads.map((a: any) => a.ad_id).join(',')}`)
+      if (fails >= 5) { console.error('  aborting after 5 consecutive failed batches.'); break }
+    } else { fails = 0 }
+    await new Promise(r => setTimeout(r, 400))  // gentle on rate limits
     // Haiku 4.5 pricing ≈ $1/M input, $5/M output
     const cost = (totalTokensIn / 1e6) * 1 + (totalTokensOut / 1e6) * 5
     console.log(`  batch ${batches}: +${n} (total ${done}) | tokens in=${totalTokensIn} out=${totalTokensOut} | est $${cost.toFixed(3)}`)
