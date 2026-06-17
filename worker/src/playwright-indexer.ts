@@ -1100,17 +1100,15 @@ async function crawlBrandCountries(opts: {
 // drifting back. Only runs for brands that actually have manual categories.
 async function stampBrandMetadata(pageId: string, categories: string[]) {
   if (!categories.length) return
-  const update: any = { brand_categories: categories }
-  try {
-    const { data } = await (supabase as any)
-      .from('discovery_ads_index').select('industries').eq('page_id', pageId).limit(400)
-    const freq: Record<string, number> = {}
-    for (const r of (data || []) as any[]) for (const ind of (r.industries || [])) freq[ind] = (freq[ind] || 0) + 1
-    const top = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 1).map(([n]) => n)
-    if (top.length) update.industries = top
-  } catch { /* keep categories-only update */ }
-  await (supabase as any).from('discovery_ads_index').update(update).eq('page_id', pageId)
-  console.log(`  🏷️ stamped categories [${categories.join(', ')}]${update.industries ? ` + industry ${update.industries[0]}` : ''}`)
+  // Stamp the manual category onto all the brand's ads. Do NOT touch industries:
+  // earlier we recomputed the "dominant" industry from the ads, but for brands the
+  // auto-detector mislabels (apparel brands keyword-match as "Health & Fitness"),
+  // that wiped manual corrections. Industry stays whatever it's set to (manual
+  // corrections persist; per-ad auto-detect only fills NEW ads).
+  await (supabase as any).from('discovery_ads_index')
+    .update({ brand_categories: categories })
+    .eq('page_id', pageId)
+  console.log(`  🏷️ stamped categories [${categories.join(', ')}]`)
 }
 
 // ========== Main ==========
