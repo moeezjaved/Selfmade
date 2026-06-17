@@ -137,10 +137,13 @@ export async function downloadAssetsForAd(opts: {
     // Images: direct from droplet first; only fall back to a pool proxy if the
     // direct fetch fails (rare). Videos: always direct.
     async function fetchImage(url: string): Promise<DownloadedAsset | null> {
+      // DIRECT-ONLY — never use the metered IPRoyal proxy for images (protects
+      // credits). fbcdn serves them to the droplet directly; on a transient miss
+      // retry once direct, else skip (re-tried on the next crawl).
       const direct = await fetchOne(url, 'image/jpeg', false)
       if (direct) return direct
-      if (await ensureProxy()) return fetchOne(url, 'image/jpeg', true)
-      return null
+      void ensureProxy  // (kept for videos/edge cases; images never proxy)
+      return await fetchOne(url, 'image/jpeg', false)
     }
 
     const [images, videos] = await Promise.all([
