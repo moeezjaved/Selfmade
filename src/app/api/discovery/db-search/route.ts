@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
+import { expandQuery, matchTierWeight, matchTierReason, type Expansion } from '@/lib/search/concepts'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,6 +93,8 @@ export async function GET(request: NextRequest) {
     // both the result query and the count query — otherwise the displayed total
     // drifts from what's actually shown.
     let keywordOr: string | null = null
+    // Concept expansion (query-side synonym/sibling map) — empty for brand mode.
+    let expansion: Expansion = { synonymTags: new Set(), relatedTags: new Set(), hit: false }
 
     // ── Build base query with ilike keyword search (fast, reliable) ──
     // Only show ads where we actually have a working R2 creative.
@@ -136,10 +139,16 @@ export async function GET(request: NextRequest) {
         const lcPhrase = clean(q).toLowerCase()
         const compound = lcPhrase.replace(/\s+/g, '')   // "active wear" → "activewear"
         const words = lcPhrase.split(/\s+/).filter(w => w.length > 1).slice(0, 6)
+        // CONCEPT EXPANSION — map the query to its concept's real tags so e.g.
+        // "thinning hair" reaches the stored "hair loss" tag (same concept) and
+        // "hair growth" (related solution). Ranking keeps the solution ads below the
+        // on-point ones. Mirrors the tag-side normalization (single concept source).
+        expansion = expandQuery(q)
+        const expandedTags = [...Array.from(expansion.synonymTags), ...Array.from(expansion.relatedTags)]
         // Text dimensions: phrase AND compound form against the copy.
         const textVariants = Array.from(new Set([lcPhrase, compound].filter(Boolean)))
-        // Tag dimensions: phrase, compound, and each significant word as a tag.
-        const tagVariants = Array.from(new Set([lcPhrase, compound, ...words].filter(Boolean)))
+        // Tag dimensions: phrase, compound, each significant word, AND expanded concept tags.
+        const tagVariants = Array.from(new Set([lcPhrase, compound, ...words, ...expandedTags].filter(Boolean)))
         const orParts = [
           ...textVariants.flatMap(v => [
             `body.ilike.%${v}%`,
@@ -216,17 +225,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ads: [], total: 0, totalInDB, source: 'indexed', searchMethod: 'error' })
     }
 
-    // 'recommended' sort = BLEND quality signals in-process (longevity-led) across
-    // the over-fetched candidate window, before we dedup down to the page. The DB
-    // pre-sorts the window (is_active → days_running → last_seen) to pick a good
-    // pool; this smooths it into a single curated score. Other sorts keep the exact
-    // DB order the user asked for (recent/oldest/longest). Brand mode also benefits —
-    // a brand's best ads surface first.
+    // 'recommended' sort = MATCH-TIER first, then quality WITHIN a tier. Once concept
+    // expansion is on, a single query produces several kinds of match — literal copy,
+    // same-concept tag, related-concept (problem→solution) tag, semantic fill — and we
+    // must never let a weaker match outrank a stronger one (a "hair growth" solution ad
+    // jumping above an ad that literally says "thinning hair"). The hard tier dominates;
+    // qualityScore (longevity-led) only orders ads within the same tier. Other sorts
+    // keep the exact DB order the user asked for (recent/oldest/longest).
+    const lcQ = q.toLowerCase()
     let candidateRows = (keywordData || []) as any[]
     if (sort === 'recommended') {
       candidateRows = candidateRows
-        .map(a => ({ a, s: qualityScore(a) }))
-        .sort((x, y) => y.s - x.s)
+        .map(a => ({ a, t: mode === 'brand' ? 0 : matchTierWeight(a, lcQ, expansion), s: qualityScore(a) }))
+        .sort((x, y) => (y.t - x.t) || (y.s - x.s))
         .map(x => x.a)
     }
 
@@ -316,7 +327,10 @@ export async function GET(request: NextRequest) {
         })
         const { data: vectorResults } = await admin.rpc('search_ads_semantic', {
           query_embedding: embRes.data[0].embedding,
-          match_threshold: 0.22,         // loose absolute floor; relative floor applied below
+          match_threshold: 0.32,         // raised: concept expansion now catches synonyms
+                                         // precisely in the topic tier, so semantic only
+                                         // fills genuine gaps — tighter floor cuts over-reach
+                                         // (the anti-aging→Mars Men false positive).
           match_count: 240,
           filter_country: country === 'ALL' ? null : country,
           filter_active: status === 'ACTIVE' ? true : status === 'INACTIVE' ? false : null,
@@ -332,7 +346,7 @@ export async function GET(request: NextRequest) {
           const sims = rows.map(r => (typeof r.similarity === 'number' ? r.similarity : null))
                            .filter((s): s is number => s != null)
           const topSim = sims.length ? Math.max(...sims) : null
-          const floor = topSim != null ? Math.max(0.27, topSim - 0.1) : null
+          const floor = topSim != null ? Math.max(0.36, topSim - 0.08) : null
 
           const haveIds = new Set(ads.map((a: any) => a.ad_id))
           const haveHashes = new Set(
@@ -384,28 +398,12 @@ export async function GET(request: NextRequest) {
       }, {})
     }
 
-    // ── Provenance: why did each ad match? ───────────────────
-    // Tag every result with the tier it came from — useful for debugging ranking
-    // and for a future "related by meaning" UI label. Semantic fillers are flagged
-    // at insert time; for lexical hits we reconstruct the reason cheaply from the row.
-    const lc = q.toLowerCase()
-    const matchReason = (ad: any): 'brand' | 'exact_keyword' | 'topic_tag' | 'semantic' | 'keyword' => {
-      if (ad._semantic) return 'semantic'
-      if (mode === 'brand') return 'brand'
-      if (!lc) return 'keyword'
-      const inText = [ad.body, ad.title, ad.description, ad.page_name]
-        .some((f: any) => String(f || '').toLowerCase().includes(lc))
-      if (inText) return 'exact_keyword'
-      const tags = [...(ad.topics || []), ...(ad.brand_categories || []), ...(ad.industries || [])]
-        .map((t: any) => String(t).toLowerCase())
-      if (tags.some((t: string) => t.includes(lc) || lc.includes(t))) return 'topic_tag'
-      return 'keyword'
-    }
-
     // ── Transform results ────────────────────────────────────
+    // matchReason = the same match TIER used for ranking (literal > exact_tag >
+    // synonym > keyword > related > semantic), so provenance and ordering agree.
     const transformed = ads.map((ad: any) => ({
       id: ad.ad_id,
-      matchReason: matchReason(ad),
+      matchReason: mode === 'brand' ? 'brand' : matchTierReason(ad, lcQ, expansion),
       similarity: ad._sim ?? null,
       pageId: ad.page_id,
       // When browsing a single brand by page_id:

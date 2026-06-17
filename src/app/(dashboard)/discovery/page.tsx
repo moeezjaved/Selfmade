@@ -1630,7 +1630,15 @@ export default function DiscoveryPage() {
               ))}
               {topBrands.map(brand => (
                 <button key={brand.pageId}
-                  onClick={() => setSelectedBrand({ pageId: brand.pageId, name: brand.name })}
+                  onClick={() => {
+                    // Filter the main grid to this brand's ads AND open the profile drawer
+                    // (same as the autocomplete brand-select), so the grid behind the drawer
+                    // shows the brand's creatives instead of staying on the concept search.
+                    setSearchInput(brand.name)
+                    setQuery(brand.name)
+                    setSearchMode('brand')
+                    setSelectedBrand({ pageId: brand.pageId, name: brand.name })
+                  }}
                   style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minWidth: 140, maxWidth: 200 }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = '#1a3a1a'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}>
