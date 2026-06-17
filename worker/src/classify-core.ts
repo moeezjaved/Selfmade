@@ -15,7 +15,7 @@ import { supabase } from './db.js'
 export const clean = (s: any) => String(s || '').replace(/[\uD800-\uDFFF]/g, '')
 
 export interface CreativeItem {
-  key: string          // creative key: 'i:<image_hash>' | 'v:<video_hash>' | 'a:<ad_id>'
+  key: string          // copy_sig (sha256 of normalized page_id+title+body); echoed as the result id
   page_name?: string
   title?: string
   body?: string
@@ -76,12 +76,13 @@ export function parseClassification(text: string): any[] {
 }
 
 /**
- * Apply one creative's classification to EVERY ad that shares the creative.
- * Keyed by image_hash / video_hash (or ad_id for hash-less ads). Setting
- * ai_classified + topics on the whole group is what makes the next backlog
- * fetch skip them — and is idempotent, so re-processing an adopted batch is safe.
+ * Apply one creative's classification to EVERY ad that shares the SAME COPY.
+ * Keyed on copy_sig (a Postgres-generated sha256 of normalized page_id+title+body):
+ * since classification derives only from copy, identical copy ⟹ identical tags, so
+ * the fan-out is provably correct (unlike image_hash, which smears one caption's tags
+ * across visual variants). Idempotent → re-processing an adopted batch is safe.
  */
-export async function propagateClassification(key: string, c: any): Promise<number> {
+export async function propagateClassification(copySig: string, c: any): Promise<number> {
   const update: Record<string, any> = {
     hook_type: HOOKS.has(c.hook_type) ? c.hook_type : null,
     emotion: Array.isArray(c.emotion) ? c.emotion.slice(0, 3) : [],
@@ -94,14 +95,31 @@ export async function propagateClassification(key: string, c: any): Promise<numb
     topics: normalizeTopics(c.topics),
     ai_classified: true,
   }
-  const kind = key.slice(0, 2)
-  const val = key.slice(2)
-  let q = (supabase as any).from('discovery_ads_index').update(update)
-  if (kind === 'i:') q = q.eq('image_hash', val)
-  else if (kind === 'v:') q = q.eq('video_hash', val)
-  else q = q.eq('ad_id', val)
-  // No count round-trip (logging-only) — at 1M scale the extra SELECT per creative
-  // doubles DB load for nothing. Fire the UPDATE and move on.
-  await q
+  // One UPDATE fans the tags out to every ad sharing this copy. No count round-trip
+  // (logging-only) — at 1M scale the extra SELECT per sig doubles DB load for nothing.
+  await (supabase as any).from('discovery_ads_index').update(update).eq('copy_sig', copySig)
   return 1
+}
+
+/**
+ * Set-based cache: for a batch of copy_sigs, return tags from any ad ALREADY
+ * classified under each sig — so steady-state reuses them (copy the tags, skip
+ * Claude) instead of paying to re-classify copy we've already seen. One query per
+ * 200 sigs, not per ad. On a fresh corpus this returns empty (classify everything).
+ */
+export async function fetchCachedTags(sigs: string[]): Promise<Map<string, any>> {
+  const map = new Map<string, any>()
+  for (let i = 0; i < sigs.length; i += 200) {
+    const slice = sigs.slice(i, i + 200)
+    const { data } = await (supabase as any)
+      .from('discovery_ads_index')
+      .select('copy_sig, hook_type, emotion, angle, cta, tone, persona, desire, usp, topics')
+      .in('copy_sig', slice)
+      .eq('ai_classified', true)
+      .not('topics', 'is', null)
+    for (const r of (data || []) as any[]) {
+      if (r.copy_sig && !map.has(r.copy_sig)) map.set(r.copy_sig, r)
+    }
+  }
+  return map
 }
