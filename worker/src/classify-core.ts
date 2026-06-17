@@ -45,8 +45,10 @@ For each creative return EXACTLY:
   "desire": core desire addressed (max 5 words),
   "usp": main unique selling point (max 8 words),
   "topics": array of 2-5 SHORT topic tags describing what the product/ad is about. Rules:
-     - lowercase, shortest canonical form (1-2 words). Tag the CORE topic and the
-       product TYPE as SEPARATE tags — e.g. ["hair loss","supplement"] NOT ["hair loss supplement"].
+     - lowercase, shortest canonical form (1-2 words). Use the SINGULAR noun and no
+       internal spaces for compound product types (e.g. "activewear" not "active wear",
+       "supplement" not "supplements"). Tag the CORE topic and the product TYPE as
+       SEPARATE tags — e.g. ["hair loss","supplement"] NOT ["hair loss supplement"].
      - Normalize synonyms to ONE canonical tag: thinning/regrow/balding → "hair loss";
        fat loss/GLP-1/semaglutide/slimming → "weight loss"; ED/erectile → "erectile dysfunction";
        low T/testosterone booster → "testosterone".
@@ -69,9 +71,29 @@ const HOOK_SET = new Set<string>(HOOKS)
 const ANGLE_SET = new Set<string>(ANGLES)
 const TONE_SET = new Set<string>(TONES)
 
+// Canonical topic map — collapses singular/plural and spacing variants to ONE
+// surface form so the topic dimension doesn't fragment (e.g. "active wear"(9) vs
+// "activewear"(1062)). Each variant maps to the dominant form observed in the data.
+// Spelling/spacing only — NOT concept merging (activewear vs gymwear stay distinct;
+// the search's semantic layer relates them). Re-run the audit periodically and add
+// new pairs here. Applied at write-time → every future classification is canonical.
+export const CANONICAL_TOPICS: Record<string, string> = {
+  'supplements': 'supplement', 'active wear': 'activewear', 'sales': 'sale',
+  'relationship': 'relationships', 'gym wear': 'gymwear', 'discounts': 'discount',
+  'snacks': 'snack', 'outdoors': 'outdoor', 'legging': 'leggings', 'vitamin': 'vitamins',
+  'gift': 'gifts', 'athletic wear': 'athleticwear', 'subscriptions': 'subscription',
+  'promotions': 'promotion', 'protein bars': 'protein bar', 'athletics': 'athletic',
+  'superfoods': 'superfood', 'multivitamins': 'multivitamin',
+}
+
+export function canonTopic(t: string): string {
+  const k = t.trim().toLowerCase()
+  return CANONICAL_TOPICS[k] || k
+}
+
 export function normalizeTopics(arr: any): string[] {
   if (!Array.isArray(arr)) return []
-  return Array.from(new Set(arr.map((t: any) => String(t).trim().toLowerCase()).filter(Boolean))).slice(0, 6)
+  return Array.from(new Set(arr.map((t: any) => canonTopic(String(t))).filter(Boolean))).slice(0, 6)
 }
 
 /** Extract the JSON array from a model text response. */
