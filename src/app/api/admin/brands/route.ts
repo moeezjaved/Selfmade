@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest) {
     // A row counts as a brand if term_type='brand' OR it has a page_id.
     admin
       .from('discovery_crawl_terms')
-      .select('id, term, term_type, page_id, category, categories, countries, priority, is_active, follower_count, picture, website, notes, created_at')
+      .select('id, term, term_type, page_id, category, categories, countries, industry, priority, is_active, follower_count, picture, website, notes, created_at')
       .or('term_type.eq.brand,page_id.not.is.null')
       .order('created_at', { ascending: false }),
     admin
@@ -176,7 +176,7 @@ export async function PATCH(req: NextRequest) {
 
   const admin = createAdminClient()
   const body = await req.json()
-  const { action, id, page_id, is_active, categories } = body
+  const { action, id, page_id, is_active, categories, industry } = body
 
   if (action === 'toggle' && id != null) {
     await admin.from('discovery_crawl_terms').update({ is_active }).eq('id', id)
@@ -188,6 +188,15 @@ export async function PATCH(req: NextRequest) {
       .from('discovery_crawl_terms')
       .update({ categories: categories.map(c => String(c).trim().toLowerCase()).filter(Boolean) })
       .eq('id', id)
+    return NextResponse.json({ success: true })
+  }
+
+  // Manual INDUSTRY override — authoritative for the brand, beats auto-detection.
+  // Apply to the brand row AND immediately to all its ads so the change is live.
+  if (action === 'update_industry' && id != null && page_id) {
+    const ind = industry ? String(industry).trim() : null
+    await (admin as any).from('discovery_crawl_terms').update({ industry: ind }).eq('id', id)
+    await (admin as any).from('discovery_ads_index').update({ industries: ind ? [ind] : [] }).eq('page_id', page_id)
     return NextResponse.json({ success: true })
   }
 

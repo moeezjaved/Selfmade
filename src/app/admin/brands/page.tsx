@@ -5,6 +5,16 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 
+// The 17 industries the Discovery filter offers (must match the worker's
+// classify.ts list). A manual pick here overrides keyword auto-detection.
+const INDUSTRY_OPTS = [
+  'Apparel & Accessories', 'Beauty & Personal Care', 'Baby, Kids & Maternity',
+  'Food & Beverage', 'Health & Fitness', 'Electronics & Technology',
+  'Finance & Insurance', 'Home & Garden', 'Travel & Tourism', 'Pets',
+  'Education', 'Real Estate', 'Jewelry & Watches', 'Sports & Outdoors',
+  'Business Services', 'E-Commerce', 'Charity & NGO',
+]
+
 interface BrandTerm {
   id: string
   term: string
@@ -12,6 +22,7 @@ interface BrandTerm {
   page_id: string | null
   category: string
   categories: string[]
+  industry: string | null
   countries: string[]
   priority: number
   is_active: boolean
@@ -151,6 +162,15 @@ export default function BrandsPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'update_categories', id, categories }),
+    })
+    load()
+  }
+
+  const updateIndustry = async (id: string, page_id: string | null, industry: string) => {
+    await fetch('/api/admin/brands', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_industry', id, page_id, industry: industry || null }),
     })
     load()
   }
@@ -537,6 +557,14 @@ export default function BrandsPage() {
                   </td>
                   <td style={{ padding: '10px 12px' }}>
                     <CategoryEditor categories={t.categories || []} onSave={cats => updateCategories(t.id, cats)} />
+                    <select
+                      value={t.industry || ''}
+                      onChange={e => updateIndustry(t.id, t.page_id, e.target.value)}
+                      title="Manual industry override (beats auto-detection)"
+                      style={{ marginTop: 6, width: '100%', fontSize: 11, padding: '4px 6px', borderRadius: 6, border: `1px solid ${t.industry ? '#bfdbfe' : '#e2e8f0'}`, background: t.industry ? '#eff6ff' : '#fff', color: t.industry ? '#1d4ed8' : '#64748b', cursor: 'pointer' }}>
+                      <option value="">🏭 Industry: auto-detect</option>
+                      {INDUSTRY_OPTS.map(i => <option key={i} value={i}>{i}</option>)}
+                    </select>
                   </td>
                   <td style={{ padding: '10px 12px' }}>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 100, background: status.bg, color: status.color }}>
