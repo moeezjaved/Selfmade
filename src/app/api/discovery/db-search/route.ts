@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'ALL'
     const platforms = searchParams.get('platforms') || ''
     const format = searchParams.get('format') || ''
-    const industry = searchParams.get('industry') || ''
+    const industry = searchParams.get('industry') || ''  // comma-separated for multi-select
+    const theme = searchParams.get('theme') || ''        // comma-separated
+    const language = searchParams.get('language') || ''  // comma-separated ISO codes
     const hookType = searchParams.get('hook_type') || ''
     const emotion = searchParams.get('emotion') || ''
     const angle = searchParams.get('angle') || ''
@@ -101,12 +103,22 @@ export async function GET(request: NextRequest) {
     if (status === 'ACTIVE') baseQuery = baseQuery.eq('is_active', true)
     if (status === 'INACTIVE') baseQuery = baseQuery.eq('is_active', false)
     if (format) baseQuery = baseQuery.eq('format', format)
-    // Industry/category filter — match against either the AI-detected industries
-    // OR the brand's explicit categories (set by indexer).
+    // Industry/category filter — match the AI/auto-detected industries OR the
+    // brand's explicit admin categories. Multi-select = match ANY of the chosen.
     if (industry) {
-      baseQuery = baseQuery.or(
-        `industries.cs.{${industry}},brand_categories.cs.{${industry}}`
-      )
+      const inds = industry.split(',').map(s => s.trim()).filter(Boolean)
+      const parts = inds.flatMap(i => [`industries.cs.{${i}}`, `brand_categories.cs.{${i}}`])
+      if (parts.length) baseQuery = baseQuery.or(parts.join(','))
+    }
+    // Theme filter — server-side (was browser-only, so it only saw the loaded 40).
+    if (theme) {
+      const themes = theme.split(',').map(s => s.trim()).filter(Boolean)
+      if (themes.length) baseQuery = baseQuery.overlaps('themes', themes)
+    }
+    // Language filter — ISO codes against the languages array.
+    if (language) {
+      const langs = language.split(',').map(s => s.trim()).filter(Boolean)
+      if (langs.length) baseQuery = baseQuery.overlaps('languages', langs)
     }
     if (hookType) baseQuery = baseQuery.eq('hook_type', hookType)
     if (emotion) baseQuery = baseQuery.contains('emotion', [emotion])

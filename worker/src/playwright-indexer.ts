@@ -30,6 +30,7 @@ import { randomBytes, createHash } from 'node:crypto'
 import { supabase } from './db.js'
 import { startProxyChain, proxyChainEnabled } from './proxy-chain.js'
 import { pickProxy, openProxyChain, recordEvent, proxyPoolEnabled, type PoolProxy } from './proxy-pool.js'
+import { detectIndustries, detectThemes, normalizePlatforms } from './classify.js'
 
 chromium.use(StealthPlugin())
 
@@ -93,6 +94,7 @@ interface ExtractedAd {
   start_date_epoch?: number      // Meta's start_date (unix seconds) — present ~always
   end_date_epoch?: number
   targeted_countries?: string[]  // targeted_or_reached_countries (empty in country=ALL crawls)
+  publisher_platform?: string[]  // FACEBOOK / INSTAGRAM / MESSENGER / ...
   display_format?: string
   body_text?: string
   cta_text?: string
@@ -226,6 +228,8 @@ function extractAdsFromText(text: string): ExtractedAd[] {
       start_date_epoch: typeof obj.start_date === 'number' ? obj.start_date : undefined,
       end_date_epoch: typeof obj.end_date === 'number' ? obj.end_date : undefined,
       targeted_countries: Array.isArray(obj.targeted_or_reached_countries) ? obj.targeted_or_reached_countries : undefined,
+      publisher_platform: Array.isArray(snap.publisher_platform) ? snap.publisher_platform
+                        : (Array.isArray(obj.publisher_platform) ? obj.publisher_platform : undefined),
       display_format: snap.display_format,
       body_text: snap.body?.text,
       cta_text: snap.cta_text,
@@ -449,6 +453,11 @@ async function saveAdsToIndex(
     // Meta usually omits the *_string dates but always sends epoch start_date.
     start_date: ad.start_date_string || epochToIso(ad.start_date_epoch),
     stop_date: ad.end_date_string || epochToIso(ad.end_date_epoch),
+    // Auto-tag from ad text + payload so Industry/Theme/Platform filters work
+    // server-side (no manual category typing needed — Mars Men self-tags).
+    industries: detectIndustries(`${ad.body_text || ''} ${ad.caption || ''} ${ad.page_name || ''}`),
+    themes: detectThemes(`${ad.body_text || ''} ${ad.caption || ''}`),
+    platforms: normalizePlatforms(ad.publisher_platform),
     last_seen: new Date().toISOString(),
     ...(ad.targeted_countries && ad.targeted_countries.length > 0 ? { targeted_countries: ad.targeted_countries } : {}),
     ...(seedTag ? { seed_terms: [seedTag] } : {}),
