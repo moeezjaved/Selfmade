@@ -432,6 +432,9 @@ async function saveAdsToIndex(
   // seed_terms (e.g. "aff:184711951390377") so the brand's Discovery grid can
   // surface affiliate ads alongside the brand's own ads, without a schema change.
   seedTag?: string,
+  // When set (per-country crawl, country=<CC>), every ad returned ran in <CC> —
+  // merge it into the ad's targeted_countries so the Country filter works.
+  tagCountry?: string,
 ): Promise<{ inserted: number; existed: number }> {
   if (ads.length === 0) return { inserted: 0, existed: 0 }
 
@@ -459,7 +462,9 @@ async function saveAdsToIndex(
     themes: detectThemes(`${ad.body_text || ''} ${ad.caption || ''}`),
     platforms: normalizePlatforms(ad.publisher_platform),
     last_seen: new Date().toISOString(),
-    ...(ad.targeted_countries && ad.targeted_countries.length > 0 ? { targeted_countries: ad.targeted_countries } : {}),
+    ...(tagCountry
+      ? { targeted_countries: [tagCountry] }
+      : (ad.targeted_countries && ad.targeted_countries.length > 0 ? { targeted_countries: ad.targeted_countries } : {})),
     ...(seedTag ? { seed_terms: [seedTag] } : {}),
     raw_image_urls:         ad.raw_image_urls.length         > 0 ? ad.raw_image_urls         : null,
     raw_video_urls:         ad.raw_video_urls.length         > 0 ? ad.raw_video_urls         : null,
@@ -471,11 +476,14 @@ async function saveAdsToIndex(
   const adIds = ads.map(a => a.ad_archive_id)
   const { data: existing } = await (supabase as any)
     .from('discovery_ads_index')
-    .select('ad_id, seed_terms')
+    .select('ad_id, seed_terms, targeted_countries')
     .in('ad_id', adIds)
   const existingIds = new Set((existing || []).map((r: any) => r.ad_id))
   const existingSeeds = new Map<string, string[]>(
     (existing || []).map((r: any) => [r.ad_id, Array.isArray(r.seed_terms) ? r.seed_terms : []])
+  )
+  const existingCountries = new Map<string, string[]>(
+    (existing || []).map((r: any) => [r.ad_id, Array.isArray(r.targeted_countries) ? r.targeted_countries : []])
   )
   const newRows      = rows.filter(r => !existingIds.has(r.ad_id))
   const existedRows  = rows.filter(r =>  existingIds.has(r.ad_id))
@@ -494,12 +502,15 @@ async function saveAdsToIndex(
   for (const row of existedRows) {
     // Affiliate mode: make sure the tag lands even on ads we'd already indexed.
     const needsTag = !!seedTag && !(existingSeeds.get(row.ad_id) || []).includes(seedTag)
-    if (!row.raw_image_urls && !row.raw_video_urls && !needsTag) continue  // nothing to do
+    // Per-country crawl: add this country to the ad's targeted_countries if missing.
+    const needsCountry = !!tagCountry && !(existingCountries.get(row.ad_id) || []).includes(tagCountry)
+    if (!row.raw_image_urls && !row.raw_video_urls && !needsTag && !needsCountry) continue  // nothing to do
     const update: any = { last_seen: row.last_seen }
     if (row.raw_image_urls)         update.raw_image_urls = row.raw_image_urls
     if (row.raw_video_urls)         update.raw_video_urls = row.raw_video_urls
     if (row.raw_video_preview_urls) update.raw_video_preview_urls = row.raw_video_preview_urls
     if (needsTag) update.seed_terms = [...(existingSeeds.get(row.ad_id) || []), seedTag!]
+    if (needsCountry) update.targeted_countries = [...(existingCountries.get(row.ad_id) || []), tagCountry!]
     const { error } = await (supabase as any)
       .from('discovery_ads_index')
       .update(update)
@@ -525,6 +536,9 @@ async function crawlBrand(opts: {
   searchTerm?: string
   affiliateDomain?: string
   probeOnly?: boolean
+  // Per-country crawl: crawl country=<CC> instead of country=ALL and tag every
+  // returned ad with <CC> in targeted_countries (powers the Country filter).
+  country?: string
 }): Promise<RunMetrics> {
   const sessionId = randomBytes(4).toString('hex').slice(0, 8)
   const metrics: RunMetrics = {
@@ -554,7 +568,9 @@ async function crawlBrand(opts: {
   // crawl. New brands (no known IDs) still crawl fully. Skipped in affiliate
   // mode (we want every affiliate, not just new ones).
   let knownIds: string[] = []
-  if (!opts.searchTerm) {
+  // Skip incremental for per-country crawls: we must enumerate ALL of that
+  // country's ads to tag each with the country (early-stop would miss some).
+  if (!opts.searchTerm && !opts.country) {
     try {
       const { data } = await (supabase as any)
         .from('discovery_ads_index')
@@ -743,7 +759,7 @@ async function crawlBrand(opts: {
   // Affiliate mode: keyword search across ALL advertisers. Otherwise: single page.
   const url = opts.searchTerm
     ? `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=US&q=${encodeURIComponent(opts.searchTerm)}&search_type=keyword_unordered&media_type=all`
-    : `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&view_all_page_id=${opts.pageId}`
+    : `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=${opts.country || 'ALL'}&view_all_page_id=${opts.pageId}`
   let aborted = false
   let abortReason = ''
   try {
@@ -980,7 +996,7 @@ async function crawlBrand(opts: {
 
   // Tag affiliate ads so the brand's grid can surface them (mixed-in display).
   const seedTag = (opts.searchTerm && opts.affiliateDomain) ? `aff:${opts.pageId}` : undefined
-  const { inserted, existed } = await saveAdsToIndex(adsArray, seedTag)
+  const { inserted, existed } = await saveAdsToIndex(adsArray, seedTag, opts.country)
   metrics.adsNew = inserted
   metrics.adsAlreadySeen = existed
 
@@ -1001,6 +1017,73 @@ async function crawlBrand(opts: {
   }).eq('id', opts.runId)
 
   return metrics
+}
+
+// ── Country config (admin /admin/countries) ──
+// Stored as a config row in discovery_crawl_terms. Multi-country crawling is
+// OFF by default → behaviour is unchanged (single country=ALL crawl per brand).
+async function readCountryConfig(): Promise<{ enabled: boolean; countries: string[] }> {
+  try {
+    const { data } = await (supabase as any)
+      .from('discovery_crawl_terms')
+      .select('countries, is_active')
+      .eq('term', '__crawl_countries__')
+      .eq('term_type', 'config')
+      .maybeSingle()
+    return {
+      enabled: !!data?.is_active,
+      countries: (Array.isArray(data?.countries) ? data.countries : []).filter((c: any) => /^[A-Z]{2}$/.test(c)),
+    }
+  } catch { return { enabled: false, countries: [] } }
+}
+
+/**
+ * Crawl one brand, honouring the multi-country toggle.
+ *  • OFF  → one country=ALL crawl (unchanged).
+ *  • ON   → crawl each target country, tag ads with it. SKIP-EMPTY: only crawl
+ *           the countries this brand actually has ads in (stored in its
+ *           `countries` column); 1-in-5 cycles re-sweep the full list to catch
+ *           expansion. Returns aggregate {adsDiscovered, adsNew} for cadence logic.
+ */
+async function crawlBrandCountries(opts: {
+  pageId: string; brandName: string; maxScrolls?: number
+  config: { enabled: boolean; countries: string[] }
+  activeCountries: string[]
+}): Promise<{ adsDiscovered: number; adsNew: number }> {
+  const mkRun = () => randomBytes(16).toString('hex').slice(0, 32).replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
+
+  // Single country=ALL crawl (toggle OFF or no countries configured).
+  if (!opts.config.enabled || opts.config.countries.length === 0) {
+    const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls })
+    return { adsDiscovered: m.adsDiscovered, adsNew: m.adsNew }
+  }
+
+  // Multi-country: pick the countries to crawl (skip-empty).
+  const fullSweep = opts.activeCountries.length === 0 || Math.random() < 0.2
+  const toCrawl = fullSweep ? opts.config.countries : opts.activeCountries
+  console.log(`  🌍 multi-country (${fullSweep ? 'full sweep' : 'active only'}): ${toCrawl.join(', ')}`)
+
+  let totalDiscovered = 0, totalNew = 0
+  const hadAds: string[] = []
+  for (const cc of toCrawl) {
+    const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls, country: cc })
+    totalDiscovered += m.adsDiscovered; totalNew += m.adsNew
+    if (m.adsDiscovered > 0) hadAds.push(cc)
+    await sleep(2_000)  // small gap between country crawls
+  }
+
+  // Update the brand's active-country list (where it actually has ads). On a
+  // full sweep this is authoritative; on an active-only pass, keep any prior
+  // country that still produced ads + drop the ones that went silent.
+  const newActive = fullSweep
+    ? hadAds
+    : Array.from(new Set([...opts.activeCountries.filter(c => hadAds.includes(c)), ...hadAds]))
+  await (supabase as any).from('discovery_crawl_terms')
+    .update({ countries: newActive })
+    .eq('page_id', opts.pageId)
+  console.log(`  🌍 active countries for ${opts.brandName || opts.pageId}: ${newActive.join(', ') || '(none)'}`)
+
+  return { adsDiscovered: totalDiscovered, adsNew: totalNew }
 }
 
 // ========== Main ==========
@@ -1041,26 +1124,29 @@ async function main() {
     process.exit(0)
   }
 
-  let brands: { page_id: string; term: string }[] = []
+  const countryConfig = await readCountryConfig()
+  if (countryConfig.enabled) console.log(`🌍 Multi-country crawling ON: ${countryConfig.countries.join(', ')}`)
+
+  let brands: { page_id: string; term: string; countries: string[] }[] = []
   if (arg && /^\d+$/.test(arg)) {
     // Look up the brand name from DB so crawler_runs.brand_name is populated
     // (otherwise the admin /admin/health dashboard shows "—" for these runs).
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('term')
+      .select('term, countries')
       .eq('page_id', arg)
       .limit(1)
       .maybeSingle()
-    brands = [{ page_id: arg, term: data?.term ?? '' }]
+    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [] }]
   } else {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('page_id, term')
+      .select('page_id, term, countries')
       .eq('is_active', true)
       .not('page_id', 'is', null)
       .order('last_crawled_at', { ascending: true, nullsFirst: true })
       .limit(20)
-    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term }))
+    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [] }))
   }
 
   if (brands.length === 0) {
@@ -1070,13 +1156,13 @@ async function main() {
 
   console.log(`🚀 Playwright Indexer — ${brands.length} brand(s) to crawl`)
   for (const brand of brands) {
-    const runId = randomBytes(16).toString('hex').slice(0, 32).replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
     try {
-      const m = await crawlBrand({
+      const m = await crawlBrandCountries({
         pageId: brand.page_id,
         brandName: brand.term,
-        runId,
         maxScrolls,
+        config: countryConfig,
+        activeCountries: brand.countries,
       })
       // Decide when this brand is eligible to crawl again by setting
       // last_crawled_at into the past so `now - last_crawled_at >= SCHED_GAP_MIN`
