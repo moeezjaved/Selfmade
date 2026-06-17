@@ -16,26 +16,67 @@ async function upsertBatch(rows: any[]) {
   }
 }
 
-// ── Industries + Themes from ad text ──────────────────────────────
-async function backfillIndustryTheme() {
+// ── Themes: per-ad (a single ad legitimately has its own themes) ──
+async function backfillThemes() {
   let off = 0, done = 0
   while (true) {
+    // ORDER BY for stable pagination — without it .range() can skip/dupe rows.
     const { data } = await (supabase as any)
       .from('discovery_ads_index')
-      .select('ad_id, body, caption, page_name')
+      .select('ad_id, body, caption')
+      .order('ad_id', { ascending: true })
       .range(off, off + 999)
     const rows = (data || []) as any[]
     if (rows.length === 0) break
-    const out = rows.map(a => ({
+    await upsertBatch(rows.map(a => ({
       ad_id: a.ad_id,
-      industries: detectIndustries(`${a.body || ''} ${a.caption || ''} ${a.page_name || ''}`),
       themes: detectThemes(`${a.body || ''} ${a.caption || ''}`),
-    }))
-    await upsertBatch(out)
-    done += out.length; off += 1000
-    console.log(`  industries/themes: ${done}`)
+    })))
+    done += rows.length; off += 1000
+    console.log(`  themes: ${done}`)
     if (rows.length < 1000) break
   }
+}
+
+// ── Industry: BRAND-level (a brand is one industry; per-ad keyword matching
+// is too noisy — different ads pick up incidental words). Compute each page's
+// dominant 1-2 industries from a sample of its ads, apply to ALL its ads. ──
+async function backfillIndustriesByBrand() {
+  // distinct page_ids across the index
+  const pageIds = new Set<string>()
+  let off = 0
+  while (true) {
+    const { data } = await (supabase as any)
+      .from('discovery_ads_index')
+      .select('page_id')
+      .not('page_id', 'is', null)
+      .order('page_id', { ascending: true })
+      .range(off, off + 999)
+    const rows = (data || []) as any[]
+    if (rows.length === 0) break
+    rows.forEach(r => pageIds.add(r.page_id))
+    off += 1000
+    if (rows.length < 1000) break
+  }
+  console.log(`  brands to classify: ${pageIds.size}`)
+  let n = 0
+  for (const pid of pageIds) {
+    const { data } = await (supabase as any)
+      .from('discovery_ads_index')
+      .select('body, caption, page_name')
+      .eq('page_id', pid)
+      .limit(300)
+    const tally: Record<string, number> = {}
+    for (const a of (data || []) as any[]) {
+      for (const ind of detectIndustries(`${a.body || ''} ${a.caption || ''} ${a.page_name || ''}`)) {
+        tally[ind] = (tally[ind] || 0) + 1
+      }
+    }
+    const top = Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([name]) => name)
+    await (supabase as any).from('discovery_ads_index').update({ industries: top }).eq('page_id', pid)
+    if (++n % 20 === 0) console.log(`  brands classified: ${n}/${pageIds.size}`)
+  }
+  console.log(`  brands classified: ${n}`)
 }
 
 // ── Platforms from archived raw responses ─────────────────────────
@@ -86,8 +127,10 @@ async function backfillPlatforms() {
 }
 
 async function main() {
-  console.log('Backfilling industries + themes…')
-  await backfillIndustryTheme()
+  console.log('Backfilling themes (per-ad)…')
+  await backfillThemes()
+  console.log('Backfilling industries (brand-level)…')
+  await backfillIndustriesByBrand()
   console.log('Backfilling platforms…')
   await backfillPlatforms()
   console.log('✅ done')
