@@ -100,6 +100,8 @@ export async function propagateClassification(key: string, c: any): Promise<numb
   if (kind === 'i:') q = q.eq('image_hash', val)
   else if (kind === 'v:') q = q.eq('video_hash', val)
   else q = q.eq('ad_id', val)
-  const { count } = await q.select('ad_id', { count: 'estimated', head: true })
-  return count || 1
+  // No count round-trip (logging-only) — at 1M scale the extra SELECT per creative
+  // doubles DB load for nothing. Fire the UPDATE and move on.
+  await q
+  return 1
 }
