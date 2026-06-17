@@ -1,65 +1,75 @@
 /**
- * Per-creative classification via the Anthropic Message Batches API (50% off).
+ * Per-COPY-SIGNATURE classification via the Anthropic Message Batches API (50% off).
  *
- * Combines all three cost levers for scaling toward 1M+ ads:
- *   1. ONE merged prompt (hooks + topics) instead of two passes  → ~2×
- *   2. Classify once per UNIQUE creative, fan out to all ads      → ~3-5×
- *   3. Batch API (async, half price)                             → 2×
- *   (+ ingest-only: we only ever touch ads with topics IS NULL — never re-sweep.)
+ * Combines all the cost levers for scaling toward 1M+ ads:
+ *   1. ONE merged prompt (hooks + topics) instead of two passes        → ~2×
+ *   2. Classify once per UNIQUE copy (copy_sig), fan out to all ads     → dedup
+ *   3. Set-based cache — reuse tags for copy already classified        → steady-state
+ *   4. Batch API (async, half price)                                   → 2×
+ *
+ * Keyed on copy_sig (Postgres-generated sha256 of normalized page_id+title+body),
+ * NOT image_hash: classification derives only from copy, so identical copy ⟹
+ * identical tags — provably correct fan-out, unlike image_hash which smears one
+ * caption's tags across visual variants. The gate is self-healing (re-picks any ad
+ * missing either output), so partial failures never leave permanent holes.
  *
  *   npx tsx src/classify-batch.ts [--wave=40000] [--once]
+ *   (requires migration 017 — copy_sig + is_classifiable generated columns)
  *
  * Restart-safe: on start it adopts any batch already in flight (or recently
  * ended) before submitting new work, so a crash never abandons paid-for results
  * or double-submits. Propagation is idempotent.
  */
 import { supabase } from './db.js'
-import { buildMergedPrompt, parseClassification, propagateClassification, type CreativeItem } from './classify-core.js'
+import { buildMergedPrompt, parseClassification, propagateClassification, fetchCachedTags, type CreativeItem } from './classify-core.js'
 
 const KEY = process.env.ANTHROPIC_API_KEY!
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5'
 const API = 'https://api.anthropic.com/v1/messages/batches'
 const HEADERS = { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }
 
-const CREATIVES_PER_REQUEST = 25      // creatives merged into one prompt
+const SIGS_PER_REQUEST = 25            // distinct copy signatures merged into one prompt
 const waveArg = process.argv.find(a => a.startsWith('--wave='))
 const WAVE = waveArg ? parseInt(waveArg.split('=')[1], 10) : 40_000   // ads scanned per wave
 const ONCE = process.argv.includes('--once')
 const POLL_MS = 30_000
 
-let tIn = 0, tOut = 0
+let tIn = 0, tOut = 0, cacheHits = 0
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-const creativeKey = (a: any): string =>
-  a.image_hash ? `i:${a.image_hash}` : a.video_hash ? `v:${a.video_hash}` : `a:${a.ad_id}`
 
-/** Scan up to WAVE unclassified ads (topics IS NULL) and reduce to UNIQUE
- *  creatives, keeping the representative with the richest body. */
-async function fetchUniqueCreatives(): Promise<CreativeItem[]> {
-  const byKey = new Map<string, CreativeItem & { _len: number }>()
+/**
+ * Scan up to WAVE work-eligible ads and reduce to UNIQUE COPY SIGNATURES, keeping
+ * the representative with the richest body. The gate is self-healing: any ad that
+ * is missing EITHER output (not classified, or classified but topics still null)
+ * gets re-picked, so a partial failure never leaves permanent holes. `is_classifiable`
+ * (Postgres-generated) drops blank/template-only bodies.
+ */
+async function fetchUniqueSignatures(): Promise<CreativeItem[]> {
+  const bySig = new Map<string, CreativeItem & { _len: number }>()
   let scanned = 0
   for (let off = 0; off < WAVE; off += 1000) {
     const { data } = await (supabase as any)
       .from('discovery_ads_index')
-      .select('ad_id, page_name, body, title, image_hash, video_hash')
-      .is('topics', null)
-      .not('body', 'is', null)
-      .neq('body', '')
+      .select('ad_id, page_name, body, title, copy_sig')
+      .eq('is_classifiable', true)
+      .or('ai_classified.is.null,ai_classified.eq.false,topics.is.null')
+      .not('copy_sig', 'is', null)
       .range(off, off + 999)
     const rows = (data || []) as any[]
     if (!rows.length) break
     scanned += rows.length
     for (const a of rows) {
-      const key = creativeKey(a)
+      const key = a.copy_sig as string
       const len = (a.body || '').length
-      const prev = byKey.get(key)
+      const prev = bySig.get(key)
       if (!prev || len > prev._len) {
-        byKey.set(key, { key, page_name: a.page_name, title: a.title, body: a.body, _len: len })
+        bySig.set(key, { key, page_name: a.page_name, title: a.title, body: a.body, _len: len })
       }
     }
     if (rows.length < 1000) break
   }
-  const items = Array.from(byKey.values())
-  if (items.length) console.log(`  scanned ${scanned} ads → ${items.length} unique creatives (${(100 * (1 - items.length / Math.max(1, scanned))).toFixed(0)}% dedup)`)
+  const items = Array.from(bySig.values())
+  if (items.length) console.log(`  scanned ${scanned} ads → ${items.length} unique copy sigs (${(100 * (1 - items.length / Math.max(1, scanned))).toFixed(0)}% dedup)`)
   return items
 }
 
@@ -70,14 +80,14 @@ function chunk<T>(arr: T[], n: number): T[][] {
 }
 
 async function submitBatch(items: CreativeItem[]): Promise<string> {
-  const requests = chunk(items, CREATIVES_PER_REQUEST).map((group, i) => ({
+  const requests = chunk(items, SIGS_PER_REQUEST).map((group, i) => ({
     custom_id: `r${i}`,
     params: { model: MODEL, max_tokens: 6000, messages: [{ role: 'user', content: buildMergedPrompt(group) }] },
   }))
   const res = await fetch(API, { method: 'POST', headers: HEADERS, body: JSON.stringify({ requests }) })
   const data = await res.json()
   if (!data.id) throw new Error(`batch submit failed: ${JSON.stringify(data).slice(0, 300)}`)
-  console.log(`  📤 submitted batch ${data.id} — ${requests.length} requests (${items.length} creatives)`)
+  console.log(`  📤 submitted batch ${data.id} — ${requests.length} requests (${items.length} copy sigs)`)
   return data.id
 }
 
@@ -138,19 +148,33 @@ async function adoptExistingBatches(): Promise<void> {
 }
 
 async function main() {
-  console.log(`Per-creative batch classify — model=${MODEL}, wave=${WAVE}, perReq=${CREATIVES_PER_REQUEST}`)
+  console.log(`Per-copy-signature batch classify — model=${MODEL}, wave=${WAVE}, perReq=${SIGS_PER_REQUEST}`)
   await adoptExistingBatches()
 
   let totalApplied = 0
   while (true) {
-    const creatives = await fetchUniqueCreatives()
-    if (!creatives.length) { console.log('  no more unclassified creatives.'); break }
-    const id = await submitBatch(creatives)
-    totalApplied += await drainBatch(id)
+    const sigs = await fetchUniqueSignatures()
+    if (!sigs.length) { console.log('  no more unclassified copy.'); break }
+
+    // Set-based cache: reuse tags for any copy already classified (steady-state
+    // saver — empty on a fresh corpus). Only the misses cost a Claude call.
+    const cached = await fetchCachedTags(sigs.map(s => s.key))
+    const misses: CreativeItem[] = []
+    for (const s of sigs) {
+      const hit = cached.get(s.key)
+      if (hit) { await propagateClassification(s.key, hit); cacheHits++; totalApplied++ }
+      else misses.push(s)
+    }
+    if (cached.size) console.log(`  cache: reused ${cached.size} sigs, ${misses.length} to classify`)
+
+    if (misses.length) {
+      const id = await submitBatch(misses)
+      totalApplied += await drainBatch(id)
+    }
     if (ONCE) break
   }
   const cost = (tIn / 1e6 * 1 + tOut / 1e6 * 5) * 0.5
-  console.log(`🏁 done — applied ${totalApplied} creatives | est $${cost.toFixed(2)} (batch-priced, in=${tIn} out=${tOut})`)
+  console.log(`🏁 done — applied ${totalApplied} sigs (${cacheHits} cache-reused) | est $${cost.toFixed(2)} (batch-priced, in=${tIn} out=${tOut})`)
   process.exit(0)
 }
 main().catch(e => { console.error(e); process.exit(1) })
