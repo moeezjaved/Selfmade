@@ -230,6 +230,14 @@ const NICHE_OPTS = [
   { value: 'Other', label: '🗂️ Other' },
 ]
 
+// Creative-DNA filter options (Phase C) — match the classifier enums.
+const HOOK_OPTS = ['Pain Point', 'Testimonial', 'Social Proof', 'Before & After', 'Question', 'Story', 'Announcement', 'Educational', 'Urgency', 'Discount', 'Unboxing', 'Us vs Them'].map(v => ({ value: v, label: v }))
+const EMOTION_OPTS = ['fear', 'curiosity', 'desire', 'trust', 'urgency', 'hope', 'excitement', 'relatability', 'aspiration', 'guilt', 'pride'].map(v => ({ value: v, label: v }))
+const ANGLE_OPTS = ['Pain Point', 'Aspiration', 'Social Proof', 'Authority', 'Scarcity', 'Curiosity', 'Value', 'Story', 'Comparison'].map(v => ({ value: v, label: v }))
+const FORMATSTYLE_OPTS = [{ value: 'UGC', label: '🤳 UGC' }, { value: 'Studio / Produced', label: '🎬 Studio / Produced' }, { value: 'Graphic / Text', label: '🔤 Graphic / Text' }, { value: 'Mixed', label: 'Mixed' }]
+const VISUALSTYLE_OPTS = ['Selfie / Handheld', 'Bathroom / Mirror', 'Kitchen / Home', 'Outdoor / Lifestyle', 'Studio Product Shot', 'Before & After', 'Text Overlay Graphic', 'Unboxing', 'Talking Head', 'Demo / How-to', 'Flat Lay', 'Lifestyle Person', 'Other'].map(v => ({ value: v, label: v }))
+const CTASTYLE_OPTS = [{ value: 'soft', label: 'Soft' }, { value: 'hard', label: 'Hard' }, { value: 'none', label: 'None' }]
+
 // ── FilterDropdown ───────────────────────────────────────────
 function FilterDropdown({ label, options, selected, onToggle, onClear, searchable }: {
   label: string
@@ -1111,6 +1119,13 @@ export default function DiscoveryPage() {
   const [niches, setNiches] = useState<string[]>([])
   const [adsPerBrandStr, setAdsPerBrandStr] = useState('')
   const [minReuseStr, setMinReuseStr] = useState('')
+  // Creative-DNA filters (Phase C)
+  const [hookTypes, setHookTypes] = useState<string[]>([])
+  const [emotions, setEmotions] = useState<string[]>([])
+  const [angles, setAngles] = useState<string[]>([])
+  const [formatStyles, setFormatStyles] = useState<string[]>([])
+  const [visualStyles, setVisualStyles] = useState<string[]>([])
+  const [ctaStyles, setCtaStyles] = useState<string[]>([])
 
   // Top brands strip
   const [topBrands, setTopBrands] = useState<{ pageId: string; name: string; adCount: number; picture: string | null }[]>([])
@@ -1230,6 +1245,13 @@ export default function DiscoveryPage() {
         ...(parseInt(minDaysStr) > 0 ? { run_time: `${parseInt(minDaysStr)}+` } : {}),
         ...(parseInt(minReuseStr) > 0 ? { min_reuse: String(parseInt(minReuseStr)) } : {}),
         ...(parseInt(adsPerBrandStr) > 0 ? { ads_per_brand: String(parseInt(adsPerBrandStr)) } : {}),
+        // Creative-DNA filters (Phase C)
+        ...(hookTypes.length ? { hook_type: hookTypes.join(',') } : {}),
+        ...(emotions.length ? { emotion: emotions.join(',') } : {}),
+        ...(angles.length ? { angle: angles.join(',') } : {}),
+        ...(formatStyles.length ? { format_style: formatStyles.join(',') } : {}),
+        ...(visualStyles.length ? { visual_style: visualStyles.join(',') } : {}),
+        ...(ctaStyles.length ? { cta_style: ctaStyles.join(',') } : {}),
       })
       const dbRes = await fetch(`/api/discovery/db-search?${dbParams}`)
       const dbData = await dbRes.json()
@@ -1281,7 +1303,7 @@ export default function DiscoveryPage() {
     } finally {
       setLoading(false)
     }
-  }, [query, searchMode, sort, status, platforms, country, format, industry, theme, dbPage, timeDays, selectedBrand?.pageId, tiers, niches, minBrandAdsStr, minDaysStr, minReuseStr, adsPerBrandStr])
+  }, [query, searchMode, sort, status, platforms, country, format, industry, theme, dbPage, timeDays, selectedBrand?.pageId, tiers, niches, minBrandAdsStr, minDaysStr, minReuseStr, adsPerBrandStr, hookTypes, emotions, angles, formatStyles, visualStyles, ctaStyles])
 
   // Fetch ads when query/filters change. BOTH browse (empty query) and search go
   // through fetchAds so EVERY server filter (niche, performance tier, brand-ads,
@@ -1292,7 +1314,7 @@ export default function DiscoveryPage() {
   useEffect(() => {
     fetchAds(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, searchMode, sort, status, platforms, country, format, industry, theme, timeDays, selectedBrand?.pageId, tiers, niches, minBrandAdsStr, minDaysStr, minReuseStr, adsPerBrandStr])
+  }, [query, searchMode, sort, status, platforms, country, format, industry, theme, timeDays, selectedBrand?.pageId, tiers, niches, minBrandAdsStr, minDaysStr, minReuseStr, adsPerBrandStr, hookTypes, emotions, angles, formatStyles, visualStyles, ctaStyles])
 
   // TOP BRANDS strip — computed from the ACTUAL loaded results so it always matches
   // the grid (and sums to the matching count), including semantic-matched brands a
@@ -1339,6 +1361,7 @@ export default function DiscoveryPage() {
   const activeFilterCount = format.length + industry.length + language.length + theme.length
     + (status !== 'ALL' ? 1 : 0) + platforms.length + (minDays > 0 ? 1 : 0) + (minBrandAds > 0 ? 1 : 0)
     + tiers.length + niches.length + ((parseInt(minReuseStr) || 0) > 0 ? 1 : 0) + ((parseInt(adsPerBrandStr) || 0) > 0 ? 1 : 0)
+    + hookTypes.length + emotions.length + angles.length + formatStyles.length + visualStyles.length + ctaStyles.length
 
   const isPermError = error.toLowerCase().includes('permission') || error.toLowerCase().includes('application does not')
 
@@ -1610,6 +1633,12 @@ export default function DiscoveryPage() {
             selected={niches} onToggle={toggle(setNiches)} onClear={() => setNiches([])}
             searchable
           />
+          <FilterDropdown label="Hook" options={HOOK_OPTS} selected={hookTypes} onToggle={toggle(setHookTypes)} onClear={() => setHookTypes([])} searchable />
+          <FilterDropdown label="Emotion" options={EMOTION_OPTS} selected={emotions} onToggle={toggle(setEmotions)} onClear={() => setEmotions([])} />
+          <FilterDropdown label="Angle" options={ANGLE_OPTS} selected={angles} onToggle={toggle(setAngles)} onClear={() => setAngles([])} />
+          <FilterDropdown label="UGC / Studio" options={FORMATSTYLE_OPTS} selected={formatStyles} onToggle={toggle(setFormatStyles)} onClear={() => setFormatStyles([])} />
+          <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable />
+          <FilterDropdown label="CTA style" options={CTASTYLE_OPTS} selected={ctaStyles} onToggle={toggle(setCtaStyles)} onClear={() => setCtaStyles([])} />
           <FilterDropdown
             label="Format"
             options={FORMAT_OPTS.map(f => ({ value: f, label: f, icon: f === 'Video' ? '🎬' : f === 'Carousel' ? '🔁' : '🖼' }))}
@@ -1667,6 +1696,7 @@ export default function DiscoveryPage() {
                 setFormat([]); setIndustry([]); setLanguage([]); setTheme([])
                 setStatus('ALL'); setPlatforms([]); setMinDaysStr(''); setMinBrandAdsStr('')
                 setTiers([]); setNiches([]); setMinReuseStr(''); setAdsPerBrandStr('')
+                setHookTypes([]); setEmotions([]); setAngles([]); setFormatStyles([]); setVisualStyles([]); setCtaStyles([])
               }}
               style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: '4px 8px', fontFamily: 'inherit' }}
             >
