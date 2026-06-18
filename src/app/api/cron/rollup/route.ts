@@ -116,11 +116,19 @@ export async function GET(request: NextRequest) {
 
   // niche is intentionally NOT written here — it's owned by the AI niche classifier.
   // days_running IS written (recomputed) — fixes the 0-everywhere data bug.
-  const updates = enriched.map(e => ({
-    ad_id: e.ad_id, page_id: e.page_id, creative_reuse_count: e.creative_reuse_count,
-    brand_active_ads: e.brand_active_ads, days_running: e.days_running,
-    performance_score: Math.round(mapP(pctOf(e.rawv)) * 1000) / 1000,
-  }))
+  // HARD longevity gate (on top of the soft ageFactor): "winning" means PROVEN, so an
+  // ad can't be winning under 14 days or optimized under 7 — regardless of reuse/brand
+  // volume. We cap the score below the tier threshold (tier is generated from score).
+  const updates = enriched.map(e => {
+    let score = mapP(pctOf(e.rawv))
+    if (e.days_running < 7) score = Math.min(score, 0.599)        // ≤ growing
+    else if (e.days_running < 14) score = Math.min(score, 0.799)  // ≤ optimized (never winning)
+    return {
+      ad_id: e.ad_id, page_id: e.page_id, creative_reuse_count: e.creative_reuse_count,
+      brand_active_ads: e.brand_active_ads, days_running: e.days_running,
+      performance_score: Math.round(score * 1000) / 1000,
+    }
+  })
 
   // 5. write back — small batches + retry. A 500-row upsert can exceed Supabase's
   //    8s statement timeout under concurrent crawler write-lock contention, so keep

@@ -43,6 +43,7 @@ interface Ad {
   niche?: string | null
   creativeReuseCount?: number
   brandActiveAds?: number
+  onScreenText?: string | null
 }
 
 // ── Classification ───────────────────────────────────────────
@@ -946,7 +947,12 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
 
   const initials = ad.pageName?.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
   const avatarBg = avatarColor(ad.pageName || '')
-  const bodyText = ad.body || ''
+  // Template-body ads (DPA/catalog) store raw `{{product.brand}}` tokens, not real
+  // copy — showing the literal template looks broken. Strip tokens; if nothing real
+  // is left, fall back to the vision-recovered on-screen text, then title.
+  const rawBody = ad.body || ''
+  const stripped = rawBody.replace(/\{\{[^}]*\}\}/g, '').replace(/\s+/g, ' ').trim()
+  const bodyText = stripped.length >= 3 ? rawBody : (ad.onScreenText || ad.title || '')
   const isLong = bodyText.length > 220
   const displayBody = expanded || !isLong ? bodyText : bodyText.slice(0, 220) + '…'
 
