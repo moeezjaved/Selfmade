@@ -37,6 +37,12 @@ interface Ad {
   industries: string[]
   themes: string[]
   langNames: string[]
+  // rollup-backed (migration 020)
+  performanceScore?: number | null
+  performanceTier?: string | null
+  niche?: string | null
+  creativeReuseCount?: number
+  brandActiveAds?: number
 }
 
 // ── Classification ───────────────────────────────────────────
@@ -169,9 +175,34 @@ const COUNTRIES = [
 
 const SORT_OPTS = [
   { value: 'recommended', label: '✨ Recommended' },
+  { value: 'performance', label: '🏆 Performance' },
+  { value: 'newest', label: 'Newest' },
   { value: 'recent', label: 'Most Recent' },
   { value: 'longest', label: 'Longest Running' },
+  { value: 'most_used', label: 'Most Used' },
+  { value: 'latest_added', label: 'Latest Added' },
   { value: 'oldest', label: 'Oldest First' },
+]
+
+// GetHookd-parity: performance tiers + coarse niches (backed by migration 020 rollup)
+const TIER_OPTS = [
+  { value: 'winning', label: '🏆 Winning' },
+  { value: 'optimized', label: '⚡ Optimized' },
+  { value: 'growing', label: '📈 Growing' },
+  { value: 'scaling', label: '🚀 Scaling' },
+  { value: 'testing', label: '🧪 Testing' },
+]
+const NICHE_OPTS = [
+  { value: 'Beauty & Personal Care', label: '💄 Beauty & Personal Care' },
+  { value: 'Fashion & Apparel', label: '👗 Fashion & Apparel' },
+  { value: 'Health & Wellness', label: '🏋️ Health & Wellness' },
+  { value: 'Food & Beverage', label: '🍫 Food & Beverage' },
+  { value: 'Tech & Electronics', label: '📱 Tech & Electronics' },
+  { value: 'Home & Garden', label: '🏠 Home & Garden' },
+  { value: 'Pets', label: '🐾 Pets' },
+  { value: 'Sports & Outdoors', label: '🏀 Sports & Outdoors' },
+  { value: 'Baby, Kids & Maternity', label: '🍼 Baby, Kids & Maternity' },
+  { value: 'Other', label: '🗂️ Other' },
 ]
 
 // ── FilterDropdown ───────────────────────────────────────────
@@ -923,6 +954,16 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
             ↗ Affiliate
           </span>
         )}
+        {/* Performance tier badge — only the top tiers (winning/optimized) to avoid noise */}
+        {(ad.performanceTier === 'winning' || ad.performanceTier === 'optimized') && (
+          <span title={`Performance tier: ${ad.performanceTier}`}
+            style={{ flexShrink: 0, fontSize: 9, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: 100, textTransform: 'uppercase',
+              color: ad.performanceTier === 'winning' ? '#166534' : '#92600a',
+              background: ad.performanceTier === 'winning' ? '#dcfce7' : '#fef9c3',
+              border: `1px solid ${ad.performanceTier === 'winning' ? '#bbf7d0' : '#fde68a'}` }}>
+            {ad.performanceTier === 'winning' ? '🏆 Winning' : '⚡ Optimized'}
+          </span>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, position: 'relative' }}>
           <button onClick={() => setShowSaveModal(true)} title="Save to board"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#9ca3af', padding: 3, borderRadius: 4, transition: 'color .15s' }}>
@@ -1038,8 +1079,13 @@ export default function DiscoveryPage() {
   const [industry, setIndustry] = useState<string[]>([])
   const [language, setLanguage] = useState<string[]>([])
   const [theme, setTheme] = useState<string[]>([])
-  const [minDaysStr, setMinDaysStr] = useState('')
-  const [minBrandAdsStr, setMinBrandAdsStr] = useState('')
+  const [minDaysStr, setMinDaysStr] = useState('')        // → server run_time min (days_running ≥ N)
+  const [minBrandAdsStr, setMinBrandAdsStr] = useState('') // → server active_ads_count (brand_active_ads ≥ N)
+  // GetHookd-parity filters (rollup-backed, server-side)
+  const [tiers, setTiers] = useState<string[]>([])
+  const [niches, setNiches] = useState<string[]>([])
+  const [adsPerBrandStr, setAdsPerBrandStr] = useState('')
+  const [minReuseStr, setMinReuseStr] = useState('')
 
   // Top brands strip
   const [topBrands, setTopBrands] = useState<{ pageId: string; name: string; adCount: number; picture: string | null }[]>([])
@@ -1152,6 +1198,13 @@ export default function DiscoveryPage() {
         // (language stays client-side until language-detection lands — DB stores
         //  ISO codes but the UI picker uses display names.)
         ...(timeDays > 0 ? { days: String(timeDays) } : {}),
+        // GetHookd-parity (rollup-backed, server-side)
+        ...(tiers.length ? { performance_scores: tiers.join(',') } : {}),
+        ...(niches.length ? { niche: niches.join('|') } : {}),          // '|' — niche names contain commas
+        ...(parseInt(minBrandAdsStr) > 0 ? { active_ads_count: String(parseInt(minBrandAdsStr)) } : {}),
+        ...(parseInt(minDaysStr) > 0 ? { run_time: `${parseInt(minDaysStr)}+` } : {}),
+        ...(parseInt(minReuseStr) > 0 ? { min_reuse: String(parseInt(minReuseStr)) } : {}),
+        ...(parseInt(adsPerBrandStr) > 0 ? { ads_per_brand: String(parseInt(adsPerBrandStr)) } : {}),
       })
       const dbRes = await fetch(`/api/discovery/db-search?${dbParams}`)
       const dbData = await dbRes.json()
@@ -1203,7 +1256,7 @@ export default function DiscoveryPage() {
     } finally {
       setLoading(false)
     }
-  }, [query, searchMode, sort, status, platforms, country, format, industry, theme, dbPage, timeDays, selectedBrand?.pageId])
+  }, [query, searchMode, sort, status, platforms, country, format, industry, theme, dbPage, timeDays, selectedBrand?.pageId, tiers, niches, minBrandAdsStr, minDaysStr, minReuseStr, adsPerBrandStr])
 
   // Fetch ads when query/filters change — always load DB ads even without a query
   useEffect(() => {
@@ -1258,13 +1311,6 @@ export default function DiscoveryPage() {
     return Array.from(set).sort()
   }, [rawAds])
 
-  // Brand ad counts from loaded results
-  const brandAdCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    rawAds.forEach(ad => { counts[ad.pageId] = (counts[ad.pageId] || 0) + 1 })
-    return counts
-  }, [rawAds])
-
   const minDays = parseInt(minDaysStr) || 0
   const minBrandAds = parseInt(minBrandAdsStr) || 0
 
@@ -1275,17 +1321,19 @@ export default function DiscoveryPage() {
       if (industry.length && !ad.industries.some(i => industry.includes(i))) return false
       if (language.length && !ad.langNames.some(l => language.includes(l))) return false
       if (theme.length && !ad.themes.some(t => theme.includes(t))) return false
-      if (minDays > 0 && ad.daysRunning < minDays) return false
-      if (minBrandAds > 0 && (brandAdCounts[ad.pageId] || 0) < minBrandAds) return false
+      // Run-time (days_running ≥) and brand-ads (brand_active_ads ≥) are now applied
+      // SERVER-side against catalog-wide counts — no client re-filter (the old loaded-
+      // count check wrongly hid valid server results).
       return true
     })
-  }, [rawAds, format, industry, language, theme, minDays, minBrandAds, brandAdCounts])
+  }, [rawAds, format, industry, language, theme])
 
   const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (v: string) =>
     setter(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])
 
   const activeFilterCount = format.length + industry.length + language.length + theme.length
     + (status !== 'ALL' ? 1 : 0) + platforms.length + (minDays > 0 ? 1 : 0) + (minBrandAds > 0 ? 1 : 0)
+    + tiers.length + niches.length + ((parseInt(minReuseStr) || 0) > 0 ? 1 : 0) + ((parseInt(adsPerBrandStr) || 0) > 0 ? 1 : 0)
 
   const isPermError = error.toLowerCase().includes('permission') || error.toLowerCase().includes('application does not')
 
@@ -1500,6 +1548,22 @@ export default function DiscoveryPage() {
           </button>
         </div>
 
+        {/* Preset chips (GetHookd-style quick filter combos) */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 2 }}>
+          {[
+            { label: '🏆 Best of the Month', apply: () => { setTiers(['winning']); setNiches([]); setTimeDays(30); setSort('performance') } },
+            { label: '🔥 Winning ads', apply: () => { setTiers(['winning']); setSort('performance') } },
+            { label: '📊 Brands · 100+ active ads', apply: () => { setMinBrandAdsStr('100') } },
+            { label: '💄 Beauty ads', apply: () => { setNiches(['Beauty & Personal Care']) } },
+            { label: '👗 Fashion ads', apply: () => { setNiches(['Fashion & Apparel']) } },
+          ].map(p => (
+            <button key={p.label} onClick={p.apply}
+              style={{ padding: '5px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, background: '#fff', color: '#374151', border: '1px solid #e2e8f0', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+
         {/* Row 2: filters — time buttons + country + format etc all on one line */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Time filter (inline) */}
@@ -1530,6 +1594,17 @@ export default function DiscoveryPage() {
               filtering isn't active, so the selector was misleading. `country` stays
               'ALL' in state so the search query is unchanged. */}
 
+          <FilterDropdown
+            label="Performance"
+            options={TIER_OPTS}
+            selected={tiers} onToggle={toggle(setTiers)} onClear={() => setTiers([])}
+          />
+          <FilterDropdown
+            label="Niche"
+            options={NICHE_OPTS}
+            selected={niches} onToggle={toggle(setNiches)} onClear={() => setNiches([])}
+            searchable
+          />
           <FilterDropdown
             label="Format"
             options={FORMAT_OPTS.map(f => ({ value: f, label: f, icon: f === 'Video' ? '🎬' : f === 'Carousel' ? '🔁' : '🖼' }))}
@@ -1571,21 +1646,14 @@ export default function DiscoveryPage() {
 
           <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
 
-          {/* Runtime minimum (compact) */}
-          <NumberInput
-            label="Min days"
-            value={minDaysStr}
-            onChange={setMinDaysStr}
-            placeholder="0"
-          />
-
-          {/* Brand active ads minimum (compact) */}
-          <NumberInput
-            label="Brand ads ≥"
-            value={minBrandAdsStr}
-            onChange={setMinBrandAdsStr}
-            placeholder="0"
-          />
+          {/* Run-time minimum — days_running ≥ N (server-side) */}
+          <NumberInput label="Run ≥ days" value={minDaysStr} onChange={setMinDaysStr} placeholder="0" />
+          {/* Brand active-ad count — brand_active_ads ≥ N (server-side) */}
+          <NumberInput label="Brand ads ≥" value={minBrandAdsStr} onChange={setMinBrandAdsStr} placeholder="0" />
+          {/* Creative reuse — creative_reuse_count ≥ N (server-side) */}
+          <NumberInput label="Reuse ≥" value={minReuseStr} onChange={setMinReuseStr} placeholder="0" />
+          {/* Limit ads per brand (GetHookd "Limit ads per brand"; default cap 3) */}
+          <NumberInput label="Ads/brand" value={adsPerBrandStr} onChange={setAdsPerBrandStr} placeholder="3" />
 
           {/* Clear all */}
           {activeFilterCount > 0 && (
@@ -1593,6 +1661,7 @@ export default function DiscoveryPage() {
               onClick={() => {
                 setFormat([]); setIndustry([]); setLanguage([]); setTheme([])
                 setStatus('ALL'); setPlatforms([]); setMinDaysStr(''); setMinBrandAdsStr('')
+                setTiers([]); setNiches([]); setMinReuseStr(''); setAdsPerBrandStr('')
               }}
               style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: '4px 8px', fontFamily: 'inherit' }}
             >
