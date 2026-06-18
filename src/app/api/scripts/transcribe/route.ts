@@ -41,9 +41,10 @@ export async function POST(req: NextRequest) {
   const { data: existing } = await admin.from('ad_scripts').select('*').eq('ad_id', adId).maybeSingle()
   if (existing?.transcript) return NextResponse.json({ script: existing, cached: true })
 
-  // Need the ad's video.
+  // Need the ad's video (+ its written copy — many UGC ads carry the real message in
+  // on-screen text/caption, not speech, so we fold the body into the analysis).
   const { data: ad } = await admin
-    .from('discovery_ads_index').select('video_url, format').eq('ad_id', adId).maybeSingle()
+    .from('discovery_ads_index').select('video_url, format, body, title').eq('ad_id', adId).maybeSingle()
   if (!ad?.video_url) return NextResponse.json({ error: 'Ad has no video to transcribe' }, { status: 400 })
 
   let tx
@@ -66,13 +67,19 @@ export async function POST(req: NextRequest) {
       file, model: 'whisper-1', response_format: 'verbose_json',
     })
     const transcript = (tr.segments || []).map((s: any) => ({ t: Math.round(s.start), text: (s.text || '').trim() }))
-    const fullText = tr.text || transcript.map((s: any) => s.text).join(' ')
+    const spoken = (tr.text || transcript.map((s: any) => s.text).join(' ')).trim()
+    const thinSpeech = spoken.replace(/[^a-z]/gi, '').length < 40   // little/no spoken audio (text-overlay UGC)
+
+    // Many UGC ads carry the message in on-screen text/caption, not speech — so fold the
+    // ad's written copy in. Skip Shopify {{template}} junk.
+    const copy = `${ad.title || ''} ${ad.body || ''}`.replace(/\{\{[^}]*\}\}/g, '').trim()
+    const analyzeText = [spoken, copy && `[ad copy] ${copy}`].filter(Boolean).join('\n\n')
 
     // Analyze framework + hooks + strategies (cheap).
     const an = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_schema', json_schema: ANALYSIS_SCHEMA },
-      messages: [{ role: 'user', content: `Analyze this ad script. Identify the copywriting FRAMEWORK (e.g. PAS, AIDA, BAB, Problem-Solution), the HOOKS used (first lines / attention grabbers), and the persuasion STRATEGIES. Return JSON.\n\nScript:\n${fullText.slice(0, 6000)}` }],
+      messages: [{ role: 'user', content: `Analyze this ad. Identify the copywriting FRAMEWORK (e.g. PAS, AIDA, BAB, Problem-Solution), the HOOKS (first lines / attention grabbers), and persuasion STRATEGIES. Return JSON.\n\n${analyzeText.slice(0, 6000) || '(no transcribable content)'}` }],
     })
     const analysis = JSON.parse(an.choices[0]?.message?.content || '{}')
 
@@ -87,7 +94,7 @@ export async function POST(req: NextRequest) {
       model: 'whisper-1+gpt-4o-mini', segments: transcript.length,
       actual_cost_usd: 0.006, reference_id: adId,
     })
-    return NextResponse.json({ script: row, cached: false })
+    return NextResponse.json({ script: row, thinSpeech, cached: false })
   } catch (e: any) {
     await refundCredits(admin, tx.id).catch(() => {})
     return NextResponse.json({ error: e?.message || 'transcription failed' }, { status: 500 })

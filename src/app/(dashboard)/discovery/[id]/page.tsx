@@ -250,6 +250,7 @@ function AiPanel({ ad }: { ad: Ad }) {
   const { balance, pricing } = useCredits()
   const isVideo = ad.format === 'Video' || !!ad.videoUrl
   const [script, setScript] = useState<any>(null)
+  const [thin, setThin] = useState(false)
   const [gen, setGen] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -289,11 +290,12 @@ function AiPanel({ ad }: { ad: Ad }) {
       {isVideo ? (
         !script ? (
           <button style={{ ...ctaS, opacity: loading ? 0.6 : 1 }} disabled={loading}
-            onClick={() => run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 2, d => setScript(d.script))}>
+            onClick={() => run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 2, d => { setScript(d.script); setThin(!!d.thinSpeech) })}>
             <Sparkles size={16} /> {loading ? 'Transcribing…' : `Generate Script · ${cost('transcribe', 2)} cr`}
           </button>
         ) : (
           <div>
+            {thin && <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }}>⚠ Mostly on-screen text / little speech — analyzed from the ad copy. Full on-screen transcription coming soon.</div>}
             <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Framework: <span style={{ color: '#1a3a1a' }}>{script.framework || '—'}</span></div>
             {script.hooks?.length > 0 && <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>Hooks: {script.hooks.join(' · ')}</div>}
             <div style={{ maxHeight: 150, overflowY: 'auto', fontSize: 12, color: '#374151', background: '#f8fafc', borderRadius: 8, padding: 10, marginBottom: 10, whiteSpace: 'pre-wrap' }}>
