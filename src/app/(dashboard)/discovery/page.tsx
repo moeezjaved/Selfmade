@@ -565,11 +565,17 @@ function MoreMenu({ ad }: { ad: Ad }) {
       </button>
       {open && (
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 160, zIndex: 100, padding: 4, fontFamily: 'inherit' }}>
-          <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
+          <a href={`/discovery/${ad.id}`} onClick={() => setOpen(false)}
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 13, color: '#1f2937', textDecoration: 'none', borderRadius: 6, cursor: 'pointer' }}
             onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             <Info size={14} /> Ad details
+          </a>
+          <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 13, color: '#1f2937', textDecoration: 'none', borderRadius: 6, cursor: 'pointer' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <ExternalLink size={14} /> View on Meta
           </a>
           <button onClick={copyLink}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 13, color: '#1f2937', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}
@@ -732,7 +738,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             onLoadedData={() => setImgLoaded(true)}
             onLoadedMetadata={() => setImgLoaded(true)}
             onCanPlay={() => setImgLoaded(true)}
-            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
             onEnded={() => setPlaying(false)}
           />
           {imgLoaded && !playing && (
