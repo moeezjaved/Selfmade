@@ -22,11 +22,13 @@ CREATE TABLE IF NOT EXISTS plans (
 
 -- Seed plans IMMEDIATELY — the user_profiles.plan_id column below defaults to
 -- 'trial' and has an FK to plans(id), so 'trial' must exist before that ALTER runs.
+-- Priced at HALF of Atria ($129/$479/$959) to undercut; same credit allotments.
+-- image_clone is repriced up (below) so the one cost-heavy action keeps margin.
 INSERT INTO plans (id, name, price_monthly_cents, monthly_credits, seats, sort_order) VALUES
   ('trial',    'Trial',     0,     100,   1, 0),
-  ('core',     'Core',      12900, 4000,  1, 1),
-  ('plus',     'Plus',      24900, 10000, 3, 2),
-  ('business', 'Business',  49900, 25000, 10, 3)
+  ('core',     'Core',      6500,  4000,  1, 1),
+  ('plus',     'Plus',      23900, 10000, 3, 2),
+  ('business', 'Business',  47900, 25000, 10, 3)
 ON CONFLICT (id) DO NOTHING;
 
 -- ── Per-action pricing (admin-editable, no deploy needed) ────────────────────
@@ -224,7 +226,7 @@ INSERT INTO credit_pricing (action_type, label, credits, est_cost_usd) VALUES
   ('script_duplicate', 'Duplicate script',           5,  0.003),
   ('brand_analysis',   'Brand analysis (URL→brief)', 8,  0.010),
   ('review_mining',    'Review mining (CSV)',        10, 0.020),
-  ('image_clone',      'Image clone (4 variations)', 15, 0.140)
+  ('image_clone',      'Image clone (4 variations)', 26, 0.140)
 ON CONFLICT (action_type) DO NOTHING;
 
 INSERT INTO credit_packs (id, name, credits, price_cents) VALUES
