@@ -174,13 +174,13 @@ async function processRow(
   // Auto-active only if user provided page_id OR lookup was high confidence.
   const highConfidence = userProvidedPageId || lookupResult?.confidence === 'high'
 
-  // AI-suggest categories — runs in parallel for the import
-  const aiCategories = await suggestCategories({
+  // Use the CSV-provided category directly. Only call the AI suggester when NO
+  // category was given — calling it for every row is what timed out the 700-brand
+  // import (700 OpenAI calls in one request → gateway timeout → non-JSON error).
+  const aiCategories = row.category ? [] : await suggestCategories({
     name: row.brand_name,
-    category: lookupResult?.page_name ? undefined : undefined,
     website: row.website,
   })
-  // Merge user-provided category with AI suggestions, dedupe
   const finalCategories = Array.from(new Set([
     ...(row.category ? [row.category.toLowerCase()] : []),
     ...aiCategories,
