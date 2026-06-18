@@ -22,7 +22,8 @@ const APP_TOKEN = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
 const COUNTRY_MAP: Record<string, string> = { UK: 'GB' }
 const normalizeCountry = (c: string) => COUNTRY_MAP[c.toUpperCase()] || c.toUpperCase()
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+let _openai: OpenAI | null = null
+const getOpenAI = () => (_openai ||= new OpenAI({ apiKey: process.env.OPENAI_API_KEY! }))
 
 // ── Get best available Meta access token ─────────────────────
 // Legacy single-token getter — kept for routes that don't need rotation
@@ -854,7 +855,7 @@ async function generateEmbeddings(admin: any): Promise<number> {
     `${ad.page_name} ${ad.title} ${ad.body} ${ad.description} ${(ad.industries || []).join(' ')} ${(ad.themes || []).join(' ')} ${(ad.topics || []).join(' ')} ${(ad.brand_categories || []).join(' ')}`.slice(0, 8000)
   )
 
-  const response = await openai.embeddings.create({
+  const response = await getOpenAI().embeddings.create({
     model: 'text-embedding-3-small',
     input: texts,
   })

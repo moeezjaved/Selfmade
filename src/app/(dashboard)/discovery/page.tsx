@@ -843,7 +843,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   )
 }
 
-function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, name: string) => void }) {
+function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBrandClick?: (pageId: string, name: string) => void; onBrandHover?: (pageId: string, el: HTMLElement) => void; onBrandLeave?: () => void }) {
   const router = useRouter()
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
@@ -912,6 +912,8 @@ function AdCard({ ad, onBrandClick }: { ad: Ad; onBrandClick?: (pageId: string, 
           )}
         </div>
         <button onClick={() => onBrandClick?.(ad.pageId, ad.pageName)}
+          onMouseEnter={(e) => onBrandHover?.(ad.pageId, e.currentTarget as HTMLElement)}
+          onMouseLeave={onBrandLeave}
           style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', textAlign: 'left' }}>
           {ad.pageName || 'Unknown Brand'}
         </button>
@@ -1043,9 +1045,17 @@ export default function DiscoveryPage() {
   const [topBrands, setTopBrands] = useState<{ pageId: string; name: string; adCount: number; picture: string | null }[]>([])
   const [brandsLoading, setBrandsLoading] = useState(false)
   const [hoverBrand, setHoverBrand] = useState<string | null>(null)
-  const [hoverRect, setHoverRect] = useState<{ left: number; bottom: number } | null>(null)
+  const [hoverRect, setHoverRect] = useState<{ left: number; top: number } | null>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const openHover = (pid: string, el: HTMLElement) => { if (hoverTimer.current) clearTimeout(hoverTimer.current); const r = el.getBoundingClientRect(); setHoverRect({ left: r.left, bottom: r.bottom }); setHoverBrand(pid) }
+  const openHover = (pid: string, el: HTMLElement) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    const r = el.getBoundingClientRect()
+    const W = 300, estH = 300, vw = window.innerWidth, vh = window.innerHeight
+    let left = r.left; if (left + W > vw - 12) left = vw - W - 12; if (left < 12) left = 12
+    let top = r.bottom + 8
+    if (top + estH > vh - 12 && r.top - estH - 8 > 12) top = r.top - estH - 8
+    setHoverRect({ left, top }); setHoverBrand(pid)
+  }
   const closeHover = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverBrand(null), 140) }
   const keepHover = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current) }
   // Responsive masonry column count.
@@ -1291,6 +1301,44 @@ export default function DiscoveryPage() {
           onClose={() => setSelectedBrand(null)}
         />
       )}
+
+      {/* Brand hover preview card (Atria-style) — single floating instance, shared by the
+          TOP BRANDS strip and every ad-card brand name. Resolves data from rawAds. */}
+      {hoverBrand && hoverRect && (() => {
+        const hbAds = rawAds.filter(a => a.pageId === hoverBrand)
+        const hbName = hbAds[0]?.pageName || topBrands.find(b => b.pageId === hoverBrand)?.name || 'Brand'
+        const hue = (hbName.charCodeAt(0) || 65) * 7 % 360
+        const thumbs = hbAds.map(a => a.thumbnailUrl || a.creatives?.[0]?.r2_url).filter(Boolean).slice(0, 3)
+        const isFollowed = followed.has(hoverBrand)
+        const viewAds = () => { setSearchInput(hbName); setQuery(hbName); setSearchMode('brand'); setSelectedBrand(null); setHoverBrand(null) }
+        return (
+          <div onMouseEnter={keepHover} onMouseLeave={closeHover}
+            style={{ position: 'fixed', top: hoverRect.top, left: hoverRect.left, width: 300, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 14px 36px rgba(0,0,0,0.18)', zIndex: 300, padding: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: `hsl(${hue},50%,85%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: `hsl(${hue},50%,30%)`, overflow: 'hidden', flexShrink: 0 }}>
+                <img src={`https://graph.facebook.com/${hoverBrand}/picture?type=large`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{hbName}</div>
+                <div style={{ fontSize: 11, color: '#6b7280' }}>{hbAds.length} ad{hbAds.length === 1 ? '' : 's'} in results</div>
+              </div>
+            </div>
+            {thumbs.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                {thumbs.map((t, i) => <img key={i} src={t as string} alt="" style={{ width: '33%', aspectRatio: '3/4', objectFit: 'cover', borderRadius: 8, background: '#f1f3f5' }} />)}
+              </div>
+            )}
+            <button onClick={() => toggleFollow(hoverBrand, hbName)}
+              style={{ width: '100%', padding: '9px', marginBottom: 8, borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, border: isFollowed ? '1px solid #1a3a1a' : '1px solid #ef4444', background: isFollowed ? '#f0fdf4' : '#fff', color: isFollowed ? '#1a3a1a' : '#ef4444' }}>
+              {isFollowed ? '✓ Following' : '♡ Follow'}
+            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={viewAds} style={{ flex: 1, padding: '9px', borderRadius: 9, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>View ads</button>
+              <button onClick={() => { setSelectedBrand({ pageId: hoverBrand, name: hbName }); setHoverBrand(null) }} style={{ flex: 1, padding: '9px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Details</button>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Header ── */}
       <div style={{ borderBottom: '1px solid #e2e8f0', background: '#fff', padding: '14px 24px', position: 'sticky', top: 0, zIndex: 40 }}>
@@ -1665,13 +1713,10 @@ export default function DiscoveryPage() {
               ))}
               {topBrands.map(brand => {
                 const hue = brand.name.charCodeAt(0) * 7 % 360
-                const sample = rawAds.filter(a => a.pageId === brand.pageId)
-                const thumbs = sample.map(a => a.thumbnailUrl || a.creatives?.[0]?.r2_url).filter(Boolean).slice(0, 3)
                 const hovered = hoverBrand === brand.pageId
-                // Click the chip → filter the grid to ONLY this brand's ads (brand mode).
                 const viewAds = () => { setSearchInput(brand.name); setQuery(brand.name); setSearchMode('brand'); setSelectedBrand(null) }
                 return (
-                  <div key={brand.pageId} style={{ position: 'relative', flexShrink: 0 }}
+                  <div key={brand.pageId} style={{ flexShrink: 0 }}
                     onMouseEnter={(e) => openHover(brand.pageId, e.currentTarget as HTMLElement)}
                     onMouseLeave={closeHover}>
                     <button onClick={viewAds}
@@ -1684,33 +1729,6 @@ export default function DiscoveryPage() {
                         <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{brand.adCount.toLocaleString()} Ads</div>
                       </div>
                     </button>
-
-                    {/* Hover preview card (Atria-style) */}
-                    {hovered && (
-                      <div onMouseEnter={keepHover} onMouseLeave={closeHover}
-                        style={{ position: 'fixed', top: (hoverRect?.bottom ?? 0) + 8, left: hoverRect?.left ?? 0, width: 300, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 14px 36px rgba(0,0,0,0.18)', zIndex: 300, padding: 14 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                          <div style={{ width: 40, height: 40, borderRadius: '50%', background: `hsl(${hue},50%,85%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: `hsl(${hue},50%,30%)` }}>{brand.name.charAt(0).toUpperCase()}</div>
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 800, color: '#111' }}>{brand.name}</div>
-                            <div style={{ fontSize: 11, color: '#6b7280' }}>{brand.adCount.toLocaleString()} ads in results</div>
-                          </div>
-                        </div>
-                        {thumbs.length > 0 && (
-                          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                            {thumbs.map((t, i) => <img key={i} src={t as string} alt="" style={{ width: '33%', aspectRatio: '3/4', objectFit: 'cover', borderRadius: 8, background: '#f1f3f5' }} />)}
-                          </div>
-                        )}
-                        <button onClick={() => toggleFollow(brand.pageId, brand.name)}
-                          style={{ width: '100%', padding: '9px', marginBottom: 8, borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, border: followed.has(brand.pageId) ? '1px solid #1a3a1a' : '1px solid #ef4444', background: followed.has(brand.pageId) ? '#f0fdf4' : '#fff', color: followed.has(brand.pageId) ? '#1a3a1a' : '#ef4444' }}>
-                          {followed.has(brand.pageId) ? '✓ Following' : '♡ Follow'}
-                        </button>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button onClick={viewAds} style={{ flex: 1, padding: '9px', borderRadius: 9, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>View ads</button>
-                          <button onClick={() => setSelectedBrand({ pageId: brand.pageId, name: brand.name })} style={{ flex: 1, padding: '9px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Details</button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )
               })}
@@ -1746,7 +1764,8 @@ export default function DiscoveryPage() {
                 <div key={ci} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {filteredAds.filter((_, i) => i % gridCols === ci).map(ad => (
                     <div key={ad.id} style={{ animation: 'fadeUp 0.3s ease-out both' }}>
-                      <AdCard ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })} />
+                      <AdCard ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })}
+                        onBrandHover={openHover} onBrandLeave={closeHover} />
                     </div>
                   ))}
                 </div>

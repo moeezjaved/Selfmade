@@ -1,0 +1,27 @@
+{
+  "functions": {
+    "src/app/api/m4/launch/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/meta/sync/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/indexer/route.ts": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/indexer",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/indexer?embed=1",
+      "schedule": "30 */2 * * *"
+    },
+    {
+      "path": "/api/indexer?classify=1",
+      "schedule": "0 */3 * * *"
+    }
+  ]
+}

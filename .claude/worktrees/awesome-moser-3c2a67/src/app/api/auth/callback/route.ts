@@ -1,0 +1,120 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { encryptToken } from '@/lib/meta/client'
+
+const META_APP_ID = process.env.META_APP_ID!
+const META_APP_SECRET = process.env.META_APP_SECRET!
+const META_API_VERSION = process.env.META_API_VERSION || 'v20.0'
+const APP_URL = 'https://www.tryselfmade.ai'
+const REDIRECT_URI = `${APP_URL}/api/auth/callback`
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const code = searchParams.get('code')
+  const state = searchParams.get('state')
+  const error = searchParams.get('error')
+
+  console.log('CALLBACK - code:', !!code, 'state:', !!state, 'error:', error)
+
+  if (error) {
+    const desc = searchParams.get('error_description') || searchParams.get('error_reason') || error
+    console.log('FACEBOOK ERROR:', error, desc)
+    return NextResponse.redirect(`${APP_URL}/connect-meta?error=${encodeURIComponent(desc)}`)
+  }
+  if (!code) {
+    // Log all params to debug
+    const allParams = Object.fromEntries(searchParams.entries())
+    console.log('NO CODE - all params:', JSON.stringify(allParams))
+    return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_code`)
+  }
+
+  const admin = createAdminClient()
+  let userId: string | null = null
+
+  // Try state param
+  if (state) {
+    try {
+      const decoded = JSON.parse(atob(decodeURIComponent(state)))
+      userId = decoded.user_id
+      console.log('USER FROM STATE:', userId)
+    } catch (e) {
+      console.log('State parse error:', e)
+    }
+  }
+
+  // Fallback: look up from activity_logs using nonce
+  if (!userId && state) {
+    try {
+      const decoded = JSON.parse(atob(decodeURIComponent(state)))
+      const nonce = decoded.nonce
+      if (nonce) {
+        const { data } = await admin.from('activity_logs')
+          .select('description')
+          .eq('action_type', 'META_OAUTH_STARTED')
+          .eq('entity_type', nonce)
+          .single()
+        if (data) {
+          userId = data.description
+          console.log('USER FROM DB LOOKUP:', userId)
+        }
+      }
+    } catch (e) {
+      console.log('DB lookup error:', e)
+    }
+  }
+
+  console.log('FINAL USER ID:', userId)
+  if (!userId) return NextResponse.redirect(`${APP_URL}/connect-meta?error=session_lost`)
+
+  try {
+    const tokenRes = await fetch(
+      `https://graph.facebook.com/${META_API_VERSION}/oauth/access_token?` +
+      new URLSearchParams({ client_id: META_APP_ID, client_secret: META_APP_SECRET, redirect_uri: REDIRECT_URI, code })
+    )
+    const tokenData = await tokenRes.json()
+    console.log('TOKEN:', tokenData.access_token ? 'OK' : tokenData.error?.message)
+    if (!tokenData.access_token) throw new Error(tokenData.error?.message || 'No access token')
+
+    const llRes = await fetch(
+      `https://graph.facebook.com/${META_API_VERSION}/oauth/access_token?` +
+      new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: META_APP_ID, client_secret: META_APP_SECRET, fb_exchange_token: tokenData.access_token })
+    )
+    const llData = await llRes.json()
+    const longLivedToken = llData.access_token || tokenData.access_token
+
+    const accountsRes = await fetch(
+      `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts?` +
+      new URLSearchParams({ fields: 'id,account_id,name,currency,timezone_name', access_token: longLivedToken })
+    )
+    const accountsData = await accountsRes.json()
+    console.log('ACCOUNTS:', JSON.stringify(accountsData).slice(0, 300))
+    const accounts = accountsData.data || []
+
+    if (!accounts.length) return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_ad_accounts_found`)
+
+    const encryptedToken = encryptToken(longLivedToken)
+    const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
+
+    for (let i = 0; i < accounts.length; i++) {
+      const account = accounts[i]
+      const { error: upsertError } = await admin.from('meta_accounts').upsert({
+        user_id: userId,
+        account_id: account.account_id || account.id.replace('act_', ''),
+        account_name: account.name,
+        access_token: encryptedToken,
+        token_expires_at: expiresAt.toISOString(),
+        currency: account.currency || 'USD',
+        timezone: account.timezone_name || 'America/New_York',
+        status: 'active',
+        is_primary: i === 0,
+      }, { onConflict: 'user_id,account_id' })
+      console.log('UPSERT:', upsertError ? JSON.stringify(upsertError) : 'SUCCESS')
+    }
+
+    return NextResponse.redirect(`${APP_URL}/connect-meta?success=true`)
+  } catch (err) {
+    console.error('ERROR:', err)
+    const message = err instanceof Error ? err.message : 'Connection failed'
+    return NextResponse.redirect(`${APP_URL}/connect-meta?error=${encodeURIComponent(message)}`)
+  }
+}
