@@ -1460,13 +1460,9 @@ export default function DiscoveryPage() {
 
           <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
 
-          {/* Country — server-side, prominent */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
-            <CountryDropdown value={country} onChange={v => { setCountry(v); setRawAds([]) }} />
-            <span style={{ fontSize: 10, color: '#9ca3af', paddingLeft: 4 }}>🌍 Showing ads worldwide — per-country filter coming soon</span>
-          </div>
-
-          <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
+          {/* Country filter removed — we crawl worldwide (country=ALL); per-country
+              filtering isn't active, so the selector was misleading. `country` stays
+              'ALL' in state so the search query is unchanged. */}
 
           <FilterDropdown
             label="Format"
