@@ -10,34 +10,43 @@ import type { UserProfile } from '@/types'
 import {
   LayoutDashboard, Megaphone, Sparkles, TrendingUp,
   ClipboardList, Settings, CreditCard, BarChart2,
-  Rocket, LogOut, Compass,
+  Rocket, LogOut, Compass, Bookmark, Heart, Star, Store,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV = [
   {
-    label: 'Main',
+    label: 'Ad Discovery',
     items: [
-      { href: '/dashboard',        icon: LayoutDashboard, label: 'Dashboard',        badge: null },
-      { href: '/m4',               icon: Rocket,          label: 'Launch Ads',       badge: 'AI' },
-      { href: '/campaigns',        icon: Megaphone,       label: 'Campaigns',        badge: null },
-      { href: '/creative-studio',  icon: Sparkles,        label: 'Creative Studio',  badge: null },
-      { href: '/discovery',         icon: Compass,         label: 'Ad Discovery',     badge: 'NEW' },
+      { href: '/discovery',            icon: Compass,   label: 'Discovery',     badge: 'NEW' },
+      { href: '/discovery/top-picks',  icon: Star,      label: 'Top Picks',     badge: null },
+      { href: '/discovery/saved',      icon: Bookmark,  label: 'Saved Ads',     badge: null },
+      { href: '/discovery/following',  icon: Heart,     label: 'Following',      badge: null },
     ],
   },
   {
-    label: 'Insights',
+    label: 'Analytics & Launch',
     items: [
-      { href: '/insights',         icon: TrendingUp,      label: 'Scale & Insights', badge: 'NEW'},
-      { href: '/reports',          icon: BarChart2,       label: 'Reports',          badge: 'NEW'},
-      { href: '/activity',         icon: ClipboardList,   label: 'Activity Log',     badge: null },
+      { href: '/m4',         icon: Rocket,      label: 'Launch Ads',       badge: 'AI' },
+      { href: '/campaigns',  icon: Megaphone,   label: 'Campaigns',        badge: null },
+      { href: '/insights',   icon: TrendingUp,  label: 'Scale & Insights', badge: 'NEW' },
+      { href: '/reports',    icon: BarChart2,   label: 'Reports',          badge: 'NEW' },
+    ],
+  },
+  {
+    label: 'AI Gen',
+    items: [
+      { href: '/creative-studio', icon: Sparkles, label: 'Creative Studio', badge: null },
+      { href: '/brands',          icon: Store,    label: 'Brands',          badge: null },
     ],
   },
   {
     label: 'Account',
     items: [
-      { href: '/settings',         icon: Settings,        label: 'Settings',         badge: null },
-      { href: '/billing',          icon: CreditCard,      label: 'Billing',          badge: null },
+      { href: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',    badge: null },
+      { href: '/activity',   icon: ClipboardList,   label: 'Activity Log', badge: null },
+      { href: '/settings',   icon: Settings,        label: 'Settings',     badge: null },
+      { href: '/billing',    icon: CreditCard,      label: 'Billing',      badge: null },
     ],
   },
 ]
@@ -50,6 +59,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  // The single active nav item = the longest href that prefixes the current path.
+  const activeHref = NAV.flatMap(s => s.items.map(i => i.href))
+    .filter(h => pathname === h || pathname.startsWith(h + '/'))
+    .sort((a, b) => b.length - a.length)[0]
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -101,8 +114,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 {section.label}
               </div>
               {section.items.map(item => {
-                const isActive = pathname === item.href ||
-                  (item.href !== '/dashboard' && pathname.startsWith(item.href))
+                // Active = the LONGEST matching href, so /discovery/saved highlights
+                // "Saved" (not also "Discovery"); /discovery/<adId> still highlights Discovery.
+                const isActive = item.href === activeHref
                 return (
                   <Link
                     key={item.href}
