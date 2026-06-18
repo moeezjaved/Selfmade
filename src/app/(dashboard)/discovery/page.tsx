@@ -710,7 +710,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
               onLoad={() => setImgLoaded(true)}
               onError={() => setImgError(true)}
               style={{
-                width: '100%', height: '100%', objectFit: 'cover', display: 'block', verticalAlign: 'top',
+                width: '100%', height: '100%', objectFit: 'contain', display: 'block', verticalAlign: 'top',
                 opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2,
               }}
             />
@@ -731,7 +731,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             onLoadedData={() => setImgLoaded(true)}
             onLoadedMetadata={() => setImgLoaded(true)}
             onCanPlay={() => setImgLoaded(true)}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
             onEnded={() => setPlaying(false)}
           />
           {imgLoaded && !playing && (
@@ -1019,7 +1019,9 @@ export default function DiscoveryPage() {
   const [sort, setSort] = useState('recommended')
   const [status, setStatus] = useState('ALL')
   const [platforms, setPlatforms] = useState<string[]>([])
-  const [country, setCountry] = useState('US')
+  // Default ALL — we crawl country=ALL (worldwide), so per-country filtering isn't
+  // active yet. Showing everything by default avoids hiding ads behind a US filter.
+  const [country, setCountry] = useState('ALL')
 
   // Client-side filters (applied to loaded ads instantly)
   const [format, setFormat] = useState<string[]>([])
@@ -1445,7 +1447,10 @@ export default function DiscoveryPage() {
           <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
 
           {/* Country — server-side, prominent */}
-          <CountryDropdown value={country} onChange={v => { setCountry(v); setRawAds([]) }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
+            <CountryDropdown value={country} onChange={v => { setCountry(v); setRawAds([]) }} />
+            <span style={{ fontSize: 10, color: '#9ca3af', paddingLeft: 4 }}>🌍 Showing ads worldwide — per-country filter coming soon</span>
+          </div>
 
           <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
 
