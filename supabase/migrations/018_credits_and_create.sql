@@ -20,6 +20,15 @@ CREATE TABLE IF NOT EXISTS plans (
   sort_order          INT DEFAULT 0
 );
 
+-- Seed plans IMMEDIATELY — the user_profiles.plan_id column below defaults to
+-- 'trial' and has an FK to plans(id), so 'trial' must exist before that ALTER runs.
+INSERT INTO plans (id, name, price_monthly_cents, monthly_credits, seats, sort_order) VALUES
+  ('trial',    'Trial',     0,     100,   1, 0),
+  ('core',     'Core',      12900, 4000,  1, 1),
+  ('plus',     'Plus',      24900, 10000, 3, 2),
+  ('business', 'Business',  49900, 25000, 10, 3)
+ON CONFLICT (id) DO NOTHING;
+
 -- ── Per-action pricing (admin-editable, no deploy needed) ────────────────────
 CREATE TABLE IF NOT EXISTS credit_pricing (
   action_type   TEXT PRIMARY KEY,
@@ -196,13 +205,7 @@ BEGIN
 END; $$;
 
 -- ── Seeds (all editable in admin) ────────────────────────────────────────────
-INSERT INTO plans (id, name, price_monthly_cents, monthly_credits, seats, sort_order) VALUES
-  ('trial',    'Trial',     0,     100,   1, 0),
-  ('core',     'Core',      12900, 4000,  1, 1),
-  ('plus',     'Plus',      24900, 10000, 3, 2),
-  ('business', 'Business',  49900, 25000, 10, 3)
-ON CONFLICT (id) DO NOTHING;
-
+-- (plans seeded earlier, before the user_profiles.plan_id FK column.)
 INSERT INTO credit_pricing (action_type, label, credits, est_cost_usd) VALUES
   ('transcribe',       'Transcribe ad video',        2,  0.006),
   ('script_generate',  'Generate script',            5,  0.003),
