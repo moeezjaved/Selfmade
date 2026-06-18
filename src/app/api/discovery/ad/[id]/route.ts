@@ -50,6 +50,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       country: (ad as any).country,
       format: (ad as any).format,
       industries: (ad as any).industries || [],
+      topics: (ad as any).topics || [],
+      // AI classification (powers the accurate category + Scripts/Clone context)
+      hookType: (ad as any).hook_type,
+      angle: (ad as any).angle,
+      persona: (ad as any).persona,
+      usp: (ad as any).usp,
+      aiClassified: (ad as any).ai_classified,
       cta: (ad as any).cta,
       mediaType: (ad as any).media_type,
     },
