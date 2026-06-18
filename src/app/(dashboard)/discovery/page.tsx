@@ -1579,7 +1579,7 @@ export default function DiscoveryPage() {
         {/* Preset chips (GetHookd-style quick filter combos) */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 2 }}>
           {[
-            { label: '🏆 Best of the Month', apply: () => { setTiers(['winning']); setNiches([]); setTimeDays(30); setSort('performance') } },
+            { label: '🏆 Best of the Month', apply: () => { setTiers(['winning']); setNiches([]); setTimeDays(0); setSort('performance') } },
             { label: '🔥 Winning ads', apply: () => { setTiers(['winning']); setSort('performance') } },
             { label: '📊 Brands · 100+ active ads', apply: () => { setMinBrandAdsStr('100') } },
             { label: '💄 Beauty ads', apply: () => { setNiches(['Beauty']) } },
