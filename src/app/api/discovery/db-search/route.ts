@@ -229,7 +229,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Over-fetch so server-side dedup can return `limit` UNIQUE creatives per page
-    const overFetchMultiplier = 5  // ~5x dedup ratio observed for popular brands
+    // Over-fetch generously: after the per-brand cap, we need a wide brand pool to
+    // fill the page (a flood-brand's extra ads are skipped, so we need others behind them).
+    const overFetchMultiplier = (q && mode === 'brand') ? 5 : 12
     const fetchLimit = limit * overFetchMultiplier
     const fetchOffset = offset * overFetchMultiplier
     baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
@@ -255,14 +257,21 @@ export async function GET(request: NextRequest) {
         .map(x => x.a)
     }
 
-    // Server-side dedup by image_hash / video_hash so the discovery grid
-    // shows one card per unique creative instead of repeating same image.
+    // Server-side dedup by image_hash / video_hash (one card per unique creative),
+    // PLUS a per-brand cap for diversity. Without it, one deep brand (e.g. Mars Men
+    // with ~1.5k long-running video ads) floods the recommended feed — burying every
+    // other brand AND every image ad. Cap each brand per page so the feed is varied.
+    // No cap in brand mode (you clicked a brand → you want all its ads).
+    const MAX_PER_BRAND = (q && mode === 'brand') ? Infinity : 3
     const seenHashes = new Set<string>()
+    const perBrand: Record<string, number> = {}
     const dedupedAds: any[] = []
     for (const ad of candidateRows) {
       const key = ad.image_hash || ad.video_hash || `_${ad.ad_id}`
       if (seenHashes.has(key)) continue
+      if ((perBrand[ad.page_id] || 0) >= MAX_PER_BRAND) continue
       seenHashes.add(key)
+      perBrand[ad.page_id] = (perBrand[ad.page_id] || 0) + 1
       dedupedAds.push(ad)
       if (dedupedAds.length >= limit) break
     }
