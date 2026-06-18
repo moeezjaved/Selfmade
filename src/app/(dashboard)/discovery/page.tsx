@@ -685,8 +685,9 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
       className="ad-card-visual"
       style={{
         position: 'relative', background: '#f1f3f5', overflow: 'hidden', lineHeight: 0,
-        // reserve space while the creative loads so the card doesn't collapse/jump
-        minHeight: !imgLoaded ? 300 : undefined,
+        // FIXED aspect ratio → every card's media is the same height, so creatives load
+        // INTO a stable box (no resize, no reflow) and the grid never jitters on scroll.
+        aspectRatio: '4 / 5', width: '100%',
       }}
     >
       {slide.type === 'image' ? (
@@ -708,7 +709,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
               onLoad={() => setImgLoaded(true)}
               onError={() => setImgError(true)}
               style={{
-                width: '100%', height: 'auto', display: 'block', verticalAlign: 'top',
+                width: '100%', height: '100%', objectFit: 'cover', display: 'block', verticalAlign: 'top',
                 opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2,
               }}
             />
@@ -729,7 +730,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             onLoadedData={() => setImgLoaded(true)}
             onLoadedMetadata={() => setImgLoaded(true)}
             onCanPlay={() => setImgLoaded(true)}
-            style={{ width: '100%', height: 'auto', display: 'block', maxHeight: 600, verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
             onEnded={() => setPlaying(false)}
           />
           {imgLoaded && !playing && (
@@ -1245,7 +1246,7 @@ export default function DiscoveryPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } } .hide-scrollbar::-webkit-scrollbar { display: none } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none }`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes fadeUp { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } } .hide-scrollbar::-webkit-scrollbar { display: none } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none }`}</style>
 
       {/* Brand Drawer */}
       {selectedBrand && (
@@ -1561,8 +1562,8 @@ export default function DiscoveryPage() {
 
         {/* Skeleton */}
         {loading && rawAds.length === 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-            {[...Array(8)].map((_, i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+            {[...Array(12)].map((_, i) => (
               <div key={i} style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
                 <div style={{ padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e2e8f0' }} className="shimmer" />
@@ -1571,7 +1572,7 @@ export default function DiscoveryPage() {
                     <div style={{ height: 10, background: '#e2e8f0', borderRadius: 6, width: '40%' }} className="shimmer" />
                   </div>
                 </div>
-                <div style={{ height: 280, background: '#e2e8f0' }} className="shimmer" />
+                <div style={{ aspectRatio: '4 / 5', background: '#e2e8f0' }} className="shimmer" />
                 <div style={{ padding: '10px 14px 12px' }}>
                   <div style={{ height: 10, background: '#e2e8f0', borderRadius: 6, marginBottom: 6 }} className="shimmer" />
                   <div style={{ height: 10, background: '#e2e8f0', borderRadius: 6, width: '80%' }} className="shimmer" />
@@ -1676,17 +1677,12 @@ export default function DiscoveryPage() {
               {activeFilterCount > 0 && <span style={{ background: '#f0fdf4', color: '#166534', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
             </div>
-            {/* Masonry layout — Atria-style compact cards */}
-            <div style={{ columnWidth: 215, columnGap: 10, columnFill: 'balance', maxWidth: '100%', overflowX: 'hidden' }}>
+            {/* Uniform CSS Grid — fixed columns + fixed-aspect cards. Appending new
+                cards never moves existing ones (no masonry rebalance), so infinite
+                scroll is smooth with zero jitter. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, maxWidth: '100%' }}>
               {filteredAds.map(ad => (
-                <div key={ad.id}
-                  style={{
-                    breakInside: 'avoid',
-                    marginBottom: 10,
-                    display: 'inline-block',
-                    width: '100%',
-                    animation: 'fadeUp 0.35s ease-out both',
-                  }}>
+                <div key={ad.id} style={{ animation: 'fadeUp 0.3s ease-out both' }}>
                   <AdCard ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })} />
                 </div>
               ))}
