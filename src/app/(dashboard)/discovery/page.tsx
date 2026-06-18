@@ -1283,36 +1283,16 @@ export default function DiscoveryPage() {
     }
   }, [query, searchMode, sort, status, platforms, country, format, industry, theme, dbPage, timeDays, selectedBrand?.pageId, tiers, niches, minBrandAdsStr, minDaysStr, minReuseStr, adsPerBrandStr])
 
-  // Fetch ads when query/filters change — always load DB ads even without a query
+  // Fetch ads when query/filters change. BOTH browse (empty query) and search go
+  // through fetchAds so EVERY server filter (niche, performance tier, brand-ads,
+  // run-time, reuse, ads-per-brand) applies in both modes. Previously browse used a
+  // separate minimal fetch that ignored the new filters → e.g. picking Niche did
+  // nothing on an empty search. (dbPage is intentionally NOT a dep — paginating must
+  // not reset the grid; fetchAds(true) always loads page 0.)
   useEffect(() => {
-    if (query.trim()) {
-      fetchAds(true)
-    } else {
-      // Browse mode: load latest indexed ads from DB without a query
-      setError('')
-      setNextCursor(null)
-      setTopBrands([])
-      setLoading(true)
-      const params = new URLSearchParams({ q: '', sort, status, page: '0', ...(platforms.length ? { platforms: platforms.join(',') } : {}), ...(timeDays > 0 ? { days: String(timeDays) } : {}) })
-      fetch(`/api/discovery/db-search?${params}`)
-        .then(r => r.json())
-        .then(d => {
-          if (d.ads?.length) {
-            setRawAds(d.ads.map((ad: any) => classifyAd({ ...ad, mediaType: ad.format || '' })))
-            setHasMore(d.hasMore)
-            setDbPage(0)
-            setDbTotal(d.total || 0)
-            setTotalInDB(d.totalInDB || 0)
-            setSearchSource('indexed')
-          } else {
-            setRawAds([])
-            setHasMore(false)
-          }
-        })
-        .catch(() => { setRawAds([]); setHasMore(false) })
-        .finally(() => setLoading(false))
-    }
-  }, [query, searchMode, sort, status, platforms, country, timeDays, industry, theme])
+    fetchAds(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, searchMode, sort, status, platforms, country, format, industry, theme, timeDays, selectedBrand?.pageId, tiers, niches, minBrandAdsStr, minDaysStr, minReuseStr, adsPerBrandStr])
 
   // TOP BRANDS strip — computed from the ACTUAL loaded results so it always matches
   // the grid (and sums to the matching count), including semantic-matched brands a
