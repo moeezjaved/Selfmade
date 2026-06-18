@@ -533,6 +533,7 @@ export async function GET(request: NextRequest) {
       niche: ad.niche ?? null,
       creativeReuseCount: ad.creative_reuse_count ?? 0,
       brandActiveAds: ad.brand_active_ads ?? 0,
+      onScreenText: ad.on_screen_text ?? null,   // vision-recovered text (template-body fallback)
     }))
 
     return NextResponse.json({
