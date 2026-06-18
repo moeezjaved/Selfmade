@@ -23,20 +23,9 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-// Coarse niche ← granular industry (mirrors the niche_map seed in migration 020).
-const NICHE_MAP: [string, string, number][] = [
-  ['Beauty & Personal Care', 'Beauty & Personal Care', 1], ['Health & Fitness', 'Health & Wellness', 2],
-  ['Baby, Kids & Maternity', 'Baby, Kids & Maternity', 3], ['Pets', 'Pets', 4],
-  ['Sports & Outdoors', 'Sports & Outdoors', 5], ['Electronics & Technology', 'Tech & Electronics', 6],
-  ['Home & Garden', 'Home & Garden', 7], ['Food & Beverage', 'Food & Beverage', 8],
-  ['Apparel & Accessories', 'Fashion & Apparel', 9], ['Jewelry & Watches', 'Fashion & Apparel', 9],
-]
-const NMAP = new Map(NICHE_MAP.map(([i, n, p]) => [i, { n, p }]))
-const nicheOf = (inds: string[] | null): string => {
-  let best: { n: string; p: number } | null = null
-  for (const ind of inds || []) { const m = NMAP.get(ind); if (m && (!best || m.p < best.p)) best = m }
-  return best ? best.n : 'Other'
-}
+// NOTE: `niche` is owned by the brand-level AI classifier (worker niche-classify,
+// 33-niche GetHookd taxonomy) — the rollup no longer derives it from industries and
+// must NOT overwrite it. The rollup only READS niche to rebuild niche_counts.
 
 async function isAuthorized(request: NextRequest): Promise<boolean> {
   const secret = request.nextUrl.searchParams.get('secret')
@@ -61,12 +50,12 @@ export async function GET(request: NextRequest) {
 
   // 1. fetch — KEYSET on ad_id (stable while the crawler inserts concurrently;
   //    offset pagination silently skips rows under concurrent writes).
-  type Row = { ad_id: string; page_id: string; image_hash: string | null; video_hash: string | null; is_active: boolean; days_running: number | null; industries: string[] | null }
+  type Row = { ad_id: string; page_id: string; image_hash: string | null; video_hash: string | null; is_active: boolean; days_running: number | null; niche: string | null }
   const rows: Row[] = []
   let cursor = ''
   for (;;) {
     let q = admin.from('discovery_ads_index')
-      .select('ad_id,page_id,image_hash,video_hash,is_active,days_running,industries')
+      .select('ad_id,page_id,image_hash,video_hash,is_active,days_running,niche')
       .order('ad_id', { ascending: true }).limit(1000)
     if (cursor) q = q.gt('ad_id', cursor)
     const { data, error } = await q
@@ -94,7 +83,7 @@ export async function GET(request: NextRequest) {
     const rt = Math.min(1, Math.log(1 + Math.max(0, a.days_running || 0)) / LN91)
     let rawv = (0.45 * rt + 0.30 * Math.min(1, rc / 6) + 0.25 * Math.min(1, bv / 30)) * (a.is_active ? 1 : 0.6)
     rawv += Math.max(0, a.days_running || 0) * 1e-7
-    return { ad_id: a.ad_id, page_id: a.page_id, creative_reuse_count: rc, brand_active_ads: bv, niche: nicheOf(a.industries), rawv }
+    return { ad_id: a.ad_id, page_id: a.page_id, creative_reuse_count: rc, brand_active_ads: bv, rawv }
   })
 
   // 4. percentile map → score (breakpoints → ~5% win / 15% opt / 25% grow / 30% scale / 25% test)
@@ -104,9 +93,10 @@ export async function GET(request: NextRequest) {
   const bp: [number, number][] = [[0, 0], [0.25, 0.2], [0.55, 0.4], [0.80, 0.6], [0.95, 0.8], [1.0, 1.0]]
   const mapP = (p: number) => { for (let i = 1; i < bp.length; i++) if (p <= bp[i][0]) { const [p0, s0] = bp[i - 1], [p1, s1] = bp[i]; return s0 + (s1 - s0) * (p - p0) / (p1 - p0 || 1) } return 1 }
 
+  // niche is intentionally NOT written here — it's owned by the AI niche classifier.
   const updates = enriched.map(e => ({
     ad_id: e.ad_id, page_id: e.page_id, creative_reuse_count: e.creative_reuse_count,
-    brand_active_ads: e.brand_active_ads, niche: e.niche,
+    brand_active_ads: e.brand_active_ads,
     performance_score: Math.round(mapP(pctOf(e.rawv)) * 1000) / 1000,
   }))
 
@@ -119,10 +109,9 @@ export async function GET(request: NextRequest) {
     wrote += batch.length
   }
 
-  // 6. niche_counts rebuild
+  // 6. niche_counts rebuild — from the stored (AI-classified) niche column
   const nc = new Map<string, { active: number; total: number }>()
-  for (const e of enriched) { const cur = nc.get(e.niche) || { active: 0, total: 0 }; cur.total++; nc.set(e.niche, cur) }
-  for (const a of rows) if (a.is_active) { const e = nc.get(nicheOf(a.industries)); if (e) e.active++ }
+  for (const a of rows) { const key = a.niche || 'Other'; const cur = nc.get(key) || { active: 0, total: 0 }; cur.total++; if (a.is_active) cur.active++; nc.set(key, cur) }
   const ncRows = Array.from(nc).map(([niche, e]) => ({ niche, active_ads: e.active, total_ads: e.total, updated_at: new Date().toISOString() }))
   if (ncRows.length) await admin.from('niche_counts').upsert(ncRows, { onConflict: 'niche' })
 
