@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { CreditCounter } from '@/components/credits/CreditCounter'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -127,8 +128,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           ))}
         </nav>
 
-        {/* User */}
+        {/* Credits + User */}
         <div style={{padding:16,borderTop:"1px solid rgba(223,254,149,0.08)"}}>
+          <div style={{marginBottom:12}}><CreditCounter /></div>
           <div className="flex items-center gap-3 cursor-pointer group">
             <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">
               {initials}
