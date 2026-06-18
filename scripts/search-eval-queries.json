@@ -25,7 +25,7 @@
     { "q": "hair loss", "mode": "adcopy", "expectIndustryAny": ["health", "hair", "men", "wellness"], "note": "topic — should match thinning/regrow ads too" },
     { "q": "thinning hair", "mode": "adcopy", "expectIndustryAny": ["health", "hair", "men", "wellness"], "note": "synonym of hair loss — semantic stress" },
 
-    { "q": "skincare", "mode": "adcopy", "expectIndustryAny": ["beauty", "skincare", "cosmetics", "health"], "note": "may be empty if no skincare brand crawled — tracks coverage" },
+    { "q": "skincare", "mode": "adcopy", "expectEmpty": true, "note": "no TOPICAL skincare brand crawled — the only semantic hits (Wellbel/Bloomin) are ingestible supplements, not skincare. Flip back to expectIndustryAny once a real skincare brand is added." },
 
     { "q": "anti-aging serum", "mode": "adcopy", "expectEmpty": true, "note": "no skincare-serum brand crawled — correct answer is EMPTY, not a confidently-wrong semantic match" },
     { "q": "car insurance", "mode": "adcopy", "expectEmpty": true, "note": "vertical not crawled — must not fabricate" },
