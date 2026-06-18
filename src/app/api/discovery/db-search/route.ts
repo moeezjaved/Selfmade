@@ -121,10 +121,11 @@ export async function GET(request: NextRequest) {
       return query
     }
 
-    // Check how many ads we have in DB
+    // Check how many ads we have in DB (planner estimate — instant; exact count
+    // seq-scans 95K rows and isn't worth it for a "do we have ads" gate).
     const { count: totalInDB } = await admin
       .from('discovery_ads_index')
-      .select('*', { count: 'exact', head: true })
+      .select('*', { count: 'planned', head: true })
 
     if (!totalInDB || totalInDB < 10) {
       return NextResponse.json({ ads: [], total: 0, totalInDB: 0, source: 'empty' })
@@ -145,7 +146,10 @@ export async function GET(request: NextRequest) {
     // Hash alone is not enough — R2 upload may have failed even when hash exists.
     let baseQuery = admin
       .from('discovery_ads_index')
-      .select('*', { count: 'exact' })
+      // NO count:'exact' — counting every match seq-scans the whole table and blew
+      // the 8s timeout ("No ads found"). The displayed total comes from the
+      // unique-creative hash pass below; the page fetch itself is fast.
+      .select('*')
       .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
 
     // Country filter — match against the ARRAY of countries the ad targeted
@@ -194,12 +198,11 @@ export async function GET(request: NextRequest) {
         // Tag dimensions: phrase, compound, each significant word, AND expanded concept tags.
         const tagVariants = Array.from(new Set([lcPhrase, compound, ...words, ...expandedTags].filter(Boolean)))
         const orParts = [
-          ...textVariants.flatMap(v => [
-            `body.ilike.%${v}%`,
-            `title.ilike.%${v}%`,
-            `description.ilike.%${v}%`,
-            `page_name.ilike.%${v}%`,
-          ]),
+          // Text dimension via FULL-TEXT SEARCH on the GIN-indexed search_vector
+          // (body+title+description+page_name). Replaces 4× `ilike '%...%'` which
+          // seq-scanned ~95K rows and blew Supabase's statement timeout → "No ads
+          // found". plfts = plainto_tsquery, so multi-word ANDs the terms. ~0.6s.
+          ...textVariants.map(v => `search_vector.plfts(english).${v}`),
           // AI topical/category tags (4th search dimension) — "active wear" now
           // hits the "activewear" topic via the compound variant.
           ...tagVariants.flatMap(v => [
