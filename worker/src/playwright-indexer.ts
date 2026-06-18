@@ -649,11 +649,19 @@ async function crawlBrand(opts: {
   // }
   const context = await browser.newContext(ctxOpts)
 
-  // ROUTE BLOCKING DISABLED 2026-05-16. Standalone tool with NO blocking
-  // captured 169 ads. Production with blocking gets 30 + zero GraphQL POSTs.
-  // Some blocked URL is preventing Meta's pagination loader from initializing.
-  // Cost trade-off: ~3 MB more bandwidth per crawl, but we get 5-7× more ads
-  // captured. Net better value per MB.
+  // ── Media/asset blocking (2026-06-19) — TARGETED, not the old blanket block. ──
+  // IPRoyal usage report showed 91% of proxy bandwidth was the browser auto-
+  // downloading ad VIDEO (59%), images (16%) and fonts — none of which we need
+  // (ad data comes from the GraphQL JSON; media is downloaded later, off-proxy).
+  // The 2026-05-16 attempt broke pagination because it ALSO blocked Meta's JS
+  // (resourceType 'script' on static.xx). So here we block ONLY media/image/font
+  // and NEVER script/stylesheet/document/xhr/fetch — pagination JS + GraphQL are
+  // untouched. Expected: ~10× lower IPRoyal usage per crawl, same ads captured.
+  await context.route('**/*', (route) => {
+    const t = route.request().resourceType()
+    if (t === 'media' || t === 'image' || t === 'font') return route.abort()
+    return route.continue()
+  })
 
   const page = await context.newPage()
   const allAds = new Map<string, ExtractedAd>()
