@@ -50,9 +50,21 @@ CREATE TABLE IF NOT EXISTS credit_packs (
 );
 
 -- ── Credit balance on the billing owner (user_profiles) ──────────────────────
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS plan_id          TEXT REFERENCES plans(id) DEFAULT 'trial';
+-- Add plan_id with NO inline default/FK → existing rows get NULL (an FK allows
+-- NULLs), so there's never a chicken-egg with the plans seed, regardless of run
+-- order or partial prior state. Then backfill to 'trial' (seeded above), set the
+-- default, and attach the FK only if it isn't already there.
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS plan_id          TEXT;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS credits_balance  INT NOT NULL DEFAULT 0;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS credits_reset_at TIMESTAMPTZ;
+UPDATE user_profiles SET plan_id = 'trial' WHERE plan_id IS NULL;
+ALTER TABLE user_profiles ALTER COLUMN plan_id SET DEFAULT 'trial';
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_profiles_plan_id_fkey') THEN
+    ALTER TABLE user_profiles ADD CONSTRAINT user_profiles_plan_id_fkey
+      FOREIGN KEY (plan_id) REFERENCES plans(id);
+  END IF;
+END $$;
 
 -- ── Immutable ledger ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS credit_transactions (
