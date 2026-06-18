@@ -643,6 +643,7 @@ function ScriptsMenu() {
 
 // ── CarouselViewer ─ swipeable preview for multi-image ads ──
 function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: string; iframeVisible: boolean }) {
+  const router = useRouter()
   // Build slide list: prefer creatives[] (full carousel), fall back to legacy single image/video
   type Slide = { type: 'image' | 'video'; url: string }
   const slides: Slide[] = useMemo(() => {
