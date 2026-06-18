@@ -120,10 +120,17 @@ async function adoptExistingBatches(): Promise<void> {
   try {
     const batches = await provider.list(20)
     const live = batches.filter(b => !b.done)
-    const ended = batches.filter(b => b.done)
-    if (live.length || ended.length) console.log(`  adopting prior ${provider.name} batches: ${live.length} in-flight, ${ended.length} ended`)
-    for (const b of ended) await drainBatch(b.id)         // idempotent re-apply
-    for (const b of live) await drainBatch(b.id)           // wait + apply
+    // Adopt ONLY in-flight batches (restart recovery — a prior run submitted then died
+    // before applying). We deliberately do NOT re-apply ENDED batches: on a clean exit
+    // they were already applied, and re-applying them every run would re-stamp thousands
+    // of already-tagged ads (a steady-state cron tick would needlessly rewrite the whole
+    // last corpus drain). The rare crash-between-end-and-apply case self-heals — those
+    // ads stay topics-null and get re-classified next run by the gate, with no double-
+    // spend on everything else.
+    if (live.length) {
+      console.log(`  adopting ${live.length} in-flight ${provider.name} batch(es) from a prior run`)
+      for (const b of live) await drainBatch(b.id)
+    }
   } catch (e: any) {
     console.warn(`  (could not list prior batches: ${e?.message || e})`)
   }
