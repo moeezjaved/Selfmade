@@ -1041,6 +1041,12 @@ export default function DiscoveryPage() {
   // Top brands strip
   const [topBrands, setTopBrands] = useState<{ pageId: string; name: string; adCount: number; picture: string | null }[]>([])
   const [brandsLoading, setBrandsLoading] = useState(false)
+  const [hoverBrand, setHoverBrand] = useState<string | null>(null)
+  const [hoverRect, setHoverRect] = useState<{ left: number; bottom: number } | null>(null)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const openHover = (pid: string, el: HTMLElement) => { if (hoverTimer.current) clearTimeout(hoverTimer.current); const r = el.getBoundingClientRect(); setHoverRect({ left: r.left, bottom: r.bottom }); setHoverBrand(pid) }
+  const closeHover = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverBrand(null), 140) }
+  const keepHover = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current) }
 
   // Search dropdown
   const [showDropdown, setShowDropdown] = useState(false)
@@ -1643,30 +1649,53 @@ export default function DiscoveryPage() {
               {brandsLoading && !topBrands.length && [1,2,3,4,5].map(i => (
                 <div key={i} style={{ flexShrink: 0, width: 140, height: 64, background: '#e2e8f0', borderRadius: 10 }} className="shimmer" />
               ))}
-              {topBrands.map(brand => (
-                <button key={brand.pageId}
-                  onClick={() => {
-                    // Filter the main grid to this brand's ads AND open the profile drawer
-                    // (same as the autocomplete brand-select), so the grid behind the drawer
-                    // shows the brand's creatives instead of staying on the concept search.
-                    setSearchInput(brand.name)
-                    setQuery(brand.name)
-                    setSearchMode('brand')
-                    setSelectedBrand({ pageId: brand.pageId, name: brand.name })
-                  }}
-                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minWidth: 140, maxWidth: 200 }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#1a3a1a'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}>
-                  {/* Avatar */}
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: `hsl(${brand.name.charCodeAt(0) * 7 % 360},50%,85%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: `hsl(${brand.name.charCodeAt(0) * 7 % 360},50%,30%)`, flexShrink: 0 }}>
-                    {brand.name.charAt(0).toUpperCase()}
+              {topBrands.map(brand => {
+                const hue = brand.name.charCodeAt(0) * 7 % 360
+                const sample = rawAds.filter(a => a.pageId === brand.pageId)
+                const thumbs = sample.map(a => a.thumbnailUrl || a.creatives?.[0]?.r2_url).filter(Boolean).slice(0, 3)
+                const hovered = hoverBrand === brand.pageId
+                // Click the chip → filter the grid to ONLY this brand's ads (brand mode).
+                const viewAds = () => { setSearchInput(brand.name); setQuery(brand.name); setSearchMode('brand'); setSelectedBrand(null) }
+                return (
+                  <div key={brand.pageId} style={{ position: 'relative', flexShrink: 0 }}
+                    onMouseEnter={(e) => openHover(brand.pageId, e.currentTarget as HTMLElement)}
+                    onMouseLeave={closeHover}>
+                    <button onClick={viewAds}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minWidth: 140, maxWidth: 200, border: `1.5px solid ${hovered ? '#1a3a1a' : '#e2e8f0'}`, boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.08)' : 'none' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: `hsl(${hue},50%,85%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: `hsl(${hue},50%,30%)`, flexShrink: 0 }}>
+                        {brand.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brand.name}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{brand.adCount.toLocaleString()} Ads</div>
+                      </div>
+                    </button>
+
+                    {/* Hover preview card (Atria-style) */}
+                    {hovered && (
+                      <div onMouseEnter={keepHover} onMouseLeave={closeHover}
+                        style={{ position: 'fixed', top: (hoverRect?.bottom ?? 0) + 8, left: hoverRect?.left ?? 0, width: 300, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 14px 36px rgba(0,0,0,0.18)', zIndex: 300, padding: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: '50%', background: `hsl(${hue},50%,85%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: `hsl(${hue},50%,30%)` }}>{brand.name.charAt(0).toUpperCase()}</div>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: '#111' }}>{brand.name}</div>
+                            <div style={{ fontSize: 11, color: '#6b7280' }}>{brand.adCount.toLocaleString()} ads in results</div>
+                          </div>
+                        </div>
+                        {thumbs.length > 0 && (
+                          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                            {thumbs.map((t, i) => <img key={i} src={t as string} alt="" style={{ width: '33%', aspectRatio: '3/4', objectFit: 'cover', borderRadius: 8, background: '#f1f3f5' }} />)}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={viewAds} style={{ flex: 1, padding: '9px', borderRadius: 9, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>View ads</button>
+                          <button onClick={() => setSelectedBrand({ pageId: brand.pageId, name: brand.name })} style={{ flex: 1, padding: '9px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Details</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brand.name}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{brand.adCount.toLocaleString()} Ads</div>
-                  </div>
-                </button>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
