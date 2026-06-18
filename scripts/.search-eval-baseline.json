@@ -1,0 +1,380 @@
+{
+  "savedAt": "2026-06-18T07:09:46.125Z",
+  "k": 10,
+  "meanP": 0.9833333333333334,
+  "hitRate": 0.7916666666666666,
+  "results": [
+    {
+      "q": "ag1",
+      "mode": "brand",
+      "note": "brand exact — must not get capped",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 607,
+      "top3": [
+        "AG1 by Athletic Greens[brand]",
+        "AG1 by Athletic Greens[brand]",
+        "AG1 by Athletic Greens[brand]"
+      ]
+    },
+    {
+      "q": "athletic greens",
+      "mode": "brand",
+      "note": "brand by full name",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 607,
+      "top3": [
+        "AG1 by Athletic Greens[brand]",
+        "AG1 by Athletic Greens[brand]",
+        "AG1 by Athletic Greens[brand]"
+      ]
+    },
+    {
+      "q": "gymshark",
+      "mode": "brand",
+      "note": "apparel brand exact",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 663,
+      "top3": [
+        "Gymshark[brand]",
+        "Gymshark[brand]",
+        "Gymshark[brand]"
+      ]
+    },
+    {
+      "q": "lululemon",
+      "mode": "brand",
+      "note": "",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 391,
+      "top3": [
+        "lululemon[brand]",
+        "lululemon[brand]",
+        "lululemon[brand]"
+      ]
+    },
+    {
+      "q": "vuori",
+      "mode": "brand",
+      "note": "",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 398,
+      "top3": [
+        "Vuori[brand]",
+        "Vuori[brand]",
+        "Vuori[brand]"
+      ]
+    },
+    {
+      "q": "alo yoga",
+      "mode": "brand",
+      "note": "",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 850,
+      "top3": [
+        "Alo Yoga[brand]",
+        "Alo Yoga[brand]",
+        "Alo Yoga[brand]"
+      ]
+    },
+    {
+      "q": "mars",
+      "mode": "brand",
+      "note": "canonical-name resolution (was 'Chuck Liddell')",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 311,
+      "top3": [
+        "Mars Men[brand]",
+        "Mars Men[brand]",
+        "Mars Men[brand]"
+      ]
+    },
+    {
+      "q": "activewear",
+      "mode": "adcopy",
+      "note": "concept → apparel brands",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": false,
+      "method": "keyword",
+      "total": 2818,
+      "top3": [
+        "TEN THOUSAND[exact_tag]",
+        "TEN THOUSAND[exact_tag]",
+        "TEN THOUSAND[exact_tag]"
+      ]
+    },
+    {
+      "q": "gym wear",
+      "mode": "adcopy",
+      "note": "synonym of activewear — semantic stress",
+      "returned": 10,
+      "relevant": 9,
+      "precision": 0.9,
+      "hit": false,
+      "method": "keyword",
+      "total": 2184,
+      "top3": [
+        "hims[synonym]",
+        "TEN THOUSAND[synonym]",
+        "TEN THOUSAND[synonym]"
+      ]
+    },
+    {
+      "q": "workout clothes",
+      "mode": "adcopy",
+      "note": "phrase synonym — semantic stress",
+      "returned": 10,
+      "relevant": 9,
+      "precision": 0.9,
+      "hit": false,
+      "method": "keyword",
+      "total": 2310,
+      "top3": [
+        "hims[synonym]",
+        "TEN THOUSAND[synonym]",
+        "TEN THOUSAND[synonym]"
+      ]
+    },
+    {
+      "q": "athleisure",
+      "mode": "adcopy",
+      "note": "",
+      "returned": 10,
+      "relevant": 9,
+      "precision": 0.9,
+      "hit": false,
+      "method": "keyword",
+      "total": 2235,
+      "top3": [
+        "hims[synonym]",
+        "TEN THOUSAND[synonym]",
+        "TEN THOUSAND[synonym]"
+      ]
+    },
+    {
+      "q": "leggings",
+      "mode": "adcopy",
+      "note": "",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 58,
+      "top3": [
+        "Born Primitive[literal]",
+        "Born Primitive[literal]",
+        "Born Primitive[literal]"
+      ]
+    },
+    {
+      "q": "gym clothes for women",
+      "mode": "adcopy",
+      "note": "long-tail concept",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "hybrid",
+      "total": 40,
+      "top3": [
+        "Alo Yoga[keyword]",
+        "Alo Yoga[keyword]",
+        "Gymshark[keyword]"
+      ]
+    },
+    {
+      "q": "greens powder",
+      "mode": "adcopy",
+      "note": "supplement concept",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "hybrid",
+      "total": 40,
+      "top3": [
+        "Grüns[literal]",
+        "Cailin Burns[literal]",
+        "Cailin Burns[literal]"
+      ]
+    },
+    {
+      "q": "supplement",
+      "mode": "adcopy",
+      "note": "",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": false,
+      "method": "keyword",
+      "total": 540,
+      "top3": [
+        "Mars Men[literal]",
+        "Mars Men[literal]",
+        "Mars Men[literal]"
+      ]
+    },
+    {
+      "q": "protein",
+      "mode": "adcopy",
+      "note": "David Protein",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 355,
+      "top3": [
+        "Mars Men[literal]",
+        "Mars Men[literal]",
+        "Mars Men[literal]"
+      ]
+    },
+    {
+      "q": "daily vitamins",
+      "mode": "adcopy",
+      "note": "concept, no specific brand",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "hybrid",
+      "total": 31,
+      "top3": [
+        "helenleland[literal]",
+        "AG1 by Athletic Greens[keyword]",
+        "AG1 by Athletic Greens[keyword]"
+      ]
+    },
+    {
+      "q": "men's health",
+      "mode": "adcopy",
+      "note": "Mars Men / Hims",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 1174,
+      "top3": [
+        "Mars Men[exact_tag]",
+        "Building Pickleball[exact_tag]",
+        "Building Pickleball[exact_tag]"
+      ]
+    },
+    {
+      "q": "hair loss",
+      "mode": "adcopy",
+      "note": "topic — should match thinning/regrow ads too",
+      "returned": 10,
+      "relevant": 9,
+      "precision": 0.9,
+      "hit": true,
+      "method": "keyword",
+      "total": 414,
+      "top3": [
+        "Mars Men[literal]",
+        "hims[literal]",
+        "hims[literal]"
+      ]
+    },
+    {
+      "q": "thinning hair",
+      "mode": "adcopy",
+      "note": "synonym of hair loss — semantic stress",
+      "returned": 10,
+      "relevant": 10,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 369,
+      "top3": [
+        "Wellbel[literal]",
+        "Wellbel[literal]",
+        "Wellbel[literal]"
+      ]
+    },
+    {
+      "q": "skincare",
+      "mode": "adcopy",
+      "note": "no TOPICAL skincare brand crawled — the only semantic hits (Wellbel/Bloomin) are ingestible supplements, not skincare. Flip back to expectIndustryAny once a real skincare brand is added.",
+      "expectEmpty": true,
+      "returned": 0,
+      "relevant": 1,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 0,
+      "top3": []
+    },
+    {
+      "q": "anti-aging serum",
+      "mode": "adcopy",
+      "note": "no skincare-serum brand crawled — correct answer is EMPTY, not a confidently-wrong semantic match",
+      "expectEmpty": true,
+      "returned": 0,
+      "relevant": 1,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 0,
+      "top3": []
+    },
+    {
+      "q": "car insurance",
+      "mode": "adcopy",
+      "note": "vertical not crawled — must not fabricate",
+      "expectEmpty": true,
+      "returned": 0,
+      "relevant": 1,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 0,
+      "top3": []
+    },
+    {
+      "q": "crypto trading app",
+      "mode": "adcopy",
+      "note": "vertical not crawled — must not fabricate",
+      "expectEmpty": true,
+      "returned": 0,
+      "relevant": 1,
+      "precision": 1,
+      "hit": true,
+      "method": "keyword",
+      "total": 0,
+      "top3": []
+    }
+  ]
+}

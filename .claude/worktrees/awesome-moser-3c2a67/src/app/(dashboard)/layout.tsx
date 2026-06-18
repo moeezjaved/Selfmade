@@ -1,0 +1,163 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+import type { User } from '@supabase/supabase-js'
+import type { UserProfile } from '@/types'
+import {
+  LayoutDashboard, Megaphone, Sparkles, TrendingUp,
+  ClipboardList, Settings, CreditCard, BarChart2,
+  Rocket, LogOut, Compass,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+const NAV = [
+  {
+    label: 'Main',
+    items: [
+      { href: '/dashboard',        icon: LayoutDashboard, label: 'Dashboard',        badge: null },
+      { href: '/m4',               icon: Rocket,          label: 'Launch Ads',       badge: 'AI' },
+      { href: '/campaigns',        icon: Megaphone,       label: 'Campaigns',        badge: null },
+      { href: '/creative-studio',  icon: Sparkles,        label: 'Creative Studio',  badge: null },
+      { href: '/discovery',         icon: Compass,         label: 'Ad Discovery',     badge: 'NEW' },
+    ],
+  },
+  {
+    label: 'Insights',
+    items: [
+      { href: '/insights',         icon: TrendingUp,      label: 'Scale & Insights', badge: 'NEW'},
+      { href: '/reports',          icon: BarChart2,       label: 'Reports',          badge: 'NEW'},
+      { href: '/activity',         icon: ClipboardList,   label: 'Activity Log',     badge: null },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      { href: '/settings',         icon: Settings,        label: 'Settings',         badge: null },
+      { href: '/billing',          icon: CreditCard,      label: 'Billing',          badge: null },
+    ],
+  },
+]
+
+interface DashboardLayoutProps {
+  children: React.ReactNode
+}
+
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      setUser(user)
+      const { data: p } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+      setProfile(p)
+    }
+    loadUser()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  const initials = user?.user_metadata?.full_name
+    ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+    : user?.email?.[0].toUpperCase() || 'A'
+
+  return (
+    <div className="flex min-h-screen bg-dark">
+
+      {/* ── SIDEBAR ── */}
+      <aside style={{width:232,flexShrink:0,background:"#243d20",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column",position:"fixed",top:0,left:0,bottom:0,zIndex:50}}>
+
+        {/* Logo */}
+        <div style={{padding:"18px 20px",borderBottom:"1px solid rgba(223,254,149,0.08)"}}>
+          <Link href="/dashboard">
+            <div className="text-lime font-black text-2xl tracking-tight font-serif italic">
+              <img src="/logo.png" alt="Selfmade" style={{height:42,width:"auto",display:"block"}}/>
+            </div>
+          </Link>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 py-3 overflow-y-auto">
+          {NAV.map(section => (
+            <div key={section.label}>
+              <div style={{padding:"16px 20px 6px",fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:".1em",color:"rgba(255,255,255,0.2)"}}>
+                {section.label}
+              </div>
+              {section.items.map(item => {
+                const isActive = pathname === item.href ||
+                  (item.href !== '/dashboard' && pathname.startsWith(item.href))
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn('sidebar-link', isActive && 'active')}
+                  >
+                    <item.icon size={16} className="flex-shrink-0"/>
+                    <span className="flex-1">{item.label}</span>
+                    {item.badge && (
+                      <span className={cn(
+                        'text-[10px] font-bold px-2 py-0.5 rounded-full',
+                        item.badge === 'New' || item.badge === 'NEW'
+                          ? 'bg-lime/20 text-lime border border-lime/30'
+                          : 'bg-lime text-dark'
+                      )}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* User */}
+        <div style={{padding:16,borderTop:"1px solid rgba(223,254,149,0.08)"}}>
+          <div className="flex items-center gap-3 cursor-pointer group">
+            <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div style={{fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.9)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {user?.user_metadata?.full_name || user?.email || 'User'}
+              </div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {profile?.subscription_status === 'trialing' ? 'Trial' : 'Pro'} · Active
+              </div>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-white/30 hover:text-white/70"
+            >
+              <LogOut size={14}/>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── MAIN ── */}
+      <div style={{flex:1,marginLeft:232,display:"flex",flexDirection:"column",minHeight:"100vh",background:"#eef5eb"}}>
+        <div id="topbar-portal"/>
+        <main className="flex-1">
+          {children}
+        </main>
+      </div>
+    </div>
+  )
+}

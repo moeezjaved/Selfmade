@@ -10,7 +10,8 @@ import { expandQuery, matchTierWeight, matchTierReason, type Expansion } from '@
 
 export const dynamic = 'force-dynamic'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+let _openai: OpenAI | null = null
+const getOpenAI = () => (_openai ||= new OpenAI({ apiKey: process.env.OPENAI_API_KEY! }))
 
 // ── Quality score for the Atria-style "Recommended" sort ──────────────────
 // A flat ORDER BY can't BLEND signals — it just tiers them. This blends the
@@ -344,7 +345,7 @@ export async function GET(request: NextRequest) {
     // SKIP brand mode (a brand's ad copy rarely resembles its own name semantically).
     if (q && mode !== 'brand' && ads.length < limit && process.env.OPENAI_API_KEY) {
       try {
-        const embRes = await openai.embeddings.create({
+        const embRes = await getOpenAI().embeddings.create({
           model: 'text-embedding-3-small',
           input: q.slice(0, 8000),
         })

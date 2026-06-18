@@ -1,0 +1,3 @@
+# Keep self-hosted worker out of Vercel — it's a separate Node.js service
+# that runs on a DigitalOcean droplet, not on Vercel.
+worker/

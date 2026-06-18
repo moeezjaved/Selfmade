@@ -12,7 +12,8 @@ import OpenAI from 'openai'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+let _openai: OpenAI | null = null
+const getOpenAI = () => (_openai ||= new OpenAI({ apiKey: process.env.OPENAI_API_KEY! }))
 const MAX_BYTES = 25 * 1024 * 1024  // Whisper hard limit
 
 const ANALYSIS_SCHEMA = {
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     if (buf.byteLength > MAX_BYTES) throw new Error('video too large to transcribe (>25MB)')
 
     const file = new File([buf], 'ad.mp4', { type: 'video/mp4' })
-    const tr: any = await openai.audio.transcriptions.create({
+    const tr: any = await getOpenAI().audio.transcriptions.create({
       file, model: 'whisper-1', response_format: 'verbose_json',
     })
     const transcript = (tr.segments || []).map((s: any) => ({ t: Math.round(s.start), text: (s.text || '').trim() }))
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
     const analyzeText = [spoken, copy && `[ad copy] ${copy}`].filter(Boolean).join('\n\n')
 
     // Analyze framework + hooks + strategies (cheap).
-    const an = await openai.chat.completions.create({
+    const an = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_schema', json_schema: ANALYSIS_SCHEMA },
       messages: [{ role: 'user', content: `Analyze this ad. Identify the copywriting FRAMEWORK (e.g. PAS, AIDA, BAB, Problem-Solution), the HOOKS (first lines / attention grabbers), and persuasion STRATEGIES. Return JSON.\n\n${analyzeText.slice(0, 6000) || '(no transcribable content)'}` }],

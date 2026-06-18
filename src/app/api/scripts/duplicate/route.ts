@@ -12,7 +12,8 @@ import OpenAI from 'openai'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+let _openai: OpenAI | null = null
+const getOpenAI = () => (_openai ||= new OpenAI({ apiKey: process.env.OPENAI_API_KEY! }))
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
       ? `Brand: ${brand.name}\nDescription: ${brand.description || ''}\nUSPs: ${(brand.usps || []).join(', ')}\nTone: ${brand.tone || ''}\nTarget: ${brand.target_audience || ''}\nPrefer words: ${(brand.preferred_words || []).join(', ')}\nAvoid words: ${(brand.avoid_words || []).join(', ')}`
       : (typeof brief === 'string' ? brief : JSON.stringify(brief || {}))
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content:
 `You are an expert direct-response copywriter. Rewrite the SOURCE ad script for a NEW brand, keeping the EXACT same framework, beat structure, pacing, and persuasion strategy — only swap in the new brand's product, angle, and voice. Do not copy the source's specific claims/product.

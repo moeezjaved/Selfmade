@@ -1,0 +1,32 @@
+{
+  "name": "selfmade-creative-worker",
+  "version": "1.0.0",
+  "description": "Self-hosted Playwright worker — extracts ad creative CDN URLs, downloads to R2",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "install-chromium": "playwright install --with-deps chromium"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.700.0",
+    "@supabase/supabase-js": "^2.46.0",
+    "playwright": "1.59.1",
+    "playwright-extra": "^4.3.6",
+    "proxy-chain": "^2.7.1",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "sharp": "^0.33.5",
+    "undici": "^6.25.0",
+    "ws": "^8.20.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

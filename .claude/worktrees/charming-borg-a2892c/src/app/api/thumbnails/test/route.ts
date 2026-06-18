@@ -1,0 +1,228 @@
+/**
+ * Test endpoint — verifies Browserless CDN URL extraction WITHOUT R2.
+ *
+ * Runs SEQUENTIALLY (1 at a time) to respect Browserless concurrency limits.
+ * Tries both v1 (chrome.browserless.io) and v2 (production-sfo.browserless.io)
+ * endpoints automatically.
+ *
+ * GET /api/thumbnails/test?limit=2
+ */
+import { NextRequest, NextResponse } from 'next/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 120
+
+async function isAuthorized(req: NextRequest): Promise<boolean> {
+  const secret = req.nextUrl.searchParams.get('secret')
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret || secret === cronSecret) return true
+  if (req.headers.get('authorization') === `Bearer ${cronSecret}`) return true
+  try {
+    const sb = await createClient()
+    const { data: { user } } = await sb.auth.getUser()
+    if (user) return true
+  } catch { /* ignore */ }
+  return false
+}
+
+// Browserless v2 uses ES module syntax — export default, not module.exports
+const EXTRACT_SCRIPT = (snapshotUrl: string) => `
+export default async ({ page }) => {
+  await page.setRequestInterception(true);
+  page.on('request', (r) => {
+    const t = r.resourceType();
+    if (t === 'font' || t === 'stylesheet') r.abort();
+    else r.continue();
+  });
+
+  let httpStatus = 0;
+  try {
+    const resp = await page.goto(${JSON.stringify(snapshotUrl)}, {
+      waitUntil: 'domcontentloaded',
+      timeout: 15000,
+    });
+    httpStatus = resp ? resp.status() : 0;
+  } catch (e) {
+    return { error: 'goto_failed: ' + e.message, httpStatus };
+  }
+
+  // Wait for ad creative to load — videos load slower than images
+  try {
+    await page.waitForFunction(() => {
+      const img = Array.from(document.querySelectorAll('img'))
+        .some(i => i.src && i.src.includes('fbcdn') && /_s\d{3,}x\d{3,}/.test(i.src));
+      const vid = document.querySelector('video[src]') ||
+                  document.querySelector('video source[src]');
+      return !!(img || vid);
+    }, { timeout: 10000 });
+  } catch (_) {}
+  // Extra delay for video element to fully attach src
+  await new Promise(r => setTimeout(r, 1500));
+
+  const result = await page.evaluate(() => {
+    let videoUrl = null;
+    const videoEl = document.querySelector('video');
+    if (videoEl) {
+      videoUrl = videoEl.src || videoEl.currentSrc || null;
+      if (!videoUrl) {
+        const src = videoEl.querySelector('source');
+        if (src) videoUrl = src.getAttribute('src');
+      }
+    }
+
+    // Return ALL fbcdn srcs — server picks the largest by stp size param
+    const allImgSrcs = Array.from(document.querySelectorAll('img'))
+      .map(img => img.src)
+      .filter(src =>
+        src &&
+        (src.includes('fbcdn.net') || src.includes('scontent')) &&
+        !src.includes('hsts-pixel') &&
+        !src.includes('/emoji')
+      );
+
+    const htmlLen = document.documentElement.outerHTML.length;
+    const title = document.title;
+
+    return { videoUrl, allImgSrcs, htmlLen, title };
+  });
+
+  return { ...result, httpStatus };
+};
+`
+
+async function callBrowserless(
+  token: string,
+  snapshotUrl: string,
+): Promise<{ ok: boolean; status: number; body: string; endpoint: string }> {
+  // Try v2 endpoint first, fall back to v1
+  const endpoints = [
+    `https://production-sfo.browserless.io/function?token=${token}`,
+    `https://chrome.browserless.io/function?token=${token}`,
+  ]
+
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: EXTRACT_SCRIPT(snapshotUrl) }),
+        signal: AbortSignal.timeout(35000),
+      })
+      const body = await res.text()
+      if (res.status !== 404) {
+        // 404 means wrong endpoint — try next. Any other status = this endpoint works
+        return { ok: res.ok, status: res.status, body, endpoint: endpoint.split('?')[0] }
+      }
+    } catch (e) {
+      // network error on this endpoint — try next
+      continue
+    }
+  }
+  return { ok: false, status: 0, body: 'all endpoints failed', endpoint: 'none' }
+}
+
+export async function GET(req: NextRequest) {
+  if (!await isAuthorized(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const browserlessToken = process.env.BROWSERLESS_TOKEN
+  if (!browserlessToken) {
+    return NextResponse.json({
+      error: 'BROWSERLESS_TOKEN not set',
+      fix: 'Add BROWSERLESS_TOKEN to Vercel env vars → Settings → Environment Variables',
+    }, { status: 400 })
+  }
+
+  const admin = createAdminClient()
+  const limit = Math.min(parseInt(req.nextUrl.searchParams.get('limit') || '2'), 5)
+  const formatFilter = req.nextUrl.searchParams.get('format') // 'video' or 'image'
+
+  let query = admin
+    .from('discovery_ads_index')
+    .select('ad_id, snapshot_url, format, page_name')
+    .not('snapshot_url', 'is', null)
+    .is('thumbnail_url', null)
+    .order('last_seen', { ascending: false })
+    .limit(limit)
+
+  if (formatFilter === 'video') query = query.ilike('format', '%video%')
+  else if (formatFilter === 'image') query = query.ilike('format', '%image%')
+
+  const { data: ads, error } = await query
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!ads?.length) return NextResponse.json({ message: 'No ads found with snapshot URLs' })
+
+  // SEQUENTIAL — one at a time to respect concurrency limit
+  const results = []
+  for (const ad of ads as { ad_id: string; snapshot_url: string; format: string | null; page_name: string | null }[]) {
+    const result: Record<string, unknown> = {
+      ad_id: ad.ad_id,
+      page_name: ad.page_name,
+      format: ad.format,
+      image_url: null,
+      video_url: null,
+      status: 'pending',
+    }
+
+    try {
+      const { ok, status, body, endpoint } = await callBrowserless(browserlessToken, ad.snapshot_url)
+      result.browserless_endpoint = endpoint
+      result.browserless_http = status
+
+      if (!ok) {
+        // Return the actual error body so we can debug
+        let errDetail = body
+        try { errDetail = JSON.stringify(JSON.parse(body)) } catch { /* raw text ok */ }
+        result.status = `browserless_${status}`
+        result.browserless_error = errDetail.slice(0, 500)
+        results.push(result)
+        continue
+      }
+
+      let json: Record<string, unknown>
+      try { json = JSON.parse(body) } catch {
+        result.status = 'json_parse_error'
+        result.raw = body.slice(0, 300)
+        results.push(result)
+        continue
+      }
+
+      result.page_http_status = json.httpStatus
+      result.html_len = json.htmlLen
+      result.page_title = json.title
+      result.debug_img_srcs = json.allImgSrcs
+      result.goto_error = json.error || null
+
+      // Pick the largest image by stp size param — done server-side
+      // e.g. _s600x600 → 600, _s60x60 → 60
+      const stpSize = (url: string): number => { const m = url.match(/_s(\d+)x\d+/); return m ? parseInt(m[1]) : 0 }
+      const allImgs = (Array.isArray(json.allImgSrcs) ? json.allImgSrcs as string[] : [])
+        .filter((u: string) => u.includes('fbcdn'))
+      allImgs.sort((a: string, b: string) => stpSize(b) - stpSize(a))
+      const imgUrl = allImgs[0] || null
+      const vidUrl = typeof json.videoUrl === 'string' && json.videoUrl.includes('fbcdn') ? json.videoUrl : null
+
+      result.image_url = imgUrl
+      result.video_url = vidUrl
+      result.status = (imgUrl || vidUrl) ? '✅ found' : `❌ not_found (page=${json.httpStatus}, html=${json.htmlLen})`
+    } catch (e) {
+      result.status = `exception: ${e instanceof Error ? e.message : String(e)}`
+    }
+
+    results.push(result)
+  }
+
+  const found = results.filter(r => r.image_url || r.video_url).length
+
+  return NextResponse.json({
+    summary: `${found}/${results.length} ads had extractable CDN URLs`,
+    success_rate: `${Math.round((found / results.length) * 100)}%`,
+    results,
+    next_step: found > 0
+      ? '✅ Works! Add R2 env vars then hit /api/thumbnails to start storing creatives.'
+      : '⚠️ Check browserless_error and debug_img_srcs fields above to diagnose.',
+  })
+}
