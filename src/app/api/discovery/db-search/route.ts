@@ -173,11 +173,25 @@ export async function GET(request: NextRequest) {
     if (status === 'ACTIVE') baseQuery = baseQuery.eq('is_active', true)
     if (status === 'INACTIVE') baseQuery = baseQuery.eq('is_active', false)
     if (format) baseQuery = baseQuery.eq('format', format)
-    // Industry/category filter — match the AI/auto-detected industries OR the
-    // brand's explicit admin categories. Multi-select = match ANY of the chosen.
+    // Industry/category filter. The old `industries` field (keyword auto-detect) is
+    // unreliable (e.g. "Travel & Tourism" on a shampoo ad), so we also match the
+    // accurate AI `topics` and admin `brand_categories` — by exact value AND by each
+    // significant word of the industry name. So "Apparel & Accessories" matches ads
+    // tagged topics {apparel} or {accessories}, keeping the filter consistent with the
+    // (accurate) categories shown on the detail page. Multi-select = match ANY chosen.
     if (industry) {
+      const STOP = new Set(['and', 'the', 'personal', 'care', 'for'])
       const inds = industry.split(',').map(s => s.trim()).filter(Boolean)
-      const parts = inds.flatMap(i => [`industries.cs.{${i}}`, `brand_categories.cs.{${i}}`])
+      const parts = inds.flatMap(i => {
+        const lc = i.toLowerCase()
+        const words = lc.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w))
+        return [
+          `industries.cs.{${i}}`,
+          `brand_categories.cs.{${lc}}`,
+          `topics.cs.{${lc}}`,
+          ...words.flatMap(w => [`topics.cs.{${w}}`, `brand_categories.cs.{${w}}`]),
+        ]
+      })
       if (parts.length) baseQuery = baseQuery.or(parts.join(','))
     }
     // Theme filter — server-side (was browser-only, so it only saw the loaded 40).
