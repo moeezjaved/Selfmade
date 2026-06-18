@@ -8,12 +8,19 @@
     },
     "src/app/api/indexer/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/rollup/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
     {
       "path": "/api/indexer?embed=1",
       "schedule": "30 */2 * * *"
+    },
+    {
+      "path": "/api/cron/rollup",
+      "schedule": "15 4 * * *"
     }
   ]
 }
