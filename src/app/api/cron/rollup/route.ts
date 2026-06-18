@@ -50,12 +50,12 @@ export async function GET(request: NextRequest) {
 
   // 1. fetch — KEYSET on ad_id (stable while the crawler inserts concurrently;
   //    offset pagination silently skips rows under concurrent writes).
-  type Row = { ad_id: string; page_id: string; image_hash: string | null; video_hash: string | null; is_active: boolean; days_running: number | null; niche: string | null }
+  type Row = { ad_id: string; page_id: string; image_hash: string | null; video_hash: string | null; is_active: boolean; days_running: number | null; niche: string | null; start_date: string | null }
   const rows: Row[] = []
   let cursor = ''
   for (;;) {
     let q = admin.from('discovery_ads_index')
-      .select('ad_id,page_id,image_hash,video_hash,is_active,days_running,niche')
+      .select('ad_id,page_id,image_hash,video_hash,is_active,days_running,niche,start_date')
       .order('ad_id', { ascending: true }).limit(1000)
     if (cursor) q = q.gt('ad_id', cursor)
     const { data, error } = await q
@@ -66,22 +66,30 @@ export async function GET(request: NextRequest) {
     if (data.length < 1000) break
   }
 
-  // 2. aggregates
-  const reuse = new Map<string, number>(), brandActive = new Map<string, number>()
+  // 2. aggregates — reuse, brand active volume, and SCALING VELOCITY (Winner Score v2):
+  //    how many NEW creatives the brand launched in the last 21 days. A brand actively
+  //    ramping a creative = a stronger winner signal than raw size alone.
+  const reuse = new Map<string, number>(), brandActive = new Map<string, number>(), brandNew = new Map<string, number>()
+  const since = Date.now() - 21 * 86400000
   for (const a of rows) {
     const ck = a.image_hash || a.video_hash
     if (ck) { const k = a.page_id + '|' + ck; reuse.set(k, (reuse.get(k) || 0) + 1) }
     if (a.is_active) brandActive.set(a.page_id, (brandActive.get(a.page_id) || 0) + 1)
+    const sd = a.start_date ? Date.parse(a.start_date) : NaN
+    if (!Number.isNaN(sd) && sd >= since) brandNew.set(a.page_id, (brandNew.get(a.page_id) || 0) + 1)
   }
 
-  // 3. raw composite (caps 90/6/30, inactive penalty 0.6) + runtime tiebreaker
+  // 3. raw composite — Winner Score v2:
+  //    0.35 longevity + 0.25 reuse + 0.20 brand commitment + 0.20 scaling velocity,
+  //    × inactive penalty. Caps: 90d / 6 reuses / 30 active / 12 new-in-21d.
   const LN91 = Math.log(91)
   const enriched = rows.map(a => {
     const ck = a.image_hash || a.video_hash
     const rc = ck ? (reuse.get(a.page_id + '|' + ck) || 0) : 0
     const bv = brandActive.get(a.page_id) || 0
+    const bn = brandNew.get(a.page_id) || 0
     const rt = Math.min(1, Math.log(1 + Math.max(0, a.days_running || 0)) / LN91)
-    let rawv = (0.45 * rt + 0.30 * Math.min(1, rc / 6) + 0.25 * Math.min(1, bv / 30)) * (a.is_active ? 1 : 0.6)
+    let rawv = (0.35 * rt + 0.25 * Math.min(1, rc / 6) + 0.20 * Math.min(1, bv / 30) + 0.20 * Math.min(1, bn / 12)) * (a.is_active ? 1 : 0.6)
     rawv += Math.max(0, a.days_running || 0) * 1e-7
     return { ad_id: a.ad_id, page_id: a.page_id, creative_reuse_count: rc, brand_active_ads: bv, rawv }
   })
