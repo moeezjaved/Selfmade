@@ -68,9 +68,6 @@ export async function GET(request: NextRequest) {
     const industry = searchParams.get('industry') || ''  // comma-separated for multi-select
     const theme = searchParams.get('theme') || ''        // comma-separated
     const language = searchParams.get('language') || ''  // comma-separated ISO codes
-    const hookType = searchParams.get('hook_type') || ''
-    const emotion = searchParams.get('emotion') || ''
-    const angle = searchParams.get('angle') || ''
     const country = searchParams.get('country') || 'US'
     const sort = searchParams.get('sort') || 'recent'
     const days = parseInt(searchParams.get('days') || '0')
@@ -90,6 +87,11 @@ export async function GET(request: NextRequest) {
     const minReuse = parseInt(searchParams.get('min_reuse') || '0')
     const hideBrands = (searchParams.get('hide_brands') || '').split(',').map(s => s.replace(/[^0-9]/g, '')).filter(Boolean)
     const adsPerBrand = parseInt(searchParams.get('ads_per_brand') || '0')  // 0 = default diversity cap
+    // Creative-DNA filters (Phase C). hook/emotion/angle were single-value before;
+    // now multi-select (comma). format_style/visual_style/cta_style are new.
+    const csv = (k: string) => (searchParams.get(k) || '').split(',').map(s => s.trim()).filter(Boolean)
+    const hookTypes = csv('hook_type'), emotions = csv('emotion'), angles = csv('angle')
+    const formatStyles = csv('format_style'), visualStyles = csv('visual_style'), ctaStyles = csv('cta_style')
     const VALID_TIERS = new Set(['winning', 'optimized', 'growing', 'scaling', 'testing'])
 
     // Applied to BOTH the result query and the count query so the total stays honest.
@@ -100,6 +102,13 @@ export async function GET(request: NextRequest) {
       if (activeAdsMin > 0) query = query.gte('brand_active_ads', activeAdsMin)
       if (minReuse > 0) query = query.gte('creative_reuse_count', minReuse)
       if (ctaTypes.length) query = query.in('cta', ctaTypes)
+      // Creative-DNA filters (Phase C) — multi-select, applied to result AND count.
+      if (hookTypes.length) query = query.in('hook_type', hookTypes)
+      if (emotions.length) query = query.overlaps('emotion', emotions)
+      if (angles.length) query = query.in('angle', angles)
+      if (formatStyles.length) query = query.in('format_style', formatStyles)
+      if (visualStyles.length) query = query.in('visual_style', visualStyles)
+      if (ctaStyles.length) query = query.in('cta_style', ctaStyles)
       if (hideBrands.length) query = query.not('page_id', 'in', `(${hideBrands.join(',')})`)
       if (runTimeBuckets.length) {
         const groups = runTimeBuckets.map(b => {
@@ -239,9 +248,6 @@ export async function GET(request: NextRequest) {
       const langs = language.split(',').map(s => s.trim()).filter(Boolean)
       if (langs.length) baseQuery = baseQuery.overlaps('languages', langs)
     }
-    if (hookType) baseQuery = baseQuery.eq('hook_type', hookType)
-    if (emotion) baseQuery = baseQuery.contains('emotion', [emotion])
-    if (angle) baseQuery = baseQuery.eq('angle', angle)
     if (platforms) baseQuery = baseQuery.overlaps('platforms', platforms.split(','))
     // Time filter: only ads started within the last N days
     if (days > 0) {
