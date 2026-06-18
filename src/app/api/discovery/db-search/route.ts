@@ -339,14 +339,21 @@ export async function GET(request: NextRequest) {
         })
         if (vectorResults?.length) {
           const rows = vectorResults as any[]
-          // RELATIVE relevance floor: a fixed cosine cutoff is fragile across queries —
-          // 0.3 is tight for "gym wear" but noise for "anti-aging serum". Anchor to the
-          // best match for THIS query and keep only neighbours within `delta` of it.
-          // (Falls back to the absolute RPC floor if the RPC doesn't return similarity.)
+          // Semantic is GAP-FILL, not a fabricator. Two states:
+          //  • There ARE real lexical/topic matches (an anchor) and the page is short →
+          //    top up with neighbours close to the best match (RELATIVE floor). Its job.
+          //  • There are ZERO lexical/topic matches → the page is empty and semantic is
+          //    the ONLY content. This is exactly where it fabricates "confidently wrong"
+          //    results (anti-aging serum → Mars Men, because we never crawled serums). So
+          //    require a STRICT ABSOLUTE floor; if nothing clears it, return empty. An
+          //    honest empty ("we may not cover this vertical") beats a wrong answer.
+          const hadLexicalAnchor = ads.length > 0
           const sims = rows.map(r => (typeof r.similarity === 'number' ? r.similarity : null))
                            .filter((s): s is number => s != null)
           const topSim = sims.length ? Math.max(...sims) : null
-          const floor = topSim != null ? Math.max(0.36, topSim - 0.08) : null
+          const floor = hadLexicalAnchor
+            ? (topSim != null ? Math.max(0.36, topSim - 0.08) : null)  // top-up: relative
+            : 0.5                                                       // no anchor: strict absolute
 
           const haveIds = new Set(ads.map((a: any) => a.ad_id))
           const haveHashes = new Set(
