@@ -693,9 +693,10 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
       onClick={() => router.push(`/discovery/${ad.id}`)}
       style={{
         position: 'relative', background: '#f1f3f5', overflow: 'hidden', lineHeight: 0, cursor: 'pointer',
-        // FIXED aspect ratio → every card's media is the same height, so creatives load
-        // INTO a stable box (no resize, no reflow) and the grid never jitters on scroll.
-        aspectRatio: '4 / 5', width: '100%',
+        // Natural aspect (Atria-style masonry) — full creative, no crop, no letterbox.
+        // A min-height placeholder reserves space while loading so the column doesn't
+        // collapse; the masonry columns (round-robin, stable) keep scroll smooth.
+        width: '100%', minHeight: !imgLoaded ? 220 : undefined,
       }}
     >
       {slide.type === 'image' ? (
@@ -717,7 +718,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
               onLoad={() => setImgLoaded(true)}
               onError={() => setImgError(true)}
               style={{
-                width: '100%', height: '100%', objectFit: 'contain', display: 'block', verticalAlign: 'top',
+                width: '100%', height: 'auto', display: 'block', verticalAlign: 'top',
                 opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2,
               }}
             />
@@ -738,7 +739,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             onLoadedData={() => setImgLoaded(true)}
             onLoadedMetadata={() => setImgLoaded(true)}
             onCanPlay={() => setImgLoaded(true)}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
+            style={{ width: '100%', height: 'auto', maxHeight: 560, display: 'block', verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
             onEnded={() => setPlaying(false)}
           />
           {imgLoaded && !playing && (
@@ -1047,6 +1048,12 @@ export default function DiscoveryPage() {
   const openHover = (pid: string, el: HTMLElement) => { if (hoverTimer.current) clearTimeout(hoverTimer.current); const r = el.getBoundingClientRect(); setHoverRect({ left: r.left, bottom: r.bottom }); setHoverBrand(pid) }
   const closeHover = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverBrand(null), 140) }
   const keepHover = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current) }
+  // Responsive masonry column count.
+  const [gridCols, setGridCols] = useState(4)
+  useEffect(() => {
+    const calc = () => { const w = window.innerWidth; setGridCols(w < 700 ? 2 : w < 1050 ? 3 : w < 1450 ? 4 : 5) }
+    calc(); window.addEventListener('resize', calc); return () => window.removeEventListener('resize', calc)
+  }, [])
 
   // Search dropdown
   const [showDropdown, setShowDropdown] = useState(false)
@@ -1716,13 +1723,17 @@ export default function DiscoveryPage() {
               {activeFilterCount > 0 && <span style={{ background: '#f0fdf4', color: '#166534', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
             </div>
-            {/* Uniform CSS Grid — fixed columns + fixed-aspect cards. Appending new
-                cards never moves existing ones (no masonry rebalance), so infinite
-                scroll is smooth with zero jitter. */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, maxWidth: '100%' }}>
-              {filteredAds.map(ad => (
-                <div key={ad.id} style={{ animation: 'fadeUp 0.3s ease-out both' }}>
-                  <AdCard ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })} />
+            {/* Masonry (Atria-style) — natural-aspect cards distributed round-robin into
+                fixed columns. Items keep their column when more load, so appending never
+                rebalances/jitters the existing cards; only the loading column settles. */}
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', maxWidth: '100%' }}>
+              {Array.from({ length: gridCols }, (_, ci) => (
+                <div key={ci} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {filteredAds.filter((_, i) => i % gridCols === ci).map(ad => (
+                    <div key={ad.id} style={{ animation: 'fadeUp 0.3s ease-out both' }}>
+                      <AdCard ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })} />
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
