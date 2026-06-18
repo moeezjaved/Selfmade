@@ -78,6 +78,40 @@ export async function GET(request: NextRequest) {
     const limit = 40
     const offset = page * limit
 
+    // ── GetHookd-parity filters (all additive; each is inert unless its param is
+    // sent, so existing queries are byte-for-byte unchanged). Backed by the rollup
+    // columns from migration 020. niche uses '|' as delimiter because niche names
+    // themselves contain commas ("Baby, Kids & Maternity").
+    const tiers = (searchParams.get('performance_scores') || searchParams.get('tiers') || '').split(',').map(s => s.trim()).filter(Boolean)
+    const niches = (searchParams.get('niche') || '').split('|').map(s => s.trim()).filter(Boolean)
+    const activeAdsMin = parseInt(searchParams.get('active_ads_count') || '0')
+    const runTimeBuckets = (searchParams.get('run_time') || '').split(',').map(s => s.trim()).filter(Boolean)
+    const ctaTypes = (searchParams.get('cta_type') || '').split('|').map(s => s.trim()).filter(Boolean)
+    const minReuse = parseInt(searchParams.get('min_reuse') || '0')
+    const hideBrands = (searchParams.get('hide_brands') || '').split(',').map(s => s.replace(/[^0-9]/g, '')).filter(Boolean)
+    const adsPerBrand = parseInt(searchParams.get('ads_per_brand') || '0')  // 0 = default diversity cap
+    const VALID_TIERS = new Set(['winning', 'optimized', 'growing', 'scaling', 'testing'])
+
+    // Applied to BOTH the result query and the count query so the total stays honest.
+    const applyHookdFilters = (query: any) => {
+      const t = tiers.filter(x => VALID_TIERS.has(x))
+      if (t.length) query = query.in('performance_tier', t)
+      if (niches.length) query = query.in('niche', niches)
+      if (activeAdsMin > 0) query = query.gte('brand_active_ads', activeAdsMin)
+      if (minReuse > 0) query = query.gte('creative_reuse_count', minReuse)
+      if (ctaTypes.length) query = query.in('cta', ctaTypes)
+      if (hideBrands.length) query = query.not('page_id', 'in', `(${hideBrands.join(',')})`)
+      if (runTimeBuckets.length) {
+        const groups = runTimeBuckets.map(b => {
+          if (b.endsWith('+')) { const n = parseInt(b); return Number.isFinite(n) ? `days_running.gte.${n}` : '' }
+          const [a, c] = b.split('-').map(x => parseInt(x))
+          return (Number.isFinite(a) && Number.isFinite(c)) ? `and(days_running.gte.${a},days_running.lt.${c})` : ''
+        }).filter(Boolean)
+        if (groups.length) query = query.or(groups.join(','))
+      }
+      return query
+    }
+
     // Check how many ads we have in DB
     const { count: totalInDB } = await admin
       .from('discovery_ads_index')
@@ -214,11 +248,19 @@ export async function GET(request: NextRequest) {
       const sinceDate = new Date(Date.now() - days * 86400000).toISOString()
       baseQuery = baseQuery.gte('start_date', sinceDate)
     }
+    // GetHookd-parity filters (performance tier, niche, brand volume, run-time,
+    // CTA, creative reuse, hide-brands) — rollup-backed, all additive.
+    baseQuery = applyHookdFilters(baseQuery)
 
     // Sort
     if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
     else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
     else if (sort === 'recent') baseQuery = baseQuery.order('last_seen', { ascending: false })
+    else if (sort === 'newest') baseQuery = baseQuery.order('start_date', { ascending: false, nullsFirst: false })
+    else if (sort === 'performance') baseQuery = baseQuery.order('performance_score', { ascending: false }).order('is_active', { ascending: false })
+    else if (sort === 'most_used') baseQuery = baseQuery.order('creative_reuse_count', { ascending: false })
+    else if (sort === 'latest_added') baseQuery = baseQuery.order('indexed_at', { ascending: false })
+    else if (sort === 'oldest_added') baseQuery = baseQuery.order('indexed_at', { ascending: true })
     else {
       // 'recommended' (default, Atria-style): proven winners first — active ads
       // that have run the longest, then recency. Makes the feed feel curated
@@ -263,7 +305,7 @@ export async function GET(request: NextRequest) {
     // with ~1.5k long-running video ads) floods the recommended feed — burying every
     // other brand AND every image ad. Cap each brand per page so the feed is varied.
     // No cap in brand mode (you clicked a brand → you want all its ads).
-    const MAX_PER_BRAND = (q && mode === 'brand') ? Infinity : 3
+    const MAX_PER_BRAND = (q && mode === 'brand') ? Infinity : (adsPerBrand > 0 ? adsPerBrand : 3)
     const seenHashes = new Set<string>()
     const perBrand: Record<string, number> = {}
     const dedupedAds: any[] = []
@@ -313,6 +355,7 @@ export async function GET(request: NextRequest) {
         // Same keyword match as the result query → the count reflects the search.
         cq = cq.or(keywordOr)
       }
+      cq = applyHookdFilters(cq)   // keep the unique-creative total honest under the new filters
       return cq
     }
     if (q) {
@@ -475,6 +518,12 @@ export async function GET(request: NextRequest) {
       desire: ad.desire,
       usp: ad.usp,
       aiClassified: ad.ai_classified,
+      // rollup-backed (migration 020) — power tier badges + niche chips in the UI
+      performanceScore: ad.performance_score ?? null,
+      performanceTier: ad.performance_tier ?? null,
+      niche: ad.niche ?? null,
+      creativeReuseCount: ad.creative_reuse_count ?? 0,
+      brandActiveAds: ad.brand_active_ads ?? 0,
     }))
 
     return NextResponse.json({
