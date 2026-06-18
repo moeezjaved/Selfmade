@@ -26,6 +26,9 @@
     { "q": "thinning hair", "mode": "adcopy", "expectIndustryAny": ["health", "hair", "men", "wellness"], "note": "synonym of hair loss — semantic stress" },
 
     { "q": "skincare", "mode": "adcopy", "expectIndustryAny": ["beauty", "skincare", "cosmetics", "health"], "note": "may be empty if no skincare brand crawled — tracks coverage" },
-    { "q": "anti-aging serum", "mode": "adcopy", "expectIndustryAny": ["beauty", "skincare", "cosmetics"], "note": "tight semantic query — threshold-fragility check" }
+
+    { "q": "anti-aging serum", "mode": "adcopy", "expectEmpty": true, "note": "no skincare-serum brand crawled — correct answer is EMPTY, not a confidently-wrong semantic match" },
+    { "q": "car insurance", "mode": "adcopy", "expectEmpty": true, "note": "vertical not crawled — must not fabricate" },
+    { "q": "crypto trading app", "mode": "adcopy", "expectEmpty": true, "note": "vertical not crawled — must not fabricate" }
   ]
 }

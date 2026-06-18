@@ -70,6 +70,21 @@ async function runCase(c) {
     return { ...c, error: String(e?.message || e) }
   }
   const ads = (json.ads || []).slice(0, K)
+
+  // EXPECTED-EMPTY cases: the corpus has nothing right for this query (vertical not
+  // crawled), so the CORRECT behavior is to return nothing rather than fabricate a
+  // confidently-wrong semantic match. Score the inverse — empty = 1.0, any junk = 0 —
+  // otherwise the harness punishes the honest fix (both score 0 under plain precision).
+  if (c.expectEmpty) {
+    const empty = ads.length === 0
+    return {
+      q: c.q, mode: c.mode || 'adcopy', note: c.note || '', expectEmpty: true,
+      returned: ads.length, relevant: empty ? 1 : 0, precision: empty ? 1 : 0,
+      hit: empty, method: json.searchMethod || '?', total: json.total || 0,
+      top3: ads.slice(0, 3).map(a => `${a.pageName || '?'}${a.matchReason ? `[${a.matchReason}]` : ''}`),
+    }
+  }
+
   const relevant = ads.filter(a => isRelevant(a, c)).length
   const precision = ads.length ? relevant / ads.length : 0
   const hit = c.expectBrands?.length
