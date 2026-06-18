@@ -683,8 +683,9 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   return (
     <div
       className="ad-card-visual"
+      onClick={() => router.push(`/discovery/${ad.id}`)}
       style={{
-        position: 'relative', background: '#f1f3f5', overflow: 'hidden', lineHeight: 0,
+        position: 'relative', background: '#f1f3f5', overflow: 'hidden', lineHeight: 0, cursor: 'pointer',
         // FIXED aspect ratio → every card's media is the same height, so creatives load
         // INTO a stable box (no resize, no reflow) and the grid never jitters on scroll.
         aspectRatio: '4 / 5', width: '100%',
@@ -734,7 +735,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             onEnded={() => setPlaying(false)}
           />
           {imgLoaded && !playing && (
-            <div onClick={(e) => { e.stopPropagation(); setPlaying(true); setTimeout(() => videoRef.current?.play(), 50) }}
+            <div onClick={() => router.push(`/discovery/${ad.id}`)}
               style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer', zIndex: 3 }}>
               <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
                 <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>

@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { X, Bookmark, Link as LinkIcon, Download, Sparkles, ExternalLink } from 'lucide-react'
+import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 
 interface Creative {
   position: number
@@ -35,6 +36,12 @@ interface Ad {
   country: string
   format: string
   industries: string[]
+  topics: string[]
+  hookType: string | null
+  angle: string | null
+  persona: string | null
+  usp: string | null
+  aiClassified: boolean
   cta: string | null
   mediaType: string
 }
@@ -184,7 +191,13 @@ export default function AdDetailPage() {
             </div>
           } />
           <InfoRow label="Display format" value={ad.format} />
-          <InfoRow label="Categories" value={(ad.industries || []).join(', ') || '—'} />
+          {/* Accurate AI topics (gpt-4o-mini) — the old `industries` keyword-detection
+              was unreliable (e.g. "Travel & Tourism" on a shampoo ad). Fall back to it
+              only if an ad hasn't been classified yet. */}
+          <InfoRow label="Categories" value={
+            (ad.topics && ad.topics.length ? ad.topics : (ad.industries || []))
+              .map(t => t.replace(/\b\w/g, c => c.toUpperCase())).join(', ') || '—'
+          } />
         </div>
 
         {/* ── RIGHT: save details + Atria AI ── */}
@@ -207,22 +220,7 @@ export default function AdDetailPage() {
             </button>
           </div>
 
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#111' }}>Selfmade AI</div>
-              <div style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span>⚡</span> 238 credits
-              </div>
-            </div>
-            <button style={{
-              width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              background: 'linear-gradient(135deg, #1a3a1a 0%, #2d5a2d 50%, #dffe95 100%)',
-              color: '#fff', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              boxShadow: '0 4px 14px rgba(26, 58, 26, 0.3)',
-            }}>
-              <Sparkles size={16} /> Clone ad
-            </button>
-          </div>
+          <AiPanel ad={ad} />
 
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -242,6 +240,90 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
     <div style={{ marginBottom: 14 }}>
       <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{value}</div>
+    </div>
+  )
+}
+
+/** Format-aware AI actions: Scripts (transcribe → framework → duplicate) for VIDEO
+ *  ads, Clone for IMAGE ads. Each action goes through the credit gate. */
+function AiPanel({ ad }: { ad: Ad }) {
+  const { balance, pricing } = useCredits()
+  const isVideo = ad.format === 'Video' || !!ad.videoUrl
+  const [script, setScript] = useState<any>(null)
+  const [gen, setGen] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [brands, setBrands] = useState<any[]>([])
+  const [brandId, setBrandId] = useState('')
+
+  useEffect(() => {
+    fetch('/api/brands').then(r => r.json()).then(d => {
+      setBrands(d.brands || []); if (d.brands?.[0]) setBrandId(d.brands[0].id)
+    }).catch(() => {})
+  }, [])
+
+  const cost = (a: string, d: number) => pricing?.[a]?.credits ?? d
+
+  async function run(url: string, body: any, action: string, dflt: number, onOk: (d: any) => void) {
+    const c = cost(action, dflt)
+    if (!confirmCredits(action.replace('_', ' '), c, balance)) return
+    setLoading(true); setErr(null)
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      const d = await r.json()
+      if (!r.ok) { setErr(d.error === 'insufficient_credits' ? `Need ${d.need} credits (you have ${d.have})` : d.error || 'failed'); return }
+      onOk(d); refreshCredits()
+    } catch (e: any) { setErr(e.message) } finally { setLoading(false) }
+  }
+
+  const cardS: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18 }
+  const ctaS: React.CSSProperties = { width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: 'linear-gradient(135deg,#1a3a1a,#2d5a2d 50%,#dffe95)', color: '#fff', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }
+
+  return (
+    <div style={cardS}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#111' }}>Selfmade AI</div>
+        <div style={{ fontSize: 11, color: '#6b7280' }}>◆ {balance.toLocaleString()} credits</div>
+      </div>
+
+      {isVideo ? (
+        !script ? (
+          <button style={{ ...ctaS, opacity: loading ? 0.6 : 1 }} disabled={loading}
+            onClick={() => run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 2, d => setScript(d.script))}>
+            <Sparkles size={16} /> {loading ? 'Transcribing…' : `Generate Script · ${cost('transcribe', 2)} cr`}
+          </button>
+        ) : (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Framework: <span style={{ color: '#1a3a1a' }}>{script.framework || '—'}</span></div>
+            {script.hooks?.length > 0 && <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>Hooks: {script.hooks.join(' · ')}</div>}
+            <div style={{ maxHeight: 150, overflowY: 'auto', fontSize: 12, color: '#374151', background: '#f8fafc', borderRadius: 8, padding: 10, marginBottom: 10, whiteSpace: 'pre-wrap' }}>
+              {(script.transcript || []).map((s: any, i: number) => <div key={i}>{s.text}</div>)}
+            </div>
+            {brands.length === 0 ? (
+              <a href="/brands" style={{ fontSize: 12, color: '#1a3a1a', fontWeight: 700 }}>+ Create a brand to duplicate this script →</a>
+            ) : (
+              <>
+                <select value={brandId} onChange={e => setBrandId(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, marginBottom: 8 }}>
+                  {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+                <button style={{ ...ctaS, opacity: loading ? 0.6 : 1 }} disabled={loading}
+                  onClick={() => run('/api/scripts/duplicate', { sourceAdId: ad.id, brandId }, 'script_duplicate', 5, d => setGen(d.generated?.script))}>
+                  {loading ? 'Writing…' : `Duplicate for my brand · ${cost('script_duplicate', 5)} cr`}
+                </button>
+              </>
+            )}
+            {gen && <div style={{ marginTop: 10, fontSize: 12, color: '#111', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 10, whiteSpace: 'pre-wrap' }}>{gen}</div>}
+          </div>
+        )
+      ) : (
+        <>
+          <button style={{ ...ctaS, opacity: 0.5, cursor: 'not-allowed' }} disabled title="Image clone — coming soon">
+            <Sparkles size={16} /> Clone ad · {cost('image_clone', 26)} cr
+          </button>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Image cloning ships once the provider keys are in.</div>
+        </>
+      )}
+      {err && <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626' }}>{err}</div>}
     </div>
   )
 }
