@@ -50,12 +50,12 @@ export async function GET(request: NextRequest) {
 
   // 1. fetch — KEYSET on ad_id (stable while the crawler inserts concurrently;
   //    offset pagination silently skips rows under concurrent writes).
-  type Row = { ad_id: string; page_id: string; image_hash: string | null; video_hash: string | null; is_active: boolean; days_running: number | null; niche: string | null; start_date: string | null }
+  type Row = { ad_id: string; page_id: string; image_hash: string | null; video_hash: string | null; is_active: boolean; start_date: string | null; stop_date: string | null; last_seen: string | null; niche: string | null }
   const rows: Row[] = []
   let cursor = ''
   for (;;) {
     let q = admin.from('discovery_ads_index')
-      .select('ad_id,page_id,image_hash,video_hash,is_active,days_running,niche,start_date')
+      .select('ad_id,page_id,image_hash,video_hash,is_active,start_date,stop_date,last_seen,niche')
       .order('ad_id', { ascending: true }).limit(1000)
     if (cursor) q = q.gt('ad_id', cursor)
     const { data, error } = await q
@@ -79,19 +79,32 @@ export async function GET(request: NextRequest) {
     if (!Number.isNaN(sd) && sd >= since) brandNew.set(a.page_id, (brandNew.get(a.page_id) || 0) + 1)
   }
 
-  // 3. raw composite — Winner Score v2:
-  //    0.35 longevity + 0.25 reuse + 0.20 brand commitment + 0.20 scaling velocity,
-  //    × inactive penalty. Caps: 90d / 6 reuses / 30 active / 12 new-in-21d.
+  // 3. raw composite — Winner Score v3:
+  //    days_running was a DATA BUG (95% stored as 0 despite multi-week start→stop
+  //    spans), so we RECOMPUTE it here = (stop_date | last_seen | now) − start_date.
+  //    Score: 0.40 longevity + 0.25 reuse + 0.20 brand commitment + 0.15 velocity,
+  //    × a "proven" age factor (min(1, days/21) — brand-new ads can't be winners),
+  //    × inactive penalty. The recomputed days_running is written back (self-heals
+  //    the column nightly + powers the run-time filter / Pattern Detection).
   const LN91 = Math.log(91)
+  const realDaysOf = (a: Row) => {
+    const end = a.stop_date ? Date.parse(a.stop_date) : (a.last_seen ? Date.parse(a.last_seen) : Date.now())
+    const start = a.start_date ? Date.parse(a.start_date) : end
+    let d = Math.floor((end - start) / 86400000)
+    if (!Number.isFinite(d) || d < 0) d = 0; if (d > 3650) d = 3650
+    return d
+  }
   const enriched = rows.map(a => {
     const ck = a.image_hash || a.video_hash
     const rc = ck ? (reuse.get(a.page_id + '|' + ck) || 0) : 0
     const bv = brandActive.get(a.page_id) || 0
     const bn = brandNew.get(a.page_id) || 0
-    const rt = Math.min(1, Math.log(1 + Math.max(0, a.days_running || 0)) / LN91)
-    let rawv = (0.35 * rt + 0.25 * Math.min(1, rc / 6) + 0.20 * Math.min(1, bv / 30) + 0.20 * Math.min(1, bn / 12)) * (a.is_active ? 1 : 0.6)
-    rawv += Math.max(0, a.days_running || 0) * 1e-7
-    return { ad_id: a.ad_id, page_id: a.page_id, creative_reuse_count: rc, brand_active_ads: bv, rawv }
+    const days = realDaysOf(a)
+    const rt = Math.min(1, Math.log(1 + days) / LN91)
+    const ageFactor = Math.min(1, days / 21)
+    let rawv = (0.40 * rt + 0.25 * Math.min(1, rc / 6) + 0.20 * Math.min(1, bv / 30) + 0.15 * Math.min(1, bn / 12)) * ageFactor * (a.is_active ? 1 : 0.6)
+    rawv += days * 1e-7
+    return { ad_id: a.ad_id, page_id: a.page_id, creative_reuse_count: rc, brand_active_ads: bv, days_running: days, rawv }
   })
 
   // 4. percentile map → score (breakpoints → ~5% win / 15% opt / 25% grow / 30% scale / 25% test)
@@ -102,9 +115,10 @@ export async function GET(request: NextRequest) {
   const mapP = (p: number) => { for (let i = 1; i < bp.length; i++) if (p <= bp[i][0]) { const [p0, s0] = bp[i - 1], [p1, s1] = bp[i]; return s0 + (s1 - s0) * (p - p0) / (p1 - p0 || 1) } return 1 }
 
   // niche is intentionally NOT written here — it's owned by the AI niche classifier.
+  // days_running IS written (recomputed) — fixes the 0-everywhere data bug.
   const updates = enriched.map(e => ({
     ad_id: e.ad_id, page_id: e.page_id, creative_reuse_count: e.creative_reuse_count,
-    brand_active_ads: e.brand_active_ads,
+    brand_active_ads: e.brand_active_ads, days_running: e.days_running,
     performance_score: Math.round(mapP(pctOf(e.rawv)) * 1000) / 1000,
   }))
 
