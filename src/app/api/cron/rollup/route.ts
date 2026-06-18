@@ -122,13 +122,20 @@ export async function GET(request: NextRequest) {
     performance_score: Math.round(mapP(pctOf(e.rawv)) * 1000) / 1000,
   }))
 
-  // 5. write back — batched upsert (each well under the 8s cap)
+  // 5. write back — small batches + retry. A 500-row upsert can exceed Supabase's
+  //    8s statement timeout under concurrent crawler write-lock contention, so keep
+  //    batches at 100 and retry transient timeouts (57014) with backoff.
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
   let wrote = 0
-  for (let i = 0; i < updates.length; i += 500) {
-    const batch = updates.slice(i, i + 500)
-    const { error } = await admin.from('discovery_ads_index').upsert(batch, { onConflict: 'ad_id' })
-    if (error) return NextResponse.json({ ok: false, step: 'write', wrote, error: error.message }, { status: 500 })
-    wrote += batch.length
+  for (let i = 0; i < updates.length; i += 100) {
+    const batch = updates.slice(i, i + 100)
+    let ok = false
+    for (let t = 0; t < 5 && !ok; t++) {
+      const { error } = await admin.from('discovery_ads_index').upsert(batch, { onConflict: 'ad_id' })
+      if (!error) { ok = true; wrote += batch.length }
+      else if (t < 4) await sleep(2000 * (t + 1))
+      else return NextResponse.json({ ok: false, step: 'write', wrote, error: error.message }, { status: 500 })
+    }
   }
 
   // 6. niche_counts rebuild — from the stored (AI-classified) niche column
