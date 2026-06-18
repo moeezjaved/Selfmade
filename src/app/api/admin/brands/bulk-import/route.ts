@@ -23,10 +23,11 @@ import OpenAI from 'openai'
 
 // Migrated off Anthropic (low-balance key) to gpt-4o-mini — same model the
 // classification pipeline standardized on. Category suggestion is a tiny call.
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
 async function suggestCategories(brand: { name: string; category?: string; website?: string }): Promise<string[]> {
   if (!process.env.OPENAI_API_KEY) return []
+  // Lazy init (inside the guard) so `next build` never instantiates the client at
+  // module load without an env var.
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   try {
     const res = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
