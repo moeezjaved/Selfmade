@@ -17,6 +17,9 @@
     },
     "src/app/api/cron/visual-dna/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/disable-dead-terms/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -35,6 +38,10 @@
     {
       "path": "/api/cron/visual-dna",
       "schedule": "40 4 * * *"
+    },
+    {
+      "path": "/api/cron/disable-dead-terms",
+      "schedule": "0 */3 * * *"
     }
   ]
 }
