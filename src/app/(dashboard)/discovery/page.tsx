@@ -1054,6 +1054,17 @@ export default function DiscoveryPage() {
     const calc = () => { const w = window.innerWidth; setGridCols(w < 700 ? 2 : w < 1050 ? 3 : w < 1450 ? 4 : 5) }
     calc(); window.addEventListener('resize', calc); return () => window.removeEventListener('resize', calc)
   }, [])
+  // Followed brands (for the Follow button on the hover card).
+  const [followed, setFollowed] = useState<Set<string>>(new Set())
+  useEffect(() => { fetch('/api/follows').then(r => r.json()).then(d => setFollowed(new Set(d.pageIds || []))).catch(() => {}) }, [])
+  const toggleFollow = async (pageId: string, name: string) => {
+    setFollowed(prev => { const s = new Set(prev); s.has(pageId) ? s.delete(pageId) : s.add(pageId); return s })  // optimistic
+    try {
+      const r = await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId, brandName: name, action: 'toggle' }) })
+      const d = await r.json()
+      setFollowed(prev => { const s = new Set(prev); d.following ? s.add(pageId) : s.delete(pageId); return s })
+    } catch { /* keep optimistic */ }
+  }
 
   // Search dropdown
   const [showDropdown, setShowDropdown] = useState(false)
@@ -1690,6 +1701,10 @@ export default function DiscoveryPage() {
                             {thumbs.map((t, i) => <img key={i} src={t as string} alt="" style={{ width: '33%', aspectRatio: '3/4', objectFit: 'cover', borderRadius: 8, background: '#f1f3f5' }} />)}
                           </div>
                         )}
+                        <button onClick={() => toggleFollow(brand.pageId, brand.name)}
+                          style={{ width: '100%', padding: '9px', marginBottom: 8, borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, border: followed.has(brand.pageId) ? '1px solid #1a3a1a' : '1px solid #ef4444', background: followed.has(brand.pageId) ? '#f0fdf4' : '#fff', color: followed.has(brand.pageId) ? '#1a3a1a' : '#ef4444' }}>
+                          {followed.has(brand.pageId) ? '✓ Following' : '♡ Follow'}
+                        </button>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={viewAds} style={{ flex: 1, padding: '9px', borderRadius: 9, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>View ads</button>
                           <button onClick={() => setSelectedBrand({ pageId: brand.pageId, name: brand.name })} style={{ flex: 1, padding: '9px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Details</button>
