@@ -1202,19 +1202,20 @@ export default function DiscoveryPage() {
     }
   }, [query, searchMode, sort, status, platforms, country, timeDays, industry, theme])
 
-  // Fetch top brands strip when query changes
+  // TOP BRANDS strip — computed from the ACTUAL loaded results so it always matches
+  // the grid (and sums to the matching count), including semantic-matched brands a
+  // separate server query would miss. Counts grow as more pages load via infinite scroll.
   useEffect(() => {
     if (!query.trim()) { setTopBrands([]); return }
-    setBrandsLoading(true)
-    const params = new URLSearchParams({ q: query, mode: searchMode, country: country !== 'ALL' ? country : '' })
-    if (industry.length === 1) params.set('industry', industry[0])
-    if (status !== 'ALL') params.set('status', status)
-    fetch(`/api/discovery/top-brands?${params}`)
-      .then(r => r.json())
-      .then(d => setTopBrands(d.brands || []))
-      .catch(() => {})
-      .finally(() => setBrandsLoading(false))
-  }, [query, searchMode, country, industry, status])
+    const m: Record<string, { pageId: string; name: string; adCount: number; picture: string | null }> = {}
+    for (const ad of rawAds) {
+      if (!ad.pageId) continue
+      if (!m[ad.pageId]) m[ad.pageId] = { pageId: ad.pageId, name: ad.pageName, adCount: 0, picture: null }
+      m[ad.pageId].adCount++
+    }
+    setTopBrands(Object.values(m).sort((a, b) => b.adCount - a.adCount).slice(0, 20))
+    setBrandsLoading(false)
+  }, [query, rawAds])
 
   // Collect available languages from loaded ads
   const availableLanguages = useMemo(() => {
