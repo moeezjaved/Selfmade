@@ -19,22 +19,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// Migrated off Anthropic (low-balance key) to gpt-4o-mini — same model the
+// classification pipeline standardized on. Category suggestion is a tiny call.
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 async function suggestCategories(brand: { name: string; category?: string; website?: string }): Promise<string[]> {
-  if (!process.env.ANTHROPIC_API_KEY) return []
+  if (!process.env.OPENAI_API_KEY) return []
   try {
-    const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const res = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
       max_tokens: 200,
-      messages: [{ role: 'user', content: `Suggest 4-7 lowercase search categories for this DTC brand. Return ONLY a JSON array, no markdown.\n\nBrand: ${brand.name}\nMeta category: ${brand.category || '(none)'}\nWebsite: ${brand.website || '(none)'}\n\nExample: ["gymwear", "athleisure", "fitness"]` }],
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: `Suggest 4-7 lowercase search categories for this DTC brand. Return ONLY a JSON object {"categories": [...]}, no markdown.\n\nBrand: ${brand.name}\nMeta category: ${brand.category || '(none)'}\nWebsite: ${brand.website || '(none)'}\n\nExample: {"categories": ["gymwear", "athleisure", "fitness"]}` }],
     })
-    const text = (msg.content[0] as any)?.text?.trim() || '[]'
-    const cleaned = text.replace(/^```json\s*|\s*```$/g, '').replace(/^```\s*|\s*```$/g, '')
-    const arr = JSON.parse(cleaned)
-    return Array.isArray(arr) ? arr.map(c => String(c).toLowerCase().trim()).filter(Boolean).slice(0, 7) : []
+    const text = res.choices[0]?.message?.content?.trim() || '{}'
+    const arr = JSON.parse(text).categories
+    return Array.isArray(arr) ? arr.map((c: any) => String(c).toLowerCase().trim()).filter(Boolean).slice(0, 7) : []
   } catch {
     return []
   }
