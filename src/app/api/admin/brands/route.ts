@@ -39,46 +39,20 @@ export async function GET(_req: NextRequest) {
       .order('last_run_at', { ascending: false }),
   ])
 
-  // Per-brand ad count + canonical display name. A single Meta page runs ads
-  // under several names (its own + partnership/affiliate ads, e.g. Grüns's page
-  // also shows "Chelsea Handler"). The real brand name is the MOST COMMON
-  // page_name on that page. ONE grouped aggregate (brand_ad_counts RPC) does
-  // this for every brand at once — the old one-query-per-brand loop hit ~530s
-  // and 504'd the gateway at ~900 brands.
-  const adCountByPage: Record<string, { count: number; name: string }> = {}
-  const tracked = (terms || []).filter((t: any) => t.page_id)
-  const trackedIds = new Set(tracked.map((t: any) => String(t.page_id)))
-  const { data: counts, error: countErr } = await (admin as any).rpc('brand_ad_counts')
-  if (!countErr && Array.isArray(counts)) {
-    // Count from the RPC; canonical name comes from crawl_state / term below.
-    for (const r of counts as any[]) {
-      const pid = String(r.page_id)
-      if (trackedIds.has(pid)) adCountByPage[pid] = { count: Number(r.ad_count) || 0, name: '' }
-    }
-  } else {
-    // Fallback if the RPC isn't migrated yet: bounded-parallel per-brand sampling
-    // (concurrency-capped so we don't exhaust the PostgREST connection pool).
-    let idx = 0
-    await Promise.all(Array.from({ length: 12 }, async () => {
-      while (idx < tracked.length) {
-        const t = tracked[idx++]
-        try {
-          const { data: sample, count } = await admin
-            .from('discovery_ads_index')
-            .select('page_name', { count: 'estimated' })
-            .eq('page_id', t.page_id).not('page_name', 'is', null).limit(400)
-          const freq: Record<string, number> = {}
-          for (const r of (sample || []) as any[]) { const n = (r.page_name || '').trim(); if (n) freq[n] = (freq[n] || 0) + 1 }
-          adCountByPage[t.page_id] = { count: count || 0, name: Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || '' }
-        } catch { /* skip */ }
-      }
-    }))
-  }
-
   // Build a map: page_id → state
   const stateByPageId: Record<string, any> = {}
   for (const s of (states || []) as any[]) {
     stateByPageId[s.page_id] = s
+  }
+
+  // Per-brand ad count comes from the crawl state's ads_indexed (already fetched
+  // above) — NOT a live per-brand DB query. At ~900 brands the old per-brand loop
+  // hit ~530s and 504'd the gateway, and a grouped RPC with mode(page_name) blew
+  // past the 60s statement_timeout. ads_indexed is the crawler's tracked count for
+  // the page and is effectively free here.
+  const adCountByPage: Record<string, { count: number; name: string }> = {}
+  for (const s of (states || []) as any[]) {
+    adCountByPage[s.page_id] = { count: Number(s.ads_indexed) || 0, name: s.brand_name || '' }
   }
 
   // Combine: each brand term gets its state + ad count
