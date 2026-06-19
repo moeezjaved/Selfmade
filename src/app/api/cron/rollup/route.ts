@@ -130,20 +130,31 @@ export async function GET(request: NextRequest) {
     }
   })
 
-  // 5. write back via apply_perf (migration 025): one set-based UPDATE per 2000-row
-  //    chunk. Per-row REST upserts hit the 8s timeout under crawl contention no matter
-  //    how small the batch; a set-based UPDATE...FROM jsonb lands each chunk in <1s.
+  // 5. write back via apply_perf (migration 025) under a COOPERATIVE WRITE PAUSE.
+  //    The cron can't docker-stop the writers, so it sets `crawl_paused` (TTL 5min);
+  //    the scheduler + worker honor it and back off, giving the write a near-zero-
+  //    contention window. Plus retry-on-lock as a backstop for in-flight overlap.
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-  let wrote = 0
-  for (let i = 0; i < updates.length; i += 2000) {
-    const chunk = updates.slice(i, i + 2000).map(u => ({ aid: u.ad_id, ps: u.performance_score, dr: u.days_running, rc: u.creative_reuse_count, bv: u.brand_active_ads }))
-    let ok = false
-    for (let t = 0; t < 5 && !ok; t++) {
-      const { data, error } = await admin.rpc('apply_perf', { p: chunk })
-      if (!error) { ok = true; wrote += (typeof data === 'number' ? data : chunk.length) }
-      else if (t < 4) await sleep(2000 * (t + 1))
-      else return NextResponse.json({ ok: false, step: 'write', wrote, error: error.message }, { status: 500 })
+  await admin.from('system_flags').upsert(
+    { key: 'crawl_paused', until: new Date(Date.now() + 5 * 60_000).toISOString(), updated_at: new Date().toISOString() },
+    { onConflict: 'key' })
+  await sleep(8000)  // let the writers notice the flag and pause before we start
+
+  let wrote = 0, failedChunks = 0
+  try {
+    for (let i = 0; i < updates.length; i += 2000) {
+      const chunk = updates.slice(i, i + 2000).map(u => ({ aid: u.ad_id, ps: u.performance_score, dr: u.days_running, rc: u.creative_reuse_count, bv: u.brand_active_ads }))
+      let ok = false
+      for (let t = 0; t < 8 && !ok; t++) {
+        const { data, error } = await admin.rpc('apply_perf', { p: chunk })
+        if (!error) { ok = true; wrote += (typeof data === 'number' ? data : chunk.length) }
+        else if (t < 7) await sleep(1500 * (t + 1))   // lock clears in seconds; retry
+      }
+      if (!ok) failedChunks++
     }
+  } finally {
+    // ALWAYS release the pause, even on error — never leave writers stuck.
+    await admin.from('system_flags').delete().eq('key', 'crawl_paused')
   }
 
   // 6. niche_counts rebuild — from the stored (AI-classified) niche column
@@ -152,5 +163,18 @@ export async function GET(request: NextRequest) {
   const ncRows = Array.from(nc).map(([niche, e]) => ({ niche, active_ads: e.active, total_ads: e.total, updated_at: new Date().toISOString() }))
   if (ncRows.length) await admin.from('niche_counts').upsert(ncRows, { onConflict: 'niche' })
 
-  return NextResponse.json({ ok: true, rows: rows.length, wrote, niches: ncRows.length, duration_ms: Date.now() - started })
+  // 7. REGRESSION GUARD — winning means proven (≥14d). If any winner is younger, the
+  //    write didn't fully land; surface it loudly so a silent nightly failure is caught
+  //    the next morning, not by a customer seeing a 2-day "winner".
+  const { count: badWinners } = await admin.from('discovery_ads_index')
+    .select('ad_id', { count: 'exact', head: true })
+    .eq('performance_tier', 'winning').lt('days_running', 14)
+  if (badWinners && badWinners > 0) {
+    console.error(`🔴 ROLLUP REGRESSION: ${badWinners} winning ads under 14 days (failedChunks=${failedChunks}). Write did not fully land.`)
+  }
+
+  return NextResponse.json({
+    ok: failedChunks === 0 && !badWinners, rows: rows.length, wrote, failedChunks,
+    badWinners: badWinners || 0, niches: ncRows.length, duration_ms: Date.now() - started,
+  })
 }
