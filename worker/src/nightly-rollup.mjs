@@ -53,9 +53,19 @@ const tWrite = Date.now();
 const nc = new Map(); for (const a of rows) { const key = a.niche || 'Other'; const e = nc.get(key) || { active: 0, total: 0 }; e.total++; if (a.is_active) e.active++; nc.set(key, e); }
 await fetch(U + '/rest/v1/niche_counts?on_conflict=niche', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(Array.from(nc).map(([niche, e]) => ({ niche, active_ads: e.active, total_ads: e.total, updated_at: new Date().toISOString() }))) }).catch(() => {});
 
-// 7. regression guard → PUSH alert
-const badR = await fetch(U + '/rest/v1/discovery_ads_index?select=ad_id&performance_tier=eq.winning&days_running=lt.14', { headers: { ...H, Range: '0-0', Prefer: 'count=exact' } });
-const bad = +((badR.headers.get('content-range') || '').split('/')[1] || 0);
-console.log(`ROLLUP rows=${rows.length} fetch=${((tCompute - t0) / 1000 - (tWrite - tCompute) / 1000).toFixed(0)}s write=${((tWrite - tCompute) / 1000).toFixed(0)}s total=${((tWrite - t0) / 1000).toFixed(0)}s wrote=${wrote} failChunks=${fail} winnersUnder14d=${bad}`);
+// 7. regression guard → PUSH alert + PULL status row (rendered on /admin/health)
+const count = async qs => { const r = await fetch(U + '/rest/v1/discovery_ads_index?' + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=exact' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
+const bad = await count('select=ad_id&performance_tier=eq.winning&days_running=lt.14');
+const winners = await count('select=ad_id&performance_tier=eq.winning');
+const fetchS = +((tCompute - t0) / 1000).toFixed(1), writeS = +((tWrite - tCompute) / 1000).toFixed(1), totalS = +((Date.now() - t0) / 1000).toFixed(1);
+console.log(`ROLLUP rows=${rows.length} fetch+compute=${fetchS}s write=${writeS}s total=${totalS}s wrote=${wrote} failChunks=${fail} winners=${winners} winnersUnder14d=${bad}`);
+
+// PULL: persist a single status row so the admin panel can show "ran, and was it clean?"
+await fetch(U + '/rest/v1/discovery_rollup_status?on_conflict=id', {
+  method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+  body: JSON.stringify({ id: 1, ran_at: new Date().toISOString(), total_rows: rows.length, winners, bad_winners: bad, fail_chunks: fail, wrote, fetch_s: fetchS, write_s: writeS, total_s: totalS }),
+}).catch(() => {});
+
+// PUSH (optional): only fires if ALERT_WEBHOOK_URL is set
 if (fail > 0 || bad > 0) await alert(`🔴 Selfmade nightly rollup REGRESSION: ${bad} winners under 14 days, ${fail} failed chunks (wrote ${wrote}/${updates.length}). days_running may be stale.`);
 process.exit(0);

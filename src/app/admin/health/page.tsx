@@ -59,6 +59,19 @@ interface HealthData {
     scheduler: { status: string; note: string }
     worker: { status: string; recent_thumbnails_added: number; note: string }
   }
+  nightly_rollup: {
+    ran_at: string
+    age_hours: number | null
+    stale: boolean
+    total_rows: number
+    winners: number
+    bad_winners: number
+    fail_chunks: number
+    wrote: number
+    fetch_s: number
+    write_s: number
+    total_s: number
+  } | null
   brands: Array<{
     term: string; page_id: string; last_crawled_at: string | null
     thumbed: number; fastReady: number; missing: number; failed: number
@@ -192,6 +205,64 @@ export default function HealthDashboard() {
                 />
               </div>
             </div>
+          </Section>
+
+          {/* ───── Nightly rollup ───── */}
+          <Section
+            title="Nightly rollup"
+            hint="The 04:15 droplet cron that recomputes days_running + Winner Score over the whole catalog under a crawl-pause. This panel is the PULL safety net: if it didn't run, leaked under-14-day winners, or failed to write chunks, you see it here next morning. (An optional ALERT_WEBHOOK_URL also pushes on failure.)"
+          >
+            {!data.nightly_rollup ? (
+              <div style={{ padding: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 13, color: '#92400e' }}>
+                No rollup status yet — run migration 027 and wait for the next 04:15 droplet cron (or trigger it manually).
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 10 }}>
+                  {(() => {
+                    const r = data.nightly_rollup!
+                    const ok = !r.stale && r.bad_winners === 0 && r.fail_chunks === 0
+                    const c = ok
+                      ? { bg: '#f0fdf4', border: '#bbf7d0', fg: '#166534', label: '✓ Clean' }
+                      : { bg: '#fee', border: '#fbb', fg: '#991b1b', label: r.stale ? '✗ Stale / missed' : '✗ Regression' }
+                    return (
+                      <span style={{ padding: '4px 12px', borderRadius: 6, fontSize: 13, fontWeight: 700, background: c.bg, border: `1px solid ${c.border}`, color: c.fg }}>
+                        {c.label} · last ran {r.ran_at ? `${humanAgo(r.ran_at)} ago` : '—'}
+                      </span>
+                    )
+                  })()}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                  <KPI label="Winners" value={data.nightly_rollup.winners.toLocaleString()} hint="Total ads in the 'winning' tier after the last run." />
+                  <KPI
+                    label="Under-14d winners"
+                    value={data.nightly_rollup.bad_winners}
+                    tone={data.nightly_rollup.bad_winners > 0 ? 'warn' : 'good'}
+                    hint="Winning ads younger than 14 days. MUST be 0 — the longevity gate caps young ads below the winning threshold. >0 means the gate leaked (the credibility-killer bug)."
+                  />
+                  <KPI
+                    label="Failed chunks"
+                    value={data.nightly_rollup.fail_chunks}
+                    tone={data.nightly_rollup.fail_chunks > 0 ? 'warn' : 'good'}
+                    hint="apply_perf write chunks that never landed after retries. >0 means some performance scores are stale."
+                  />
+                  <KPI
+                    label="Rows recomputed"
+                    value={data.nightly_rollup.total_rows.toLocaleString()}
+                    sub={`wrote ${data.nightly_rollup.wrote.toLocaleString()}`}
+                    hint="Full catalog size fetched + recomputed. This is the O(corpus) cost — when fetch time crosses ~10 min the rollup needs to go incremental."
+                  />
+                  <KPI label="Fetch + compute" value={`${data.nightly_rollup.fetch_s}s`} hint="Time to pull the full table and recompute scores. Grows with the catalog." />
+                  <KPI
+                    label="Write (crawler paused)"
+                    value={`${data.nightly_rollup.write_s}s`}
+                    tone={data.nightly_rollup.write_s > 120 ? 'warn' : 'neutral'}
+                    hint="apply_perf write window — the crawler + all classifier crons are paused this long. Watch this as the catalog grows."
+                  />
+                  <KPI label="Total runtime" value={`${data.nightly_rollup.total_s}s`} hint="End-to-end. Lives on the droplet specifically because this exceeds Vercel's 300s cap." />
+                </div>
+              </>
+            )}
           </Section>
 
           {/* ───── Currently running / next crawl ───── */}
