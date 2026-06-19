@@ -50,9 +50,10 @@ export async function GET(_req: NextRequest) {
   const trackedIds = new Set(tracked.map((t: any) => String(t.page_id)))
   const { data: counts, error: countErr } = await (admin as any).rpc('brand_ad_counts')
   if (!countErr && Array.isArray(counts)) {
+    // Count from the RPC; canonical name comes from crawl_state / term below.
     for (const r of counts as any[]) {
       const pid = String(r.page_id)
-      if (trackedIds.has(pid)) adCountByPage[pid] = { count: Number(r.ad_count) || 0, name: r.brand_name || '' }
+      if (trackedIds.has(pid)) adCountByPage[pid] = { count: Number(r.ad_count) || 0, name: '' }
     }
   } else {
     // Fallback if the RPC isn't migrated yet: bounded-parallel per-brand sampling
@@ -104,7 +105,7 @@ export async function GET(_req: NextRequest) {
         in_progress: !!state.cursor,
       } : null,
       ad_count: counts?.count || 0,
-      brand_name: counts?.name || t.term,
+      brand_name: counts?.name || state?.brand_name || t.term,
       next_recrawl_at,
       status,
     }
