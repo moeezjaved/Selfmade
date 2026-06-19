@@ -490,10 +490,19 @@ async function saveAdsToIndex(
   const existedRows  = rows.filter(r =>  existingIds.has(r.ad_id))
 
   if (newRows.length > 0) {
-    const { error } = await (supabase as any)
-      .from('discovery_ads_index')
-      .upsert(newRows, { onConflict: 'ad_id' })
-    if (error) console.warn(`[save-ads] insert error: ${error.message}`)
+    // CHUNK the upsert. discovery_ads_index carries ~23 indexes (incl. 3 GIN), so
+    // each row is heavy to write; a single statement inserting a big brand's
+    // hundreds of new ads blew the 60s statement_timeout under concurrency and
+    // LOST those ads. Small batches each finish fast → inserts succeed and more
+    // concurrent crawls can run. Sequential so we don't pile parallel writes.
+    const CHUNK = 50
+    for (let i = 0; i < newRows.length; i += CHUNK) {
+      const batch = newRows.slice(i, i + CHUNK)
+      const { error } = await (supabase as any)
+        .from('discovery_ads_index')
+        .upsert(batch, { onConflict: 'ad_id' })
+      if (error) console.warn(`[save-ads] insert error (rows ${i}-${i + batch.length}): ${error.message}`)
+    }
   }
 
   // Backfill raw URLs onto existing rows. Critical for the migration: most
