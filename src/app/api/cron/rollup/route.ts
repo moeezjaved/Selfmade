@@ -130,17 +130,17 @@ export async function GET(request: NextRequest) {
     }
   })
 
-  // 5. write back — small batches + retry. A 500-row upsert can exceed Supabase's
-  //    8s statement timeout under concurrent crawler write-lock contention, so keep
-  //    batches at 100 and retry transient timeouts (57014) with backoff.
+  // 5. write back via apply_perf (migration 025): one set-based UPDATE per 2000-row
+  //    chunk. Per-row REST upserts hit the 8s timeout under crawl contention no matter
+  //    how small the batch; a set-based UPDATE...FROM jsonb lands each chunk in <1s.
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
   let wrote = 0
-  for (let i = 0; i < updates.length; i += 100) {
-    const batch = updates.slice(i, i + 100)
+  for (let i = 0; i < updates.length; i += 2000) {
+    const chunk = updates.slice(i, i + 2000).map(u => ({ aid: u.ad_id, ps: u.performance_score, dr: u.days_running, rc: u.creative_reuse_count, bv: u.brand_active_ads }))
     let ok = false
     for (let t = 0; t < 5 && !ok; t++) {
-      const { error } = await admin.from('discovery_ads_index').upsert(batch, { onConflict: 'ad_id' })
-      if (!error) { ok = true; wrote += batch.length }
+      const { data, error } = await admin.rpc('apply_perf', { p: chunk })
+      if (!error) { ok = true; wrote += (typeof data === 'number' ? data : chunk.length) }
       else if (t < 4) await sleep(2000 * (t + 1))
       else return NextResponse.json({ ok: false, step: 'write', wrote, error: error.message }, { status: 500 })
     }
