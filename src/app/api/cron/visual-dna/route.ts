@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { isCrawlPaused } from '@/lib/discovery/pause'
 import OpenAI from 'openai'
 
 export const dynamic = 'force-dynamic'
@@ -66,6 +67,7 @@ async function vision(thumb: string): Promise<any | null> {
 export async function GET(request: NextRequest) {
   if (!(await isAuthorized(request))) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
+  if (await isCrawlPaused(admin)) return NextResponse.json({ ok: true, skipped: 'crawl_paused' })
   const started = Date.now()
 
   // 1. unclassified winning ads → unique creatives (dedup by hash)
