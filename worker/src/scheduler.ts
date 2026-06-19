@@ -47,6 +47,21 @@ interface BrandRow {
   last_crawled_at: string | null
 }
 
+// Cooperative write-pause: the nightly rollup sets `system_flags.crawl_paused`
+// (TTL'd) so it can write with near-zero contention. We back off while it's set.
+async function waitIfPaused() {
+  for (;;) {
+    let until = 0
+    try {
+      const { data } = await (supabase as any).from('system_flags').select('until').eq('key', 'crawl_paused').maybeSingle()
+      until = data?.until ? Date.parse(data.until) : 0
+    } catch { return }   // never let a flag-check error stall crawling
+    if (!until || until <= Date.now()) return
+    console.log(`[paused] rollup write in progress — backing off 20s`)
+    await sleep(20000)
+  }
+}
+
 async function main() {
   console.log(`\n🤖 Indexer scheduler started`)
   console.log(`   min_brand_gap = ${MIN_BRAND_GAP_MIN} min  (anti-throttle)`)
@@ -56,6 +71,7 @@ async function main() {
   let cycle = 0
   while (true) {
     cycle++
+    await waitIfPaused()   // hold off while the nightly rollup is writing
     try {
       const brand = await pickNextBrand()
       if (!brand) {

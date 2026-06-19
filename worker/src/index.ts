@@ -250,7 +250,23 @@ async function processBatch(ads: AdRow[]): Promise<ProcessResult[]> {
   return results
 }
 
+// Cooperative write-pause: back off while the nightly rollup holds `crawl_paused`,
+// so its big write runs with near-zero row-lock contention.
+async function waitIfPaused() {
+  for (;;) {
+    let until = 0
+    try {
+      const { data } = await (supabase as any).from('system_flags').select('until').eq('key', 'crawl_paused').maybeSingle()
+      until = data?.until ? Date.parse(data.until) : 0
+    } catch { return }
+    if (!until || until <= Date.now()) return
+    console.log(`⏸️  rollup write in progress — pausing 20s`)
+    await sleep(20_000)
+  }
+}
+
 async function loop() {
+  await waitIfPaused()
   console.log(`\n🔄 Polling for ads (concurrency=${config.concurrency}, batch=${config.batchSize})…`)
   const ads = await claimAds(config.batchSize, config.imagesOnly)
 
