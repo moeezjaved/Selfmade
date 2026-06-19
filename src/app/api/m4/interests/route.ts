@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { llm } from '@/lib/llm'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -192,12 +193,9 @@ Respond ONLY with valid JSON:
   let tiers: any = { high_intent: [], core_category: [], support: [] }
   let personas: any[] = []
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY || '', 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
+    const data = await llm.messages.create({
+      model: 'claude-sonnet-4-6', max_tokens: 3000, messages: [{ role: 'user', content: prompt }],
     })
-    const data = await res.json()
     const text = (data.content?.[0]?.text || '').replace(/```json|```/g, '').trim()
     const start = text.indexOf('{'); const end = text.lastIndexOf('}')
     if (start !== -1 && end !== -1) {

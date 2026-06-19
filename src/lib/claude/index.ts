@@ -1,11 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { llm } from '@/lib/llm'
 import { AIStrategyResult, CreativeAnalysis, GeneratedCopyVariant } from '@/types'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
+const anthropic = llm   // OpenAI-backed shim (migrated off Claude)
 
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'gpt-4o'
 
 // ── SKILL: 5 AGENT STRATEGY ──────────────────────────────────
 // Implements the AI Ads Strategist SKILL.md internally

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { llm } from '@/lib/llm'
 
-const client = new Anthropic()
+const client = llm
 
 export async function POST(request: NextRequest) {
   try {
