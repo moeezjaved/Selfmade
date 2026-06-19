@@ -38,10 +38,6 @@
       "schedule": "0 4 * * *"
     },
     {
-      "path": "/api/cron/rollup",
-      "schedule": "15 4 * * *"
-    },
-    {
       "path": "/api/cron/visual-dna",
       "schedule": "40 4 * * *"
     },
