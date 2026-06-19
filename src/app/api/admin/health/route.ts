@@ -224,7 +224,7 @@ export async function GET() {
   // Worker liveness: check if any thumbnails were added in last hour
   const { count: recentThumbs } = await admin
     .from('discovery_ads_index')
-    .select('*', { count: 'exact', head: true })
+    .select('*', { count: 'estimated', head: true })
     .gte('indexed_at', hourAgo)
     .not('thumbnail_url', 'is', null)
   const worker_status: 'up' | 'idle' | 'unknown' =
@@ -351,7 +351,10 @@ export async function GET() {
 }
 
 async function countWhere(admin: any, ...filters: [string, string, any][]): Promise<number> {
-  let q = admin.from('discovery_ads_index').select('*', { count: 'exact', head: true })
+  // 'estimated' (planner stats, not a full scan) — exact counts on a 160K+ row
+  // table under heavy crawl-write load were timing out the whole route (504).
+  // Approximate counts are fine for an at-a-glance health dashboard.
+  let q = admin.from('discovery_ads_index').select('*', { count: 'estimated', head: true })
   for (const [col, op, val] of filters) {
     if (op === 'is') q = q.is(col, val)
     else if (op === 'not.is') q = q.not(col, 'is', val)
