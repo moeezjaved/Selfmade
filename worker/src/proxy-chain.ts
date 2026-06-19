@@ -23,7 +23,7 @@
  *
  * Reference: https://github.com/apify/proxy-chain (same library Apify uses)
  */
-import { Server, anonymizeProxy, closeAnonymizedProxy } from 'proxy-chain'
+import { Server } from 'proxy-chain'
 
 const PROXY_HOST = process.env.WORKER_PROXY_HOST || ''
 const PROXY_PORT = process.env.WORKER_PROXY_PORT || '12321'
@@ -31,6 +31,25 @@ const PROXY_USER = process.env.WORKER_PROXY_USER || ''
 const PROXY_PASS = process.env.WORKER_PROXY_PASS || ''
 
 export const proxyChainEnabled = !!(PROXY_HOST && PROXY_USER && PROXY_PASS)
+
+/**
+ * Media CDN hosts the crawler must NEVER pull through the metered IPRoyal proxy.
+ *
+ * Meta autoplays ad-video previews via MSE/range fetches that Playwright's
+ * context.route() CANNOT reliably intercept — verified 2026-06-19 against an
+ * IPRoyal usage report: ~1.7 GB/day of video-*.fbcdn.net tunneled straight
+ * through the proxy despite the in-page block. Filtering here is bulletproof:
+ * every byte the browser sends upstream passes through this local server first,
+ * regardless of how Chromium initiated the request, so a rejected CONNECT never
+ * reaches (or bills) IPRoyal.
+ *
+ * Blocked: video-* / scontent-* (images — the worker fetches creatives direct
+ * off the droplet). NOT blocked: static.xx.fbcdn.net (JS/CSS) — the page needs
+ * it to render and fire the GraphQL pagination calls, and www.facebook.com.
+ */
+export function isBlockedMediaHost(hostname: string): boolean {
+  return /^(video[-.]|scontent[-.])/i.test(hostname)
+}
 
 /**
  * Build IPRoyal sticky session PASSWORD (not username — verified via curl tests).
@@ -78,11 +97,27 @@ export async function startProxyChain(opts: {
     country: opts.country ?? 'us',
   })
   const upstreamUrl = `http://${encodeURIComponent(PROXY_USER)}:${encodeURIComponent(stickyPass)}@${PROXY_HOST}:${PROXY_PORT}`
-  const localhostUrl = await anonymizeProxy(upstreamUrl)
+  // Filtering local server (replaces anonymizeProxy) — rejects media-CDN hosts so
+  // they never consume IPRoyal bytes. A blocked CONNECT is refused before any
+  // upstream connection is made; the browser's video/image fetch simply fails,
+  // which is exactly what we want (the crawl only needs the GraphQL JSON).
+  const server = new Server({
+    port: 0,   // random free port
+    verbose: false,
+    prepareRequestFunction: ({ hostname }) => {
+      if (hostname && isBlockedMediaHost(hostname)) {
+        throw new Error(`blocked-media-host:${hostname}`)   // rejected, never forwarded upstream
+      }
+      return { upstreamProxyUrl: upstreamUrl }
+    },
+  })
+  server.on('error', () => { /* swallow per-connection errors (rejected media etc.) */ })
+  await server.listen()
+  const localhostUrl = `http://127.0.0.1:${server.port}`
   return {
     url: localhostUrl,
     close: async () => {
-      try { await closeAnonymizedProxy(localhostUrl, true) } catch { /* ignore */ }
+      try { await server.close(true) } catch { /* ignore */ }
     },
   }
 }
@@ -109,8 +144,14 @@ export async function startProxyServer(opts: {
   const server = new Server({
     port: opts.port ?? 0,  // 0 = random free port
     verbose: false,
-    prepareRequestFunction: () => ({ upstreamProxyUrl: upstreamUrl }),
+    prepareRequestFunction: ({ hostname }) => {
+      if (hostname && isBlockedMediaHost(hostname)) {
+        throw new Error(`blocked-media-host:${hostname}`)
+      }
+      return { upstreamProxyUrl: upstreamUrl }
+    },
   })
+  server.on('error', () => { /* swallow per-connection errors */ })
   await server.listen()
   const url = `http://127.0.0.1:${server.port}`
   return {
