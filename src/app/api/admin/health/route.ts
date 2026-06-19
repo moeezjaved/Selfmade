@@ -230,8 +230,44 @@ export async function GET() {
     recentThumbs === null ? 'unknown'
     : recentThumbs > 0 ? 'up' : 'idle'
 
+  // ── Nightly rollup status (written by worker/src/nightly-rollup.mjs) ──
+  const { data: rollupRow } = await admin
+    .from('discovery_rollup_status')
+    .select('ran_at, total_rows, winners, bad_winners, fail_chunks, wrote, fetch_s, write_s, total_s')
+    .eq('id', 1)
+    .maybeSingle()
+  const rollupAgeHours = rollupRow?.ran_at
+    ? (Date.now() - new Date(rollupRow.ran_at).getTime()) / 3_600_000
+    : null
+  // Cron runs 04:15 daily; >26h since last completion means it missed a night.
+  const rollupStale = rollupAgeHours === null || rollupAgeHours > 26
+  const nightly_rollup = rollupRow ? {
+    ran_at: rollupRow.ran_at,
+    age_hours: rollupAgeHours !== null ? Math.round(rollupAgeHours * 10) / 10 : null,
+    stale: rollupStale,
+    total_rows: rollupRow.total_rows,
+    winners: rollupRow.winners,
+    bad_winners: rollupRow.bad_winners,
+    fail_chunks: rollupRow.fail_chunks,
+    wrote: rollupRow.wrote,
+    fetch_s: rollupRow.fetch_s,
+    write_s: rollupRow.write_s,
+    total_s: rollupRow.total_s,
+  } : null
+
   // ── Health alerts ──
   const alerts: { level: 'critical' | 'warning' | 'info'; message: string }[] = []
+  if (!rollupRow) {
+    alerts.push({ level: 'warning', message: 'Nightly rollup has never reported a status (migration 027 + droplet cron not yet run?).' })
+  } else if (rollupStale) {
+    alerts.push({ level: 'critical', message: `Nightly rollup hasn't completed in ${rollupAgeHours !== null ? Math.round(rollupAgeHours) : '∞'}h — days_running / Winner Score going stale.` })
+  }
+  if (rollupRow && rollupRow.bad_winners > 0) {
+    alerts.push({ level: 'critical', message: `Nightly rollup REGRESSION: ${rollupRow.bad_winners} "winning" ads are under 14 days old — the longevity gate leaked.` })
+  }
+  if (rollupRow && rollupRow.fail_chunks > 0) {
+    alerts.push({ level: 'critical', message: `Nightly rollup: ${rollupRow.fail_chunks} write chunk(s) failed — performance scores partially stale.` })
+  }
   if (preview_server_status === 'down') {
     alerts.push({ level: 'critical', message: 'Preview-server droplet unreachable — admin preview button will fail.' })
   }
@@ -294,6 +330,7 @@ export async function GET() {
       elapsed_seconds: Math.round((Date.now() - new Date((currentlyRunning as any).started_at).getTime()) / 1000),
     } : null,
     next_crawl: nextCrawl,
+    nightly_rollup,
     brands: brandStats,
     recent_runs: (runs24h ?? []).slice(0, 10).map((r: any) => ({
       brand_name: r.brand_name,
