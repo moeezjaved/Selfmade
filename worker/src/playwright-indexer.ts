@@ -649,17 +649,22 @@ async function crawlBrand(opts: {
   // }
   const context = await browser.newContext(ctxOpts)
 
-  // ── Media/asset blocking (2026-06-19) — TARGETED, not the old blanket block. ──
-  // IPRoyal usage report showed 91% of proxy bandwidth was the browser auto-
-  // downloading ad VIDEO (59%), images (16%) and fonts — none of which we need
-  // (ad data comes from the GraphQL JSON; media is downloaded later, off-proxy).
-  // The 2026-05-16 attempt broke pagination because it ALSO blocked Meta's JS
-  // (resourceType 'script' on static.xx). So here we block ONLY media/image/font
-  // and NEVER script/stylesheet/document/xhr/fetch — pagination JS + GraphQL are
-  // untouched. Expected: ~10× lower IPRoyal usage per crawl, same ads captured.
+  // ── Media/asset blocking (2026-06-19, v2 host-based) ──
+  // The IPRoyal video CDN bytes weren't from resourceType 'media' — Meta streams
+  // ad-video previews via xhr/fetch (MSE), which a resourceType block can't catch
+  // (we must allow 'fetch' for GraphQL). So block the media CDNs by HOST: any
+  // `video-*`/`video.*` and `scontent-*`/`scontent.*` fbcdn/cdninstagram host —
+  // we never need those bytes (ad data + media URLs come from GraphQL JSON; the
+  // real media is downloaded later DIRECT off-proxy by the worker). We deliberately
+  // do NOT touch `static.xx.fbcdn.net` (Meta's pagination JS) or `www.facebook.com`
+  // (the GraphQL endpoint) — blocking those broke pagination on 2026-05-16.
   await context.route('**/*', (route) => {
-    const t = route.request().resourceType()
+    const req = route.request()
+    const t = req.resourceType()
     if (t === 'media' || t === 'image' || t === 'font') return route.abort()
+    let host = ''
+    try { host = new URL(req.url()).hostname } catch { /* ignore */ }
+    if (host.startsWith('video-') || host.startsWith('video.') || host.startsWith('scontent-') || host.startsWith('scontent.')) return route.abort()
     return route.continue()
   })
 
