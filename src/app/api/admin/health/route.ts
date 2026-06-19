@@ -66,8 +66,13 @@ export async function GET() {
 
   const successPct = (rows: any[] | null) => {
     if (!rows || rows.length === 0) return null
-    const ok = rows.filter(r => r.status === 'success').length
-    return Math.round((ok / rows.length) * 100)
+    // Exclude in-flight 'running' crawls — at high concurrency there are always
+    // ~N running at any snapshot, and counting them as failures tanked the rate
+    // (showed 58% when real completion was ~98%). Rate over COMPLETED runs only.
+    const done = rows.filter(r => r.status !== 'running')
+    if (done.length === 0) return null
+    const ok = done.filter(r => r.status === 'success').length
+    return Math.round((ok / done.length) * 100)
   }
 
   const successRate1h = successPct(runs1h ?? [])
