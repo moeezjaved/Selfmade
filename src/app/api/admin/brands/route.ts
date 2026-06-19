@@ -11,6 +11,7 @@ import { isAdminToken } from '@/lib/admin/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 const RECRAWL_INTERVAL_DAYS = 7
 
@@ -41,28 +42,36 @@ export async function GET(_req: NextRequest) {
   // Per-brand ad count + canonical display name. A single Meta page runs ads
   // under several names (its own + partnership/affiliate ads, e.g. Grüns's page
   // also shows "Chelsea Handler"). The real brand name is the MOST COMMON
-  // page_name on that page — not whichever ad we happen to sample first. We
-  // fetch a sample of page_names per brand and take the mode. Run sequentially
-  // (parallel times out) with 'estimated' count (fast on big tables).
+  // page_name on that page. ONE grouped aggregate (brand_ad_counts RPC) does
+  // this for every brand at once — the old one-query-per-brand loop hit ~530s
+  // and 504'd the gateway at ~900 brands.
   const adCountByPage: Record<string, { count: number; name: string }> = {}
   const tracked = (terms || []).filter((t: any) => t.page_id)
-  for (const t of tracked) {
-    try {
-      const { data: sample, count, error } = await admin
-        .from('discovery_ads_index')
-        .select('page_name', { count: 'estimated' })
-        .eq('page_id', t.page_id)
-        .not('page_name', 'is', null)
-        .limit(400)
-      if (error) continue
-      const freq: Record<string, number> = {}
-      for (const r of (sample || []) as any[]) {
-        const n = (r.page_name || '').trim()
-        if (n) freq[n] = (freq[n] || 0) + 1
+  const trackedIds = new Set(tracked.map((t: any) => String(t.page_id)))
+  const { data: counts, error: countErr } = await (admin as any).rpc('brand_ad_counts')
+  if (!countErr && Array.isArray(counts)) {
+    for (const r of counts as any[]) {
+      const pid = String(r.page_id)
+      if (trackedIds.has(pid)) adCountByPage[pid] = { count: Number(r.ad_count) || 0, name: r.brand_name || '' }
+    }
+  } else {
+    // Fallback if the RPC isn't migrated yet: bounded-parallel per-brand sampling
+    // (concurrency-capped so we don't exhaust the PostgREST connection pool).
+    let idx = 0
+    await Promise.all(Array.from({ length: 12 }, async () => {
+      while (idx < tracked.length) {
+        const t = tracked[idx++]
+        try {
+          const { data: sample, count } = await admin
+            .from('discovery_ads_index')
+            .select('page_name', { count: 'estimated' })
+            .eq('page_id', t.page_id).not('page_name', 'is', null).limit(400)
+          const freq: Record<string, number> = {}
+          for (const r of (sample || []) as any[]) { const n = (r.page_name || '').trim(); if (n) freq[n] = (freq[n] || 0) + 1 }
+          adCountByPage[t.page_id] = { count: count || 0, name: Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || '' }
+        } catch { /* skip */ }
       }
-      const canonical = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || ''
-      adCountByPage[t.page_id] = { count: count || 0, name: canonical }
-    } catch { /* skip on failure */ }
+    }))
   }
 
   // Build a map: page_id → state
