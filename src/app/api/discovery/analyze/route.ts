@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { llm } from '@/lib/llm'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const claude = new Anthropic()
+const claude = llm
 
 export async function POST(request: NextRequest) {
   try {

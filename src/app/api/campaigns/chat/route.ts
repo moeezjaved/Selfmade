@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
-import Anthropic from '@anthropic-ai/sdk'
+import { llm } from '@/lib/llm'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
 const V = process.env.META_API_VERSION || 'v20.0'
-const claude = new Anthropic()
+const claude = llm
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()

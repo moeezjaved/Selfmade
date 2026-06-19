@@ -12,12 +12,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
-import Anthropic from '@anthropic-ai/sdk'
+import { llm } from '@/lib/llm'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const anthropic = llm
 
 async function getMetaToken(admin: any): Promise<string | null> {
   const { data: accounts } = await admin
@@ -88,7 +88,7 @@ async function fetchPageInfo(idOrSlug: string, token: string): Promise<any> {
  * are likely to search (e.g. "gymwear", "skincare", "protein powder").
  */
 async function suggestCategories(brand: { name: string; category?: string; website?: string; about?: string }): Promise<string[]> {
-  if (!process.env.ANTHROPIC_API_KEY) return []
+  if (!process.env.OPENAI_API_KEY) return []
 
   const prompt = `You are categorizing a DTC brand for a search engine.
 

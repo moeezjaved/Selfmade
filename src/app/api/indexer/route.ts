@@ -9,7 +9,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 import { loadTokenPool, type TokenPool, type PoolToken } from '@/lib/meta/token-pool'
 import { proxyFetch, metaProxyEnabled } from '@/lib/meta/proxy'
-import Anthropic from '@anthropic-ai/sdk'
+import { llm } from '@/lib/llm'
 import OpenAI from 'openai'
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +21,7 @@ const APP_TOKEN = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
 // Meta uses ISO codes — normalize common aliases
 const COUNTRY_MAP: Record<string, string> = { UK: 'GB' }
 const normalizeCountry = (c: string) => COUNTRY_MAP[c.toUpperCase()] || c.toUpperCase()
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+const anthropic = llm
 let _openai: OpenAI | null = null
 const getOpenAI = () => (_openai ||= new OpenAI({ apiKey: process.env.OPENAI_API_KEY! }))
 
