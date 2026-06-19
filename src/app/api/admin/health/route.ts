@@ -12,6 +12,7 @@
  * Designed to be polled every 30s by the dashboard page.
  */
 import { NextResponse } from 'next/server'
+import { isAdminToken } from '@/lib/admin/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { fetch as undiciFetch } from 'undici'
 
@@ -22,7 +23,7 @@ export const maxDuration = 30
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user && !(await isAdminToken())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient() as any
   const now = new Date()

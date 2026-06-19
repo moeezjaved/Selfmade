@@ -27,6 +27,7 @@
  * GET /api/admin/brands/preview?page_id=129669023798560&limit=10
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdminToken } from '@/lib/admin/auth'
 import { ProxyAgent, fetch as undiciFetch } from 'undici'
 import { createClient } from '@/lib/supabase/server'
 
@@ -82,7 +83,7 @@ const UA =
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user && !(await isAdminToken())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const pageId = req.nextUrl.searchParams.get('page_id')?.trim()
   const limit = Math.min(parseInt(req.nextUrl.searchParams.get('limit') || '10'), 30)

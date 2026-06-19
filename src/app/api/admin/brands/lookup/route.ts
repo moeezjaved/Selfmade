@@ -9,6 +9,7 @@
  * GET /api/admin/brands/lookup?name=Gymshark&website=https://gymshark.com
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdminToken } from '@/lib/admin/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
@@ -141,7 +142,7 @@ async function websiteScrape(website: string, token: string | null): Promise<Can
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user && !(await isAdminToken())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const name = req.nextUrl.searchParams.get('name')?.trim()
   const website = req.nextUrl.searchParams.get('website')?.trim()
