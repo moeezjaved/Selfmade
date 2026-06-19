@@ -5,6 +5,7 @@
  * hike → bump the credit cost in /api/admin/credit-pricing).
  */
 import { NextResponse } from 'next/server'
+import { isAdminToken } from '@/lib/admin/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,7 @@ const CREDIT_RETAIL_USD = 0.03
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user && !(await isAdminToken())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
 
   // Spend transactions only (delta < 0, committed). Paginate the ledger.

@@ -5,6 +5,7 @@
  * GET /api/admin/seeds/preview?term=gymwear&country=US&limit=10
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdminToken } from '@/lib/admin/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
@@ -29,7 +30,7 @@ async function getMetaToken(admin: any): Promise<string | null> {
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user && !(await isAdminToken())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const term = req.nextUrl.searchParams.get('term')?.trim()
   const country = req.nextUrl.searchParams.get('country') || 'US'

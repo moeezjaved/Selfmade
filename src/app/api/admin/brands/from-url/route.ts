@@ -10,6 +10,7 @@
  * User reviews then clicks "Add" which calls the existing POST /api/admin/brands.
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdminToken } from '@/lib/admin/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 import { llm } from '@/lib/llm'
@@ -134,7 +135,7 @@ Example output: ["gymwear", "athleisure", "fitness"]`
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user && !(await isAdminToken())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const url = body.url?.trim()

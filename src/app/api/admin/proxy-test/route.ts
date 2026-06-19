@@ -7,6 +7,7 @@
  * GET /api/admin/proxy-test
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdminToken } from '@/lib/admin/auth'
 import { createClient } from '@/lib/supabase/server'
 import { proxyFetch, metaProxyEnabled } from '@/lib/meta/proxy'
 
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(_req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user && !(await isAdminToken())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const result: any = {
     env_vars_present: metaProxyEnabled,
