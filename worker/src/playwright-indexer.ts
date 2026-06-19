@@ -78,6 +78,7 @@ interface RunMetrics {
   adsNew: number
   adsAlreadySeen: number
   bytesThroughProxy: number
+  blockedMedia: number       // video/image/font requests aborted (never hit IPRoyal)
   responsesCaptured: number
   cursorsSeen: number
   scrollCount: number
@@ -547,7 +548,7 @@ async function crawlBrand(opts: {
     sessionId,
     startedAt: Date.now(),
     adsDiscovered: 0, adsNew: 0, adsAlreadySeen: 0,
-    bytesThroughProxy: 0,
+    bytesThroughProxy: 0, blockedMedia: 0,
     responsesCaptured: 0, cursorsSeen: 0, scrollCount: 0,
     successWindow: [],
   }
@@ -661,10 +662,10 @@ async function crawlBrand(opts: {
   await context.route('**/*', (route) => {
     const req = route.request()
     const t = req.resourceType()
-    if (t === 'media' || t === 'image' || t === 'font') return route.abort()
+    if (t === 'media' || t === 'image' || t === 'font') { metrics.blockedMedia++; return route.abort() }
     let host = ''
     try { host = new URL(req.url()).hostname } catch { /* ignore */ }
-    if (host.startsWith('video-') || host.startsWith('video.') || host.startsWith('scontent-') || host.startsWith('scontent.')) return route.abort()
+    if (host.startsWith('video-') || host.startsWith('video.') || host.startsWith('scontent-') || host.startsWith('scontent.')) { metrics.blockedMedia++; return route.abort() }
     return route.continue()
   })
 
@@ -765,7 +766,7 @@ async function crawlBrand(opts: {
       if (metrics.successWindow.length > SUCCESS_RATE_WINDOW) {
         metrics.successWindow.shift()
       }
-      console.log(`  📦 captured ${ads.length} ads (${newCount} new) + ${cursors.length} cursors | ${(metrics.bytesThroughProxy / 1024).toFixed(1)} KB total`)
+      console.log(`  📦 captured ${ads.length} ads (${newCount} new) + ${cursors.length} cursors | ${(metrics.bytesThroughProxy / 1024).toFixed(1)} KB GraphQL | ${metrics.blockedMedia} media reqs blocked (0 IPRoyal)`)
     } catch (e: any) {
       console.warn(`  ⚠️ response handler: ${e?.message?.slice(0, 100)}`)
     }
