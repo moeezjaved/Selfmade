@@ -72,6 +72,14 @@ interface HealthData {
     write_s: number
     total_s: number
   } | null
+  db_health: {
+    probe_ms: number
+    dead_pct: number | null
+    live: number | null
+    dead: number | null
+    last_autovacuum: string | null
+    table_mb: number | null
+  } | null
   brands: Array<{
     term: string; page_id: string; last_crawled_at: string | null
     thumbed: number; fastReady: number; missing: number; failed: number
@@ -205,6 +213,45 @@ export default function HealthDashboard() {
                 />
               </div>
             </div>
+          </Section>
+
+          {/* ───── DB write health ───── */}
+          <Section
+            title="DB write health"
+            hint="Can the database keep up with crawl writes? BLOAT % (dead rows ÷ total) is the gauge: push crawl concurrency up while it stays low (<10%); if it climbs and stays high (>30%), writes are outpacing autovacuum — that's your ceiling, ease off. Latency is the early-warning light (was 12s during the bloat crisis)."
+          >
+            {!data.db_health ? (
+              <div style={{ padding: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 13, color: '#92400e' }}>
+                No DB health yet — run migration 029 (db_write_health function).
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                <KPI
+                  label="Read latency"
+                  value={data.db_health.probe_ms != null ? `${data.db_health.probe_ms} ms` : '—'}
+                  tone={data.db_health.probe_ms == null ? 'neutral' : data.db_health.probe_ms < 1000 ? 'good' : data.db_health.probe_ms < 5000 ? 'warn' : 'warn'}
+                  hint="Time for a tiny probe query. <1s healthy. Climbing = DB under strain (it hit 12s during the bloat crisis)."
+                />
+                <KPI
+                  label="Bloat (dead rows)"
+                  value={data.db_health.dead_pct != null ? `${data.db_health.dead_pct}%` : '—'}
+                  tone={data.db_health.dead_pct == null ? 'neutral' : data.db_health.dead_pct < 10 ? 'good' : data.db_health.dead_pct < 30 ? 'warn' : 'warn'}
+                  sub={data.db_health.live != null ? `${(data.db_health.live / 1000).toFixed(0)}K live · ${((data.db_health.dead ?? 0) / 1000).toFixed(0)}K dead` : ''}
+                  hint="Dead rows ÷ total. THE gauge for sustainable concurrency: low = push harder, high (>30%) = autovacuum falling behind, ease off."
+                />
+                <KPI
+                  label="Last autovacuum"
+                  value={data.db_health.last_autovacuum ? `${humanAgo(data.db_health.last_autovacuum)} ago` : 'never'}
+                  tone={data.db_health.last_autovacuum ? 'good' : 'warn'}
+                  hint="When the janitor last cleaned the table. Recent = it's keeping up."
+                />
+                <KPI
+                  label="Table size"
+                  value={data.db_health.table_mb != null ? `${(data.db_health.table_mb / 1024).toFixed(2)} GB` : '—'}
+                  hint="discovery_ads_index total size (table + indexes). Tracks disk growth toward the Supabase limit."
+                />
+              </div>
+            )}
           </Section>
 
           {/* ───── Nightly rollup ───── */}

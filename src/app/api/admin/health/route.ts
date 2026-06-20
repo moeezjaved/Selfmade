@@ -236,6 +236,24 @@ export async function GET() {
     recentThumbs === null ? 'unknown'
     : recentThumbs > 0 ? 'up' : 'idle'
 
+  // ── DB write health — latency probe + bloat % (is the DB keeping up with writes?) ──
+  let db_health: any = null
+  try {
+    const t0 = Date.now()
+    await admin.from('discovery_ads_index').select('ad_id').limit(1)
+    const probe_ms = Date.now() - t0
+    const { data: dbh } = await admin.rpc('db_write_health')
+    const r = Array.isArray(dbh) ? dbh[0] : dbh
+    db_health = {
+      probe_ms,
+      dead_pct: r ? Number(r.dead_pct) || 0 : null,
+      live: r ? Number(r.live) || 0 : null,
+      dead: r ? Number(r.dead) || 0 : null,
+      last_autovacuum: r?.last_autovacuum ?? null,
+      table_mb: r?.table_bytes ? Math.round(Number(r.table_bytes) / 1024 / 1024) : null,
+    }
+  } catch { db_health = null }
+
   // ── Nightly rollup status (written by worker/src/nightly-rollup.mjs) ──
   const { data: rollupRow } = await admin
     .from('discovery_rollup_status')
@@ -273,6 +291,12 @@ export async function GET() {
   }
   if (rollupRow && rollupRow.fail_chunks > 0) {
     alerts.push({ level: 'critical', message: `Nightly rollup: ${rollupRow.fail_chunks} write chunk(s) failed — performance scores partially stale.` })
+  }
+  if (db_health?.dead_pct != null && db_health.dead_pct > 30) {
+    alerts.push({ level: 'warning', message: `DB bloat at ${db_health.dead_pct}% dead rows — autovacuum is falling behind the write load. Ease crawl concurrency.` })
+  }
+  if (db_health?.probe_ms != null && db_health.probe_ms > 5000) {
+    alerts.push({ level: 'critical', message: `DB read latency ${(db_health.probe_ms / 1000).toFixed(1)}s — the database is struggling. Pause/throttle writers.` })
   }
   if (preview_server_status === 'down') {
     alerts.push({ level: 'critical', message: 'Preview-server droplet unreachable — admin preview button will fail.' })
@@ -337,6 +361,7 @@ export async function GET() {
     } : null,
     next_crawl: nextCrawl,
     nightly_rollup,
+    db_health,
     brands: brandStats,
     recent_runs: (runs24h ?? []).slice(0, 10).map((r: any) => ({
       brand_name: r.brand_name,
