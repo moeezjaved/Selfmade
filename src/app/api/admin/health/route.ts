@@ -41,7 +41,10 @@ export async function GET() {
     countWhere(admin),
     countWhere(admin, ['thumbnail_url', 'not.is', null]),
     countWhere(admin, ['raw_image_urls', 'not.is', null], ['thumbnail_url', 'is', null]),
-    countWhere(admin, ['thumbnail_url', 'is', null]),
+    // "missing" = NO creative at all (no image thumbnail AND no video). A downloaded
+    // video ad sets video_url (not thumbnail_url), so counting only thumbnail-null
+    // wrongly showed 61K finished video ads as "missing".
+    countWhere(admin, ['thumbnail_url', 'is', null], ['video_url', 'is', null]),
     countWhere(admin, ['creative_extraction_failed_at', 'not.is', null]),
   ])
 
