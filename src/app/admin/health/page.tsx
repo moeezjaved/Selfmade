@@ -34,6 +34,8 @@ interface HealthData {
   queue: {
     total: number
     thumbed: number
+    video: number
+    with_creative: number
     fast_path_ready: number
     missing: number
     failed: number
@@ -349,7 +351,7 @@ export default function HealthDashboard() {
           >
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
               <KPI label="Total" value={data.queue.total.toLocaleString()} hint="Every ad ID in the database across all brands. New ads land here when the indexer crawls a brand." />
-              <KPI label="With thumbnails" value={data.queue.thumbed.toLocaleString()} sub={`${data.queue.thumbed_pct}%`} hint="Ads where the worker successfully downloaded a creative to R2. These are visible in your discovery section." />
+              <KPI label="With creative" value={data.queue.with_creative.toLocaleString()} sub={`${data.queue.thumbed_pct}% · ${data.queue.thumbed.toLocaleString()} img · ${data.queue.video.toLocaleString()} vid`} tone="good" hint="Ads with a downloaded creative in R2 — image (thumbnail) OR video. These are visible in discovery. Videos set video_url, not thumbnail_url, so counting only thumbnails understated this." />
               <KPI label="Fast-path ready" value={data.queue.fast_path_ready.toLocaleString()} sub="raw URLs populated" tone={data.queue.fast_path_ready > 0 ? 'good' : 'warn'} hint="Ads where the indexer extracted creative URLs directly from Meta's GraphQL response. The worker processes these in ~5s each (vs ~25s for the legacy DOM path). >0 = healthy." />
               <KPI label="Missing" value={data.queue.missing.toLocaleString()} hint="Ads with no thumbnail yet. Worker will eventually process them, fast-path-ready first then legacy." />
               <KPI label="Marked failed" value={data.queue.failed.toLocaleString()} tone={data.queue.failed > 1000 ? 'warn' : 'neutral'} hint="Ads the worker tried 3 times and gave up on (usually because Meta returned a 1087-byte placeholder = ad expired/deleted before we could grab it). Reset by setting creative_extraction_failed_at = NULL in SQL." />
