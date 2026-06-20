@@ -12,6 +12,7 @@ import {
   ClipboardList, Settings, CreditCard, BarChart2,
   Rocket, LogOut, Compass, Bookmark, Heart, Star, Store,
 } from 'lucide-react'
+import { Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV = [
@@ -28,6 +29,7 @@ const NAV = [
   {
     label: 'Analytics & Launch',
     items: [
+      { href: '/mello',      icon: Bot,         label: 'Ask Mello',        badge: 'AI' },
       { href: '/m4',         icon: Rocket,      label: 'Launch Ads',       badge: 'AI' },
       { href: '/campaigns',  icon: Megaphone,   label: 'Campaigns',        badge: null },
       { href: '/insights',   icon: TrendingUp,  label: 'Scale & Insights', badge: 'NEW' },
