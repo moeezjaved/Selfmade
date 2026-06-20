@@ -1271,14 +1271,16 @@ export default function DiscoveryPage() {
         // Cross-page dedup: drop ads whose hash was already shown
         setRawAds(prev => {
           if (reset) return classified
+          // Key by creative hash (so the SAME creative reused across many ad_ids
+          // shows once), falling back to ad id (so a re-fetched page can't dupe an
+          // ad that happens to have no hash yet). Both guard the offset-pagination
+          // overlap where page N re-returns creatives already shown on page N-1.
+          const dedupKey = (a: Ad) =>
+            (a as any).image_hash || (a as any).video_hash || `id:${a.id}`
           const seen = new Set<string>()
-          for (const a of prev) {
-            const k = (a as any).image_hash || (a as any).video_hash
-            if (k) seen.add(k)
-          }
+          for (const a of prev) seen.add(dedupKey(a))
           const newOnes = classified.filter((a: Ad) => {
-            const k = (a as any).image_hash || (a as any).video_hash
-            if (!k) return true
+            const k = dedupKey(a)
             if (seen.has(k)) return false
             seen.add(k)
             return true
