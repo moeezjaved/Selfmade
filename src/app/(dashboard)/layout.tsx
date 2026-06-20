@@ -109,6 +109,30 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Nav */}
         <nav className="flex-1 py-3 overflow-y-auto">
+          {/* Mello — primary AI agent, pinned at the top (Raya-style) */}
+          {(() => {
+            const melloActive = pathname === '/mello' || pathname.startsWith('/mello/')
+            return (
+              <div style={{padding:"0 12px 6px"}}>
+                <Link
+                  href="/mello"
+                  style={{
+                    display:"flex",alignItems:"center",gap:10,padding:"11px 12px",borderRadius:11,
+                    background: melloActive ? "#dffe95" : "rgba(223,254,149,0.10)",
+                    border: melloActive ? "1px solid #dffe95" : "1px solid rgba(223,254,149,0.18)",
+                    transition:"all .15s",
+                  }}
+                >
+                  <span style={{width:26,height:26,borderRadius:8,background: melloActive ? "#2d5a27" : "#dffe95",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <Sparkles size={15} color={melloActive ? "#dffe95" : "#2d5a27"} />
+                  </span>
+                  <span style={{flex:1,fontWeight:800,fontSize:14.5,color: melloActive ? "#243d20" : "rgba(255,255,255,0.92)"}}>Ask Mello</span>
+                  <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 7px",borderRadius:99,background: melloActive ? "#2d5a27" : "#dffe95",color: melloActive ? "#dffe95" : "#243d20"}}>AI</span>
+                </Link>
+              </div>
+            )
+          })()}
+
           {NAV.map(section => (
             <div key={section.label}>
               <div style={{padding:"16px 20px 6px",fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:".1em",color:"rgba(255,255,255,0.2)"}}>
