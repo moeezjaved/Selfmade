@@ -8,11 +8,7 @@
 -- no in-memory state, consistent on the primary. Stale claims (process died
 -- before saving) become reclaimable after 3 minutes.
 alter table discovery_ads_index add column if not exists creative_claimed_at timestamptz;
-
--- Partial index so the claim's WHERE + ORDER stays fast (mirrors idx_ads_worker_claim).
-create index if not exists idx_ads_claim_pending
-  on discovery_ads_index (is_active desc, last_seen desc)
-  where thumbnail_url is null and video_url is null and creative_extraction_failed_at is null;
+-- (claim WHERE+ORDER is already covered by idx_ads_worker_claim — no new index needed)
 
 create or replace function claim_creative_ads(p_batch int)
 returns table(
