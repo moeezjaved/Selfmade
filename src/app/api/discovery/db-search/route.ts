@@ -506,6 +506,12 @@ export async function GET(request: NextRequest) {
       snapshotUrl: ad.snapshot_url,
       thumbnailUrl: ad.thumbnail_url || null,
       videoUrl: ad.video_url || null,
+      // Needed by the client's CROSS-PAGE dedup: the server dedups within a page,
+      // but its offset is into the raw (non-deduped) rows, so page N re-encounters
+      // creatives already shown on page N-1. The client filters those by hash —
+      // but only if we actually hand it the hashes.
+      image_hash: ad.image_hash || null,
+      video_hash: ad.video_hash || null,
       creatives: creativesByAd[ad.ad_id] || [],
       startDate: ad.start_date,
       stopDate: ad.stop_date,
