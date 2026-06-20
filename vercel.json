@@ -26,6 +26,12 @@
     },
     "src/app/api/cron/enrich-categories/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/automations/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/mello/conversations/[id]/messages/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -52,6 +58,10 @@
     {
       "path": "/api/cron/enrich-categories",
       "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/cron/automations",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
