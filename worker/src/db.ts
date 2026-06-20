@@ -27,15 +27,25 @@ export interface AdRow {
  * Race-safe enough since we update thumbnail_url to a sentinel right after fetching.
  */
 export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<AdRow[]> {
-  // Need ads that have NEITHER an R2 thumbnail NOR an R2 video,
-  // AND haven't already been marked as un-extractable.
-  // Prioritize ACTIVE ads first (they extract successfully much more often).
-  // FAST-PATH ONLY: only claim ads where the indexer has already extracted
-  // raw fbcdn URLs from the GraphQL listing payload. Legacy DOM extraction
-  // through Playwright is removed entirely — it cost ~2-3 MB per ad through
-  // proxy and we proved at scale (2026-05-15) it burns through bandwidth
-  // catastrophically. Brands with ads that lack raw_image_urls AND
-  // raw_video_urls just sit until the indexer re-crawls them.
+  // ATOMIC claim via RPC (migration 030): marks rows creative_claimed_at=now()
+  // with FOR UPDATE SKIP LOCKED and returns them, so concurrent/streaming claims
+  // never hand out the same ad twice. This replaces the plain-SELECT claim, which
+  // — under the streaming worker + Supabase pooler read-after-write lag — kept
+  // returning just-processed ads and re-downloaded ~35% of them. Stale claims
+  // (process died) are reclaimable after 3 min.
+  if (!process.env.WORKER_PAGE_ID) {
+    const { data, error } = await (supabase as any).rpc('claim_creative_ads', { p_batch: batchSize })
+    if (!error && Array.isArray(data)) {
+      let rows = data as AdRow[]
+      if (imagesOnly) rows = rows.filter((r: any) => !/video/i.test(r.format || ''))
+      return rows
+    }
+    // error (e.g. RPC not yet migrated) → fall through to legacy SELECT
+    if (error && !/function .*claim_creative_ads.* does not exist|PGRST202|404/i.test(error.message || '')) {
+      console.warn(`[claim] rpc error, falling back to SELECT: ${error.message}`)
+    }
+  }
+  // ── Legacy SELECT fallback (pre-migration-030, or WORKER_PAGE_ID scoping) ──
   let query: any = supabase
     .from('discovery_ads_index')
     .select('ad_id, snapshot_url, format, page_name, raw_image_urls, raw_video_urls, raw_video_preview_urls')
