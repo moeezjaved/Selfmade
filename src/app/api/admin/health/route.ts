@@ -34,12 +34,14 @@ export async function GET() {
   const [
     qTotal,
     qThumbed,
+    qVideo,
     qFastReady,
     qMissing,
     qFailed,
   ] = await Promise.all([
     countWhere(admin),
     countWhere(admin, ['thumbnail_url', 'not.is', null]),
+    countWhere(admin, ['video_url', 'not.is', null]),
     countWhere(admin, ['raw_image_urls', 'not.is', null], ['thumbnail_url', 'is', null]),
     // "missing" = NO creative at all (no image thumbnail AND no video). A downloaded
     // video ad sets video_url (not thumbnail_url), so counting only thumbnail-null
@@ -47,6 +49,9 @@ export async function GET() {
     countWhere(admin, ['thumbnail_url', 'is', null], ['video_url', 'is', null]),
     countWhere(admin, ['creative_extraction_failed_at', 'not.is', null]),
   ])
+  // "with creative" = has an image OR a video. total - missing avoids double-
+  // counting ads that have both (carousels). This is the real "processed" figure.
+  const qWithCreative = Math.max(0, qTotal - qMissing)
 
   // ── Crawler runs (1h + 24h) ──
   const [{ data: runs1h }, { data: runs24h }] = await Promise.all([
@@ -319,10 +324,12 @@ export async function GET() {
     queue: {
       total: qTotal,
       thumbed: qThumbed,
+      video: qVideo,
+      with_creative: qWithCreative,
       fast_path_ready: qFastReady,
       missing: qMissing,
       failed: qFailed,
-      thumbed_pct: qTotal > 0 ? Math.round((qThumbed / qTotal) * 1000) / 10 : 0,
+      thumbed_pct: qTotal > 0 ? Math.round((qWithCreative / qTotal) * 1000) / 10 : 0,
     },
     activity: {
       runs_1h: (runs1h ?? []).length,
