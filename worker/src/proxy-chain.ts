@@ -51,6 +51,47 @@ export function isBlockedMediaHost(hostname: string): boolean {
   return /^(video[-.]|scontent[-.])/i.test(hostname)
 }
 
+// ── IPRoyal byte accounting (proof: only GraphQL + JS/CSS should appear) ──
+// Every CONNECT that is NOT blocked is forwarded upstream to IPRoyal; we tally
+// the upstream bytes per host so the crawl can log exactly what consumes the
+// metered proxy. If any scontent-*/video-* (or other media) host ever shows up
+// here with bytes, it's a leak.
+const hostBytes = new Map<string, number>()
+const connHost = new Map<number, string>()
+let usageLoggerStarted = false
+
+function recordConn(connectionId: number | undefined, hostname: string | undefined) {
+  if (typeof connectionId === 'number' && hostname) connHost.set(connectionId, hostname)
+}
+function recordClosed(connectionId: number, stats: any) {
+  const host = connHost.get(connectionId)
+  connHost.delete(connectionId)
+  if (!host || !stats) return
+  const bytes = (stats.trgRxBytes || 0) + (stats.trgTxBytes || 0)   // bytes over the IPRoyal upstream
+  if (bytes > 0) hostBytes.set(host, (hostBytes.get(host) || 0) + bytes)
+}
+
+/** Print a per-host breakdown of IPRoyal bytes (and flag any media leak). */
+export function logProxyUsage(): void {
+  if (hostBytes.size === 0) return
+  const rows = Array.from(hostBytes.entries()).sort((a, b) => b[1] - a[1])
+  const total = rows.reduce((s, [, b]) => s + b, 0)
+  const leak = rows.filter(([h]) => isBlockedMediaHost(h)).reduce((s, [, b]) => s + b, 0)
+  const mb = (n: number) => (n / 1048576).toFixed(2) + ' MB'
+  console.log(`📊 IPRoyal usage by host (total ${mb(total)}${leak > 0 ? ` | ⚠️ MEDIA LEAK ${mb(leak)}` : ' | ✅ no media'}):`)
+  for (const [h, b] of rows.slice(0, 8)) {
+    const flag = isBlockedMediaHost(h) ? ' ⚠️ MEDIA' : ''
+    console.log(`   ${mb(b).padStart(10)}  ${((b / total) * 100).toFixed(0).padStart(3)}%  ${h}${flag}`)
+  }
+}
+
+function startUsageLogger() {
+  if (usageLoggerStarted) return
+  usageLoggerStarted = true
+  setInterval(logProxyUsage, 60_000).unref()   // every 60s; unref so it can't keep the process alive
+  process.on('exit', logProxyUsage)
+}
+
 /**
  * Build IPRoyal sticky session PASSWORD (not username — verified via curl tests).
  *
@@ -104,14 +145,17 @@ export async function startProxyChain(opts: {
   const server = new Server({
     port: 0,   // random free port
     verbose: false,
-    prepareRequestFunction: ({ hostname }) => {
+    prepareRequestFunction: ({ hostname, connectionId }: any) => {
       if (hostname && isBlockedMediaHost(hostname)) {
         throw new Error(`blocked-media-host:${hostname}`)   // rejected, never forwarded upstream
       }
+      recordConn(connectionId, hostname)
       return { upstreamProxyUrl: upstreamUrl }
     },
   })
+  server.on('connectionClosed', ({ connectionId, stats }: any) => recordClosed(connectionId, stats))
   server.on('error', () => { /* swallow per-connection errors (rejected media etc.) */ })
+  startUsageLogger()
   await server.listen()
   const localhostUrl = `http://127.0.0.1:${server.port}`
   return {
@@ -144,14 +188,17 @@ export async function startProxyServer(opts: {
   const server = new Server({
     port: opts.port ?? 0,  // 0 = random free port
     verbose: false,
-    prepareRequestFunction: ({ hostname }) => {
+    prepareRequestFunction: ({ hostname, connectionId }: any) => {
       if (hostname && isBlockedMediaHost(hostname)) {
         throw new Error(`blocked-media-host:${hostname}`)
       }
+      recordConn(connectionId, hostname)
       return { upstreamProxyUrl: upstreamUrl }
     },
   })
+  server.on('connectionClosed', ({ connectionId, stats }: any) => recordClosed(connectionId, stats))
   server.on('error', () => { /* swallow per-connection errors */ })
+  startUsageLogger()
   await server.listen()
   const url = `http://127.0.0.1:${server.port}`
   return {
