@@ -212,42 +212,100 @@ async function processAd(ad: AdRow): Promise<ProcessResult> {
 }
 
 /**
- * Process a batch of ads with concurrency control.
- * Uses a sliding-window pool — never blocks on the slowest ad in a chunk.
+ * Streaming producer/consumer drain.
+ *
+ * The old model claimed a batch, waited for the ENTIRE batch to finish, then
+ * claimed the next + slept — so concurrency collapsed at every boundary (the
+ * last slow videos held up the next claim). This keeps an in-memory buffer
+ * topped up by a producer while N consumers pull continuously: no idle slots,
+ * no boundary drain, no inter-batch sleep.
+ *
+ * `claimed` (in-memory) stops the producer from re-buffering an ad that's claimed
+ * but not yet processed — its thumbnail is still null so claimAds would hand it
+ * back. Each ad is processed by exactly one consumer (queue.shift is atomic in
+ * single-threaded JS), so nothing is double-processed or dropped.
  */
-async function processBatch(ads: AdRow[]): Promise<ProcessResult[]> {
-  const results: ProcessResult[] = []
-  let cursor = 0
-  const total = ads.length
+async function runStream(isStopping: () => boolean): Promise<void> {
+  const queue: AdRow[] = []
+  const claimed = new Set<string>()
+  const REFILL_AT = Math.max(config.concurrency * 2, config.batchSize)
+  // rolling-window counters, flushed to telemetry every 30s
+  let wImg = 0, wVid = 0, wDed = 0, wProxy = 0, wDroplet = 0, wOk = 0, wCount = 0
 
-  async function worker() {
-    while (cursor < total) {
-      const idx = cursor++
-      const ad = ads[idx]
-      const t0 = Date.now()
-      const result = await Promise.race([
-        processAd(ad),
-        new Promise<ProcessResult>((resolve) =>
-          setTimeout(
-            () => resolve({ ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'timeout' }),
-            config.adTimeoutMs,
-          ),
-        ),
-      ])
-      const dt = ((Date.now() - t0) / 1000).toFixed(1)
-      const tag = result.ok ? '✅' : '❌'
-      const dedupTag = result.dedupedCount > 0 ? ` ♻️${result.dedupedCount}` : ''
-      const detail = result.ok
-        ? `${result.imageCount}img+${result.videoCount}vid${dedupTag}`
-        : result.error || 'unknown'
-      console.log(`  ${tag} [${idx + 1}/${total}] ${ad.ad_id} (${dt}s) ${detail}`)
-      results.push(result)
+  async function producer() {
+    while (!isStopping()) {
+      await waitIfPaused()
+      if (queue.length >= REFILL_AT) { await sleep(150); continue }
+      let ads: AdRow[] = []
+      try { ads = await claimAds(config.batchSize, config.imagesOnly) }
+      catch (e: any) { console.warn(`[producer] claim error: ${e?.message ?? e}`); await sleep(3000); continue }
+      const fresh = ads.filter((a) => !claimed.has(a.ad_id))
+      if (fresh.length) {
+        for (const a of fresh) claimed.add(a.ad_id)
+        queue.push(...fresh)
+      } else if (queue.length === 0 && claimed.size === 0) {
+        const depth = await getQueueDepth().catch(() => -1)
+        console.log(`💤 Queue empty (${depth} in DB). Sleeping ${config.emptyQueueSleep / 1000}s…`)
+        await sleep(config.emptyQueueSleep)
+      } else {
+        await sleep(400)  // only already-buffered ads came back; let consumers drain
+      }
     }
   }
 
-  const pool = Array.from({ length: Math.min(config.concurrency, total) }, () => worker())
-  await Promise.all(pool)
-  return results
+  async function consumer() {
+    while (!isStopping()) {
+      const ad = queue.shift()
+      if (!ad) { await sleep(80); continue }
+      const t0 = Date.now()
+      let result: ProcessResult
+      try {
+        result = await Promise.race([
+          processAd(ad),
+          new Promise<ProcessResult>((r) => setTimeout(
+            () => r({ ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'timeout' }),
+            config.adTimeoutMs)),
+        ])
+      } catch (e: any) {
+        result = { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: e?.message ?? String(e) }
+      } finally {
+        claimed.delete(ad.ad_id)
+      }
+      const dt = ((Date.now() - t0) / 1000).toFixed(1)
+      const dedupTag = result.dedupedCount > 0 ? ` ♻️${result.dedupedCount}` : ''
+      console.log(`  ${result.ok ? '✅' : '❌'} ${ad.ad_id} (${dt}s) ${result.ok ? `${result.imageCount}img+${result.videoCount}vid${dedupTag}` : (result.error || 'unknown')}`)
+      totalProcessed++; wCount++
+      if (result.ok) { totalSuccess++; wOk++ } else { totalFailed++ }
+      wImg += result.imageCount; wVid += result.videoCount; wDed += result.dedupedCount
+      wProxy += result.bytes_proxy ?? 0; wDroplet += result.bytes_droplet ?? 0
+    }
+  }
+
+  async function flusher() {
+    while (!isStopping()) {
+      await sleep(30_000)
+      lifetimeProxyMB += wProxy / 1024 / 1024
+      lifetimeDropletMB += wDroplet / 1024 / 1024
+      const adsPerMin = totalProcessed / Math.max((Date.now() - startTime) / 60000, 0.01)
+      const depth = await getQueueDepth().catch(() => -1)
+      console.log(`\n📊 ${totalSuccess}/${totalProcessed} ok | ${adsPerMin.toFixed(0)} ads/min | buffer=${queue.length} inflight=${claimed.size} | queue(DB)=${depth} | +${wImg}img +${wVid}vid /30s`)
+      try {
+        await (supabase as any).from('worker_runs').insert({
+          worker_id: WORKER_ID, hostname: HOSTNAME, batch_size: wCount,
+          ads_ok: wOk, ads_failed: wCount - wOk, images_saved: wImg, videos_saved: wVid,
+          deduped_count: wDed, bytes_proxy: wProxy, bytes_droplet: wDroplet, duration_ms: 30_000,
+        })
+      } catch { /* telemetry only */ }
+      await writeHeartbeat({
+        worker_id: WORKER_ID, hostname: HOSTNAME, session_started_at: SESSION_STARTED_AT,
+        session_processed: totalProcessed, session_succeeded: totalSuccess, session_failed: totalFailed,
+        last_batch_size: wCount, last_batch_seconds: 30, ads_per_min: parseFloat(adsPerMin.toFixed(2)),
+      }).catch(() => {})
+      wImg = wVid = wDed = wProxy = wDroplet = wOk = wCount = 0
+    }
+  }
+
+  await Promise.all([producer(), flusher(), ...Array.from({ length: config.concurrency }, () => consumer())])
 }
 
 // Cooperative write-pause: back off while the nightly rollup holds `crawl_paused`,
@@ -265,87 +323,6 @@ async function waitIfPaused() {
   }
 }
 
-async function loop() {
-  await waitIfPaused()
-  console.log(`\n🔄 Polling for ads (concurrency=${config.concurrency}, batch=${config.batchSize})…`)
-  const ads = await claimAds(config.batchSize, config.imagesOnly)
-
-  if (!ads.length) {
-    const remaining = await getQueueDepth()
-    console.log(`💤 Queue empty (${remaining} total in DB). Sleeping ${config.emptyQueueSleep / 1000}s…`)
-    await sleep(config.emptyQueueSleep)
-    return
-  }
-
-  console.log(`📦 Got ${ads.length} ads to process`)
-  const t0 = Date.now()
-  const results = await processBatch(ads)
-  const dt = (Date.now() - t0) / 1000
-
-  const ok = results.filter((r) => r.ok).length
-  const fail = results.length - ok
-  const totalImages = results.reduce((s, r) => s + r.imageCount, 0)
-  const totalVideos = results.reduce((s, r) => s + r.videoCount, 0)
-  const totalDeduped = results.reduce((s, r) => s + r.dedupedCount, 0)
-  const batchProxyMB = results.reduce((s, r) => s + (r.bytes_proxy ?? 0), 0) / 1024 / 1024
-  const batchDropletMB = results.reduce((s, r) => s + (r.bytes_droplet ?? 0), 0) / 1024 / 1024
-  totalProcessed += results.length
-  totalSuccess += ok
-  totalFailed += fail
-  lifetimeProxyMB += batchProxyMB
-  lifetimeDropletMB += batchDropletMB
-
-  const elapsedMin = (Date.now() - startTime) / 1000 / 60
-  const adsPerMin = totalProcessed / elapsedMin
-  const remaining = await getQueueDepth()
-  const etaMin = remaining / Math.max(adsPerMin, 1)
-
-  console.log(`\n✅ Batch done in ${dt.toFixed(1)}s — ${ok} ok, ${fail} failed | ${totalImages} imgs + ${totalVideos} vids saved, ${totalDeduped} ♻️ deduped`)
-  console.log(`💾 Bandwidth (batch): ${batchProxyMB.toFixed(2)} MB proxy + ${batchDropletMB.toFixed(2)} MB droplet`)
-  console.log(`📊 Lifetime: ${totalSuccess}/${totalProcessed} ok (${((totalSuccess / totalProcessed) * 100).toFixed(0)}%) | ${adsPerMin.toFixed(1)} ads/min | queue: ${remaining} | ETA: ${etaMin.toFixed(0)} min`)
-  console.log(`💰 Lifetime bandwidth: ${lifetimeProxyMB.toFixed(1)} MB proxy ($${(lifetimeProxyMB * 0.0035).toFixed(3)} approx) + ${lifetimeDropletMB.toFixed(1)} MB droplet (free)\n`)
-
-  // Persist batch metrics to DB so the admin /admin/health dashboard can
-  // sum total bandwidth (worker + indexer) — was previously only logging
-  // to stdout, causing dashboard to underreport actual IPRoyal usage by
-  // ~50× (only indexer was tracked).
-  try {
-    const totalBytesProxy = results.reduce((s, r) => s + (r.bytes_proxy ?? 0), 0)
-    const totalBytesDroplet = results.reduce((s, r) => s + (r.bytes_droplet ?? 0), 0)
-    await (supabase as any).from('worker_runs').insert({
-      worker_id: WORKER_ID,
-      hostname: HOSTNAME,
-      batch_size: results.length,
-      ads_ok: ok,
-      ads_failed: fail,
-      images_saved: totalImages,
-      videos_saved: totalVideos,
-      deduped_count: totalDeduped,
-      bytes_proxy: totalBytesProxy,
-      bytes_droplet: totalBytesDroplet,
-      duration_ms: Math.round(dt * 1000),
-    })
-  } catch (e: any) {
-    // Non-fatal — telemetry only. If worker_runs table doesn't exist
-    // (migration 014 not applied), just continue.
-    console.warn(`[worker_runs] write failed: ${e?.message ?? e}`)
-  }
-
-  // Best-effort heartbeat for the dashboard
-  await writeHeartbeat({
-    worker_id: WORKER_ID,
-    hostname: HOSTNAME,
-    session_started_at: SESSION_STARTED_AT,
-    session_processed: totalProcessed,
-    session_succeeded: totalSuccess,
-    session_failed: totalFailed,
-    last_batch_size: results.length,
-    last_batch_seconds: parseFloat(dt.toFixed(2)),
-    ads_per_min: parseFloat(adsPerMin.toFixed(2)),
-  })
-
-  await sleep(config.batchSleep)
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
@@ -369,13 +346,13 @@ async function main() {
     })
   }
 
-  while (!stopping) {
-    try {
-      await loop()
-    } catch (err) {
-      console.error('💥 Loop error (will retry in 10s):', err)
-      await sleep(10_000)
-    }
+  // Streaming drain — producer keeps the buffer full, N consumers pull
+  // continuously. Runs until shutdown (it loops internally).
+  try {
+    await runStream(() => stopping)
+  } catch (err) {
+    console.error('💥 Stream error:', err)
+    process.exit(1)
   }
 }
 
