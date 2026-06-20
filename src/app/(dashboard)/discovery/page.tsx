@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { Masonry, useInfiniteLoader } from 'masonic'
 import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import BrandDrawer from './BrandDrawer'
@@ -1361,6 +1362,35 @@ export default function DiscoveryPage() {
     })
   }, [rawAds, format, industry, language, theme])
 
+  // ── Virtualized masonry plumbing (masonic) ──────────────────────────────
+  // Route the (non-memoized) card handlers through a ref so the masonry render
+  // component stays stable — otherwise masonic re-renders every visible card on
+  // each parent render.
+  const cardHandlers = useRef({ setSelectedBrand, openHover, closeHover })
+  cardHandlers.current = { setSelectedBrand, openHover, closeHover }
+  const MasonryCard = useMemo(() => {
+    const Card = ({ data: ad }: { index: number; data: Ad; width: number }) => (
+      <AdCard
+        ad={ad}
+        onBrandClick={(pid, name) => cardHandlers.current.setSelectedBrand({ pageId: pid, name })}
+        onBrandHover={(pid, el) => cardHandlers.current.openHover(pid, el)}
+        onBrandLeave={() => cardHandlers.current.closeHover()}
+      />
+    )
+    Card.displayName = 'MasonryCard'
+    return Card
+  }, [])
+  // Infinite load via masonic's onRender. The ref always holds the latest paging
+  // state so the stable callback never goes stale.
+  const loadMoreRef = useRef<() => void>(() => {})
+  loadMoreRef.current = () => {
+    if (!loading && hasMore && searchSource === 'indexed') fetchAds(false, undefined, dbPage + 1)
+  }
+  const maybeLoadMore = useInfiniteLoader(
+    async () => { loadMoreRef.current() },
+    { isItemLoaded: (i: number, items: Ad[]) => i < items.length, minimumBatchSize: 24, threshold: 6 },
+  )
+
   const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (v: string) =>
     setter(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])
 
@@ -1866,31 +1896,22 @@ export default function DiscoveryPage() {
               {activeFilterCount > 0 && <span style={{ background: '#f0fdf4', color: '#166534', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
             </div>
-            {/* Masonry (Atria-style) — natural-aspect cards distributed round-robin into
-                fixed columns. Items keep their column when more load, so appending never
-                rebalances/jitters the existing cards; only the loading column settles. */}
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', maxWidth: '100%' }}>
-              {Array.from({ length: gridCols }, (_, ci) => (
-                <div key={ci} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {filteredAds.filter((_, i) => i % gridCols === ci).map(ad => (
-                    <div key={ad.id} style={{ animation: 'fadeUp 0.3s ease-out both' }}>
-                      <AdCard ad={ad} onBrandClick={(pid, name) => setSelectedBrand({ pageId: pid, name })}
-                        onBrandHover={openHover} onBrandLeave={closeHover} />
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-            {/* Infinite scroll sentinel — auto-loads next page when in view */}
-            {hasMore && (
-              <InfiniteScrollSentinel
-                loading={loading}
-                onLoad={() =>
-                  searchSource === 'indexed'
-                    ? fetchAds(false, undefined, dbPage + 1)
-                    : fetchAds(false, nextCursor || undefined)
-                }
-              />
+            {/* Virtualized masonry (masonic) — balanced Pinterest columns where only
+                the visible cards are mounted (windowing). Deep scroll stays flat in
+                memory (no DOM accumulation / tab freeze). onRender drives infinite load.
+                Keyed by the server query so a NEW search remounts to a fresh grid+top. */}
+            <Masonry
+              key={`${query}|${searchMode}|${selectedBrand?.pageId || ''}|${sort}|${status}|${country}|${timeDays}`}
+              items={filteredAds}
+              columnGutter={12}
+              columnCount={gridCols}
+              overscanBy={3}
+              itemKey={(ad: Ad) => ad.id}
+              render={MasonryCard}
+              onRender={maybeLoadMore}
+            />
+            {loading && hasMore && (
+              <div style={{ textAlign: 'center', padding: 24, color: '#9ca3af', fontSize: 13 }}>Loading more…</div>
             )}
           </>
         )}
