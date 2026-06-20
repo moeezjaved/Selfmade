@@ -7,6 +7,7 @@
  * blocking (serverless-friendly) while preserving the inline-picker UX.
  */
 import { listAdAccounts, getAccountInfo, getAdPerformance, searchAdLibrary } from './meta-data'
+import { getCompetitorAds, analyzeNichePatterns, findWinningAds } from './library-data'
 
 export const TOOLS = [
   {
@@ -84,6 +85,54 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'get_competitor_ads',
+      description: "Deep-dive a competitor brand (or a niche) using Selfmade's crawl corpus. Returns their ads with the problem they target, mechanism, offer, CTA style, creative style (UGC/Studio), visual, and longevity. Use for competitor analysis and offer comparison.",
+      parameters: {
+        type: 'object',
+        properties: {
+          brand: { type: 'string', description: 'Competitor brand / page name to match' },
+          niche: { type: 'string', description: 'Niche filter, e.g. "Hair", "Supplements"' },
+          active_only: { type: 'boolean', description: 'Only currently-running ads' },
+          limit: { type: 'integer', description: 'Max ads (default 12, max 24)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'analyze_niche_patterns',
+      description: 'Aggregate the patterns across a niche or keyword: format mix, creative style mix (UGC vs Studio vs Graphic), CTA-style mix, the most common problems/mechanisms/offers, top brands, ad longevity, and the share that are proven winners. Use for trends, white-space, format comparison, and "what is working" questions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          niche: { type: 'string', description: 'Niche to analyze' },
+          query: { type: 'string', description: 'Keyword/brand if no clean niche' },
+          sample: { type: 'integer', description: 'Rows to sample (default 400, max 800)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'find_winning_ads',
+      description: "Find PROVEN winners (top performance tiers) in a niche/keyword — optionally long-running and by format. Returns each ad's creative breakdown. Use for inspiration, proven references, and winner-lookalikes.",
+      parameters: {
+        type: 'object',
+        properties: {
+          niche: { type: 'string' },
+          query: { type: 'string' },
+          format: { type: 'string', enum: ['image', 'video', 'carousel'] },
+          min_days_active: { type: 'integer', description: 'Only ads running at least this many days (proven)' },
+          limit: { type: 'integer', description: 'Max results (default 10, max 24)' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'request_clarification',
       description: 'Ask the user to choose from options before continuing — e.g. which ad account to analyze, or which date range. Renders an inline picker. Use when you genuinely need the user to decide.',
       parameters: {
@@ -119,6 +168,9 @@ export const TOOL_LABELS: Record<string, string> = {
   get_account_info: 'Getting account info…',
   get_ad_performance: 'Loading live ad performance…',
   search_ad_library: 'Searching the ad library…',
+  get_competitor_ads: 'Analyzing competitor ads…',
+  analyze_niche_patterns: 'Analyzing niche patterns…',
+  find_winning_ads: 'Finding proven winners…',
   request_clarification: 'Asking for clarification…',
 }
 
@@ -143,6 +195,12 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       return await getAdPerformance(ctx.userId, args)
     case 'search_ad_library':
       return await searchAdLibrary(args)
+    case 'get_competitor_ads':
+      return await getCompetitorAds(args)
+    case 'analyze_niche_patterns':
+      return await analyzeNichePatterns(args)
+    case 'find_winning_ads':
+      return await findWinningAds(args)
     default:
       throw new Error(`Unknown tool: ${name}`)
   }
@@ -161,8 +219,14 @@ export function formatToolResult(name: string, result: any): { sub_item?: any; i
   if (name === 'get_ad_performance') {
     return { icon: 'chart', sub_item: { label: `Loaded ${result?.count ?? 0} ${result?.level || 'ad'}(s)` } }
   }
-  if (name === 'search_ad_library') {
-    return { icon: 'search', sub_item: { label: `Found ${result?.count ?? 0} reference ad(s)` } }
+  if (name === 'search_ad_library' || name === 'find_winning_ads') {
+    return { icon: 'search', sub_item: { label: `Found ${result?.count ?? 0} ad(s)` } }
+  }
+  if (name === 'get_competitor_ads') {
+    return { icon: 'search', sub_item: { label: `Analyzed ${result?.count ?? 0} competitor ad(s)` } }
+  }
+  if (name === 'analyze_niche_patterns') {
+    return { icon: 'chart', sub_item: { label: `Analyzed ${result?.sampled ?? 0} ad(s) in the niche` } }
   }
   return {}
 }
