@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Masonry, useInfiniteLoader } from 'masonic'
+import { Masonry } from 'masonic'
 import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import BrandDrawer from './BrandDrawer'
@@ -1380,16 +1380,22 @@ export default function DiscoveryPage() {
     Card.displayName = 'MasonryCard'
     return Card
   }, [])
-  // Infinite load via masonic's onRender. The ref always holds the latest paging
-  // state so the stable callback never goes stale.
+  // Infinite load. masonic's useInfiniteLoader does NOT work here — it only fires
+  // when it renders an index BEYOND the loaded array, but we only ever render the
+  // items we have (no placeholders), so it never triggers. Instead use onRender
+  // directly: masonic calls it with the rendered [start, stop] range; when the
+  // user scrolls within ~12 of the end of the loaded set, fetch the next page.
+  // The loadingMoreRef guard prevents double-fetch before `loading` state flips.
+  const loadingMoreRef = useRef(false)
   const loadMoreRef = useRef<() => void>(() => {})
   loadMoreRef.current = () => {
-    if (!loading && hasMore && searchSource === 'indexed') fetchAds(false, undefined, dbPage + 1)
+    if (loadingMoreRef.current || loading || !hasMore || searchSource !== 'indexed') return
+    loadingMoreRef.current = true
+    Promise.resolve(fetchAds(false, undefined, dbPage + 1)).finally(() => { loadingMoreRef.current = false })
   }
-  const maybeLoadMore = useInfiniteLoader(
-    async () => { loadMoreRef.current() },
-    { isItemLoaded: (i: number, items: Ad[]) => i < items.length, minimumBatchSize: 24, threshold: 6 },
-  )
+  const handleMasonryRender = useCallback((_start: number, stopIndex: number, items: Ad[]) => {
+    if (stopIndex >= items.length - 12) loadMoreRef.current()
+  }, [])
 
   const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (v: string) =>
     setter(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])
@@ -1908,7 +1914,7 @@ export default function DiscoveryPage() {
               overscanBy={3}
               itemKey={(ad: Ad) => ad.id}
               render={MasonryCard}
-              onRender={maybeLoadMore}
+              onRender={handleMasonryRender}
             />
             {loading && hasMore && (
               <div style={{ textAlign: 'center', padding: 24, color: '#9ca3af', fontSize: 13 }}>Loading more…</div>
