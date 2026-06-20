@@ -28,6 +28,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { randomBytes, createHash } from 'node:crypto'
 import { supabase } from './db.js'
+import { isCacheableAsset, readAsset, writeAsset } from './asset-cache.js'
 import { startProxyChain, proxyChainEnabled } from './proxy-chain.js'
 import { pickProxy, openProxyChain, recordEvent, proxyPoolEnabled, type PoolProxy } from './proxy-pool.js'
 import { detectIndustries, detectThemes, normalizePlatforms } from './classify.js'
@@ -79,6 +80,8 @@ interface RunMetrics {
   adsAlreadySeen: number
   bytesThroughProxy: number
   blockedMedia: number       // video/image/font requests aborted (never hit IPRoyal)
+  cacheHits: number          // JS/CSS served from disk cache (0 IPRoyal)
+  cacheMiss: number          // JS/CSS fetched + cached (paid IPRoyal once)
   responsesCaptured: number
   cursorsSeen: number
   scrollCount: number
@@ -557,7 +560,7 @@ async function crawlBrand(opts: {
     sessionId,
     startedAt: Date.now(),
     adsDiscovered: 0, adsNew: 0, adsAlreadySeen: 0,
-    bytesThroughProxy: 0, blockedMedia: 0,
+    bytesThroughProxy: 0, blockedMedia: 0, cacheHits: 0, cacheMiss: 0,
     responsesCaptured: 0, cursorsSeen: 0, scrollCount: 0,
     successWindow: [],
   }
@@ -668,13 +671,30 @@ async function crawlBrand(opts: {
   // real media is downloaded later DIRECT off-proxy by the worker). We deliberately
   // do NOT touch `static.xx.fbcdn.net` (Meta's pagination JS) or `www.facebook.com`
   // (the GraphQL endpoint) — blocking those broke pagination on 2026-05-16.
-  await context.route('**/*', (route) => {
+  await context.route('**/*', async (route) => {
     const req = route.request()
     const t = req.resourceType()
     if (t === 'media' || t === 'image' || t === 'font') { metrics.blockedMedia++; return route.abort() }
+    const url = req.url()
     let host = ''
-    try { host = new URL(req.url()).hostname } catch { /* ignore */ }
+    try { host = new URL(url).hostname } catch { /* ignore */ }
     if (host.startsWith('video-') || host.startsWith('video.') || host.startsWith('scontent-') || host.startsWith('scontent.')) { metrics.blockedMedia++; return route.abort() }
+    // JS/CSS DISK CACHE — Facebook's static bundles are the same versioned files
+    // every crawl. Serve from local disk to skip the metered proxy. Only GET; a
+    // cache hit costs 0 IPRoyal. Misses fetch through the proxy once, then cache.
+    if (req.method() === 'GET' && isCacheableAsset(url)) {
+      try {
+        const hit = await readAsset(url)
+        if (hit) { metrics.cacheHits++; return route.fulfill({ status: hit.status, headers: hit.headers, body: hit.body }) }
+        const resp = await route.fetch()
+        const body = await resp.body()
+        void writeAsset(url, resp.status(), resp.headers(), body)
+        metrics.cacheMiss++
+        const headers: Record<string, string> = { ...resp.headers() }
+        delete headers['content-encoding']; delete headers['content-length']
+        return route.fulfill({ status: resp.status(), headers, body })
+      } catch { return route.continue() }   // any cache/fetch error → normal load
+    }
     return route.continue()
   })
 
@@ -775,7 +795,7 @@ async function crawlBrand(opts: {
       if (metrics.successWindow.length > SUCCESS_RATE_WINDOW) {
         metrics.successWindow.shift()
       }
-      console.log(`  📦 captured ${ads.length} ads (${newCount} new) + ${cursors.length} cursors | ${(metrics.bytesThroughProxy / 1024).toFixed(1)} KB GraphQL | ${metrics.blockedMedia} media reqs blocked (0 IPRoyal)`)
+      console.log(`  📦 captured ${ads.length} ads (${newCount} new) + ${cursors.length} cursors | ${(metrics.bytesThroughProxy / 1024).toFixed(1)} KB GraphQL | ${metrics.blockedMedia} media blocked | JS/CSS cache ${metrics.cacheHits} hit / ${metrics.cacheMiss} miss (0 IPRoyal)`)
     } catch (e: any) {
       console.warn(`  ⚠️ response handler: ${e?.message?.slice(0, 100)}`)
     }
