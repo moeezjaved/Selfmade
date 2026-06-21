@@ -19,6 +19,7 @@ import os from 'node:os'
 import { config } from './config.js'
 import {
   claimAds,
+  dequeue,
   updateAdCreative,
   getQueueDepth,
   writeHeartbeat,
@@ -54,6 +55,7 @@ interface ProcessResult {
   bytes_proxy?: number     // bytes consumed via IPRoyal (images only)
   bytes_droplet?: number   // bytes consumed via droplet direct (videos only)
   error?: string
+  terminal?: boolean       // give-up (marked failed) → dequeue, don't retry. transient (timeout/exception) leaves it queued for the 3-min stale reclaim.
 }
 
 /**
@@ -119,7 +121,7 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
 
   if (imageUrls.length === 0 && videoUrls.length === 0) {
     await markExtractionFailed(ad.ad_id)
-    return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: empty raw URL arrays' }
+    return { ad_id: ad.ad_id, ok: false, terminal: true, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: empty raw URL arrays' }
   }
 
   const { images, videos, bytes_proxy_total, bytes_droplet_total } = await downloadAssetsForAd({
@@ -134,7 +136,7 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
     // indexing and download, IPRoyal session blocked by Meta, or the ad
     // is in a state where Meta now gates everything. Mark failed.
     await markExtractionFailed(ad.ad_id)
-    return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: all placeholders → marked failed' }
+    return { ad_id: ad.ad_id, ok: false, terminal: true, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: all placeholders → marked failed' }
   }
 
   // Map URL → buffer so processAsset can skip its own download
@@ -159,7 +161,7 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
 
   if (creatives.length === 0) {
     await markExtractionFailed(ad.ad_id)
-    return { ad_id: ad.ad_id, ok: false, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: r2 upload failed' }
+    return { ad_id: ad.ad_id, ok: false, terminal: true, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: r2 upload failed' }
   }
 
   const firstImage = imageResults.find((r) => r.url)
@@ -271,6 +273,10 @@ async function runStream(isStopping: () => boolean): Promise<void> {
       } finally {
         claimed.delete(ad.ad_id)
       }
+      // Dequeue on a TERMINAL result (success or give-up). Transient failures
+      // (timeout / unexpected exception) are left in the queue → re-claimed after the
+      // 3-min stale window, so a blip never loses an ad.
+      if (result.ok || result.terminal) await dequeue(ad.ad_id).catch(() => {})
       const dt = ((Date.now() - t0) / 1000).toFixed(1)
       const dedupTag = result.dedupedCount > 0 ? ` ♻️${result.dedupedCount}` : ''
       console.log(`  ${result.ok ? '✅' : '❌'} ${ad.ad_id} (${dt}s) ${result.ok ? `${result.imageCount}img+${result.videoCount}vid${dedupTag}` : (result.error || 'unknown')}`)
