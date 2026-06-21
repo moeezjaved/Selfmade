@@ -146,16 +146,15 @@ export async function GET(request: NextRequest) {
     // Hash alone is not enough — R2 upload may have failed even when hash exists.
     let baseQuery = admin
       .from('discovery_ads_index')
-      // NO count:'exact' — counting every match seq-scans the whole table and blew
-      // the 8s timeout ("No ads found"). The displayed total comes from the
-      // unique-creative hash pass below; the page fetch itself is fast.
-      .select('*')
-      // NO has-creative filter here. The append-only worker writes creatives ONLY
-      // to discovery_creatives (no thumbnail_url/hash on the index row), so filtering
-      // on thumbnail_url would hide every newly-drained ad. Has-creative is enforced
-      // in JS below against discovery_creatives (a fast keyed batch fetch), which
-      // covers old AND new ads. (An inner-join embed here times out under the
-      // brand/country .or() + performance sort — that was the "No ads found" regression.)
+      // INNER-JOIN discovery_creatives in ONE query: enforces has-creative (covers
+      // append-only ads with no thumbnail_url/hash on the index row) AND carries the
+      // creatives for dedup + thumbnails, AND gives the has-creative total via
+      // count:'planned' — replacing 3 sequential round-trips with one. The embed only
+      // timed out before the (page_id,performance_score)/(page_id,days_running)
+      // composite indexes existed (the brand sort scanned the whole score index);
+      // with those in place it's sub-second. Brand mode must use page_id=eq (NOT the
+      // seed_terms affiliate OR) — the unindexed array-contains makes the join 9s+.
+      .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash)', { count: 'planned' })
 
     // Country filter — match against the ARRAY of countries the ad targeted
     // (covers multi-country ads correctly). Falls back to legacy 'country'
@@ -169,11 +168,12 @@ export async function GET(request: NextRequest) {
     // Keyword search — OR across body, title, page_name, brand_categories
     if (q) {
       if (mode === 'brand') {
-        // Exact page_id when we have it (captures every display name on that page);
-        // PLUS affiliate ads — different pages whose ads drive to this brand's site,
-        // tagged "aff:<pageId>" in seed_terms by the affiliate-discovery crawl.
-        // Otherwise fall back to a fuzzy page_name match for typed brand searches.
-        if (pageId) baseQuery = baseQuery.or(`page_id.eq.${pageId},seed_terms.cs.{aff:${pageId}}`)
+        // Exact page_id (captures every display name on that page). NOTE: the
+        // seed_terms affiliate OR is intentionally dropped here — an array-contains on
+        // the unindexed seed_terms forces a seq-scan that makes the inner-join embed
+        // 9s+ (vs 0.3s for page_id=eq). Brand-affiliate ads are deferred until
+        // seed_terms gets a GIN index. Otherwise fall back to a fuzzy page_name match.
+        if (pageId) baseQuery = baseQuery.eq('page_id', pageId)
         else baseQuery = baseQuery.ilike('page_name', `%${q}%`)
       } else {
         // Topic/keyword search across 3 dimensions: ad copy, brand name, category.
@@ -285,10 +285,11 @@ export async function GET(request: NextRequest) {
         .order('last_seen', { ascending: false })
     }
 
-    // Over-fetch so server-side dedup can return `limit` UNIQUE creatives per page
-    // Over-fetch generously: after the per-brand cap, we need a wide brand pool to
-    // fill the page (a flood-brand's extra ads are skipped, so we need others behind them).
-    const overFetchMultiplier = (q && mode === 'brand') ? 5 : 12
+    // Over-fetch so server-side dedup can return `limit` UNIQUE creatives per page.
+    // Smaller than before: the inner-join means EVERY fetched row already has a
+    // creative (no rows wasted on undrained ads), so the only shrinkage is dedup +
+    // the per-brand cap. Keyword mode's semantic gap-fill tops up any shortfall.
+    const overFetchMultiplier = (q && mode === 'brand') ? 4 : 6
     const fetchLimit = limit * overFetchMultiplier
     const fetchOffset = offset * overFetchMultiplier
     baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
@@ -314,41 +315,30 @@ export async function GET(request: NextRequest) {
         .map(x => x.a)
     }
 
-    // ── Creatives for the candidate window, keyed off discovery_creatives ──────
-    // Both the has-creative filter AND the dedup key come from here (not the index
-    // row), because (a) append-only ads have no thumbnail_url/hash on the index row,
-    // and (b) the index row's "primary" hash is whichever creative was written last,
-    // so two identical carousels (same first creative) get DIFFERENT keys and fail to
-    // dedup — that was the "same 'It's been' video 3×" bug. Fetch full creative data
-    // once (ordered images-first, position asc) and reuse it for the transform.
+    // ── Dedup by the FIRST creative (from the embedded discovery_creatives) ─────
+    // The inner-join already guaranteed every candidate has ≥1 creative. Sort each
+    // ad's creatives images-first / position-asc so the FIRST is a STABLE dedup key —
+    // the index row's "primary" hash is whichever creative was written last, so two
+    // identical carousels got different keys and failed to dedup ("'It's been' 3×").
     type Cre = { position: number; asset_type: 'image' | 'video'; r2_url: string; hash: string | null }
-    const candIds = candidateRows.map((a: any) => a.ad_id).filter(Boolean)
+    const sortCres = (cs: Cre[]) => cs.slice().sort((a, b) =>
+      (a.asset_type === b.asset_type ? 0 : a.asset_type === 'image' ? -1 : 1) || (a.position - b.position))
     const creativesByAd: Record<string, Cre[]> = {}
-    for (let i = 0; i < candIds.length; i += 300) {
-      const slice = candIds.slice(i, i + 300)
-      const { data: cc } = await admin
-        .from('discovery_creatives')
-        .select('ad_id, position, asset_type, r2_url, hash')
-        .in('ad_id', slice)
-        .order('asset_type', { ascending: true })   // images before videos
-        .order('position', { ascending: true })
-      for (const c of (cc || []) as any[]) {
-        (creativesByAd[c.ad_id] ||= []).push({ position: c.position, asset_type: c.asset_type, r2_url: c.r2_url, hash: c.hash })
-      }
+    for (const ad of candidateRows) {
+      const cs = (ad.discovery_creatives || []) as Cre[]
+      if (cs.length) creativesByAd[ad.ad_id] = sortCres(cs)
     }
 
-    // Server-side dedup by the FIRST creative's hash (one stable card per unique
-    // creative), PLUS a per-brand cap for diversity. Without the cap, one deep brand
-    // (e.g. Mars Men with ~1.5k long-running video ads) floods the recommended feed.
-    // No cap in brand mode (you clicked a brand → you want all its ads). Ads with NO
-    // stored creative are skipped — they aren't displayable yet.
+    // Server-side dedup by the first creative's hash, PLUS a per-brand cap for
+    // diversity (one deep brand like Mars Men would otherwise flood the feed). No cap
+    // in brand mode (you clicked a brand → you want all its ads).
     const MAX_PER_BRAND = (q && mode === 'brand') ? Infinity : (adsPerBrand > 0 ? adsPerBrand : 3)
     const seenHashes = new Set<string>()
     const perBrand: Record<string, number> = {}
     const dedupedAds: any[] = []
     for (const ad of candidateRows) {
       const cres = creativesByAd[ad.ad_id]
-      if (!cres || !cres.length) continue                 // has-creative filter (JS)
+      if (!cres || !cres.length) continue
       const key = cres[0].hash || `_${ad.ad_id}`          // first creative = stable dedup key
       if (seenHashes.has(key)) continue
       if ((perBrand[ad.page_id] || 0) >= MAX_PER_BRAND) continue
@@ -359,67 +349,21 @@ export async function GET(request: NextRequest) {
     }
 
     ads = dedupedAds
-    // Count distinct image AND video hashes matching the SAME filter as the search.
-    // PostgREST caps each request at ~1000 rows, so for brand searches (bounded to
-    // one advertiser's ads) we PAGINATE to count the full set — otherwise the total
-    // undercounts (e.g. Mars Men showed 242 of its real ~331 unique creatives).
-    const uniqSet = new Set<string>()
+    // Total = the planner's estimate of has-creative ads matching (count:'planned'
+    // from the inner-join main query) — instant, replaces the old multi-chunk count
+    // pass. Falls back to the deduped page size if the planner returns null.
+    total = kwCount || dedupedAds.length
     // Canonical brand name = most common page_name among the brand's OWN ads
-    // (page_id === pageId). A page runs partnership/affiliate ads under other
-    // names (e.g. Grüns's page also shows "Chelsea Handler"); the dominant name
-    // is the real brand. Computed here so the grid labels every card with the
-    // real name users search by — not whichever partnership ad sorted first.
+    // (page_id === pageId) in the fetched window — a page runs partnership ads under
+    // other names (e.g. Grüns's page also shows "Chelsea Handler"); the dominant one
+    // is the real brand users searched.
     const nameFreq: Record<string, number> = {}
-    const addHashes = (rows: any[]) => {
-      for (const r of rows) {
-        if (r.image_hash) uniqSet.add('i:' + r.image_hash)
-        if (r.video_hash) uniqSet.add('v:' + r.video_hash)
-        // Append-only ads carry no index-row hash — count them by ad_id so the total
-        // (and thus pagination) includes them instead of stopping the grid short.
-        if (!r.image_hash && !r.video_hash && r.ad_id) uniqSet.add('a:' + r.ad_id)
-        if (pageId && r.page_id === pageId && r.page_name) {
-          const n = String(r.page_name).trim()
-          if (n) nameFreq[n] = (nameFreq[n] || 0) + 1
-        }
+    for (const r of candidateRows) {
+      if (pageId && r.page_id === pageId && r.page_name) {
+        const n = String(r.page_name).trim()
+        if (n) nameFreq[n] = (nameFreq[n] || 0) + 1
       }
     }
-    const countChunk = (off: number) => {
-      let cq = admin
-        .from('discovery_ads_index')
-        .select('image_hash,video_hash,page_id,page_name,ad_id')
-        // No thumbnail_url filter — append-only ads have none. The count is an
-        // approximate match-total (drives pagination); undrained ads are a minor
-        // over-count, far safer than the under-count that truncated the grid.
-        .range(off, off + 999)
-      if (country && country !== 'ALL') cq = cq.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
-      if (q && mode === 'brand') {
-        if (pageId) cq = cq.or(`page_id.eq.${pageId},seed_terms.cs.{aff:${pageId}}`)
-        else cq = cq.ilike('page_name', `%${q}%`)
-      } else if (q && keywordOr) {
-        // Same keyword match as the result query → the count reflects the search.
-        cq = cq.or(keywordOr)
-      }
-      cq = applyHookdFilters(cq)   // keep the unique-creative total honest under the new filters
-      return cq
-    }
-    if (q) {
-      // Bounded pagination for an accurate unique-creative count. Brand mode is
-      // one advertiser; keyword mode can be large, so cap the scan (≤10k rows)
-      // to keep latency sane — deeper totals are an estimate floor, not exact.
-      const maxScan = mode === 'brand' ? 50_000 : 10_000
-      for (let off = 0; off < maxScan; off += 1000) {
-        const { data: chunk } = await countChunk(off)
-        const rows = (chunk || []) as any[]
-        addHashes(rows)
-        if (rows.length < 1000) break
-      }
-    } else {
-      const { data: chunk } = await countChunk(0)
-      addHashes((chunk || []) as any[])
-    }
-    const uniqueHashCount = uniqSet.size
-    total = uniqueHashCount || dedupedAds.length
-    // Most common page_name among the brand's own ads = the real brand name.
     const canonicalName = Object.entries(nameFreq).sort((a, b) => b[1] - a[1])[0]?.[0] || brandName || ''
 
     // ── Semantic GAP-FILL for concept searches (additive, never replaces) ──
