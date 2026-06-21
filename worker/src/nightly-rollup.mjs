@@ -64,13 +64,14 @@ const scoreOf = (e, pctOf) => { let s = mapP(pctOf(e.rawv)); if (e.days < 7) s =
 // ── REST helpers ──────────────────────────────────────────────────────────────
 const SEL = 'ad_id,page_id,image_hash,video_hash,is_active,start_date,stop_date,last_seen,niche';
 async function getJSON(qs) { const r = await fetch(REST + qs, { headers: H }); return r.ok ? r.json() : []; }
-async function keyset(baseQs) {           // keyset-paginate by ad_id (stable under concurrent inserts)
-  const out = []; let cursor = '';
+async function keyset(baseQs, label) {     // keyset-paginate by ad_id (stable under concurrent inserts)
+  const out = []; let cursor = '', nextHb = 100000;
   for (;;) {
     let q = baseQs + '&order=ad_id.asc&limit=1000' + (cursor ? '&ad_id=gt.' + encodeURIComponent(cursor) : '');
     const d = await getJSON(q);
     if (!Array.isArray(d) || !d.length) break;
     out.push(...d); cursor = d[d.length - 1].ad_id;
+    if (label && out.length >= nextHb) { console.log(`[rollup] ${label}: fetched ${out.length} @ +${((Date.now() - t0) / 1000) | 0}s`); nextHb += 100000; }
     if (d.length < 1000) break;
   }
   return out;
@@ -83,6 +84,7 @@ async function alert(msg) { console.error(msg); if (ALERT) await fetch(ALERT, { 
 // write score chunks via apply_perf under a cooperative crawl-pause + heartbeat.
 async function writeUpdates(updates) {
   if (!updates.length) return { wrote: 0, fail: 0 };
+  console.log(`[rollup] writing ${updates.length} scores @ +${((Date.now() - t0) / 1000) | 0}s`);
   await setFlag();
   const hb = setInterval(setFlag, 60_000);
   await sleep(8000);                         // let writers notice the pause
@@ -95,6 +97,7 @@ async function writeUpdates(updates) {
         if (r.ok) { ok = true; wrote += chunk.length; } else { await r.text().catch(() => {}); if (t < 7) await sleep(1500 * (t + 1)); }
       }
       if (!ok) fail++;
+      if ((i / 2000) % 25 === 24) console.log(`[rollup] wrote ${wrote}/${updates.length} (fail ${fail}) @ +${((Date.now() - t0) / 1000) | 0}s`);   // heartbeat every ~50K
     }
   } finally { clearInterval(hb); await clearFlag(); }
   return { wrote, fail };
@@ -112,7 +115,7 @@ let rows, updates, mode, touchedBrands = 0;
 if (FULL) {
   // ── FULL weekly: recompute everything, calibrate, cache cutpoints ──
   mode = 'full';
-  rows = await keyset('discovery_ads_index?select=' + SEL);
+  rows = await keyset('discovery_ads_index?select=' + SEL, 'full-fetch');
   const enriched = enrich(rows, aggregate(rows));
   const sorted = enriched.map(e => e.rawv).sort((a, b) => a - b), N = sorted.length || 1;
   const pctOf = v => { let lo = 0, hi = sorted.length; while (lo < hi) { const m = (lo + hi) >> 1; if (sorted[m] <= v) lo = m + 1; else hi = m; } return lo / N; };
@@ -128,19 +131,21 @@ if (FULL) {
   const pctOf = v => { let lo = 0, hi = cp.length; while (lo < hi) { const m = (lo + hi) >> 1; if (cp[m] <= v) lo = m + 1; else hi = m; } return Math.min(1, lo / Q); };
 
   // (a) brands with NEW ads since last run (indexed_at is insert-only → clean watermark)
-  const newAds = await keyset('discovery_ads_index?select=ad_id,page_id&indexed_at=gt.' + encodeURIComponent(lastRan));
+  const newAds = await keyset('discovery_ads_index?select=ad_id,page_id&indexed_at=gt.' + encodeURIComponent(lastRan), 'new-ads');
   const touched = new Set(newAds.map(r => r.page_id));
   // (b) tier-threshold crossers: active ads near the 7/14d gates whose realDays just crossed
-  const nearGate = await keyset('discovery_ads_index?select=ad_id,page_id,start_date,stop_date,last_seen,days_running&is_active=is.true&days_running=lt.14');
+  const nearGate = await keyset('discovery_ads_index?select=ad_id,page_id,start_date,stop_date,last_seen,days_running&is_active=is.true&days_running=lt.14', 'near-gate');
+  const newAdBrands = touched.size;
   for (const a of nearGate) { const rd = realDays(a); const sd = a.days_running ?? 0; if ((rd >= 7 && sd < 7) || (rd >= 14 && sd < 14)) touched.add(a.page_id); }
   touchedBrands = touched.size;
+  console.log(`[rollup] incremental: ${newAds.length} new ads / ${newAdBrands} brands + ${touched.size - newAdBrands} crosser brands = ${touched.size} touched @ +${((Date.now() - t0) / 1000) | 0}s`);
 
   // fetch ALL ads of touched brands (chunk the page_id IN-list), re-aggregate per brand
   rows = [];
   const ids = [...touched];
   for (let i = 0; i < ids.length; i += 100) {
     const inList = ids.slice(i, i + 100).map(x => encodeURIComponent(x)).join(',');
-    rows.push(...await keyset('discovery_ads_index?select=' + SEL + '&page_id=in.(' + inList + ')'));
+    rows.push(...await keyset('discovery_ads_index?select=' + SEL + '&page_id=in.(' + inList + ')', 'brand-ads'));
   }
   updates = enrich(rows, aggregate(rows)).map(e => scoreOf(e, pctOf));
 }
