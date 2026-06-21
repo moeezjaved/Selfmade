@@ -1304,7 +1304,9 @@ export default function DiscoveryPage() {
       if (reset) setRawAds([])
       setHasMore(false)
       setNextCursor(null)
-      setDbTotal(dbData.total || 0)
+      // Don't wipe the running total when a deep loadMore page comes back empty
+      // (genuine end of feed) — only reset it on a fresh search.
+      setDbTotal(prev => dbData.total || (reset ? 0 : prev))
       setTotalInDB(dbData.totalInDB || 0)
       setSearchSource('indexed')
     } catch (e: any) {

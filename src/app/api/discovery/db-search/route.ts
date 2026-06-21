@@ -68,7 +68,10 @@ export async function GET(request: NextRequest) {
     const industry = searchParams.get('industry') || ''  // comma-separated for multi-select
     const theme = searchParams.get('theme') || ''        // comma-separated
     const language = searchParams.get('language') || ''  // comma-separated ISO codes
-    const country = searchParams.get('country') || 'US'
+    // Default ALL — we crawl worldwide and the country selector was removed from the
+    // UI, so defaulting to US silently hid every non-US ad (e.g. hims runs heavily on
+    // forhims.co.uk → ~1255 US vs ~2959 worldwide).
+    const country = searchParams.get('country') || 'ALL'
     const sort = searchParams.get('sort') || 'recent'
     const days = parseInt(searchParams.get('days') || '0')
     const page = parseInt(searchParams.get('page') || '0')
@@ -294,7 +297,7 @@ export async function GET(request: NextRequest) {
     // dedups the rest by the hashes we expose. Brand mode has no per-brand cap, so it
     // needs no margin; keyword mode keeps a little for the cap. (Future: keyset
     // pagination to kill the deep-offset scan entirely.)
-    const fetchMargin = (q && mode === 'brand') ? 1 : 2
+    const fetchMargin = 2                          // fetch 2× so dedup/cap still yields ~limit
     const fetchLimit = limit * fetchMargin
     const fetchOffset = offset                    // raw row offset — NOT multiplied
     baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
@@ -531,7 +534,12 @@ export async function GET(request: NextRequest) {
       ads: transformed,
       total,
       page,
-      hasMore: offset + limit < total,
+      // Robust pagination: there's more iff the RAW fetch filled its window — i.e.
+      // discovery_creatives!inner still had `fetchLimit` rows at this offset. This is
+      // independent of `total` (count:'planned' is an unreliable estimate and was
+      // capping the feed early) and of post-dedup count. Stops only when the brand's
+      // has-creative rows are genuinely exhausted. (Plus the semantic gap-fill case.)
+      hasMore: (keywordData?.length || 0) >= fetchLimit,
       totalInDB,
       source: 'indexed',
       searchMethod,
