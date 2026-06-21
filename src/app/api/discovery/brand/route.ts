@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       admin.from('discovery_ads_index').select('*', { count: 'estimated', head: true }).eq('page_id', pageId),
       admin.from('discovery_ads_index').select('*', { count: 'estimated', head: true }).eq('page_id', pageId).eq('is_active', true),
-      admin.from('discovery_ads_index').select('*', { count: 'estimated', head: true }).eq('page_id', pageId).not('thumbnail_url', 'is', null),
+      admin.from('discovery_ads_index').select('*, discovery_creatives!inner(ad_id)', { count: 'estimated', head: true }).eq('page_id', pageId),
       admin.from('discovery_ads_index').select('*', { count: 'estimated', head: true }).eq('page_id', pageId).eq('format', 'Video'),
     ])
     const totalCount = totalRes.count ?? 0
@@ -50,9 +50,11 @@ export async function GET(request: NextRequest) {
     // placeholders for fresh-but-unprocessed brands like Gymshark on day 1.
     let query = admin
       .from('discovery_ads_index')
-      .select('ad_id, page_id, page_name, body, title, snapshot_url, start_date, stop_date, is_active, days_running, format, thumbnail_url, video_url, hook_type, emotion, angle, persona, desire, usp, themes, last_seen')
+      // creative-queue Phase 2: thumbnails come from discovery_creatives (embed), not
+      // the ads table. Non-inner embed so the brand page still lists ads the drain
+      // hasn't processed yet; we sort ads-with-creatives first in JS below.
+      .select('ad_id, page_id, page_name, body, title, snapshot_url, start_date, stop_date, is_active, days_running, format, thumbnail_url, video_url, hook_type, emotion, angle, persona, desire, usp, themes, last_seen, discovery_creatives(asset_type,r2_url,hash,position)')
       .eq('page_id', pageId)
-      .order('thumbnail_url', { ascending: false, nullsFirst: false })  // ads with creatives first
       .order('last_seen', { ascending: false })
       .limit(500)
 
@@ -61,7 +63,15 @@ export async function GET(request: NextRequest) {
     const { data: ads, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    const allAds = ads || []
+    // Augment each ad with thumbnail/video/creatives derived from discovery_creatives,
+    // then float ads-that-have-a-creative to the top (stable on last_seen within groups).
+    const allAds = ((ads || []) as any[]).map((a: any) => {
+      const cr: any[] = a.discovery_creatives || []
+      const img = cr.find((c: any) => c.asset_type === 'image')
+      const vid = cr.find((c: any) => c.asset_type === 'video')
+      return { ...a, thumbnail_url: img?.r2_url || a.thumbnail_url || null, video_url: vid?.r2_url || a.video_url || null, creatives: cr }
+    })
+    allAds.sort((a: any, b: any) => (b.creatives.length ? 1 : 0) - (a.creatives.length ? 1 : 0))
 
     if (!allAds.length) {
       return NextResponse.json({

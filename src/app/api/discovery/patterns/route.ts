@@ -47,7 +47,8 @@ export async function GET(req: NextRequest) {
   // Pull winning-tier ads (optionally in a niche), with their Creative DNA.
   const rows: Row[] = []
   let cursor = ''
-  const cols = 'ad_id,image_hash,video_hash,format,days_running,niche,hook_type,emotion,angle,tone,persona,cta,format_style,visual_style,on_screen_text,usp,topics'
+  // creative-queue Phase 2: hashes come from discovery_creatives (embed), not the ads table.
+  const cols = 'ad_id,format,days_running,niche,hook_type,emotion,angle,tone,persona,cta,format_style,visual_style,on_screen_text,usp,topics,discovery_creatives(asset_type,hash)'
   while (rows.length < CAP) {
     let q = admin.from('discovery_ads_index').select(cols)
       .eq('performance_tier', 'winning').order('ad_id', { ascending: true }).limit(1000)
@@ -74,7 +75,8 @@ export async function GET(req: NextRequest) {
   const seen = new Set<string>()
   const uniq: Row[] = []
   for (const r of pool) {
-    const k = r.image_hash || r.video_hash || r.ad_id
+    const cre: any[] = (r as any).discovery_creatives || []
+    const k = cre.find(c => c.asset_type === 'image')?.hash || cre.find(c => c.asset_type === 'video')?.hash || r.ad_id
     if (seen.has(k)) continue
     seen.add(k); uniq.push(r)
   }
