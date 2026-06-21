@@ -32,34 +32,28 @@ export async function GET(request: NextRequest) {
     const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
     const nq = norm(term)
 
-    // ── 1. Search our own indexed DB ──────────────────────────────
-    // Source A — ad index by page_name (handles exact + accented matches).
-    const { data: rows } = await (admin as any)
-      .from('discovery_ads_index')
-      .select('page_id, page_name')
-      .ilike('page_name', `%${term}%`)
-      .not('page_id', 'is', null)
-      .not('page_name', 'is', null)
-      .limit(500)
-
-    // Source B — tracked brands by the name the USER typed when adding them
-    // (discovery_crawl_terms.term). This is accent-insensitive: a brand added as
-    // "gruns" is found even though its page_name is "Grüns". Bounded table, so we
-    // fetch and match in JS with the normalize() above.
+    // ── 1. Search the tracked-brand list (small, fast) ────────────────
+    // We match against discovery_crawl_terms (~few-K rows) — NOT a `ilike '%term%'`
+    // over discovery_ads_index. That leading-wildcard seq-scans the whole 700K-row
+    // table (~9s under load) on EVERY keystroke — it was the brand-search hang and a
+    // top resource hog (the "exhausting resources" warning). The tracked list covers
+    // every brand we crawl; we match BOTH directions so a longer typed query
+    // ("mars men") still finds a shorter term ("mars") and vice-versa. (Full
+    // page_name substring search returns once a pg_trgm GIN index is built via a
+    // direct connection — deferred; not worth a per-keystroke seq-scan.)
     const { data: trackedAll } = await (admin as any)
       .from('discovery_crawl_terms')
       .select('page_id, term')
       .not('page_id', 'is', null)
-      .limit(5000)
+      .limit(8000)
     const trackedHits: string[] = ((trackedAll || []) as any[])
-      .filter((t) => t.term && norm(t.term).includes(nq))
+      .filter((t) => {
+        const nt = norm(t.term)
+        return nt && (nt.includes(nq) || nq.includes(nt))
+      })
       .map((t) => t.page_id)
 
-    // Union candidate page_ids from both sources.
-    const candidatePageIds = Array.from(new Set<string>([
-      ...((rows || []) as any[]).map((r) => r.page_id),
-      ...trackedHits,
-    ])).slice(0, 12)
+    const candidatePageIds = Array.from(new Set<string>(trackedHits)).slice(0, 12)
 
     if (candidatePageIds.length > 0) {
       // Pictures from discovery_crawl_terms in one batched query
