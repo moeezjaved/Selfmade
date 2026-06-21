@@ -285,13 +285,18 @@ export async function GET(request: NextRequest) {
         .order('last_seen', { ascending: false })
     }
 
-    // Over-fetch so server-side dedup can return `limit` UNIQUE creatives per page.
-    // Smaller than before: the inner-join means EVERY fetched row already has a
-    // creative (no rows wasted on undrained ads), so the only shrinkage is dedup +
-    // the per-brand cap. Keyword mode's semantic gap-fill tops up any shortfall.
-    const overFetchMultiplier = (q && mode === 'brand') ? 4 : 6
-    const fetchLimit = limit * overFetchMultiplier
-    const fetchOffset = offset * overFetchMultiplier
+    // Page STRAIGHT THROUGH the has-creative results (the inner-join already filtered
+    // to displayable ads), `limit` per page. CRITICAL: do NOT multiply the offset by
+    // an over-fetch factor — that skipped (factor-1)*40 rows per page, so the grid
+    // could only ever reach total/factor (the "only 315 of 1238" cap) AND deep pages
+    // landed at huge offsets (row 1000+) that scan forever. A small per-page fetch
+    // margin lets server-side dedup/cap trim within the page; the client cross-page-
+    // dedups the rest by the hashes we expose. Brand mode has no per-brand cap, so it
+    // needs no margin; keyword mode keeps a little for the cap. (Future: keyset
+    // pagination to kill the deep-offset scan entirely.)
+    const fetchMargin = (q && mode === 'brand') ? 1 : 2
+    const fetchLimit = limit * fetchMargin
+    const fetchOffset = offset                    // raw row offset — NOT multiplied
     baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
     const { data: keywordData, error: kwErr, count: kwCount } = await baseQuery
 
