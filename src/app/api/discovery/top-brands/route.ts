@@ -75,8 +75,8 @@ export async function GET(request: NextRequest) {
       for (let off = 0; off < 10_000; off += 1000) {
         let bq = admin
           .from('discovery_ads_index')
-          .select('page_id, page_name, image_hash, video_hash, ad_id')
-          .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
+          // creative-queue Phase 2: has-creative + hashes via discovery_creatives embed.
+          .select('page_id, page_name, ad_id, discovery_creatives!inner(asset_type,hash)')
           .or(keywordOr)
         if (country && country !== 'ALL') bq = bq.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
         if (industry) {
@@ -92,7 +92,8 @@ export async function GET(request: NextRequest) {
           if (!counts[ad.page_id]) counts[ad.page_id] = { name: ad.page_name, hashes: new Set<string>() }
           const c = counts[ad.page_id]
           // count UNIQUE creatives per brand (match the grid's dedup)
-          c.hashes.add(ad.image_hash || ad.video_hash || `_${ad.ad_id}`)
+          const cre: any[] = ad.discovery_creatives || []
+          c.hashes.add(cre.find(c => c.asset_type === 'image')?.hash || cre.find(c => c.asset_type === 'video')?.hash || `_${ad.ad_id}`)
           if (ad.page_name) c.name = ad.page_name
         }
         if (chunk.length < 1000) break

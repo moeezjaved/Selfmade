@@ -20,7 +20,6 @@ import { config } from './config.js'
 import {
   claimAds,
   dequeue,
-  updateAdCreative,
   getQueueDepth,
   writeHeartbeat,
   findExistingByHash,
@@ -164,18 +163,12 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
     return { ad_id: ad.ad_id, ok: false, terminal: true, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: r2 upload failed' }
   }
 
-  const firstImage = imageResults.find((r) => r.url)
-  const firstVideo = videoResults.find((r) => r.url)
-  await Promise.all([
-    saveCreatives(creatives),
-    updateAdCreative(
-      ad.ad_id,
-      firstImage?.url ?? null,
-      firstVideo?.url ?? null,
-      firstImage?.hash ?? null,
-      firstVideo?.hash ?? null,
-    ),
-  ])
+  // APPEND-ONLY (creative-queue Phase 2): write creatives to discovery_creatives and
+  // STOP here. We no longer UPDATE discovery_ads_index (thumbnail_url/video_url/
+  // image_hash/video_hash) per ad — that ~50K/hr UPDATE on a 23-index table was the
+  // dead-tuple churn that bloated the DB and capped crawl+drain. Serving now reads
+  // creatives from discovery_creatives. The consumer dequeues this ad on success.
+  await saveCreatives(creatives)
 
   const imageCount = imageResults.filter((r) => r.url).length
   const videoCount = videoResults.filter((r) => r.url).length
