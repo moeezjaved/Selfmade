@@ -54,6 +54,24 @@ export function videoHash(buffer: Buffer): string {
 }
 
 /**
+ * Original pixel dimensions of an image, for the no-reflow grid. Cheap — sharp
+ * reads only the header, not the full decode. Returns null on any failure so a
+ * bad image never blocks a creative save (the client falls back to a default
+ * aspect when dims are missing).
+ */
+export async function imageDimensions(
+  buffer: Buffer,
+): Promise<{ width: number; height: number } | null> {
+  try {
+    const { width, height } = await sharp(buffer, { failOn: 'none' }).metadata()
+    if (!width || !height) return null
+    return { width, height }
+  } catch {
+    return null
+  }
+}
+
+/**
  * Hamming distance between two equal-length hex hashes.
  * Useful for fuzzy matching (e.g. distance < 6 = visually identical).
  */

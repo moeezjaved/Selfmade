@@ -148,6 +148,8 @@ export interface CreativeInsert {
   asset_type: 'image' | 'video'
   r2_url: string
   hash: string | null
+  width?: number | null    // original pixel dims (images) → no-reflow grid
+  height?: number | null
 }
 
 /**

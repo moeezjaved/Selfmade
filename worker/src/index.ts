@@ -32,7 +32,7 @@ import {
 import { extractCreative, getBrowser, closeBrowser } from './extract.js'
 import { downloadAssetsForAd } from './proxied-fetch.js'
 import { uploadBufferToR2 } from './r2.js'
-import { imageHash, videoHash } from './hash.js'
+import { imageHash, videoHash, imageDimensions } from './hash.js'
 
 const WORKER_ID = process.env.WORKER_ID || `worker-${os.hostname()}`
 const HOSTNAME = os.hostname()
@@ -70,14 +70,20 @@ async function processAsset(
   adId: string,
   position: number,
   prefetchedBuf?: Buffer | null,
-): Promise<{ url: string | null; hash: string | null; deduped: boolean }> {
+): Promise<{ url: string | null; hash: string | null; deduped: boolean; width: number | null; height: number | null }> {
   const contentType = type === 'image' ? 'image/jpeg' : 'video/mp4'
   // Use the buffer downloaded via the proxied browser/undici path.
   // The bare-IP downloadFromCDN fallback used to live here, but it ALWAYS
   // returns 1087-byte placeholders against Meta's CDN — it was just
   // generating noise. We now silently skip URLs the proxied path rejected.
-  if (!prefetchedBuf) return { url: null, hash: null, deduped: false }
+  if (!prefetchedBuf) return { url: null, hash: null, deduped: false, width: null, height: null }
   const buf = prefetchedBuf
+
+  // Pixel dimensions for the no-reflow grid (images only — sharp reads the header,
+  // ~free; videos get a client-side aspect fallback until video-dim parsing lands).
+  const dims = type === 'image' ? await imageDimensions(buf) : null
+  const width = dims?.width ?? null
+  const height = dims?.height ?? null
 
   const hash = type === 'image' ? await imageHash(buf) : videoHash(buf)
   if (!hash) {
@@ -85,12 +91,12 @@ async function processAsset(
       ? `thumbnails/${adId}_${position}.jpg`
       : `videos/${adId}_${position}.mp4`
     const url = await uploadBufferToR2(buf, key, contentType)
-    return { url, hash: null, deduped: false }
+    return { url, hash: null, deduped: false, width, height }
   }
 
   const existing = await findExistingByHash(hash, type)
   if (existing) {
-    return { url: existing, hash, deduped: true }
+    return { url: existing, hash, deduped: true, width, height }
   }
 
   // Use position in key so carousels don't overwrite each other
@@ -98,7 +104,7 @@ async function processAsset(
     ? `thumbnails/${adId}_${position}.jpg`
     : `videos/${adId}_${position}.mp4`
   const url = await uploadBufferToR2(buf, key, contentType)
-  return { url, hash, deduped: false }
+  return { url, hash, deduped: false, width, height }
 }
 
 /**
@@ -152,10 +158,10 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
 
   const creatives: CreativeInsert[] = []
   imageResults.forEach((r, i) => {
-    if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'image', r2_url: r.url, hash: r.hash })
+    if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'image', r2_url: r.url, hash: r.hash, width: r.width, height: r.height })
   })
   videoResults.forEach((r, i) => {
-    if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'video', r2_url: r.url, hash: r.hash })
+    if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'video', r2_url: r.url, hash: r.hash, width: r.width, height: r.height })
   })
 
   if (creatives.length === 0) {
