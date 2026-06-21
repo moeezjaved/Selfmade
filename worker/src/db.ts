@@ -27,22 +27,21 @@ export interface AdRow {
  * Race-safe enough since we update thumbnail_url to a sentinel right after fetching.
  */
 export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<AdRow[]> {
-  // ATOMIC claim via RPC (migration 030): marks rows creative_claimed_at=now()
-  // with FOR UPDATE SKIP LOCKED and returns them, so concurrent/streaming claims
-  // never hand out the same ad twice. This replaces the plain-SELECT claim, which
-  // — under the streaming worker + Supabase pooler read-after-write lag — kept
-  // returning just-processed ads and re-downloaded ~35% of them. Stale claims
-  // (process died) are reclaimable after 3 min.
+  // WORK-QUEUE claim (migration 034): SKIP LOCKED a batch of pending jobs from
+  // creative_queue — O(pending), replacing the old O(corpus) thumbnail_url-IS-NULL
+  // scan that hit ~133s at 700K (it scanned most of the table to find the few pending).
+  // The worker DELETEs the row (dequeue) on a terminal result; transient failures leave
+  // it for the 3-min stale reclaim. Falls back to the legacy SELECT if not yet migrated.
   if (!process.env.WORKER_PAGE_ID) {
-    const { data, error } = await (supabase as any).rpc('claim_creative_ads', { p_batch: batchSize })
+    const { data, error } = await (supabase as any).rpc('claim_creative_queue', { p_batch: batchSize })
     if (!error && Array.isArray(data)) {
       let rows = data as AdRow[]
       if (imagesOnly) rows = rows.filter((r: any) => !/video/i.test(r.format || ''))
       return rows
     }
     // error (e.g. RPC not yet migrated) → fall through to legacy SELECT
-    if (error && !/function .*claim_creative_ads.* does not exist|PGRST202|404/i.test(error.message || '')) {
-      console.warn(`[claim] rpc error, falling back to SELECT: ${error.message}`)
+    if (error && !/function .*claim_creative_queue.* does not exist|PGRST202|404/i.test(error.message || '')) {
+      console.warn(`[claim] queue rpc error, falling back to SELECT: ${error.message}`)
     }
   }
   // ── Legacy SELECT fallback (pre-migration-030, or WORKER_PAGE_ID scoping) ──
@@ -76,6 +75,18 @@ export async function claimAds(batchSize: number, imagesOnly: boolean): Promise<
     return []
   }
   return (data || []) as AdRow[]
+}
+
+/**
+ * Remove a job from creative_queue once the worker reaches a TERMINAL result
+ * (success or give-up). Transient failures are NOT dequeued — they're re-claimed
+ * after the 3-min stale window. No-op (best-effort) if the queue isn't migrated.
+ */
+export async function dequeue(adId: string): Promise<void> {
+  const { error } = await (supabase as any).from('creative_queue').delete().eq('ad_id', adId)
+  if (error && !/relation .*creative_queue.* does not exist|PGRST205|404/i.test(error.message || '')) {
+    console.warn(`  ⚠️  dequeue failed for ${adId}:`, error.message)
+  }
 }
 
 export async function updateAdCreative(
@@ -151,15 +162,19 @@ export async function saveCreatives(rows: CreativeInsert[]): Promise<void> {
 }
 
 export async function getQueueDepth(): Promise<number> {
+  // O(pending): just count the work-queue (a few thousand rows), not the old
+  // O(corpus) thumbnail_url-IS-NULL scan over discovery_ads_index (which timed out
+  // → -1 at 700K). Falls back to the legacy scan if creative_queue isn't migrated.
   const { count, error } = await (supabase as any)
+    .from('creative_queue')
+    .select('*', { count: 'exact', head: true })
+  if (!error && count != null) return count
+  const { count: legacy } = await (supabase as any)
     .from('discovery_ads_index')
     .select('*', { count: 'exact', head: true })
-    .is('thumbnail_url', null)
-    .is('video_url', null)
-    .is('creative_extraction_failed_at', null)
-    .not('snapshot_url', 'is', null)
-  if (error) return -1
-  return count ?? 0
+    .is('thumbnail_url', null).is('video_url', null)
+    .is('creative_extraction_failed_at', null).not('snapshot_url', 'is', null)
+  return legacy ?? -1
 }
 
 /**
