@@ -38,10 +38,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       caption: (ad as any).caption,
       description: (ad as any).description,
       snapshotUrl: (ad as any).snapshot_url,
-      // creative-queue Phase 2: prefer discovery_creatives (the drain no longer writes
-      // thumbnail_url/video_url back to the ads table), fall back to legacy columns.
-      thumbnailUrl: (creatives || []).find((c: any) => c.asset_type === 'image')?.r2_url || (ad as any).thumbnail_url,
-      videoUrl: (creatives || []).find((c: any) => c.asset_type === 'video')?.r2_url || (ad as any).video_url,
+      thumbnailUrl: (ad as any).thumbnail_url,
+      videoUrl: (ad as any).video_url,
       creatives: creatives || [],
       startDate: (ad as any).start_date,
       stopDate: (ad as any).stop_date,
