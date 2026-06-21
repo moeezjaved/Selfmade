@@ -4,7 +4,7 @@
  * Personas, Ad angles, USPs, Desires, Emotions, Themes tabs.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createClient, createReadClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const admin = createAdminClient()
+    const admin = createReadClient()
     const { searchParams } = request.nextUrl
     const pageId = searchParams.get('page_id')
     const days = parseInt(searchParams.get('days') || '0')

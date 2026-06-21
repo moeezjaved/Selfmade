@@ -2,7 +2,7 @@
  * Single ad detail — fetches one ad + its carousel creatives.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createClient, createReadClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const admin = createAdminClient()
+  const admin = createReadClient()
   const { data: ad, error } = await admin
     .from('discovery_ads_index')
     .select('*')

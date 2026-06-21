@@ -26,12 +26,29 @@ export async function createClient() {
   )
 }
 
-// Admin client with service role — bypasses RLS
-// Only use in API routes, NEVER in client components
+// Admin client with service role — bypasses RLS, talks to the PRIMARY (writable).
+// Only use in API routes, NEVER in client components. Use for any route that WRITES
+// (follows, saves, mello) and wherever strong read-after-write is required.
 export function createAdminClient() {
   const { createClient } = require('@supabase/supabase-js')
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+
+// ── Ingestion ↔ serving split ────────────────────────────────────────────────
+// READ-ONLY client for serving (the heavy discovery SELECTs). When SUPABASE_READ_URL
+// is set to a Supabase READ REPLICA's API URL, all serving reads hit the replica, so
+// a crawl/drain write spike on the primary can never slow (or 504) the product. Until
+// a replica is provisioned + the env is set, it transparently falls back to the
+// primary URL — identical behavior, zero risk to deploy now. Service role bypasses
+// RLS; API routes only. NEVER write through this client (a replica is read-only).
+export function createReadClient() {
+  const { createClient } = require('@supabase/supabase-js')
+  return createClient(
+    process.env.SUPABASE_READ_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )

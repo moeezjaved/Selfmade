@@ -10,7 +10,7 @@
  * user has a connected Meta account — useful for brands we haven't crawled yet.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createClient, createReadClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
 export const dynamic = 'force-dynamic'
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ pages: [] })
 
-    const admin = createAdminClient()
+    const admin = createReadClient()
     const term = q.trim()
     // Accent/diacritic-insensitive normalize: "gruns" ⇄ "Grüns", "cafe" ⇄ "café".
     const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()

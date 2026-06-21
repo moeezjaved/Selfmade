@@ -3,7 +3,7 @@
  * Same result shape as db-search so the Following page renders identically.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createClient, createReadClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 const LIMIT = 40
@@ -12,49 +12,55 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const admin = createAdminClient()
+  const admin = createReadClient()   // serving reads → replica when SUPABASE_READ_URL set
   const page = parseInt(req.nextUrl.searchParams.get('page') || '0')
 
   const { data: follows } = await admin.from('followed_brands').select('page_id, brand_name').eq('user_id', user.id)
   const pageIds = (follows || []).map((f: any) => f.page_id)
   if (!pageIds.length) return NextResponse.json({ ads: [], total: 0, hasMore: false, brands: [] })
 
-  // Over-fetch for hash dedup, newest first.
+  // Over-fetch for hash dedup, newest first. INNER-JOIN discovery_creatives so we
+  // (a) filter to has-creative ads — covers append-only ads whose index row no longer
+  // carries thumbnail_url/hash — and (b) carry the creatives for stable dedup + thumbnails.
   const over = LIMIT * 5
   const { data: rows } = await admin
     .from('discovery_ads_index')
-    .select('*')
+    .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash,width,height)')
     .in('page_id', pageIds)
-    .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
     .order('last_seen', { ascending: false })
     .range(page * over, page * over + over - 1)
 
+  // Sort each ad's creatives images-first / position-asc so the FIRST is a STABLE dedup
+  // key (the index row's "primary" hash is whichever creative was written last, so two
+  // identical carousels got different keys and failed to dedup).
+  type Cre = { position: number; asset_type: 'image' | 'video'; r2_url: string; hash: string | null; width: number | null; height: number | null }
+  const sortCres = (cs: Cre[]) => cs.slice().sort((a, b) =>
+    (a.asset_type === b.asset_type ? 0 : a.asset_type === 'image' ? -1 : 1) || (a.position - b.position))
+
   const seen = new Set<string>()
-  const deduped: any[] = []
+  const deduped: { ad: any; cres: Cre[] }[] = []
   for (const ad of (rows || []) as any[]) {
-    const key = ad.image_hash || ad.video_hash || `_${ad.ad_id}`
+    const cres = sortCres((ad.discovery_creatives || []) as Cre[])
+    if (!cres.length) continue
+    const key = cres[0].hash || `_${ad.ad_id}`
     if (seen.has(key)) continue
-    seen.add(key); deduped.push(ad)
+    seen.add(key); deduped.push({ ad, cres })
     if (deduped.length >= LIMIT) break
   }
 
-  const adIds = deduped.map(a => a.ad_id)
-  let creativesByAd: Record<string, any[]> = {}
-  if (adIds.length) {
-    const { data: cre } = await admin.from('discovery_creatives')
-      .select('ad_id, position, asset_type, r2_url, hash').in('ad_id', adIds)
-      .order('asset_type', { ascending: true }).order('position', { ascending: true })
-    creativesByAd = ((cre || []) as any[]).reduce((a: any, c: any) => { (a[c.ad_id] ||= []).push(c); return a }, {})
-  }
-
-  const ads = deduped.map((ad: any) => ({
-    id: ad.ad_id, pageId: ad.page_id, pageName: ad.page_name, body: ad.body, title: ad.title,
-    caption: ad.caption, description: ad.description, snapshotUrl: ad.snapshot_url,
-    thumbnailUrl: ad.thumbnail_url || null, videoUrl: ad.video_url || null,
-    creatives: creativesByAd[ad.ad_id] || [], startDate: ad.start_date, stopDate: ad.stop_date,
-    platforms: ad.platforms || [], languages: ad.languages || [], isActive: ad.is_active,
-    daysRunning: ad.days_running, country: ad.country, format: ad.format,
-    industries: ad.industries || [], topics: ad.topics || [], cta: ad.cta,
-  }))
+  const ads = deduped.map(({ ad, cres }) => {
+    const imgC = cres.find((c) => c.asset_type === 'image')
+    const vidC = cres.find((c) => c.asset_type === 'video')
+    return {
+      id: ad.ad_id, pageId: ad.page_id, pageName: ad.page_name, body: ad.body, title: ad.title,
+      caption: ad.caption, description: ad.description, snapshotUrl: ad.snapshot_url,
+      thumbnailUrl: imgC?.r2_url || vidC?.r2_url || null, videoUrl: vidC?.r2_url || null,
+      image_hash: imgC?.hash ?? null, video_hash: vidC?.hash ?? null,
+      creatives: cres, startDate: ad.start_date, stopDate: ad.stop_date,
+      platforms: ad.platforms || [], languages: ad.languages || [], isActive: ad.is_active,
+      daysRunning: ad.days_running, country: ad.country, format: ad.format,
+      industries: ad.industries || [], topics: ad.topics || [], cta: ad.cta,
+    }
+  })
   return NextResponse.json({ ads, hasMore: (rows || []).length >= over, brands: follows || [] })
 }

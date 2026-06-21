@@ -4,7 +4,7 @@
  * Also returns top brands for the query.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createClient, createReadClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
 import { expandQuery, matchTierWeight, matchTierReason, type Expansion } from '@/lib/search/concepts'
 
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const admin = createAdminClient()
+    const admin = createReadClient()   // serving reads → replica when SUPABASE_READ_URL set
     const { searchParams } = request.nextUrl
 
     const q = (searchParams.get('q') || '').trim()
