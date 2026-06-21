@@ -52,18 +52,19 @@ export async function GET(req: NextRequest) {
 
   // Pull ads that have a hash AND a stored R2 creative.
   // Limit to a manageable pool — sort by last_seen for relevance.
-  // Creative hash + r2_url now come from discovery_creatives via an INNER JOIN
-  // (creative-queue Phase 2 — the drain no longer writes hash/thumbnail to the ads
-  // table). The type filter is applied in JS against the joined creatives.
   let query: any = admin
     .from('discovery_ads_index')
-    .select('ad_id, page_id, page_name, body, is_active, start_date, last_seen, industries, format, country, discovery_creatives!inner(asset_type,hash,r2_url)')
+    .select('ad_id, page_id, page_name, body, thumbnail_url, video_url, image_hash, video_hash, is_active, start_date, last_seen, industries, format, country')
+    .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
+    .or('image_hash.not.is.null,video_hash.not.is.null')
     .order('last_seen', { ascending: false })
     .limit(8000)
 
   if (country) query = query.eq('country', country)
   if (format) query = query.eq('format', format)
   if (industry) query = query.contains('industries', [industry])
+  if (type === 'image') query = query.not('image_hash', 'is', null)
+  if (type === 'video') query = query.not('video_hash', 'is', null)
 
   const { data: ads, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -71,21 +72,16 @@ export async function GET(req: NextRequest) {
   // Group by hash in JS — way simpler than custom Postgres aggregation
   const groups = new Map<string, CreativeGroup>()
   for (const ad of ads || []) {
-    const cr: any[] = ad.discovery_creatives || []
-    const img = cr.find(c => c.asset_type === 'image')
-    const vid = cr.find(c => c.asset_type === 'video')
-    // pick the creative matching the type filter (default: image-first primary)
-    const chosen = type === 'image' ? img : type === 'video' ? vid : (img || vid)
-    const key = chosen?.hash
+    const key = ad.image_hash || ad.video_hash
     if (!key) continue
-    const isImage = chosen.asset_type === 'image'
+    const isImage = !!ad.image_hash
 
     if (!groups.has(key)) {
       groups.set(key, {
         hash: key,
         type: isImage ? 'image' : 'video',
-        thumbnail_url: isImage ? chosen.r2_url : null,
-        video_url: isImage ? null : chosen.r2_url,
+        thumbnail_url: ad.thumbnail_url,
+        video_url: ad.video_url,
         ad_count: 0,
         active_count: 0,
         copy_variations: 0,

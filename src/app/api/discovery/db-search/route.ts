@@ -149,12 +149,8 @@ export async function GET(request: NextRequest) {
       // NO count:'exact' — counting every match seq-scans the whole table and blew
       // the 8s timeout ("No ads found"). The displayed total comes from the
       // unique-creative hash pass below; the page fetch itself is fast.
-      // "Has a working R2 creative" is now an INNER JOIN to discovery_creatives
-      // (creative-queue Phase 2: the drain no longer writes thumbnail_url/hash back to
-      // discovery_ads_index — that per-ad UPDATE was the 50K/hr churn that bloated the
-      // DB). The embed carries the hashes the per-page dedup needs. Display data still
-      // comes from the creativesByAd batch below (it also covers semantic-fill ads).
-      .select('*, discovery_creatives!inner(asset_type,hash)')
+      .select('*')
+      .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
 
     // Country filter — match against the ARRAY of countries the ad targeted
     // (covers multi-country ads correctly). Falls back to legacy 'country'
@@ -318,17 +314,12 @@ export async function GET(request: NextRequest) {
     // with ~1.5k long-running video ads) floods the recommended feed — burying every
     // other brand AND every image ad. Cap each brand per page so the feed is varied.
     // No cap in brand mode (you clicked a brand → you want all its ads).
-    // Pull the primary image/video creative out of an ad's creative list (embed or
-    // creativesByAd batch). Images-first matches the old position-0 image_hash || video_hash.
-    const imgCreative = (cr: any[]) => cr?.find((c: any) => c.asset_type === 'image')
-    const vidCreative = (cr: any[]) => cr?.find((c: any) => c.asset_type === 'video')
     const MAX_PER_BRAND = (q && mode === 'brand') ? Infinity : (adsPerBrand > 0 ? adsPerBrand : 3)
     const seenHashes = new Set<string>()
     const perBrand: Record<string, number> = {}
     const dedupedAds: any[] = []
     for (const ad of candidateRows) {
-      const cr = ad.discovery_creatives
-      const key = imgCreative(cr)?.hash || vidCreative(cr)?.hash || `_${ad.ad_id}`
+      const key = ad.image_hash || ad.video_hash || `_${ad.ad_id}`
       if (seenHashes.has(key)) continue
       if ((perBrand[ad.page_id] || 0) >= MAX_PER_BRAND) continue
       seenHashes.add(key)
@@ -351,10 +342,8 @@ export async function GET(request: NextRequest) {
     const nameFreq: Record<string, number> = {}
     const addHashes = (rows: any[]) => {
       for (const r of rows) {
-        const ih = imgCreative(r.discovery_creatives)?.hash
-        const vh = vidCreative(r.discovery_creatives)?.hash
-        if (ih) uniqSet.add('i:' + ih)
-        if (vh) uniqSet.add('v:' + vh)
+        if (r.image_hash) uniqSet.add('i:' + r.image_hash)
+        if (r.video_hash) uniqSet.add('v:' + r.video_hash)
         if (pageId && r.page_id === pageId && r.page_name) {
           const n = String(r.page_name).trim()
           if (n) nameFreq[n] = (nameFreq[n] || 0) + 1
@@ -364,7 +353,8 @@ export async function GET(request: NextRequest) {
     const countChunk = (off: number) => {
       let cq = admin
         .from('discovery_ads_index')
-        .select('page_id,page_name,discovery_creatives!inner(asset_type,hash)')
+        .select('image_hash,video_hash,page_id,page_name')
+        .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
         .range(off, off + 999)
       if (country && country !== 'ALL') cq = cq.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
       if (q && mode === 'brand') {
@@ -443,7 +433,7 @@ export async function GET(request: NextRequest) {
 
           const haveIds = new Set(ads.map((a: any) => a.ad_id))
           const haveHashes = new Set(
-            ads.map((a: any) => imgCreative(a.discovery_creatives)?.hash || vidCreative(a.discovery_creatives)?.hash).filter(Boolean)
+            ads.map((a: any) => a.image_hash || a.video_hash).filter(Boolean)
           )
           // Slice by page offset so deeper pages get DIFFERENT semantic fillers
           // (results are similarity-ranked & stable for the same query → no repeats).
@@ -514,18 +504,14 @@ export async function GET(request: NextRequest) {
       caption: ad.caption,
       description: ad.description,
       snapshotUrl: ad.snapshot_url,
-      // Creative data now comes from discovery_creatives (the creativesByAd batch) —
-      // the drain no longer writes thumbnail_url/hash back to the ads table (Phase 2,
-      // the per-ad UPDATE was the churn). Legacy ad columns are a fallback for any
-      // pre-refactor row that lacks creative rows.
-      thumbnailUrl: imgCreative(creativesByAd[ad.ad_id])?.r2_url || ad.thumbnail_url || null,
-      videoUrl: vidCreative(creativesByAd[ad.ad_id])?.r2_url || ad.video_url || null,
+      thumbnailUrl: ad.thumbnail_url || null,
+      videoUrl: ad.video_url || null,
       // Needed by the client's CROSS-PAGE dedup: the server dedups within a page,
       // but its offset is into the raw (non-deduped) rows, so page N re-encounters
       // creatives already shown on page N-1. The client filters those by hash —
       // but only if we actually hand it the hashes.
-      image_hash: imgCreative(creativesByAd[ad.ad_id])?.hash || ad.image_hash || null,
-      video_hash: vidCreative(creativesByAd[ad.ad_id])?.hash || ad.video_hash || null,
+      image_hash: ad.image_hash || null,
+      video_hash: ad.video_hash || null,
       creatives: creativesByAd[ad.ad_id] || [],
       startDate: ad.start_date,
       stopDate: ad.stop_date,
