@@ -150,7 +150,12 @@ export async function GET(request: NextRequest) {
       // the 8s timeout ("No ads found"). The displayed total comes from the
       // unique-creative hash pass below; the page fetch itself is fast.
       .select('*')
-      .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
+      // NO has-creative filter here. The append-only worker writes creatives ONLY
+      // to discovery_creatives (no thumbnail_url/hash on the index row), so filtering
+      // on thumbnail_url would hide every newly-drained ad. Has-creative is enforced
+      // in JS below against discovery_creatives (a fast keyed batch fetch), which
+      // covers old AND new ads. (An inner-join embed here times out under the
+      // brand/country .or() + performance sort — that was the "No ads found" regression.)
 
     // Country filter — match against the ARRAY of countries the ad targeted
     // (covers multi-country ads correctly). Falls back to legacy 'country'
@@ -309,17 +314,42 @@ export async function GET(request: NextRequest) {
         .map(x => x.a)
     }
 
-    // Server-side dedup by image_hash / video_hash (one card per unique creative),
-    // PLUS a per-brand cap for diversity. Without it, one deep brand (e.g. Mars Men
-    // with ~1.5k long-running video ads) floods the recommended feed — burying every
-    // other brand AND every image ad. Cap each brand per page so the feed is varied.
-    // No cap in brand mode (you clicked a brand → you want all its ads).
+    // ── Creatives for the candidate window, keyed off discovery_creatives ──────
+    // Both the has-creative filter AND the dedup key come from here (not the index
+    // row), because (a) append-only ads have no thumbnail_url/hash on the index row,
+    // and (b) the index row's "primary" hash is whichever creative was written last,
+    // so two identical carousels (same first creative) get DIFFERENT keys and fail to
+    // dedup — that was the "same 'It's been' video 3×" bug. Fetch full creative data
+    // once (ordered images-first, position asc) and reuse it for the transform.
+    type Cre = { position: number; asset_type: 'image' | 'video'; r2_url: string; hash: string | null }
+    const candIds = candidateRows.map((a: any) => a.ad_id).filter(Boolean)
+    const creativesByAd: Record<string, Cre[]> = {}
+    for (let i = 0; i < candIds.length; i += 300) {
+      const slice = candIds.slice(i, i + 300)
+      const { data: cc } = await admin
+        .from('discovery_creatives')
+        .select('ad_id, position, asset_type, r2_url, hash')
+        .in('ad_id', slice)
+        .order('asset_type', { ascending: true })   // images before videos
+        .order('position', { ascending: true })
+      for (const c of (cc || []) as any[]) {
+        (creativesByAd[c.ad_id] ||= []).push({ position: c.position, asset_type: c.asset_type, r2_url: c.r2_url, hash: c.hash })
+      }
+    }
+
+    // Server-side dedup by the FIRST creative's hash (one stable card per unique
+    // creative), PLUS a per-brand cap for diversity. Without the cap, one deep brand
+    // (e.g. Mars Men with ~1.5k long-running video ads) floods the recommended feed.
+    // No cap in brand mode (you clicked a brand → you want all its ads). Ads with NO
+    // stored creative are skipped — they aren't displayable yet.
     const MAX_PER_BRAND = (q && mode === 'brand') ? Infinity : (adsPerBrand > 0 ? adsPerBrand : 3)
     const seenHashes = new Set<string>()
     const perBrand: Record<string, number> = {}
     const dedupedAds: any[] = []
     for (const ad of candidateRows) {
-      const key = ad.image_hash || ad.video_hash || `_${ad.ad_id}`
+      const cres = creativesByAd[ad.ad_id]
+      if (!cres || !cres.length) continue                 // has-creative filter (JS)
+      const key = cres[0].hash || `_${ad.ad_id}`          // first creative = stable dedup key
       if (seenHashes.has(key)) continue
       if ((perBrand[ad.page_id] || 0) >= MAX_PER_BRAND) continue
       seenHashes.add(key)
@@ -344,6 +374,9 @@ export async function GET(request: NextRequest) {
       for (const r of rows) {
         if (r.image_hash) uniqSet.add('i:' + r.image_hash)
         if (r.video_hash) uniqSet.add('v:' + r.video_hash)
+        // Append-only ads carry no index-row hash — count them by ad_id so the total
+        // (and thus pagination) includes them instead of stopping the grid short.
+        if (!r.image_hash && !r.video_hash && r.ad_id) uniqSet.add('a:' + r.ad_id)
         if (pageId && r.page_id === pageId && r.page_name) {
           const n = String(r.page_name).trim()
           if (n) nameFreq[n] = (nameFreq[n] || 0) + 1
@@ -353,8 +386,10 @@ export async function GET(request: NextRequest) {
     const countChunk = (off: number) => {
       let cq = admin
         .from('discovery_ads_index')
-        .select('image_hash,video_hash,page_id,page_name')
-        .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
+        .select('image_hash,video_hash,page_id,page_name,ad_id')
+        // No thumbnail_url filter — append-only ads have none. The count is an
+        // approximate match-total (drives pagination); undrained ads are a minor
+        // over-count, far safer than the under-count that truncated the grid.
         .range(off, off + 999)
       if (country && country !== 'ALL') cq = cq.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
       if (q && mode === 'brand') {
@@ -459,32 +494,31 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── Fetch carousel creatives for these ads in one batched call ─────
-    const adIds = ads.map((a: any) => a.ad_id).filter(Boolean)
-    let creativesByAd: Record<string, Array<{ position: number; asset_type: 'image' | 'video'; r2_url: string; hash: string | null }>> = {}
-    if (adIds.length > 0) {
-      const { data: creativesData } = await admin
+    // ── Top up creatives for semantic-fill ads ────────────────────────
+    // Candidate ads already have their creatives in creativesByAd (fetched above for
+    // dedup); the semantic gap-fill adds ads from a different RPC that aren't in there.
+    const missingIds = ads.map((a: any) => a.ad_id).filter((id: string) => id && !creativesByAd[id])
+    for (let i = 0; i < missingIds.length; i += 300) {
+      const slice = missingIds.slice(i, i + 300)
+      const { data: cd } = await admin
         .from('discovery_creatives')
         .select('ad_id, position, asset_type, r2_url, hash')
-        .in('ad_id', adIds)
-        .order('asset_type', { ascending: true })  // images first, then videos
+        .in('ad_id', slice)
+        .order('asset_type', { ascending: true })
         .order('position', { ascending: true })
-      creativesByAd = ((creativesData || []) as any[]).reduce((acc: any, c: any) => {
-        if (!acc[c.ad_id]) acc[c.ad_id] = []
-        acc[c.ad_id].push({
-          position: c.position,
-          asset_type: c.asset_type,
-          r2_url: c.r2_url,
-          hash: c.hash,
-        })
-        return acc
-      }, {})
+      for (const c of (cd || []) as any[]) {
+        (creativesByAd[c.ad_id] ||= []).push({ position: c.position, asset_type: c.asset_type, r2_url: c.r2_url, hash: c.hash })
+      }
     }
 
     // ── Transform results ────────────────────────────────────
     // matchReason = the same match TIER used for ranking (literal > exact_tag >
     // synonym > keyword > related > semantic), so provenance and ordering agree.
-    const transformed = ads.map((ad: any) => ({
+    const transformed = ads.map((ad: any) => {
+      const cres = creativesByAd[ad.ad_id] || []
+      const imgC = cres.find((c) => c.asset_type === 'image')
+      const vidC = cres.find((c) => c.asset_type === 'video')
+      return {
       id: ad.ad_id,
       matchReason: mode === 'brand' ? 'brand' : matchTierReason(ad, lcQ, expansion),
       similarity: ad._sim ?? null,
@@ -504,15 +538,16 @@ export async function GET(request: NextRequest) {
       caption: ad.caption,
       description: ad.description,
       snapshotUrl: ad.snapshot_url,
-      thumbnailUrl: ad.thumbnail_url || null,
-      videoUrl: ad.video_url || null,
+      thumbnailUrl: ad.thumbnail_url || imgC?.r2_url || vidC?.r2_url || null,
+      videoUrl: ad.video_url || vidC?.r2_url || null,
       // Needed by the client's CROSS-PAGE dedup: the server dedups within a page,
       // but its offset is into the raw (non-deduped) rows, so page N re-encounters
-      // creatives already shown on page N-1. The client filters those by hash —
-      // but only if we actually hand it the hashes.
-      image_hash: ad.image_hash || null,
-      video_hash: ad.video_hash || null,
-      creatives: creativesByAd[ad.ad_id] || [],
+      // creatives already shown on page N-1. The client filters those by hash — so
+      // these MUST be the same first-creative hashes the server deduped on (prefer
+      // discovery_creatives; fall back to the index row only for legacy ads).
+      image_hash: imgC?.hash ?? ad.image_hash ?? null,
+      video_hash: vidC?.hash ?? ad.video_hash ?? null,
+      creatives: cres,
       startDate: ad.start_date,
       stopDate: ad.stop_date,
       platforms: ad.platforms || [],
@@ -540,7 +575,8 @@ export async function GET(request: NextRequest) {
       creativeReuseCount: ad.creative_reuse_count ?? 0,
       brandActiveAds: ad.brand_active_ads ?? 0,
       onScreenText: ad.on_screen_text ?? null,   // vision-recovered text (template-body fallback)
-    }))
+      }
+    })
 
     return NextResponse.json({
       ads: transformed,
