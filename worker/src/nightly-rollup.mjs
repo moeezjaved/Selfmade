@@ -24,6 +24,7 @@ const ALERT = process.env.ALERT_WEBHOOK_URL || '';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const t0 = Date.now();
 const ARG_FULL = process.argv.includes('--full');
+const ARG_INCR = process.argv.includes('--incremental');   // force incremental (overrides Sunday=full), for manual/test runs
 const REST = U + '/rest/v1/';
 
 // ── scoring math (unchanged — keep IDENTICAL to preserve scores) ──────────────
@@ -88,16 +89,21 @@ async function writeUpdates(updates) {
   await setFlag();
   const hb = setInterval(setFlag, 60_000);
   await sleep(8000);                         // let writers notice the pause
+  // CHUNK=800: at ~700K rows a 2000-row apply_perf UPDATE (heap + 4-5 indexes) now
+  // exceeds Supabase's 8s REST statement timeout → times out + retries (~20s/chunk,
+  // hours for a full write). 800 lands in ~3s with margin. (At multi-M scale this
+  // needs a direct-PG path; the REST 8s cap is the ceiling.)
+  const CHUNK = 800;
   let wrote = 0, fail = 0;
   try {
-    for (let i = 0; i < updates.length; i += 2000) {
-      const chunk = updates.slice(i, i + 2000); let ok = false;
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const chunk = updates.slice(i, i + CHUNK); let ok = false;
       for (let t = 0; t < 8 && !ok; t++) {
         const r = await fetch(REST + 'rpc/apply_perf', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify({ p: chunk }) });
         if (r.ok) { ok = true; wrote += chunk.length; } else { await r.text().catch(() => {}); if (t < 7) await sleep(1500 * (t + 1)); }
       }
       if (!ok) fail++;
-      if ((i / 2000) % 25 === 24) console.log(`[rollup] wrote ${wrote}/${updates.length} (fail ${fail}) @ +${((Date.now() - t0) / 1000) | 0}s`);   // heartbeat every ~50K
+      if ((i / CHUNK) % 60 === 59) console.log(`[rollup] wrote ${wrote}/${updates.length} (fail ${fail}) @ +${((Date.now() - t0) / 1000) | 0}s`);   // heartbeat every ~48K
     }
   } finally { clearInterval(hb); await clearFlag(); }
   return { wrote, fail };
@@ -108,7 +114,8 @@ const cal = (await getJSON('discovery_rollup_calibration?id=eq.1&select=cutpoint
 const status = (await getJSON('discovery_rollup_status?id=eq.1&select=ran_at&limit=1'))[0] || null;
 const lastRan = status?.ran_at || '1970-01-01T00:00:00Z';
 const calStale = !cal || !Array.isArray(cal.cutpoints) || !cal.cutpoints.length || (Date.now() - Date.parse(cal.ran_at) > 8 * 864e5);
-const FULL = ARG_FULL || new Date().getUTCDay() === 0 || calStale;   // Sunday=full, or no/stale calibration
+// FULL when: forced, no/stale calibration, or it's Sunday (weekly recalibration) — unless --incremental forces incremental.
+const FULL = ARG_FULL || calStale || (new Date().getUTCDay() === 0 && !ARG_INCR);
 
 let rows, updates, mode, touchedBrands = 0;
 
@@ -133,8 +140,13 @@ if (FULL) {
   // (a) brands with NEW ads since last run (indexed_at is insert-only → clean watermark)
   const newAds = await keyset('discovery_ads_index?select=ad_id,page_id&indexed_at=gt.' + encodeURIComponent(lastRan), 'new-ads');
   const touched = new Set(newAds.map(r => r.page_id));
-  // (b) tier-threshold crossers: active ads near the 7/14d gates whose realDays just crossed
-  const nearGate = await keyset('discovery_ads_index?select=ad_id,page_id,start_date,stop_date,last_seen,days_running&is_active=is.true&days_running=lt.14', 'near-gate');
+  // (b) tier-threshold crossers: an active ad crosses the 7/14d gate when realDays
+  //     (≈ now − start_date) hits 7 or 14, i.e. it STARTED ~7 or ~14 days ago. So we
+  //     only need active ads whose start_date is in the [now−16d, now−6d] window
+  //     (covers both gates + margin) — a tiny, indexed slice, not all recent actives.
+  const d6 = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
+  const d16 = new Date(Date.now() - 16 * 864e5).toISOString().slice(0, 10);
+  const nearGate = await keyset(`discovery_ads_index?select=ad_id,page_id,start_date,stop_date,last_seen,days_running&is_active=is.true&start_date=gte.${d16}&start_date=lte.${d6}`, 'near-gate');
   const newAdBrands = touched.size;
   for (const a of nearGate) { const rd = realDays(a); const sd = a.days_running ?? 0; if ((rd >= 7 && sd < 7) || (rd >= 14 && sd < 14)) touched.add(a.page_id); }
   touchedBrands = touched.size;
