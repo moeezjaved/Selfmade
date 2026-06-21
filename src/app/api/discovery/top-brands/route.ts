@@ -3,7 +3,7 @@
  * Powers the horizontal brand strip above search results (like Atria).
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createClient, createReadClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ brands: [] })
 
-    const admin = createAdminClient()
+    const admin = createReadClient()   // serving reads → replica when SUPABASE_READ_URL set
     const { searchParams } = request.nextUrl
     const q = (searchParams.get('q') || '').trim()
     const mode = searchParams.get('mode') || 'adcopy'
@@ -28,15 +28,18 @@ export async function GET(request: NextRequest) {
     if (q && mode === 'brand') {
       let bq = admin
         .from('discovery_ads_index')
-        .select('page_id, page_name')
+        // INNER-JOIN discovery_creatives so we only count ads that actually have a
+        // displayable creative (append-only ads have no thumbnail_url on the index row).
+        .select('page_id, page_name, discovery_creatives!inner(asset_type)')
         .ilike('page_name', `%${q}%`)
       if (country && country !== 'ALL') bq = bq.eq('country', country)
       if (status === 'ACTIVE') bq = bq.eq('is_active', true)
       if (status === 'INACTIVE') bq = bq.eq('is_active', false)
 
       const counts: Record<string, { name: string; count: number }> = {}
-      // paginate (PostgREST caps at 1000) so big brands count fully
-      for (let off = 0; off < 50_000; off += 1000) {
+      // paginate (PostgREST caps at 1000) so big brands count fully. The page_name
+      // ilike is still a seq-scan (pg_trgm index is the real fix, deferred) — bound it.
+      for (let off = 0; off < 20_000; off += 1000) {
         const { data: rows } = await bq.range(off, off + 999)
         const chunk = rows || []
         for (const ad of chunk) {
@@ -71,12 +74,19 @@ export async function GET(request: NextRequest) {
         ...tagVariants.flatMap(v => [`brand_categories.cs.{${v}}`, `topics.cs.{${v}}`, `industries.cs.{${v}}`]),
       ].join(',')
 
+      // INNER-JOIN discovery_creatives instead of the thumbnail_url.like filter: that
+      // filter both MISSED append-only ads (no thumbnail_url on the index row) AND
+      // seq-scanned the 700K-row table. The embed carries each ad's creatives so we can
+      // dedup on the FIRST creative's hash (images-first / position-asc) — matching the
+      // grid's stable dedup key — instead of the unstable index-row image_hash||video_hash.
+      type Cre = { position: number; asset_type: 'image' | 'video'; hash: string | null }
+      const sortCres = (cs: Cre[]) => cs.slice().sort((a, b) =>
+        (a.asset_type === b.asset_type ? 0 : a.asset_type === 'image' ? -1 : 1) || (a.position - b.position))
       const counts: Record<string, { name: string; hashes: Set<string> }> = {}
       for (let off = 0; off < 10_000; off += 1000) {
         let bq = admin
           .from('discovery_ads_index')
-          .select('page_id, page_name, image_hash, video_hash, ad_id')
-          .or('thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%')
+          .select('page_id, page_name, ad_id, discovery_creatives!inner(asset_type,position,hash)')
           .or(keywordOr)
         if (country && country !== 'ALL') bq = bq.or(`targeted_countries.cs.{${country}},country.eq.${country}`)
         if (industry) {
@@ -91,8 +101,10 @@ export async function GET(request: NextRequest) {
           if (!ad.page_id) continue
           if (!counts[ad.page_id]) counts[ad.page_id] = { name: ad.page_name, hashes: new Set<string>() }
           const c = counts[ad.page_id]
-          // count UNIQUE creatives per brand (match the grid's dedup)
-          c.hashes.add(ad.image_hash || ad.video_hash || `_${ad.ad_id}`)
+          // count UNIQUE creatives per brand, keyed on the FIRST creative's hash
+          // (match the grid's stable dedup); fall back to ad_id when no hash.
+          const cres = sortCres((ad.discovery_creatives || []) as Cre[])
+          c.hashes.add(cres[0]?.hash || `_${ad.ad_id}`)
           if (ad.page_name) c.name = ad.page_name
         }
         if (chunk.length < 1000) break

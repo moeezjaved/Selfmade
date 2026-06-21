@@ -10,7 +10,7 @@
  * Creatives are deduped by hash so one reused winner doesn't dominate a pattern.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createReadClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 const CAP = 5000
@@ -40,7 +40,7 @@ function topArray(rows: Row[], pick: (r: Row) => string[] | null | undefined, n 
 }
 
 export async function GET(req: NextRequest) {
-  const admin = createAdminClient()
+  const admin = createReadClient()
   const niche = (req.nextUrl.searchParams.get('niche') || '').trim()
   const topic = (req.nextUrl.searchParams.get('topic') || '').trim().toLowerCase()
 
