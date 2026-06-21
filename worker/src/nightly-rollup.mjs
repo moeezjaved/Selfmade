@@ -59,12 +59,31 @@ function enrich(rows, agg) {
     return { ad_id: a.ad_id, page_id: a.page_id, rc, bv, days, rawv };
   });
 }
-// score one enriched ad given a pctOf(rawv)→[0,1] function (+ hard longevity gate)
-const scoreOf = (e, pctOf) => { let s = mapP(pctOf(e.rawv)); if (e.days < 7) s = Math.min(s, .599); else if (e.days < 14) s = Math.min(s, .799); return { aid: e.ad_id, ps: Math.round(s * 1000) / 1000, dr: e.days, rc: e.rc, bv: e.bv }; };
+// score one enriched ad given a pctOf(rawv)→[0,1] function (+ hard longevity gate).
+// SENTINEL FLOOR 0.001: a scored ad NEVER lands exactly 0, so it always leaves the
+// `score=0` set (an un-scoreable ad can't loop forever) AND `score=0` becomes a clean
+// "never scored" signal for the self-heal below. 0.001 is still 'testing' tier.
+const scoreOf = (e, pctOf) => { let s = mapP(pctOf(e.rawv)); if (e.days < 7) s = Math.min(s, .599); else if (e.days < 14) s = Math.min(s, .799); s = Math.max(0.001, s); return { aid: e.ad_id, ps: Math.round(s * 1000) / 1000, dr: e.days, rc: e.rc, bv: e.bv }; };
 
 // ── REST helpers ──────────────────────────────────────────────────────────────
 const SEL = 'ad_id,page_id,image_hash,video_hash,is_active,start_date,stop_date,last_seen,niche';
-async function getJSON(qs) { const r = await fetch(REST + qs, { headers: H }); return r.ok ? r.json() : []; }
+// Retry on non-200 (503/timeout under DB load), then THROW — never silently return
+// []. The rollup runs alongside live crawl+drain, so transient errors are expected;
+// but a swallowed error returning "0 rows" is the DANGEROUS pattern: a truncated MAIN
+// fetch would compute the percentile cutpoints on a fraction of the corpus → skewed
+// tiers for everyone (NOT self-healed). So fetch failures are LOUD everywhere — a
+// persistent failure aborts the whole run (cron logs exit≠0, retries next night; no
+// partial/wrong write, the corpus keeps its previous correct scores). A 200 with an
+// empty array is real end-of-data and returns immediately (only errors retry).
+async function getJSON(qs, retries = 5) {
+  let lastErr = '';
+  for (let t = 0; t <= retries; t++) {
+    try { const r = await fetch(REST + qs, { headers: H }); if (r.ok) return await r.json(); lastErr = r.status + ' ' + (await r.text().catch(() => '')).slice(0, 160); }
+    catch (e) { lastErr = String((e && e.message) || e); }
+    if (t < retries) await sleep(1500 * (t + 1));
+  }
+  throw new Error(`getJSON FAILED after ${retries + 1} tries: ${qs.split('?')[0]} — ${lastErr}`);
+}
 async function keyset(baseQs, label) {     // keyset-paginate by ad_id (stable under concurrent inserts)
   const out = []; let cursor = '', nextHb = 100000;
   for (;;) {
@@ -78,17 +97,17 @@ async function keyset(baseQs, label) {     // keyset-paginate by ad_id (stable u
   return out;
 }
 const count = async qs => { const r = await fetch(REST + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=exact' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
-async function setFlag() { await fetch(REST + 'system_flags?on_conflict=key', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'crawl_paused', until: new Date(Date.now() + 5 * 60_000).toISOString(), updated_at: new Date().toISOString() }) }); }
+const countPlanned = async qs => { const r = await fetch(REST + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=planned' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
+async function setFlag(mins = 5) { await fetch(REST + 'system_flags?on_conflict=key', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'crawl_paused', until: new Date(Date.now() + mins * 60_000).toISOString(), updated_at: new Date().toISOString() }) }); }
 async function clearFlag() { await fetch(REST + 'system_flags?key=eq.crawl_paused', { method: 'DELETE', headers: { ...H, Prefer: 'return=minimal' } }).catch(() => {}); }
 async function alert(msg) { console.error(msg); if (ALERT) await fetch(ALERT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: msg }) }).catch(() => {}); }
 
 // write score chunks via apply_perf under a cooperative crawl-pause + heartbeat.
-async function writeUpdates(updates) {
+async function writeUpdates(updates, manageFlag = true) {
   if (!updates.length) return { wrote: 0, fail: 0 };
   console.log(`[rollup] writing ${updates.length} scores @ +${((Date.now() - t0) / 1000) | 0}s`);
-  await setFlag();
-  const hb = setInterval(setFlag, 60_000);
-  await sleep(8000);                         // let writers notice the pause
+  let hb = null;
+  if (manageFlag) { await setFlag(); hb = setInterval(() => setFlag().catch(() => {}), 60_000); await sleep(8000); }   // let writers notice the pause
   // CHUNK=800: at ~700K rows a 2000-row apply_perf UPDATE (heap + 4-5 indexes) now
   // exceeds Supabase's 8s REST statement timeout → times out + retries (~20s/chunk,
   // hours for a full write). 800 lands in ~3s with margin. (At multi-M scale this
@@ -105,7 +124,7 @@ async function writeUpdates(updates) {
       if (!ok) fail++;
       if ((i / CHUNK) % 60 === 59) console.log(`[rollup] wrote ${wrote}/${updates.length} (fail ${fail}) @ +${((Date.now() - t0) / 1000) | 0}s`);   // heartbeat every ~48K
     }
-  } finally { clearInterval(hb); await clearFlag(); }
+  } finally { if (hb) { clearInterval(hb); await clearFlag(); } }
   return { wrote, fail };
 }
 
@@ -117,7 +136,7 @@ const calStale = !cal || !Array.isArray(cal.cutpoints) || !cal.cutpoints.length 
 // FULL when: forced, no/stale calibration, or it's Sunday (weekly recalibration) — unless --incremental forces incremental.
 const FULL = ARG_FULL || calStale || (new Date().getUTCDay() === 0 && !ARG_INCR);
 
-let rows, updates, mode, touchedBrands = 0;
+let rows, updates, mode, touchedBrands = 0, incrHb = null;
 
 if (FULL) {
   // ── FULL weekly: recompute everything, calibrate, cache cutpoints ──
@@ -134,6 +153,14 @@ if (FULL) {
 } else {
   // ── INCREMENTAL nightly: re-score only touched brands using cached cutpoints ──
   mode = 'incremental';
+  // Pause crawl+drain for the WHOLE incremental (it's short). Its small fetches are
+  // unreliable under live DB load (503 → retry storms); a brief clean window makes
+  // them fast + 503-free. 10-min TTL covers the run; if the process dies the flag
+  // self-expires. The FULL run can't do this (its fetch is ~40min) so it only pauses
+  // during the write and fetches-with-retry.
+  await setFlag(5);
+  incrHb = setInterval(() => setFlag(5).catch(() => {}), 60_000);   // heartbeat: keep the pause alive through a slow fetch (degraded DB); flag self-expires in 5min if this process dies
+  await sleep(8000);   // let crawl+drain notice and back off before we fetch
   const cp = cal.cutpoints, Q = cp.length - 1;
   const pctOf = v => { let lo = 0, hi = cp.length; while (lo < hi) { const m = (lo + hi) >> 1; if (cp[m] <= v) lo = m + 1; else hi = m; } return Math.min(1, lo / Q); };
 
@@ -149,8 +176,18 @@ if (FULL) {
   const nearGate = await keyset(`discovery_ads_index?select=ad_id,page_id,start_date,stop_date,last_seen,days_running&is_active=is.true&start_date=gte.${d16}&start_date=lte.${d6}`, 'near-gate');
   const newAdBrands = touched.size;
   for (const a of nearGate) { const rd = realDays(a); const sd = a.days_running ?? 0; if ((rd >= 7 && sd < 7) || (rd >= 14 && sd < 14)) touched.add(a.page_id); }
+  const crosserBrands = touched.size - newAdBrands;
+  // (c) SELF-HEAL (bounded): re-score up to MAX_HEAL brands that still have score=0
+  //     (= never-scored) ads. Drains a partial-fetch backlog gradually over nights
+  //     instead of one big spike; the sentinel floor guarantees re-scored ads leave
+  //     the set, so it converges to 0 and then costs nothing. Capped so the 04:15
+  //     cron never balloons. Bounded single query (limit 3000), not a full scan.
+  const MAX_HEAL = Number(process.env.ROLLUP_MAX_HEAL || 100);
+  const zeroRows = await getJSON('discovery_ads_index?select=page_id&performance_score=eq.0&limit=3000');
+  let healAdded = 0;
+  for (const z of (Array.isArray(zeroRows) ? zeroRows : [])) { if (healAdded >= MAX_HEAL) break; if (z.page_id && !touched.has(z.page_id)) { touched.add(z.page_id); healAdded++; } }
   touchedBrands = touched.size;
-  console.log(`[rollup] incremental: ${newAds.length} new ads / ${newAdBrands} brands + ${touched.size - newAdBrands} crosser brands = ${touched.size} touched @ +${((Date.now() - t0) / 1000) | 0}s`);
+  console.log(`[rollup] incremental: ${newAds.length} new / ${newAdBrands} brands + ${crosserBrands} crosser + ${healAdded} self-heal = ${touched.size} touched @ +${((Date.now() - t0) / 1000) | 0}s`);
 
   // fetch ALL ads of touched brands (chunk the page_id IN-list), re-aggregate per brand
   rows = [];
@@ -163,7 +200,8 @@ if (FULL) {
 }
 
 const tCompute = Date.now();
-const { wrote, fail } = await writeUpdates(updates);
+// FULL manages its own write-pause; INCREMENTAL already holds the pause (set above).
+const { wrote, fail } = await writeUpdates(updates, FULL);
 const tWrite = Date.now();
 
 // niche_counts rebuild — FULL only (small drift between weekly runs is fine for filter chips)
@@ -176,10 +214,15 @@ if (mode === 'full') {
 // regression guard + status row (winners-under-14d is a corpus-wide invariant either mode)
 const bad = await count('discovery_ads_index?select=ad_id&performance_tier=eq.winning&days_running=lt.14');
 const winners = await count('discovery_ads_index?select=ad_id&performance_tier=eq.winning');
+const scoreZero = await countPlanned('discovery_ads_index?select=ad_id&performance_score=eq.0');   // self-heal convergence gauge
 const fetchS = +((tCompute - t0) / 1000).toFixed(1), writeS = +((tWrite - tCompute) / 1000).toFixed(1), totalS = +((Date.now() - t0) / 1000).toFixed(1);
-console.log(`ROLLUP[${mode}] rows=${rows.length} touchedBrands=${touchedBrands} fetch+compute=${fetchS}s write=${writeS}s total=${totalS}s wrote=${wrote} failChunks=${fail} winners=${winners} winnersUnder14d=${bad}`);
+console.log(`ROLLUP[${mode}] rows=${rows.length} touchedBrands=${touchedBrands} fetch+compute=${fetchS}s write=${writeS}s total=${totalS}s wrote=${wrote} failChunks=${fail} winners=${winners} winnersUnder14d=${bad} scoreZero=${scoreZero}`);
 
 await fetch(REST + 'discovery_rollup_status?on_conflict=id', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: 1, ran_at: new Date().toISOString(), total_rows: rows.length, winners, bad_winners: bad, fail_chunks: fail, wrote, fetch_s: fetchS, write_s: writeS, total_s: totalS }) }).catch(() => {});
+// score_zero gauge — separate PATCH so it writes once migration 033 adds the column,
+// without breaking the core status row before then (unknown-column 400 is swallowed).
+await fetch(REST + 'discovery_rollup_status?id=eq.1', { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ score_zero: scoreZero }) }).catch(() => {});
 
 if (fail > 0 || bad > 0) await alert(`🔴 Selfmade rollup[${mode}] REGRESSION: ${bad} winners under 14d, ${fail} failed chunks (wrote ${wrote}/${updates.length}).`);
+if (!FULL) { if (incrHb) clearInterval(incrHb); await clearFlag(); }   // release the incremental's clean-window pause
 process.exit(0);
