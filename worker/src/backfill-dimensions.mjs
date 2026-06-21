@@ -57,9 +57,11 @@ while (true) {
   let passFilled = 0
 
 while (true) {
+  // Clean id-keyset range scan (PK index — always fast). The `width is null` filter
+  // has no supporting index → the planner seq-scans+sorts 1.5M rows → 8s timeout. So
+  // page by id and skip already-filled rows in JS instead.
   let q = db.from('discovery_creatives')
-    .select('id, ad_id, position, asset_type, r2_url')
-    .is('width', null)
+    .select('id, ad_id, position, asset_type, r2_url, width')
     .eq('asset_type', 'image')
     .order('id', { ascending: true })
     .limit(BATCH)
@@ -67,10 +69,12 @@ while (true) {
   const { data: rows, error } = await q
   if (error) { console.error('select failed:', error.message); await new Promise(r => setTimeout(r, 5000)); continue }
   if (!rows || rows.length === 0) break
+  cursor = rows[rows.length - 1].id   // advance keyset regardless of fill result
 
-  const dims = await mapLimit(rows, CONCURRENCY, (r) => dimsOf(r.r2_url))
+  const todo = rows.filter((r) => r.width == null)   // only fetch dims for un-filled
+  const dims = await mapLimit(todo, CONCURRENCY, (r) => dimsOf(r.r2_url))
   const updates = []
-  rows.forEach((r, i) => {
+  todo.forEach((r, i) => {
     const d = dims[i]
     if (d) updates.push({ id: r.id, ad_id: r.ad_id, position: r.position, asset_type: r.asset_type, r2_url: r.r2_url, width: d.width, height: d.height })
     else missed++
@@ -84,7 +88,6 @@ while (true) {
   }
 
   done += rows.length
-  cursor = rows[rows.length - 1].id
   const rate = (done / ((Date.now() - startedAt) / 1000)).toFixed(0)
   console.log(`pass=${pass} done=${done} filled=${filled} missed=${missed} | ${rate}/s | cursor=${cursor.slice(0, 8)}`)
   if (THROTTLE_MS) await new Promise(r => setTimeout(r, THROTTLE_MS))   // gentle throttle
