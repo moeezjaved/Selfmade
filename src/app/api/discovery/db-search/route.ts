@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
       // composite indexes existed (the brand sort scanned the whole score index);
       // with those in place it's sub-second. Brand mode must use page_id=eq (NOT the
       // seed_terms affiliate OR) — the unindexed array-contains makes the join 9s+.
-      .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash)', { count: 'planned' })
+      .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash,width,height)', { count: 'planned' })
 
     // Country filter — match against the ARRAY of countries the ad targeted
     // (covers multi-country ads correctly). Falls back to legacy 'country'
@@ -328,7 +328,7 @@ export async function GET(request: NextRequest) {
     // ad's creatives images-first / position-asc so the FIRST is a STABLE dedup key —
     // the index row's "primary" hash is whichever creative was written last, so two
     // identical carousels got different keys and failed to dedup ("'It's been' 3×").
-    type Cre = { position: number; asset_type: 'image' | 'video'; r2_url: string; hash: string | null }
+    type Cre = { position: number; asset_type: 'image' | 'video'; r2_url: string; hash: string | null; width: number | null; height: number | null }
     const sortCres = (cs: Cre[]) => cs.slice().sort((a, b) =>
       (a.asset_type === b.asset_type ? 0 : a.asset_type === 'image' ? -1 : 1) || (a.position - b.position))
     const creativesByAd: Record<string, Cre[]> = {}
@@ -454,12 +454,12 @@ export async function GET(request: NextRequest) {
       const slice = missingIds.slice(i, i + 300)
       const { data: cd } = await admin
         .from('discovery_creatives')
-        .select('ad_id, position, asset_type, r2_url, hash')
+        .select('ad_id, position, asset_type, r2_url, hash, width, height')
         .in('ad_id', slice)
         .order('asset_type', { ascending: true })
         .order('position', { ascending: true })
       for (const c of (cd || []) as any[]) {
-        (creativesByAd[c.ad_id] ||= []).push({ position: c.position, asset_type: c.asset_type, r2_url: c.r2_url, hash: c.hash })
+        (creativesByAd[c.ad_id] ||= []).push({ position: c.position, asset_type: c.asset_type, r2_url: c.r2_url, hash: c.hash, width: c.width, height: c.height })
       }
     }
 

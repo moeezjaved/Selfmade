@@ -1,0 +1,83 @@
+/**
+ * Backfill discovery_creatives.width/height for existing IMAGE creatives.
+ *
+ * Atria-style no-reflow grid needs pixel dims. New crawls capture them in
+ * processAsset; this fills the historical rows. Reads each R2 image header via
+ * sharp (only the header, not a full decode), keyset-paginates by id so it's
+ * resumable, and updates in small batches. Videos are skipped (client fallback).
+ *
+ * Run on the droplet:  node src/backfill-dimensions.mjs
+ * Safe to stop/restart — `width is null` + id keyset means it never redoes a row.
+ * Throttled (CONCURRENCY parallel header reads) so it doesn't saturate R2 or the DB.
+ */
+import { createClient } from '@supabase/supabase-js'
+import sharp from 'sharp'
+
+const URL = process.env.SUPABASE_URL
+const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+if (!URL || !KEY) { console.error('missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY'); process.exit(1) }
+const db = createClient(URL, KEY, { auth: { persistSession: false } })
+
+const BATCH = 500          // rows fetched per page
+const CONCURRENCY = 12     // parallel image-header reads
+const FETCH_TIMEOUT = 15_000
+
+async function dimsOf(url) {
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT)
+    const res = await fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(t))
+    if (!res.ok) return null
+    const buf = Buffer.from(await res.arrayBuffer())
+    const { width, height } = await sharp(buf, { failOn: 'none' }).metadata()
+    return (width && height) ? { width, height } : null
+  } catch { return null }
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length)
+  let i = 0
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx]) }
+  }))
+  return out
+}
+
+let cursor = ''            // last id processed (keyset)
+let done = 0, filled = 0, missed = 0
+const startedAt = Date.now()
+
+while (true) {
+  let q = db.from('discovery_creatives')
+    .select('id, ad_id, position, asset_type, r2_url')
+    .is('width', null)
+    .eq('asset_type', 'image')
+    .order('id', { ascending: true })
+    .limit(BATCH)
+  if (cursor) q = q.gt('id', cursor)
+  const { data: rows, error } = await q
+  if (error) { console.error('select failed:', error.message); await new Promise(r => setTimeout(r, 5000)); continue }
+  if (!rows || rows.length === 0) break
+
+  const dims = await mapLimit(rows, CONCURRENCY, (r) => dimsOf(r.r2_url))
+  const updates = []
+  rows.forEach((r, i) => {
+    const d = dims[i]
+    if (d) updates.push({ id: r.id, ad_id: r.ad_id, position: r.position, asset_type: r.asset_type, r2_url: r.r2_url, width: d.width, height: d.height })
+    else missed++
+  })
+
+  if (updates.length) {
+    const { error: upErr } = await db.from('discovery_creatives').upsert(updates, { onConflict: 'id' })
+    if (upErr) { console.error('upsert failed:', upErr.message); await new Promise(r => setTimeout(r, 5000)); continue }
+    filled += updates.length
+  }
+
+  done += rows.length
+  cursor = rows[rows.length - 1].id
+  const rate = (done / ((Date.now() - startedAt) / 1000)).toFixed(0)
+  console.log(`done=${done} filled=${filled} missed=${missed} | ${rate}/s | cursor=${cursor.slice(0, 8)}`)
+  await new Promise(r => setTimeout(r, 150))   // gentle throttle
+}
+
+console.log(`\n✅ backfill complete: filled=${filled} missed=${missed} done=${done} in ${((Date.now() - startedAt) / 60000).toFixed(1)}min`)

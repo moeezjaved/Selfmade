@@ -11,6 +11,8 @@ interface Creative {
   asset_type: 'image' | 'video'
   r2_url: string
   hash: string | null
+  width?: number | null    // original pixel dims → reserve card height (no reflow)
+  height?: number | null
 }
 
 interface Ad {
@@ -713,18 +715,33 @@ function ScriptsMenu() {
   )
 }
 
+// ── Image CDN (Atria layer 4: right-sized srcset, no Vercel-optimizer cost) ──
+// Creatives live on R2. To avoid shipping full-size images to every card, route them
+// through Cloudflare Image Resizing (R2 is already Cloudflare → cheapest at scale).
+// Set NEXT_PUBLIC_IMG_CDN to a Cloudflare custom-domain host that fronts the bucket
+// with Image Resizing enabled (e.g. "cdn.tryselfmade.ai"). Until then images pass
+// through full-size — the no-reflow box already keeps scroll smooth; this just trims
+// bytes once the CDN is wired (a one-env-var switch, no code change).
+const IMG_CDN = process.env.NEXT_PUBLIC_IMG_CDN || ''
+const IMG_WIDTHS = [256, 384, 640, 828, 1080]
+const cdnAt = (url: string, w: number) =>
+  IMG_CDN && url ? `https://${IMG_CDN}/cdn-cgi/image/width=${w},quality=75,format=auto/${url}` : url
+const cdnSrc = (url: string) => (IMG_CDN ? cdnAt(url, 640) : url)
+const cdnSrcSet = (url: string) =>
+  IMG_CDN && url ? IMG_WIDTHS.map((w) => `${cdnAt(url, w)} ${w}w`).join(', ') : undefined
+
 // ── CarouselViewer ─ swipeable preview for multi-image ads ──
 function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: string; iframeVisible: boolean }) {
   const router = useRouter()
   // Build slide list: prefer creatives[] (full carousel), fall back to legacy single image/video
-  type Slide = { type: 'image' | 'video'; url: string }
+  type Slide = { type: 'image' | 'video'; url: string; width?: number | null; height?: number | null }
   const slides: Slide[] = useMemo(() => {
     if (ad.creatives && ad.creatives.length > 0) {
       const sorted = [...ad.creatives].sort((a, b) => {
         if (a.asset_type !== b.asset_type) return a.asset_type === 'image' ? -1 : 1
         return a.position - b.position
       })
-      return sorted.map((c) => ({ type: c.asset_type, url: c.r2_url }))
+      return sorted.map((c) => ({ type: c.asset_type, url: c.r2_url, width: c.width, height: c.height }))
     }
     const fallback: Slide[] = []
     if (ad.thumbnailUrl && !ad.thumbnailUrl.includes('graph.facebook.com')) {
@@ -752,17 +769,25 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   // Discovery API already filters these out, but defense in depth.
   if (!slide) return null
 
-  // Natural aspect ratio — image/video sets the height, no cropping (Atria-style)
+  // ── No-reflow card height (Atria technique) ────────────────────────────────
+  // Reserve the EXACT visual height BEFORE any media loads, from the first
+  // creative's stored pixel dims (padding-bottom = h/w ratio). The image/video then
+  // fills that box absolutely, so there is ZERO layout shift when it decodes — the
+  // masonry never reflows. All carousel slides share this one box (cover-fit) so
+  // navigating doesn't change the card height. Fallback when dims are missing
+  // (legacy creatives pre-backfill): square for images, 4:5 for video.
+  const primary = slides[0]
+  const rawPct = (primary?.width && primary?.height) ? (primary.height / primary.width) * 100 : null
+  const aspectPct = rawPct != null
+    ? Math.min(178, Math.max(56, rawPct))   // clamp 16:9 … 9:16 so nothing is absurdly tall/short
+    : (primary?.type === 'video' ? 125 : 100)
   return (
     <div
       className="ad-card-visual"
       onClick={() => router.push(`/discovery/${ad.id}`)}
       style={{
-        position: 'relative', background: '#f1f3f5', overflow: 'hidden', lineHeight: 0, cursor: 'pointer',
-        // Natural aspect (Atria-style masonry) — full creative, no crop, no letterbox.
-        // A min-height placeholder reserves space while loading so the column doesn't
-        // collapse; the masonry columns (round-robin, stable) keep scroll smooth.
-        width: '100%', minHeight: !imgLoaded ? 220 : undefined,
+        position: 'relative', width: '100%', paddingBottom: `${aspectPct}%`,
+        background: '#f1f3f5', overflow: 'hidden', lineHeight: 0, cursor: 'pointer',
       }}
     >
       {slide.type === 'image' ? (
@@ -777,15 +802,18 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             </div>
           ) : (
             <img
-              src={slide.url}
+              src={cdnSrc(slide.url)}
+              srcSet={cdnSrcSet(slide.url)}
+              sizes="(max-width: 700px) 50vw, 343px"
               alt={ad.pageName}
-              loading="eager"
+              loading="lazy"
               decoding="async"
               onLoad={() => setImgLoaded(true)}
               onError={() => setImgError(true)}
               style={{
-                width: '100%', height: 'auto', display: 'block', verticalAlign: 'top',
-                opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2,
+                position: 'absolute', inset: 0, width: '100%', height: '100%',
+                objectFit: 'cover', display: 'block',
+                opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', zIndex: 2,
               }}
             />
           )}
@@ -805,7 +833,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             onLoadedData={() => setImgLoaded(true)}
             onLoadedMetadata={() => setImgLoaded(true)}
             onCanPlay={() => setImgLoaded(true)}
-            style={{ width: '100%', height: 'auto', maxHeight: 560, display: 'block', verticalAlign: 'top', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', position: 'relative', zIndex: 2 }}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', zIndex: 2 }}
             onEnded={() => setPlaying(false)}
           />
           {imgLoaded && !playing && (
