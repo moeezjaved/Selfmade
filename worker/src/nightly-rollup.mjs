@@ -1,71 +1,168 @@
 /**
- * Nightly rollup — runs ON THE DROPLET (no Vercel 300s limit; the fetch alone is
- * ~160s at 120K rows and grows). Recomputes days_running + Winner Score, writes via
- * set-based apply_perf, under a cooperative crawl-pause with a HEARTBEAT (re-leases
- * the flag every 60s so it survives a multi-minute write but still auto-expires in
- * 5min if this process dies). Regression guard PUSHES to ALERT_WEBHOOK_URL on failure.
+ * Discovery rollup — INCREMENTAL nightly, FULL weekly. Runs ON THE DROPLET.
  *
- * Run: docker exec worker node /app/scripts/nightly-rollup.mjs   (via rollup-cron.sh)
+ * WHY: the old version re-scored the WHOLE corpus every night — at ~700K ads that's
+ * a multi-hour full-table fetch+write that spikes Supabase CPU >80% and holds the
+ * crawl-pause for hours. The score's only cross-corpus dependency is the percentile
+ * calibration (score = mapP(pctOf(rawv))); everything else is BRAND-LOCAL.
+ *
+ * DESIGN:
+ *  • FULL (weekly / first run / --full): fetch all, recompute everything, calibrate
+ *    percentiles, write all, and CACHE the quantile cutpoints (migration 032).
+ *  • INCREMENTAL (nightly): re-score only TOUCHED ads using the cached cutpoints —
+ *      - new ads (indexed_at > last run)               → their brands
+ *      - tier-threshold crossers (realDays crossed 7/14 since last score)
+ *      - changed brands (the above) re-aggregated from THEIR OWN ads (brand-local)
+ *    No full-table sort, tiny write set, near-zero crawl-pause. Tiers stay anchored to
+ *    the last weekly calibration; the weekly full pass re-anchors (and ages out the
+ *    brand-velocity window) so "Winning" can't drift.
+ *
+ * Run: docker exec worker node /app/src/nightly-rollup.mjs [--full]   (via rollup-cron.sh)
  */
 const U = process.env.SUPABASE_URL, K = process.env.SUPABASE_SERVICE_ROLE_KEY, H = { apikey: K, Authorization: 'Bearer ' + K };
 const ALERT = process.env.ALERT_WEBHOOK_URL || '';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const t0 = Date.now();
+const ARG_FULL = process.argv.includes('--full');
+const REST = U + '/rest/v1/';
 
-async function setFlag() {
-  await fetch(U + '/rest/v1/system_flags?on_conflict=key', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'crawl_paused', until: new Date(Date.now() + 5 * 60_000).toISOString(), updated_at: new Date().toISOString() }) });
-}
-async function clearFlag() { await fetch(U + '/rest/v1/system_flags?key=eq.crawl_paused', { method: 'DELETE', headers: { ...H, Prefer: 'return=minimal' } }).catch(() => {}); }
-async function alert(msg) { console.error(msg); if (ALERT) await fetch(ALERT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: msg }) }).catch(() => {}); }
-
-// 1. fetch
-const rows = []; let cursor = '';
-while (true) { let q = U + '/rest/v1/discovery_ads_index?select=ad_id,page_id,image_hash,video_hash,is_active,start_date,stop_date,last_seen,niche&order=ad_id.asc&limit=1000'; if (cursor) q += '&ad_id=gt.' + encodeURIComponent(cursor); const d = await (await fetch(q, { headers: H })).json(); if (!Array.isArray(d) || !d.length) break; rows.push(...d); cursor = d[d.length - 1].ad_id; if (d.length < 1000) break; }
-
-// 2-4. aggregates + score (Winner Score v3: longevity + reuse + brand vol + velocity, ageFactor, hard gate)
-const reuse = new Map(), brandActive = new Map(), brandNew = new Map(), since = Date.now() - 21 * 864e5;
-const realDays = a => { const end = a.stop_date ? Date.parse(a.stop_date) : (a.last_seen ? Date.parse(a.last_seen) : Date.now()); const start = a.start_date ? Date.parse(a.start_date) : end; let d = Math.floor((end - start) / 864e5); if (!Number.isFinite(d) || d < 0) d = 0; if (d > 3650) d = 3650; return d; };
-for (const a of rows) { const ck = a.image_hash || a.video_hash; if (ck) { const k = a.page_id + '|' + ck; reuse.set(k, (reuse.get(k) || 0) + 1); } if (a.is_active) brandActive.set(a.page_id, (brandActive.get(a.page_id) || 0) + 1); const sd = a.start_date ? Date.parse(a.start_date) : NaN; if (!Number.isNaN(sd) && sd >= since) brandNew.set(a.page_id, (brandNew.get(a.page_id) || 0) + 1); }
+// ── scoring math (unchanged — keep IDENTICAL to preserve scores) ──────────────
 const LN91 = Math.log(91);
-const enriched = rows.map(a => { const ck = a.image_hash || a.video_hash; const rc = ck ? (reuse.get(a.page_id + '|' + ck) || 0) : 0; const bv = brandActive.get(a.page_id) || 0; const bn = brandNew.get(a.page_id) || 0; const days = realDays(a); const rt = Math.min(1, Math.log(1 + days) / LN91); const af = Math.min(1, days / 21); let rawv = (0.40 * rt + 0.25 * Math.min(1, rc / 6) + 0.20 * Math.min(1, bv / 30) + 0.15 * Math.min(1, bn / 12)) * af * (a.is_active ? 1 : 0.6); rawv += days * 1e-7; return { ad_id: a.ad_id, rc, bv, days, rawv }; });
-const sorted = enriched.map(e => e.rawv).sort((a, b) => a - b), N = sorted.length || 1;
-const pctOf = v => { let lo = 0, hi = sorted.length; while (lo < hi) { const m = (lo + hi) >> 1; if (sorted[m] <= v) lo = m + 1; else hi = m; } return lo / N; };
+const realDays = a => { const end = a.stop_date ? Date.parse(a.stop_date) : (a.last_seen ? Date.parse(a.last_seen) : Date.now()); const start = a.start_date ? Date.parse(a.start_date) : end; let d = Math.floor((end - start) / 864e5); if (!Number.isFinite(d) || d < 0) d = 0; if (d > 3650) d = 3650; return d; };
 const bp = [[0, 0], [.25, .2], [.55, .4], [.8, .6], [.95, .8], [1, 1]];
 const mapP = p => { for (let i = 1; i < bp.length; i++) if (p <= bp[i][0]) { const [p0, s0] = bp[i - 1], [p1, s1] = bp[i]; return s0 + (s1 - s0) * (p - p0) / (p1 - p0 || 1); } return 1; };
-const updates = enriched.map(e => { let s = mapP(pctOf(e.rawv)); if (e.days < 7) s = Math.min(s, .599); else if (e.days < 14) s = Math.min(s, .799); return { aid: e.ad_id, ps: Math.round(s * 1000) / 1000, dr: e.days, rc: e.rc, bv: e.bv }; });
-const tCompute = Date.now();
 
-// 5. write under cooperative pause + HEARTBEAT
-await setFlag();
-const hb = setInterval(setFlag, 60_000);   // re-lease every 60s so the flag survives a multi-minute write
-await sleep(8000);                          // let writers notice + pause
-let wrote = 0, fail = 0;
-try {
-  for (let i = 0; i < updates.length; i += 2000) {
-    const chunk = updates.slice(i, i + 2000); let ok = false;
-    for (let t = 0; t < 8 && !ok; t++) { const r = await fetch(U + '/rest/v1/rpc/apply_perf', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify({ p: chunk }) }); if (r.ok) { ok = true; wrote += chunk.length; } else { await r.text().catch(() => {}); if (t < 7) await sleep(1500 * (t + 1)); } }
-    if (!ok) fail++;
+// per-brand aggregates over a set of rows (brand-local → exact for any complete brand)
+function aggregate(rows) {
+  const reuse = new Map(), brandActive = new Map(), brandNew = new Map(), since = Date.now() - 21 * 864e5;
+  for (const a of rows) {
+    const ck = a.image_hash || a.video_hash;
+    if (ck) { const k = a.page_id + '|' + ck; reuse.set(k, (reuse.get(k) || 0) + 1); }
+    if (a.is_active) brandActive.set(a.page_id, (brandActive.get(a.page_id) || 0) + 1);
+    const sd = a.start_date ? Date.parse(a.start_date) : NaN;
+    if (!Number.isNaN(sd) && sd >= since) brandNew.set(a.page_id, (brandNew.get(a.page_id) || 0) + 1);
   }
-} finally { clearInterval(hb); await clearFlag(); }
+  return { reuse, brandActive, brandNew };
+}
+function enrich(rows, agg) {
+  return rows.map(a => {
+    const ck = a.image_hash || a.video_hash;
+    const rc = ck ? (agg.reuse.get(a.page_id + '|' + ck) || 0) : 0;
+    const bv = agg.brandActive.get(a.page_id) || 0;
+    const bn = agg.brandNew.get(a.page_id) || 0;
+    const days = realDays(a);
+    const rt = Math.min(1, Math.log(1 + days) / LN91);
+    const af = Math.min(1, days / 21);
+    let rawv = (0.40 * rt + 0.25 * Math.min(1, rc / 6) + 0.20 * Math.min(1, bv / 30) + 0.15 * Math.min(1, bn / 12)) * af * (a.is_active ? 1 : 0.6);
+    rawv += days * 1e-7;
+    return { ad_id: a.ad_id, page_id: a.page_id, rc, bv, days, rawv };
+  });
+}
+// score one enriched ad given a pctOf(rawv)→[0,1] function (+ hard longevity gate)
+const scoreOf = (e, pctOf) => { let s = mapP(pctOf(e.rawv)); if (e.days < 7) s = Math.min(s, .599); else if (e.days < 14) s = Math.min(s, .799); return { aid: e.ad_id, ps: Math.round(s * 1000) / 1000, dr: e.days, rc: e.rc, bv: e.bv }; };
+
+// ── REST helpers ──────────────────────────────────────────────────────────────
+const SEL = 'ad_id,page_id,image_hash,video_hash,is_active,start_date,stop_date,last_seen,niche';
+async function getJSON(qs) { const r = await fetch(REST + qs, { headers: H }); return r.ok ? r.json() : []; }
+async function keyset(baseQs) {           // keyset-paginate by ad_id (stable under concurrent inserts)
+  const out = []; let cursor = '';
+  for (;;) {
+    let q = baseQs + '&order=ad_id.asc&limit=1000' + (cursor ? '&ad_id=gt.' + encodeURIComponent(cursor) : '');
+    const d = await getJSON(q);
+    if (!Array.isArray(d) || !d.length) break;
+    out.push(...d); cursor = d[d.length - 1].ad_id;
+    if (d.length < 1000) break;
+  }
+  return out;
+}
+const count = async qs => { const r = await fetch(REST + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=exact' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
+async function setFlag() { await fetch(REST + 'system_flags?on_conflict=key', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'crawl_paused', until: new Date(Date.now() + 5 * 60_000).toISOString(), updated_at: new Date().toISOString() }) }); }
+async function clearFlag() { await fetch(REST + 'system_flags?key=eq.crawl_paused', { method: 'DELETE', headers: { ...H, Prefer: 'return=minimal' } }).catch(() => {}); }
+async function alert(msg) { console.error(msg); if (ALERT) await fetch(ALERT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: msg }) }).catch(() => {}); }
+
+// write score chunks via apply_perf under a cooperative crawl-pause + heartbeat.
+async function writeUpdates(updates) {
+  if (!updates.length) return { wrote: 0, fail: 0 };
+  await setFlag();
+  const hb = setInterval(setFlag, 60_000);
+  await sleep(8000);                         // let writers notice the pause
+  let wrote = 0, fail = 0;
+  try {
+    for (let i = 0; i < updates.length; i += 2000) {
+      const chunk = updates.slice(i, i + 2000); let ok = false;
+      for (let t = 0; t < 8 && !ok; t++) {
+        const r = await fetch(REST + 'rpc/apply_perf', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify({ p: chunk }) });
+        if (r.ok) { ok = true; wrote += chunk.length; } else { await r.text().catch(() => {}); if (t < 7) await sleep(1500 * (t + 1)); }
+      }
+      if (!ok) fail++;
+    }
+  } finally { clearInterval(hb); await clearFlag(); }
+  return { wrote, fail };
+}
+
+// ── mode selection ─────────────────────────────────────────────────────────────
+const cal = (await getJSON('discovery_rollup_calibration?id=eq.1&select=cutpoints,n,ran_at&limit=1'))[0] || null;
+const status = (await getJSON('discovery_rollup_status?id=eq.1&select=ran_at&limit=1'))[0] || null;
+const lastRan = status?.ran_at || '1970-01-01T00:00:00Z';
+const calStale = !cal || !Array.isArray(cal.cutpoints) || !cal.cutpoints.length || (Date.now() - Date.parse(cal.ran_at) > 8 * 864e5);
+const FULL = ARG_FULL || new Date().getUTCDay() === 0 || calStale;   // Sunday=full, or no/stale calibration
+
+let rows, updates, mode, touchedBrands = 0;
+
+if (FULL) {
+  // ── FULL weekly: recompute everything, calibrate, cache cutpoints ──
+  mode = 'full';
+  rows = await keyset('discovery_ads_index?select=' + SEL);
+  const enriched = enrich(rows, aggregate(rows));
+  const sorted = enriched.map(e => e.rawv).sort((a, b) => a - b), N = sorted.length || 1;
+  const pctOf = v => { let lo = 0, hi = sorted.length; while (lo < hi) { const m = (lo + hi) >> 1; if (sorted[m] <= v) lo = m + 1; else hi = m; } return lo / N; };
+  updates = enriched.map(e => scoreOf(e, pctOf));
+  // cache a compact quantile array (Q+1 points) so nightly can approximate pctOf
+  const Q = 2048, cutpoints = [], last = Math.max(0, sorted.length - 1);
+  for (let i = 0; i <= Q; i++) { const idx = Math.min(last, Math.round((i / Q) * last)); cutpoints.push(sorted[idx] ?? 0); }
+  await fetch(REST + 'discovery_rollup_calibration?on_conflict=id', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: 1, cutpoints, n: N, bp, ran_at: new Date().toISOString() }) }).catch(() => {});
+} else {
+  // ── INCREMENTAL nightly: re-score only touched brands using cached cutpoints ──
+  mode = 'incremental';
+  const cp = cal.cutpoints, Q = cp.length - 1;
+  const pctOf = v => { let lo = 0, hi = cp.length; while (lo < hi) { const m = (lo + hi) >> 1; if (cp[m] <= v) lo = m + 1; else hi = m; } return Math.min(1, lo / Q); };
+
+  // (a) brands with NEW ads since last run (indexed_at is insert-only → clean watermark)
+  const newAds = await keyset('discovery_ads_index?select=ad_id,page_id&indexed_at=gt.' + encodeURIComponent(lastRan));
+  const touched = new Set(newAds.map(r => r.page_id));
+  // (b) tier-threshold crossers: active ads near the 7/14d gates whose realDays just crossed
+  const nearGate = await keyset('discovery_ads_index?select=ad_id,page_id,start_date,stop_date,last_seen,days_running&is_active=is.true&days_running=lt.14');
+  for (const a of nearGate) { const rd = realDays(a); const sd = a.days_running ?? 0; if ((rd >= 7 && sd < 7) || (rd >= 14 && sd < 14)) touched.add(a.page_id); }
+  touchedBrands = touched.size;
+
+  // fetch ALL ads of touched brands (chunk the page_id IN-list), re-aggregate per brand
+  rows = [];
+  const ids = [...touched];
+  for (let i = 0; i < ids.length; i += 100) {
+    const inList = ids.slice(i, i + 100).map(x => encodeURIComponent(x)).join(',');
+    rows.push(...await keyset('discovery_ads_index?select=' + SEL + '&page_id=in.(' + inList + ')'));
+  }
+  updates = enrich(rows, aggregate(rows)).map(e => scoreOf(e, pctOf));
+}
+
+const tCompute = Date.now();
+const { wrote, fail } = await writeUpdates(updates);
 const tWrite = Date.now();
 
-// 6. niche_counts
-const nc = new Map(); for (const a of rows) { const key = a.niche || 'Other'; const e = nc.get(key) || { active: 0, total: 0 }; e.total++; if (a.is_active) e.active++; nc.set(key, e); }
-await fetch(U + '/rest/v1/niche_counts?on_conflict=niche', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(Array.from(nc).map(([niche, e]) => ({ niche, active_ads: e.active, total_ads: e.total, updated_at: new Date().toISOString() }))) }).catch(() => {});
+// niche_counts rebuild — FULL only (small drift between weekly runs is fine for filter chips)
+if (mode === 'full') {
+  const nc = new Map();
+  for (const a of rows) { const key = a.niche || 'Other'; const e = nc.get(key) || { active: 0, total: 0 }; e.total++; if (a.is_active) e.active++; nc.set(key, e); }
+  await fetch(REST + 'niche_counts?on_conflict=niche', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(Array.from(nc).map(([niche, e]) => ({ niche, active_ads: e.active, total_ads: e.total, updated_at: new Date().toISOString() }))) }).catch(() => {});
+}
 
-// 7. regression guard → PUSH alert + PULL status row (rendered on /admin/health)
-const count = async qs => { const r = await fetch(U + '/rest/v1/discovery_ads_index?' + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=exact' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
-const bad = await count('select=ad_id&performance_tier=eq.winning&days_running=lt.14');
-const winners = await count('select=ad_id&performance_tier=eq.winning');
+// regression guard + status row (winners-under-14d is a corpus-wide invariant either mode)
+const bad = await count('discovery_ads_index?select=ad_id&performance_tier=eq.winning&days_running=lt.14');
+const winners = await count('discovery_ads_index?select=ad_id&performance_tier=eq.winning');
 const fetchS = +((tCompute - t0) / 1000).toFixed(1), writeS = +((tWrite - tCompute) / 1000).toFixed(1), totalS = +((Date.now() - t0) / 1000).toFixed(1);
-console.log(`ROLLUP rows=${rows.length} fetch+compute=${fetchS}s write=${writeS}s total=${totalS}s wrote=${wrote} failChunks=${fail} winners=${winners} winnersUnder14d=${bad}`);
+console.log(`ROLLUP[${mode}] rows=${rows.length} touchedBrands=${touchedBrands} fetch+compute=${fetchS}s write=${writeS}s total=${totalS}s wrote=${wrote} failChunks=${fail} winners=${winners} winnersUnder14d=${bad}`);
 
-// PULL: persist a single status row so the admin panel can show "ran, and was it clean?"
-await fetch(U + '/rest/v1/discovery_rollup_status?on_conflict=id', {
-  method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-  body: JSON.stringify({ id: 1, ran_at: new Date().toISOString(), total_rows: rows.length, winners, bad_winners: bad, fail_chunks: fail, wrote, fetch_s: fetchS, write_s: writeS, total_s: totalS }),
-}).catch(() => {});
+await fetch(REST + 'discovery_rollup_status?on_conflict=id', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: 1, ran_at: new Date().toISOString(), total_rows: rows.length, winners, bad_winners: bad, fail_chunks: fail, wrote, fetch_s: fetchS, write_s: writeS, total_s: totalS }) }).catch(() => {});
 
-// PUSH (optional): only fires if ALERT_WEBHOOK_URL is set
-if (fail > 0 || bad > 0) await alert(`🔴 Selfmade nightly rollup REGRESSION: ${bad} winners under 14 days, ${fail} failed chunks (wrote ${wrote}/${updates.length}). days_running may be stale.`);
+if (fail > 0 || bad > 0) await alert(`🔴 Selfmade rollup[${mode}] REGRESSION: ${bad} winners under 14d, ${fail} failed chunks (wrote ${wrote}/${updates.length}).`);
 process.exit(0);
