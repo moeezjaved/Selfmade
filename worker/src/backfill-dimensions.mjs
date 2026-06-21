@@ -18,8 +18,9 @@ const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!URL || !KEY) { console.error('missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY'); process.exit(1) }
 const db = createClient(URL, KEY, { auth: { persistSession: false } })
 
-const BATCH = 500          // rows fetched per page
-const CONCURRENCY = 12     // parallel image-header reads
+const BATCH = parseInt(process.env.BF_BATCH || '500')          // rows fetched per page
+const CONCURRENCY = parseInt(process.env.BF_CONCURRENCY || '12') // parallel image-header reads
+const THROTTLE_MS = parseInt(process.env.BF_THROTTLE_MS || '150')
 const FETCH_TIMEOUT = 15_000
 
 async function dimsOf(url) {
@@ -43,9 +44,17 @@ async function mapLimit(items, limit, fn) {
   return out
 }
 
-let cursor = ''            // last id processed (keyset)
 let done = 0, filled = 0, missed = 0
 const startedAt = Date.now()
+
+// Outer convergence loop: a pass with transient misses (large image timeouts / R2
+// bursts) leaves those rows width=null; a fresh pass re-attempts them. Repeat until
+// a full pass fills nothing new — i.e. only genuinely-unfetchable URLs remain.
+let pass = 0
+while (true) {
+  pass++
+  let cursor = ''
+  let passFilled = 0
 
 while (true) {
   let q = db.from('discovery_creatives')
@@ -71,13 +80,18 @@ while (true) {
     const { error: upErr } = await db.from('discovery_creatives').upsert(updates, { onConflict: 'id' })
     if (upErr) { console.error('upsert failed:', upErr.message); await new Promise(r => setTimeout(r, 5000)); continue }
     filled += updates.length
+    passFilled += updates.length
   }
 
   done += rows.length
   cursor = rows[rows.length - 1].id
   const rate = (done / ((Date.now() - startedAt) / 1000)).toFixed(0)
-  console.log(`done=${done} filled=${filled} missed=${missed} | ${rate}/s | cursor=${cursor.slice(0, 8)}`)
-  await new Promise(r => setTimeout(r, 150))   // gentle throttle
+  console.log(`pass=${pass} done=${done} filled=${filled} missed=${missed} | ${rate}/s | cursor=${cursor.slice(0, 8)}`)
+  if (THROTTLE_MS) await new Promise(r => setTimeout(r, THROTTLE_MS))   // gentle throttle
 }
 
-console.log(`\n✅ backfill complete: filled=${filled} missed=${missed} done=${done} in ${((Date.now() - startedAt) / 60000).toFixed(1)}min`)
+  console.log(`— pass ${pass} done: filled ${passFilled} this pass —`)
+  if (passFilled === 0) break   // converged: only genuinely-unfetchable URLs remain
+}
+
+console.log(`\n✅ backfill complete (${pass} passes): filled=${filled} done=${done} in ${((Date.now() - startedAt) / 60000).toFixed(1)}min`)
