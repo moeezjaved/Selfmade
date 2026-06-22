@@ -25,6 +25,10 @@ export async function GET(_req: NextRequest) {
   const [
     { data: terms },
     { data: states },
+    { count: totalTermsCount },
+    { count: activeTermsCount },
+    { count: brandsIndexedCount },
+    { count: totalAdsCount },
   ] = await Promise.all([
     // Show only BRAND-type terms (not category/adcopy seeds).
     // A row counts as a brand if term_type='brand' OR it has a page_id.
@@ -37,6 +41,26 @@ export async function GET(_req: NextRequest) {
       .from('discovery_brand_crawl_state')
       .select('page_id, brand_name, cursor, ads_indexed, last_run_at, last_run_added, exhausted_at')
       .order('last_run_at', { ascending: false }),
+    // Accurate summary counts. The two list queries above are capped at PostgREST's
+    // 1000-row default, so deriving stats from their .length froze every card at 1000.
+    // These head:true COUNT queries return the real totals regardless of that cap.
+    admin
+      .from('discovery_crawl_terms')
+      .select('*', { count: 'exact', head: true })
+      .or('term_type.eq.brand,page_id.not.is.null'),
+    admin
+      .from('discovery_crawl_terms')
+      .select('*', { count: 'exact', head: true })
+      .or('term_type.eq.brand,page_id.not.is.null')
+      .eq('is_active', true),
+    admin
+      .from('discovery_brand_crawl_state')
+      .select('*', { count: 'exact', head: true })
+      .gt('ads_indexed', 0),
+    // Big table → 'planned' (planner estimate) so this never hits the statement timeout.
+    admin
+      .from('discovery_ads_index')
+      .select('*', { count: 'planned', head: true }),
   ])
 
   // Build a map: page_id → state
@@ -100,10 +124,12 @@ export async function GET(_req: NextRequest) {
     terms: enriched,
     orphans,
     summary: {
-      total_terms: terms?.length || 0,
-      active_terms: (terms || []).filter((t: any) => t.is_active).length,
-      brands_indexed: Object.keys(adCountByPage).filter(k => adCountByPage[k].count > 0).length,
-      total_ads: Object.values(adCountByPage).reduce((s, x) => s + x.count, 0),
+      // Real counts (uncapped). Fall back to the capped array math only if a count
+      // query returns null for some reason, so the cards never go blank.
+      total_terms: totalTermsCount ?? (terms?.length || 0),
+      active_terms: activeTermsCount ?? (terms || []).filter((t: any) => t.is_active).length,
+      brands_indexed: brandsIndexedCount ?? Object.keys(adCountByPage).filter(k => adCountByPage[k].count > 0).length,
+      total_ads: totalAdsCount ?? Object.values(adCountByPage).reduce((s, x) => s + x.count, 0),
     },
   })
 }
