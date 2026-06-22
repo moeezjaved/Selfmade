@@ -20,29 +20,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminToken } from '@/lib/admin/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
-import OpenAI from 'openai'
-
-// Migrated off Anthropic (low-balance key) to gpt-4o-mini — same model the
-// classification pipeline standardized on. Category suggestion is a tiny call.
-async function suggestCategories(brand: { name: string; category?: string; website?: string }): Promise<string[]> {
-  if (!process.env.OPENAI_API_KEY) return []
-  // Lazy init (inside the guard) so `next build` never instantiates the client at
-  // module load without an env var.
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  try {
-    const res = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 200,
-      response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content: `Suggest 4-7 lowercase search categories for this DTC brand. Return ONLY a JSON object {"categories": [...]}, no markdown.\n\nBrand: ${brand.name}\nMeta category: ${brand.category || '(none)'}\nWebsite: ${brand.website || '(none)'}\n\nExample: {"categories": ["gymwear", "athleisure", "fitness"]}` }],
-    })
-    const text = res.choices[0]?.message?.content?.trim() || '{}'
-    const arr = JSON.parse(text).categories
-    return Array.isArray(arr) ? arr.map((c: any) => String(c).toLowerCase().trim()).filter(Boolean).slice(0, 7) : []
-  } catch {
-    return []
-  }
-}
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -175,17 +152,13 @@ async function processRow(
   // Auto-active only if user provided page_id OR lookup was high confidence.
   const highConfidence = userProvidedPageId || lookupResult?.confidence === 'high'
 
-  // Use the CSV-provided category directly. Only call the AI suggester when NO
-  // category was given — calling it for every row is what timed out the 700-brand
-  // import (700 OpenAI calls in one request → gateway timeout → non-JSON error).
-  const aiCategories = row.category ? [] : await suggestCategories({
-    name: row.brand_name,
-    website: row.website,
-  })
-  const finalCategories = Array.from(new Set([
-    ...(row.category ? [row.category.toLowerCase()] : []),
-    ...aiCategories,
-  ]))
+  // Use the CSV-provided category directly. We NO LONGER call an AI suggester for
+  // empty-category rows — one synchronous OpenAI call PER brand timed out the whole
+  // request (the "An error occurred" non-JSON response on any list with blank
+  // categories). Categories are auto-detected after the brand is crawled (the
+  // classification pipeline + the admin "Industry: auto-detect"), so import-time
+  // suggestion is redundant. Import stays fast regardless of how many rows lack a category.
+  const finalCategories = row.category ? [row.category.toLowerCase()] : []
 
   const insert: Record<string, any> = {
     term,
