@@ -150,6 +150,7 @@ export interface CreativeInsert {
   hash: string | null
   width?: number | null    // original pixel dims (images) → no-reflow grid
   height?: number | null
+  poster_url?: string | null   // video poster frame (FB preview, re-hosted to R2)
 }
 
 /**
