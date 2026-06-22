@@ -69,18 +69,25 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
 
   useEffect(() => {
-    const loadUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      setUser(user)
-      const { data: p } = await supabase
+    let mounted = true
+    // getSession() reads the session from LOCAL STORAGE (no network round-trip), so the
+    // user's name/initials/plan render on first paint. getUser() POSTs to the auth
+    // server to validate the JWT — that network wait was the blank "User / … credits"
+    // cold-start delay. Page-level auth is still enforced server-side by the API routes
+    // and middleware; this is display only. The profile (plan badge) loads in the
+    // background and never blocks the name from showing.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
+      if (!session?.user) { router.push('/login'); return }
+      setUser(session.user)
+      supabase
         .from('user_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', session.user.id)
         .single()
-      setProfile(p)
-    }
-    loadUser()
+        .then(({ data }) => { if (mounted) setProfile(data) })
+    })
+    return () => { mounted = false }
   }, [])
 
   const handleSignOut = async () => {

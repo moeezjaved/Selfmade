@@ -24,14 +24,25 @@ export interface CreditState {
   loading: boolean
 }
 
+const BAL_CACHE = 'credits:lastBalance'
 export function useCredits(): CreditState & { refetch: () => void } {
-  const [s, setS] = useState<CreditState>({ balance: 0, plan: 'trial', reset_at: null, pricing: {}, loading: true })
+  // Seed from the last-known balance (localStorage) so the pill shows a real number on
+  // first paint instead of a '…' flash while /api/credits/balance loads. It refreshes
+  // in the background and corrects if it changed.
+  const [s, setS] = useState<CreditState>(() => {
+    let cached = NaN
+    if (typeof window !== 'undefined') cached = Number(localStorage.getItem(BAL_CACHE))
+    const have = Number.isFinite(cached)
+    return { balance: have ? cached : 0, plan: 'trial', reset_at: null, pricing: {}, loading: !have }
+  })
   const refetch = useCallback(async () => {
     try {
       const r = await fetch('/api/credits/balance')
       if (!r.ok) return
       const d = await r.json()
-      setS({ balance: d.balance ?? 0, plan: d.plan ?? 'trial', reset_at: d.reset_at ?? null, pricing: d.pricing ?? {}, loading: false })
+      const balance = d.balance ?? 0
+      if (typeof window !== 'undefined') localStorage.setItem(BAL_CACHE, String(balance))
+      setS({ balance, plan: d.plan ?? 'trial', reset_at: d.reset_at ?? null, pricing: d.pricing ?? {}, loading: false })
     } catch { setS(p => ({ ...p, loading: false })) }
   }, [])
   useEffect(() => {
