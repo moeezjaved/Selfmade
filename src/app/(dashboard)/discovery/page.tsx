@@ -801,6 +801,10 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   // Reset load state whenever the visible slide changes (carousel nav)
   useEffect(() => { setImgLoaded(false); setImgError(false) }, [slide?.url])
 
+  // Play INLINE (not navigate). stopPropagation so the card's onClick (→ detail page)
+  // doesn't fire — clicking the play button was opening the detail page instead of
+  // playing the video right there in the grid.
+  const startPlay = (e?: React.MouseEvent) => { e?.stopPropagation(); setPlaying(true); videoRef.current?.play().catch(() => {}) }
   const next = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i + 1) % total); setPlaying(false) }
   const prev = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i - 1 + total) % total); setPlaying(false) }
 
@@ -871,9 +875,9 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
               <span style={{ position: 'absolute', fontSize: 72, fontWeight: 900, color: 'rgba(255,255,255,0.10)', letterSpacing: '-0.05em', userSelect: 'none', lineHeight: 1 }}>
                 {(ad.pageName || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
               </span>
-              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', zIndex: 1 }}>
+              <button onClick={startPlay} aria-label="Play" style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', zIndex: 2, border: 'none', cursor: 'pointer', padding: 0 }}>
                 <span style={{ fontSize: 20, marginLeft: 3, color: '#111' }}>▶</span>
-              </div>
+              </button>
             </div>
           )}
           <video
@@ -892,9 +896,10 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
           {imgLoaded && !playing && (
             <div onClick={() => router.push(`/discovery/${ad.id}`)}
               style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer', zIndex: 3 }}>
-              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
-                <span style={{ fontSize: 20, marginLeft: 3 }}>▶</span>
-              </div>
+              {/* Play button PLAYS inline (stopPropagation); clicking around it opens detail. */}
+              <button onClick={startPlay} aria-label="Play" style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)', border: 'none', cursor: 'pointer', padding: 0 }}>
+                <span style={{ fontSize: 20, marginLeft: 3, color: '#111' }}>▶</span>
+              </button>
             </div>
           )}
         </>
