@@ -1383,6 +1383,7 @@ export default function DiscoveryPage() {
   // Apply client-side filters
   const filteredAds = useMemo(() => {
     return rawAds.filter(ad => {
+      if (!ad || !ad.id) return false   // never feed masonic a null/undefined item (it crashes itemKey)
       if (format.length && !format.includes(ad.format)) return false
       if (industry.length && !ad.industries.some(i => industry.includes(i))) return false
       if (language.length && !ad.langNames.some(l => language.includes(l))) return false
@@ -1401,14 +1402,20 @@ export default function DiscoveryPage() {
   const cardHandlers = useRef({ setSelectedBrand, openHover, closeHover })
   cardHandlers.current = { setSelectedBrand, openHover, closeHover }
   const MasonryCard = useMemo(() => {
-    const Card = ({ data: ad }: { index: number; data: Ad; width: number }) => (
-      <AdCard
-        ad={ad}
-        onBrandClick={(pid, name) => cardHandlers.current.setSelectedBrand({ pageId: pid, name })}
-        onBrandHover={(pid, el) => cardHandlers.current.openHover(pid, el)}
-        onBrandLeave={() => cardHandlers.current.closeHover()}
-      />
-    )
+    const Card = ({ data: ad }: { index: number; data: Ad; width: number }) => {
+      // Defensive: masonic's virtualizer can momentarily hand us an undefined item
+      // when the items array grows mid-scroll (during infinite-load). Without this
+      // guard, AdCard reads ad.creatives/etc. on undefined → crashes the whole page.
+      if (!ad) return null
+      return (
+        <AdCard
+          ad={ad}
+          onBrandClick={(pid, name) => cardHandlers.current.setSelectedBrand({ pageId: pid, name })}
+          onBrandHover={(pid, el) => cardHandlers.current.openHover(pid, el)}
+          onBrandLeave={() => cardHandlers.current.closeHover()}
+        />
+      )
+    }
     Card.displayName = 'MasonryCard'
     return Card
   }, [])
@@ -1944,7 +1951,7 @@ export default function DiscoveryPage() {
               columnGutter={12}
               columnCount={gridCols}
               overscanBy={3}
-              itemKey={(ad: Ad) => ad.id}
+              itemKey={(ad: Ad, i: number) => ad?.id ?? `_${i}`}
               render={MasonryCard}
               onRender={handleMasonryRender}
             />
