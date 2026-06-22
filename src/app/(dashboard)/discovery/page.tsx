@@ -859,8 +859,22 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         </>
       ) : (
         <>
+          {/* Branded placeholder while the video frame loads — reads as an intentional
+              "video, ready to play" card (brand gradient + initial watermark + play
+              button), NOT a grey loading box. The real first frame fades in over it. */}
           {!imgLoaded && (
-            <div className="thumb-skeleton" style={{ position: 'absolute', inset: 0, zIndex: 1 }} />
+            <div style={{
+              position: 'absolute', inset: 0, zIndex: 1,
+              background: `linear-gradient(140deg, ${avatarBg} 0%, #14181c 130%)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+            }}>
+              <span style={{ position: 'absolute', fontSize: 72, fontWeight: 900, color: 'rgba(255,255,255,0.10)', letterSpacing: '-0.05em', userSelect: 'none', lineHeight: 1 }}>
+                {(ad.pageName || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+              </span>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', zIndex: 1 }}>
+                <span style={{ fontSize: 20, marginLeft: 3, color: '#111' }}>▶</span>
+              </div>
+            </div>
           )}
           <video
             ref={videoRef}
