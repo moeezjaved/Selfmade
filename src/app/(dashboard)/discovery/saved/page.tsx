@@ -11,6 +11,7 @@ export default function SavedAdsPage() {
   const [selectedBoard, setSelectedBoard] = useState<string | null>(null)
   const [savedAds, setSavedAds] = useState<SavedAd[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingAds, setLoadingAds] = useState(true)
   const [newBoardName, setNewBoardName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -30,9 +31,17 @@ export default function SavedAdsPage() {
 
   const loadSavedAds = async () => {
     if (!selectedBoard) return
-    const res = await fetch(`/api/discovery/saved?board_id=${selectedBoard}`)
-    const data = await res.json()
-    setSavedAds(data.ads || [])
+    // Track in-flight so the panel shows a loader, NOT a premature "board is empty"
+    // (the fetch starts empty → without this it flashes the empty state every load /
+    // board-switch even when the board has ads).
+    setLoadingAds(true)
+    try {
+      const res = await fetch(`/api/discovery/saved?board_id=${selectedBoard}`)
+      const data = await res.json()
+      setSavedAds(data.ads || [])
+    } finally {
+      setLoadingAds(false)
+    }
   }
 
   useEffect(() => { loadBoards() }, [])
@@ -185,6 +194,10 @@ export default function SavedAdsPage() {
               style={{ marginTop: 20, padding: '10px 24px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
               + New Board
             </button>
+          </div>
+        ) : loadingAds && savedAds.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '80px 20px', color: '#9ca3af', fontSize: 14 }}>
+            Loading {currentBoard.name}…
           </div>
         ) : savedAds.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6b7280' }}>
