@@ -296,7 +296,10 @@ export async function GET(request: NextRequest) {
       // winners within the window — same intent, instant. To restore the exact blend as
       // an index-backed ORDER BY, add the (is_active,days_running,last_seen,ad_id)
       // composite index (migration 038) and switch this back.
-      baseQuery = baseQuery.order('last_seen', { ascending: false, nullsFirst: false })
+      // NOTE: default NULLS FIRST (do NOT pass nullsFirst:false) — the last_seen index
+      // is DESC NULLS FIRST, so NULLS LAST can't use it and falls back to a full sort
+      // (8.6s vs 0.25s, measured). The ad_id tiebreaker below keeps pages deterministic.
+      baseQuery = baseQuery.order('last_seen', { ascending: false })
     }
     // Stable tiebreaker — without a unique final sort key, rows that tie on the sort
     // column(s) come back in arbitrary (non-deterministic) order across requests, so
