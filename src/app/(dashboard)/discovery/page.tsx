@@ -1,6 +1,29 @@
 'use client'
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Component, Fragment } from 'react'
+import type { ReactNode } from 'react'
 import { Masonry } from 'masonic'
+
+// masonic's virtualizer can throw during fast scroll near the load-more boundary
+// (its positioner momentarily indexes past the items array → WeakMap.set(undefined)
+// / itemKey on undefined). Without a boundary, that takes down the WHOLE discovery
+// page ("Application error"). This catches the throw and REMOUNTS the masonry on the
+// next tick — a fresh masonic mount rebuilds its positioner cleanly and recovers,
+// so the user sees a brief blink instead of a dead page. Retries are capped.
+class MasonryBoundary extends Component<{ children: ReactNode }, { k: number; errored: boolean }> {
+  state = { k: 0, errored: false }
+  static getDerivedStateFromError() { return { errored: true } }
+  componentDidCatch() {
+    if (this.state.k < 30) {
+      setTimeout(() => this.setState((s) => ({ errored: false, k: s.k + 1 })), 50)
+    }
+  }
+  render() {
+    if (this.state.errored) {
+      return <div style={{ textAlign: 'center', padding: 24, color: '#9ca3af', fontSize: 13 }}>Loading…</div>
+    }
+    return <Fragment key={this.state.k}>{this.props.children}</Fragment>
+  }
+}
 import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import BrandDrawer from './BrandDrawer'
@@ -1945,16 +1968,18 @@ export default function DiscoveryPage() {
                 the visible cards are mounted (windowing). Deep scroll stays flat in
                 memory (no DOM accumulation / tab freeze). onRender drives infinite load.
                 Keyed by the server query so a NEW search remounts to a fresh grid+top. */}
-            <Masonry
-              key={`${query}|${searchMode}|${selectedBrand?.pageId || ''}|${sort}|${status}|${country}|${timeDays}`}
-              items={filteredAds}
-              columnGutter={12}
-              columnCount={gridCols}
-              overscanBy={3}
-              itemKey={(ad: Ad, i: number) => ad?.id ?? `_${i}`}
-              render={MasonryCard}
-              onRender={handleMasonryRender}
-            />
+            <MasonryBoundary>
+              <Masonry
+                key={`${query}|${searchMode}|${selectedBrand?.pageId || ''}|${sort}|${status}|${country}|${timeDays}`}
+                items={filteredAds}
+                columnGutter={12}
+                columnCount={gridCols}
+                overscanBy={1.5}
+                itemKey={(ad: Ad, i: number) => ad?.id ?? `_${i}`}
+                render={MasonryCard}
+                onRender={handleMasonryRender}
+              />
+            </MasonryBoundary>
             {loading && hasMore && (
               <div style={{ textAlign: 'center', padding: 24, color: '#9ca3af', fontSize: 13 }}>Loading more…</div>
             )}
