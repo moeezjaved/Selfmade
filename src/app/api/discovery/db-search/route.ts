@@ -157,7 +157,11 @@ export async function GET(request: NextRequest) {
       // composite indexes existed (the brand sort scanned the whole score index);
       // with those in place it's sub-second. Brand mode must use page_id=eq (NOT the
       // seed_terms affiliate OR) — the unindexed array-contains makes the join 9s+.
-      .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash,width,height)', { count: 'planned' })
+      // count=exact for brand mode (page_id=eq is indexed → fast + ACCURATE: the
+      // planner estimate is garbage, e.g. ~1,000 for hims's real 2,959 has-creative
+      // ads). Keyword/browse stay 'planned' (exact would scan too much).
+      .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash,width,height)',
+        { count: (q && mode === 'brand') ? 'exact' : 'planned' })
 
     // Country filter — match against the ARRAY of countries the ad targeted
     // (covers multi-country ads correctly). Falls back to legacy 'country'
@@ -297,9 +301,16 @@ export async function GET(request: NextRequest) {
     // dedups the rest by the hashes we expose. Brand mode has no per-brand cap, so it
     // needs no margin; keyword mode keeps a little for the cap. (Future: keyset
     // pagination to kill the deep-offset scan entirely.)
-    const fetchMargin = 2                          // fetch 2× so dedup/cap still yields ~limit
-    const fetchLimit = limit * fetchMargin
-    const fetchOffset = offset                    // raw row offset — NOT multiplied
+    // NON-OVERLAPPING WINDOW pagination. Each page scans a fresh `fetchLimit`-row
+    // window of has-creative ads (page * fetchLimit) and returns ALL unique creatives
+    // in it (no `limit` cap). This fixes the heavy-dedup STALL: with the old
+    // offset+limit overlap, a brand like hims (2,959 ads → ~986 unique) hit runs of
+    // all-duplicate rows → the deduped list stopped growing → infinite-scroll stalled
+    // at ~half (the "511 of 986" bug). Window-aligned windows each contribute their
+    // fresh unique ads, so the list keeps growing until the raw rows are exhausted.
+    const fetchMargin = 3
+    const fetchLimit = limit * fetchMargin         // 120-row window
+    const fetchOffset = page * fetchLimit           // window-aligned — no overlap, no skip
     baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
     const { data: keywordData, error: kwErr, count: kwCount } = await baseQuery
 
@@ -353,7 +364,9 @@ export async function GET(request: NextRequest) {
       seenHashes.add(key)
       perBrand[ad.page_id] = (perBrand[ad.page_id] || 0) + 1
       dedupedAds.push(ad)
-      if (dedupedAds.length >= limit) break
+      // No `>= limit` break — return ALL unique creatives in this window (the window
+      // IS the page now). Capping at `limit` while advancing the offset by the full
+      // window would skip the window's extra unique creatives.
     }
 
     ads = dedupedAds
