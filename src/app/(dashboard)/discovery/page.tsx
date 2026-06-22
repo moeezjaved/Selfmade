@@ -747,12 +747,27 @@ function ScriptsMenu() {
 // through full-size — the no-reflow box already keeps scroll smooth; this just trims
 // bytes once the CDN is wired (a one-env-var switch, no code change).
 const IMG_CDN = process.env.NEXT_PUBLIC_IMG_CDN || ''
-const IMG_WIDTHS = [256, 384, 640, 828, 1080]
-const cdnAt = (url: string, w: number) =>
-  IMG_CDN && url ? `https://${IMG_CDN}/cdn-cgi/image/width=${w},quality=75,format=auto/${url}` : url
-const cdnSrc = (url: string) => (IMG_CDN ? cdnAt(url, 640) : url)
+// Grid cards render at ~340px wide → 480px covers 1.4× DPR; the srcset lets the
+// browser pick 256/384/480/640 by column width & screen density.
+const IMG_WIDTHS = [256, 384, 480, 640]
+// Resize EVERY grid thumbnail. Why this matters: r2.dev serves the ORIGINAL
+// creative (often 1080px+, several hundred KB) — downloading that per card is
+// exactly why cards sat blank/"loading" while you scrolled (Atria/GetHookd serve
+// ~480px webp, so they paint instantly).
+//  • If NEXT_PUBLIC_IMG_CDN is set → Cloudflare Image Resizing on our own domain
+//    (cheapest at scale, R2 is already Cloudflare). This is the production target.
+//  • Otherwise → fall back to the weserv.nl edge image proxy so thumbnails are
+//    small TODAY without waiting on the custom-domain setup. It caches at the edge
+//    and emits webp; the card's skeleton + "image unavailable" fallback keep a rare
+//    miss graceful. Flip the env var later and Cloudflare takes over — no code change.
+const cdnAt = (url: string, w: number) => {
+  if (!url) return url
+  if (IMG_CDN) return `https://${IMG_CDN}/cdn-cgi/image/width=${w},quality=75,format=auto/${url}`
+  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${w}&q=72&output=webp`
+}
+const cdnSrc = (url: string) => cdnAt(url, 480)
 const cdnSrcSet = (url: string) =>
-  IMG_CDN && url ? IMG_WIDTHS.map((w) => `${cdnAt(url, w)} ${w}w`).join(', ') : undefined
+  url ? IMG_WIDTHS.map((w) => `${cdnAt(url, w)} ${w}w`).join(', ') : undefined
 
 // ── CarouselViewer ─ swipeable preview for multi-image ads ──
 function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: string; iframeVisible: boolean }) {
@@ -1993,7 +2008,11 @@ export default function DiscoveryPage() {
                 items={filteredAds}
                 columnGutter={12}
                 columnCount={gridCols}
-                overscanBy={1.5}
+                // Mount ~3 screens ahead so a card's thumbnail starts fetching
+                // before it scrolls into view → no blank cards mid-scroll. (Was 1.5,
+                // throttled down only to dodge the old masonic crash, which is now
+                // fixed at the source via gridKey, so we can preload aggressively.)
+                overscanBy={3}
                 itemKey={(ad: Ad, i: number) => ad?.id ?? `_${i}`}
                 render={MasonryCard}
                 onRender={handleMasonryRender}
