@@ -51,6 +51,17 @@ export function isBlockedMediaHost(hostname: string): boolean {
   return /^(video[-.]|scontent[-.])/i.test(hostname)
 }
 
+// Chromium phones home to Google in the background (account sync, autofill, GCM
+// push, component + safe-browsing updates, connectivity checks) — NONE of which
+// the crawl needs, but they tunnel through the metered IPRoyal proxy (~7% of usage
+// in the report: accounts/www/mtalk/android.clients/clients2.google.com,
+// content-autofill.googleapis.com, connectivitycheck.gstatic.com). Reject them so
+// they never bill IPRoyal. (The Meta crawl only needs www.facebook.com +
+// static.xx.fbcdn.net.)
+export function isBlockedTelemetryHost(hostname: string): boolean {
+  return /(^|\.)(google\.com|googleapis\.com|gstatic\.com|google-analytics\.com|doubleclick\.net|googletagmanager\.com)$/i.test(hostname)
+}
+
 // ── IPRoyal byte accounting (proof: only GraphQL + JS/CSS should appear) ──
 // Every CONNECT that is NOT blocked is forwarded upstream to IPRoyal; we tally
 // the upstream bytes per host so the crawl can log exactly what consumes the
@@ -146,8 +157,8 @@ export async function startProxyChain(opts: {
     port: 0,   // random free port
     verbose: false,
     prepareRequestFunction: ({ hostname, connectionId }: any) => {
-      if (hostname && isBlockedMediaHost(hostname)) {
-        throw new Error(`blocked-media-host:${hostname}`)   // rejected, never forwarded upstream
+      if (hostname && (isBlockedMediaHost(hostname) || isBlockedTelemetryHost(hostname))) {
+        throw new Error(`blocked-host:${hostname}`)   // rejected, never forwarded upstream
       }
       recordConn(connectionId, hostname)
       return { upstreamProxyUrl: upstreamUrl }
