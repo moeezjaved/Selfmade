@@ -26,7 +26,26 @@ export default function ErrorTracker() {
       return false
     }
 
+    // After a deploy, Vercel purges the old JS chunks; a long-open tab then 404s on a
+    // lazy chunk → "Application error: a client-side exception". Auto-reload ONCE to
+    // pull the new build instead of stranding the user on the error page. Guarded by a
+    // 15s sessionStorage stamp so a genuinely-broken chunk can't loop-reload forever.
+    const CHUNK_RE = /ChunkLoadError|Loading (?:CSS )?chunk [\w-]+ failed|dynamically imported module|Importing a module script failed|error loading dynamically imported/i
+    const maybeChunkReload = (message?: string) => {
+      if (!message || !CHUNK_RE.test(message)) return false
+      try {
+        const KEY = '__chunk_reload_ts'
+        const last = Number(sessionStorage.getItem(KEY) || 0)
+        if (Date.now() - last > 15000) {
+          sessionStorage.setItem(KEY, String(Date.now()))
+          window.location.reload()
+        }
+      } catch { window.location.reload() }
+      return true
+    }
+
     const onError = (event: ErrorEvent) => {
+      if (maybeChunkReload(event.message) || maybeChunkReload(event.error?.message)) return
       if (isNoise(event.message)) return
       log(event.message, event.error?.stack)
     }
@@ -34,6 +53,7 @@ export default function ErrorTracker() {
     const onUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason
       const message = reason instanceof Error ? reason.message : String(reason)
+      if (maybeChunkReload(message)) return
       if (isNoise(message)) return
       const stack = reason instanceof Error ? reason.stack : undefined
       log(`Unhandled Promise: ${message}`, stack)
