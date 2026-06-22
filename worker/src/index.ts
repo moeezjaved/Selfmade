@@ -169,6 +169,40 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
     return { ad_id: ad.ad_id, ok: false, terminal: true, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: r2 upload failed' }
   }
 
+  // ── VIDEO POSTERS (drain-time, fresh URL) ──────────────────────────────────────────
+  // Re-host FB's video_preview_image_url for each video creative WHILE we're draining the
+  // ad, i.e. while that signed fbcdn URL is still valid (it expires in hours). Download is
+  // direct-first/proxy-fallback like image creatives — it's an image, so it never touches
+  // IPRoyal in the common case. Best-effort: a poster failure must never fail the creative
+  // save. Old/expired ads are handled separately (mp4 frame extraction), not here.
+  const previewUrls = ad.raw_video_preview_urls || []
+  if (previewUrls.length > 0 && creatives.some((c) => c.asset_type === 'video')) {
+    try {
+      const { images: posterAssets } = await downloadAssetsForAd({
+        adId: ad.ad_id,
+        imageUrls: previewUrls.slice(0, 6),
+        timeoutMs: 30_000,
+      })
+      const posterBufByUrl = new Map(posterAssets.map((a) => [a.url, a.buffer]))
+      const posterByPos: Record<number, string> = {}
+      await Promise.all(
+        previewUrls.map(async (purl, i) => {
+          const buf = posterBufByUrl.get(purl)
+          if (!buf) return
+          const h = await imageHash(buf).catch(() => null)
+          const url = await uploadBufferToR2(buf, `posters/${h || `${ad.ad_id}_${i}`}.jpg`, 'image/jpeg')
+          if (url) posterByPos[i] = url
+        })
+      )
+      const firstPoster = Object.values(posterByPos)[0]
+      for (const c of creatives) {
+        if (c.asset_type === 'video') c.poster_url = posterByPos[c.position] || firstPoster || null
+      }
+    } catch {
+      /* poster is best-effort — never fail the creative save over it */
+    }
+  }
+
   // APPEND-ONLY (creative-queue Phase 2): write creatives to discovery_creatives and
   // STOP here. We no longer UPDATE discovery_ads_index (thumbnail_url/video_url/
   // image_hash/video_hash) per ad — that ~50K/hr UPDATE on a 23-index table was the
