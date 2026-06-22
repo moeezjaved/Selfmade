@@ -283,13 +283,20 @@ export async function GET(request: NextRequest) {
     else if (sort === 'latest_added') baseQuery = baseQuery.order('indexed_at', { ascending: false })
     else if (sort === 'oldest_added') baseQuery = baseQuery.order('indexed_at', { ascending: true })
     else {
-      // 'recommended' (default, Atria-style): proven winners first — active ads
-      // that have run the longest, then recency. Makes the feed feel curated
-      // instead of a raw chronological dump.
-      baseQuery = baseQuery
-        .order('is_active', { ascending: false })
-        .order('days_running', { ascending: false, nullsFirst: false })
-        .order('last_seen', { ascending: false })
+      // 'recommended' (default, Atria-style): proven winners first. The FINAL ranking
+      // is done in-process by qualityScore (longevity + active + recency + format) over
+      // the candidate window below, so the DB ORDER only needs to surface a good
+      // candidate POOL — fast. We deliberately order by last_seen (the ONE indexed sort
+      // column → 0.2s) instead of the old is_active-led 4-column blend, which had NO
+      // composite index and FULL-SORTED the entire has-creative set on every load
+      // (~12s server-side → the grid's multi-second skeleton you saw). Leading a sort
+      // with the is_active boolean was the specific killer (2-value column → no early
+      // cutoff → whole-set sort). last_seen DESC naturally front-loads active ads
+      // (active = crawled/seen recently) and qualityScore then promotes the long-running
+      // winners within the window — same intent, instant. To restore the exact blend as
+      // an index-backed ORDER BY, add the (is_active,days_running,last_seen,ad_id)
+      // composite index (migration 038) and switch this back.
+      baseQuery = baseQuery.order('last_seen', { ascending: false, nullsFirst: false })
     }
     // Stable tiebreaker — without a unique final sort key, rows that tie on the sort
     // column(s) come back in arbitrary (non-deterministic) order across requests, so
