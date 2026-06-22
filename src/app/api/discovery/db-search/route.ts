@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
       // count=exact for brand mode (page_id=eq is indexed → fast + ACCURATE: the
       // planner estimate is garbage, e.g. ~1,000 for hims's real 2,959 has-creative
       // ads). Keyword/browse stay 'planned' (exact would scan too much).
-      .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash,width,height)',
+      .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash,width,height,poster_url)',
         { count: (q && mode === 'brand') ? 'exact' : 'planned' })
 
     // Country filter — match against the ARRAY of countries the ad targeted
@@ -355,7 +355,7 @@ export async function GET(request: NextRequest) {
     // ad's creatives images-first / position-asc so the FIRST is a STABLE dedup key —
     // the index row's "primary" hash is whichever creative was written last, so two
     // identical carousels got different keys and failed to dedup ("'It's been' 3×").
-    type Cre = { position: number; asset_type: 'image' | 'video'; r2_url: string; hash: string | null; width: number | null; height: number | null }
+    type Cre = { position: number; asset_type: 'image' | 'video'; r2_url: string; hash: string | null; width: number | null; height: number | null; poster_url: string | null }
     const sortCres = (cs: Cre[]) => cs.slice().sort((a, b) =>
       (a.asset_type === b.asset_type ? 0 : a.asset_type === 'image' ? -1 : 1) || (a.position - b.position))
     const creativesByAd: Record<string, Cre[]> = {}
@@ -483,12 +483,12 @@ export async function GET(request: NextRequest) {
       const slice = missingIds.slice(i, i + 300)
       const { data: cd } = await admin
         .from('discovery_creatives')
-        .select('ad_id, position, asset_type, r2_url, hash, width, height')
+        .select('ad_id, position, asset_type, r2_url, hash, width, height, poster_url')
         .in('ad_id', slice)
         .order('asset_type', { ascending: true })
         .order('position', { ascending: true })
       for (const c of (cd || []) as any[]) {
-        (creativesByAd[c.ad_id] ||= []).push({ position: c.position, asset_type: c.asset_type, r2_url: c.r2_url, hash: c.hash, width: c.width, height: c.height })
+        (creativesByAd[c.ad_id] ||= []).push({ position: c.position, asset_type: c.asset_type, r2_url: c.r2_url, hash: c.hash, width: c.width, height: c.height, poster_url: c.poster_url })
       }
     }
 
