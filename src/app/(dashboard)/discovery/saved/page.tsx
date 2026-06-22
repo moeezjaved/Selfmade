@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ExternalLink, Bookmark } from 'lucide-react'
+import { cleanCopy } from '@/lib/cleanCopy'
 
 interface Board { id: string; name: string; emoji: string; discovery_saved_ads?: { count: number }[] }
 interface SavedAd { id: string; ad_id: string; page_name: string; snapshot_url: string; ad_data: any; saved_at: string }
@@ -226,12 +227,17 @@ export default function SavedAdsPage() {
                       )}
                       <a href={saved.snapshot_url} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', inset: 0, zIndex: 2 }} />
                     </div>
-                    {(ad.title || ad.body) && (
-                      <div style={{ padding: '10px 14px 12px' }}>
-                        {ad.title && <div style={{ fontSize: 12, fontWeight: 700, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{ad.title}</div>}
-                        {ad.body && <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{ad.body}</div>}
-                      </div>
-                    )}
+                    {(() => {
+                      const title = cleanCopy(ad.title)
+                      const body = cleanCopy(ad.body)
+                      if (!title && !body) return null
+                      return (
+                        <div style={{ padding: '10px 14px 12px' }}>
+                          {title && <div style={{ fontSize: 12, fontWeight: 700, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{title}</div>}
+                          {body && <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{body}</div>}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}

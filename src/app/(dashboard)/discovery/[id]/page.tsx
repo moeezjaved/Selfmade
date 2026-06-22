@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { X, Bookmark, Link as LinkIcon, Download, Sparkles, ExternalLink } from 'lucide-react'
+import { cleanCopy } from '@/lib/cleanCopy'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 
 interface Creative {
@@ -150,9 +151,9 @@ export default function AdDetailPage() {
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db' }} />
             <span>{startFmt} – {ad.stopDate ? endFmt : 'Present'}</span>
           </div>
-          {ad.body && (
+          {cleanCopy(ad.body) && (
             <div style={{ padding: '0 16px 14px', fontSize: 13, color: '#1f2937', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-              {ad.body}
+              {cleanCopy(ad.body)}
             </div>
           )}
           <DetailMedia slides={slides} adId={ad.id} />

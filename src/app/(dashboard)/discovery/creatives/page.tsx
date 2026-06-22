@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { cleanCopy } from '@/lib/cleanCopy'
 
 interface Creative {
   hash: string
@@ -236,9 +237,9 @@ function CreativeCard({ creative: c, onOpen }: { creative: Creative; onOpen: () 
           {runtime > 0 && <Stat label={`${runtime}d run`} />}
         </div>
 
-        {c.sample_body && (
+        {cleanCopy(c.sample_body) && (
           <div style={{ fontSize: 11, color: '#6b7280', marginTop: 8, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4 }}>
-            {c.sample_body}
+            {cleanCopy(c.sample_body)}
           </div>
         )}
       </div>
