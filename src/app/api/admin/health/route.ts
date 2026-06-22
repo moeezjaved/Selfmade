@@ -49,9 +49,27 @@ export async function GET() {
     countWhere(admin, ['thumbnail_url', 'is', null], ['video_url', 'is', null]),
     countWhere(admin, ['creative_extraction_failed_at', 'not.is', null]),
   ])
-  // "with creative" = has an image OR a video. total - missing avoids double-
-  // counting ads that have both (carousels). This is the real "processed" figure.
-  const qWithCreative = Math.max(0, qTotal - qMissing)
+  // ── ACCURATE creative coverage (post-Phase-2) ──────────────────────────────
+  // The thumbnail_url/video_url counts above are LEGACY: the append-only worker
+  // stopped writing those columns (creatives live in discovery_creatives now), so a
+  // drained ad shows as "missing" by the old yardstick. Count the ads that ACTUALLY
+  // have a creative row (RPC, migration 037), and report "pending" from the real
+  // work-queue. Falls back to the legacy calc if the RPC isn't deployed yet.
+  let qCreativeAds: number | null = null
+  try {
+    const { data: cc } = await admin.rpc('discovery_ads_with_creative_count')
+    if (typeof cc === 'number') qCreativeAds = cc
+  } catch { /* RPC not deployed → legacy fallback below */ }
+  let qPending = 0
+  try {
+    const { count } = await admin.from('creative_queue').select('*', { count: 'exact', head: true })
+    qPending = count ?? 0
+  } catch { /* creative_queue absent → 0 */ }
+
+  // "with creative" = ads with a real creative row (accurate) — else legacy estimate.
+  const qWithCreative = qCreativeAds ?? Math.max(0, qTotal - qMissing)
+  // Real "no creative yet" = total − with_creative (replaces the stale thumbnail calc).
+  const qMissingReal = qCreativeAds != null ? Math.max(0, qTotal - qCreativeAds) : qMissing
 
   // ── Crawler runs (1h + 24h) ──
   const [{ data: runs1h }, { data: runs24h }] = await Promise.all([
@@ -327,7 +345,10 @@ export async function GET() {
       video: qVideo,
       with_creative: qWithCreative,
       fast_path_ready: qFastReady,
-      missing: qMissing,
+      // accurate "no creative yet" (from discovery_creatives, not the dead thumbnail
+      // column) + the real drainable backlog sitting in the work-queue.
+      missing: qMissingReal,
+      pending: qPending,
       failed: qFailed,
       thumbed_pct: qTotal > 0 ? Math.round((qWithCreative / qTotal) * 1000) / 10 : 0,
     },

@@ -38,6 +38,7 @@ interface HealthData {
     with_creative: number
     fast_path_ready: number
     missing: number
+    pending?: number
     failed: number
     thumbed_pct: number
   }
@@ -349,12 +350,13 @@ export default function HealthDashboard() {
             title="Ad queue"
             hint="Snapshot of every ad ever discovered, broken down by processing state. Total includes ads from all brands ever crawled (even inactive ones)."
           >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
               <KPI label="Total" value={data.queue.total.toLocaleString()} hint="Every ad ID in the database across all brands. New ads land here when the indexer crawls a brand." />
-              <KPI label="With creative" value={data.queue.with_creative.toLocaleString()} sub={`${data.queue.thumbed_pct}% · ${data.queue.thumbed.toLocaleString()} img · ${data.queue.video.toLocaleString()} vid`} tone="good" hint="Ads with a downloaded creative in R2 — image (thumbnail) OR video. These are visible in discovery. Videos set video_url, not thumbnail_url, so counting only thumbnails understated this." />
-              <KPI label="Fast-path ready" value={data.queue.fast_path_ready.toLocaleString()} sub="raw URLs populated" tone={data.queue.fast_path_ready > 0 ? 'good' : 'warn'} hint="Ads where the indexer extracted creative URLs directly from Meta's GraphQL response. The worker processes these in ~5s each (vs ~25s for the legacy DOM path). >0 = healthy." />
-              <KPI label="Missing" value={data.queue.missing.toLocaleString()} hint="Ads with no thumbnail yet. Worker will eventually process them, fast-path-ready first then legacy." />
-              <KPI label="Marked failed" value={data.queue.failed.toLocaleString()} tone={data.queue.failed > 1000 ? 'warn' : 'neutral'} hint="Ads the worker tried 3 times and gave up on (usually because Meta returned a 1087-byte placeholder = ad expired/deleted before we could grab it). Reset by setting creative_extraction_failed_at = NULL in SQL." />
+              <KPI label="With creative" value={data.queue.with_creative.toLocaleString()} sub="have a discovery_creatives row" tone="good" hint="Ads that ACTUALLY have a creative row in discovery_creatives (the append-only source of truth) — these show in discovery. Counted via a distinct-ad count, not the legacy thumbnail_url column the worker no longer writes." />
+              <KPI label="Fast-path ready" value={data.queue.fast_path_ready.toLocaleString()} sub="raw URLs populated" tone={data.queue.fast_path_ready > 0 ? 'good' : 'warn'} hint="Ads where the indexer extracted creative URLs directly from Meta's GraphQL response. The worker processes these in ~5s each. (Legacy thumbnail-based metric.)" />
+              <KPI label="Missing (no creative)" value={data.queue.missing.toLocaleString()} hint="Ads with NO creative row in discovery_creatives yet = total − with_creative. The real backlog. Drops as the drain processes the queue." />
+              <KPI label="Pending (queue)" value={(data.queue.pending ?? 0).toLocaleString()} tone={(data.queue.pending ?? 0) > 0 ? 'warn' : 'good'} hint="Ads enqueued in creative_queue waiting for the drain — the LIVE drainable backlog. Shrinks in real time as the worker processes it. 0 = drain caught up." />
+              <KPI label="Marked failed" value={data.queue.failed.toLocaleString()} tone={data.queue.failed > 1000 ? 'warn' : 'neutral'} hint="Ads the worker tried 3 times and gave up on (usually a 1087-byte placeholder = ad expired/deleted before we could grab it). Reset by setting creative_extraction_failed_at = NULL." />
             </div>
           </Section>
 
