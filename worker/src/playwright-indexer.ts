@@ -58,10 +58,16 @@ const TARGET_ADS_PER_BRAND = 1500         // bumped after fixing pagination scro
 // behaviour of hammering the same blocked brand every cycle.
 const SCHED_GAP_MIN = parseInt(process.env.SCHEDULER_MIN_BRAND_GAP_MIN ?? '360', 10)  // 6h between full re-crawls
 const GATE_RETRY_MIN = parseInt(process.env.SCHEDULER_GATE_RETRY_MIN ?? '15', 10)     // retry a gated brand in 15m
-// After a crawl that added >= this many ads, re-crawl soon to verify we got the
-// FULL inventory (Meta soft-gates can truncate a big brand to ~30 and mark it
-// "complete"). The verify pass is cheap thanks to incremental early-stop.
-const GROWTH_VERIFY_THRESHOLD = parseInt(process.env.SCHEDULER_GROWTH_VERIFY ?? '20', 10)
+// Verify-recrawl: re-crawl soon ONLY when this crawl looks SOFT-GATED, not after
+// every productive haul. Meta soft-gates truncate a brand to ~30 ads and mark the
+// page "complete" (has_next_page=false). The OLD trigger ("added >= GROWTH_VERIFY
+// new ads") fired on EVERY productive crawl — e.g. a fresh brand returning 1,013
+// ads got re-crawled 30 min later for nothing — which is what was burning IPRoyal
+// and breaking the 7-day cadence (re-crawling at ~283/hr). The real soft-gate
+// SIGNATURE is a crawl that hit Meta's has_next_page=false at a SUSPICIOUSLY LOW
+// count (truncation) — OR hit the page cap with more pages still pending. A big
+// "complete" haul or an incremental early-stop on known ads is NOT suspect.
+const SOFT_GATE_SUSPECT_MAX = parseInt(process.env.SCHEDULER_SOFT_GATE_MAX ?? '45', 10) // a "complete" crawl returning <= this many is truncation-suspect
 const VERIFY_RETRY_MIN = parseInt(process.env.SCHEDULER_VERIFY_RETRY_MIN ?? '30', 10) // verify-recrawl in 30m
 // Below this many already-indexed ads, skip incremental early-stop and crawl
 // fully — guards under-covered / soft-gated brands from being cemented low.
@@ -86,6 +92,7 @@ interface RunMetrics {
   cursorsSeen: number
   scrollCount: number
   successWindow: boolean[]   // true = ad data, false = empty/error
+  softGateSuspect: boolean   // crawl looks truncated/incomplete → warrants one verify-recrawl
 }
 
 interface ExtractedAd {
@@ -563,6 +570,7 @@ async function crawlBrand(opts: {
     bytesThroughProxy: 0, blockedMedia: 0, cacheHits: 0, cacheMiss: 0,
     responsesCaptured: 0, cursorsSeen: 0, scrollCount: 0,
     successWindow: [],
+    softGateSuspect: false,
   }
 
   console.log(`\n🌐 Crawling ${opts.brandName || opts.pageId} (session ${sessionId})…`)
@@ -1002,6 +1010,15 @@ async function crawlBrand(opts: {
 
   // ========== Save to DB ==========
   metrics.adsDiscovered = allAds.size
+  // Soft-gate suspicion (drives verify-recrawl). TRUE only when the result might be
+  // INCOMPLETE: Meta said "complete" (has_next_page=false) but at a suspiciously low
+  // count (classic ~30 truncation), OR we stopped at the page cap with more pending.
+  // FALSE for a big clean haul (clearly complete) and for an incremental early-stop
+  // on known ads (we know we captured the full NEW set) — so productive crawls no
+  // longer trigger a wasteful 30-min re-crawl.
+  metrics.softGateSuspect =
+    abortReason === 'cursor_walk_ended_with_more' ||
+    (abortReason === 'cursor_walk_complete' && metrics.adsDiscovered <= SOFT_GATE_SUSPECT_MAX)
   let adsArray = Array.from(allAds.values())
 
   // ── Affiliate filtering ──
@@ -1095,13 +1112,13 @@ async function crawlBrandCountries(opts: {
   pageId: string; brandName: string; maxScrolls?: number
   config: { enabled: boolean; countries: string[] }
   activeCountries: string[]
-}): Promise<{ adsDiscovered: number; adsNew: number }> {
+}): Promise<{ adsDiscovered: number; adsNew: number; softGateSuspect: boolean }> {
   const mkRun = () => randomBytes(16).toString('hex').slice(0, 32).replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
 
   // Single country=ALL crawl (toggle OFF or no countries configured).
   if (!opts.config.enabled || opts.config.countries.length === 0) {
     const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls })
-    return { adsDiscovered: m.adsDiscovered, adsNew: m.adsNew }
+    return { adsDiscovered: m.adsDiscovered, adsNew: m.adsNew, softGateSuspect: m.softGateSuspect }
   }
 
   // Multi-country: pick the countries to crawl (skip-empty). Intersect the
@@ -1113,11 +1130,12 @@ async function crawlBrandCountries(opts: {
   const toCrawl = fullSweep ? opts.config.countries : activeInConfig
   console.log(`  🌍 multi-country (${fullSweep ? 'full sweep' : 'active only'}): ${toCrawl.join(', ')}`)
 
-  let totalDiscovered = 0, totalNew = 0
+  let totalDiscovered = 0, totalNew = 0, anySuspect = false
   const hadAds: string[] = []
   for (const cc of toCrawl) {
     const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls, country: cc })
     totalDiscovered += m.adsDiscovered; totalNew += m.adsNew
+    if (m.softGateSuspect) anySuspect = true
     if (m.adsDiscovered > 0) hadAds.push(cc)
     await sleep(2_000)  // small gap between country crawls
   }
@@ -1133,7 +1151,7 @@ async function crawlBrandCountries(opts: {
     .eq('page_id', opts.pageId)
   console.log(`  🌍 active countries for ${opts.brandName || opts.pageId}: ${newActive.join(', ') || '(none)'}`)
 
-  return { adsDiscovered: totalDiscovered, adsNew: totalNew }
+  return { adsDiscovered: totalDiscovered, adsNew: totalNew, softGateSuspect: anySuspect }
 }
 
 // Stamp a brand's MANUAL admin categories onto all its ads (brand_categories),
@@ -1239,23 +1257,27 @@ async function main() {
       // last_crawled_at into the past so `now - last_crawled_at >= SCHED_GAP_MIN`
       // fires after `backoffMin`. Three cases:
       //   • Gated (0 ads, IP soft-blocked) → GATE_RETRY_MIN, another IP retries.
-      //   • Substantial new ads (>= GROWTH_VERIFY_THRESHOLD) → VERIFY_RETRY_MIN.
-      //     A truncated "soft-gate" crawl returns a partial set but is marked
-      //     complete (e.g. ag1 returned 30 of hundreds). We can't tell a soft-gate
-      //     from a real small brand in one crawl — so after ANY big haul we
-      //     re-crawl soon to verify. Incremental makes the verify cheap: a fully
-      //     covered brand finds ~0 new and settles to full cadence; a soft-gated
-      //     one keeps finding new ads and keeps recovering until it stabilises.
-      //   • Otherwise (little/no growth → stable) → full SCHED_GAP_MIN cadence.
+      //   • SOFT-GATE SUSPECT (m.softGateSuspect) → VERIFY_RETRY_MIN. Set ONLY when
+      //     the crawl might be truncated: Meta marked the page complete
+      //     (has_next_page=false) at a suspiciously low count (e.g. ag1 returned 30
+      //     of hundreds), OR we hit the page cap with more pending. The verify is
+      //     cheap (incremental): a fully covered brand finds ~0 new and settles; a
+      //     real soft-gate keeps recovering. NOTE: this used to fire on ANY haul
+      //     >= GROWTH_VERIFY_THRESHOLD new ads — which re-crawled every productive
+      //     brand 30 min later (~283/hr, burning IPRoyal + breaking the 7-day gap).
+      //   • Otherwise (clean complete haul or incremental early-stop) → full SCHED_GAP_MIN cadence.
       const now = Date.now()
       let backoffMin: number
       if (m.adsDiscovered === 0) {
         backoffMin = GATE_RETRY_MIN
         console.warn(`  ⚠️ ${brand.term || brand.page_id}: 0 ads (gated) — retry in ${GATE_RETRY_MIN} min`)
-      } else if (m.adsNew >= GROWTH_VERIFY_THRESHOLD) {
+      } else if (m.softGateSuspect) {
+        // Only re-crawl soon when the result looks TRUNCATED/incomplete — NOT after
+        // every productive haul (that was re-crawling at ~283/hr and burning IPRoyal).
         backoffMin = VERIFY_RETRY_MIN
-        console.log(`  🔎 ${brand.term || brand.page_id}: +${m.adsNew} new — verify-recrawl in ${VERIFY_RETRY_MIN} min (guards against soft-gate truncation)`)
+        console.log(`  🔎 ${brand.term || brand.page_id}: ${m.adsDiscovered} ads, possibly soft-gate-truncated — verify-recrawl in ${VERIFY_RETRY_MIN} min`)
       } else {
+        // Clean, complete haul (or incremental early-stop on known ads) → full 7-day cadence.
         backoffMin = SCHED_GAP_MIN
       }
       const lastCrawled = new Date(now - Math.max(0, SCHED_GAP_MIN - backoffMin) * 60_000).toISOString()
