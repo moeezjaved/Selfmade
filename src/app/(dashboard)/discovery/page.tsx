@@ -37,6 +37,7 @@ interface Creative {
   hash: string | null
   width?: number | null    // original pixel dims → reserve card height (no reflow)
   height?: number | null
+  poster_url?: string | null   // video poster frame (FB preview, re-hosted to R2)
 }
 
 interface Ad {
@@ -773,14 +774,14 @@ const cdnSrcSet = (url: string) =>
 function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: string; iframeVisible: boolean }) {
   const router = useRouter()
   // Build slide list: prefer creatives[] (full carousel), fall back to legacy single image/video
-  type Slide = { type: 'image' | 'video'; url: string; width?: number | null; height?: number | null }
+  type Slide = { type: 'image' | 'video'; url: string; width?: number | null; height?: number | null; poster?: string | null }
   const slides: Slide[] = useMemo(() => {
     if (ad.creatives && ad.creatives.length > 0) {
       const sorted = [...ad.creatives].sort((a, b) => {
         if (a.asset_type !== b.asset_type) return a.asset_type === 'image' ? -1 : 1
         return a.position - b.position
       })
-      return sorted.map((c) => ({ type: c.asset_type, url: c.r2_url, width: c.width, height: c.height }))
+      return sorted.map((c) => ({ type: c.asset_type, url: c.r2_url, width: c.width, height: c.height, poster: c.poster_url }))
     }
     const fallback: Slide[] = []
     if (ad.thumbnailUrl && !ad.thumbnailUrl.includes('graph.facebook.com')) {
@@ -804,7 +805,10 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   // Play INLINE (not navigate). stopPropagation so the card's onClick (→ detail page)
   // doesn't fire — clicking the play button was opening the detail page instead of
   // playing the video right there in the grid.
-  const startPlay = (e?: React.MouseEvent) => { e?.stopPropagation(); setPlaying(true); videoRef.current?.play().catch(() => {}) }
+  // Mount + autoplay the video INLINE (stopPropagation so the card's onClick → detail
+  // page doesn't fire). The <video> isn't in the DOM until `playing` flips, so nothing
+  // downloads until this runs.
+  const startPlay = (e?: React.MouseEvent) => { e?.stopPropagation(); setPlaying(true) }
   const next = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i + 1) % total); setPlaying(false) }
   const prev = (e?: React.MouseEvent) => { e?.stopPropagation(); setIdx(i => (i - 1 + total) % total); setPlaying(false) }
 
@@ -824,6 +828,10 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   const aspectPct = rawPct != null
     ? Math.min(178, Math.max(56, rawPct))   // clamp 16:9 … 9:16 so nothing is absurdly tall/short
     : (primary?.type === 'video' ? 125 : 100)
+  // Real video poster (FB preview frame, re-hosted to R2), resized via the CDN. When
+  // present the card shows the actual first frame instead of the branded placeholder,
+  // and the video only downloads on click (preload off) → fast + cheap.
+  const posterSrc = (slide?.type === 'video' && slide.poster) ? cdnSrc(slide.poster) : undefined
   return (
     <div
       className="ad-card-visual"
@@ -863,40 +871,52 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         </>
       ) : (
         <>
-          {/* Branded placeholder while the video frame loads — reads as an intentional
-              "video, ready to play" card (brand gradient + initial watermark + play
-              button), NOT a grey loading box. The real first frame fades in over it. */}
-          {!imgLoaded && (
+          {/* RESTING STATE (not playing): show the real poster frame if we have one,
+              otherwise the branded gradient+initial placeholder. The <video> is NOT
+              mounted yet — so nothing downloads until the user hits play. */}
+          {!playing && (
             <div style={{
               position: 'absolute', inset: 0, zIndex: 1,
               background: `linear-gradient(140deg, ${avatarBg} 0%, #14181c 130%)`,
               display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
             }}>
-              <span style={{ position: 'absolute', fontSize: 72, fontWeight: 900, color: 'rgba(255,255,255,0.10)', letterSpacing: '-0.05em', userSelect: 'none', lineHeight: 1 }}>
-                {(ad.pageName || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
-              </span>
-              <button onClick={startPlay} aria-label="Play" style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', zIndex: 2, border: 'none', cursor: 'pointer', padding: 0 }}>
-                <span style={{ fontSize: 20, marginLeft: 3, color: '#111' }}>▶</span>
-              </button>
+              {/* brand initial watermark (visible until the poster paints; always visible if no poster) */}
+              {!imgLoaded && (
+                <span style={{ position: 'absolute', fontSize: 72, fontWeight: 900, color: 'rgba(255,255,255,0.10)', letterSpacing: '-0.05em', userSelect: 'none', lineHeight: 1 }}>
+                  {(ad.pageName || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+                </span>
+              )}
+              {posterSrc && (
+                <img
+                  src={posterSrc}
+                  alt={ad.pageName}
+                  loading="lazy"
+                  decoding="async"
+                  onLoad={() => setImgLoaded(true)}
+                  onError={() => setImgLoaded(true)}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease' }}
+                />
+              )}
             </div>
           )}
-          <video
-            ref={videoRef}
-            key={slide.url}
-            src={slide.url}
-            controls={playing}
-            preload="metadata"
-            playsInline
-            onLoadedData={() => setImgLoaded(true)}
-            onLoadedMetadata={() => setImgLoaded(true)}
-            onCanPlay={() => setImgLoaded(true)}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', outline: 'none', border: 'none', background: '#000', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', zIndex: 2 }}
-            onEnded={() => setPlaying(false)}
-          />
-          {imgLoaded && !playing && (
+          {/* VIDEO — only mounted once the user hits play, so it never downloads upfront. */}
+          {playing && (
+            <video
+              ref={videoRef}
+              key={slide.url}
+              src={slide.url}
+              autoPlay
+              controls
+              playsInline
+              preload="auto"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', outline: 'none', border: 'none', background: '#000', zIndex: 2 }}
+              onEnded={() => setPlaying(false)}
+            />
+          )}
+          {/* Play overlay — the button PLAYS inline (stopPropagation); clicking around it opens detail. */}
+          {!playing && (
             <div onClick={() => router.push(`/discovery/${ad.id}`)}
-              style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', cursor: 'pointer', zIndex: 3 }}>
-              {/* Play button PLAYS inline (stopPropagation); clicking around it opens detail. */}
+              style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.18)', cursor: 'pointer', zIndex: 3 }}>
               <button onClick={startPlay} aria-label="Play" style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)', border: 'none', cursor: 'pointer', padding: 0 }}>
                 <span style={{ fontSize: 20, marginLeft: 3, color: '#111' }}>▶</span>
               </button>

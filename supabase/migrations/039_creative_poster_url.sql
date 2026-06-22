@@ -1,0 +1,13 @@
+-- Video poster frames.
+--
+-- Meta's GraphQL already gives every video ad a `video_preview_image_url` (FB's own
+-- poster frame), and the crawler ALREADY captures + stores it in
+-- discovery_ads_index.raw_video_preview_urls (zero extra IPRoyal — it's a field in a
+-- response we already download). This column lets us re-host that poster to R2 (like we
+-- already do for image creatives) and attach it to the VIDEO creative, so the grid can
+-- show the real first frame instantly instead of the branded placeholder — and the
+-- <video> only downloads when the user hits play.
+--
+-- Nullable, metadata-only add (no table rewrite) → instant. Still, run with crawl+drain
+-- paused per the standing pause-before-DDL rule, to be safe.
+alter table discovery_creatives add column if not exists poster_url text;
