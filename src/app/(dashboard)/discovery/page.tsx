@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Component, Fragment } from 'react'
 import type { ReactNode } from 'react'
 import { Masonry } from 'masonic'
+import { cleanCopy } from '@/lib/cleanCopy'
 
 // masonic's virtualizer can throw during fast scroll near the load-more boundary
 // (its positioner momentarily indexes past the items array → WeakMap.set(undefined)
@@ -1000,11 +1001,10 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
   const initials = ad.pageName?.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || '?'
   const avatarBg = avatarColor(ad.pageName || '')
   // Template-body ads (DPA/catalog) store raw `{{product.brand}}` tokens, not real
-  // copy — showing the literal template looks broken. Strip tokens; if nothing real
-  // is left, fall back to the vision-recovered on-screen text, then title.
-  const rawBody = ad.body || ''
-  const stripped = rawBody.replace(/\{\{[^}]*\}\}/g, '').replace(/\s+/g, ' ').trim()
-  const bodyText = stripped.length >= 3 ? rawBody : (ad.onScreenText || ad.title || '')
+  // copy — showing the literal template looks broken. cleanCopy strips the tokens
+  // (even when mixed with real text), falling back to vision-recovered on-screen
+  // text, then title, only if the body was nothing but tokens.
+  const bodyText = cleanCopy(ad.body, ad.onScreenText, ad.title)
   const isLong = bodyText.length > 220
   const displayBody = expanded || !isLong ? bodyText : bodyText.slice(0, 220) + '…'
 
@@ -1417,6 +1417,25 @@ export default function DiscoveryPage() {
       return true
     })
   }, [rawAds, format, industry, language, theme])
+
+  // Masonry remount signature. masonic's positioner caches per-index geometry; when
+  // a filter SHRINKS the result set without a remount, its cached range still points
+  // past the now-shorter items array → it reads `items[staleIndex]` (undefined) and
+  // does WeakMap.set(undefined) → throw (the old "client-side exception"). The fix:
+  // give Masonry a `key` that changes whenever a NEW result set is fetched, so it
+  // gets a clean positioner. This MUST mirror the fetchAds(true) effect deps exactly
+  // — every server-side filter — or a filter that changes the data but not the key
+  // would desync the positioner again. (load-more keeps the key stable → no remount,
+  // so infinite scroll still appends smoothly.) The error boundary stays as a backstop.
+  const gridKey = useMemo(() => [
+    query, searchMode, selectedBrand?.pageId || '', sort, status, country, timeDays,
+    platforms.join(','), format.join(','), industry.join(','), language.join(','), theme.join(','),
+    tiers.join(','), niches.join('|'), minBrandAdsStr, minDaysStr, minReuseStr, adsPerBrandStr,
+    hookTypes.join(','), emotions.join(','), angles.join(','),
+    formatStyles.join(','), visualStyles.join(','), ctaStyles.join(','),
+  ].join('|'), [query, searchMode, selectedBrand?.pageId, sort, status, country, timeDays,
+    platforms, format, industry, language, theme, tiers, niches, minBrandAdsStr, minDaysStr, minReuseStr,
+    adsPerBrandStr, hookTypes, emotions, angles, formatStyles, visualStyles, ctaStyles])
 
   // ── Virtualized masonry plumbing (masonic) ──────────────────────────────
   // Route the (non-memoized) card handlers through a ref so the masonry render
@@ -1970,7 +1989,7 @@ export default function DiscoveryPage() {
                 Keyed by the server query so a NEW search remounts to a fresh grid+top. */}
             <MasonryBoundary>
               <Masonry
-                key={`${query}|${searchMode}|${selectedBrand?.pageId || ''}|${sort}|${status}|${country}|${timeDays}`}
+                key={gridKey}
                 items={filteredAds}
                 columnGutter={12}
                 columnCount={gridCols}

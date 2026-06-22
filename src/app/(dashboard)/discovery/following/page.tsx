@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Heart } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { cleanCopy } from '@/lib/cleanCopy'
 
 interface Ad {
   id: string; pageId: string; pageName: string; body: string
@@ -65,7 +66,7 @@ export default function FollowingPage() {
                   {thumb(ad) && <img src={thumb(ad) as string} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />}
                   <div style={{ padding: '10px 12px' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{ad.pageName}</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{ad.body}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{cleanCopy(ad.body)}</div>
                   </div>
                 </div>
               ))}

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { X, ExternalLink, Heart, Clock, TrendingUp, Video, Image, Layers } from 'lucide-react'
+import { cleanCopy } from '@/lib/cleanCopy'
 
 // ── Types ────────────────────────────────────────────────────────
 interface BrandData {
@@ -154,12 +155,17 @@ function MiniCreativeCard({ ad }: { ad: any }) {
           )}
         </div>
         {/* Text */}
-        {(ad.body || ad.title) && (
-          <div style={{ padding: '8px 10px' }}>
-            {ad.title && <div style={{ fontSize: 11, fontWeight: 700, color: '#111', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.title}</div>}
-            {ad.body && <div style={{ fontSize: 10, color: '#6b7280', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any }}>{ad.body}</div>}
-          </div>
-        )}
+        {(() => {
+          const title = cleanCopy(ad.title)
+          const body = cleanCopy(ad.body)
+          if (!title && !body) return null
+          return (
+            <div style={{ padding: '8px 10px' }}>
+              {title && <div style={{ fontSize: 11, fontWeight: 700, color: '#111', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>}
+              {body && <div style={{ fontSize: 10, color: '#6b7280', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any }}>{body}</div>}
+            </div>
+          )
+        })()}
       </div>
     </a>
   )
@@ -240,17 +246,21 @@ function HooksTab({ hooks }: { hooks: BrandData['hooks'] }) {
             </span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {hook.examples.map(ex => (
-              <div key={ex.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                {ex.thumb && (
-                  <img src={ex.thumb} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', flexShrink: 0, border: '1px solid #e2e8f0' }}
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                )}
-                <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.6, fontStyle: 'italic' }}>
-                  "{ex.body}{ex.body.length >= 160 ? '…' : ''}"
+            {hook.examples.map(ex => {
+              const body = cleanCopy(ex.body)
+              if (!body) return null
+              return (
+                <div key={ex.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  {ex.thumb && (
+                    <img src={ex.thumb} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', flexShrink: 0, border: '1px solid #e2e8f0' }}
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  )}
+                  <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.6, fontStyle: 'italic' }}>
+                    "{body}{body.length >= 160 ? '…' : ''}"
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       ))}
@@ -263,10 +273,12 @@ function TextListTab({ items, emptyMsg }: {
   items: { id: string; text: string; isActive: boolean; date: string; snapshot_url: string; thumb?: string | null }[]
   emptyMsg: string
 }) {
-  if (!items.length) return <EmptyState text={emptyMsg} />
+  // Strip dynamic-creative {{tokens}} and drop entries that were nothing but tokens.
+  const visible = items.map(i => ({ ...i, text: cleanCopy(i.text) })).filter(i => i.text)
+  if (!visible.length) return <EmptyState text={emptyMsg} />
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {items.map(item => (
+      {visible.map(item => (
         <a key={item.id} href={item.snapshot_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
           <div style={{
             padding: '12px 14px', background: '#fff', borderRadius: 10, border: '1px solid #f1f5f9',
