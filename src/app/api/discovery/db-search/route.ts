@@ -291,6 +291,11 @@ export async function GET(request: NextRequest) {
         .order('days_running', { ascending: false, nullsFirst: false })
         .order('last_seen', { ascending: false })
     }
+    // Stable tiebreaker — without a unique final sort key, rows that tie on the sort
+    // column(s) come back in arbitrary (non-deterministic) order across requests, so
+    // offset-based pages overlap/shuffle and some creatives never appear. ad_id makes
+    // every page boundary deterministic.
+    baseQuery = baseQuery.order('ad_id', { ascending: true })
 
     // Page STRAIGHT THROUGH the has-creative results (the inner-join already filtered
     // to displayable ads), `limit` per page. CRITICAL: do NOT multiply the offset by
@@ -308,8 +313,9 @@ export async function GET(request: NextRequest) {
     // all-duplicate rows → the deduped list stopped growing → infinite-scroll stalled
     // at ~half (the "511 of 986" bug). Window-aligned windows each contribute their
     // fresh unique ads, so the list keeps growing until the raw rows are exhausted.
-    const fetchMargin = 3
-    const fetchLimit = limit * fetchMargin         // 120-row window
+    const fetchMargin = 2
+    const fetchLimit = limit * fetchMargin         // 80-row window → ~50-60 unique/page,
+                                                   // so loadMore fires more often (smoother)
     const fetchOffset = page * fetchLimit           // window-aligned — no overlap, no skip
     baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
     const { data: keywordData, error: kwErr, count: kwCount } = await baseQuery
