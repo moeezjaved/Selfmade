@@ -24,17 +24,26 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
 
   const q = (req.nextUrl.searchParams.get('q') || '').trim()
-  let query = admin
-    .from('discovery_brand_crawl_state')
-    .select('page_id, brand_name, ads_indexed')
-    .gt('ads_indexed', 0)
-    .order('ads_indexed', { ascending: false })
-    .limit(q ? 60 : 120)
-  if (q) query = query.ilike('brand_name', `%${q}%`)
-
-  const { data, error } = await query
+  const limit = q ? 60 : 120
+  const build = (cols: string) => {
+    let qq = admin.from('discovery_brand_crawl_state').select(cols).gt('ads_indexed', 0).order('ads_indexed', { ascending: false }).limit(limit)
+    if (q) qq = qq.ilike('brand_name', `%${q}%`)
+    return qq
+  }
+  // Try the rich columns (migration 040); fall back if not applied yet.
+  let { data, error } = await build('page_id, brand_name, ads_indexed, active_count, video_count, image_count, carousel_count')
+  if (error) ({ data, error } = await build('page_id, brand_name, ads_indexed'))
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const brands = (data || []).map((b: any) => ({ pageId: b.page_id, name: b.brand_name || b.page_id, adCount: b.ads_indexed || 0 }))
+
+  const brands = (data || []).map((b: any) => {
+    const total = b.ads_indexed || 0
+    const active = b.active_count ?? null
+    return {
+      pageId: b.page_id, name: b.brand_name || b.page_id, adCount: total,
+      active, inactive: active != null ? Math.max(0, total - active) : null,
+      video: b.video_count ?? null, image: b.image_count ?? null, carousel: b.carousel_count ?? null,
+    }
+  })
   return NextResponse.json({ brands })
 }
 

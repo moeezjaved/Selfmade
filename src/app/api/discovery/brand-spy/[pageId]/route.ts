@@ -116,8 +116,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   // Self-heal the list count: crawl_state.ads_indexed stores only the last run's count, so
   // the directory can lag the real index total (the 357-vs-933 gruns mismatch). Sync the
   // true live count back so the list and this dashboard agree. Best-effort.
+  const cOf = (k: string) => fmt.find((f) => f.label === k)?.count || 0
   admin.from('discovery_brand_crawl_state')
-    .upsert({ page_id: pageId, brand_name: name || pageId, ads_indexed: total }, { onConflict: 'page_id' })
+    .upsert({
+      page_id: pageId, brand_name: name || pageId, ads_indexed: total,
+      active_count: active, video_count: cOf('Video'), image_count: cOf('Image'), carousel_count: cOf('Carousel/DCO'),
+      stats_at: new Date().toISOString(),
+    }, { onConflict: 'page_id' })
     .then(() => {}, () => {})
 
   const startsSorted = ads.map((a) => a.start_date).filter(Boolean).sort() as string[]

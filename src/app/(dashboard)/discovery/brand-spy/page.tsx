@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCredits, refreshCredits } from '@/components/credits/CreditCounter'
 
-type Brand = { pageId: string; name: string; adCount: number }
+type Brand = { pageId: string; name: string; adCount: number; active: number | null; inactive: number | null; video: number | null; image: number | null; carousel: number | null }
 
 function tab(active: boolean): React.CSSProperties {
   return { padding: '7px 16px', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none', color: active ? '#111' : '#6b7280', background: active ? 'rgba(223,254,149,0.5)' : '#f3f4f6', border: 'none', cursor: 'pointer' }
@@ -78,16 +78,26 @@ export default function BrandSpyList() {
         style={{ width: 360, padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, marginBottom: 14, outline: 'none' }} />
 
       <div style={{ background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px', padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          <div>Brand</div><div style={{ textAlign: 'right' }}>Ads tracked</div><div style={{ textAlign: 'right' }}>Spy</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 90px', padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <div>Brand</div><div>Ads (active · inactive)</div><div>Type</div><div style={{ textAlign: 'right' }}>Spy</div>
         </div>
         {loading && <div style={{ padding: 24, color: '#9ca3af', fontSize: 14 }}>Loading brands…</div>}
         {!loading && brands.length === 0 && <div style={{ padding: 24, color: '#9ca3af', fontSize: 14 }}>No brands match “{q}”.</div>}
         {brands.map((b) => (
           <div key={b.pageId} className="bs-row" onClick={() => busy ? null : spy({ pageId: b.pageId, name: b.name }, b.pageId)}
-            style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>
+            style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 90px', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</div>
-            <div style={{ textAlign: 'right', fontSize: 14, color: '#374151' }}>{b.adCount.toLocaleString()}</div>
+            <div style={{ fontSize: 13, color: '#374151' }}>
+              {b.active != null
+                ? <span><span style={{ color: '#16a34a', fontWeight: 700 }}>{b.active.toLocaleString()}</span> active · <span style={{ color: '#9ca3af' }}>{(b.inactive ?? 0).toLocaleString()} inactive</span></span>
+                : <span>{b.adCount.toLocaleString()} ads</span>}
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', display: 'flex', gap: 8 }}>
+              {b.video != null && <span title="Video">🎬 {b.video}</span>}
+              {b.image != null && <span title="Image">🖼️ {b.image}</span>}
+              {b.carousel != null && b.carousel > 0 && <span title="Carousel/DCO">▦ {b.carousel}</span>}
+              {b.active == null && <span>—</span>}
+            </div>
             <div style={{ textAlign: 'right' }}><span style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', background: 'rgba(32,117,255,0.08)', padding: '5px 12px', borderRadius: 999 }}>{busy === b.pageId ? '…' : 'Spy →'}</span></div>
           </div>
         ))}
