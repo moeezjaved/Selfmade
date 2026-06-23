@@ -10,6 +10,10 @@ import Link from 'next/link'
 
 type Brand = { pageId: string; name: string; adCount: number; picture: string | null }
 
+function tab(active: boolean): React.CSSProperties {
+  return { padding: '7px 16px', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none', color: active ? '#111' : '#6b7280', background: active ? 'rgba(223,254,149,0.5)' : '#f3f4f6' }
+}
+
 export default function BrandSpyList() {
   const [brands, setBrands] = useState<Brand[]>([])
   const [q, setQ] = useState('')
@@ -31,6 +35,11 @@ export default function BrandSpyList() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
+      <style>{`.bs-row:hover{background:#fafafa}`}</style>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        <Link href="/discovery/brand-spy" style={tab(true)}>Brands</Link>
+        <Link href="/discovery/brand-spy/feed" style={tab(false)}>Feed</Link>
+      </div>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111', marginBottom: 2 }}>Brand Spy</h1>
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 18 }}>
         Track any competitor’s Meta ads over time — format mix, launch cadence, active-ad trends, and the hooks they run. We snapshot every brand continuously, so the history is already there.
@@ -53,6 +62,7 @@ export default function BrandSpyList() {
           <Link
             key={b.pageId}
             href={`/discovery/brand-spy/${b.pageId}`}
+            className="bs-row"
             style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', textDecoration: 'none', color: 'inherit' }}
           >
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</div>

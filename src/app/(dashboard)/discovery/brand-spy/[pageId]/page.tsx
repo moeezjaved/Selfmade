@@ -72,6 +72,20 @@ export default function BrandSpyDetail() {
       .then(setD).catch((e) => setErr(String(e))).finally(() => setLoading(false))
   }, [pageId])
 
+  const exportCsv = () => {
+    if (!d) return
+    const esc = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`
+    const rows = ['Section,Item,Value,Extra']
+    d.formatMix.forEach((f) => rows.push(['Media Mix', f.format, f.count, `${f.pct}%`].map(esc).join(',')))
+    d.creativeTests.forEach((t) => rows.push(['Creative Test', t.date, `${t.running}/${t.launched} live`, `${t.survival}% survival`].map(esc).join(',')))
+    d.longestRunning.forEach((a) => rows.push(['Longest Running', a.hook, `${a.days}d live`, a.snapshot_url || ''].map(esc).join(',')))
+    d.topHooks.forEach((h) => rows.push(['Top Hook', h.label, h.count, ''].map(esc).join(',')))
+    d.topAngles.forEach((h) => rows.push(['Top Angle', h.label, h.count, ''].map(esc).join(',')))
+    const url = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }))
+    const a = document.createElement('a'); a.href = url; a.download = `brand-spy-${(d.brand.name || pageId).replace(/[^a-z0-9]+/gi, '-')}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) return <div style={{ padding: 32, color: '#6b7280' }}>Loading Brand Spy…</div>
   if (err || !d) return <div style={{ padding: 32, color: '#b91c1c' }}>Couldn’t load: {err}</div>
 
@@ -80,7 +94,10 @@ export default function BrandSpyDetail() {
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <Link href="/discovery/brand-spy" style={{ fontSize: 13, color: '#2075ff', textDecoration: 'none' }}>← All spied brands</Link>
-        <Link href={`/discovery/brand/${pageId}`} style={{ fontSize: 13, color: '#2075ff', textDecoration: 'none' }}>View all ads →</Link>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+          <button onClick={exportCsv} style={{ fontSize: 13, fontWeight: 700, color: '#111', background: 'rgba(223,254,149,0.6)', border: '1px solid #cde87a', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}>⬇ Export CSV</button>
+          <Link href={`/discovery/brand/${pageId}`} style={{ fontSize: 13, color: '#2075ff', textDecoration: 'none' }}>View all ads →</Link>
+        </div>
       </div>
       <h1 style={{ fontSize: 26, fontWeight: 800, color: '#111', margin: '4px 0 2px' }}>{d.brand.name}</h1>
       <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 18 }}>Spying since first crawl{s.firstSeen ? ` · earliest ad ${new Date(s.firstSeen).toLocaleDateString()}` : ''}</div>
