@@ -150,6 +150,20 @@ async function worker(id: number): Promise<void> {
  * a fresh brand instead of all colliding on the single oldest one.
  */
 async function pickNextBrand(exclude: Set<string>): Promise<BrandRow | null> {
+  // MULTI-DROPLET path: atomic claim (migration 043). Each call stamps crawling_at and returns a
+  // DISTINCT brand via FOR UPDATE SKIP LOCKED, so N droplets never collide. Falls back to the
+  // legacy in-memory SELECT path if the function isn't deployed yet (single-droplet safe).
+  try {
+    const { data, error } = await (supabase as any).rpc('claim_next_brand', { p_gap_min: MIN_BRAND_GAP_MIN })
+    if (!error) {
+      const row = Array.isArray(data) ? data[0] : data
+      if (!row) return null
+      if (exclude.has(row.page_id)) return null   // our own in-flight (lease not yet cleared)
+      return { page_id: row.page_id, term: row.term, last_crawled_at: null } as BrandRow
+    }
+    // error (e.g. function missing) → fall through to legacy path
+  } catch { /* fall through */ }
+
   const cutoff = new Date(Date.now() - MIN_BRAND_GAP_MIN * 60 * 1000).toISOString()
   const batch = Math.max(20, CONCURRENCY * 3)
 
