@@ -121,6 +121,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     .then(() => {}, () => {})
 
   const startsSorted = ads.map((a) => a.start_date).filter(Boolean).sort() as string[]
+  const seenSorted = ads.map((a) => a.last_seen).filter(Boolean).sort() as string[]
+  const dataAsOf = seenSorted[seenSorted.length - 1] || null   // freshest snapshot we hold
   return NextResponse.json({
     brand: { pageId, name: name || pageId, picture: null },
     summary: {
@@ -129,6 +131,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
       videoPct: Math.round(((fmt.find((f) => f.label === 'Video')?.count || 0) / total) * 100),
       imagePct: Math.round(((fmt.find((f) => f.label === 'Image')?.count || 0) / total) * 100),
       firstSeen: startsSorted[0] || null, lastSeen: startsSorted[startsSorted.length - 1] || null,
+      dataAsOf,
     },
     formatMix,
     launchesByMonth,
