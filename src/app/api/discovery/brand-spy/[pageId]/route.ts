@@ -113,6 +113,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     .slice(0, 8)
     .map((a) => ({ adId: a.ad_id, days: a.days_running || 0, hook: ((a.body || a.hook_type || '').trim()).slice(0, 90), snapshot_url: a.snapshot_url }))
 
+  // Self-heal the list count: crawl_state.ads_indexed stores only the last run's count, so
+  // the directory can lag the real index total (the 357-vs-933 gruns mismatch). Sync the
+  // true live count back so the list and this dashboard agree. Best-effort.
+  admin.from('discovery_brand_crawl_state')
+    .upsert({ page_id: pageId, brand_name: name || pageId, ads_indexed: total }, { onConflict: 'page_id' })
+    .then(() => {}, () => {})
+
   const startsSorted = ads.map((a) => a.start_date).filter(Boolean).sort() as string[]
   return NextResponse.json({
     brand: { pageId, name: name || pageId, picture: null },
