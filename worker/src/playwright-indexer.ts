@@ -578,7 +578,9 @@ async function crawlBrand(opts: {
 }): Promise<RunMetrics> {
   // Per-crawl caps — lifted when `full` so a spied brand gets its complete archive.
   const TARGET = opts.full ? 200_000 : TARGET_ADS_PER_BRAND
-  const TIME_BUDGET = opts.full ? 1_200_000 : PER_BRAND_TIME_BUDGET_MS   // 20 min for full
+  const TIME_BUDGET = opts.full ? 2_100_000 : PER_BRAND_TIME_BUDGET_MS   // 35 min for full (a 14K-ad
+  // brand like Grüns is ~19 min of paging; the old 20 min cut it off mid-archive). Cursor-resume
+  // still backstops anything that exceeds even this, filling across the next pass.
   const sessionId = randomBytes(4).toString('hex').slice(0, 8)
   const metrics: RunMetrics = {
     brandPageId: opts.pageId,
@@ -1216,6 +1218,55 @@ async function stampBrandMetadata(pageId: string, categories: string[], industry
   console.log(`  🏷️ stamped${categories.length ? ` categories [${categories.join(', ')}]` : ''}${industry ? ` industry [${industry}]` : ''}`)
 }
 
+/**
+ * Affiliate discovery for a SPIED brand. After we've fully crawled the brand's OWN page, we
+ * also want the "Sarah Graysun with Grüns" creator/affiliate ads that Atria counts toward the
+ * brand's total (Grüns shows 14,448 there — far more than its own page). Those ads live on
+ * OTHER pages but reference the brand's domain, so:
+ *   1. Derive the brand's destination domain from its own ads' link_url (the most common one,
+ *      excluding social hosts), and
+ *   2. Run a keyword search for that domain, keeping ads from other pages that reference it,
+ *      tagged `aff:<pageId>` so the Brand Spy engine can merge them into the brand view.
+ * Best-effort: if we can't find a domain (no link_url captured), skip silently.
+ */
+async function discoverAffiliatesFor(pageId: string, brandName: string, maxScrolls?: number) {
+  const SOCIAL = ['facebook.com', 'instagram.com', 'fb.com', 'fb.me', 'l.facebook.com', 'lm.facebook.com']
+  // Sample recent ads to find the brand's own destination domain.
+  const { data } = await (supabase as any)
+    .from('discovery_ads_index')
+    .select('link_url')
+    .eq('page_id', pageId)
+    .not('link_url', 'is', null)
+    .order('last_seen', { ascending: false })
+    .limit(800)
+  const tally = new Map<string, number>()
+  for (const r of (data || []) as { link_url: string | null }[]) {
+    const raw = (r.link_url || '').toLowerCase()
+    const m = raw.match(/^(?:https?:\/\/)?(?:www\.)?([a-z0-9.-]+\.[a-z]{2,})/i)
+    if (!m) continue
+    const host = m[1]
+    if (SOCIAL.some(s => host === s || host.endsWith('.' + s))) continue
+    tally.set(host, (tally.get(host) || 0) + 1)
+  }
+  const top = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]
+  if (!top) { console.log(`  🔗 ${brandName || pageId}: no destination domain in ads — skipping affiliate scan`); return }
+  const domain = top[0]
+  console.log(`  🔗 ${brandName || pageId}: affiliate scan for domain="${domain}" (search by brand name)`)
+  const runId = randomBytes(16).toString('hex').slice(0, 32).replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
+  try {
+    await crawlBrand({
+      pageId, brandName, runId,
+      // Search the brand NAME for broad recall, then filter to ads that actually reference the
+      // domain — catches affiliates who name the brand but link via a tracker/shortlink too.
+      searchTerm: brandName || domain,
+      affiliateDomain: domain,
+      maxScrolls: maxScrolls ?? 80,
+    })
+  } catch (e: any) {
+    console.warn(`  🔗 affiliate scan failed for ${brandName || pageId}: ${e?.message ?? e}`)
+  }
+}
+
 // ========== Main ==========
 async function main() {
   await ensureDirs()
@@ -1305,6 +1356,14 @@ async function main() {
       })
       // Propagate the brand's manual admin categories + industry override.
       await stampBrandMetadata(brand.page_id, brand.categories, brand.industry)
+
+      // Spied brand (priority >= 9), own-page crawl fully done (no resume cursor pending) and
+      // productive → also pull affiliate/creator ads referencing the brand's domain, tagged
+      // aff:<pageId> so the Brand Spy dashboard merges them in. Runs once per full-crawl
+      // completion (≈ weekly cadence), not on every resume pass.
+      if ((brand.priority ?? 5) >= 9 && !m.nextCursor && m.adsDiscovered > 0) {
+        await discoverAffiliatesFor(brand.page_id, brand.term || brand.page_id)
+      }
       // Decide when this brand is eligible to crawl again by setting
       // last_crawled_at into the past so `now - last_crawled_at >= SCHED_GAP_MIN`
       // fires after `backoffMin`. Three cases:

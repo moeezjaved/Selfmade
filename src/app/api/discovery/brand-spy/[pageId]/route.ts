@@ -20,7 +20,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 30
+export const maxDuration = 60
 
 type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; snapshot_url: string | null }
 
@@ -37,21 +37,48 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   const admin = createAdminClient()
 
   // Pull this brand's ads (minimal columns, page_id is indexed → light for one brand).
+  // No 8K truncation — a spied brand can have 14K+ ads (Atria shows Grüns at 14,448);
+  // walk every page until the index is exhausted, with a generous safety ceiling so a
+  // pathological brand can't blow the 30s serverless budget.
+  const PAGE = 1000
+  const MAX_ADS = 60_000
   const ads: Ad[] = []
   let name = ''
-  for (let from = 0; from < 8000; from += 1000) {
+  for (let from = 0; from < MAX_ADS; from += PAGE) {
     const { data, error } = await admin
       .from('discovery_ads_index')
       .select('ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url')
       .eq('page_id', pageId)
       .order('start_date', { ascending: true })
-      .range(from, from + 999)
+      .range(from, from + PAGE - 1)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data?.length) break
     if (!name && (data[0] as any).page_name) name = (data[0] as any).page_name
     ads.push(...(data as any))
-    if (data.length < 1000) break
+    if (data.length < PAGE) break
   }
+  const ownCount = ads.length
+
+  // AFFILIATE / creator ads — other pages running ads that reference this brand's domain, tagged
+  // `aff:<pageId>` by the crawler's affiliate-discovery pass. Merged into the brand view the way
+  // Atria counts them toward the brand total. Needs the seed_terms GIN index (migration 041);
+  // best-effort — if it errors (index not built yet) we just show own-page ads.
+  const ownIds = new Set(ads.map((a) => a.ad_id))
+  let affiliateCount = 0
+  try {
+    for (let from = 0; from < 20_000; from += PAGE) {
+      const { data, error } = await admin
+        .from('discovery_ads_index')
+        .select('ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url')
+        .contains('seed_terms', [`aff:${pageId}`])
+        .order('start_date', { ascending: true })
+        .range(from, from + PAGE - 1)
+      if (error) break
+      if (!data?.length) break
+      for (const a of data as any[]) { if (!ownIds.has(a.ad_id)) { ads.push(a); affiliateCount++ } }
+      if (data.length < PAGE) break
+    }
+  } catch { /* index not ready — own-page only */ }
 
   if (ads.length === 0) {
     return NextResponse.json({ brand: { pageId, name: name || pageId, picture: null }, summary: { total: 0 }, formatMix: [], launchesByMonth: [], activeTrend: [], topHooks: [], topAngles: [] })
@@ -132,6 +159,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     brand: { pageId, name: name || pageId, picture: null },
     summary: {
       total, active, inactive: total - active,
+      ownCount, affiliateCount,   // own-page vs creator/affiliate split (total = own + affiliate)
       activePct: Math.round((active / total) * 100),
       videoPct: Math.round(((fmt.find((f) => f.label === 'Video')?.count || 0) / total) * 100),
       imagePct: Math.round(((fmt.find((f) => f.label === 'Image')?.count || 0) / total) * 100),

@@ -19,7 +19,7 @@ const FMT_COLORS: Record<string, string> = { Video: '#2075ff', Image: '#10b981',
 
 type Spy = {
   brand: { pageId: string; name: string }
-  summary: { total: number; active: number; inactive: number; activePct: number; videoPct: number; imagePct: number; firstSeen: string | null; dataAsOf: string | null }
+  summary: { total: number; active: number; inactive: number; ownCount?: number; affiliateCount?: number; activePct: number; videoPct: number; imagePct: number; firstSeen: string | null; dataAsOf: string | null }
   formatMix: { format: string; count: number; pct: number }[]
   launchesByMonth: { month: string; count: number }[]
   activeTrend: { week: string; active: number }[]
@@ -145,7 +145,7 @@ export default function BrandSpyDetail() {
 
       {/* Persistent summary panel */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-        <Stat k="Total ads" v={s.total.toLocaleString()} />
+        <Stat k="Total ads" v={s.total.toLocaleString()} sub={s.affiliateCount ? `${(s.ownCount ?? 0).toLocaleString()} own + ${s.affiliateCount.toLocaleString()} affiliate` : undefined} />
         <Stat k="Active" v={s.active.toLocaleString()} sub={`${s.activePct}% live`} />
         <Stat k="Inactive" v={s.inactive.toLocaleString()} sub="taken down" />
         <Stat k="Video / Image" v={`${s.videoPct}% / ${s.imagePct}%`} sub="creative mix" />
