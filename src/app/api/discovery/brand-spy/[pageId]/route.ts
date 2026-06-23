@@ -78,7 +78,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   // best-effort — if it errors (index not built yet) we just show own-page ads.
   const ownIds = new Set(ads.map((a) => a.ad_id))
   let affiliateCount = 0
-  try {
+  // Deferred for now — affiliate display is off until the seed_terms GIN index (migration 041)
+  // is built and BRAND_SPY_AFFILIATES=1 is set. Without the index this query is a 1.4M-row scan
+  // that would slow every dashboard open, so it stays gated.
+  if (process.env.BRAND_SPY_AFFILIATES === '1') try {
     for (let from = 0; from < 20_000; from += PAGE) {
       const { data, error } = await admin
         .from('discovery_ads_index')
