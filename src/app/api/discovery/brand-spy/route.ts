@@ -39,14 +39,49 @@ export async function GET(req: NextRequest) {
     if (myPageIds.length === 0) return NextResponse.json({ brands: [], scope: 'mine' })
   }
 
+  // scope=mine → the user's few spied brands: compute the REAL counts live from the index
+  // (total / active / video / image), so the list never shows a stale crawl_state value like the
+  // crawler's per-run count (the "27 ads" bug). Cheap: a handful of HEAD count queries per brand.
+  if (myPageIds) {
+    const names = new Map<string, string>()
+    const { data: st } = await admin.from('discovery_brand_crawl_state').select('page_id, brand_name').in('page_id', myPageIds)
+    for (const r of (st || []) as any[]) if (r.brand_name) names.set(r.page_id, r.brand_name)
+
+    const cnt = (pid: string, extra?: (q: any) => any) => {
+      let qq = admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', pid)
+      if (extra) qq = extra(qq)
+      return qq.then((r: any) => r.count || 0)
+    }
+    const brands = await Promise.all(myPageIds.map(async (pid) => {
+      const [total, active, video, image] = await Promise.all([
+        cnt(pid),
+        cnt(pid, (q) => q.eq('is_active', true)),
+        cnt(pid, (q) => q.ilike('format', '%video%')),
+        cnt(pid, (q) => q.ilike('format', '%image%')),
+      ])
+      // Fall back to an ad's page_name if crawl_state has no brand_name yet.
+      let name = names.get(pid)
+      if (!name) {
+        const { data: one } = await admin.from('discovery_ads_index').select('page_name').eq('page_id', pid).not('page_name', 'is', null).limit(1).maybeSingle()
+        name = (one as any)?.page_name || pid
+      }
+      return {
+        pageId: pid, name: name || pid, adCount: total,
+        active, inactive: Math.max(0, total - active),
+        video, image, carousel: Math.max(0, total - video - image),
+      }
+    }))
+    brands.sort((a, b) => b.adCount - a.adCount)
+    const filtered = q ? brands.filter((b) => b.name.toLowerCase().includes(q.toLowerCase())) : brands
+    return NextResponse.json({ brands: filtered, scope: 'mine' })
+  }
+
+  // scope=all (directory) → fast crawl_state read (approximate counts; used by the add-modal).
   const build = (cols: string) => {
-    let qq = admin.from('discovery_brand_crawl_state').select(cols).order('ads_indexed', { ascending: false }).limit(limit)
-    if (myPageIds) qq = qq.in('page_id', myPageIds)
-    else qq = qq.gt('ads_indexed', 0)
+    let qq = admin.from('discovery_brand_crawl_state').select(cols).gt('ads_indexed', 0).order('ads_indexed', { ascending: false }).limit(limit)
     if (q) qq = qq.ilike('brand_name', `%${q}%`)
     return qq
   }
-  // Try the rich columns (migration 040); fall back if not applied yet.
   let { data, error } = await build('page_id, brand_name, ads_indexed, active_count, video_count, image_count, carousel_count')
   if (error) ({ data, error } = await build('page_id, brand_name, ads_indexed'))
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
