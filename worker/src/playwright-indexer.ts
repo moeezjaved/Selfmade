@@ -1451,6 +1451,9 @@ async function main() {
       await (supabase as any).from('discovery_crawl_terms')
         .update({ last_crawled_at: lastCrawled, ...update })
         .eq('page_id', brand.page_id)
+      // Release the multi-droplet claim (migration 043). Best-effort + separate so a not-yet-applied
+      // migration can't fail the cadence update above; a stale claim self-expires via the lease anyway.
+      await (supabase as any).from('discovery_crawl_terms').update({ crawling_at: null }).eq('page_id', brand.page_id).then(() => {}, () => {})
 
       // Keep the admin Brands view in sync. It reads discovery_brand_crawl_state
       // (exhausted_at) to show "✅ Done — re-crawl in Nd" vs "Queued". The droplet
