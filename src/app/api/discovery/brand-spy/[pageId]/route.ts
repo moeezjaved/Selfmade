@@ -22,9 +22,12 @@ import { createAdminClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; snapshot_url: string | null; link_url: string | null }
+type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; snapshot_url: string | null; link_url?: string | null }
 
-const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url, link_url'
+// NOTE: link_url is NOT persisted on discovery_ads_index yet (the crawler captures it in memory
+// but never writes it), so it's deliberately absent from this select — including it 500s the whole
+// dashboard. The Landing Pages tab stays empty until we add the column + crawler write + backfill.
+const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url'
 // First line of the ad body = the "hook" (Foreplay groups ads by this).
 const hookOf = (b: string | null) => (b || '').split('\n')[0].trim().replace(/\s+/g, ' ').slice(0, 140)
 // Normalize a destination URL to host + path (drop query/tracking) for landing-page rollup.
@@ -172,7 +175,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   // (Foreplay's Landing Pages tab). Grouped by host+path, sorted by total.
   const lpMap = new Map<string, { url: string; host: string; active: number; inactive: number }>()
   for (const a of ads) {
-    const n = normUrl(a.link_url)
+    const n = normUrl(a.link_url ?? null)
     if (!n) continue
     const cur = lpMap.get(n.url) || { url: n.url, host: n.host, active: 0, inactive: 0 }
     if (a.is_active) cur.active++; else cur.inactive++
