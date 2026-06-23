@@ -57,10 +57,32 @@ async function getMetaToken(admin: any): Promise<string | null> {
   return process.env.META_APP_TOKEN || process.env.META_ACCESS_TOKEN || null
 }
 
+// Split a CSV line into fields honoring double-quoted values (RFC 4180): a field wrapped
+// in "..." may contain commas, and "" inside a quoted field is a literal quote. A naive
+// line.split(',') corrupted any row whose brand name had a comma ("Dr. Smith, MD",
+// "Company, Inc.") — the name fragment landed in the page_id column. This fixes that.
+function parseCsvLine(line: string): string[] {
+  const out: string[] = []
+  let cur = '', inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++ }   // escaped "" → literal "
+        else inQuotes = false
+      } else cur += ch
+    } else if (ch === '"') inQuotes = true
+    else if (ch === ',') { out.push(cur); cur = '' }
+    else cur += ch
+  }
+  out.push(cur)
+  return out.map(c => c.trim())
+}
+
 function parseCsv(csv: string): InputRow[] {
   const lines = csv.trim().split(/\r?\n/).filter(l => l.trim())
   if (lines.length === 0) return []
-  const headerCells = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_'))
+  const headerCells = parseCsvLine(lines[0]).map(h => h.toLowerCase().replace(/\s+/g, '_'))
   const headerIdx: Record<string, number> = {}
   headerCells.forEach((h, i) => { headerIdx[h] = i })
 
@@ -73,7 +95,7 @@ function parseCsv(csv: string): InputRow[] {
   const websiteKey = ['website', 'url', 'site'].find(k => k in headerIdx)
 
   return lines.slice(1).map(line => {
-    const cells = line.split(',').map(c => c.trim())
+    const cells = parseCsvLine(line)
     return {
       brand_name: cells[headerIdx[nameKey]] || '',
       page_id: pageIdKey ? cells[headerIdx[pageIdKey]] || undefined : undefined,
@@ -142,6 +164,10 @@ async function processRow(
   if (!term) return { brand_name: row.brand_name, status: 'error', message: 'empty name' }
 
   let pageId = row.page_id?.trim()
+  // A real Facebook page_id is all digits. Anything else is corrupt input (e.g. a stray
+  // name fragment) — drop it and fall through to the name→page_id lookup rather than
+  // storing garbage in the page_id column.
+  if (pageId && !/^\d+$/.test(pageId)) pageId = undefined
   let lookupResult: any = {}
   const userProvidedPageId = !!pageId
   if (!pageId) {
