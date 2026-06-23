@@ -9,7 +9,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area,
-  XAxis, YAxis, Tooltip, CartesianGrid,
+  PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts'
 
 const ACCENT = '#dffe95'
@@ -22,9 +22,13 @@ type Spy = {
   formatMix: { format: string; count: number; pct: number }[]
   launchesByMonth: { month: string; count: number }[]
   activeTrend: { week: string; active: number }[]
+  creativeTests: { date: string; launched: number; running: number; survival: number }[]
+  longestRunning: { adId: string; days: number; hook: string; snapshot_url: string | null }[]
   topHooks: { label: string; count: number }[]
   topAngles: { label: string; count: number }[]
 }
+
+const FMT_COLORS: Record<string, string> = { Video: '#2075ff', Image: '#10b981', 'Carousel/DCO': '#f59e0b' }
 
 function Stat({ k, v, sub }: { k: string; v: string | number; sub?: string }) {
   return (
@@ -123,11 +127,62 @@ export default function BrandSpyDetail() {
         </div>
       </div>
 
-      {/* Format mix + AI hooks/angles */}
+      {/* Creative Tests — automated competitor A/B-test detection */}
+      <div style={{ ...card, marginBottom: 18 }}>
+        <div style={label}>Creative Tests <span style={{ textTransform: 'none', fontWeight: 500 }}>— ads launched together; survival = still-running / launched (high = a winning test)</span></div>
+        {d.creativeTests.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No multi-ad launch batches detected yet.</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {d.creativeTests.map((t) => {
+            const color = t.survival >= 60 ? '#10b981' : t.survival >= 30 ? '#f59e0b' : '#ef4444'
+            return (
+              <div key={t.date} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px', alignItems: 'center', gap: 12 }}>
+                <div style={{ fontSize: 13, color: '#374151' }}>{new Date(t.date).toLocaleDateString()}</div>
+                <div style={{ height: 18, background: '#f3f4f6', borderRadius: 6, overflow: 'hidden' }}>
+                  <div style={{ width: `${t.survival}%`, height: '100%', background: color, borderRadius: 6 }} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'right', color: '#111' }}>{t.running}/{t.launched} live <span style={{ color, fontWeight: 800 }}>{t.survival}%</span></div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Longest-running ads — the brand's proven winners */}
+      <div style={{ ...card, marginBottom: 18 }}>
+        <div style={label}>Longest-Running Ads <span style={{ textTransform: 'none', fontWeight: 500 }}>— run-duration ≈ profitability; these are their proven winners</span></div>
+        {d.longestRunning.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No active ads yet.</div>}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {d.longestRunning.map((a) => (
+            <a key={a.adId} href={a.snapshot_url || '#'} target="_blank" rel="noreferrer"
+               style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 12, alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f3f4f6', textDecoration: 'none', color: 'inherit' }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#10b981' }}>{a.days}d live</span>
+              <span style={{ fontSize: 13, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.hook || '(no ad text)'}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* Media Mix donut + AI hooks/angles */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         <div style={card}>
-          <div style={label}>Creative Format Mix</div>
-          <Bars rows={d.formatMix.map((f) => ({ label: f.format, count: f.count }))} />
+          <div style={label}>Media Mix</div>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie data={d.formatMix} dataKey="count" nameKey="format" cx="50%" cy="50%" innerRadius={42} outerRadius={66} paddingAngle={2}>
+                {d.formatMix.map((f) => <Cell key={f.format} fill={FMT_COLORS[f.format] || '#9ca3af'} />)}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {d.formatMix.map((f) => (
+              <div key={f.format} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: FMT_COLORS[f.format] || '#9ca3af' }} />
+                <span style={{ flex: 1, color: '#374151' }}>{f.format}</span>
+                <b style={{ color: '#111' }}>{f.count}</b><span style={{ color: '#9ca3af', width: 36, textAlign: 'right' }}>{f.pct}%</span>
+              </div>
+            ))}
+          </div>
         </div>
         <div style={card}>
           <div style={label}>Top Hooks <span style={{ textTransform: 'none', fontWeight: 500 }}>(AI)</span></div>
