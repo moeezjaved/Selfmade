@@ -1361,7 +1361,8 @@ async function main() {
       // productive → also pull affiliate/creator ads referencing the brand's domain, tagged
       // aff:<pageId> so the Brand Spy dashboard merges them in. Runs once per full-crawl
       // completion (≈ weekly cadence), not on every resume pass.
-      if ((brand.priority ?? 5) >= 9 && !m.nextCursor && m.adsDiscovered > 0) {
+      // DEFERRED: gated off until we enable affiliate display (set BRAND_SPY_AFFILIATES=1).
+      if (process.env.BRAND_SPY_AFFILIATES === '1' && (brand.priority ?? 5) >= 9 && !m.nextCursor && m.adsDiscovered > 0) {
         await discoverAffiliatesFor(brand.page_id, brand.term || brand.page_id)
       }
       // Decide when this brand is eligible to crawl again by setting
