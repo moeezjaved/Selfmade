@@ -27,6 +27,8 @@ type Spy = {
   longestRunning: { adId: string; days: number; hook: string; snapshot_url: string | null }[]
   topHooks: { label: string; count: number }[]
   topAngles: { label: string; count: number }[]
+  landingPages: { url: string; host: string; active: number; inactive: number; total: number; fullUrl: string }[]
+  hooks: { text: string; count: number; days: number; adId: string; snapshot_url: string | null; active: boolean }[]
 }
 
 function Stat({ k, v, sub }: { k: string; v: string | number; sub?: string }) {
@@ -35,24 +37,6 @@ function Stat({ k, v, sub }: { k: string; v: string | number; sub?: string }) {
       <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{k}</div>
       <div style={{ fontSize: 26, fontWeight: 800, color: '#111', marginTop: 4 }}>{v}</div>
       {sub && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{sub}</div>}
-    </div>
-  )
-}
-
-function Bars({ rows }: { rows: { label: string; count: number }[] }) {
-  const top = Math.max(1, ...rows.map((r) => r.count))
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {rows.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No data yet</div>}
-      {rows.map((r) => (
-        <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 130, fontSize: 13, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</div>
-          <div style={{ flex: 1, height: 16, background: '#f3f4f6', borderRadius: 6, overflow: 'hidden' }}>
-            <div style={{ width: `${(r.count / top) * 100}%`, height: '100%', background: '#2075ff', borderRadius: 6 }} />
-          </div>
-          <div style={{ width: 44, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#111' }}>{r.count}</div>
-        </div>
-      ))}
     </div>
   )
 }
@@ -92,6 +76,77 @@ const LongestRunning = ({ d }: { d: Spy }) => (
     ))}
   </div>
 )
+
+// Hooks tab — Foreplay-style list: thumbnail, the opening line, run-time, sorted longest-running.
+function Hooks({ d }: { d: Spy }) {
+  const [q, setQ] = useState('')
+  const rows = d.hooks.filter((h) => !q || h.text.toLowerCase().includes(q.toLowerCase()))
+  return (
+    <div style={card}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
+        <div style={label}>Hooks <span style={{ textTransform: 'none', fontWeight: 500 }}>— opening lines, sorted by longest-running</span></div>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search hooks…" style={{ width: 220, padding: '7px 10px', border: '1px solid #e6e6e6', borderRadius: 8, fontSize: 13 }} />
+      </div>
+      {rows.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No hooks captured yet.</div>}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {rows.map((h) => (
+          <div key={h.text} style={{ display: 'grid', gridTemplateColumns: '46px 1fr 90px 110px', gap: 12, alignItems: 'center', padding: '9px 0', borderBottom: '1px solid #f3f4f6' }}>
+            {h.snapshot_url
+              ? <img src={h.snapshot_url} alt="" style={{ width: 46, height: 46, objectFit: 'cover', borderRadius: 8, background: '#f3f4f6' }} />
+              : <div style={{ width: 46, height: 46, borderRadius: 8, background: '#f3f4f6' }} />}
+            <div style={{ fontSize: 14, color: '#111', lineHeight: 1.35 }}>“{h.text}”{h.count > 1 && <span style={{ color: '#9ca3af', fontWeight: 600 }}> · {h.count} ads</span>}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: h.active ? '#16a34a' : '#9ca3af' }}>{h.active ? '● ' : ''}{h.days}d</div>
+            <a href={h.snapshot_url || '#'} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 700, color: '#111', textAlign: 'center', background: '#f3f4f6', borderRadius: 8, padding: '7px 0', textDecoration: 'none' }}>Ad Details</a>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Landing Pages tab — Foreplay-style: ranked destination list (active/inactive) + live preview.
+function LandingPages({ d }: { d: Spy }) {
+  const [sel, setSel] = useState(d.landingPages[0] || null)
+  const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
+  const [copied, setCopied] = useState(false)
+  if (d.landingPages.length === 0) {
+    return <div style={{ ...card, textAlign: 'center', padding: 40, color: '#9ca3af' }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>No destination URLs captured yet</div>
+      These fill in as the crawler captures each ad’s link. Re-spy or wait for the next crawl pass.
+    </div>
+  }
+  const shotW = device === 'desktop' ? 1280 : 390
+  const shot = sel ? `https://s.wordpress.com/mshots/v1/${encodeURIComponent(sel.fullUrl)}?w=${shotW}` : ''
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 12 }}>
+      <div style={{ ...card, padding: 8, maxHeight: 620, overflowY: 'auto' }}>
+        {d.landingPages.map((p) => {
+          const on = sel?.url === p.url
+          return (
+            <button key={p.url} onClick={() => setSel(p)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: on ? '1px solid #cde87a' : '1px solid transparent', background: on ? 'rgba(223,254,149,0.25)' : 'transparent', borderRadius: 10, cursor: 'pointer', marginBottom: 2 }}>
+              <div style={{ fontSize: 13, color: '#2075ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🔗 {p.url}</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}><span style={{ color: '#16a34a', fontWeight: 700 }}>● {p.active} Active</span> · {p.inactive} Inactive</div>
+            </button>
+          )
+        })}
+      </div>
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <div style={{ flex: 1, fontSize: 13, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel?.fullUrl}</div>
+          <button onClick={() => { if (sel) { navigator.clipboard.writeText(sel.fullUrl); setCopied(true); setTimeout(() => setCopied(false), 1200) } }} style={{ fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, border: '1px solid #e6e6e6', background: '#fff', cursor: 'pointer' }}>{copied ? 'Copied ✓' : 'Copy URL'}</button>
+          {(['mobile', 'desktop'] as const).map((dv) => (
+            <button key={dv} onClick={() => setDevice(dv)} style={{ fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, border: '1px solid #e6e6e6', background: device === dv ? 'rgba(223,254,149,0.5)' : '#fff', cursor: 'pointer', textTransform: 'capitalize' }}>{dv}</button>
+          ))}
+          <a href={sel?.fullUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', textDecoration: 'none' }}>Open ↗</a>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', background: '#f8f9fa', borderRadius: 10, padding: 12, minHeight: 460 }}>
+          {shot && <img key={shot} src={shot} alt="landing page preview" style={{ width: device === 'desktop' ? '100%' : 360, borderRadius: 8, border: '1px solid #e6e6e6', alignSelf: 'flex-start' }} />}
+        </div>
+        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Live preview rendered on demand — may take a few seconds the first time.</div>
+      </div>
+    </div>
+  )
+}
 
 const TABS = [['overview', 'Overview'], ['tests', 'Creative Tests'], ['hooks', 'Hooks'], ['timeline', 'Timeline'], ['landing', 'Landing Pages']] as const
 
@@ -209,19 +264,9 @@ export default function BrandSpyDetail() {
         </div>
       )}
 
-      {tab === 'hooks' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div style={card}><div style={label}>Top Hooks <span style={{ textTransform: 'none', fontWeight: 500 }}>(AI)</span></div><Bars rows={d.topHooks} /></div>
-          <div style={card}><div style={label}>Top Angles <span style={{ textTransform: 'none', fontWeight: 500 }}>(AI)</span></div><Bars rows={d.topAngles} /></div>
-        </div>
-      )}
+      {tab === 'hooks' && <Hooks d={d} />}
 
-      {tab === 'landing' && (
-        <div style={{ ...card, textAlign: 'center', padding: 40, color: '#9ca3af' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Landing Pages — coming soon</div>
-          The crawler is being upgraded to capture each ad’s destination URL. Once live, this tab ranks every funnel page the brand drives to (quizzes, advertorials, offer pages) with active / inactive counts.
-        </div>
-      )}
+      {tab === 'landing' && <LandingPages d={d} />}
     </div>
   )
 }

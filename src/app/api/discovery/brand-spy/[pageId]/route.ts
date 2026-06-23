@@ -22,7 +22,20 @@ import { createAdminClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; snapshot_url: string | null }
+type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; snapshot_url: string | null; link_url: string | null }
+
+const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url, link_url'
+// First line of the ad body = the "hook" (Foreplay groups ads by this).
+const hookOf = (b: string | null) => (b || '').split('\n')[0].trim().replace(/\s+/g, ' ').slice(0, 140)
+// Normalize a destination URL to host + path (drop query/tracking) for landing-page rollup.
+const normUrl = (u: string | null): { url: string; host: string } | null => {
+  const m = (u || '').match(/^(?:https?:\/\/)?(?:www\.)?([a-z0-9.-]+\.[a-z]{2,})(\/[^?#]*)?/i)
+  if (!m) return null
+  const host = m[1].toLowerCase()
+  if (['facebook.com', 'instagram.com', 'fb.com', 'fb.me'].some((s) => host === s || host.endsWith('.' + s))) return null
+  const path = (m[2] || '').replace(/\/$/, '')
+  return { url: host + path, host }
+}
 
 const MONTH = (d: Date) => `${d.toLocaleString('en', { month: 'short' })} '${String(d.getFullYear()).slice(2)}`
 const tally = (xs: (string | null)[]) => {
@@ -47,7 +60,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   for (let from = 0; from < MAX_ADS; from += PAGE) {
     const { data, error } = await admin
       .from('discovery_ads_index')
-      .select('ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url')
+      .select(SELECT)
       .eq('page_id', pageId)
       .order('start_date', { ascending: true })
       .range(from, from + PAGE - 1)
@@ -69,7 +82,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     for (let from = 0; from < 20_000; from += PAGE) {
       const { data, error } = await admin
         .from('discovery_ads_index')
-        .select('ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url')
+        .select(SELECT)
         .contains('seed_terms', [`aff:${pageId}`])
         .order('start_date', { ascending: true })
         .range(from, from + PAGE - 1)
@@ -152,6 +165,34 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     }, { onConflict: 'page_id' })
     .then(() => {}, () => {})
 
+  // LANDING PAGES — every destination funnel the brand drives to, with active/inactive counts
+  // (Foreplay's Landing Pages tab). Grouped by host+path, sorted by total.
+  const lpMap = new Map<string, { url: string; host: string; active: number; inactive: number }>()
+  for (const a of ads) {
+    const n = normUrl(a.link_url)
+    if (!n) continue
+    const cur = lpMap.get(n.url) || { url: n.url, host: n.host, active: 0, inactive: 0 }
+    if (a.is_active) cur.active++; else cur.inactive++
+    lpMap.set(n.url, cur)
+  }
+  const landingPages = Array.from(lpMap.values())
+    .map((p) => ({ ...p, total: p.active + p.inactive, fullUrl: `https://${p.url}` }))
+    .sort((a, b) => b.total - a.total).slice(0, 60)
+
+  // HOOKS — the opening line of each ad, grouped, with the longest run time and a representative
+  // creative (Foreplay's Hooks tab, sorted Longest Running).
+  const hookMap = new Map<string, { text: string; count: number; days: number; adId: string; snapshot_url: string | null; active: boolean }>()
+  for (const a of ads) {
+    const text = hookOf(a.body)
+    if (!text) continue
+    const cur = hookMap.get(text) || { text, count: 0, days: 0, adId: a.ad_id, snapshot_url: a.snapshot_url, active: false }
+    cur.count++
+    if ((a.days_running || 0) > cur.days) { cur.days = a.days_running || 0; cur.adId = a.ad_id; cur.snapshot_url = a.snapshot_url }
+    if (a.is_active) cur.active = true
+    hookMap.set(text, cur)
+  }
+  const hooks = Array.from(hookMap.values()).sort((a, b) => b.days - a.days).slice(0, 80)
+
   const startsSorted = ads.map((a) => a.start_date).filter(Boolean).sort() as string[]
   const seenSorted = ads.map((a) => a.last_seen).filter(Boolean).sort() as string[]
   const dataAsOf = seenSorted[seenSorted.length - 1] || null   // freshest snapshot we hold
@@ -171,6 +212,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     activeTrend,
     creativeTests,
     longestRunning,
+    landingPages,
+    hooks,
     topHooks: tally(ads.map((a) => a.hook_type)).slice(0, 8),
     topAngles: tally(ads.map((a) => a.angle)).slice(0, 8),
   })
