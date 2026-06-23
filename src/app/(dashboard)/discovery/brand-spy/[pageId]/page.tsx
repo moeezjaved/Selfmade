@@ -18,7 +18,7 @@ const label: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: '#6b7
 
 type Spy = {
   brand: { pageId: string; name: string }
-  summary: { total: number; active: number; inactive: number; activePct: number; videoPct: number; imagePct: number; firstSeen: string | null }
+  summary: { total: number; active: number; inactive: number; activePct: number; videoPct: number; imagePct: number; firstSeen: string | null; dataAsOf: string | null }
   formatMix: { format: string; count: number; pct: number }[]
   launchesByMonth: { month: string; count: number }[]
   activeTrend: { week: string; active: number }[]
@@ -100,14 +100,17 @@ export default function BrandSpyDetail() {
         </div>
       </div>
       <h1 style={{ fontSize: 26, fontWeight: 800, color: '#111', margin: '4px 0 2px' }}>{d.brand.name}</h1>
-      <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 18 }}>Spying since first crawl{s.firstSeen ? ` · earliest ad ${new Date(s.firstSeen).toLocaleDateString()}` : ''}</div>
+      <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 18 }}>
+        {s.firstSeen ? `Earliest ad ${new Date(s.firstSeen).toLocaleDateString()}` : 'Spying since first crawl'}
+        {s.dataAsOf ? <span> · <span style={{ color: '#16a34a', fontWeight: 600 }}>data as of {new Date(s.dataAsOf).toLocaleString()}</span></span> : null}
+      </div>
 
-      {/* Summary stats */}
+      {/* Summary stats — exact active/inactive split */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 18 }}>
         <Stat k="Total ads" v={s.total.toLocaleString()} />
-        <Stat k="Active ads" v={s.active.toLocaleString()} sub={`${s.activePct}% of total`} />
-        <Stat k="Video" v={`${s.videoPct}%`} sub="of creative mix" />
-        <Stat k="Image" v={`${s.imagePct}%`} sub="of creative mix" />
+        <Stat k="Active" v={s.active.toLocaleString()} sub={`${s.activePct}% live`} />
+        <Stat k="Inactive" v={s.inactive.toLocaleString()} sub="taken down" />
+        <Stat k="Video / Image" v={`${s.videoPct}% / ${s.imagePct}%`} sub="creative mix" />
       </div>
 
       {/* Charts row */}
