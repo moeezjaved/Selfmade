@@ -101,6 +101,8 @@ interface RunMetrics {
   successWindow: boolean[]   // true = ad data, false = empty/error
   softGateSuspect: boolean   // crawl looks truncated/incomplete → warrants one verify-recrawl
   emptyBrandBail: boolean    // 0 ads + no template → genuinely empty page (not gated)
+  nextCursor: string | null  // resume point: cursor to start the NEXT crawl from when we
+                             // stopped mid-library (cap/budget) with more to go; null = done
 }
 
 interface ExtractedAd {
@@ -588,6 +590,17 @@ async function crawlBrand(opts: {
     successWindow: [],
     softGateSuspect: false,
     emptyBrandBail: false,
+    nextCursor: null,
+  }
+
+  // Cursor-resume: country=ALL crawls resume from where the last pass stopped, so a big
+  // brand (50K ads) fills in over many cheap passes instead of restarting from the top and
+  // early-stopping on the ads we already have. Only for the single-country path.
+  let resumeCursor: string | null = null
+  if (!opts.country && !opts.searchTerm) {
+    const { data: st } = await (supabase as any).from('discovery_brand_crawl_state').select('cursor').eq('page_id', opts.pageId).maybeSingle()
+    resumeCursor = st?.cursor || null
+    if (resumeCursor) console.log(`  ⏭️  resuming from saved cursor (brand has more ads past what we've crawled)`)
   }
 
   console.log(`\n🌐 Crawling ${opts.brandName || opts.pageId} (session ${sessionId})…`)
@@ -908,7 +921,7 @@ async function crawlBrand(opts: {
           // not from the initial HTML. We let page.evaluate just run from the
           // template's current cursor (same one the template carried).
           const tpl = tplState.template
-          const initialCursor: string | null = (() => {
+          const initialCursor: string | null = resumeCursor || (() => {
             try { return JSON.parse(tpl.parsedBody.variables ?? '{}').cursor ?? null }
             catch { return null }
           })()
@@ -984,6 +997,10 @@ async function crawlBrand(opts: {
 
           // Cursor walk replaces the scroll loop — break out
           abortReason = result.stoppedEarly ? 'incremental_known' : (result.hasNext ? 'cursor_walk_ended_with_more' : 'cursor_walk_complete')
+          // Cursor-resume: stopped mid-library with more to go AND made progress → save the
+          // resume point for the next pass. Complete / caught-up / no-progress → clear it.
+          metrics.nextCursor = (abortReason === 'cursor_walk_ended_with_more' && result.lastCursor && (adsCountAfter - adsCountBefore) > 0)
+            ? result.lastCursor : null
           break
         } catch (e: any) {
           console.warn(`  ⚠️ Cursor-walk error: ${e?.message?.slice(0, 200)} — continuing with scroll-only`)
@@ -1141,13 +1158,13 @@ async function crawlBrandCountries(opts: {
   pageId: string; brandName: string; maxScrolls?: number; full?: boolean
   config: { enabled: boolean; countries: string[] }
   activeCountries: string[]
-}): Promise<{ adsDiscovered: number; adsNew: number; softGateSuspect: boolean; emptyBrandBail: boolean }> {
+}): Promise<{ adsDiscovered: number; adsNew: number; softGateSuspect: boolean; emptyBrandBail: boolean; nextCursor: string | null }> {
   const mkRun = () => randomBytes(16).toString('hex').slice(0, 32).replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
 
   // Single country=ALL crawl (toggle OFF or no countries configured).
   if (!opts.config.enabled || opts.config.countries.length === 0) {
     const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls, full: opts.full })
-    return { adsDiscovered: m.adsDiscovered, adsNew: m.adsNew, softGateSuspect: m.softGateSuspect, emptyBrandBail: m.emptyBrandBail }
+    return { adsDiscovered: m.adsDiscovered, adsNew: m.adsNew, softGateSuspect: m.softGateSuspect, emptyBrandBail: m.emptyBrandBail, nextCursor: m.nextCursor }
   }
 
   // Multi-country: pick the countries to crawl (skip-empty). Intersect the
@@ -1181,7 +1198,7 @@ async function crawlBrandCountries(opts: {
     .eq('page_id', opts.pageId)
   console.log(`  🌍 active countries for ${opts.brandName || opts.pageId}: ${newActive.join(', ') || '(none)'}`)
 
-  return { adsDiscovered: totalDiscovered, adsNew: totalNew, softGateSuspect: anySuspect, emptyBrandBail: totalDiscovered === 0 && everyEmptyBail }
+  return { adsDiscovered: totalDiscovered, adsNew: totalNew, softGateSuspect: anySuspect, emptyBrandBail: totalDiscovered === 0 && everyEmptyBail, nextCursor: null }
 }
 
 // Stamp a brand's MANUAL admin categories onto all its ads (brand_categories),
@@ -1304,7 +1321,12 @@ async function main() {
       let backoffMin: number
       const update: any = {}   // extra fields written alongside last_crawled_at
       let removeBrand = false
-      if (m.adsDiscovered === 0 && m.emptyBrandBail) {
+      if (m.nextCursor) {
+        // Big brand, partially crawled — a resume cursor is saved. Re-crawl SOON so it keeps
+        // filling in across passes (a 50K-ad brand otherwise takes ages at full cadence).
+        backoffMin = VERIFY_RETRY_MIN
+        console.log(`  ⏭️  ${brand.term || brand.page_id}: more ads to crawl — resume in ${VERIFY_RETRY_MIN} min`)
+      } else if (m.adsDiscovered === 0 && m.emptyBrandBail) {
         // FAST REMOVAL (1-strike). A clean empty-bail means the page rendered and returned
         // ZERO ads under active_status=all — which surfaces even PAUSED/inactive ads. So any
         // brand that has EVER advertised shows ads here; a clean empty means the account has
@@ -1363,8 +1385,8 @@ async function main() {
           last_run_at: new Date(now).toISOString(),
           last_run_added: m.adsNew,
           ads_indexed: m.adsDiscovered,
-          exhausted_at: doneStable ? new Date(now).toISOString() : null,
-          cursor: null,
+          exhausted_at: (doneStable && !m.nextCursor) ? new Date(now).toISOString() : null,
+          cursor: m.nextCursor ?? null,   // resume point for big brands; null when fully crawled
         }, { onConflict: 'page_id' })
       }
     } catch (e: any) {
