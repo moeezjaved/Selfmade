@@ -165,7 +165,9 @@ export async function POST(req: NextRequest) {
     priority: priority || 5,
     is_active: true,
   }
-  if (page_id) insert.page_id = String(page_id).trim()
+  const pidStr = page_id ? String(page_id).trim() : ''
+  if (pidStr && !/^\d+$/.test(pidStr)) return NextResponse.json({ error: 'page_id must be numeric (a Facebook page ID)' }, { status: 400 })
+  if (pidStr) insert.page_id = pidStr
 
   // Dedup by page_id (term is unique but page_id is not — same advertiser under a different
   // name spelling would otherwise be crawled twice). Reject if this page_id already exists.
