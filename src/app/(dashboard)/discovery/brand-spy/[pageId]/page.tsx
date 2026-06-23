@@ -64,19 +64,6 @@ const MediaMix = ({ d }: { d: Spy }) => (
   </div>
 )
 
-const LongestRunning = ({ d }: { d: Spy }) => (
-  <div style={card}>
-    <div style={label}>Longest-Running Ads <span style={{ textTransform: 'none', fontWeight: 500 }}>— their proven winners</span></div>
-    {d.longestRunning.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No active ads yet.</div>}
-    {d.longestRunning.map((a) => (
-      <a key={a.adId} href={a.snapshot_url || '#'} target="_blank" rel="noreferrer" style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 12, alignItems: 'center', padding: '7px 0', borderBottom: '1px solid #f3f4f6', textDecoration: 'none', color: 'inherit' }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#10b981' }}>{a.days}d live</span>
-        <span style={{ fontSize: 13, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.hook || '(no ad text)'}</span>
-      </a>
-    ))}
-  </div>
-)
-
 // Hooks tab — Foreplay-style list: thumbnail, the opening line, run-time, sorted longest-running.
 function Hooks({ d }: { d: Spy }) {
   const [q, setQ] = useState('')
@@ -148,14 +135,238 @@ function LandingPages({ d }: { d: Spy }) {
   )
 }
 
-const TABS = [['overview', 'Overview'], ['tests', 'Creative Tests'], ['hooks', 'Hooks'], ['timeline', 'Timeline'], ['landing', 'Landing Pages']] as const
+// ── Per-ad card from db-search (reused: same media/thumbnail resolution as Discovery) ──
+type Card = {
+  id: string; pageName: string; body: string | null; title: string | null; caption: string | null
+  snapshotUrl: string | null; thumbnailUrl: string | null; videoUrl: string | null
+  startDate: string | null; stopDate: string | null; platforms: string[]
+  isActive: boolean; daysRunning: number | null; format: string | null
+  hookType: string | null; angle: string | null; cta: string | null; niche: string | null
+}
+
+// Fetch a spied brand's ads from db-search with filters + pagination (Ad Library + Timeline share this).
+function useBrandAds(pageId: string, opts: { days: number; format: string; status: string; sort: string }) {
+  const { days, format, status, sort } = opts
+  const [ads, setAds] = useState<Card[]>([])
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [total, setTotal] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => { setPage(0) }, [pageId, days, format, status, sort])
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    const p = new URLSearchParams({ pageId, mode: 'brand', page: String(page), sort })
+    if (days) p.set('days', String(days))
+    if (format) p.set('format', format)
+    if (status && status !== 'ALL') p.set('status', status)
+    fetch(`/api/discovery/db-search?${p.toString()}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return
+        setAds((prev) => (page === 0 ? d.ads || [] : [...prev, ...(d.ads || [])]))
+        setHasMore(!!d.hasMore)
+        if (typeof d.totalInDB === 'number') setTotal(d.totalInDB)
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [pageId, page, days, format, status, sort])
+  return { ads, loading, hasMore, total, loadMore: () => setPage((p) => p + 1) }
+}
+
+const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' }) : '—')
+const FMT_BADGE: Record<string, string> = { Video: '#2075ff', Image: '#10b981', 'Carousel/DCO': '#f59e0b' }
+
+function AdCard({ a, onOpen }: { a: Card; onOpen: (a: Card) => void }) {
+  const isVideo = (a.format || '').toLowerCase().includes('video') || !!a.videoUrl
+  const img = a.thumbnailUrl
+  return (
+    <button onClick={() => onOpen(a)} style={{ textAlign: 'left', background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
+        <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#2075ff' }}>{(a.pageName || '?')[0]?.toUpperCase()}</div>
+        <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.pageName}</div>
+        <span style={{ fontSize: 11, fontWeight: 700, color: a.isActive ? '#16a34a' : '#9ca3af' }}>{a.isActive ? '● Live' : 'Off'}</span>
+      </div>
+      <div style={{ fontSize: 11, color: '#9ca3af', padding: '0 12px 8px' }}>{fmtDate(a.startDate)}{a.isActive ? ' – Present' : a.stopDate ? ` – ${fmtDate(a.stopDate)}` : ''}</div>
+      {a.body && <div style={{ fontSize: 12, color: '#374151', padding: '0 12px 8px', lineHeight: 1.4, maxHeight: 52, overflow: 'hidden' }}>{a.body.slice(0, 120)}</div>}
+      <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#f3f4f6' }}>
+        {img ? <img src={img} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c4c4c4', fontSize: 12 }}>no preview</div>}
+        {isVideo && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>▶</div></div>}
+        <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[a.format || ''] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{a.format || 'Ad'}</span>
+        {(a.daysRunning || 0) > 0 && <span style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{a.daysRunning}d</span>}
+      </div>
+    </button>
+  )
+}
+
+function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h)
+  }, [onClose])
+  const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, padding: '9px 0', borderBottom: '1px solid #f3f4f6', fontSize: 13 }}>
+      <div style={{ color: '#9ca3af', fontWeight: 600 }}>{k}</div><div style={{ color: '#111' }}>{v}</div>
+    </div>
+  )
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.45)', zIndex: 60, display: 'flex', justifyContent: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(880px, 94vw)', height: '100%', background: '#fff', overflowY: 'auto', boxShadow: '-8px 0 30px rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+          <div style={{ fontSize: 13, color: '#6b7280' }}>ID: {a.id}</div>
+          <button onClick={onClose} style={{ fontSize: 13, fontWeight: 700, padding: '6px 12px', borderRadius: 8, border: '1px solid #e6e6e6', background: '#fff', cursor: 'pointer' }}>ESC to close ✕</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+          <div style={{ padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#2075ff' }}>{(a.pageName || '?')[0]?.toUpperCase()}</div>
+              <b style={{ fontSize: 14 }}>{a.pageName}</b>
+            </div>
+            {a.body && <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.5, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{a.body.slice(0, 600)}</div>}
+            <div style={{ borderRadius: 10, overflow: 'hidden', background: '#f3f4f6' }}>
+              {a.videoUrl ? <video src={a.videoUrl} poster={a.thumbnailUrl || undefined} controls style={{ width: '100%', display: 'block' }} />
+                : a.thumbnailUrl ? <img src={a.thumbnailUrl} alt="" style={{ width: '100%', display: 'block' }} />
+                : <div style={{ padding: 60, textAlign: 'center', color: '#9ca3af' }}>no preview</div>}
+            </div>
+          </div>
+          <div style={{ padding: 18, borderLeft: '1px solid #f3f4f6' }}>
+            <a href={a.snapshotUrl || '#'} target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: ACCENT, color: '#111', fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 10, textDecoration: 'none', marginBottom: 14 }}>Open in Meta Ad Library ↗</a>
+            <Row k="Status" v={a.isActive ? <span style={{ color: '#16a34a', fontWeight: 700 }}>● Still Running{a.startDate ? ` from ${fmtDate(a.startDate)}` : ''}</span> : <span style={{ color: '#9ca3af' }}>Inactive{a.stopDate ? ` (ended ${fmtDate(a.stopDate)})` : ''}</span>} />
+            <Row k="Time Running" v={`${a.daysRunning || 0} day${(a.daysRunning || 0) === 1 ? '' : 's'}`} />
+            <Row k="Format" v={a.format || '—'} />
+            <Row k="Niche" v={a.niche || '—'} />
+            <Row k="Platforms" v={(a.platforms || []).join(', ') || '—'} />
+            <Row k="Hook" v={a.hookType || '—'} />
+            <Row k="Angle" v={a.angle || '—'} />
+            <Row k="CTA" v={a.cta || '—'} />
+            <Row k="First seen" v={fmtDate(a.startDate)} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const FILTER_BTN = (on: boolean): React.CSSProperties => ({ fontSize: 13, fontWeight: 700, padding: '7px 12px', borderRadius: 8, border: '1px solid #e6e6e6', background: on ? 'rgba(223,254,149,0.5)' : '#fff', cursor: 'pointer', color: '#111' })
+
+function FilterBar({ days, setDays, format, setFormat, status, setStatus, sort, setSort, total }: any) {
+  const Sel = (val: string, set: (v: string) => void, opts: [string, string][]) => (
+    <select value={val} onChange={(e) => set(e.target.value)} style={{ ...FILTER_BTN(!!val && val !== 'ALL'), appearance: 'auto' }}>
+      {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+    </select>
+  )
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+      {([[0, 'All time'], [7, '7d'], [30, '30d'], [90, '90d'], [180, '180d']] as [number, string][]).map(([d, l]) => (
+        <button key={d} onClick={() => setDays(d)} style={FILTER_BTN(days === d)}>{l}</button>
+      ))}
+      <div style={{ width: 1, height: 22, background: '#e6e6e6', margin: '0 2px' }} />
+      {Sel(format, setFormat, [['', 'Format · All'], ['Video', 'Video'], ['Image', 'Image'], ['Carousel', 'Carousel']])}
+      {Sel(status, setStatus, [['ALL', 'Status · All'], ['ACTIVE', 'Active'], ['INACTIVE', 'Inactive']])}
+      {Sel(sort, setSort, [['newest', 'Newest'], ['longest', 'Longest running'], ['recommended', 'Recommended']])}
+      <div style={{ marginLeft: 'auto', fontSize: 13, color: '#6b7280' }}>{total != null ? `${total.toLocaleString()} ads` : ''}</div>
+    </div>
+  )
+}
+
+function AdLibrary({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: Card) => void }) {
+  const [days, setDays] = useState(0)
+  const [format, setFormat] = useState('')
+  const [status, setStatus] = useState('ALL')
+  const [sort, setSort] = useState('newest')
+  const { ads, loading, hasMore, total, loadMore } = useBrandAds(pageId, { days, format, status, sort })
+  return (
+    <div>
+      {/* Analytics header — Media Mix · Top Landing Pages · Top Hooks (Foreplay layout) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <MediaMix d={d} />
+        <div style={card}>
+          <div style={label}>Top Landing Pages</div>
+          {d.landingPages.slice(0, 6).map((p) => (
+            <div key={p.url} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid #f3f4f6', fontSize: 13 }}>
+              <span style={{ flex: 1, color: '#2075ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.url}</span>
+              <b style={{ color: '#111' }}>{p.total}</b><span style={{ color: '#9ca3af', width: 40, textAlign: 'right' }}>{Math.round((p.total / Math.max(1, d.summary.total)) * 100)}%</span>
+            </div>
+          ))}
+          {d.landingPages.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No destination URLs yet</div>}
+        </div>
+        <div style={card}>
+          <div style={label}>Top Hooks</div>
+          {d.hooks.slice(0, 6).map((h) => (
+            <div key={h.text} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid #f3f4f6', fontSize: 13 }}>
+              <span style={{ flex: 1, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>“{h.text}”</span>
+              <b style={{ color: h.active ? '#16a34a' : '#9ca3af' }}>{h.days}d</b>
+            </div>
+          ))}
+          {d.hooks.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No hooks yet</div>}
+        </div>
+      </div>
+
+      <FilterBar days={days} setDays={setDays} format={format} setFormat={setFormat} status={status} setStatus={setStatus} sort={sort} setSort={setSort} total={total} />
+
+      {ads.length === 0 && loading && <div style={{ color: '#9ca3af', fontSize: 14, padding: 20 }}>Loading ads…</div>}
+      {ads.length === 0 && !loading && <div style={{ color: '#9ca3af', fontSize: 14, padding: 20 }}>No ads match these filters.</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+        {ads.map((a) => <AdCard key={a.id} a={a} onOpen={onOpen} />)}
+      </div>
+      {hasMore && (
+        <div style={{ textAlign: 'center', marginTop: 18 }}>
+          <button onClick={loadMore} disabled={loading} style={{ padding: '10px 24px', borderRadius: 10, border: '1px solid #e6e6e6', background: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>{loading ? 'Loading…' : 'Load more ads'}</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TimelineGantt({ pageId, onOpen }: { pageId: string; onOpen: (a: Card) => void }) {
+  const { ads, loading, hasMore, loadMore } = useBrandAds(pageId, { days: 0, format: '', status: 'ALL', sort: 'recent' })
+  if (loading && ads.length === 0) return <div style={{ color: '#9ca3af', fontSize: 14, padding: 20 }}>Loading timeline…</div>
+  if (ads.length === 0) return <div style={{ color: '#9ca3af', fontSize: 14, padding: 20 }}>No ads to chart yet.</div>
+  const now = Date.now()
+  const spans = ads.map((a) => ({ a, s: a.startDate ? +new Date(a.startDate) : NaN, e: a.stopDate ? +new Date(a.stopDate) : (a.isActive ? now : NaN) })).filter((x) => !isNaN(x.s))
+  const min = Math.min(...spans.map((x) => x.s))
+  const max = now
+  const span = Math.max(1, max - min)
+  const months: { label: string; left: number }[] = []
+  const d0 = new Date(min); d0.setDate(1)
+  for (let t = +d0; t <= max; ) { const dt = new Date(t); months.push({ label: dt.toLocaleString('en', { month: 'short', year: '2-digit' }), left: ((t - min) / span) * 100 }); dt.setMonth(dt.getMonth() + 1); t = +dt }
+  return (
+    <div style={card}>
+      <div style={label}>Timeline <span style={{ textTransform: 'none', fontWeight: 500 }}>— each ad’s live window; click to inspect</span></div>
+      <div style={{ position: 'relative', height: 18, marginLeft: 200, marginBottom: 6, borderBottom: '1px solid #eee' }}>
+        {months.map((m, i) => <span key={i} style={{ position: 'absolute', left: `${m.left}%`, fontSize: 10, color: '#9ca3af' }}>{m.label}</span>)}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 560, overflowY: 'auto' }}>
+        {spans.map(({ a, s, e }) => {
+          const left = ((s - min) / span) * 100
+          const width = Math.max(0.6, ((Math.min(e, max) - s) / span) * 100)
+          return (
+            <div key={a.id} style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 8, alignItems: 'center' }}>
+              <button onClick={() => onOpen(a)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', overflow: 'hidden' }}>
+                {a.thumbnailUrl ? <img src={a.thumbnailUrl} alt="" style={{ width: 26, height: 26, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }} /> : <div style={{ width: 26, height: 26, borderRadius: 5, background: '#f3f4f6', flexShrink: 0 }} />}
+                <span style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.id}</span>
+              </button>
+              <div style={{ position: 'relative', height: 18, background: '#f8f9fa', borderRadius: 5 }}>
+                <button onClick={() => onOpen(a)} title={`${fmtDate(a.startDate)} → ${a.isActive ? 'Present' : fmtDate(a.stopDate)}`} style={{ position: 'absolute', left: `${left}%`, width: `${width}%`, top: 2, height: 14, borderRadius: 5, border: 'none', cursor: 'pointer', background: a.isActive ? '#bbf7d0' : '#e5e7eb' }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {hasMore && <div style={{ textAlign: 'center', marginTop: 12 }}><button onClick={loadMore} disabled={loading} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #e6e6e6', background: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{loading ? 'Loading…' : 'Load more'}</button></div>}
+    </div>
+  )
+}
+
+const TABS = [['library', 'Ad Library'], ['tests', 'Creative Tests'], ['hooks', 'Hooks'], ['timeline', 'Timeline'], ['landing', 'Landing Pages']] as const
 
 export default function BrandSpyDetail() {
   const { pageId } = useParams<{ pageId: string }>()
   const [d, setD] = useState<Spy | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
-  const [tab, setTab] = useState<typeof TABS[number][0]>('overview')
+  const [tab, setTab] = useState<typeof TABS[number][0]>('library')
+  const [drawerAd, setDrawerAd] = useState<Card | null>(null)
 
   useEffect(() => {
     if (!pageId) return
@@ -213,16 +424,12 @@ export default function BrandSpyDetail() {
         ))}
       </div>
 
-      {tab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <MediaMix d={d} />
-          <LongestRunning d={d} />
-        </div>
-      )}
+      {tab === 'library' && <AdLibrary d={d} pageId={pageId} onOpen={setDrawerAd} />}
 
       {tab === 'timeline' && (
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <TimelineGantt pageId={pageId} onOpen={setDrawerAd} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
             <div style={card}>
               <div style={label}>Ad Launch Trends <span style={{ textTransform: 'none', fontWeight: 500 }}>— new ads / month</span></div>
               <ResponsiveContainer width="100%" height={240}>
@@ -267,6 +474,8 @@ export default function BrandSpyDetail() {
       {tab === 'hooks' && <Hooks d={d} />}
 
       {tab === 'landing' && <LandingPages d={d} />}
+
+      {drawerAd && <AdDetailsDrawer a={drawerAd} onClose={() => setDrawerAd(null)} />}
     </div>
   )
 }
