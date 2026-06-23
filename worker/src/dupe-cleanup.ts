@@ -20,7 +20,8 @@ import { supabase } from './db.js'
 const DRY = process.env.DRY === '1'
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-type Row = { id: string; term: string; page_id: string; last_crawled_at: string | null; ads_found: number | null; created_at: string }
+type Row = { id: string; term: string; page_id: string; is_active: boolean; last_crawled_at: string | null; ads_found: number | null; created_at: string }
+const DELETE_CORRUPTED = process.env.DELETE_CORRUPTED === '1'
 
 async function main() {
   console.log(`🔎 dupe-cleanup ${DRY ? '(DRY RUN — no changes)' : '(LIVE — will deactivate redundant copies)'}`)
@@ -31,9 +32,8 @@ async function main() {
   for (;;) {
     let q = (supabase as any)
       .from('discovery_crawl_terms')
-      .select('id, term, page_id, last_crawled_at, ads_found, created_at')
+      .select('id, term, page_id, is_active, last_crawled_at, ads_found, created_at')
       .not('page_id', 'is', null)
-      .eq('is_active', true)
       .order('id', { ascending: true })
       .limit(1000)
     if (cursor) q = q.gt('id', cursor)
@@ -57,10 +57,29 @@ async function main() {
   const badSamples = [...new Set(badPageId.map((r) => r.page_id))].slice(0, 8)
   if (badSamples.length) console.log(`    sample bad page_id values: ${badSamples.map((s) => `"${s}"`).join(', ')}`)
 
-  // Group ONLY the valid numeric page_ids.
+  // DELETE-CORRUPTED mode: hard-delete the rows whose page_id is non-numeric. They came
+  // from malformed CSV (the comma split also truncated the NAME), so they can't be crawled
+  // or salvaged in place — a clean re-import (now that the parser is fixed) is the way to
+  // recover those brands. Separate from the dupe pass below.
+  if (DELETE_CORRUPTED) {
+    console.log(`🗑️  DELETE-CORRUPTED mode: ${badPageId.length} rows with non-numeric page_id`)
+    badPageId.slice(0, 15).forEach((r) => console.log(`    DELETE "${r.term}" (page_id="${r.page_id}", ${r.is_active ? 'active' : 'inactive'})`))
+    if (badPageId.length > 15) console.log(`    …and ${badPageId.length - 15} more`)
+    if (DRY) { console.log('DRY RUN — no deletes.'); return }
+    let del = 0
+    for (const r of badPageId) {
+      const { error } = await (supabase as any).from('discovery_crawl_terms').delete().eq('id', r.id)
+      if (!error) del++
+      await sleep(60)
+    }
+    console.log(`🗑️  deleted ${del} corrupted-page_id rows`)
+    return
+  }
+
+  // Group ONLY the valid numeric page_ids that are still ACTIVE (the dupe pass).
   const byPage = new Map<string, Row[]>()
   for (const r of rows) {
-    if (!isNumericPageId(r.page_id)) continue
+    if (!isNumericPageId(r.page_id) || !r.is_active) continue
     const g = byPage.get(r.page_id) || []
     g.push(r); byPage.set(r.page_id, g)
   }
