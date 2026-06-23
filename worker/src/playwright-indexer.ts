@@ -1315,24 +1315,24 @@ async function main() {
     ...(b?.category && b.category !== 'General' ? [b.category] : []),
   ].map(c => String(c).trim().toLowerCase()).filter(Boolean)))
 
-  let brands: { page_id: string; term: string; countries: string[]; categories: string[]; industry: string | null; ads_found: number | null; priority: number }[] = []
+  let brands: { page_id: string; term: string; countries: string[]; categories: string[]; industry: string | null; ads_found: number | null; priority: number; full_crawled_at: string | null }[] = []
   if (arg && /^\d+$/.test(arg)) {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('term, countries, category, categories, industry, ads_found, priority')
+      .select('term, countries, category, categories, industry, ads_found, priority, full_crawled_at')
       .eq('page_id', arg)
       .limit(1)
       .maybeSingle()
-    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [], categories: manualCats(data), industry: data?.industry || null, ads_found: data?.ads_found ?? null, priority: data?.priority ?? 5 }]
+    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [], categories: manualCats(data), industry: data?.industry || null, ads_found: data?.ads_found ?? null, priority: data?.priority ?? 5, full_crawled_at: data?.full_crawled_at ?? null }]
   } else {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('page_id, term, countries, category, categories, industry, ads_found, priority')
+      .select('page_id, term, countries, category, categories, industry, ads_found, priority, full_crawled_at')
       .eq('is_active', true)
       .not('page_id', 'is', null)
       .order('last_crawled_at', { ascending: true, nullsFirst: true })
       .limit(20)
-    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [], categories: manualCats(b), industry: b.industry || null, ads_found: b.ads_found ?? null, priority: b.priority ?? 5 }))
+    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [], categories: manualCats(b), industry: b.industry || null, ads_found: b.ads_found ?? null, priority: b.priority ?? 5, full_crawled_at: b.full_crawled_at ?? null }))
   }
 
   if (brands.length === 0) {
@@ -1343,14 +1343,20 @@ async function main() {
   console.log(`🚀 Playwright Indexer — ${brands.length} brand(s) to crawl`)
   for (const brand of brands) {
     try {
+      // FULL (deep archive) crawl — no caps, no early-stop, captures the complete library
+      // incl. inactive/taken-down ads — fires for:
+      //   • SPIED brands (priority >= 9, paid),
+      //   • NEW brands (ads_found null = never produced ads yet → crawl them fully, not capped),
+      //   • BACKFILL (full_crawled_at null = never deep-crawled → one-time deep re-walk to recover
+      //     the old archive we truncated at 1500). After it completes we stamp full_crawled_at so
+      //     the brand reverts to fast incremental. Kill-switch: FULL_BACKFILL=0 to pause the sweep.
+      const backfillOn = process.env.FULL_BACKFILL !== '0'
+      const isFull = (brand.priority ?? 5) >= 9 || brand.ads_found == null || (backfillOn && brand.full_crawled_at == null)
       const m = await crawlBrandCountries({
         pageId: brand.page_id,
         brandName: brand.term,
         maxScrolls,
-        // Spied brands (priority >= 9, set when a user pays to Spy them) get a FULL
-        // archive crawl — no caps, no early-stop — so we capture their complete library
-        // incl. inactive/taken-down ads. The bulk queue (priority 5) crawls normally.
-        full: (brand.priority ?? 5) >= 9,
+        full: isFull,
         config: countryConfig,
         activeCountries: brand.countries,
       })
@@ -1427,6 +1433,10 @@ async function main() {
         continue
       }
 
+      // B backfill: once a brand's deep crawl genuinely completes (not mid-resume), stamp
+      // full_crawled_at so it reverts to fast incremental and the sweep advances to the next brand.
+      if (isFull && !m.nextCursor && m.adsDiscovered > 0) update.full_crawled_at = new Date(now).toISOString()
+
       const lastCrawled = new Date(now - Math.max(0, SCHED_GAP_MIN - backoffMin) * 60_000).toISOString()
       await (supabase as any).from('discovery_crawl_terms')
         .update({ last_crawled_at: lastCrawled, ...update })
@@ -1440,12 +1450,17 @@ async function main() {
       //   • gated (0 ads) → leave the row untouched (transient, will retry).
       if (m.adsDiscovered > 0) {
         const doneStable = backoffMin === SCHED_GAP_MIN
+        // ads_indexed must be the CUMULATIVE total for this brand, not this run's count — else an
+        // incremental run that adds 27 ads stomps the field to 27 (the "27 ads" list bug). Read the
+        // real total from the index.
+        const { count: realTotal } = await (supabase as any)
+          .from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', brand.page_id)
         await (supabase as any).from('discovery_brand_crawl_state').upsert({
           page_id: brand.page_id,
           brand_name: brand.term || null,
           last_run_at: new Date(now).toISOString(),
           last_run_added: m.adsNew,
-          ads_indexed: m.adsDiscovered,
+          ads_indexed: realTotal ?? m.adsDiscovered,
           exhausted_at: (doneStable && !m.nextCursor) ? new Date(now).toISOString() : null,
           cursor: m.nextCursor ?? null,   // resume point for big brands; null when fully crawled
         }, { onConflict: 'page_id' })

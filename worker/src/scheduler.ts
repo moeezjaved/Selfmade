@@ -153,7 +153,19 @@ async function pickNextBrand(exclude: Set<string>): Promise<BrandRow | null> {
   const cutoff = new Date(Date.now() - MIN_BRAND_GAP_MIN * 60 * 1000).toISOString()
   const batch = Math.max(20, CONCURRENCY * 3)
 
-  // Brands that have NEVER been crawled — top priority
+  // JUST-SPIED brands jump the whole queue — a user paid to Spy them (priority 9, the app
+  // resets last_crawled_at = null), so they crawl on the very next free worker slot.
+  const { data: spied } = await (supabase as any)
+    .from('discovery_crawl_terms')
+    .select('page_id, term, last_crawled_at')
+    .eq('is_active', true)
+    .not('page_id', 'is', null)
+    .gte('priority', 9)
+    .is('last_crawled_at', null)
+    .limit(batch)
+  for (const b of (spied || []) as BrandRow[]) if (!exclude.has(b.page_id)) return b
+
+  // Brands that have NEVER been crawled — next priority
   const { data: never } = await (supabase as any)
     .from('discovery_crawl_terms')
     .select('page_id, term, last_crawled_at')
