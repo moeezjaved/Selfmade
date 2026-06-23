@@ -1288,22 +1288,21 @@ async function main() {
       const now = Date.now()
       let backoffMin: number
       const update: any = {}   // extra fields written alongside last_crawled_at
+      let removeBrand = false
       if (m.adsDiscovered === 0 && m.emptyBrandBail) {
-        // FAST DEACTIVATION (1-strike). A clean empty-bail means the page rendered and
-        // returned ZERO ads under active_status=all — which surfaces even PAUSED/inactive
-        // ads. So any brand that has EVER advertised shows ads here; a clean empty means
-        // the account has never run an ad (a non-advertiser). Remove it on the FIRST clean
-        // empty so the queue self-cleans in one pass instead of two (saves re-crawling all
-        // ~24K junk a second time). Distinct from a gate (gates trip anti-burn / return
-        // block pages → different code path), and reversible (is_active=false, not delete).
-        // GUARD: never deactivate a brand that previously returned ads (ads_found > 0) — a
-        // one-off empty on a known advertiser is a transient gate, not junk → keep it.
+        // FAST REMOVAL (1-strike). A clean empty-bail means the page rendered and returned
+        // ZERO ads under active_status=all — which surfaces even PAUSED/inactive ads. So any
+        // brand that has EVER advertised shows ads here; a clean empty means the account has
+        // never run an ad (a non-advertiser). DELETE it from the crawl list on the first
+        // clean empty so the queue self-cleans in one pass. Distinct from a gate (gates trip
+        // anti-burn / return block pages → different code path). GUARD: never remove a brand
+        // that previously returned ads (ads_found > 0) — a one-off empty on a known
+        // advertiser is a transient gate, not junk → keep it.
         backoffMin = SCHED_GAP_MIN
         if ((brand.ads_found ?? 0) > 0) {
           console.log(`  ∅ ${brand.term || brand.page_id}: empty now but had ${brand.ads_found} ads before — kept (transient, not junk)`)
         } else {
-          update.is_active = false
-          console.log(`  🗑️  ${brand.term || brand.page_id}: empty, no ad history (active_status=all) — deactivated (removed from queue)`)
+          removeBrand = true
         }
       } else if (m.adsDiscovered === 0) {
         backoffMin = GATE_RETRY_MIN
@@ -1317,8 +1316,19 @@ async function main() {
         // Clean, complete haul (or incremental early-stop on known ads) → full 7-day cadence.
         backoffMin = SCHED_GAP_MIN
       }
-      // A productive crawl records the real count, clearing any prior empty strike (-1).
+      // A productive crawl records the real count.
       if (m.adsDiscovered > 0) update.ads_found = m.adsDiscovered
+
+      // HARD-REMOVE confirmed-empty junk from the crawl list. We log term + page_id so the
+      // removal is recoverable from the logs if ever needed, and since the brand produced
+      // no ads nothing in discovery_ads_index is orphaned. `continue` skips the cadence
+      // update (the row is gone).
+      if (removeBrand) {
+        await (supabase as any).from('discovery_crawl_terms').delete().eq('page_id', brand.page_id)
+        console.log(`  🗑️  REMOVED from brand list: "${brand.term}" (page_id=${brand.page_id}) — empty, no ad history`)
+        continue
+      }
+
       const lastCrawled = new Date(now - Math.max(0, SCHED_GAP_MIN - backoffMin) * 60_000).toISOString()
       await (supabase as any).from('discovery_crawl_terms')
         .update({ last_crawled_at: lastCrawled, ...update })
