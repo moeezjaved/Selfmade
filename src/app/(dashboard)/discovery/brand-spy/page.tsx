@@ -32,16 +32,17 @@ export default function BrandSpyList() {
   const [manualUrl, setManualUrl] = useState('')
   const [msg, setMsg] = useState('')
 
-  const fetchBrands = useCallback(async (query: string): Promise<Brand[]> => {
-    const res = await fetch(`/api/discovery/brand-spy${query ? `?q=${encodeURIComponent(query)}` : ''}`)
+  const fetchBrands = useCallback(async (query: string, scope: 'mine' | 'all'): Promise<Brand[]> => {
+    const p = new URLSearchParams({ scope }); if (query) p.set('q', query)
+    const res = await fetch(`/api/discovery/brand-spy?${p}`)
     const j = await res.json().catch(() => ({}))
     return j.brands || []
   }, [])
 
-  const load = useCallback(async (query: string) => { setLoading(true); try { setBrands(await fetchBrands(query)) } finally { setLoading(false) } }, [fetchBrands])
+  const load = useCallback(async (query: string) => { setLoading(true); try { setBrands(await fetchBrands(query, 'mine')) } finally { setLoading(false) } }, [fetchBrands])
   useEffect(() => { const t = setTimeout(() => load(q.trim()), q ? 300 : 0); return () => clearTimeout(t) }, [q, load])
   // Modal search
-  useEffect(() => { if (!open) return; const t = setTimeout(async () => setMResults(await fetchBrands(mQ.trim())), 250); return () => clearTimeout(t) }, [mQ, open, fetchBrands])
+  useEffect(() => { if (!open) return; const t = setTimeout(async () => setMResults(await fetchBrands(mQ.trim(), 'all')), 250); return () => clearTimeout(t) }, [mQ, open, fetchBrands])
 
   const spy = async (payload: { url?: string; pageId?: string; name?: string }, busyKey: string) => {
     setMsg('')
@@ -81,8 +82,15 @@ export default function BrandSpyList() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 90px', padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           <div>Brand</div><div>Ads (active · inactive)</div><div>Type</div><div style={{ textAlign: 'right' }}>Spy</div>
         </div>
-        {loading && <div style={{ padding: 24, color: '#9ca3af', fontSize: 14 }}>Loading brands…</div>}
-        {!loading && brands.length === 0 && <div style={{ padding: 24, color: '#9ca3af', fontSize: 14 }}>No brands match “{q}”.</div>}
+        {loading && <div style={{ padding: 24, color: '#9ca3af', fontSize: 14 }}>Loading your brands…</div>}
+        {!loading && brands.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>{q ? `No spied brand matches “${q}”` : 'You’re not spying on any brands yet'}</div>
+            <div style={{ fontSize: 13, marginBottom: 14 }}>Add a competitor to start tracking its Meta ads — format mix, creative tests, hooks, and a full active/inactive history.</div>
+            <button onClick={() => { setOpen(true); setModalTab('search'); setMQ(''); setManualUrl(''); setMsg('') }}
+              style={{ padding: '9px 18px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>+ Spy your first brand{cost ? ` · ${cost} cr` : ''}</button>
+          </div>
+        )}
         {brands.map((b) => (
           <div key={b.pageId} className="bs-row" onClick={() => busy ? null : spy({ pageId: b.pageId, name: b.name }, b.pageId)}
             style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 90px', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>

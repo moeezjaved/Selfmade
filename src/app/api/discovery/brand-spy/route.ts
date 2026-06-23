@@ -24,9 +24,25 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
 
   const q = (req.nextUrl.searchParams.get('q') || '').trim()
-  const limit = q ? 60 : 120
+  // scope=mine (default) → only THIS user's spied brands (the tracked list). scope=all →
+  // the full directory (used by the add-modal's search to find new brands to spy).
+  const scope = req.nextUrl.searchParams.get('scope') || 'mine'
+  const limit = q ? 60 : 200
+
+  let myPageIds: string[] | null = null
+  if (scope === 'mine') {
+    const { data: txs } = await admin
+      .from('credit_transactions')
+      .select('reference_id')
+      .eq('user_id', user.id).eq('action_type', ACTION).eq('status', 'committed')
+    myPageIds = Array.from(new Set((txs || []).map((t: any) => t.reference_id).filter(Boolean)))
+    if (myPageIds.length === 0) return NextResponse.json({ brands: [], scope: 'mine' })
+  }
+
   const build = (cols: string) => {
-    let qq = admin.from('discovery_brand_crawl_state').select(cols).gt('ads_indexed', 0).order('ads_indexed', { ascending: false }).limit(limit)
+    let qq = admin.from('discovery_brand_crawl_state').select(cols).order('ads_indexed', { ascending: false }).limit(limit)
+    if (myPageIds) qq = qq.in('page_id', myPageIds)
+    else qq = qq.gt('ads_indexed', 0)
     if (q) qq = qq.ilike('brand_name', `%${q}%`)
     return qq
   }
