@@ -167,6 +167,19 @@ export async function POST(req: NextRequest) {
   }
   if (page_id) insert.page_id = String(page_id).trim()
 
+  // Dedup by page_id (term is unique but page_id is not — same advertiser under a different
+  // name spelling would otherwise be crawled twice). Reject if this page_id already exists.
+  if (insert.page_id) {
+    const { data: dup } = await admin
+      .from('discovery_crawl_terms')
+      .select('term')
+      .eq('page_id', insert.page_id)
+      .neq('term', insert.term)
+      .limit(1)
+      .maybeSingle()
+    if (dup) return NextResponse.json({ error: `Already tracked as "${dup.term}" (same page_id)` }, { status: 409 })
+  }
+
   const { data, error } = await admin
     .from('discovery_crawl_terms')
     .insert(insert)

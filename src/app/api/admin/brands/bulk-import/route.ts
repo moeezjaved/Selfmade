@@ -37,7 +37,7 @@ interface ResultRow {
   brand_name: string
   page_id?: string
   category?: string
-  status: 'imported' | 'updated' | 'needs_manual' | 'error'
+  status: 'imported' | 'updated' | 'needs_manual' | 'error' | 'duplicate'
   message?: string
   candidates?: any[]
 }
@@ -175,7 +175,25 @@ async function processRow(
   }
   if (pageId) insert.page_id = pageId
 
-  // Upsert by term (avoid duplicates)
+  // Dedup by page_id. `term` is unique (so duplicate NAMES can't happen), but page_id is
+  // NOT — the same advertiser can arrive under a different name spelling, or the name→
+  // page_id lookup can resolve variants to one page. Without this, the crawler would crawl
+  // the same Facebook page twice (wasted IPRoyal + double-counting). If this page_id is
+  // already tracked under a DIFFERENT term, skip it as a duplicate.
+  if (pageId) {
+    const { data: dup } = await admin
+      .from('discovery_crawl_terms')
+      .select('term')
+      .eq('page_id', pageId)
+      .neq('term', term)
+      .limit(1)
+      .maybeSingle()
+    if (dup) {
+      return { brand_name: row.brand_name, page_id: pageId, category: row.category, status: 'duplicate', message: `same page_id already tracked as "${dup.term}"` }
+    }
+  }
+
+  // Upsert by term (avoid duplicate names)
   const { data, error } = await admin
     .from('discovery_crawl_terms')
     .upsert(insert, { onConflict: 'term' })
@@ -257,6 +275,7 @@ export async function POST(req: NextRequest) {
     imported: results.filter(r => r.status === 'imported').length,
     updated: results.filter(r => r.status === 'updated').length,
     needs_manual: results.filter(r => r.status === 'needs_manual').length,
+    duplicate: results.filter(r => r.status === 'duplicate').length,
     errors: results.filter(r => r.status === 'error').length,
   }
 
