@@ -564,7 +564,15 @@ async function crawlBrand(opts: {
   // Per-country crawl: crawl country=<CC> instead of country=ALL and tag every
   // returned ad with <CC> in targeted_countries (powers the Country filter).
   country?: string
+  // FULL re-crawl (spied brands only): lift the 1500 target / page / time caps AND
+  // disable the incremental early-stop, so we walk the ENTIRE library to has_next=false —
+  // including the inactive/taken-down archive that sits past the active ads. Expensive, so
+  // scoped to high-priority spied brands, never the bulk queue.
+  full?: boolean
 }): Promise<RunMetrics> {
+  // Per-crawl caps — lifted when `full` so a spied brand gets its complete archive.
+  const TARGET = opts.full ? 200_000 : TARGET_ADS_PER_BRAND
+  const TIME_BUDGET = opts.full ? 1_200_000 : PER_BRAND_TIME_BUDGET_MS   // 20 min for full
   const sessionId = randomBytes(4).toString('hex').slice(0, 8)
   const metrics: RunMetrics = {
     brandPageId: opts.pageId,
@@ -827,7 +835,7 @@ async function crawlBrand(opts: {
     await sleep(8_000)  // initial render
 
     const startMs = Date.now()
-    const maxScrolls = opts.maxScrolls ?? MAX_SCROLLS_PER_BRAND
+    const maxScrolls = opts.maxScrolls ?? (opts.full ? 600 : MAX_SCROLLS_PER_BRAND)
 
     for (let scrollIdx = 0; scrollIdx < maxScrolls; scrollIdx++) {
       // Anti-burn check
@@ -841,14 +849,14 @@ async function crawlBrand(opts: {
         }
       }
       // Time budget
-      if (Date.now() - startMs > PER_BRAND_TIME_BUDGET_MS) {
-        console.log(`  ⏰ Time budget exhausted (${PER_BRAND_TIME_BUDGET_MS / 1000}s)`)
+      if (Date.now() - startMs > TIME_BUDGET) {
+        console.log(`  ⏰ Time budget exhausted (${TIME_BUDGET / 1000}s)`)
         abortReason = 'time_budget'
         break
       }
       // Target ads
-      if (allAds.size >= TARGET_ADS_PER_BRAND) {
-        console.log(`  🎯 Reached target of ${TARGET_ADS_PER_BRAND} ads`)
+      if (allAds.size >= TARGET) {
+        console.log(`  🎯 Reached target of ${TARGET} ads`)
         break
       }
       // Empty-brand early bail — page rendered + scrolled a few times with ZERO ads and
@@ -910,8 +918,8 @@ async function crawlBrand(opts: {
             (async () => {
               const tpl = ${JSON.stringify(tpl)};
               const startCursor = ${JSON.stringify(initialCursor)};
-              const maxPages = ${TARGET_ADS_PER_BRAND / 10 + 5};   // ~10 ads per page
-              const knownSet = new Set(${JSON.stringify(knownIds)});  // incremental: ads we already have
+              const maxPages = ${opts.full ? 20000 : TARGET_ADS_PER_BRAND / 10 + 5};   // ~10 ads per page
+              const knownSet = new Set(${JSON.stringify(opts.full ? [] : knownIds)});  // empty in FULL mode → no early-stop, walk the whole archive
 
               const out = { pages: 0, fetched: 0, lastCursor: null, hasNext: true, stoppedEarly: false };
               let cursor = startCursor;
@@ -1127,7 +1135,7 @@ async function readCountryConfig(): Promise<{ enabled: boolean; countries: strin
  *           expansion. Returns aggregate {adsDiscovered, adsNew} for cadence logic.
  */
 async function crawlBrandCountries(opts: {
-  pageId: string; brandName: string; maxScrolls?: number
+  pageId: string; brandName: string; maxScrolls?: number; full?: boolean
   config: { enabled: boolean; countries: string[] }
   activeCountries: string[]
 }): Promise<{ adsDiscovered: number; adsNew: number; softGateSuspect: boolean; emptyBrandBail: boolean }> {
@@ -1135,7 +1143,7 @@ async function crawlBrandCountries(opts: {
 
   // Single country=ALL crawl (toggle OFF or no countries configured).
   if (!opts.config.enabled || opts.config.countries.length === 0) {
-    const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls })
+    const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls, full: opts.full })
     return { adsDiscovered: m.adsDiscovered, adsNew: m.adsNew, softGateSuspect: m.softGateSuspect, emptyBrandBail: m.emptyBrandBail }
   }
 
@@ -1151,7 +1159,7 @@ async function crawlBrandCountries(opts: {
   let totalDiscovered = 0, totalNew = 0, anySuspect = false, everyEmptyBail = true
   const hadAds: string[] = []
   for (const cc of toCrawl) {
-    const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls, country: cc })
+    const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls, country: cc, full: opts.full })
     totalDiscovered += m.adsDiscovered; totalNew += m.adsNew
     if (m.softGateSuspect) anySuspect = true
     if (!m.emptyBrandBail) everyEmptyBail = false   // empty only if EVERY country was empty
@@ -1235,24 +1243,24 @@ async function main() {
     ...(b?.category && b.category !== 'General' ? [b.category] : []),
   ].map(c => String(c).trim().toLowerCase()).filter(Boolean)))
 
-  let brands: { page_id: string; term: string; countries: string[]; categories: string[]; industry: string | null; ads_found: number | null }[] = []
+  let brands: { page_id: string; term: string; countries: string[]; categories: string[]; industry: string | null; ads_found: number | null; priority: number }[] = []
   if (arg && /^\d+$/.test(arg)) {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('term, countries, category, categories, industry, ads_found')
+      .select('term, countries, category, categories, industry, ads_found, priority')
       .eq('page_id', arg)
       .limit(1)
       .maybeSingle()
-    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [], categories: manualCats(data), industry: data?.industry || null, ads_found: data?.ads_found ?? null }]
+    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [], categories: manualCats(data), industry: data?.industry || null, ads_found: data?.ads_found ?? null, priority: data?.priority ?? 5 }]
   } else {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('page_id, term, countries, category, categories, industry, ads_found')
+      .select('page_id, term, countries, category, categories, industry, ads_found, priority')
       .eq('is_active', true)
       .not('page_id', 'is', null)
       .order('last_crawled_at', { ascending: true, nullsFirst: true })
       .limit(20)
-    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [], categories: manualCats(b), industry: b.industry || null, ads_found: b.ads_found ?? null }))
+    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [], categories: manualCats(b), industry: b.industry || null, ads_found: b.ads_found ?? null, priority: b.priority ?? 5 }))
   }
 
   if (brands.length === 0) {
@@ -1267,6 +1275,10 @@ async function main() {
         pageId: brand.page_id,
         brandName: brand.term,
         maxScrolls,
+        // Spied brands (priority >= 9, set when a user pays to Spy them) get a FULL
+        // archive crawl — no caps, no early-stop — so we capture their complete library
+        // incl. inactive/taken-down ads. The bulk queue (priority 5) crawls normally.
+        full: (brand.priority ?? 5) >= 9,
         config: countryConfig,
         activeCountries: brand.countries,
       })
