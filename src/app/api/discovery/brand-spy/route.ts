@@ -45,6 +45,23 @@ const extractPageId = (s: string): string | null => {
   return m ? m[1] : null
 }
 
+const COUNTRIES = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'PL', 'MX', 'BR', 'IN', 'JP', 'SG', 'AE', 'ZA']
+
+// Add the brand to the crawl queue if missing, reactivate if deactivated, and (when
+// forceFresh) reset last_crawled_at so it re-crawls as top priority — a paid spy should
+// pull current, complete data, not whatever stale snapshot we happen to have.
+async function ensureTracked(admin: ReturnType<typeof createAdminClient>, pageId: string, name: string, forceFresh: boolean) {
+  const { data: ex } = await admin.from('discovery_crawl_terms').select('page_id, is_active').eq('page_id', pageId).maybeSingle()
+  if (ex) {
+    const upd: Record<string, any> = {}
+    if (ex.is_active === false) upd.is_active = true
+    if (forceFresh) upd.last_crawled_at = null
+    if (Object.keys(upd).length) await admin.from('discovery_crawl_terms').update(upd).eq('page_id', pageId)
+  } else {
+    await admin.from('discovery_crawl_terms').insert({ term: name, page_id: pageId, term_type: 'brand', category: 'General', is_active: true, priority: 9, last_crawled_at: null, countries: COUNTRIES })
+  }
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -56,28 +73,25 @@ export async function POST(req: NextRequest) {
   if (!pageId) return NextResponse.json({ error: 'Paste a Meta Ad Library page URL (…view_all_page_id=123…) or a numeric page ID — not a keyword search.' }, { status: 400 })
   const name = (body.name || '').trim().toLowerCase() || pageId
 
-  // Already tracked? → free, just open it.
-  const { data: existing } = await admin
-    .from('discovery_crawl_terms')
-    .select('page_id, is_active')
-    .eq('page_id', pageId)
-    .limit(1)
-    .maybeSingle()
-  if (existing) {
-    if (existing.is_active === false) await admin.from('discovery_crawl_terms').update({ is_active: true }).eq('page_id', pageId)
-    return NextResponse.json({ pageId, charged: false, alreadyTracked: true })
+  // Has THIS user already paid to spy THIS brand? (credit_transactions ledger, ref = pageId).
+  // If so it's free to re-open — we charge once per user per brand, not per click.
+  const { data: prior } = await admin
+    .from('credit_transactions')
+    .select('id')
+    .eq('user_id', user.id).eq('action_type', ACTION).eq('reference_id', pageId).eq('status', 'committed')
+    .limit(1).maybeSingle()
+  if (prior) {
+    await ensureTracked(admin, pageId, name, false)
+    return NextResponse.json({ pageId, charged: false, alreadySpied: true })
   }
 
-  // New brand → charge credits, then add to the crawl queue. Reserve→commit (refund on fail).
+  // First time this user spies this brand (directory OR manual) → charge, queue a fresh
+  // thorough re-crawl, commit. Reserve→commit→refund on failure.
   const cost = await getActionCost(admin, ACTION)
   let txId: string | null = null
   try {
     if (cost && cost > 0) { const tx = await reserveCredits(admin, user.id, ACTION, pageId); txId = tx.id }
-    const { error: insErr } = await admin.from('discovery_crawl_terms').insert({
-      term: name, page_id: pageId, term_type: 'brand', category: 'General', is_active: true, priority: 8,
-      countries: ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'PL', 'MX', 'BR', 'IN', 'JP', 'SG', 'AE', 'ZA'],
-    })
-    if (insErr) throw new Error(insErr.message)
+    await ensureTracked(admin, pageId, name, true)
     if (txId) await commitCredits(admin, txId, { page_id: pageId })
     return NextResponse.json({ pageId, charged: !!txId, cost: cost || 0 })
   } catch (e) {

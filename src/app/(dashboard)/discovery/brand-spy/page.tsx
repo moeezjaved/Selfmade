@@ -1,9 +1,9 @@
 'use client'
 /**
- * Brand Spy — directory + manual add. Reads the fast per-brand summary
- * (/api/discovery/brand-spy over discovery_brand_crawl_state). "Add manually" pastes a Meta
- * Ad Library page URL to start spying a NEW brand (charges brand_spy credits + queues it to
- * crawl). Brands we already track are free to open.
+ * Brand Spy — directory + manual add. Spying ANY brand (directory click or manual URL)
+ * charges brand_spy credits the first time THIS user spies it (free to re-open after),
+ * and queues a fresh thorough re-crawl so the data is current. Fast list reads the per-brand
+ * summary table.
  */
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
@@ -25,7 +25,7 @@ export default function BrandSpyList() {
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<'search' | 'manual'>('search')
   const [manualUrl, setManualUrl] = useState('')
-  const [spying, setSpying] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
 
   const load = useCallback(async (query: string) => {
@@ -38,18 +38,18 @@ export default function BrandSpyList() {
   }, [])
   useEffect(() => { const t = setTimeout(() => load(q.trim()), q ? 300 : 0); return () => clearTimeout(t) }, [q, load])
 
-  const spyManual = async () => {
+  // Charge (first spy of this brand for this user) → queue fresh crawl → open dashboard.
+  const spy = async (payload: { url?: string; pageId?: string; name?: string }, busyKey: string) => {
     setMsg('')
-    if (!manualUrl.trim()) return
-    if (cost && !confirm(`Start spying on this brand? This uses ${cost} credits and adds it to continuous tracking.`)) return
-    setSpying(true)
+    if (cost && !confirm(`Spy this brand? This uses ${cost} credits the first time (free to re-open after) and pulls a fresh, complete snapshot.`)) return
+    setBusy(busyKey)
     try {
-      const res = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: manualUrl.trim() }) })
+      const res = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
       const j = await res.json()
-      if (!res.ok) { setMsg(j.error || 'Failed'); setSpying(false); return }
+      if (!res.ok) { setMsg(j.error || 'Failed'); setBusy(null); return }
       refreshCredits()
       router.push(`/discovery/brand-spy/${j.pageId}`)
-    } catch (e) { setMsg(String(e)); setSpying(false) }
+    } catch (e) { setMsg(String(e)); setBusy(null) }
   }
 
   return (
@@ -61,10 +61,9 @@ export default function BrandSpyList() {
       </div>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111', marginBottom: 2 }}>Brand Spy</h1>
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
-        Track any competitor’s Meta ads over time — format mix, launch cadence, active-ad trends, and the hooks they run. We snapshot every brand continuously, so the history is already there.
+        Track any competitor’s Meta ads over time — format mix, launch cadence, active-ad trends, and the hooks they run. Spying a brand pulls a fresh, complete snapshot.
       </div>
 
-      {/* Search / Add-manually toggle */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <button onClick={() => setMode('search')} style={tab(mode === 'search')}>Search brands</button>
         <button onClick={() => setMode('manual')} style={tab(mode === 'manual')}>Add manually{cost ? ` · ${cost} credits` : ''}</button>
@@ -79,9 +78,9 @@ export default function BrandSpyList() {
           <div style={{ display: 'flex', gap: 8 }}>
             <input value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} placeholder="facebook.com/ads/library/?...view_all_page_id=123… or a page ID"
               style={{ flex: 1, padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none' }} />
-            <button onClick={spyManual} disabled={spying || !manualUrl.trim()}
-              style={{ padding: '9px 18px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: spying ? 'wait' : 'pointer', opacity: spying || !manualUrl.trim() ? 0.6 : 1 }}>
-              {spying ? 'Spying…' : `Spy${cost ? ` · ${cost} cr` : ''}`}
+            <button onClick={() => manualUrl.trim() && spy({ url: manualUrl.trim() }, 'manual')} disabled={busy === 'manual' || !manualUrl.trim()}
+              style={{ padding: '9px 18px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: busy ? 'wait' : 'pointer', opacity: busy === 'manual' || !manualUrl.trim() ? 0.6 : 1 }}>
+              {busy === 'manual' ? 'Spying…' : `Spy${cost ? ` · ${cost} cr` : ''}`}
             </button>
           </div>
           <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 6 }}>Paste a brand’s Meta Ad Library <b>page URL</b> (not a keyword search). New brands are queued for continuous tracking.</div>
@@ -96,14 +95,14 @@ export default function BrandSpyList() {
         {loading && <div style={{ padding: 24, color: '#9ca3af', fontSize: 14 }}>Loading brands…</div>}
         {!loading && brands.length === 0 && <div style={{ padding: 24, color: '#9ca3af', fontSize: 14 }}>No brands match “{q}”.</div>}
         {brands.map((b) => (
-          <Link key={b.pageId} href={`/discovery/brand-spy/${b.pageId}`} className="bs-row"
-            style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', textDecoration: 'none', color: 'inherit' }}>
+          <div key={b.pageId} className="bs-row" onClick={() => busy ? null : spy({ pageId: b.pageId, name: b.name }, b.pageId)}
+            style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</div>
             <div style={{ textAlign: 'right', fontSize: 14, color: '#374151' }}>{b.adCount.toLocaleString()}</div>
             <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', background: 'rgba(32,117,255,0.08)', padding: '5px 12px', borderRadius: 999 }}>Spy →</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', background: 'rgba(32,117,255,0.08)', padding: '5px 12px', borderRadius: 999 }}>{busy === b.pageId ? '…' : `Spy${cost ? ` · ${cost}` : ''} →`}</span>
             </div>
-          </Link>
+          </div>
         ))}
       </div>
     </div>
