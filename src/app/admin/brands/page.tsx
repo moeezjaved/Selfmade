@@ -95,9 +95,9 @@ export default function BrandsPage() {
   const [newBrand, setNewBrand] = useState({ term: '', page_id: '', category: 'General', priority: 5 })
   const [filter, setFilter] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (q?: string) => {
     try {
-      const res = await fetch('/api/admin/brands')
+      const res = await fetch(`/api/admin/brands${q ? `?q=${encodeURIComponent(q)}` : ''}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const j = await res.json()
       setData(j)
@@ -110,10 +110,12 @@ export default function BrandsPage() {
   }, [])
 
   useEffect(() => {
-    load()
-    const t = setInterval(load, 30_000) // refresh every 30s
-    return () => clearInterval(t)
-  }, [load])
+    // Debounced SERVER-side search: typing in the box queries ALL brands by name/page_id
+    // (not just the loaded 1000). Also refreshes every 30s with the current search.
+    const debounce = setTimeout(() => load(filter || undefined), filter ? 300 : 0)
+    const t = setInterval(() => load(filter || undefined), 30_000)
+    return () => { clearTimeout(debounce); clearInterval(t) }
+  }, [load, filter])
 
   const addBrand = async () => {
     if (!newBrand.term.trim()) return
@@ -272,11 +274,10 @@ export default function BrandsPage() {
   if (error && !data) return <div style={{ padding: 32, color: '#c0392b' }}>Error: {error}</div>
   if (!data) return null
 
-  // Sort newest first so just-imported brands appear at top
-  const filtered = data.terms
-    .filter(t =>
-      !filter || t.term.toLowerCase().includes(filter.toLowerCase()) || t.brand_name?.toLowerCase().includes(filter.toLowerCase())
-    )
+  // The API already filters by the search box (server-side, across ALL brands incl. by
+  // page_id), so we just sort newest-first here — no client filter (it would hide
+  // page_id matches whose name doesn't contain the digits).
+  const filtered = [...data.terms]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
@@ -498,10 +499,11 @@ export default function BrandsPage() {
         </div>
       )}
 
-      {/* Filter input */}
+      {/* Search input — server-side across ALL brands (by name or exact page_id) */}
       <input value={filter} onChange={e => setFilter(e.target.value)}
-        placeholder="Filter brands by name…"
-        style={{ ...inputStyle, marginBottom: 12, width: 260 }} />
+        placeholder="Search all brands by name or page ID…"
+        style={{ ...inputStyle, marginBottom: 12, width: 320 }} />
+      {filter && <span style={{ marginLeft: 10, fontSize: 12, color: '#888' }}>{filtered.length} match{filtered.length === 1 ? '' : 'es'}</span>}
 
       {/* Brands table */}
       <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>

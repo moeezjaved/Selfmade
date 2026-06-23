@@ -15,12 +15,27 @@ export const maxDuration = 60
 
 const RECRAWL_INTERVAL_DAYS = 7
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user && !(await isAdminToken())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
+
+  // Optional search: exact page_id (numeric) or name substring. Without it the list is
+  // capped at PostgREST's 1000-row default ordered newest-first, so older brands are
+  // invisible — search finds ANY brand by name/page_id. discovery_crawl_terms is small
+  // (~27K rows) so an ilike here is cheap (unlike the 700K+ ads table).
+  const q = (req.nextUrl.searchParams.get('q') || '').trim()
+  let termsQuery = admin
+    .from('discovery_crawl_terms')
+    .select('id, term, term_type, page_id, category, categories, countries, industry, priority, is_active, follower_count, picture, website, notes, created_at')
+    .or('term_type.eq.brand,page_id.not.is.null')
+  if (q) {
+    if (/^\d+$/.test(q)) termsQuery = termsQuery.eq('page_id', q)
+    else termsQuery = termsQuery.ilike('term', `%${q}%`)
+  }
+  termsQuery = termsQuery.order('created_at', { ascending: false }).limit(q ? 200 : 1000)
 
   const [
     { data: terms },
@@ -30,13 +45,7 @@ export async function GET(_req: NextRequest) {
     { count: brandsIndexedCount },
     { count: totalAdsCount },
   ] = await Promise.all([
-    // Show only BRAND-type terms (not category/adcopy seeds).
-    // A row counts as a brand if term_type='brand' OR it has a page_id.
-    admin
-      .from('discovery_crawl_terms')
-      .select('id, term, term_type, page_id, category, categories, countries, industry, priority, is_active, follower_count, picture, website, notes, created_at')
-      .or('term_type.eq.brand,page_id.not.is.null')
-      .order('created_at', { ascending: false }),
+    termsQuery,
     admin
       .from('discovery_brand_crawl_state')
       .select('page_id, brand_name, cursor, ads_indexed, last_run_at, last_run_added, exhausted_at')
