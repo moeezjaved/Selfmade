@@ -47,6 +47,10 @@ const SUCCESS_RATE_WINDOW = 50  // last N ads checked
 // Per-brand budget
 const PER_BRAND_TIME_BUDGET_MS = 240_000  // 4 min — we hit this often during pagination
 const MAX_SCROLLS_PER_BRAND = 60          // hard cap (was 30 — most listings have ~1500 ads)
+const EMPTY_BRAND_BAIL_SCROLLS = 5        // if 0 ads + no pagination template after this many
+                                          // scrolls, the page has nothing (personal acct / inactive
+                                          // advertiser — ~86% of the cold queue). Bail instead of
+                                          // grinding the full 60 / 4-min time budget on a dead brand.
 const SCROLL_DELAY_MIN_MS = 2_500
 const SCROLL_DELAY_MAX_MS = 5_000         // tighter range — we want pagination to fire faster
 
@@ -93,6 +97,7 @@ interface RunMetrics {
   scrollCount: number
   successWindow: boolean[]   // true = ad data, false = empty/error
   softGateSuspect: boolean   // crawl looks truncated/incomplete → warrants one verify-recrawl
+  emptyBrandBail: boolean    // 0 ads + no template → genuinely empty page (not gated)
 }
 
 interface ExtractedAd {
@@ -571,6 +576,7 @@ async function crawlBrand(opts: {
     responsesCaptured: 0, cursorsSeen: 0, scrollCount: 0,
     successWindow: [],
     softGateSuspect: false,
+    emptyBrandBail: false,
   }
 
   console.log(`\n🌐 Crawling ${opts.brandName || opts.pageId} (session ${sessionId})…`)
@@ -845,6 +851,18 @@ async function crawlBrand(opts: {
         console.log(`  🎯 Reached target of ${TARGET_ADS_PER_BRAND} ads`)
         break
       }
+      // Empty-brand early bail — page rendered + scrolled a few times with ZERO ads and
+      // no pagination template captured → this advertiser has nothing in the Library.
+      // ~86% of the cold queue is like this (personal accounts), and without this they
+      // run the full 4-min time budget. Bail now and let the crawler move on. Distinct
+      // from a gate (which trips anti-burn / returns block pages) → cadence treats it as
+      // a clean empty, not a soon-retry.
+      if (scrollIdx >= EMPTY_BRAND_BAIL_SCROLLS && allAds.size === 0 && !tplState.template) {
+        console.log(`  ∅ ${opts.brandName || opts.pageId}: 0 ads after ${scrollIdx} scrolls, no template — empty brand, bailing`)
+        metrics.emptyBrandBail = true
+        abortReason = 'empty_brand_bail'
+        break
+      }
       // ── Single discrete wheel per iteration (matches standalone tool that captured 169 ads) ──
       // Earlier rapid 3× wheels per iteration didn't register as discrete user
       // events — Meta's IntersectionObserver only saw clustered scrolls.
@@ -1112,13 +1130,13 @@ async function crawlBrandCountries(opts: {
   pageId: string; brandName: string; maxScrolls?: number
   config: { enabled: boolean; countries: string[] }
   activeCountries: string[]
-}): Promise<{ adsDiscovered: number; adsNew: number; softGateSuspect: boolean }> {
+}): Promise<{ adsDiscovered: number; adsNew: number; softGateSuspect: boolean; emptyBrandBail: boolean }> {
   const mkRun = () => randomBytes(16).toString('hex').slice(0, 32).replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
 
   // Single country=ALL crawl (toggle OFF or no countries configured).
   if (!opts.config.enabled || opts.config.countries.length === 0) {
     const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls })
-    return { adsDiscovered: m.adsDiscovered, adsNew: m.adsNew, softGateSuspect: m.softGateSuspect }
+    return { adsDiscovered: m.adsDiscovered, adsNew: m.adsNew, softGateSuspect: m.softGateSuspect, emptyBrandBail: m.emptyBrandBail }
   }
 
   // Multi-country: pick the countries to crawl (skip-empty). Intersect the
@@ -1130,12 +1148,13 @@ async function crawlBrandCountries(opts: {
   const toCrawl = fullSweep ? opts.config.countries : activeInConfig
   console.log(`  🌍 multi-country (${fullSweep ? 'full sweep' : 'active only'}): ${toCrawl.join(', ')}`)
 
-  let totalDiscovered = 0, totalNew = 0, anySuspect = false
+  let totalDiscovered = 0, totalNew = 0, anySuspect = false, everyEmptyBail = true
   const hadAds: string[] = []
   for (const cc of toCrawl) {
     const m = await crawlBrand({ pageId: opts.pageId, brandName: opts.brandName, runId: mkRun(), maxScrolls: opts.maxScrolls, country: cc })
     totalDiscovered += m.adsDiscovered; totalNew += m.adsNew
     if (m.softGateSuspect) anySuspect = true
+    if (!m.emptyBrandBail) everyEmptyBail = false   // empty only if EVERY country was empty
     if (m.adsDiscovered > 0) hadAds.push(cc)
     await sleep(2_000)  // small gap between country crawls
   }
@@ -1151,7 +1170,7 @@ async function crawlBrandCountries(opts: {
     .eq('page_id', opts.pageId)
   console.log(`  🌍 active countries for ${opts.brandName || opts.pageId}: ${newActive.join(', ') || '(none)'}`)
 
-  return { adsDiscovered: totalDiscovered, adsNew: totalNew, softGateSuspect: anySuspect }
+  return { adsDiscovered: totalDiscovered, adsNew: totalNew, softGateSuspect: anySuspect, emptyBrandBail: totalDiscovered === 0 && everyEmptyBail }
 }
 
 // Stamp a brand's MANUAL admin categories onto all its ads (brand_categories),
@@ -1268,7 +1287,13 @@ async function main() {
       //   • Otherwise (clean complete haul or incremental early-stop) → full SCHED_GAP_MIN cadence.
       const now = Date.now()
       let backoffMin: number
-      if (m.adsDiscovered === 0) {
+      if (m.adsDiscovered === 0 && m.emptyBrandBail) {
+        // Page rendered cleanly with no ads (not blocked) → this advertiser genuinely has
+        // nothing. Age it out on the FULL cadence instead of a soon gate-retry, so the
+        // ~86% junk of the cold queue isn't re-crawled every GATE_RETRY_MIN.
+        backoffMin = SCHED_GAP_MIN
+        console.log(`  ∅ ${brand.term || brand.page_id}: empty brand — full cadence (no soon-retry)`)
+      } else if (m.adsDiscovered === 0) {
         backoffMin = GATE_RETRY_MIN
         console.warn(`  ⚠️ ${brand.term || brand.page_id}: 0 ads (gated) — retry in ${GATE_RETRY_MIN} min`)
       } else if (m.softGateSuspect) {
