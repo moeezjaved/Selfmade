@@ -22,7 +22,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
-type Ad = { format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; hook_type: string | null; angle: string | null }
+type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; snapshot_url: string | null }
 
 const MONTH = (d: Date) => `${d.toLocaleString('en', { month: 'short' })} '${String(d.getFullYear()).slice(2)}`
 const tally = (xs: (string | null)[]) => {
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   for (let from = 0; from < 8000; from += 1000) {
     const { data, error } = await admin
       .from('discovery_ads_index')
-      .select('page_name, format, start_date, last_seen, is_active, hook_type, angle')
+      .select('ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url')
       .eq('page_id', pageId)
       .order('start_date', { ascending: true })
       .range(from, from + 999)
@@ -90,6 +90,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     activeTrend.push({ week: MONTH(new Date(wEnd)) + ` w${Math.ceil((new Date(wEnd).getDate()) / 7)}`, active, source: 'real' })
   }
 
+  // Creative Tests — group ads by launch DAY; a batch of >=2 launched together is a test.
+  // survival = still-running / launched (Foreplay's A/B-test detection: high survival = winner).
+  const dayMap = new Map<string, { launched: number; running: number }>()
+  for (const a of ads) {
+    if (!a.start_date) continue
+    const day = a.start_date.slice(0, 10)
+    const cur = dayMap.get(day) || { launched: 0, running: 0 }
+    cur.launched++; if (a.is_active) cur.running++
+    dayMap.set(day, cur)
+  }
+  const creativeTests = Array.from(dayMap.entries())
+    .filter(([, t]) => t.launched >= 2)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 12)
+    .map(([date, t]) => ({ date, launched: t.launched, running: t.running, survival: Math.round((t.running / t.launched) * 100) }))
+
+  // Longest-running ACTIVE ads — Foreplay's core signal: run-duration ≈ profitability.
+  const longestRunning = ads
+    .filter((a) => a.is_active && (a.days_running || 0) > 0)
+    .sort((a, b) => (b.days_running || 0) - (a.days_running || 0))
+    .slice(0, 8)
+    .map((a) => ({ adId: a.ad_id, days: a.days_running || 0, hook: ((a.body || a.hook_type || '').trim()).slice(0, 90), snapshot_url: a.snapshot_url }))
+
   const startsSorted = ads.map((a) => a.start_date).filter(Boolean).sort() as string[]
   return NextResponse.json({
     brand: { pageId, name: name || pageId, picture: null },
@@ -103,6 +126,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     formatMix,
     launchesByMonth,
     activeTrend,
+    creativeTests,
+    longestRunning,
     topHooks: tally(ads.map((a) => a.hook_type)).slice(0, 8),
     topAngles: tally(ads.map((a) => a.angle)).slice(0, 8),
   })
