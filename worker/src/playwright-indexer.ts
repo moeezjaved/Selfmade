@@ -55,7 +55,10 @@ const SCROLL_DELAY_MIN_MS = 2_500
 const SCROLL_DELAY_MAX_MS = 5_000         // tighter range — we want pagination to fire faster
 
 // Pagination
-const TARGET_ADS_PER_BRAND = 1500         // bumped after fixing pagination scroll — Hims has ~2800 visible ads
+const TARGET_ADS_PER_BRAND = 4000         // default cap for the bulk queue — most brands are
+                                          // well under it; big brands (Hims ~2800, etc.) now crawl
+                                          // their full current library instead of truncating at 1500.
+                                          // Spied brands (opts.full) ignore this entirely (200K).
 // Re-crawl cadence. A successful crawl marks the brand crawled "now" → not
 // re-crawled for SCHED_GAP_MIN. A GATED crawl (0 ads, IP soft-blocked) backs
 // off only GATE_RETRY_MIN so a different IP can retry soon — without the old
