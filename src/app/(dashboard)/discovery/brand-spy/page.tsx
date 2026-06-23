@@ -1,9 +1,8 @@
 'use client'
 /**
- * Brand Spy — directory + manual add. Spying ANY brand (directory click or manual URL)
- * charges brand_spy credits the first time THIS user spies it (free to re-open after),
- * and queues a fresh thorough re-crawl so the data is current. Fast list reads the per-brand
- * summary table.
+ * Brand Spy — directory + "Start Spying on Competitors" modal (Foreplay-style). Spying any
+ * brand charges brand_spy credits the first time a user spies it (free to re-open), and
+ * queues a full archive crawl. Fast list reads the per-brand summary table.
  */
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
@@ -23,25 +22,30 @@ export default function BrandSpyList() {
   const [brands, setBrands] = useState<Brand[]>([])
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
-  const [mode, setMode] = useState<'search' | 'manual'>('search')
-  const [manualUrl, setManualUrl] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+
+  // Modal state
+  const [open, setOpen] = useState(false)
+  const [modalTab, setModalTab] = useState<'search' | 'manual'>('search')
+  const [mQ, setMQ] = useState('')
+  const [mResults, setMResults] = useState<Brand[]>([])
+  const [manualUrl, setManualUrl] = useState('')
   const [msg, setMsg] = useState('')
 
-  const load = useCallback(async (query: string) => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/discovery/brand-spy${query ? `?q=${encodeURIComponent(query)}` : ''}`)
-      const j = await res.json()
-      setBrands(j.brands || [])
-    } catch { setBrands([]) } finally { setLoading(false) }
+  const fetchBrands = useCallback(async (query: string): Promise<Brand[]> => {
+    const res = await fetch(`/api/discovery/brand-spy${query ? `?q=${encodeURIComponent(query)}` : ''}`)
+    const j = await res.json().catch(() => ({}))
+    return j.brands || []
   }, [])
-  useEffect(() => { const t = setTimeout(() => load(q.trim()), q ? 300 : 0); return () => clearTimeout(t) }, [q, load])
 
-  // Charge (first spy of this brand for this user) → queue fresh crawl → open dashboard.
+  const load = useCallback(async (query: string) => { setLoading(true); try { setBrands(await fetchBrands(query)) } finally { setLoading(false) } }, [fetchBrands])
+  useEffect(() => { const t = setTimeout(() => load(q.trim()), q ? 300 : 0); return () => clearTimeout(t) }, [q, load])
+  // Modal search
+  useEffect(() => { if (!open) return; const t = setTimeout(async () => setMResults(await fetchBrands(mQ.trim())), 250); return () => clearTimeout(t) }, [mQ, open, fetchBrands])
+
   const spy = async (payload: { url?: string; pageId?: string; name?: string }, busyKey: string) => {
     setMsg('')
-    if (cost && !confirm(`Spy this brand? This uses ${cost} credits the first time (free to re-open after) and pulls a fresh, complete snapshot.`)) return
+    if (cost && !confirm(`Spy this brand? Uses ${cost} credits the first time (free to re-open) and pulls a fresh, complete snapshot.`)) return
     setBusy(busyKey)
     try {
       const res = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
@@ -54,39 +58,24 @@ export default function BrandSpyList() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
-      <style>{`.bs-row:hover{background:#fafafa}`}</style>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        <Link href="/discovery/brand-spy" style={tab(true)}>Brands</Link>
-        <Link href="/discovery/brand-spy/feed" style={tab(false)}>Feed</Link>
-      </div>
-      <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111', marginBottom: 2 }}>Brand Spy</h1>
-      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
-        Track any competitor’s Meta ads over time — format mix, launch cadence, active-ad trends, and the hooks they run. Spying a brand pulls a fresh, complete snapshot.
-      </div>
+      <style>{`.bs-row:hover{background:#fafafa}.bs-mrow:hover{background:#f6f8ff}`}</style>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        <button onClick={() => setMode('search')} style={tab(mode === 'search')}>Search brands</button>
-        <button onClick={() => setMode('manual')} style={tab(mode === 'manual')}>Add manually{cost ? ` · ${cost} credits` : ''}</button>
-      </div>
-
-      {mode === 'search' ? (
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a brand to spy on…"
-          style={{ width: 360, padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, marginBottom: 14, outline: 'none' }} />
-      ) : (
-        <div style={{ background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, padding: 16, marginBottom: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 6 }}>Start spying on a new competitor</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} placeholder="facebook.com/ads/library/?...view_all_page_id=123… or a page ID"
-              style={{ flex: 1, padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none' }} />
-            <button onClick={() => manualUrl.trim() && spy({ url: manualUrl.trim() }, 'manual')} disabled={busy === 'manual' || !manualUrl.trim()}
-              style={{ padding: '9px 18px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: busy ? 'wait' : 'pointer', opacity: busy === 'manual' || !manualUrl.trim() ? 0.6 : 1 }}>
-              {busy === 'manual' ? 'Spying…' : `Spy${cost ? ` · ${cost} cr` : ''}`}
-            </button>
-          </div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 6 }}>Paste a brand’s Meta Ad Library <b>page URL</b> (not a keyword search). New brands are queued for continuous tracking.</div>
-          {msg && <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 6 }}>{msg}</div>}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Link href="/discovery/brand-spy" style={tab(true)}>Brands</Link>
+          <Link href="/discovery/brand-spy/feed" style={tab(false)}>Feed</Link>
         </div>
-      )}
+        <button onClick={() => { setOpen(true); setModalTab('search'); setMQ(''); setManualUrl(''); setMsg('') }}
+          style={{ padding: '9px 16px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+          + Spy new brand{cost ? ` · ${cost} cr` : ''}
+        </button>
+      </div>
+
+      <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111', marginBottom: 2 }}>Brand Spy</h1>
+      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>Track any competitor’s Meta ads over time — format mix, launch cadence, active-ad trends, creative tests, and the hooks they run.</div>
+
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter your brands…"
+        style={{ width: 360, padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, marginBottom: 14, outline: 'none' }} />
 
       <div style={{ background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px', padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -99,12 +88,66 @@ export default function BrandSpyList() {
             style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</div>
             <div style={{ textAlign: 'right', fontSize: 14, color: '#374151' }}>{b.adCount.toLocaleString()}</div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', background: 'rgba(32,117,255,0.08)', padding: '5px 12px', borderRadius: 999 }}>{busy === b.pageId ? '…' : `Spy${cost ? ` · ${cost}` : ''} →`}</span>
-            </div>
+            <div style={{ textAlign: 'right' }}><span style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', background: 'rgba(32,117,255,0.08)', padding: '5px 12px', borderRadius: 999 }}>{busy === b.pageId ? '…' : 'Spy →'}</span></div>
           </div>
         ))}
       </div>
+
+      {/* ── "Start Spying on Competitors" modal ── */}
+      {open && (
+        <div onClick={() => !busy && setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 80, zIndex: 50 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '92vw', background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 19, fontWeight: 800, color: '#111' }}>Start Spying on Competitors</div>
+                <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>Track &amp; save every ad your competitors launch.</div>
+              </div>
+              <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', fontSize: 20, color: '#9ca3af', cursor: 'pointer' }}>×</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 6, margin: '16px 0 14px' }}>
+              <button onClick={() => setModalTab('search')} style={tab(modalTab === 'search')}>Search Brand</button>
+              <button onClick={() => setModalTab('manual')} style={tab(modalTab === 'manual')}>Add Manually</button>
+            </div>
+
+            {modalTab === 'search' ? (
+              <div>
+                <input autoFocus value={mQ} onChange={(e) => setMQ(e.target.value)} placeholder="Type a brand name…"
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+                <div style={{ maxHeight: 320, overflowY: 'auto', marginTop: 10, border: mResults.length ? '1px solid #eee' : 'none', borderRadius: 8 }}>
+                  {mResults.map((b) => (
+                    <div key={b.pageId} className="bs-mrow" onClick={() => spy({ pageId: b.pageId, name: b.name }, b.pageId)}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize' }}>{b.name || b.pageId}</span>
+                      <span style={{ fontSize: 13, color: '#6b7280' }}>{b.adCount.toLocaleString()} ads</span>
+                    </div>
+                  ))}
+                  {mQ && mResults.length === 0 && <div style={{ padding: 12, fontSize: 13, color: '#9ca3af' }}>No tracked brand matches — use “Add Manually” to start one.</div>}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Facebook Ad Library URL</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input autoFocus value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} placeholder="facebook.com/ads/library/?…view_all_page_id=123…"
+                    style={{ flex: 1, padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none' }} />
+                  <a href="https://www.facebook.com/ads/library/" target="_blank" rel="noreferrer" style={{ padding: '10px 14px', background: '#f3f4f6', borderRadius: 8, fontSize: 13, fontWeight: 700, color: '#374151', textDecoration: 'none', whiteSpace: 'nowrap' }}>↗ Ad Library</a>
+                </div>
+                <div style={{ fontSize: 12, color: '#9ca3af', background: '#f9fafb', borderRadius: 8, padding: '8px 10px', marginTop: 8 }}>
+                  Copy the Facebook Ad Library <b>page URL</b> of a brand — <b>not a keyword search</b>.
+                </div>
+                <button onClick={() => manualUrl.trim() && spy({ url: manualUrl.trim() }, 'manual')} disabled={busy === 'manual' || !manualUrl.trim()}
+                  style={{ marginTop: 14, width: '100%', padding: '11px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: busy ? 'wait' : 'pointer', opacity: busy === 'manual' || !manualUrl.trim() ? 0.6 : 1 }}>
+                  {busy === 'manual' ? 'Spying…' : `Add Brand${cost ? ` · ${cost} credits` : ''}`}
+                </button>
+              </div>
+            )}
+
+            {msg && <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 10 }}>{msg}</div>}
+            <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>◆ {cost ? `${cost} credits` : 'Free'} per new brand · continuous tracking until removed</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
