@@ -1350,12 +1350,18 @@ async function main() {
       //   • BACKFILL (full_crawled_at null = never deep-crawled → one-time deep re-walk to recover
       //     the old archive we truncated at 1500). After it completes we stamp full_crawled_at so
       //     the brand reverts to fast incremental. Kill-switch: FULL_BACKFILL=0 to pause the sweep.
-      // DEPTH vs BREADTH. Spied brands ALWAYS go full (a user paid for depth on demand). The
-      // breadth-killers — full crawls of new brands and the backfill sweep — are gated behind
-      // FULL_BACKFILL so we can run BREADTH-FIRST (FULL_BACKFILL=0: drain the never-crawled queue
-      // fast, every crawl quick/capped) until the queue is clear, then flip depth on.
+      // DEPTH vs BREADTH, balanced for a single droplet:
+      //   • SPIED brands (priority >= 9) → ALWAYS full (a user paid for depth on demand).
+      //   • NEW brands (ads_found null, never crawled) → FAST capped crawl, so the never-crawled
+      //     queue keeps draining at full speed (a deep walk would hold a worker 35 min).
+      //   • ALREADY-CRAWLED-but-never-deep brands (ads_found > 0, full_crawled_at null) → run the
+      //     deep BACKFILL on only ~1-in-N passes (FULL_BACKFILL_RATE, default 0.25). The other
+      //     passes crawl fast. So archives backfill gradually in the background without choking
+      //     fresh throughput. Kill the sweep entirely with FULL_BACKFILL=0.
       const backfillOn = process.env.FULL_BACKFILL !== '0'
-      const isFull = (brand.priority ?? 5) >= 9 || (backfillOn && (brand.ads_found == null || brand.full_crawled_at == null))
+      const backfillRate = parseFloat(process.env.FULL_BACKFILL_RATE ?? '0.25')
+      const eligibleForBackfill = backfillOn && brand.full_crawled_at == null && (brand.ads_found ?? 0) > 0
+      const isFull = (brand.priority ?? 5) >= 9 || (eligibleForBackfill && Math.random() < backfillRate)
       const m = await crawlBrandCountries({
         pageId: brand.page_id,
         brandName: brand.term,
