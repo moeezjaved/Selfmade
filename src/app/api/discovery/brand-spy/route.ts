@@ -55,7 +55,7 @@ async function ensureTracked(admin: ReturnType<typeof createAdminClient>, pageId
   if (ex) {
     const upd: Record<string, any> = {}
     if (ex.is_active === false) upd.is_active = true
-    if (forceFresh) upd.last_crawled_at = null
+    if (forceFresh) { upd.last_crawled_at = null; upd.priority = 9 }   // priority 9 → crawler does a FULL archive crawl
     if (Object.keys(upd).length) await admin.from('discovery_crawl_terms').update(upd).eq('page_id', pageId)
   } else {
     await admin.from('discovery_crawl_terms').insert({ term: name, page_id: pageId, term_type: 'brand', category: 'General', is_active: true, priority: 9, last_crawled_at: null, countries: COUNTRIES })
