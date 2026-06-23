@@ -1289,21 +1289,21 @@ async function main() {
       let backoffMin: number
       const update: any = {}   // extra fields written alongside last_crawled_at
       if (m.adsDiscovered === 0 && m.emptyBrandBail) {
-        // Page rendered cleanly with no ads (not blocked) → this advertiser genuinely has
-        // nothing. 2-STRIKE DEACTIVATION: a single empty could be a one-off silent gate,
-        // so require TWO clean-empty crawls before pulling the brand. `ads_found` is
-        // unused elsewhere (admin shows crawl_count), so we borrow it as the strike
-        // marker: -1 = "one clean-empty seen". A crawl that finds ads overwrites it with
-        // the real count (below), so only genuinely-empty brands ever reach strike 2.
-        // This is the durable junk filter — ground truth (no ads exist), which no name
-        // rule can match. Soft-deactivate (is_active=false), not delete → auditable.
+        // FAST DEACTIVATION (1-strike). A clean empty-bail means the page rendered and
+        // returned ZERO ads under active_status=all — which surfaces even PAUSED/inactive
+        // ads. So any brand that has EVER advertised shows ads here; a clean empty means
+        // the account has never run an ad (a non-advertiser). Remove it on the FIRST clean
+        // empty so the queue self-cleans in one pass instead of two (saves re-crawling all
+        // ~24K junk a second time). Distinct from a gate (gates trip anti-burn / return
+        // block pages → different code path), and reversible (is_active=false, not delete).
+        // GUARD: never deactivate a brand that previously returned ads (ads_found > 0) — a
+        // one-off empty on a known advertiser is a transient gate, not junk → keep it.
         backoffMin = SCHED_GAP_MIN
-        if (brand.ads_found === -1) {
-          update.is_active = false
-          console.log(`  🗑️  ${brand.term || brand.page_id}: 2nd consecutive empty — deactivated (removed from crawl queue)`)
+        if ((brand.ads_found ?? 0) > 0) {
+          console.log(`  ∅ ${brand.term || brand.page_id}: empty now but had ${brand.ads_found} ads before — kept (transient, not junk)`)
         } else {
-          update.ads_found = -1
-          console.log(`  ∅ ${brand.term || brand.page_id}: empty brand (strike 1/2) — full cadence`)
+          update.is_active = false
+          console.log(`  🗑️  ${brand.term || brand.page_id}: empty, no ad history (active_status=all) — deactivated (removed from queue)`)
         }
       } else if (m.adsDiscovered === 0) {
         backoffMin = GATE_RETRY_MIN
