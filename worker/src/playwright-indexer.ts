@@ -1235,24 +1235,24 @@ async function main() {
     ...(b?.category && b.category !== 'General' ? [b.category] : []),
   ].map(c => String(c).trim().toLowerCase()).filter(Boolean)))
 
-  let brands: { page_id: string; term: string; countries: string[]; categories: string[]; industry: string | null }[] = []
+  let brands: { page_id: string; term: string; countries: string[]; categories: string[]; industry: string | null; ads_found: number | null }[] = []
   if (arg && /^\d+$/.test(arg)) {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('term, countries, category, categories, industry')
+      .select('term, countries, category, categories, industry, ads_found')
       .eq('page_id', arg)
       .limit(1)
       .maybeSingle()
-    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [], categories: manualCats(data), industry: data?.industry || null }]
+    brands = [{ page_id: arg, term: data?.term ?? '', countries: Array.isArray(data?.countries) ? data.countries : [], categories: manualCats(data), industry: data?.industry || null, ads_found: data?.ads_found ?? null }]
   } else {
     const { data } = await (supabase as any)
       .from('discovery_crawl_terms')
-      .select('page_id, term, countries, category, categories, industry')
+      .select('page_id, term, countries, category, categories, industry, ads_found')
       .eq('is_active', true)
       .not('page_id', 'is', null)
       .order('last_crawled_at', { ascending: true, nullsFirst: true })
       .limit(20)
-    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [], categories: manualCats(b), industry: b.industry || null }))
+    brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [], categories: manualCats(b), industry: b.industry || null, ads_found: b.ads_found ?? null }))
   }
 
   if (brands.length === 0) {
@@ -1287,12 +1287,24 @@ async function main() {
       //   • Otherwise (clean complete haul or incremental early-stop) → full SCHED_GAP_MIN cadence.
       const now = Date.now()
       let backoffMin: number
+      const update: any = {}   // extra fields written alongside last_crawled_at
       if (m.adsDiscovered === 0 && m.emptyBrandBail) {
         // Page rendered cleanly with no ads (not blocked) → this advertiser genuinely has
-        // nothing. Age it out on the FULL cadence instead of a soon gate-retry, so the
-        // ~86% junk of the cold queue isn't re-crawled every GATE_RETRY_MIN.
+        // nothing. 2-STRIKE DEACTIVATION: a single empty could be a one-off silent gate,
+        // so require TWO clean-empty crawls before pulling the brand. `ads_found` is
+        // unused elsewhere (admin shows crawl_count), so we borrow it as the strike
+        // marker: -1 = "one clean-empty seen". A crawl that finds ads overwrites it with
+        // the real count (below), so only genuinely-empty brands ever reach strike 2.
+        // This is the durable junk filter — ground truth (no ads exist), which no name
+        // rule can match. Soft-deactivate (is_active=false), not delete → auditable.
         backoffMin = SCHED_GAP_MIN
-        console.log(`  ∅ ${brand.term || brand.page_id}: empty brand — full cadence (no soon-retry)`)
+        if (brand.ads_found === -1) {
+          update.is_active = false
+          console.log(`  🗑️  ${brand.term || brand.page_id}: 2nd consecutive empty — deactivated (removed from crawl queue)`)
+        } else {
+          update.ads_found = -1
+          console.log(`  ∅ ${brand.term || brand.page_id}: empty brand (strike 1/2) — full cadence`)
+        }
       } else if (m.adsDiscovered === 0) {
         backoffMin = GATE_RETRY_MIN
         console.warn(`  ⚠️ ${brand.term || brand.page_id}: 0 ads (gated) — retry in ${GATE_RETRY_MIN} min`)
@@ -1305,9 +1317,11 @@ async function main() {
         // Clean, complete haul (or incremental early-stop on known ads) → full 7-day cadence.
         backoffMin = SCHED_GAP_MIN
       }
+      // A productive crawl records the real count, clearing any prior empty strike (-1).
+      if (m.adsDiscovered > 0) update.ads_found = m.adsDiscovered
       const lastCrawled = new Date(now - Math.max(0, SCHED_GAP_MIN - backoffMin) * 60_000).toISOString()
       await (supabase as any).from('discovery_crawl_terms')
-        .update({ last_crawled_at: lastCrawled })
+        .update({ last_crawled_at: lastCrawled, ...update })
         .eq('page_id', brand.page_id)
 
       // Keep the admin Brands view in sync. It reads discovery_brand_crawl_state
