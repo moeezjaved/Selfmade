@@ -2,22 +2,22 @@
  * Vision classifier (E2) — fills the VISUAL filters text can't: format_style (UGC vs studio),
  * visual_style (the setting), visual_scene, and on_screen_text — by actually LOOKING at the creative
  * with gpt-4o-mini vision. Deduped by creative HASH (one call per unique image, fanned out to every
- * ad that uses it) and scoped to the ads users actually filter on (active by default) to control cost.
+ * ad that uses it).
+ *
+ * Two scopes:
+ *   • GLOBAL (cost-controlled) — VISION_SCOPE=active|winning|all → powers the Discovery filters.
+ *   • BRAND (deep spy)         — VISION_PAGE_ID=<page_id>        → EVERY creative of one brand.
  *
  *   docker run -d --name vision --env-file /opt/worker/.env \
  *     -v /root/Selfmade/worker/src:/app/src selfmade-worker npx tsx src/vision-classify.ts
- *   # tunables: VISION_CONCURRENCY (6), VISION_SCOPE (active|winning|all), VISION_MAX (0=unlimited)
+ *   # tunables: VISION_CONCURRENCY (6), VISION_SCOPE (active|winning|all), VISION_MAX (0=∞), VISION_PAGE_ID
  *
- * on_screen_text it writes feeds the TEXT classifier (classify-batch) so video hooks get accurate.
+ * runVision() is also imported by vision-spy-daemon.ts to run the brand pass per spied brand.
  */
 import { supabase } from './db.js'
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY
 const MODEL = process.env.VISION_MODEL || 'gpt-4o-mini'
-const CONCURRENCY = Math.max(1, parseInt(process.env.VISION_CONCURRENCY ?? '6', 10))
-const SCOPE = (process.env.VISION_SCOPE || 'active').toLowerCase()   // active | winning | all
-const PAGE_ID = (process.env.VISION_PAGE_ID || '').trim()           // set → FULL pass for ONE spied brand
-const MAX = Math.max(0, parseInt(process.env.VISION_MAX ?? '0', 10)) // 0 = unlimited
 const BATCH = 300
 
 const FORMAT_STYLES = ['UGC', 'Studio / Produced', 'Graphic / Text', 'Mixed']
@@ -33,9 +33,9 @@ const PROMPT = `Look at this ad creative and return ONE JSON object only, no pro
 UGC = looks user-shot/selfie/handheld/phone footage. Studio / Produced = polished, lit, produced.
 Graphic / Text = mostly designed graphic or text card. Mixed = a combination.`
 
-type Cand = { hash: string; assetType: string; img: string }
+type Cand = { hash: string; img: string }
 
-async function classifyOne(c: Cand): Promise<boolean> {
+export async function classifyOne(c: Cand): Promise<boolean> {
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -61,33 +61,29 @@ async function classifyOne(c: Cand): Promise<boolean> {
       on_screen_text: (typeof o.on_screen_text === 'string' && o.on_screen_text.trim()) ? o.on_screen_text.slice(0, 500) : null,
       visual_classified: true,
     }
-    // Fan out to EVERY ad that uses this creative (matches whichever hash column it lives in).
     await (supabase as any).from('discovery_ads_index')
       .update(update)
-      .or(`image_hash.eq.${c.hash},video_hash.eq.${c.hash}`)
+      .or(`image_hash.eq.${c.hash},video_hash.eq.${c.hash}`)   // fan out to every ad with this creative
     return true
   } catch { return false }
 }
 
-async function main() {
-  if (!OPENAI_KEY) { console.error('missing OPENAI_API_KEY'); process.exit(1) }
-  console.log(`👁️  vision-classify — model=${MODEL}, ${PAGE_ID ? `brand=${PAGE_ID} (FULL)` : `scope=${SCOPE}`}, concurrency=${CONCURRENCY}, max=${MAX || '∞'}`)
+/** Run a vision pass. Pass pageId for the FULL brand (deep spy) scope, else the global scope. */
+export async function runVision(opts: { pageId?: string; scope?: string; max?: number; concurrency?: number }): Promise<{ done: number; ok: number }> {
+  const { pageId = '', scope = 'active', max = 0, concurrency = 6 } = opts
   const seen = new Set<string>()
   let cursor: string | null = null
   let done = 0, ok = 0
   for (;;) {
-    // Active ads (or winners / all) that still need visual classification + have a creative image.
     let q = (supabase as any)
       .from('discovery_ads_index')
       .select('ad_id, image_hash, video_hash, discovery_creatives!inner(poster_url, r2_url, asset_type, hash)')
       .or('visual_classified.is.null,visual_classified.eq.false')
       .order('ad_id', { ascending: false })
       .limit(BATCH)
-    // Brand-scoped (a spied brand) → FULL pass over EVERY creative, active or not. Otherwise the
-    // global, cost-controlled scope (active / winning) that powers the Discovery filters.
-    if (PAGE_ID) q = q.eq('page_id', PAGE_ID)
-    else if (SCOPE === 'active') q = q.eq('is_active', true)
-    else if (SCOPE === 'winning') q = q.in('performance_tier', ['winning', 'optimized'])
+    if (pageId) q = q.eq('page_id', pageId)                                    // deep spy: ALL creatives
+    else if (scope === 'active') q = q.eq('is_active', true)
+    else if (scope === 'winning') q = q.in('performance_tier', ['winning', 'optimized'])
     if (cursor) q = q.lt('ad_id', cursor)
     const { data, error } = await q
     if (error) { console.error('query error:', error.message); break }
@@ -102,20 +98,31 @@ async function main() {
       const img = cre?.poster_url || cre?.r2_url
       if (!img) continue
       seen.add(hash)
-      fresh.push({ hash, assetType: cre?.asset_type || 'image', img })
+      fresh.push({ hash, img })
     }
-
-    for (let i = 0; i < fresh.length; i += CONCURRENCY) {
-      const slice = fresh.slice(i, i + CONCURRENCY)
+    for (let i = 0; i < fresh.length; i += concurrency) {
+      const slice = fresh.slice(i, i + concurrency)
       const res = await Promise.all(slice.map(classifyOne))
       done += slice.length; ok += res.filter(Boolean).length
-      if (MAX && done >= MAX) { console.log(`reached VISION_MAX=${MAX}`); console.log(`✅ vision-classify done — ${ok}/${done} unique creatives`); process.exit(0) }
+      if (max && done >= max) return { done, ok }
     }
     cursor = rows[rows.length - 1].ad_id
-    console.log(`  … ${done} unique creatives classified (${ok} ok), cursor=${cursor}`)
+    console.log(`  … ${done} unique creatives classified (${ok} ok)${pageId ? ` [brand ${pageId}]` : ''}`)
   }
+  return { done, ok }
+}
+
+async function main() {
+  if (!OPENAI_KEY) { console.error('missing OPENAI_API_KEY'); process.exit(1) }
+  const pageId = (process.env.VISION_PAGE_ID || '').trim()
+  const scope = (process.env.VISION_SCOPE || 'active').toLowerCase()
+  const max = Math.max(0, parseInt(process.env.VISION_MAX ?? '0', 10))
+  const concurrency = Math.max(1, parseInt(process.env.VISION_CONCURRENCY ?? '6', 10))
+  console.log(`👁️  vision-classify — model=${MODEL}, ${pageId ? `brand=${pageId} (FULL)` : `scope=${scope}`}, concurrency=${concurrency}, max=${max || '∞'}`)
+  const { done, ok } = await runVision({ pageId, scope, max, concurrency })
   console.log(`✅ vision-classify done — ${ok}/${done} unique creatives`)
   process.exit(0)
 }
 
-main().catch((e) => { console.error('fatal:', e); process.exit(1) })
+// Run as CLI unless imported (the daemon imports runVision/classifyOne).
+if (process.env.VISION_AS_LIB !== '1') main().catch((e) => { console.error('fatal:', e); process.exit(1) })
