@@ -519,8 +519,11 @@ export async function GET(request: NextRequest) {
       caption: ad.caption,
       description: ad.description,
       snapshotUrl: ad.snapshot_url,
-      thumbnailUrl: ad.thumbnail_url || imgC?.r2_url || vidC?.r2_url || null,
-      videoUrl: ad.video_url || vidC?.r2_url || null,
+      // Poster fallback chain — last two are the crawler's RAW Meta media (Meta's own video
+      // preview image / first image), so VIDEO ads that have no R2 creative yet still show a
+      // thumbnail in the feed instead of a grey card. Zero-cost (already captured at crawl time).
+      thumbnailUrl: ad.thumbnail_url || imgC?.r2_url || vidC?.poster_url || vidC?.r2_url || ad.raw_video_preview_urls?.[0] || ad.raw_image_urls?.[0] || null,
+      videoUrl: ad.video_url || vidC?.r2_url || ad.raw_video_urls?.[0] || null,
       // Needed by the client's CROSS-PAGE dedup: the server dedups within a page,
       // but its offset is into the raw (non-deduped) rows, so page N re-encounters
       // creatives already shown on page N-1. The client filters those by hash — so
