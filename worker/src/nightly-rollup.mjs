@@ -113,6 +113,11 @@ async function writeUpdates(updates, manageFlag = true) {
   // hours for a full write). 800 lands in ~3s with margin. (At multi-M scale this
   // needs a direct-PG path; the REST 8s cap is the ceiling.)
   const CHUNK = 800;
+  // THROTTLE: sleep between write chunks so a FULL recalibration (2.3M rows) doesn't pin the DB.
+  // This is the fix for the 3.7h CPU spike — it paces apply_perf so reads (the live feed + the
+  // running backfills) keep their I/O. Set ROLLUP_THROTTLE_MS=300-600 when running the heavy
+  // backfill alongside other load; 0 (default) preserves the original full-speed nightly behavior.
+  const THROTTLE_MS = Math.max(0, parseInt(process.env.ROLLUP_THROTTLE_MS || '0', 10));
   let wrote = 0, fail = 0;
   try {
     for (let i = 0; i < updates.length; i += CHUNK) {
@@ -122,6 +127,7 @@ async function writeUpdates(updates, manageFlag = true) {
         if (r.ok) { ok = true; wrote += chunk.length; } else { await r.text().catch(() => {}); if (t < 7) await sleep(1500 * (t + 1)); }
       }
       if (!ok) fail++;
+      if (THROTTLE_MS) await sleep(THROTTLE_MS);   // pace the writes → no CPU spike
       if ((i / CHUNK) % 60 === 59) console.log(`[rollup] wrote ${wrote}/${updates.length} (fail ${fail}) @ +${((Date.now() - t0) / 1000) | 0}s`);   // heartbeat every ~48K
     }
   } finally { if (hb) { clearInterval(hb); await clearFlag(); } }
