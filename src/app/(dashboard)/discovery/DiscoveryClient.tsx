@@ -1588,11 +1588,11 @@ export default function DiscoveryPage() {
     if (stopIndex >= items.length - 12) loadMoreRef.current()
   }, [])
 
-  // Atria-style seamless scroll: eagerly prefetch the first few pages WITHOUT waiting for a scroll,
-  // so a buffer is always ahead of the user (when they scroll, it's already loaded — no "loading
-  // more"). After EAGER_PAGES the 2500px scroll sentinel takes over (it also prefetches ~2.5 screens
-  // early). Pages 0–2 are snapshot-backed so these prefetches are instant; page 3 is a fast live query.
-  const EAGER_PAGES = 3
+  // Seamless scroll without the jitter: prefetch ONE page ahead eagerly (a buffer is ready before
+  // the user scrolls), then let the 2500px scroll sentinel take over (it loads ~2.5 screens early).
+  // Eager-loading 3 pages at once made the masonry re-settle in visible bursts; 1 keeps a buffer
+  // with a single gentle append. (Page 1 is snapshot-backed → instant.)
+  const EAGER_PAGES = 1
   useEffect(() => {
     if (!loading && !loadingMoreRef.current && hasMore && searchSource === 'indexed' && dbPage < EAGER_PAGES) {
       loadMoreRef.current()
