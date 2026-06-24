@@ -1483,16 +1483,20 @@ export default function DiscoveryPage() {
   // the grid (and sums to the matching count), including semantic-matched brands a
   // separate server query would miss. Counts grow as more pages load via infinite scroll.
   useEffect(() => {
-    if (!query.trim()) { setTopBrands([]); return }
-    const m: Record<string, { pageId: string; name: string; adCount: number; picture: string | null }> = {}
+    // Build the brand strip from the loaded feed — on the DEFAULT feed too, not just search.
+    // Count = the brand's total active ads (brandActiveAds, rollup-backed) so the chips read like
+    // the mockup ("2,777 ads"), falling back to the loaded-in-feed count when that's unavailable.
+    const m: Record<string, { pageId: string; name: string; total: number; loaded: number; picture: string | null }> = {}
     for (const ad of rawAds) {
       if (!ad.pageId) continue
-      if (!m[ad.pageId]) m[ad.pageId] = { pageId: ad.pageId, name: ad.pageName, adCount: 0, picture: null }
-      m[ad.pageId].adCount++
+      if (!m[ad.pageId]) m[ad.pageId] = { pageId: ad.pageId, name: ad.pageName, total: 0, loaded: 0, picture: null }
+      m[ad.pageId].loaded++
+      if (ad.brandActiveAds && ad.brandActiveAds > m[ad.pageId].total) m[ad.pageId].total = ad.brandActiveAds
     }
-    setTopBrands(Object.values(m).sort((a, b) => b.adCount - a.adCount).slice(0, 20))
+    const list = Object.values(m).map(b => ({ pageId: b.pageId, name: b.name, adCount: b.total || b.loaded, picture: b.picture }))
+    setTopBrands(list.sort((a, b) => b.adCount - a.adCount).slice(0, 20))
     setBrandsLoading(false)
-  }, [query, rawAds])
+  }, [rawAds])
 
   // Collect available languages from loaded ads
   const availableLanguages = useMemo(() => {
@@ -2041,9 +2045,9 @@ export default function DiscoveryPage() {
         )}
 
         {/* ── Top Brands Strip (like Atria) ── */}
-        {(topBrands.length > 0 || brandsLoading) && query && (
+        {(topBrands.length > 0 || brandsLoading) && (
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Top Brands</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>{query ? 'Top Brands' : 'Top brands · most active'}</div>
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
               {brandsLoading && !topBrands.length && [1,2,3,4,5].map(i => (
                 <div key={i} style={{ flexShrink: 0, width: 140, height: 64, background: '#e2e8f0', borderRadius: 10 }} className="shimmer" />
@@ -2058,7 +2062,7 @@ export default function DiscoveryPage() {
                     onMouseLeave={closeHover}>
                     <button onClick={viewAds}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minWidth: 140, maxWidth: 200, border: `1.5px solid ${hovered ? '#1a3a1a' : '#e2e8f0'}`, boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.08)' : 'none' }}>
-                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: `hsl(${hue},50%,85%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: `hsl(${hue},50%,30%)`, flexShrink: 0 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: `linear-gradient(135deg, hsl(${hue},62%,52%), hsl(${(hue + 28) % 360},60%,44%))`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, color: '#fff', flexShrink: 0, boxShadow: `0 2px 6px hsla(${hue},55%,40%,0.35)` }}>
                         {brand.name.charAt(0).toUpperCase()}
                       </div>
                       <div style={{ minWidth: 0 }}>
