@@ -25,7 +25,7 @@ class MasonryBoundary extends Component<{ children: ReactNode }, { k: number; er
     return <Fragment key={this.state.k}>{this.props.children}</Fragment>
   }
 }
-import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download } from 'lucide-react'
+import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download, Copy } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import BrandDrawer from './BrandDrawer'
 
@@ -1025,21 +1025,22 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             background: '#dffe95',
             color: '#14281a',
             border: 'none',
-            padding: '8px 15px',
-            borderRadius: 9,
-            fontSize: 12.5,
-            fontWeight: 800,
+            padding: '8px 14px',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 600,
+            letterSpacing: '-0.01em',
             cursor: 'pointer',
             fontFamily: 'inherit',
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 7,
             boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
           }}
           onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
           onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
         >
-          <span style={{ fontSize: 13 }}>✨</span> Clone ad
+          <Copy size={14} strokeWidth={2.4} /> Clone ad
         </button>
       </div>
     </div>
