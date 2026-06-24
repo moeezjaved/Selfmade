@@ -80,9 +80,9 @@ async function main() {
       .select('id, ad_id, position, r2_url')
       .eq('asset_type', 'video')
       .is('poster_url', null)
-      .order('ad_id', { ascending: true })
+      .order('ad_id', { ascending: false })   // newest first ≈ feed order → visible videos get posters first
       .limit(BATCH)
-    if (cursor) q = q.gt('ad_id', cursor)
+    if (cursor) q = q.lt('ad_id', cursor)
     const { data: cres, error } = await q
     if (error) { console.error('query failed:', error.message); break }
     if (!cres?.length) break

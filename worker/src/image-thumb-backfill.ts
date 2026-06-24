@@ -47,9 +47,12 @@ async function main() {
       .is('poster_url', null)
       .not('r2_url', 'is', null)
       .not('hash', 'is', null)
-      .order('ad_id', { ascending: true })
+      // NEWEST ad_id first ≈ feed order (recent/active ads are what the Performance feed
+      // front-loads) → the ads users actually SEE get thumbs within the first hour or two,
+      // the long tail fills behind it.
+      .order('ad_id', { ascending: false })
       .limit(BATCH)
-    if (cursor) q = q.gt('ad_id', cursor)
+    if (cursor) q = q.lt('ad_id', cursor)
     const { data: cres, error } = await q
     if (error) { console.error('query error:', error.message); break }
     if (!cres || cres.length === 0) break
