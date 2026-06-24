@@ -9,6 +9,9 @@ import OpenAI from 'openai'
 import { expandQuery, matchTierWeight, matchTierReason, type Expansion } from '@/lib/search/concepts'
 
 export const dynamic = 'force-dynamic'
+// Let a cold/uncached query finish instead of dying at the 10s default — a killed function never
+// runs the snapshot write-through, so the feed could never warm itself out of the slow state.
+export const maxDuration = 60
 
 let _openai: OpenAI | null = null
 const getOpenAI = () => (_openai ||= new OpenAI({ apiKey: process.env.OPENAI_API_KEY! }))
@@ -341,10 +344,16 @@ export async function GET(request: NextRequest) {
       // winners within the window — same intent, instant. To restore the exact blend as
       // an index-backed ORDER BY, add the (is_active,days_running,last_seen,ad_id)
       // composite index (migration 038) and switch this back.
-      // NOTE: default NULLS FIRST (do NOT pass nullsFirst:false) — the last_seen index
-      // is DESC NULLS FIRST, so NULLS LAST can't use it and falls back to a full sort
-      // (8.6s vs 0.25s, measured). The ad_id tiebreaker below keeps pages deterministic.
-      baseQuery = baseQuery.order('last_seen', { ascending: false })
+      //
+      // UPDATE (post full-rollup): order by performance_score DESC instead. Two wins:
+      //  (1) Better ranking — proven WINNERS first, which is what "Recommended" should mean.
+      //  (2) FIXES THE INNER-JOIN WADE: last_seen DESC front-loads the newest ads, but the newest
+      //      ads are the ~815K un-drained ones with NO creative yet — so discovery_creatives!inner
+      //      skipped row after row (timing out → perpetual skeletons). High-performance ads are
+      //      older/established → already drained → have creatives → the join lands immediately.
+      // Index-backed by discovery_ads_perf_score_idx (perf_score DESC NULLS LAST, ad_id) from 038,
+      // so we MUST pass nullsFirst:false to match it (NULLS LAST → scored ads first, no full sort).
+      baseQuery = baseQuery.order('performance_score', { ascending: false, nullsFirst: false })
     }
     // Stable tiebreaker — without a unique final sort key, rows that tie on the sort
     // column(s) come back in arbitrary (non-deterministic) order across requests, so
