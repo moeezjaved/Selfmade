@@ -22,11 +22,13 @@ import { createAdminClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; snapshot_url: string | null; link_url?: string | null; thumbnail_url?: string | null; raw_image_urls?: string[] | null; raw_video_preview_urls?: string[] | null; performance_score?: number | null }
+type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; title?: string | null; snapshot_url: string | null; link_url?: string | null; thumbnail_url?: string | null; raw_image_urls?: string[] | null; raw_video_preview_urls?: string[] | null; performance_score?: number | null; persona?: string | null; usp?: string | null; desire?: string | null; emotion?: string[] | null; themes?: string[] | null; cta?: string | null }
 
 // link_url (migration 045) feeds the Landing Pages tab. RESILIENT: if the column isn't applied yet
 // the select falls back to SELECT_BASE so the dashboard never 500s on deploy/migration ordering.
-const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score, link_url'
+// The classifier DNA columns (persona/usp/desire/emotion/themes/cta/title) power the Atria-style
+// Overview chip rows; they're in the rich SELECT only so a missing column degrades to empty, not 500.
+const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, title, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score, link_url, persona, usp, desire, emotion, themes, cta'
 const SELECT_BASE = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score'
 
 // Real thumbnail (image) for a hook/card — the crawler's captured media, proxied through weserv
@@ -126,6 +128,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   // Format mix
   const fmt = tally(ads.map((a) => norm(a.format)))
   const formatMix = fmt.map((f) => ({ ...f, format: f.label, pct: Math.round((f.count / total) * 100) }))
+
+  // ── Creative-DNA aggregates (Atria-style Overview) — the brand's playbook from the classifier.
+  const tallyArr = (xs: (string[] | null | undefined)[]) => tally(xs.flatMap((a) => Array.isArray(a) ? a : []))
+  const topPersonas = tally(ads.map((a) => a.persona)).slice(0, 10)
+  const topAnglesDNA = tally(ads.map((a) => a.angle)).slice(0, 10)
+  const topUSPs = tally(ads.map((a) => a.usp)).slice(0, 10)
+  const topDesires = tally(ads.map((a) => a.desire)).slice(0, 10)
+  const topEmotions = tallyArr(ads.map((a) => a.emotion)).slice(0, 10)
+  const topThemes = tallyArr(ads.map((a) => a.themes)).slice(0, 10)
+  const topCTAs = tally(ads.map((a) => a.cta)).slice(0, 10)
+  // Distinct-count tiles (Hooks / Ad copy / Headlines / Landing pages), like Atria's overview row.
+  const distinct = (xs: (string | null | undefined)[]) => new Set(xs.map((x) => (x || '').trim()).filter(Boolean)).size
+  const counts = {
+    hooks: distinct(ads.map((a) => a.hook_type)),
+    adCopy: distinct(ads.map((a) => (a.body || '').trim().slice(0, 200))),
+    headlines: distinct(ads.map((a) => a.title)),
+    landingPages: distinct(ads.map((a) => a.link_url)),
+  }
 
   // Launches per month (from start_date), chronological, last 12 months with data
   const monthMap = new Map<string, { d: Date; count: number }>()
@@ -246,5 +266,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     topAds,
     topHooks: tally(ads.map((a) => a.hook_type)).slice(0, 8),
     topAngles: tally(ads.map((a) => a.angle)).slice(0, 8),
+    // Atria-style Overview DNA
+    topPersonas, topAnglesDNA, topUSPs, topDesires, topEmotions, topThemes, topCTAs, counts,
   })
 }

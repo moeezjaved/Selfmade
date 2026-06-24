@@ -1663,7 +1663,7 @@ export default function DiscoveryPage() {
             </button>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={viewAds} style={{ flex: 1, padding: '9px', borderRadius: 9, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>View ads</button>
-              <button onClick={() => { setSelectedBrand({ pageId: hoverBrand, name: hbName }); setHoverBrand(null) }} style={{ flex: 1, padding: '9px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Details</button>
+              <button onClick={() => { window.open(`/discovery/brand-spy/${hoverBrand}`, '_blank', 'noopener'); setHoverBrand(null) }} style={{ flex: 1, padding: '9px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Details</button>
             </div>
           </div>
         )

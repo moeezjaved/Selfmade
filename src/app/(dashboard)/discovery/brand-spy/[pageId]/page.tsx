@@ -30,6 +30,78 @@ type Spy = {
   landingPages: { url: string; host: string; active: number; inactive: number; total: number; fullUrl: string }[]
   hooks: { text: string; count: number; days: number; adId: string; snapshot_url: string | null; thumb: string | null; active: boolean }[]
   topAds: { adId: string; score: number; days: number; active: boolean; hook: string; thumb: string | null; snapshot_url: string | null }[]
+  // Atria-style Overview DNA
+  topPersonas?: { label: string; count: number }[]
+  topAnglesDNA?: { label: string; count: number }[]
+  topUSPs?: { label: string; count: number }[]
+  topDesires?: { label: string; count: number }[]
+  topEmotions?: { label: string; count: number }[]
+  topThemes?: { label: string; count: number }[]
+  topCTAs?: { label: string; count: number }[]
+  counts?: { hooks: number; adCopy: number; headlines: number; landingPages: number }
+}
+
+// ── Overview tab (Atria-style): media mix + the brand's creative-DNA chip rows + count tiles ──
+function ChipRow({ icon, label, items }: { icon: string; label: string; items?: { label: string; count: number }[] }) {
+  if (!items || !items.length) return null
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ width: 150, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}><span>{icon}</span>{label}</div>
+      <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {items.slice(0, 8).map((it) => (
+          <span key={it.label} title={`${it.count} ads`} style={{ fontSize: 12, fontWeight: 600, color: '#1a3a1a', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 100, padding: '3px 10px', whiteSpace: 'nowrap' }}>
+            {it.label} <span style={{ opacity: 0.55, fontWeight: 700 }}>{it.count}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Overview({ d }: { d: Spy }) {
+  const c = d.counts || { hooks: 0, adCopy: 0, headlines: 0, landingPages: 0 }
+  const total = d.summary.total || 1
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Media mix bar */}
+      <div style={{ ...card, padding: 18 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#111', marginBottom: 12 }}>Media mix</div>
+        <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', marginBottom: 14 }}>
+          {d.formatMix.map((f) => <div key={f.format} style={{ width: `${f.pct}%`, background: FMT_COLORS[f.format] || '#9ca3af' }} />)}
+        </div>
+        {d.formatMix.map((f) => (
+          <div key={f.format} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '4px 0' }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: FMT_COLORS[f.format] || '#9ca3af' }} />
+            <span style={{ flex: 1, color: '#374151', fontWeight: 600 }}>{f.format}</span>
+            <span style={{ color: '#111', fontWeight: 700 }}>{f.count} ads</span>
+            <span style={{ width: 52, textAlign: 'right', color: '#6b7280', fontWeight: 700 }}>{f.pct}%</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Creative-DNA chip rows */}
+      <div style={{ ...card, padding: '6px 18px 12px' }}>
+        <ChipRow icon="🧑" label="Top personas" items={d.topPersonas} />
+        <ChipRow icon="🎯" label="Top ad angles" items={d.topAnglesDNA?.length ? d.topAnglesDNA : d.topAngles} />
+        <ChipRow icon="⭐" label="Top USPs" items={d.topUSPs} />
+        <ChipRow icon="🔥" label="Top desires" items={d.topDesires} />
+        <ChipRow icon="😊" label="Top emotions" items={d.topEmotions} />
+        <ChipRow icon="🎨" label="Top themes" items={d.topThemes} />
+        <ChipRow icon="📣" label="Top CTAs" items={d.topCTAs} />
+        <ChipRow icon="🪝" label="Top hooks" items={d.topHooks} />
+      </div>
+
+      {/* Count tiles */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        {[['Hooks', c.hooks], ['Ad copy', c.adCopy], ['Headlines', c.headlines], ['Landing pages', c.landingPages]].map(([k, v]) => (
+          <div key={k as string} style={{ ...card, padding: 16, textAlign: 'center' }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#111' }}>{(v as number).toLocaleString()}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginTop: 2 }}>{k as string}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function Stat({ k, v, sub }: { k: string; v: string | number; sub?: string }) {
@@ -471,14 +543,14 @@ function TimelineTab({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a
   )
 }
 
-const TABS = [['library', 'Ad Library'], ['tests', 'Creative Tests'], ['hooks', 'Hooks'], ['timeline', 'Timeline'], ['landing', 'Landing Pages']] as const
+const TABS = [['overview', 'Overview'], ['library', 'Ad Library'], ['tests', 'Creative Tests'], ['hooks', 'Hooks'], ['timeline', 'Timeline'], ['landing', 'Landing Pages']] as const
 
 export default function BrandSpyDetail() {
   const { pageId } = useParams<{ pageId: string }>()
   const [d, setD] = useState<Spy | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
-  const [tab, setTab] = useState<typeof TABS[number][0]>('library')
+  const [tab, setTab] = useState<typeof TABS[number][0]>('overview')
   const [drawerAd, setDrawerAd] = useState<Card | null>(null)
 
   useEffect(() => {
@@ -537,6 +609,7 @@ export default function BrandSpyDetail() {
         ))}
       </div>
 
+      {tab === 'overview' && <Overview d={d} />}
       {tab === 'library' && <AdLibrary d={d} pageId={pageId} onOpen={setDrawerAd} />}
 
       {tab === 'timeline' && <TimelineTab d={d} pageId={pageId} onOpen={setDrawerAd} />}
