@@ -748,6 +748,12 @@ function ScriptsMenu() {
 // through full-size — the no-reflow box already keeps scroll smooth; this just trims
 // bytes once the CDN is wired (a one-env-var switch, no code change).
 const IMG_CDN = process.env.NEXT_PUBLIC_IMG_CDN || ''
+// Transformations cost per-resize at scale; default OFF. With IMG_CDN set but transforms OFF we
+// serve the R2 object DIRECTLY through the Cloudflare custom domain (free egress, edge-cached) —
+// full-res but no per-image fee. Opt into resizing later with NEXT_PUBLIC_IMG_TRANSFORM=1, or move
+// to drain-side pre-resized thumbnails (option B) for small-AND-free at 5M scale.
+const IMG_TRANSFORM = process.env.NEXT_PUBLIC_IMG_TRANSFORM === '1'
+const R2_HOST_RE = /^https?:\/\/[^/]*(r2\.dev|r2\.cloudflarestorage\.com)/i
 // Grid cards render at ~340px wide → 480px covers 1.4× DPR; the srcset lets the
 // browser pick 256/384/480/640 by column width & screen density.
 const IMG_WIDTHS = [256, 384, 480, 640]
@@ -763,7 +769,20 @@ const IMG_WIDTHS = [256, 384, 480, 640]
 //    miss graceful. Flip the env var later and Cloudflare takes over — no code change.
 const cdnAt = (url: string, w: number) => {
   if (!url) return url
-  if (IMG_CDN) return `https://${IMG_CDN}/cdn-cgi/image/width=${w},quality=75,format=auto/${url}`
+  if (IMG_CDN) {
+    const isR2 = R2_HOST_RE.test(url)
+    // R2 creatives → serve via our Cloudflare custom domain (same bucket/key, just swap the host).
+    if (isR2) {
+      const path = url.replace(/^https?:\/\/[^/]+/, '')   // keep the /<key>
+      // Transforms ON → Cloudflare Image Resizing (same-zone source). OFF → direct edge-cached serve.
+      return IMG_TRANSFORM
+        ? `https://${IMG_CDN}/cdn-cgi/image/width=${w},quality=75,format=auto${path}`
+        : `https://${IMG_CDN}${path}`
+    }
+    // Non-R2 (raw Meta CDN URLs from un-drained ads): if transforms are on, Cloudflare can fetch +
+    // resize the external URL; otherwise fall through to weserv so it's still small.
+    if (IMG_TRANSFORM) return `https://${IMG_CDN}/cdn-cgi/image/width=${w},quality=75,format=auto/${url}`
+  }
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${w}&q=72&output=webp`
 }
 const cdnSrc = (url: string) => cdnAt(url, 480)
