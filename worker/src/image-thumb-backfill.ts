@@ -16,11 +16,12 @@
  */
 import { supabase } from './db.js'
 import { uploadThumb } from './r2.js'
+import sharp from 'sharp'
 
 const CONCURRENCY = Math.max(1, parseInt(process.env.THUMB_CONCURRENCY ?? '3', 10))
 const BATCH = Math.max(20, parseInt(process.env.THUMB_BATCH ?? '200', 10))
 
-type Cre = { id: string; ad_id: string; hash: string | null; r2_url: string }
+type Cre = { id: string; ad_id: string; hash: string | null; r2_url: string; width: number | null; height: number | null }
 
 async function backfillOne(c: Cre): Promise<boolean> {
   if (!c.hash || !c.r2_url) return false
@@ -30,7 +31,13 @@ async function backfillOne(c: Cre): Promise<boolean> {
     const buf = Buffer.from(await res.arrayBuffer())
     const url = await uploadThumb(buf, c.hash)
     if (!url) return false
-    await (supabase as any).from('discovery_creatives').update({ poster_url: url }).eq('id', c.id)
+    const update: Record<string, any> = { poster_url: url }
+    // Stamp width/height if missing → the masonry pre-sizes the card from these (no reflow,
+    // Atria-style stable grid). Free here since we already have the decoded buffer.
+    if (c.width == null || c.height == null) {
+      try { const m = await sharp(buf, { failOn: 'none' }).metadata(); if (m.width && m.height) { update.width = m.width; update.height = m.height } } catch { /* keep poster_url */ }
+    }
+    await (supabase as any).from('discovery_creatives').update(update).eq('id', c.id)
     return true
   } catch { return false }
 }
@@ -42,7 +49,7 @@ async function main() {
   for (;;) {
     let q = (supabase as any)
       .from('discovery_creatives')
-      .select('id, ad_id, hash, r2_url')
+      .select('id, ad_id, hash, r2_url, width, height')
       .eq('asset_type', 'image')
       .is('poster_url', null)
       .not('r2_url', 'is', null)
