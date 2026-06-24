@@ -753,6 +753,10 @@ const IMG_CDN = process.env.NEXT_PUBLIC_IMG_CDN || ''
 // full-res but no per-image fee. Opt into resizing later with NEXT_PUBLIC_IMG_TRANSFORM=1, or move
 // to drain-side pre-resized thumbnails (option B) for small-AND-free at 5M scale.
 const IMG_TRANSFORM = process.env.NEXT_PUBLIC_IMG_TRANSFORM === '1'
+// pub-*.r2.dev is ALREADY on Cloudflare's edge. NEXT_PUBLIC_IMG_DIRECT=1 serves R2 creatives from
+// that URL as-is (no weserv proxy hop = no 1.2s latency), with ZERO setup — no custom domain / DNS.
+// Full-res, but latency was the killer. (Custom domain via IMG_CDN later removes r2.dev rate limits.)
+const IMG_DIRECT = process.env.NEXT_PUBLIC_IMG_DIRECT === '1'
 const R2_HOST_RE = /^https?:\/\/[^/]*(r2\.dev|r2\.cloudflarestorage\.com)/i
 // Grid cards render at ~340px wide → 480px covers 1.4× DPR; the srcset lets the
 // browser pick 256/384/480/640 by column width & screen density.
@@ -783,6 +787,9 @@ const cdnAt = (url: string, w: number) => {
     // resize the external URL; otherwise fall through to weserv so it's still small.
     if (IMG_TRANSFORM) return `https://${IMG_CDN}/cdn-cgi/image/width=${w},quality=75,format=auto/${url}`
   }
+  // No custom domain: serve R2 creatives straight from r2.dev (already Cloudflare edge) to skip
+  // weserv's latency. Non-R2 (Meta) URLs still go through weserv so they're resized + hotlink-safe.
+  if (IMG_DIRECT && R2_HOST_RE.test(url)) return url
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${w}&q=72&output=webp`
 }
 const cdnSrc = (url: string) => cdnAt(url, 480)
