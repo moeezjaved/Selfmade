@@ -862,6 +862,8 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
     <div
       className="ad-card-visual"
       onClick={() => router.push(`/discovery/${ad.id}`)}
+      onMouseEnter={() => { if (slide?.type === 'video') setPlaying(true) }}
+      onMouseLeave={() => { if (slide?.type === 'video') setPlaying(false) }}
       style={{
         position: 'relative', width: '100%', paddingBottom: `${aspectPct}%`,
         background: '#f1f3f5', overflow: 'hidden', lineHeight: 0, cursor: 'pointer',
@@ -1092,9 +1094,10 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
     <>
     {showSaveModal && <SaveModal ad={ad} onClose={() => { setShowSaveModal(false); setIsSaved(true) }} />}
     <div
-      style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'box-shadow .2s', cursor: 'default' }}
-      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)')}
-      onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+      className="animate-fade-up"
+      style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'box-shadow .2s, transform .2s', cursor: 'default' }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 10px 28px rgba(0,0,0,0.12)'; e.currentTarget.style.transform = 'translateY(-3px)' }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none' }}
     >
       {/* ── Brand header (compact) ── */}
       <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -1137,8 +1140,10 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, position: 'relative' }}>
           <button onClick={() => setShowSaveModal(true)} title="Save to board"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#9ca3af', padding: 3, borderRadius: 4, transition: 'color .15s' }}>
-            {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#9ca3af', padding: 3, borderRadius: 4, transition: 'color .15s', display: 'inline-flex' }}>
+            <span key={isSaved ? 'saved' : 'unsaved'} style={{ display: 'inline-flex', animation: isSaved ? 'savepop .3s ease' : 'none' }}>
+              {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+            </span>
           </button>
           <MoreMenu ad={ad} />
         </div>
@@ -1146,7 +1151,7 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
 
       {/* ── Date range (compact) ── */}
       <div style={{ padding: '0 10px 6px', fontSize: 10, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span style={{ width: 5, height: 5, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db' }} />
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db', animation: ad.isActive ? 'livepulse 2s infinite' : 'none' }} />
         <span>
           {ad.startDate ? new Date(ad.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
           {' - '}
