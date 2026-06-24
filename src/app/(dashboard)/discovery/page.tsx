@@ -1002,7 +1002,9 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         className="hover-overlay"
         style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.30) 26%, rgba(0,0,0,0) 52%)',
+          // Gradient only on images (it's the backdrop for the Clone-ad pill); video has no clone
+          // button, so keep its hover clean — just the Scripts menu, no shadow.
+          background: slide.type === 'video' ? 'transparent' : 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.30) 26%, rgba(0,0,0,0) 52%)',
           display: playing ? 'none' : 'flex',
           alignItems: 'flex-end',
           justifyContent: 'flex-start',
@@ -1018,6 +1020,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             <ScriptsMenu />
           </div>
         )}
+        {slide.type !== 'video' && (
         <button
           onClick={(e) => { e.stopPropagation(); /* Clone wired up later */ }}
           style={{
@@ -1042,6 +1045,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         >
           <Copy size={14} strokeWidth={2.4} /> Clone ad
         </button>
+        )}
       </div>
     </div>
   )
