@@ -68,6 +68,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  // Render the dashboard CLIENT-ONLY. Some descendant's first paint diverged server↔client →
+  // hydration #418/#423/#425 → the tree got discarded ("feed vanishes"). Gating the whole layout on
+  // mount means server + first client render emit the same static placeholder (no dynamic content to
+  // mismatch); the real UI renders after mount. Auth-gated dashboard → no SEO cost, one-tick blank.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     let mounted = true
@@ -99,6 +105,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const initials = user?.user_metadata?.full_name
     ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.[0].toUpperCase() || 'A'
+
+  // Client-only gate (see note above) — identical static shell on server + first client render.
+  if (!mounted) return <div className="flex min-h-screen bg-dark" />
 
   return (
     <div className="flex min-h-screen bg-dark">
