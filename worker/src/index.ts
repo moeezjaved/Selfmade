@@ -31,7 +31,7 @@ import {
 } from './db.js'
 import { extractCreative, getBrowser, closeBrowser } from './extract.js'
 import { downloadAssetsForAd } from './proxied-fetch.js'
-import { uploadBufferToR2 } from './r2.js'
+import { uploadBufferToR2, uploadThumb } from './r2.js'
 import { imageHash, videoHash, imageDimensions } from './hash.js'
 
 const WORKER_ID = process.env.WORKER_ID || `worker-${os.hostname()}`
@@ -70,13 +70,13 @@ async function processAsset(
   adId: string,
   position: number,
   prefetchedBuf?: Buffer | null,
-): Promise<{ url: string | null; hash: string | null; deduped: boolean; width: number | null; height: number | null }> {
+): Promise<{ url: string | null; hash: string | null; deduped: boolean; width: number | null; height: number | null; thumbUrl: string | null }> {
   const contentType = type === 'image' ? 'image/jpeg' : 'video/mp4'
   // Use the buffer downloaded via the proxied browser/undici path.
   // The bare-IP downloadFromCDN fallback used to live here, but it ALWAYS
   // returns 1087-byte placeholders against Meta's CDN — it was just
   // generating noise. We now silently skip URLs the proxied path rejected.
-  if (!prefetchedBuf) return { url: null, hash: null, deduped: false, width: null, height: null }
+  if (!prefetchedBuf) return { url: null, hash: null, deduped: false, width: null, height: null, thumbUrl: null }
   const buf = prefetchedBuf
 
   // Pixel dimensions for the no-reflow grid (images only — sharp reads the header,
@@ -91,12 +91,14 @@ async function processAsset(
       ? `thumbnails/${adId}_${position}.jpg`
       : `videos/${adId}_${position}.mp4`
     const url = await uploadBufferToR2(buf, key, contentType)
-    return { url, hash: null, deduped: false, width, height }
+    return { url, hash: null, deduped: false, width, height, thumbUrl: null }
   }
 
   const existing = await findExistingByHash(hash, type)
   if (existing) {
-    return { url: existing, hash, deduped: true, width, height }
+    // Deduped → thumb (if any) already exists by hash; leave null so serving uses full-res until
+    // the image-thumb backfill stamps poster_url for the whole back-catalog at once.
+    return { url: existing, hash, deduped: true, width, height, thumbUrl: null }
   }
 
   // Use position in key so carousels don't overwrite each other
@@ -104,7 +106,10 @@ async function processAsset(
     ? `thumbnails/${adId}_${position}.jpg`
     : `videos/${adId}_${position}.mp4`
   const url = await uploadBufferToR2(buf, key, contentType)
-  return { url, hash, deduped: false, width, height }
+  // B: also store a small 480px webp thumb (keyed by hash) for fast serving. Images only — videos
+  // get poster_url from the FB preview / mp4-poster path. Returned as thumbUrl → creative.poster_url.
+  const thumbUrl = (type === 'image' && url) ? await uploadThumb(buf, hash) : null
+  return { url, hash, deduped: false, width, height, thumbUrl }
 }
 
 /**
@@ -158,7 +163,7 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
 
   const creatives: CreativeInsert[] = []
   imageResults.forEach((r, i) => {
-    if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'image', r2_url: r.url, hash: r.hash, width: r.width, height: r.height })
+    if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'image', r2_url: r.url, hash: r.hash, width: r.width, height: r.height, poster_url: r.thumbUrl ?? null })
   })
   videoResults.forEach((r, i) => {
     if (r.url) creatives.push({ ad_id: ad.ad_id, position: i, asset_type: 'video', r2_url: r.url, hash: r.hash, width: r.width, height: r.height })
