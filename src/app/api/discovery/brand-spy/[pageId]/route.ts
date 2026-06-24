@@ -22,12 +22,21 @@ import { createAdminClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; snapshot_url: string | null; link_url?: string | null }
+type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; snapshot_url: string | null; link_url?: string | null; thumbnail_url?: string | null; raw_image_urls?: string[] | null; raw_video_preview_urls?: string[] | null; performance_score?: number | null }
 
 // NOTE: link_url is NOT persisted on discovery_ads_index yet (the crawler captures it in memory
 // but never writes it), so it's deliberately absent from this select — including it 500s the whole
 // dashboard. The Landing Pages tab stays empty until we add the column + crawler write + backfill.
-const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url'
+const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score'
+
+// Real thumbnail (image) for a hook/card — the crawler's captured media, proxied through weserv
+// (hotlink-safe). snapshot_url is a LIBRARY LINK, not an image, so it can't be used as a thumbnail.
+const thumbOf = (a: Ad): string | null => {
+  const u = a.thumbnail_url || (a.raw_image_urls?.[0]) || (a.raw_video_preview_urls?.[0]) || null
+  if (!u) return null
+  if (u.includes('weserv.nl') || u.includes('r2.') || u.includes('cloudflarestorage')) return u
+  return `https://images.weserv.nl/?url=${encodeURIComponent(u.replace(/^https?:\/\//, ''))}&w=200&output=webp`
+}
 // First line of the ad body = the "hook" (Foreplay groups ads by this).
 const hookOf = (b: string | null) => (b || '').split('\n')[0].trim().replace(/\s+/g, ' ').slice(0, 140)
 // Normalize a destination URL to host + path (drop query/tracking) for landing-page rollup.
@@ -187,17 +196,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
 
   // HOOKS — the opening line of each ad, grouped, with the longest run time and a representative
   // creative (Foreplay's Hooks tab, sorted Longest Running).
-  const hookMap = new Map<string, { text: string; count: number; days: number; adId: string; snapshot_url: string | null; active: boolean }>()
+  const hookMap = new Map<string, { text: string; count: number; days: number; adId: string; snapshot_url: string | null; thumb: string | null; active: boolean }>()
   for (const a of ads) {
     const text = hookOf(a.body)
     if (!text) continue
-    const cur = hookMap.get(text) || { text, count: 0, days: 0, adId: a.ad_id, snapshot_url: a.snapshot_url, active: false }
+    const cur = hookMap.get(text) || { text, count: 0, days: 0, adId: a.ad_id, snapshot_url: a.snapshot_url, thumb: thumbOf(a), active: false }
     cur.count++
-    if ((a.days_running || 0) > cur.days) { cur.days = a.days_running || 0; cur.adId = a.ad_id; cur.snapshot_url = a.snapshot_url }
+    if ((a.days_running || 0) > cur.days) { cur.days = a.days_running || 0; cur.adId = a.ad_id; cur.snapshot_url = a.snapshot_url; cur.thumb = thumbOf(a) }
     if (a.is_active) cur.active = true
     hookMap.set(text, cur)
   }
   const hooks = Array.from(hookMap.values()).sort((a, b) => b.days - a.days).slice(0, 80)
+
+  // TOP ADS by performance score (rollup-backed) — the Timeline page's "best ads" panel.
+  const topAds = ads
+    .filter((a) => a.performance_score != null)
+    .sort((a, b) => (b.performance_score || 0) - (a.performance_score || 0))
+    .slice(0, 10)
+    .map((a) => ({ adId: a.ad_id, score: Math.round(a.performance_score || 0), days: a.days_running || 0, active: !!a.is_active, hook: hookOf(a.body) || '(no text)', thumb: thumbOf(a), snapshot_url: a.snapshot_url }))
 
   const startsSorted = ads.map((a) => a.start_date).filter(Boolean).sort() as string[]
   const seenSorted = ads.map((a) => a.last_seen).filter(Boolean).sort() as string[]
@@ -220,6 +236,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     longestRunning,
     landingPages,
     hooks,
+    topAds,
     topHooks: tally(ads.map((a) => a.hook_type)).slice(0, 8),
     topAngles: tally(ads.map((a) => a.angle)).slice(0, 8),
   })
