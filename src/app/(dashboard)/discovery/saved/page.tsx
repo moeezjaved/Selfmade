@@ -16,6 +16,11 @@ export default function SavedAdsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [selectedEmoji, setSelectedEmoji] = useState('📋')
+  // Atria-style toolbar filters (client-side — the whole board is already in memory)
+  const [q, setQ] = useState('')
+  const [fmt, setFmt] = useState('')        // '' | 'video' | 'image'
+  const [status, setStatus] = useState('')  // '' | 'active' | 'inactive'
+  const [sortBy, setSortBy] = useState('recent')  // recent | oldest | brand
 
   const EMOJIS = ['📋', '⭐', '🔥', '💡', '🎯', '🚀', '💎', '🎨', '📱', '🛒', '💄', '👗', '🏋️', '🍕', '✈️', '🏠']
 
@@ -83,6 +88,17 @@ export default function SavedAdsPage() {
 
   const currentBoard = boards.find(b => b.id === selectedBoard)
   const adCount = (b: Board) => b.discovery_saved_ads?.[0]?.count ?? 0
+
+  const fmtOf = (s: SavedAd) => (s.ad_data?.mediaType === 'video' || s.ad_data?.videoUrl || s.ad_data?.format === 'video') ? 'video' : 'image'
+  const visibleAds = savedAds
+    .filter(s => !q || `${s.page_name || ''} ${s.ad_data?.title || ''} ${s.ad_data?.body || ''}`.toLowerCase().includes(q.toLowerCase()))
+    .filter(s => !fmt || fmtOf(s) === fmt)
+    .filter(s => !status || (status === 'active' ? !!s.ad_data?.isActive : !s.ad_data?.isActive))
+    .sort((a, b) =>
+      sortBy === 'brand' ? (a.page_name || '').localeCompare(b.page_name || '') :
+      sortBy === 'oldest' ? +new Date(a.saved_at) - +new Date(b.saved_at) :
+      +new Date(b.saved_at) - +new Date(a.saved_at))
+  const selStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#374151', padding: '7px 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -207,54 +223,98 @@ export default function SavedAdsPage() {
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
-              {currentBoard.emoji} <strong style={{ color: '#111' }}>{currentBoard.name}</strong> · {savedAds.length} ads
+            {/* ── Atria-style toolbar ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#111', marginRight: 4 }}>
+                {currentBoard.emoji} {currentBoard.name}
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', marginLeft: 8 }}>{visibleAds.length} ads</span>
+              </div>
+              <div style={{ flex: 1 }} />
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search saved ads…"
+                style={{ ...selStyle, width: 200, fontWeight: 500 }} />
+              <select value={fmt} onChange={e => setFmt(e.target.value)} style={selStyle}>
+                <option value="">Format: All</option>
+                <option value="video">Video</option>
+                <option value="image">Image</option>
+              </select>
+              <select value={status} onChange={e => setStatus(e.target.value)} style={selStyle}>
+                <option value="">Status: All</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={selStyle}>
+                <option value="recent">Sort: Recently added</option>
+                <option value="oldest">Sort: Oldest</option>
+                <option value="brand">Sort: Brand A–Z</option>
+              </select>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-              {savedAds.map(saved => {
+
+            {visibleAds.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: '#9ca3af', fontSize: 14 }}>No ads match your filters.</div>
+            ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(248px, 1fr))', gap: 16 }}>
+              {visibleAds.map(saved => {
                 const ad = saved.ad_data || {}
                 const initials = (saved.page_name || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+                const isVid = fmtOf(saved) === 'video'
+                const media = ad.thumbnailUrl || ad.creatives?.[0]?.url || null
+                const tier = ad.performanceTier
+                const title = cleanCopy(ad.title)
+                const body = cleanCopy(ad.body)
                 return (
-                  <div key={saved.id} style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid #f1f5f9' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1a3a1a', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{initials}</div>
+                  <div key={saved.id} className="animate-fade-up"
+                    style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'box-shadow .2s, transform .2s' }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 10px 28px rgba(0,0,0,0.12)'; e.currentTarget.style.transform = 'translateY(-3px)' }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none' }}>
+                    {/* header */}
+                    <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#1a3a1a', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{initials}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{saved.page_name}</div>
-                        <div style={{ fontSize: 11, color: '#9ca3af' }}>Saved {new Date(saved.saved_at).toLocaleDateString()}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <a href={saved.snapshot_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280' }}><ExternalLink size={13} /></a>
-                        <button onClick={() => unsaveAd(saved.ad_id)} title="Remove from board"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 2 }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#dc2626')}
-                          onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}>
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                    <div style={{ position: 'relative', height: 240, background: '#f8fafc', overflow: 'hidden' }}>
-                      {saved.snapshot_url ? (
-                        <iframe src={saved.snapshot_url} style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} scrolling="no" loading="lazy" title="ad" />
-                      ) : (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 13 }}>No preview</div>
-                      )}
-                      <a href={saved.snapshot_url} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', inset: 0, zIndex: 2 }} />
-                    </div>
-                    {(() => {
-                      const title = cleanCopy(ad.title)
-                      const body = cleanCopy(ad.body)
-                      if (!title && !body) return null
-                      return (
-                        <div style={{ padding: '10px 14px 12px' }}>
-                          {title && <div style={{ fontSize: 12, fontWeight: 700, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{title}</div>}
-                          {body && <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{body}</div>}
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{saved.page_name}</div>
+                        <div style={{ fontSize: 10.5, color: '#9ca3af', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db', animation: ad.isActive ? 'livepulse 2s infinite' : 'none' }} />
+                          Saved {new Date(saved.saved_at).toLocaleDateString()}
                         </div>
-                      )
-                    })()}
+                      </div>
+                      {(tier === 'winning' || tier === 'optimized') && (
+                        <span style={{ flexShrink: 0, fontSize: 8.5, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: 100, textTransform: 'uppercase',
+                          color: tier === 'winning' ? '#166534' : '#92600a', background: tier === 'winning' ? '#dcfce7' : '#fef9c3', border: `1px solid ${tier === 'winning' ? '#bbf7d0' : '#fde68a'}` }}>
+                          {tier === 'winning' ? '🏆 Winning' : '⚡ Optimized'}
+                        </span>
+                      )}
+                      <a href={saved.snapshot_url} target="_blank" rel="noopener noreferrer" title="Open in Meta Ad Library" style={{ color: '#9ca3af', flexShrink: 0, display: 'flex' }}><ExternalLink size={13} /></a>
+                      <button onClick={() => unsaveAd(saved.ad_id)} title="Remove from board"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 0, flexShrink: 0, display: 'flex' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#dc2626')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    {/* media — REAL creative (no more Meta iframe) */}
+                    <a href={saved.snapshot_url} target="_blank" rel="noopener noreferrer"
+                      style={{ position: 'relative', display: 'block', width: '100%', paddingBottom: '118%', background: '#0f172a', overflow: 'hidden' }}>
+                      {media ? (
+                        <img src={media} alt={saved.page_name} loading="lazy" decoding="async"
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 12 }}>No preview</div>
+                      )}
+                      {isVid && (
+                        <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,0.55)', padding: '2px 7px', borderRadius: 100 }}>▶ Video</span>
+                      )}
+                    </a>
+                    {/* copy */}
+                    {(title || body) && (
+                      <div style={{ padding: '9px 12px 12px' }}>
+                        {title && <div style={{ fontSize: 12, fontWeight: 700, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{title}</div>}
+                        {body && <div style={{ fontSize: 11.5, color: '#4b5563', marginTop: 2, lineHeight: 1.45, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{body}</div>}
+                      </div>
+                    )}
                   </div>
                 )
               })}
             </div>
+            )}
           </>
         )}
       </div>
