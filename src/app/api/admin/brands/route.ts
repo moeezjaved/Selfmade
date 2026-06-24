@@ -34,15 +34,18 @@ export async function GET(req: NextRequest) {
   const CRAWLING_WINDOW_MS = 35 * 60 * 1000   // matches the claim lease — crawling_at within this = live now
   const crawlingCutoff = new Date(Date.now() - CRAWLING_WINDOW_MS).toISOString()
 
-  // "Highest ad count" needs page_ids ordered by ads_indexed, which lives in the STATE table —
-  // pre-fetch the top ones, then pull their term rows.
-  let topIds: string[] | null = null
-  if (!q && view === 'top') {
-    const { data: topStates } = await admin
-      .from('discovery_brand_crawl_state')
-      .select('page_id').gt('ads_indexed', 0)
-      .order('ads_indexed', { ascending: false }).limit(300)
-    topIds = (topStates || []).map((s: any) => s.page_id)
+  // Views ranked by a STATE-table column (ad count / new-ads / in-progress / soft-gated) need the
+  // page_ids pre-fetched from discovery_brand_crawl_state, then we pull those term rows.
+  const STATE_VIEWS = ['top', 'new_ads', 'in_progress', 'soft_gated']
+  let stateIds: string[] | null = null
+  if (!q && STATE_VIEWS.includes(view)) {
+    let sq = admin.from('discovery_brand_crawl_state').select('page_id')
+    if (view === 'top') sq = sq.gt('ads_indexed', 0).order('ads_indexed', { ascending: false })
+    else if (view === 'new_ads') sq = sq.gt('last_run_added', 0).order('last_run_added', { ascending: false })
+    else if (view === 'in_progress') sq = sq.not('cursor', 'is', null).order('last_run_at', { ascending: false })
+    else if (view === 'soft_gated') sq = sq.not('soft_gate_at', 'is', null).order('soft_gate_at', { ascending: false })
+    const { data: st } = await sq.limit(300)
+    stateIds = (st || []).map((s: any) => s.page_id)
   }
 
   let termsQuery = admin
@@ -61,15 +64,20 @@ export async function GET(req: NextRequest) {
     termsQuery = termsQuery.gte('crawling_at', crawlingCutoff).order('crawling_at', { ascending: false }).limit(1000)
   } else if (view === 'spy') {
     termsQuery = termsQuery.gte('priority', 9).order('crawling_at', { ascending: false, nullsFirst: false }).limit(1000)
-  } else if (view === 'top') {
-    termsQuery = (topIds && topIds.length) ? termsQuery.in('page_id', topIds).limit(1000) : termsQuery.eq('page_id', '__none__')
+  } else if (STATE_VIEWS.includes(view)) {
+    termsQuery = (stateIds && stateIds.length) ? termsQuery.in('page_id', stateIds).limit(1000) : termsQuery.eq('page_id', '__none__')
   } else {
     termsQuery = termsQuery.order('created_at', { ascending: false }).limit(1000)
   }
 
+  // States fetch is resilient to migration 044 (soft_gate_at): try with the column, fall back
+  // without it, so a Vercel deploy ahead of the migration can't break the whole page.
+  const STATE_COLS = 'page_id, brand_name, cursor, ads_indexed, last_run_at, last_run_added, exhausted_at'
+  let { data: states } = await admin.from('discovery_brand_crawl_state').select(STATE_COLS + ', soft_gate_at').order('last_run_at', { ascending: false })
+  if (!states) ({ data: states } = await admin.from('discovery_brand_crawl_state').select(STATE_COLS).order('last_run_at', { ascending: false }))
+
   const [
     { data: terms },
-    { data: states },
     { count: totalTermsCount },
     { count: activeTermsCount },
     { count: brandsIndexedCount },
@@ -78,12 +86,11 @@ export async function GET(req: NextRequest) {
     { count: fullyCrawledCount },
     { count: crawlingNowCount },
     { count: spyCount },
+    { count: inProgressCount },
+    { count: newAdsCount },
+    { count: softGatedCount },
   ] = await Promise.all([
     termsQuery,
-    admin
-      .from('discovery_brand_crawl_state')
-      .select('page_id, brand_name, cursor, ads_indexed, last_run_at, last_run_added, exhausted_at')
-      .order('last_run_at', { ascending: false }),
     // Accurate summary counts. The two list queries above are capped at PostgREST's
     // 1000-row default, so deriving stats from their .length froze every card at 1000.
     // These head:true COUNT queries return the real totals regardless of that cap.
@@ -113,6 +120,10 @@ export async function GET(req: NextRequest) {
       .or('term_type.eq.brand,page_id.not.is.null').gte('crawling_at', crawlingCutoff),
     admin.from('discovery_crawl_terms').select('*', { count: 'exact', head: true })
       .or('term_type.eq.brand,page_id.not.is.null').gte('priority', 9),
+    // crawl_state-based view counts (in-progress = saved cursor, new-ads, soft-gated).
+    admin.from('discovery_brand_crawl_state').select('*', { count: 'exact', head: true }).not('cursor', 'is', null),
+    admin.from('discovery_brand_crawl_state').select('*', { count: 'exact', head: true }).gt('last_run_added', 0),
+    admin.from('discovery_brand_crawl_state').select('*', { count: 'exact', head: true }).not('soft_gate_at', 'is', null),
   ])
 
   // Build a map: page_id → state
@@ -150,6 +161,9 @@ export async function GET(req: NextRequest) {
     const fully_crawled = !!t.full_crawled_at
     const never_crawled = !t.last_crawled_at
     const is_spy = (t.priority ?? 5) >= 9
+    const in_progress = !!state?.cursor
+    const soft_gated = !!state?.soft_gate_at
+    const new_ads_last_run = state?.last_run_added ?? 0
     return {
       ...t,
       state: state ? {
@@ -163,12 +177,12 @@ export async function GET(req: NextRequest) {
       brand_name: counts?.name || state?.brand_name || t.term,
       next_recrawl_at,
       status,
-      crawling_now, fully_crawled, never_crawled, is_spy,
+      crawling_now, fully_crawled, never_crawled, is_spy, in_progress, soft_gated, new_ads_last_run,
     }
   })
-  // "Highest ad count" view: order the enriched rows by ad_count (the state table set the
-  // candidate page_ids; this sorts them).
+  // Re-apply ranking the STATE_VIEWS prefetch implied (the `.in()` term query loses that order).
   if (!q && view === 'top') enriched.sort((a: any, b: any) => (b.ad_count || 0) - (a.ad_count || 0))
+  else if (!q && view === 'new_ads') enriched.sort((a: any, b: any) => (b.new_ads_last_run || 0) - (a.new_ads_last_run || 0))
 
   // Also collect any brands in state table that have NO term (lost track)
   const orphans = (states || [])
@@ -195,6 +209,9 @@ export async function GET(req: NextRequest) {
       fully_crawled: fullyCrawledCount ?? 0,
       crawling_now: crawlingNowCount ?? 0,
       spy: spyCount ?? 0,
+      in_progress: inProgressCount ?? 0,
+      new_ads: newAdsCount ?? 0,
+      soft_gated: softGatedCount ?? 0,
     },
     view,
   })

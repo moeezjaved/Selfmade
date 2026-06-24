@@ -38,6 +38,9 @@ interface BrandTerm {
   fully_crawled?: boolean
   never_crawled?: boolean
   is_spy?: boolean
+  in_progress?: boolean
+  soft_gated?: boolean
+  new_ads_last_run?: number
   state: {
     last_run_at: string
     ads_indexed: number
@@ -56,12 +59,18 @@ interface Summary {
   fully_crawled?: number
   crawling_now?: number
   spy?: number
+  in_progress?: number
+  new_ads?: number
+  soft_gated?: number
 }
 
 const VIEWS: { key: string; label: string; sumKey?: keyof Summary }[] = [
   { key: 'all', label: 'All' },
   { key: 'top', label: '🔥 Highest ads' },
+  { key: 'new_ads', label: '🆕 Most new ads', sumKey: 'new_ads' },
   { key: 'crawling', label: '⏳ Crawling now', sumKey: 'crawling_now' },
+  { key: 'in_progress', label: '↪️ In progress', sumKey: 'in_progress' },
+  { key: 'soft_gated', label: '🚧 Soft-gated', sumKey: 'soft_gated' },
   { key: 'spy', label: '🎯 Spied', sumKey: 'spy' },
   { key: 'never', label: 'Never crawled', sumKey: 'never_crawled' },
   { key: 'fully', label: '✅ Fully crawled', sumKey: 'fully_crawled' },
@@ -301,9 +310,11 @@ export default function BrandsPage() {
   // otherwise sort newest-first. No client filter (it would hide page_id matches).
   const filtered = view === 'top'
     ? [...data.terms].sort((a, b) => (b.ad_count || 0) - (a.ad_count || 0))
-    : (view === 'crawling' || view === 'fully')
-      ? data.terms
-      : [...data.terms].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    : view === 'new_ads'
+      ? [...data.terms].sort((a, b) => (b.new_ads_last_run || 0) - (a.new_ads_last_run || 0))
+      : (view === 'crawling' || view === 'fully' || view === 'in_progress' || view === 'soft_gated')
+        ? data.terms
+        : [...data.terms].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
@@ -584,6 +595,15 @@ export default function BrandsPage() {
                           )}
                           {t.fully_crawled && (
                             <span title="Has had a complete deep-archive crawl" style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100, background: '#dcfce7', color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 }}>✅ FULL</span>
+                          )}
+                          {t.soft_gated && (
+                            <span title="Meta soft-gated this brand's last crawl (truncated the library)" style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100, background: '#ffedd5', color: '#9a3412', textTransform: 'uppercase', letterSpacing: 0.5 }}>🚧 SOFT-GATE</span>
+                          )}
+                          {t.in_progress && (
+                            <span title="Mid-walk — a resume cursor is saved; it'll continue next pass" style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100, background: '#e0e7ff', color: '#3730a3', textTransform: 'uppercase', letterSpacing: 0.5 }}>↪️ IN PROGRESS</span>
+                          )}
+                          {(view === 'new_ads' && (t.new_ads_last_run ?? 0) > 0) && (
+                            <span title="New ads added on the last crawl run" style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100, background: '#dcfce7', color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 }}>+{t.new_ads_last_run} NEW</span>
                           )}
                           {(Date.now() - new Date(t.created_at).getTime()) < 86_400_000 && (
                             <span style={{
