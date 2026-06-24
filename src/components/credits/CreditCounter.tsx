@@ -26,15 +26,12 @@ export interface CreditState {
 
 const BAL_CACHE = 'credits:lastBalance'
 export function useCredits(): CreditState & { refetch: () => void } {
-  // Seed from the last-known balance (localStorage) so the pill shows a real number on
-  // first paint instead of a '…' flash while /api/credits/balance loads. It refreshes
-  // in the background and corrects if it changed.
-  const [s, setS] = useState<CreditState>(() => {
-    let cached = NaN
-    if (typeof window !== 'undefined') cached = Number(localStorage.getItem(BAL_CACHE))
-    const have = Number.isFinite(cached)
-    return { balance: have ? cached : 0, plan: 'trial', reset_at: null, pricing: {}, loading: !have }
-  })
+  // IMPORTANT: initialize to a CONSTANT (same on server + client) — do NOT read localStorage in the
+  // useState initializer. That runs during SSR render: the server (no window) rendered '…' while the
+  // client rendered the cached '90' → React hydration #425/#418/#423 → the whole dashboard tree got
+  // discarded ("feed vanishes"). We seed from cache in the post-mount effect below instead, so the
+  // server HTML and first client render match. (Trades a 1-tick '…' on the pill for not breaking the page.)
+  const [s, setS] = useState<CreditState>({ balance: 0, plan: 'trial', reset_at: null, pricing: {}, loading: true })
   const refetch = useCallback(async () => {
     try {
       const r = await fetch('/api/credits/balance')
@@ -46,6 +43,10 @@ export function useCredits(): CreditState & { refetch: () => void } {
     } catch { setS(p => ({ ...p, loading: false })) }
   }, [])
   useEffect(() => {
+    // Post-mount (client-only): seed instantly from the cached balance so the pill shows a real
+    // number while the live refetch lands — same UX as before, but without the hydration mismatch.
+    const cached = Number(localStorage.getItem(BAL_CACHE))
+    if (Number.isFinite(cached)) setS(p => ({ ...p, balance: cached, loading: false }))
     refetch()
     const h = () => refetch()
     window.addEventListener(REFRESH_EVENT, h)
