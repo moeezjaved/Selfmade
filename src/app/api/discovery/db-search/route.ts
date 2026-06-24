@@ -4,7 +4,7 @@
  * Also returns top brands for the query.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createReadClient } from '@/lib/supabase/server'
+import { createClient, createReadClient, createAdminClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
 import { expandQuery, matchTierWeight, matchTierReason, type Expansion } from '@/lib/search/concepts'
 
@@ -94,7 +94,9 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get('sort') || 'recent'
     const days = parseInt(searchParams.get('days') || '0')
     const page = parseInt(searchParams.get('page') || '0')
-    const limit = 40
+    // 60 (was 40): a fuller first paint so the grid fills a tall screen before the scroll sentinel
+    // is in view — no premature "loading more". fetchLimit = 120-row window → ~75-90 unique/page.
+    const limit = 60
     const offset = page * limit
 
     // ── GetHookd-parity filters (all additive; each is inert unless its param is
@@ -626,6 +628,16 @@ export async function GET(request: NextRequest) {
     if (!isEval && transformed.length > 0) {
       if (FEED_CACHE.size > 300) FEED_CACHE.clear()
       FEED_CACHE.set(_cacheKey, { at: Date.now(), body: payload })
+    }
+    // Write-through the persistent snapshot on a bare-feed miss → it self-populates on the FIRST
+    // request after a deploy/migration (never empty, even before the cron's first tick) and
+    // self-refreshes from user traffic if the cron is ever down. Best-effort (table may not exist).
+    if (isBareFeed && transformed.length > 0) {
+      try {
+        await createAdminClient()
+          .from('discovery_feed_cache')
+          .upsert({ key: snapKey, payload, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+      } catch { /* table not present yet → ignore */ }
     }
     return NextResponse.json(payload)
   } catch (err: any) {
