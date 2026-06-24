@@ -1020,20 +1020,22 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             onClick={(e) => { e.stopPropagation(); /* Clone wired up later */ }}
             style={{
               pointerEvents: 'auto',
-              background: 'linear-gradient(90deg, #f97316, #ea580c)',
-              color: '#fff',
+              background: '#dffe95',
+              color: '#14281a',
               border: 'none',
-              padding: '8px 16px',
-              borderRadius: 8,
+              padding: '9px 18px',
+              borderRadius: 10,
               fontSize: 13,
-              fontWeight: 700,
+              fontWeight: 800,
               cursor: 'pointer',
               fontFamily: 'inherit',
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+              boxShadow: '0 6px 18px rgba(0,0,0,0.30)',
             }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
           >
             <span style={{ fontSize: 14 }}>✨</span> Clone ad
           </button>
