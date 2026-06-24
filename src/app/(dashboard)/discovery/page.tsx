@@ -1152,6 +1152,14 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
           {' - '}
           {ad.stopDate ? new Date(ad.stopDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Present'}
         </span>
+        {/* Reuse — how many ad placements run THIS same creative (deduped into one card). A high
+            number = a creative the brand is scaling hard across countries/retailers. */}
+        {(ad.creativeReuseCount ?? 0) > 1 && (
+          <span title={`This creative runs as ${ad.creativeReuseCount} separate ads (across countries / retailers) — shown once here`}
+            style={{ flexShrink: 0, fontSize: 9, fontWeight: 800, color: '#3730a3', background: '#e0e7ff', border: '1px solid #c7d2fe', padding: '1px 6px', borderRadius: 100, whiteSpace: 'nowrap' }}>
+            ↻ {ad.creativeReuseCount} placements
+          </span>
+        )}
       </div>
 
       {/* ── Ad copy body (compact) ── */}
@@ -2053,9 +2061,9 @@ export default function DiscoveryPage() {
           <>
             <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span>
-                Showing <strong style={{ color: '#111' }}>{filteredAds.length}</strong>
-                {rawAds.length !== filteredAds.length ? ` of ${rawAds.length}` : ''}
-                {searchSource === 'indexed' && dbTotal > 0 ? ` of ${dbTotal.toLocaleString()} matching` : ''} ads
+                Showing <strong style={{ color: '#111' }}>{filteredAds.length.toLocaleString()}</strong> unique {filteredAds.length === 1 ? 'creative' : 'creatives'}
+                {searchSource === 'indexed' && dbTotal > filteredAds.length ? <span title="The same creative often runs across many countries/retailers as separate ads — we show each once."> · from {dbTotal.toLocaleString()} placements</span> : ''}
+                {hasMore ? ' · scroll for more' : ''}
               </span>
               {/* Search mode badge */}
               <span style={{ background: searchMode === 'brand' ? '#eff6ff' : searchMode === 'category' ? '#f0fdf4' : '#faf5ff', color: searchMode === 'brand' ? '#1d4ed8' : searchMode === 'category' ? '#166534' : '#7c3aed', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100, border: `1px solid ${searchMode === 'brand' ? '#bfdbfe' : searchMode === 'category' ? '#bbf7d0' : '#e9d5ff'}` }}>
