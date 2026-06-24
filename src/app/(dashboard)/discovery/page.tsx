@@ -995,51 +995,52 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         </span>
       </div>
 
-      {/* Hover overlay — Clone ad (image, centered) or Scripts (video, top-left so it doesn't cover play button) */}
+      {/* Hover overlay — bottom-up gradient ("shadow from below, faded by ~half height") + a lime
+          Clone-ad pill anchored bottom-left, matching the mockup. Video also gets the Scripts menu
+          pinned top-left so it never covers the centred play button. */}
       <div
         className="hover-overlay"
         style={{
           position: 'absolute', inset: 0,
-          background: slide.type === 'video' ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.35)',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.30) 26%, rgba(0,0,0,0) 52%)',
           display: 'flex',
-          alignItems: slide.type === 'video' ? 'flex-start' : 'center',
-          justifyContent: slide.type === 'video' ? 'flex-start' : 'center',
-          padding: slide.type === 'video' ? 10 : 0,
+          alignItems: 'flex-end',
+          justifyContent: 'flex-start',
+          padding: 12,
           opacity: 0,
-          transition: 'opacity .15s',
+          transition: 'opacity .18s',
           pointerEvents: 'none',
           zIndex: 6,
         }}
       >
-        {slide.type === 'video' ? (
-          <div style={{ pointerEvents: 'auto' }}>
+        {slide.type === 'video' && (
+          <div style={{ position: 'absolute', top: 10, left: 10, pointerEvents: 'auto' }}>
             <ScriptsMenu />
           </div>
-        ) : (
-          <button
-            onClick={(e) => { e.stopPropagation(); /* Clone wired up later */ }}
-            style={{
-              pointerEvents: 'auto',
-              background: '#dffe95',
-              color: '#14281a',
-              border: 'none',
-              padding: '9px 18px',
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 800,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              boxShadow: '0 6px 18px rgba(0,0,0,0.30)',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
-            onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
-          >
-            <span style={{ fontSize: 14 }}>✨</span> Clone ad
-          </button>
         )}
+        <button
+          onClick={(e) => { e.stopPropagation(); /* Clone wired up later */ }}
+          style={{
+            pointerEvents: 'auto',
+            background: '#dffe95',
+            color: '#14281a',
+            border: 'none',
+            padding: '8px 15px',
+            borderRadius: 9,
+            fontSize: 12.5,
+            fontWeight: 800,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
+        >
+          <span style={{ fontSize: 13 }}>✨</span> Clone ad
+        </button>
       </div>
     </div>
   )

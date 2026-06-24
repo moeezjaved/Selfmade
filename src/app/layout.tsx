@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Toaster } from 'react-hot-toast'
+import ClientToaster from '@/components/ClientToaster'
 import ErrorTracker from '@/components/ErrorTracker'
 import './globals.css'
 
@@ -40,24 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-dark text-white antialiased font-sans" suppressHydrationWarning>
         <ErrorTracker />
         {children}
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              background: '#152928',
-              color: '#ffffff',
-              border: '1px solid rgba(223,254,149,0.2)',
-              fontFamily: 'Hanken Grotesk, sans-serif',
-              fontSize: '14px',
-            },
-            success: {
-              iconTheme: { primary: '#dffe95', secondary: '#10211f' },
-            },
-            error: {
-              iconTheme: { primary: '#f87171', secondary: '#10211f' },
-            },
-          }}
-        />
+        <ClientToaster />
       </body>
     </html>
   )
