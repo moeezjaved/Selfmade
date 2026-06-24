@@ -34,6 +34,10 @@ interface BrandTerm {
   created_at: string
   status: 'queued' | 'in_progress' | 'exhausted_waiting' | 'ready_to_recrawl'
   next_recrawl_at: string | null
+  crawling_now?: boolean
+  fully_crawled?: boolean
+  never_crawled?: boolean
+  is_spy?: boolean
   state: {
     last_run_at: string
     ads_indexed: number
@@ -48,7 +52,20 @@ interface Summary {
   active_terms: number
   brands_indexed: number
   total_ads: number
+  never_crawled?: number
+  fully_crawled?: number
+  crawling_now?: number
+  spy?: number
 }
+
+const VIEWS: { key: string; label: string; sumKey?: keyof Summary }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'top', label: '🔥 Highest ads' },
+  { key: 'crawling', label: '⏳ Crawling now', sumKey: 'crawling_now' },
+  { key: 'spy', label: '🎯 Spied', sumKey: 'spy' },
+  { key: 'never', label: 'Never crawled', sumKey: 'never_crawled' },
+  { key: 'fully', label: '✅ Fully crawled', sumKey: 'fully_crawled' },
+]
 
 const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }> = {
   queued:             { bg: '#f1f5f9', color: '#374151', label: 'Queued' },
@@ -94,10 +111,15 @@ export default function BrandsPage() {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [newBrand, setNewBrand] = useState({ term: '', page_id: '', category: 'General', priority: 5 })
   const [filter, setFilter] = useState('')
+  const [view, setView] = useState('all')
 
-  const load = useCallback(async (q?: string) => {
+  const load = useCallback(async (q?: string, v?: string) => {
     try {
-      const res = await fetch(`/api/admin/brands${q ? `?q=${encodeURIComponent(q)}` : ''}`)
+      const params = new URLSearchParams()
+      if (q) params.set('q', q)
+      if (v && v !== 'all') params.set('view', v)
+      const qs = params.toString()
+      const res = await fetch(`/api/admin/brands${qs ? `?${qs}` : ''}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const j = await res.json()
       setData(j)
@@ -110,12 +132,12 @@ export default function BrandsPage() {
   }, [])
 
   useEffect(() => {
-    // Debounced SERVER-side search: typing in the box queries ALL brands by name/page_id
-    // (not just the loaded 1000). Also refreshes every 30s with the current search.
-    const debounce = setTimeout(() => load(filter || undefined), filter ? 300 : 0)
-    const t = setInterval(() => load(filter || undefined), 30_000)
+    // Debounced SERVER-side search + view filter: covers ALL brands (not just the loaded 1000).
+    // Refreshes every 30s so "Crawling now" stays live.
+    const debounce = setTimeout(() => load(filter || undefined, view), filter ? 300 : 0)
+    const t = setInterval(() => load(filter || undefined, view), 30_000)
     return () => { clearTimeout(debounce); clearInterval(t) }
-  }, [load, filter])
+  }, [load, filter, view])
 
   const addBrand = async () => {
     if (!newBrand.term.trim()) return
@@ -274,11 +296,14 @@ export default function BrandsPage() {
   if (error && !data) return <div style={{ padding: 32, color: '#c0392b' }}>Error: {error}</div>
   if (!data) return null
 
-  // The API already filters by the search box (server-side, across ALL brands incl. by
-  // page_id), so we just sort newest-first here — no client filter (it would hide
-  // page_id matches whose name doesn't contain the digits).
-  const filtered = [...data.terms]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  // The API already filters by the search box + view (server-side, across ALL brands). Preserve
+  // the server's ordering for views that impose one (top = ad_count, crawling/fully = time);
+  // otherwise sort newest-first. No client filter (it would hide page_id matches).
+  const filtered = view === 'top'
+    ? [...data.terms].sort((a, b) => (b.ad_count || 0) - (a.ad_count || 0))
+    : (view === 'crawling' || view === 'fully')
+      ? data.terms
+      : [...data.terms].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
@@ -499,10 +524,26 @@ export default function BrandsPage() {
         </div>
       )}
 
+      {/* View filters — server-side, cover ALL brands. Counts come from the summary. */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        {VIEWS.map(v => {
+          const on = view === v.key
+          const cnt = v.sumKey && data?.summary ? (data.summary[v.sumKey] as number | undefined) : undefined
+          return (
+            <button key={v.key} onClick={() => setView(v.key)}
+              style={{ padding: '7px 13px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                border: on ? '1px solid #2075ff' : '1px solid #e2e8f0', background: on ? '#eaf2ff' : '#fff', color: on ? '#1d4ed8' : '#374151' }}>
+              {v.label}{cnt != null ? <span style={{ color: '#94a3b8', fontWeight: 600 }}> · {cnt.toLocaleString()}</span> : null}
+            </button>
+          )
+        })}
+      </div>
+
       {/* Search input — server-side across ALL brands (by name or exact page_id) */}
       <input value={filter} onChange={e => setFilter(e.target.value)}
         placeholder="Search all brands by name or page ID…"
         style={{ ...inputStyle, marginBottom: 12, width: 320 }} />
+      {view === 'crawling' && <span style={{ marginLeft: 4, fontSize: 12, color: '#888' }}>brands being crawled in the last 35 min · 🎯 = spied · auto-refreshes every 30s</span>}
       {filter && <span style={{ marginLeft: 10, fontSize: 12, color: '#888' }}>{filtered.length} match{filtered.length === 1 ? '' : 'es'}</span>}
 
       {/* Brands table */}
@@ -535,6 +576,15 @@ export default function BrandsPage() {
                       <div>
                         <div style={{ fontWeight: 700, color: '#111', display: 'flex', alignItems: 'center', gap: 6 }}>
                           {t.brand_name || t.term}
+                          {t.crawling_now && (
+                            <span title="Being crawled right now" style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100, background: '#dbeafe', color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: 0.5 }}>⏳ LIVE</span>
+                          )}
+                          {t.is_spy && (
+                            <span title="Spied brand (priority 9 — always full crawl)" style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100, background: '#fae8ff', color: '#86198f', textTransform: 'uppercase', letterSpacing: 0.5 }}>🎯 SPY</span>
+                          )}
+                          {t.fully_crawled && (
+                            <span title="Has had a complete deep-archive crawl" style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100, background: '#dcfce7', color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 }}>✅ FULL</span>
+                          )}
                           {(Date.now() - new Date(t.created_at).getTime()) < 86_400_000 && (
                             <span style={{
                               fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100,

@@ -27,15 +27,45 @@ export async function GET(req: NextRequest) {
   // invisible — search finds ANY brand by name/page_id. discovery_crawl_terms is small
   // (~27K rows) so an ilike here is cheap (unlike the 700K+ ads table).
   const q = (req.nextUrl.searchParams.get('q') || '').trim()
+  // view filters (applied server-side so they cover ALL brands, not just the newest 1000):
+  //   all (default) · top (highest ad count) · never (never crawled) · fully (deep-crawled) ·
+  //   crawling (being crawled right now) · spy (priority-9 spied brands)
+  const view = (req.nextUrl.searchParams.get('view') || 'all').trim()
+  const CRAWLING_WINDOW_MS = 35 * 60 * 1000   // matches the claim lease — crawling_at within this = live now
+  const crawlingCutoff = new Date(Date.now() - CRAWLING_WINDOW_MS).toISOString()
+
+  // "Highest ad count" needs page_ids ordered by ads_indexed, which lives in the STATE table —
+  // pre-fetch the top ones, then pull their term rows.
+  let topIds: string[] | null = null
+  if (!q && view === 'top') {
+    const { data: topStates } = await admin
+      .from('discovery_brand_crawl_state')
+      .select('page_id').gt('ads_indexed', 0)
+      .order('ads_indexed', { ascending: false }).limit(300)
+    topIds = (topStates || []).map((s: any) => s.page_id)
+  }
+
   let termsQuery = admin
     .from('discovery_crawl_terms')
-    .select('id, term, term_type, page_id, category, categories, countries, industry, priority, is_active, follower_count, picture, website, notes, created_at')
+    .select('id, term, term_type, page_id, category, categories, countries, industry, priority, is_active, follower_count, picture, website, notes, created_at, last_crawled_at, full_crawled_at, crawling_at')
     .or('term_type.eq.brand,page_id.not.is.null')
   if (q) {
     if (/^\d+$/.test(q)) termsQuery = termsQuery.eq('page_id', q)
     else termsQuery = termsQuery.ilike('term', `%${q}%`)
+    termsQuery = termsQuery.order('created_at', { ascending: false }).limit(200)
+  } else if (view === 'never') {
+    termsQuery = termsQuery.is('last_crawled_at', null).order('created_at', { ascending: false }).limit(1000)
+  } else if (view === 'fully') {
+    termsQuery = termsQuery.not('full_crawled_at', 'is', null).order('full_crawled_at', { ascending: false }).limit(1000)
+  } else if (view === 'crawling') {
+    termsQuery = termsQuery.gte('crawling_at', crawlingCutoff).order('crawling_at', { ascending: false }).limit(1000)
+  } else if (view === 'spy') {
+    termsQuery = termsQuery.gte('priority', 9).order('crawling_at', { ascending: false, nullsFirst: false }).limit(1000)
+  } else if (view === 'top') {
+    termsQuery = (topIds && topIds.length) ? termsQuery.in('page_id', topIds).limit(1000) : termsQuery.eq('page_id', '__none__')
+  } else {
+    termsQuery = termsQuery.order('created_at', { ascending: false }).limit(1000)
   }
-  termsQuery = termsQuery.order('created_at', { ascending: false }).limit(q ? 200 : 1000)
 
   const [
     { data: terms },
@@ -44,6 +74,10 @@ export async function GET(req: NextRequest) {
     { count: activeTermsCount },
     { count: brandsIndexedCount },
     { count: totalAdsCount },
+    { count: neverCrawledCount },
+    { count: fullyCrawledCount },
+    { count: crawlingNowCount },
+    { count: spyCount },
   ] = await Promise.all([
     termsQuery,
     admin
@@ -70,6 +104,15 @@ export async function GET(req: NextRequest) {
     admin
       .from('discovery_ads_index')
       .select('*', { count: 'planned', head: true }),
+    // Per-view counts for the filter chips (cheap head:true on the small terms table).
+    admin.from('discovery_crawl_terms').select('*', { count: 'exact', head: true })
+      .or('term_type.eq.brand,page_id.not.is.null').is('last_crawled_at', null),
+    admin.from('discovery_crawl_terms').select('*', { count: 'exact', head: true })
+      .or('term_type.eq.brand,page_id.not.is.null').not('full_crawled_at', 'is', null),
+    admin.from('discovery_crawl_terms').select('*', { count: 'exact', head: true })
+      .or('term_type.eq.brand,page_id.not.is.null').gte('crawling_at', crawlingCutoff),
+    admin.from('discovery_crawl_terms').select('*', { count: 'exact', head: true })
+      .or('term_type.eq.brand,page_id.not.is.null').gte('priority', 9),
   ])
 
   // Build a map: page_id → state
@@ -102,6 +145,11 @@ export async function GET(req: NextRequest) {
     } else if (state?.cursor) {
       status = 'in_progress'
     }
+    // Crawl-lifecycle flags for the admin filter chips.
+    const crawling_now = !!t.crawling_at && new Date(t.crawling_at).getTime() > now - CRAWLING_WINDOW_MS
+    const fully_crawled = !!t.full_crawled_at
+    const never_crawled = !t.last_crawled_at
+    const is_spy = (t.priority ?? 5) >= 9
     return {
       ...t,
       state: state ? {
@@ -115,8 +163,12 @@ export async function GET(req: NextRequest) {
       brand_name: counts?.name || state?.brand_name || t.term,
       next_recrawl_at,
       status,
+      crawling_now, fully_crawled, never_crawled, is_spy,
     }
   })
+  // "Highest ad count" view: order the enriched rows by ad_count (the state table set the
+  // candidate page_ids; this sorts them).
+  if (!q && view === 'top') enriched.sort((a: any, b: any) => (b.ad_count || 0) - (a.ad_count || 0))
 
   // Also collect any brands in state table that have NO term (lost track)
   const orphans = (states || [])
@@ -139,7 +191,12 @@ export async function GET(req: NextRequest) {
       active_terms: activeTermsCount ?? (terms || []).filter((t: any) => t.is_active).length,
       brands_indexed: brandsIndexedCount ?? Object.keys(adCountByPage).filter(k => adCountByPage[k].count > 0).length,
       total_ads: totalAdsCount ?? Object.values(adCountByPage).reduce((s, x) => s + x.count, 0),
+      never_crawled: neverCrawledCount ?? 0,
+      fully_crawled: fullyCrawledCount ?? 0,
+      crawling_now: crawlingNowCount ?? 0,
+      spy: spyCount ?? 0,
     },
+    view,
   })
 }
 
