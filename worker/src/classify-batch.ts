@@ -52,7 +52,7 @@ async function fetchUniqueSignatures(): Promise<CreativeItem[]> {
   for (let off = 0; off < WAVE; off += 1000) {
     const { data } = await (supabase as any)
       .from('discovery_ads_index')
-      .select('ad_id, page_name, body, title, copy_sig')
+      .select('ad_id, page_name, body, title, copy_sig, on_screen_text')
       .eq('is_classifiable', true)
       .or('ai_classified.is.null,ai_classified.eq.false,topics.is.null')
       .not('copy_sig', 'is', null)
@@ -64,8 +64,12 @@ async function fetchUniqueSignatures(): Promise<CreativeItem[]> {
       const key = a.copy_sig as string
       const len = (a.body || '').length
       const prev = bySig.get(key)
+      // Pick the representative with the richest body; carry on_screen_text (vision-extracted) so the
+      // model sees what the viewer actually reads on the creative — the real hook for video ads.
       if (!prev || len > prev._len) {
-        bySig.set(key, { key, page_name: a.page_name, title: a.title, body: a.body, _len: len })
+        bySig.set(key, { key, page_name: a.page_name, title: a.title, body: a.body, on_screen_text: a.on_screen_text, _len: len })
+      } else if (!prev.on_screen_text && a.on_screen_text) {
+        prev.on_screen_text = a.on_screen_text   // keep any on-screen text even if a shorter-body row has it
       }
     }
     if (rows.length < 1000) break
