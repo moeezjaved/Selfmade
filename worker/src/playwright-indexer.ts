@@ -473,6 +473,8 @@ async function saveAdsToIndex(
     title: null,
     caption: ad.caption || null,
     cta: ad.cta_text || null,
+    link_url: ad.link_url || null,   // destination URL (migration 045) → Brand Spy Landing Pages
+
     is_active: ad.is_active,
     format: normalizeFormat(ad),
     // Meta usually omits the *_string dates but always sends epoch start_date.

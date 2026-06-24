@@ -24,10 +24,10 @@ export const maxDuration = 60
 
 type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; snapshot_url: string | null; link_url?: string | null; thumbnail_url?: string | null; raw_image_urls?: string[] | null; raw_video_preview_urls?: string[] | null; performance_score?: number | null }
 
-// NOTE: link_url is NOT persisted on discovery_ads_index yet (the crawler captures it in memory
-// but never writes it), so it's deliberately absent from this select — including it 500s the whole
-// dashboard. The Landing Pages tab stays empty until we add the column + crawler write + backfill.
-const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score'
+// link_url (migration 045) feeds the Landing Pages tab. RESILIENT: if the column isn't applied yet
+// the select falls back to SELECT_BASE so the dashboard never 500s on deploy/migration ordering.
+const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score, link_url'
+const SELECT_BASE = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score'
 
 // Real thumbnail (image) for a hook/card — the crawler's captured media, proxied through weserv
 // (hotlink-safe). snapshot_url is a LIBRARY LINK, not an image, so it can't be used as a thumbnail.
@@ -69,13 +69,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   const MAX_ADS = 60_000
   const ads: Ad[] = []
   let name = ''
+  let cols = SELECT   // drops to SELECT_BASE on the first page if link_url isn't applied yet
   for (let from = 0; from < MAX_ADS; from += PAGE) {
-    const { data, error } = await admin
+    let { data, error } = await admin
       .from('discovery_ads_index')
-      .select(SELECT)
+      .select(cols)
       .eq('page_id', pageId)
       .order('start_date', { ascending: true })
       .range(from, from + PAGE - 1)
+    if (error && cols === SELECT) {
+      // link_url column missing (migration 045 not applied) → retry this page without it, and use
+      // the base select for the rest. Landing Pages stays empty until the migration lands.
+      cols = SELECT_BASE
+      ;({ data, error } = await admin.from('discovery_ads_index').select(cols).eq('page_id', pageId).order('start_date', { ascending: true }).range(from, from + PAGE - 1))
+    }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data?.length) break
     if (!name && (data[0] as any).page_name) name = (data[0] as any).page_name
