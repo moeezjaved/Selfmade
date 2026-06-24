@@ -52,7 +52,7 @@ const normUrl = (u: string | null): { url: string; host: string } | null => {
 }
 
 const MONTH = (d: Date) => `${d.toLocaleString('en', { month: 'short' })} '${String(d.getFullYear()).slice(2)}`
-const tally = (xs: (string | null)[]) => {
+const tally = (xs: (string | null | undefined)[]) => {
   const m: Record<string, number> = {}
   for (const x of xs) { const k = (x || '').trim(); if (k) m[k] = (m[k] || 0) + 1 }
   return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([label, count]) => ({ label, count }))
