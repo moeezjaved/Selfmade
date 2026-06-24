@@ -54,8 +54,8 @@ export async function uploadBufferToR2(
 export async function uploadThumb(buffer: Buffer, hash: string): Promise<string | null> {
   try {
     const webp = await sharp(buffer, { failOn: 'none' })
-      .resize(480, null, { withoutEnlargement: true })
-      .webp({ quality: 72 })
+      .resize(480, null, { withoutEnlargement: true, kernel: 'cubic' })   // cubic ~ faster than lanczos, fine at 480px
+      .webp({ quality: 72, effort: 0 })                                    // effort 0 = fastest encode (CPU-bound backfill)
       .toBuffer()
     return await uploadBufferToR2(webp, `thumbs/${hash}.webp`, 'image/webp')
   } catch (err) {
