@@ -513,7 +513,7 @@ export default function BrandSpyDetail() {
         <Link href="/discovery/brand-spy" style={{ fontSize: 13, color: '#2075ff', textDecoration: 'none' }}>← All spied brands</Link>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <button onClick={exportCsv} style={{ fontSize: 13, fontWeight: 700, color: '#111', background: 'rgba(223,254,149,0.6)', border: '1px solid #cde87a', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}>⬇ Export CSV</button>
-          <Link href={`/discovery/brand/${pageId}`} style={{ fontSize: 13, color: '#2075ff', textDecoration: 'none' }}>View all ads →</Link>
+          <button onClick={() => setTab('library')} style={{ fontSize: 13, fontWeight: 700, color: '#2075ff', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View all ads →</button>
         </div>
       </div>
       <h1 style={{ fontSize: 26, fontWeight: 800, color: '#111', margin: '4px 0 2px' }}>{d.brand.name}</h1>
