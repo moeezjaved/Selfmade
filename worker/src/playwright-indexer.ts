@@ -1477,6 +1477,11 @@ async function main() {
           exhausted_at: (doneStable && !m.nextCursor) ? new Date(now).toISOString() : null,
           cursor: m.nextCursor ?? null,   // resume point for big brands; null when fully crawled
         }, { onConflict: 'page_id' })
+        // Record/clear soft-gate truncation (migration 044) for the admin filter. Separate +
+        // best-effort so a not-yet-applied migration can't break the crawl_state upsert above.
+        await (supabase as any).from('discovery_brand_crawl_state')
+          .update({ soft_gate_at: m.softGateSuspect ? new Date(now).toISOString() : null })
+          .eq('page_id', brand.page_id).then(() => {}, () => {})
       }
     } catch (e: any) {
       console.error(`💥 Brand ${brand.page_id} crashed: ${e?.message}`)
