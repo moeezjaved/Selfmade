@@ -996,14 +996,14 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
       </div>
 
       {/* Hover overlay — bottom-up gradient ("shadow from below, faded by ~half height") + a lime
-          Clone-ad pill anchored bottom-left, matching the mockup. Video also gets the Scripts menu
-          pinned top-left so it never covers the centred play button. */}
+          Clone-ad pill anchored bottom-left, matching the mockup. Hidden once a video is PLAYING so
+          it never covers the video or its native controls (scrubber/volume/fullscreen). */}
       <div
         className="hover-overlay"
         style={{
           position: 'absolute', inset: 0,
           background: 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.30) 26%, rgba(0,0,0,0) 52%)',
-          display: 'flex',
+          display: playing ? 'none' : 'flex',
           alignItems: 'flex-end',
           justifyContent: 'flex-start',
           padding: 12,
