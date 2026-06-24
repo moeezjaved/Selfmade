@@ -19,6 +19,7 @@ export interface CreativeItem {
   page_name?: string
   title?: string
   body?: string
+  on_screen_text?: string   // vision-extracted text shown ON the creative — the real hook for video
 }
 
 /**
@@ -27,9 +28,11 @@ export interface CreativeItem {
  * self-describing (we map by id, not by request order — survives restarts).
  */
 export function buildMergedPrompt(items: CreativeItem[]): string {
-  const text = items.map((it, i) =>
-    `CREATIVE ${i + 1} [${it.key}]:\nBrand: ${clean(it.page_name)}\nHeadline: ${clean(it.title)}\nBody: ${clean(it.body).slice(0, 400)}`
-  ).join('\n\n---\n\n')
+  const text = items.map((it, i) => {
+    const onScreen = clean(it.on_screen_text).slice(0, 200)
+    return `CREATIVE ${i + 1} [${it.key}]:\nBrand: ${clean(it.page_name)}\nHeadline: ${clean(it.title)}\nBody: ${clean(it.body).slice(0, 400)}` +
+      (onScreen ? `\nOn-screen text (what the viewer reads on the creative — weight this heavily for the hook): ${onScreen}` : '')
+  }).join('\n\n---\n\n')
 
   return `Analyze these ${items.length} ad creatives. For EACH, return one JSON object. Output a JSON array only, no prose.
 
