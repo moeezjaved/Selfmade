@@ -116,6 +116,30 @@ export async function GET(request: NextRequest) {
     const formatStyles = csv('format_style'), visualStyles = csv('visual_style'), ctaStyles = csv('cta_style')
     const VALID_TIERS = new Set(['winning', 'optimized', 'growing', 'scaling', 'testing'])
 
+    // ── Persistent feed snapshot (instant cold loads under write load) ──────────
+    // The bare default feed (no query / no filters / page 0) is the hottest path and the one that
+    // sits on skeletons while the rollup+drain write discovery_ads_index. A cron refreshes a
+    // snapshot row every few minutes; serving it skips the live (contended) query entirely. Keyed
+    // by sort only — a FIXED key, robust to param-string drift (unlike the in-memory cache). The
+    // read is best-effort: if the table doesn't exist yet (pre-migration) it falls through to live.
+    const fresh = searchParams.get('fresh') === '1'   // cron sets this to force a live recompute
+    const isBareFeed = !q && page === 0 && !pageId && status === 'ALL' && !platforms && !format &&
+      !industry && !theme && !language && country === 'ALL' && days === 0 &&
+      tiers.length === 0 && niches.length === 0 && activeAdsMin === 0 && runTimeBuckets.length === 0 &&
+      ctaTypes.length === 0 && minReuse === 0 && hideBrands.length === 0 && adsPerBrand === 0 &&
+      hookTypes.length === 0 && emotions.length === 0 && angles.length === 0 &&
+      formatStyles.length === 0 && visualStyles.length === 0 && ctaStyles.length === 0
+    const snapKey = `feed:default:${sort}`
+    if (isBareFeed && !fresh) {
+      try {
+        const { data: snapRows } = await admin.from('discovery_feed_cache').select('payload, updated_at').eq('key', snapKey).limit(1)
+        const snap = snapRows?.[0]
+        if (snap && Date.now() - new Date(snap.updated_at).getTime() < 6 * 60_000) {
+          return NextResponse.json({ ...snap.payload, cached: 'snapshot' })
+        }
+      } catch { /* table not present yet → fall through to the live query */ }
+    }
+
     // Applied to BOTH the result query and the count query so the total stays honest.
     const applyHookdFilters = (query: any) => {
       const t = tiers.filter(x => VALID_TIERS.has(x))
