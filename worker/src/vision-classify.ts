@@ -16,6 +16,7 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY
 const MODEL = process.env.VISION_MODEL || 'gpt-4o-mini'
 const CONCURRENCY = Math.max(1, parseInt(process.env.VISION_CONCURRENCY ?? '6', 10))
 const SCOPE = (process.env.VISION_SCOPE || 'active').toLowerCase()   // active | winning | all
+const PAGE_ID = (process.env.VISION_PAGE_ID || '').trim()           // set → FULL pass for ONE spied brand
 const MAX = Math.max(0, parseInt(process.env.VISION_MAX ?? '0', 10)) // 0 = unlimited
 const BATCH = 300
 
@@ -70,7 +71,7 @@ async function classifyOne(c: Cand): Promise<boolean> {
 
 async function main() {
   if (!OPENAI_KEY) { console.error('missing OPENAI_API_KEY'); process.exit(1) }
-  console.log(`👁️  vision-classify — model=${MODEL}, scope=${SCOPE}, concurrency=${CONCURRENCY}, max=${MAX || '∞'}`)
+  console.log(`👁️  vision-classify — model=${MODEL}, ${PAGE_ID ? `brand=${PAGE_ID} (FULL)` : `scope=${SCOPE}`}, concurrency=${CONCURRENCY}, max=${MAX || '∞'}`)
   const seen = new Set<string>()
   let cursor: string | null = null
   let done = 0, ok = 0
@@ -82,7 +83,10 @@ async function main() {
       .or('visual_classified.is.null,visual_classified.eq.false')
       .order('ad_id', { ascending: false })
       .limit(BATCH)
-    if (SCOPE === 'active') q = q.eq('is_active', true)
+    // Brand-scoped (a spied brand) → FULL pass over EVERY creative, active or not. Otherwise the
+    // global, cost-controlled scope (active / winning) that powers the Discovery filters.
+    if (PAGE_ID) q = q.eq('page_id', PAGE_ID)
+    else if (SCOPE === 'active') q = q.eq('is_active', true)
     else if (SCOPE === 'winning') q = q.in('performance_tier', ['winning', 'optimized'])
     if (cursor) q = q.lt('ad_id', cursor)
     const { data, error } = await q
