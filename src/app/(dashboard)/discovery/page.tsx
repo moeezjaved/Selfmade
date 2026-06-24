@@ -1288,6 +1288,11 @@ export default function DiscoveryPage() {
     const calc = () => { const w = window.innerWidth; setGridCols(w < 700 ? 2 : w < 1050 ? 3 : w < 1450 ? 4 : 5) }
     calc(); window.addEventListener('resize', calc); return () => window.removeEventListener('resize', calc)
   }, [])
+  // masonic measures the DOM to position cards — the server can't replicate that, so SSR vs client
+  // diverge → React hydration error (#418/#423) → the boundary discards + remounts the grid: the
+  // "feed vanishes then comes back" flash. Render the masonry ONLY after mount so it never SSRs.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
   // Followed brands (for the Follow button on the hover card).
   const [followed, setFollowed] = useState<Set<string>>(new Set())
   useEffect(() => { fetch('/api/follows').then(r => r.json()).then(d => setFollowed(new Set(d.pageIds || []))).catch(() => {}) }, [])
@@ -2067,6 +2072,7 @@ export default function DiscoveryPage() {
                 the visible cards are mounted (windowing). Deep scroll stays flat in
                 memory (no DOM accumulation / tab freeze). onRender drives infinite load.
                 Keyed by the server query so a NEW search remounts to a fresh grid+top. */}
+            {mounted && (
             <MasonryBoundary>
               <Masonry
                 key={gridKey}
@@ -2083,6 +2089,7 @@ export default function DiscoveryPage() {
                 onRender={handleMasonryRender}
               />
             </MasonryBoundary>
+            )}
             {loading && hasMore && (
               <div style={{ textAlign: 'center', padding: 24, color: '#9ca3af', fontSize: 13 }}>Loading more…</div>
             )}
