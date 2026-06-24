@@ -1581,6 +1581,15 @@ export default function DiscoveryPage() {
 
   const isPermError = error.toLowerCase().includes('permission') || error.toLowerCase().includes('application does not')
 
+  // CLIENT-ONLY render. This whole page is client-data driven (everything loads via useEffect) and
+  // some of its first-paint content diverged server↔client → React hydration errors #418/#423/#425,
+  // which made the feed "vanish then return". Rendering a static placeholder until mounted means the
+  // server HTML and the first client render are identical (nothing dynamic), so there's no hydration
+  // step to fail. After mount the real UI renders client-side. (Dashboard = auth-gated, no SEO cost.)
+  if (!mounted) {
+    return <div style={{ minHeight: '100vh', background: '#f8fafc' }} />
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes fadeUp { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } } .hide-scrollbar::-webkit-scrollbar { display: none } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none }`}</style>
