@@ -13,6 +13,16 @@ export const dynamic = 'force-dynamic'
 let _openai: OpenAI | null = null
 const getOpenAI = () => (_openai ||= new OpenAI({ apiKey: process.env.OPENAI_API_KEY! }))
 
+// ── Instant-feed cache ────────────────────────────────────────────────────
+// db-search returns PUBLIC ad data — identical for every signed-in user — so the response can be
+// cached by its raw query string. Under heavy DB write load (the rollup/drain writing the very
+// table the feed reads), the first paint was stuck on skeletons; this serves repeat loads (the
+// default feed especially) from memory in <5ms instead of re-running the contended query. Short
+// TTL keeps it fresh; per warm serverless instance (cold starts just repopulate); size-bounded.
+type FeedHit = { at: number; body: any }
+const FEED_CACHE = new Map<string, FeedHit>()
+const FEED_TTL = 60_000   // 60s — instant without going meaningfully stale
+
 // ── Quality score for the Atria-style "Recommended" sort ──────────────────
 // A flat ORDER BY can't BLEND signals — it just tiers them. This blends the
 // signals that make a feed feel curated: longevity dominates (a long-running ad
@@ -55,6 +65,15 @@ export async function GET(request: NextRequest) {
 
     const admin = createReadClient()   // serving reads → replica when SUPABASE_READ_URL set
     const { searchParams } = request.nextUrl
+
+    // Instant-feed cache hit — public ad data, so skip the (possibly contended) DB round-trips.
+    const _cacheKey = searchParams.toString()
+    if (!isEval) {
+      const _hit = FEED_CACHE.get(_cacheKey)
+      if (_hit && Date.now() - _hit.at < FEED_TTL) {
+        return NextResponse.json({ ..._hit.body, cached: true })
+      }
+    }
 
     const q = (searchParams.get('q') || '').trim()
     const mode = searchParams.get('mode') || 'adcopy'
@@ -564,7 +583,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({
+    const payload = {
       ads: transformed,
       total,
       page,
@@ -577,7 +596,14 @@ export async function GET(request: NextRequest) {
       totalInDB,
       source: 'indexed',
       searchMethod,
-    })
+    }
+    // Cache only successful, non-empty pages (an empty result is usually a transient timeout
+    // under write load — caching it would pin skeletons). Bound the map so it can't grow forever.
+    if (!isEval && transformed.length > 0) {
+      if (FEED_CACHE.size > 300) FEED_CACHE.clear()
+      FEED_CACHE.set(_cacheKey, { at: Date.now(), body: payload })
+    }
+    return NextResponse.json(payload)
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
