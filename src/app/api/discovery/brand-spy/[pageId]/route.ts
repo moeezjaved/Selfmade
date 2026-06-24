@@ -131,13 +131,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
 
   // ── Creative-DNA aggregates (Atria-style Overview) — the brand's playbook from the classifier.
   const tallyArr = (xs: (string[] | null | undefined)[]) => tally(xs.flatMap((a) => Array.isArray(a) ? a : []))
-  const topPersonas = tally(ads.map((a) => a.persona)).slice(0, 10)
-  const topAnglesDNA = tally(ads.map((a) => a.angle)).slice(0, 10)
-  const topUSPs = tally(ads.map((a) => a.usp)).slice(0, 10)
-  const topDesires = tally(ads.map((a) => a.desire)).slice(0, 10)
-  const topEmotions = tallyArr(ads.map((a) => a.emotion)).slice(0, 10)
-  const topThemes = tallyArr(ads.map((a) => a.themes)).slice(0, 10)
-  const topCTAs = tally(ads.map((a) => a.cta)).slice(0, 10)
+  const topPersonas = tally(ads.map((a) => a.persona)).slice(0, 40)
+  const topAnglesDNA = tally(ads.map((a) => a.angle)).slice(0, 40)
+  const topUSPs = tally(ads.map((a) => a.usp)).slice(0, 40)
+  const topDesires = tally(ads.map((a) => a.desire)).slice(0, 40)
+  const topEmotions = tallyArr(ads.map((a) => a.emotion)).slice(0, 40)
+  const topThemes = tallyArr(ads.map((a) => a.themes)).slice(0, 40)
+  const topCTAs = tally(ads.map((a) => a.cta)).slice(0, 40)
   // Distinct-count tiles (Hooks / Ad copy / Headlines / Landing pages), like Atria's overview row.
   const distinct = (xs: (string | null | undefined)[]) => new Set(xs.map((x) => (x || '').trim()).filter(Boolean)).size
   const counts = {
