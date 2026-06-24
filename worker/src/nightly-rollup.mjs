@@ -117,7 +117,10 @@ async function writeUpdates(updates, manageFlag = true) {
   // This is the fix for the 3.7h CPU spike — it paces apply_perf so reads (the live feed + the
   // running backfills) keep their I/O. Set ROLLUP_THROTTLE_MS=300-600 when running the heavy
   // backfill alongside other load; 0 (default) preserves the original full-speed nightly behavior.
-  const THROTTLE_MS = Math.max(0, parseInt(process.env.ROLLUP_THROTTLE_MS || '0', 10));
+  // Default-on for FULL runs (300ms) so the AUTOMATIC weekly Sunday recalibration is throttled
+  // too — not just manual runs. Incremental nightly stays 0 (it's tiny). Explicit env always wins
+  // (set ROLLUP_THROTTLE_MS=0 to force full speed, or higher to go gentler).
+  const THROTTLE_MS = Math.max(0, parseInt(process.env.ROLLUP_THROTTLE_MS ?? (FULL ? '300' : '0'), 10));
   let wrote = 0, fail = 0;
   try {
     for (let i = 0; i < updates.length; i += CHUNK) {
