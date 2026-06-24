@@ -33,6 +33,7 @@ const SIGS_PER_REQUEST = 25            // distinct copy signatures merged into o
 const waveArg = process.argv.find(a => a.startsWith('--wave='))
 const WAVE = waveArg ? parseInt(waveArg.split('=')[1], 10) : 40_000   // ads scanned per wave
 const ONCE = process.argv.includes('--once')
+const PAGE_ID = (process.env.CLASSIFY_PAGE_ID || '').trim()   // set → classify ONLY this brand (deep spy)
 const POLL_MS = 30_000
 
 let tIn = 0, tOut = 0, cacheHits = 0
@@ -50,13 +51,14 @@ async function fetchUniqueSignatures(): Promise<CreativeItem[]> {
   const bySig = new Map<string, CreativeItem & { _len: number }>()
   let scanned = 0
   for (let off = 0; off < WAVE; off += 1000) {
-    const { data } = await (supabase as any)
+    let q = (supabase as any)
       .from('discovery_ads_index')
       .select('ad_id, page_name, body, title, copy_sig, on_screen_text')
       .eq('is_classifiable', true)
       .or('ai_classified.is.null,ai_classified.eq.false,topics.is.null')
       .not('copy_sig', 'is', null)
-      .range(off, off + 999)
+    if (PAGE_ID) q = q.eq('page_id', PAGE_ID)   // deep spy: this brand only
+    const { data } = await q.range(off, off + 999)
     const rows = (data || []) as any[]
     if (!rows.length) break
     scanned += rows.length
