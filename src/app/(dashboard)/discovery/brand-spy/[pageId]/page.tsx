@@ -28,7 +28,8 @@ type Spy = {
   topHooks: { label: string; count: number }[]
   topAngles: { label: string; count: number }[]
   landingPages: { url: string; host: string; active: number; inactive: number; total: number; fullUrl: string }[]
-  hooks: { text: string; count: number; days: number; adId: string; snapshot_url: string | null; active: boolean }[]
+  hooks: { text: string; count: number; days: number; adId: string; snapshot_url: string | null; thumb: string | null; active: boolean }[]
+  topAds: { adId: string; score: number; days: number; active: boolean; hook: string; thumb: string | null; snapshot_url: string | null }[]
 }
 
 function Stat({ k, v, sub }: { k: string; v: string | number; sub?: string }) {
@@ -78,8 +79,8 @@ function Hooks({ d }: { d: Spy }) {
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {rows.map((h) => (
           <div key={h.text} style={{ display: 'grid', gridTemplateColumns: '46px 1fr 90px 110px', gap: 12, alignItems: 'center', padding: '9px 0', borderBottom: '1px solid #f3f4f6' }}>
-            {h.snapshot_url
-              ? <img src={h.snapshot_url} alt="" style={{ width: 46, height: 46, objectFit: 'cover', borderRadius: 8, background: '#f3f4f6' }} />
+            {h.thumb
+              ? <img src={h.thumb} alt="" loading="lazy" style={{ width: 46, height: 46, objectFit: 'cover', borderRadius: 8, background: '#f3f4f6' }} />
               : <div style={{ width: 46, height: 46, borderRadius: 8, background: '#f3f4f6' }} />}
             <div style={{ fontSize: 14, color: '#111', lineHeight: 1.35 }}>“{h.text}”{h.count > 1 && <span style={{ color: '#9ca3af', fontWeight: 600 }}> · {h.count} ads</span>}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: h.active ? '#16a34a' : '#9ca3af' }}>{h.active ? '● ' : ''}{h.days}d</div>
@@ -156,17 +157,19 @@ function useBrandAds(pageId: string, opts: { days: number; format: string; statu
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    const p = new URLSearchParams({ pageId, mode: 'brand', page: String(page), sort })
+    const p = new URLSearchParams({ page: String(page), sort })
     if (days) p.set('days', String(days))
     if (format) p.set('format', format)
     if (status && status !== 'ALL') p.set('status', status)
-    fetch(`/api/discovery/db-search?${p.toString()}`)
+    // Brand Spy's own ads endpoint — reads discovery_ads_index directly (raw media), so it shows
+    // every ad even before the drain downloads creatives. (db-search would 0-out a fresh brand.)
+    fetch(`/api/discovery/brand-spy/${pageId}/ads?${p.toString()}`)
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return
         setAds((prev) => (page === 0 ? d.ads || [] : [...prev, ...(d.ads || [])]))
         setHasMore(!!d.hasMore)
-        if (typeof d.totalInDB === 'number') setTotal(d.totalInDB)
+        if (typeof d.total === 'number') setTotal(d.total)
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -358,6 +361,116 @@ function TimelineGantt({ pageId, onOpen }: { pageId: string; onOpen: (a: Card) =
   )
 }
 
+// Creative Tests — each launch-day row expands (Foreplay-style) to show that day's ads, fetched
+// on demand from the /ads?day= endpoint. survival = still-running / launched.
+function CreativeTests({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: Card) => void }) {
+  const [open, setOpen] = useState<string | null>(null)
+  const [adsByDay, setAdsByDay] = useState<Record<string, Card[]>>({})
+  const [loadingDay, setLoadingDay] = useState<string | null>(null)
+  const toggle = async (date: string) => {
+    if (open === date) { setOpen(null); return }
+    setOpen(date)
+    if (!adsByDay[date]) {
+      setLoadingDay(date)
+      try {
+        const r = await fetch(`/api/discovery/brand-spy/${pageId}/ads?day=${date}&sort=longest`)
+        const j = await r.json()
+        setAdsByDay((m) => ({ ...m, [date]: j.ads || [] }))
+      } finally { setLoadingDay(null) }
+    }
+  }
+  return (
+    <div style={card}>
+      <div style={label}>Creative Tests <span style={{ textTransform: 'none', fontWeight: 500 }}>— ads launched together on one day; click to see them. survival = still-running / launched</span></div>
+      {d.creativeTests.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No multi-ad launch batches detected yet.</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {d.creativeTests.map((t) => {
+          const color = t.survival >= 60 ? '#10b981' : t.survival >= 30 ? '#f59e0b' : '#ef4444'
+          const isOpen = open === t.date
+          return (
+            <div key={t.date} style={{ border: '1px solid #f0f0f0', borderRadius: 10, overflow: 'hidden' }}>
+              <button onClick={() => toggle(t.date)} style={{ width: '100%', display: 'grid', gridTemplateColumns: '20px 120px 1fr 140px', alignItems: 'center', gap: 12, padding: '10px 12px', background: isOpen ? '#fafafa' : '#fff', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ color: '#9ca3af', fontSize: 12 }}>{isOpen ? '▾' : '▸'}</span>
+                <span style={{ fontSize: 13, color: '#374151', fontWeight: 600 }}>{new Date(t.date).toLocaleDateString()}</span>
+                <span style={{ height: 16, background: '#f3f4f6', borderRadius: 6, overflow: 'hidden', display: 'block' }}><span style={{ display: 'block', width: `${t.survival}%`, height: '100%', background: color, borderRadius: 6 }} /></span>
+                <span style={{ fontSize: 13, fontWeight: 700, textAlign: 'right', color: '#111' }}>{t.running}/{t.launched} live <span style={{ color, fontWeight: 800 }}>{t.survival}%</span></span>
+              </button>
+              {isOpen && (
+                <div style={{ padding: 12, background: '#fafafa', borderTop: '1px solid #f0f0f0' }}>
+                  {loadingDay === t.date && <div style={{ color: '#9ca3af', fontSize: 13 }}>Loading ads…</div>}
+                  {adsByDay[t.date] && adsByDay[t.date].length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No previews for this day.</div>}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                    {(adsByDay[t.date] || []).map((a) => <AdCard key={a.id} a={a} onOpen={onOpen} />)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Timeline tab — Ad Launch Trends + Active Ad Trends (range-filtered) + Top 10 ads by performance.
+function TimelineTab({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: Card) => void }) {
+  const [range, setRange] = useState(0)   // months to show; 0 = all
+  const launches = range ? d.launchesByMonth.slice(-range) : d.launchesByMonth
+  const trend = range ? d.activeTrend.slice(-Math.round(range * 4.33)) : d.activeTrend
+  return (
+    <div>
+      {/* Top 10 ads by performance score */}
+      <div style={{ ...card, marginBottom: 12 }}>
+        <div style={label}>Top Ads by Performance <span style={{ textTransform: 'none', fontWeight: 500 }}>— highest performance score (rollup)</span></div>
+        {d.topAds.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No performance scores computed yet — these fill in after the nightly rollup.</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+          {d.topAds.map((a, i) => (
+            <a key={a.adId} href={a.snapshot_url || '#'} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'inherit', border: '1px solid #e6e6e6', borderRadius: 10, overflow: 'hidden', position: 'relative', display: 'block' }}>
+              <span style={{ position: 'absolute', top: 6, left: 6, zIndex: 1, fontSize: 10, fontWeight: 800, color: '#111', background: ACCENT, padding: '2px 7px', borderRadius: 6 }}>#{i + 1}</span>
+              <span style={{ position: 'absolute', top: 6, right: 6, zIndex: 1, fontSize: 10, fontWeight: 800, color: '#fff', background: '#2075ff', padding: '2px 7px', borderRadius: 6 }}>{a.score}</span>
+              <div style={{ aspectRatio: '4 / 5', background: '#f3f4f6' }}>
+                {a.thumb ? <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c4c4c4', fontSize: 11 }}>no preview</div>}
+              </div>
+              <div style={{ padding: '7px 9px', fontSize: 11, color: '#374151', lineHeight: 1.3, maxHeight: 46, overflow: 'hidden' }}>{a.hook}</div>
+              <div style={{ padding: '0 9px 8px', fontSize: 11, fontWeight: 700, color: a.active ? '#16a34a' : '#9ca3af' }}>{a.active ? '● ' : ''}{a.days}d</div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* Range filter for the trend charts */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        {([[3, '3m'], [6, '6m'], [12, '12m'], [0, 'All']] as [number, string][]).map(([m, l]) => (
+          <button key={m} onClick={() => setRange(m)} style={FILTER_BTN(range === m)}>{l}</button>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={card}>
+          <div style={label}>Ad Launch Trends <span style={{ textTransform: 'none', fontWeight: 500 }}>— new ads / month</span></div>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={launches} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" /><XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} /><YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} allowDecimals={false} /><Tooltip /><Line type="monotone" dataKey="count" stroke="#ff7a00" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={card}>
+          <div style={label}>Active Ad Trends <span style={{ textTransform: 'none', fontWeight: 500 }}>— ads live / week</span></div>
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={trend} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <defs><linearGradient id="spyArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ff7a00" stopOpacity={0.35} /><stop offset="100%" stopColor="#ff7a00" stopOpacity={0} /></linearGradient></defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" /><XAxis dataKey="week" tick={{ fontSize: 10, fill: '#9ca3af' }} interval={3} /><YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} allowDecimals={false} /><Tooltip /><Area type="monotone" dataKey="active" stroke="#ff7a00" strokeWidth={2} fill="url(#spyArea)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12 }}><TimelineGantt pageId={pageId} onOpen={onOpen} /></div>
+      <div style={{ marginTop: 14, padding: 12, background: 'rgba(223,254,149,0.18)', border: `1px solid ${ACCENT}`, borderRadius: 10, fontSize: 12, color: '#3f6212' }}>◆ Trends reconstructed from every ad’s live window in our index — history from before you started watching, from real snapshots.</div>
+    </div>
+  )
+}
+
 const TABS = [['library', 'Ad Library'], ['tests', 'Creative Tests'], ['hooks', 'Hooks'], ['timeline', 'Timeline'], ['landing', 'Landing Pages']] as const
 
 export default function BrandSpyDetail() {
@@ -426,50 +539,9 @@ export default function BrandSpyDetail() {
 
       {tab === 'library' && <AdLibrary d={d} pageId={pageId} onOpen={setDrawerAd} />}
 
-      {tab === 'timeline' && (
-        <div>
-          <TimelineGantt pageId={pageId} onOpen={setDrawerAd} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-            <div style={card}>
-              <div style={label}>Ad Launch Trends <span style={{ textTransform: 'none', fontWeight: 500 }}>— new ads / month</span></div>
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={d.launchesByMonth} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" /><XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} /><YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} allowDecimals={false} /><Tooltip /><Line type="monotone" dataKey="count" stroke="#ff7a00" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div style={card}>
-              <div style={label}>Active Ad Trends <span style={{ textTransform: 'none', fontWeight: 500 }}>— ads live / week (last 26w)</span></div>
-              <ResponsiveContainer width="100%" height={240}>
-                <AreaChart data={d.activeTrend} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                  <defs><linearGradient id="spyArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ff7a00" stopOpacity={0.35} /><stop offset="100%" stopColor="#ff7a00" stopOpacity={0} /></linearGradient></defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" /><XAxis dataKey="week" tick={{ fontSize: 10, fill: '#9ca3af' }} interval={3} /><YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} allowDecimals={false} /><Tooltip /><Area type="monotone" dataKey="active" stroke="#ff7a00" strokeWidth={2} fill="url(#spyArea)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-          <div style={{ marginTop: 14, padding: 12, background: 'rgba(223,254,149,0.18)', border: `1px solid ${ACCENT}`, borderRadius: 10, fontSize: 12, color: '#3f6212' }}>◆ Trends reconstructed from every ad’s live window in our index — history from before you started watching, from real snapshots.</div>
-        </div>
-      )}
+      {tab === 'timeline' && <TimelineTab d={d} pageId={pageId} onOpen={setDrawerAd} />}
 
-      {tab === 'tests' && (
-        <div style={card}>
-          <div style={label}>Creative Tests <span style={{ textTransform: 'none', fontWeight: 500 }}>— ads launched together; survival = still-running / launched (high = a winning test)</span></div>
-          {d.creativeTests.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No multi-ad launch batches detected yet.</div>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {d.creativeTests.map((t) => {
-              const color = t.survival >= 60 ? '#10b981' : t.survival >= 30 ? '#f59e0b' : '#ef4444'
-              return (
-                <div key={t.date} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 130px', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 13, color: '#374151' }}>{new Date(t.date).toLocaleDateString()}</div>
-                  <div style={{ height: 18, background: '#f3f4f6', borderRadius: 6, overflow: 'hidden' }}><div style={{ width: `${t.survival}%`, height: '100%', background: color, borderRadius: 6 }} /></div>
-                  <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'right', color: '#111' }}>{t.running}/{t.launched} live <span style={{ color, fontWeight: 800 }}>{t.survival}%</span></div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      {tab === 'tests' && <CreativeTests d={d} pageId={pageId} onOpen={setDrawerAd} />}
 
       {tab === 'hooks' && <Hooks d={d} />}
 
