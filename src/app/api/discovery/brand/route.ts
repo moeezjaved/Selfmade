@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
     if (!allAds.length) {
       return NextResponse.json({
         brand: { page_id: pageId, page_name: '', total_ads: 0, active_ads: 0, first_seen: null, last_seen: null, with_creative: 0, video_ads: 0, avg_days_running: 0 },
+        ads: [], hasMore: false, nextCursor: null,   // always include ads[] so the client never sees undefined
         creatives: [], adCopies: [], headlines: [], hooks: [], angles: [],
         emotions: [], themes: [], personas: [], usps: [], desires: [], landingPages: [],
       })

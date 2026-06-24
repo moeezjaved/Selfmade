@@ -124,9 +124,13 @@ export default function BrandPage() {
       const res = await fetch(`/api/discovery/brand?${params}`)
       const data = await res.json()
       if (data.error) { setError(data.error); return }
-      setAds(prev => reset ? data.ads : [...prev, ...data.ads])
-      setHasMore(data.hasMore)
-      setNextCursor(data.nextCursor)
+      // Guard: the brand API omits `ads` entirely when a brand has no creative-backed ads
+      // (e.g. freshly-spied brands whose creatives aren't drained yet) → setAds(undefined) used to
+      // crash every ads.map/.length below with a client-side exception.
+      const incoming = Array.isArray(data.ads) ? data.ads : []
+      setAds(prev => reset ? incoming : [...prev, ...incoming])
+      setHasMore(!!data.hasMore)
+      setNextCursor(data.nextCursor ?? null)
     } catch (e: any) {
       setError(e.message)
     } finally {
