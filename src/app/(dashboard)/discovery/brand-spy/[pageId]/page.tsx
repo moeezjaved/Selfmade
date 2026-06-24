@@ -58,6 +58,36 @@ function ChipRow({ icon, label, items }: { icon: string; label: string; items?: 
   )
 }
 
+// Per-dimension deep-dive (Atria tabs: Personas / Ad angles / USPs / Desires / Emotions / Themes) —
+// the full ranked breakdown with proportion bars + ad counts.
+function DnaList({ title, items }: { title: string; items?: { label: string; count: number }[] }) {
+  if (!items?.length) return (
+    <div style={{ ...card, padding: 48, textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>
+      No {title.toLowerCase()} yet — the AI classifier is still processing this brand&apos;s ads. Check back shortly.
+    </div>
+  )
+  const max = items[0]?.count || 1
+  return (
+    <div style={{ ...card, padding: 18 }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: '#111', marginBottom: 14 }}>{title} <span style={{ fontWeight: 500, color: '#9ca3af' }}>· {items.length}</span></div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+        {items.map((it, i) => (
+          <div key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 22, fontSize: 12, color: '#9ca3af', fontWeight: 700, textAlign: 'right', flexShrink: 0 }}>{i + 1}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#111', marginBottom: 4 }}>{it.label}</div>
+              <div style={{ height: 6, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ width: `${Math.round((it.count / max) * 100)}%`, height: '100%', background: '#1a3a1a', borderRadius: 4 }} />
+              </div>
+            </div>
+            <div style={{ width: 64, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#374151', flexShrink: 0 }}>{it.count} ads</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Overview({ d }: { d: Spy }) {
   const c = d.counts || { hooks: 0, adCopy: 0, headlines: 0, landingPages: 0 }
   const total = d.summary.total || 1
@@ -543,7 +573,7 @@ function TimelineTab({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a
   )
 }
 
-const TABS = [['overview', 'Overview'], ['library', 'Ad Library'], ['tests', 'Creative Tests'], ['hooks', 'Hooks'], ['timeline', 'Timeline'], ['landing', 'Landing Pages']] as const
+const TABS = [['overview', 'Overview'], ['library', 'Ad Library'], ['hooks', 'Hooks'], ['personas', 'Personas'], ['angles', 'Ad angles'], ['usps', 'USPs'], ['desires', 'Desires'], ['emotions', 'Emotions'], ['themes', 'Themes'], ['tests', 'Creative Tests'], ['timeline', 'Timeline'], ['landing', 'Landing Pages']] as const
 
 export default function BrandSpyDetail() {
   const { pageId } = useParams<{ pageId: string }>()
@@ -603,13 +633,19 @@ export default function BrandSpyDetail() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
         {TABS.map(([id, lbl]) => (
-          <button key={id} onClick={() => setTab(id)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', color: tab === id ? '#111' : '#6b7280', background: tab === id ? 'rgba(223,254,149,0.5)' : '#f3f4f6' }}>{lbl}</button>
+          <button key={id} onClick={() => setTab(id)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', color: tab === id ? '#111' : '#6b7280', background: tab === id ? 'rgba(223,254,149,0.5)' : '#f3f4f6' }}>{lbl}</button>
         ))}
       </div>
 
       {tab === 'overview' && <Overview d={d} />}
+      {tab === 'personas' && <DnaList title="Personas" items={d.topPersonas} />}
+      {tab === 'angles' && <DnaList title="Ad angles" items={d.topAnglesDNA?.length ? d.topAnglesDNA : d.topAngles} />}
+      {tab === 'usps' && <DnaList title="USPs" items={d.topUSPs} />}
+      {tab === 'desires' && <DnaList title="Desires" items={d.topDesires} />}
+      {tab === 'emotions' && <DnaList title="Emotions" items={d.topEmotions} />}
+      {tab === 'themes' && <DnaList title="Themes" items={d.topThemes} />}
       {tab === 'library' && <AdLibrary d={d} pageId={pageId} onOpen={setDrawerAd} />}
 
       {tab === 'timeline' && <TimelineTab d={d} pageId={pageId} onOpen={setDrawerAd} />}
