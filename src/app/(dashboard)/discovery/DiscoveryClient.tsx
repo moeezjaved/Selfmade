@@ -1588,6 +1588,17 @@ export default function DiscoveryPage() {
     if (stopIndex >= items.length - 12) loadMoreRef.current()
   }, [])
 
+  // Atria-style seamless scroll: eagerly prefetch the first few pages WITHOUT waiting for a scroll,
+  // so a buffer is always ahead of the user (when they scroll, it's already loaded — no "loading
+  // more"). After EAGER_PAGES the 2500px scroll sentinel takes over (it also prefetches ~2.5 screens
+  // early). Pages 0–2 are snapshot-backed so these prefetches are instant; page 3 is a fast live query.
+  const EAGER_PAGES = 3
+  useEffect(() => {
+    if (!loading && !loadingMoreRef.current && hasMore && searchSource === 'indexed' && dbPage < EAGER_PAGES) {
+      loadMoreRef.current()
+    }
+  }, [dbPage, loading, hasMore, searchSource, rawAds.length])
+
   const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (v: string) =>
     setter(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])
 
@@ -2124,9 +2135,9 @@ export default function DiscoveryPage() {
               />
             </MasonryBoundary>
             )}
-            {loading && hasMore && (
-              <div style={{ textAlign: 'center', padding: 24, color: '#9ca3af', fontSize: 13 }}>Loading more…</div>
-            )}
+            {/* No "loading more" text — eager prefetch + 2500px sentinel keep the next pages ready
+                before the user reaches them (Atria-style). Just a spacer so the scroll area is stable. */}
+            {loading && hasMore && <div style={{ height: 24 }} />}
           </>
         )}
       </div>

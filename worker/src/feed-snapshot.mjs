@@ -23,24 +23,26 @@ const H = { apikey: SRK, Authorization: `Bearer ${SRK}` }
 // Pre-warm the sorts the UI defaults to. Add more here if you want other bare-feed sorts instant.
 const SORTS = ['recommended', 'performance']
 
-async function refreshOne(sort) {
-  const r = await fetch(`${APP}/api/discovery/db-search?sort=${sort}&fresh=1`, {
+const PAGES = [0, 1, 2]   // pre-warm the first 3 pages so eager-prefetch is instant (no "loading more")
+
+async function refreshOne(sort, page) {
+  const r = await fetch(`${APP}/api/discovery/db-search?sort=${sort}&page=${page}&fresh=1`, {
     headers: EVAL ? { 'x-eval-token': EVAL } : {},
   })
-  if (!r.ok) { console.error(`  ✗ db-search ${sort} → ${r.status}`); return }
+  if (!r.ok) { console.error(`  ✗ db-search ${sort} p${page} → ${r.status}`); return }
   const payload = await r.json()
-  if (!Array.isArray(payload.ads) || payload.ads.length === 0) { console.warn(`  · ${sort}: empty payload, skip`); return }
+  if (!Array.isArray(payload.ads) || payload.ads.length === 0) { console.warn(`  · ${sort} p${page}: empty, skip`); return }
   const up = await fetch(REST + 'discovery_feed_cache?on_conflict=key', {
     method: 'POST',
     headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ key: `feed:default:${sort}`, payload, updated_at: new Date().toISOString() }),
+    body: JSON.stringify({ key: `feed:default:${sort}:${page}`, payload, updated_at: new Date().toISOString() }),
   })
-  console.log(`  ✓ ${sort}: ${payload.ads.length} ads → cache ${up.ok ? 'OK' : 'FAILED ' + up.status}`)
+  console.log(`  ✓ ${sort} p${page}: ${payload.ads.length} ads → cache ${up.ok ? 'OK' : 'FAILED ' + up.status}`)
 }
 
 async function tick() {
   console.log(`[feed-snapshot] refreshing @ ${new Date().toISOString()}`)
-  for (const s of SORTS) { try { await refreshOne(s) } catch (e) { console.error(`  ✗ ${s}:`, e?.message ?? e) } }
+  for (const s of SORTS) for (const p of PAGES) { try { await refreshOne(s, p) } catch (e) { console.error(`  ✗ ${s} p${p}:`, e?.message ?? e) } }
 }
 
 if (!SRK || !process.env.SUPABASE_URL) { console.error('missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY'); process.exit(1) }

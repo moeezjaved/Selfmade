@@ -128,13 +128,15 @@ export async function GET(request: NextRequest) {
     // by sort only — a FIXED key, robust to param-string drift (unlike the in-memory cache). The
     // read is best-effort: if the table doesn't exist yet (pre-migration) it falls through to live.
     const fresh = searchParams.get('fresh') === '1'   // cron sets this to force a live recompute
-    const isBareFeed = !q && page === 0 && !pageId && status === 'ALL' && !platforms && !format &&
+    // Snapshot the first 3 pages (0–2) of the bare feed so the user has ~180 cards instantly and
+    // the eager prefetch (page 1–2) is instant too — no "loading more" wait. Keyed per page.
+    const isBareFeed = !q && page <= 2 && !pageId && status === 'ALL' && !platforms && !format &&
       !industry && !theme && !language && country === 'ALL' && days === 0 &&
       tiers.length === 0 && niches.length === 0 && activeAdsMin === 0 && runTimeBuckets.length === 0 &&
       ctaTypes.length === 0 && minReuse === 0 && hideBrands.length === 0 && adsPerBrand === 0 &&
       hookTypes.length === 0 && emotions.length === 0 && angles.length === 0 &&
       formatStyles.length === 0 && visualStyles.length === 0 && ctaStyles.length === 0
-    const snapKey = `feed:default:${sort}`
+    const snapKey = `feed:default:${sort}:${page}`
     if (isBareFeed && !fresh) {
       try {
         const { data: snapRows } = await admin.from('discovery_feed_cache').select('payload, updated_at').eq('key', snapKey).limit(1)
