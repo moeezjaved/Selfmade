@@ -146,6 +146,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     headlines: distinct(ads.map((a) => a.title)),
     landingPages: distinct(ads.map((a) => a.link_url)),
   }
+  // Trend header (Atria: "N ads were live in last 30 days, including M new ads (±X%)").
+  const nowMs = Date.now(), d30 = nowMs - 30 * 864e5, d60 = nowMs - 60 * 864e5
+  const liveLast30 = ads.filter((a) => a.last_seen && Date.parse(a.last_seen) >= d30).length
+  const newLast30 = ads.filter((a) => a.start_date && Date.parse(a.start_date) >= d30).length
+  const newPrev30 = ads.filter((a) => a.start_date && Date.parse(a.start_date) >= d60 && Date.parse(a.start_date) < d30).length
+  const trend = { liveLast30, newLast30, pctChange: newPrev30 > 0 ? Math.round(((newLast30 - newPrev30) / newPrev30) * 100) : null }
 
   // Launches per month (from start_date), chronological, last 12 months with data
   const monthMap = new Map<string, { d: Date; count: number }>()
@@ -267,6 +273,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     topHooks: tally(ads.map((a) => a.hook_type)).slice(0, 8),
     topAngles: tally(ads.map((a) => a.angle)).slice(0, 8),
     // Atria-style Overview DNA
-    topPersonas, topAnglesDNA, topUSPs, topDesires, topEmotions, topThemes, topCTAs, counts,
+    topPersonas, topAnglesDNA, topUSPs, topDesires, topEmotions, topThemes, topCTAs, counts, trend,
   })
 }

@@ -39,6 +39,7 @@ type Spy = {
   topThemes?: { label: string; count: number }[]
   topCTAs?: { label: string; count: number }[]
   counts?: { hooks: number; adCopy: number; headlines: number; landingPages: number }
+  trend?: { liveLast30: number; newLast30: number; pctChange: number | null }
 }
 
 // ── Overview tab (Atria-style): media mix + the brand's creative-DNA chip rows + count tiles ──
@@ -90,9 +91,21 @@ function DnaList({ title, items }: { title: string; items?: { label: string; cou
 
 function Overview({ d }: { d: Spy }) {
   const c = d.counts || { hooks: 0, adCopy: 0, headlines: 0, landingPages: 0 }
-  const total = d.summary.total || 1
+  const t = d.trend
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Trend header (Atria) */}
+      {t && (
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#111' }}>
+          <strong style={{ fontWeight: 800 }}>{t.liveLast30.toLocaleString()} ads</strong> were live in the last 30 days
+          {t.newLast30 > 0 && <>, including <strong style={{ fontWeight: 800 }}>{t.newLast30.toLocaleString()} new ads</strong></>}
+          {t.pctChange != null && (
+            <span style={{ marginLeft: 8, fontSize: 15, fontWeight: 800, color: t.pctChange >= 0 ? '#059669' : '#dc2626' }}>
+              ({t.pctChange >= 0 ? '+' : ''}{t.pctChange}%)
+            </span>
+          )}
+        </div>
+      )}
       {/* Media mix bar */}
       <div style={{ ...card, padding: 18 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: '#111', marginBottom: 12 }}>Media mix</div>
