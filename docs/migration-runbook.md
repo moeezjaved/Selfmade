@@ -12,14 +12,14 @@ maxes the DB and bottlenecks ingestion to 5M.
 Connection strings (keep off-screen — never paste into chat):
 - `TOKYO` = session pooler of the current project (`postgres.mylbmxqijhucgyaupxqr@aws-1-ap-northeast-1.pooler.supabase.com:5432`)
 - `USEAST` = session pooler of the NEW project (created in step 1)
-All `psql`/`pg_dump`/`pg_restore` below run via `docker run --rm -v /root/migration:/backup postgres:16 …` on the droplet.
+All `psql`/`pg_dump`/`pg_restore` below run via `docker run --rm -v /root/migration:/backup postgres:17 …` on the droplet.
 
 ---
 
 ## 0 — Pre-flight (no downtime)
 ```bash
 mkdir -p /root/migration
-docker pull postgres:16
+docker pull postgres:17
 ```
 - Confirm Vercel functions region = **iad1** (us-east-1).
 - Decide the maintenance window (low traffic; pre-launch so anytime).
@@ -28,9 +28,9 @@ docker pull postgres:16
 Gabriel's unblock is the role-level timeout. Prove it works through the pooler before committing:
 ```bash
 # raise it on Tokyo
-docker run --rm postgres:16 psql "$TOKYO" -c "alter role postgres set statement_timeout = 0;"
+docker run --rm postgres:17 psql "$TOKYO" -c "alter role postgres set statement_timeout = 0;"
 # fresh connection → try a schema-only dump (forces the planner across all tables, ~30s)
-docker run --rm -v /root/migration:/backup postgres:16 pg_dump "$TOKYO" --schema=public --schema-only -f /backup/_test_schema.sql
+docker run --rm -v /root/migration:/backup postgres:17 pg_dump "$TOKYO" --schema=public --schema-only -f /backup/_test_schema.sql
 ```
 - **Completes without "canceling statement due to statement timeout"** → pooler respects it. Proceed.
 - **Still times out** → the pooler overrides it. **Fallback:** run `pg_dump` from your **Mac over the Direct connection** (`db.<ref>.supabase.co:5432`, IPv6 — your home ISP almost certainly has IPv6) where the role setting applies cleanly. Install client: `brew install libpq` then use its `pg_dump`. Everything else in this runbook is identical, just from the Mac.
@@ -39,7 +39,7 @@ docker run --rm -v /root/migration:/backup postgres:16 pg_dump "$TOKYO" --schema
 1. Dashboard → **New project** → org `moeezjaved's Org` → region **East US (us-east-1)** → **size the disk above Tokyo's current 72%** (e.g. 2× headroom for 5M). Get its session-pooler string → `USEAST`.
 2. Extensions must exist *before* restore or dependent objects (the GIN trgm index, etc.) fail:
 ```bash
-docker run --rm postgres:16 psql "$USEAST" -c "
+docker run --rm postgres:17 psql "$USEAST" -c "
 create extension if not exists pg_trgm;
 create extension if not exists pgcrypto;
 create extension if not exists \"uuid-ossp\";
@@ -58,11 +58,11 @@ Now dump — **split, because of the auth gotcha**:
 ```bash
 # A) PUBLIC schema = your app (tables, indexes, triggers, functions, sequences, generated-col DEFS).
 #    Custom format (-Fc) so we can parallel-restore.
-docker run --rm -v /root/migration:/backup postgres:16 \
+docker run --rm -v /root/migration:/backup postgres:17 \
   pg_dump "$TOKYO" -Fc --no-owner --no-privileges --schema=public -f /backup/public.dump
 
 # B) AUTH USERS as DATA-ONLY (do NOT dump the auth schema structure — see gotcha #1).
-docker run --rm -v /root/migration:/backup postgres:16 \
+docker run --rm -v /root/migration:/backup postgres:17 \
   pg_dump "$TOKYO" -Fc --no-owner --no-privileges --data-only \
   --table=auth.users --table=auth.identities -f /backup/auth_data.dump
 ```
@@ -72,14 +72,14 @@ docker run --rm -v /root/migration:/backup postgres:16 \
 `discovery_ads_index` has ~23 indexes + `discovery_creatives` ~2.1M rows — **index rebuild is the slow part.** Use `-j` parallel restore:
 ```bash
 # Public schema + data, parallel
-docker run --rm -v /root/migration:/backup postgres:16 \
+docker run --rm -v /root/migration:/backup postgres:17 \
   pg_restore -d "$USEAST" -j 4 --no-owner --no-privileges /backup/public.dump
 ```
 If the index build inside the restore is brutal, split it: `--section=pre-data` then `--section=data` then `--section=post-data` (indexes last). For most cases `-j 4` is enough.
 
 Then load auth users into the new project's **existing** auth tables (data-only):
 ```bash
-docker run --rm -v /root/migration:/backup postgres:16 \
+docker run --rm -v /root/migration:/backup postgres:17 \
   pg_restore -d "$USEAST" --data-only --no-owner --no-privileges /backup/auth_data.dump
 ```
 
@@ -88,7 +88,7 @@ docker run --rm -v /root/migration:/backup postgres:16 \
 
 **b) Reset sequences** (BIGSERIAL columns) to `max(id)` so new inserts don't collide:
 ```bash
-docker run --rm postgres:16 psql "$USEAST" -c "
+docker run --rm postgres:17 psql "$USEAST" -c "
 do \$\$ declare r record; begin
   for r in select schemaname, sequencename from pg_sequences where schemaname='public' loop
     execute format('select setval(%L, coalesce((select max(\"id\") from public.%I),1))',
@@ -106,7 +106,7 @@ end \$\$;"
 
 ## 7 — VERIFY (beyond row counts) — gate before cutover
 ```bash
-docker run --rm -e PGOPTIONS='-c statement_timeout=0' postgres:16 psql "$USEAST" -c "
+docker run --rm -e PGOPTIONS='-c statement_timeout=0' postgres:17 psql "$USEAST" -c "
 -- extensions
 select extname from pg_extension where extname in ('pg_trgm','pgcrypto','uuid-ossp');
 -- triggers (must include trg_enqueue_creative; on_auth_user_created re-applied in 5a)
@@ -128,13 +128,13 @@ select (select count(*) from discovery_ads_index) ads,
 ### 7b — PROVE no data was lost (exact per-table count, Tokyo vs us-east)
 Writers are frozen, so counts are stable. Run this on **BOTH** `$TOKYO` and `$USEAST`; the outputs must be **identical**:
 ```bash
-docker run --rm -e PGOPTIONS='-c statement_timeout=0' postgres:16 psql "$TOKYO" -At -F',' -c "
+docker run --rm -e PGOPTIONS='-c statement_timeout=0' postgres:17 psql "$TOKYO" -At -F',' -c "
 select table_name,
   (xpath('/row/c/text()', query_to_xml(format('select count(*) c from %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint cnt
 from information_schema.tables
 where table_schema='public' and table_type='BASE TABLE' order by table_name;" > /root/migration/counts_tokyo.csv
 
-docker run --rm -e PGOPTIONS='-c statement_timeout=0' postgres:16 psql "$USEAST" -At -F',' -c "
+docker run --rm -e PGOPTIONS='-c statement_timeout=0' postgres:17 psql "$USEAST" -At -F',' -c "
 select table_name,
   (xpath('/row/c/text()', query_to_xml(format('select count(*) c from %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint cnt
 from information_schema.tables
@@ -142,8 +142,8 @@ where table_schema='public' and table_type='BASE TABLE' order by table_name;" > 
 
 diff /root/migration/counts_tokyo.csv /root/migration/counts_useast.csv && echo "✅ EVERY public table matches — zero rows lost" || echo "❌ MISMATCH — do NOT cut over; investigate the diff"
 # auth users too:
-docker run --rm postgres:16 psql "$TOKYO"  -At -c "select 'auth.users', count(*) from auth.users"
-docker run --rm postgres:16 psql "$USEAST" -At -c "select 'auth.users', count(*) from auth.users"
+docker run --rm postgres:17 psql "$TOKYO"  -At -c "select 'auth.users', count(*) from auth.users"
+docker run --rm postgres:17 psql "$USEAST" -At -c "select 'auth.users', count(*) from auth.users"
 ```
 **Hard gate:** the `diff` must print `✅` (zero output) and `auth.users` must match. If any table differs, **STOP** — Tokyo is untouched, so re-dump/re-restore that table; do not proceed to cutover.
 
