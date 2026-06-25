@@ -46,6 +46,10 @@ async function main() {
   console.log(`🖼️  image-thumb backfill started (concurrency=${CONCURRENCY}, batch=${BATCH})`)
   let cursor: string | null = null
   let done = 0, ok = 0
+  // THUMB_ORDER=asc lets a SECOND droplet attack the SAME backlog from the OLDEST end while the
+  // primary (desc, default) works newest-first — they converge in the middle, and the is-null filter
+  // makes overlap idempotent (whoever sets poster_url first, the other just skips). ~2× throughput.
+  const ASC = (process.env.THUMB_ORDER || 'desc').toLowerCase() === 'asc'
   for (;;) {
     let q = (supabase as any)
       .from('discovery_creatives')
@@ -54,12 +58,10 @@ async function main() {
       .is('poster_url', null)
       .not('r2_url', 'is', null)
       .not('hash', 'is', null)
-      // NEWEST ad_id first ≈ feed order (recent/active ads are what the Performance feed
-      // front-loads) → the ads users actually SEE get thumbs within the first hour or two,
-      // the long tail fills behind it.
-      .order('ad_id', { ascending: false })
+      // Default NEWEST-first (feed order → visible ads get thumbs first); asc = oldest-first for box 2.
+      .order('ad_id', { ascending: ASC })
       .limit(BATCH)
-    if (cursor) q = q.lt('ad_id', cursor)
+    if (cursor) q = ASC ? q.gt('ad_id', cursor) : q.lt('ad_id', cursor)
     const { data: cres, error } = await q
     if (error) { console.error('query error:', error.message); break }
     if (!cres || cres.length === 0) break

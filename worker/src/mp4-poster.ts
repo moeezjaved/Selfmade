@@ -74,15 +74,17 @@ async function processOne(c: { id: string; ad_id: string; position: number; r2_u
 async function main() {
   console.log(`🎞️  mp4-poster started (concurrency=${CONCURRENCY}, batch=${BATCH})`)
   let cursor: string | null = null   // ad_id keyset (INDEXED → fast)
+  // POSTER_ORDER=asc → a 2nd droplet works oldest-first while the primary works newest-first (default).
+  const ASC = (process.env.POSTER_ORDER || 'desc').toLowerCase() === 'asc'
   for (;;) {
     let q = (supabase as any)
       .from('discovery_creatives')
       .select('id, ad_id, position, r2_url')
       .eq('asset_type', 'video')
       .is('poster_url', null)
-      .order('ad_id', { ascending: false })   // newest first ≈ feed order → visible videos get posters first
+      .order('ad_id', { ascending: ASC })   // default newest-first; asc = oldest-first for box 2
       .limit(BATCH)
-    if (cursor) q = q.lt('ad_id', cursor)
+    if (cursor) q = ASC ? q.gt('ad_id', cursor) : q.lt('ad_id', cursor)
     const { data: cres, error } = await q
     if (error) { console.error('query failed:', error.message); break }
     if (!cres?.length) break
