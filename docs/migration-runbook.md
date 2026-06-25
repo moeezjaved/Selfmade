@@ -123,7 +123,29 @@ select (select count(*) from discovery_ads_index) ads,
        (select count(*) from discovery_creatives) creatives,
        (select count(*) from auth.users) users;"
 ```
-**Pass criteria:** 3 extensions present · `trg_enqueue_creative` + the `updated_at` triggers present · `on_auth_user_created` present (after 5a) · generated columns non-null · 5 policies · indexes `indisvalid=t` · row counts match Tokyo (±a few from the freeze).
+**Pass criteria:** 3 extensions present · `trg_enqueue_creative` + the `updated_at` triggers present · `on_auth_user_created` present (after 5a) · generated columns non-null · 5 policies · indexes `indisvalid=t`.
+
+### 7b — PROVE no data was lost (exact per-table count, Tokyo vs us-east)
+Writers are frozen, so counts are stable. Run this on **BOTH** `$TOKYO` and `$USEAST`; the outputs must be **identical**:
+```bash
+docker run --rm -e PGOPTIONS='-c statement_timeout=0' postgres:16 psql "$TOKYO" -At -F',' -c "
+select table_name,
+  (xpath('/row/c/text()', query_to_xml(format('select count(*) c from %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint cnt
+from information_schema.tables
+where table_schema='public' and table_type='BASE TABLE' order by table_name;" > /root/migration/counts_tokyo.csv
+
+docker run --rm -e PGOPTIONS='-c statement_timeout=0' postgres:16 psql "$USEAST" -At -F',' -c "
+select table_name,
+  (xpath('/row/c/text()', query_to_xml(format('select count(*) c from %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint cnt
+from information_schema.tables
+where table_schema='public' and table_type='BASE TABLE' order by table_name;" > /root/migration/counts_useast.csv
+
+diff /root/migration/counts_tokyo.csv /root/migration/counts_useast.csv && echo "✅ EVERY public table matches — zero rows lost" || echo "❌ MISMATCH — do NOT cut over; investigate the diff"
+# auth users too:
+docker run --rm postgres:16 psql "$TOKYO"  -At -c "select 'auth.users', count(*) from auth.users"
+docker run --rm postgres:16 psql "$USEAST" -At -c "select 'auth.users', count(*) from auth.users"
+```
+**Hard gate:** the `diff` must print `✅` (zero output) and `auth.users` must match. If any table differs, **STOP** — Tokyo is untouched, so re-dump/re-restore that table; do not proceed to cutover.
 
 ## 8 — Cutover (the writer inventory — miss one and you lose data)
 Update `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (+ new anon key + new DB password) in **EVERY** place that touches the DB:
