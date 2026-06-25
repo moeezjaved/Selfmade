@@ -1,0 +1,161 @@
+'use client'
+/**
+ * Brands tab — browse/search the brand directory (the big catalog). Search any brand to spy it,
+ * jump to its Meta Ad Library, or open Brand Spy. Sits next to Explore in the Discovery sub-nav.
+ */
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { Search, Target, ExternalLink, Eye } from 'lucide-react'
+
+const DARK = '#1a3a1a'
+
+interface Brand {
+  pageId: string; name: string; avatar: string | null; industry: string | null; adCount: number
+  country: string | null; adLibraryUrl: string; isCrawled: boolean; isSpied: boolean
+}
+
+const TABS = [
+  { label: '🔍 Explore', href: '/discovery' },
+  { label: '🏷️ Brands', href: '/discovery/brands' },
+]
+
+export default function BrandsPage() {
+  const [brands, setBrands] = useState<Brand[]>([])
+  const [industries, setIndustries] = useState<string[]>([])
+  const [total, setTotal] = useState(0)
+  const [q, setQ] = useState('')
+  const [qInput, setQInput] = useState('')
+  const [industry, setIndustry] = useState('')
+  const [sort, setSort] = useState('ads')
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const sentinel = useRef<HTMLDivElement>(null)
+
+  const fetchPage = useCallback(async (p: number, replace: boolean) => {
+    setLoading(true); setError(null)
+    try {
+      const sp = new URLSearchParams({ page: String(p), sort })
+      if (q) sp.set('q', q); if (industry) sp.set('industry', industry)
+      const r = await fetch(`/api/discovery/brands?${sp}`)
+      const d = await r.json()
+      if (!r.ok) throw new Error(d.error || 'failed')
+      setBrands(prev => replace ? d.brands : [...prev, ...d.brands])
+      setTotal(d.total); setHasMore(d.hasMore)
+      if (d.industries?.length) setIndustries(d.industries)
+    } catch (e) { setError(e instanceof Error ? e.message : 'failed to load') }
+    finally { setLoading(false) }
+  }, [q, industry, sort])
+
+  // Reset + reload whenever the query/filter/sort changes.
+  useEffect(() => { setPage(0); fetchPage(0, true) }, [q, industry, sort, fetchPage])
+
+  // Infinite scroll.
+  useEffect(() => {
+    const el = sentinel.current
+    if (!el) return
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && hasMore && !loading) { const np = page + 1; setPage(np); fetchPage(np, false) }
+    }, { rootMargin: '400px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, loading, page, fetchPage])
+
+  const submitSearch = (e: React.FormEvent) => { e.preventDefault(); setQ(qInput.trim()) }
+
+  // Spy = enqueue an on-demand crawl of this brand's ads (+ charge once per user), THEN open the
+  // spy view. Most directory brands aren't crawled yet, so this POST is what makes them useful.
+  const [spying, setSpying] = useState<string | null>(null)
+  const spy = async (b: Brand) => {
+    if (b.isSpied) { window.location.assign(`/discovery/brand-spy/${b.pageId}`); return }
+    if (!confirm(`Spy "${b.name}"?\n\nWe'll crawl their full ad archive from the Meta Ad Library. This spends Brand Spy credits the first time (free to re-open after).`)) return
+    setSpying(b.pageId); setError(null)
+    try {
+      const r = await fetch('/api/discovery/brand-spy', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId: b.pageId, name: b.name }),
+      })
+      const d = await r.json()
+      if (!r.ok) throw new Error(d.error || 'failed to start spying')
+      window.location.assign(`/discovery/brand-spy/${b.pageId}`)
+    } catch (e) { setError(e instanceof Error ? e.message : 'failed to start spying'); setSpying(null) }
+  }
+
+  return (
+    <div style={{ padding: '20px 28px', maxWidth: 1200, margin: '0 auto' }}>
+      {/* Header + sub-nav */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ marginRight: 4 }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>Brands</div>
+          <div style={{ fontSize: 11, color: '#6b7280' }}>Search {total ? total.toLocaleString() : ''} brands · spy any of them</div>
+        </div>
+        <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 9, padding: 3 }}>
+          {TABS.map(t => {
+            const active = t.href === '/discovery/brands'
+            return <a key={t.href} href={t.href} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, background: active ? '#fff' : 'transparent', color: active ? '#111' : '#6b7280', textDecoration: 'none', boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>{t.label}</a>
+          })}
+        </div>
+        <form onSubmit={submitSearch} style={{ flex: 1, maxWidth: 420, position: 'relative' }}>
+          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+          <input value={qInput} onChange={e => setQInput(e.target.value)} placeholder="Search brands…"
+            style={{ width: '100%', padding: '9px 12px 9px 34px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#f8fafc', boxSizing: 'border-box' }} />
+        </form>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        <select value={industry} onChange={e => setIndustry(e.target.value)} style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: '#fff', fontFamily: 'inherit' }}>
+          <option value="">All industries</option>
+          {industries.map(i => <option key={i} value={i}>{i}</option>)}
+        </select>
+        <select value={sort} onChange={e => setSort(e.target.value)} style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: '#fff', fontFamily: 'inherit' }}>
+          <option value="ads">Sort: Most ads</option>
+          <option value="name">Sort: A–Z</option>
+        </select>
+      </div>
+
+      {error && <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 16 }}>{error}</div>}
+
+      {/* List */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid #f1f5f9', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <span style={{ flex: 1 }}>Brand</span>
+          <span style={{ width: 160 }}>Industry</span>
+          <span style={{ width: 90, textAlign: 'right' }}># Ads</span>
+          <span style={{ width: 230 }} />
+        </div>
+        {brands.map(b => (
+          <div key={b.pageId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: '1px solid #f8fafc' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              {b.avatar ? <img src={b.avatar} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                : <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#eef2f7', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>{b.name.slice(0, 1)}</div>}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</div>
+                {b.isCrawled && <span style={{ fontSize: 10, fontWeight: 700, color: '#059669' }}>● in your index</span>}
+              </div>
+            </div>
+            <span style={{ width: 160, fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.industry || '—'}</span>
+            <span style={{ width: 90, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#374151' }}>{b.adCount.toLocaleString()}</span>
+            <div style={{ width: 230, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <a href={b.adLibraryUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600, color: '#6b7280', textDecoration: 'none', padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 7 }}>
+                <ExternalLink size={13} /> Ad Library
+              </a>
+              <button onClick={() => spy(b)} disabled={spying === b.pageId}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: '#dffe95', background: DARK, border: 'none', cursor: spying === b.pageId ? 'default' : 'pointer', padding: '6px 12px', borderRadius: 7, fontFamily: 'inherit' }}>
+                {b.isSpied ? <Eye size={13} /> : <Target size={13} />} {spying === b.pageId ? 'Starting…' : b.isSpied ? 'Spying' : 'Spy'}
+              </button>
+            </div>
+          </div>
+        ))}
+        {loading && <div style={{ padding: 20, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>Loading…</div>}
+        {!loading && brands.length === 0 && (
+          <div style={{ padding: 50, textAlign: 'center', color: '#9ca3af' }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#6b7280' }}>No brands found.</div>
+            <div style={{ fontSize: 13, marginTop: 4 }}>Import the catalog in admin → Brand Directory, or adjust your search.</div>
+          </div>
+        )}
+        <div ref={sentinel} style={{ height: 1 }} />
+      </div>
+    </div>
+  )
+}

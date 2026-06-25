@@ -1683,8 +1683,7 @@ export default function DiscoveryPage() {
           <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 9, padding: 3, flexShrink: 0 }}>
             {[
               { label: '🔍 Explore', href: '/discovery' },
-              { label: '🎨 Creatives', href: '/discovery/creatives' },
-              { label: '🔖 Saved', href: '/discovery/saved' },
+              { label: '🏷️ Brands', href: '/discovery/brands' },
             ].map(tab => (
               <a key={tab.href} href={tab.href}
                 style={{
