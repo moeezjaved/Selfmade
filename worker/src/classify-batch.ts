@@ -31,7 +31,10 @@ const provider = getProvider()   // CLASSIFY_PROVIDER=openai|anthropic
 
 const SIGS_PER_REQUEST = 25            // distinct copy signatures merged into one prompt
 const waveArg = process.argv.find(a => a.startsWith('--wave='))
-const WAVE = waveArg ? parseInt(waveArg.split('=')[1], 10) : 40_000   // ads scanned per wave
+// 12k ads/wave ≈ ~7k unique sigs ≈ ~1.1M input tokens — safely under OpenAI's 2M enqueued-token
+// Batch limit (40k waves were ~3.6M → every batch failed with token_limit_exceeded). Raise via
+// --wave=N if your org's batch limit is higher.
+const WAVE = waveArg ? parseInt(waveArg.split('=')[1], 10) : 12_000   // ads scanned per wave
 const ONCE = process.argv.includes('--once')
 const PAGE_ID = (process.env.CLASSIFY_PAGE_ID || '').trim()   // set → classify ONLY this brand (deep spy)
 const POLL_MS = 30_000
