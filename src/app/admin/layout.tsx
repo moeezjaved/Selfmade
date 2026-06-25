@@ -7,6 +7,8 @@ const NAV = [
   { href: '/admin/users', label: 'Users', icon: '◉' },
   { href: '/admin/payments', label: 'Payments', icon: '◎' },
   { href: '/admin/credit-pricing', label: 'Credit Pricing', icon: '◆' },
+  { href: '/admin/experts', label: 'Experts', icon: '⭐' },
+  { href: '/admin/brand-directory', label: 'Brand Directory', icon: '📇' },
   { href: '/admin/funnel', label: 'Funnel', icon: '▽' },
   { href: '/admin/errors', label: 'Error Logs', icon: '⚠' },
   { href: '/admin/invite-codes', label: 'Invite Codes', icon: '🎟' },
