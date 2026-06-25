@@ -64,11 +64,18 @@ async function main() {
     if (error) { console.error('query error:', error.message); break }
     if (!cres || cres.length === 0) break
 
-    for (let i = 0; i < cres.length; i += CONCURRENCY) {
-      const chunk = cres.slice(i, i + CONCURRENCY)
-      const results = await Promise.all(chunk.map(backfillOne))
-      done += chunk.length; ok += results.filter(Boolean).length
-    }
+    // Streaming worker pool: keep CONCURRENCY items in flight at ALL times, refilling as each
+    // finishes — so one slow R2 download / Tokyo write blocks only its own worker, not the whole
+    // wave. (The old `Promise.all` on fixed chunks gated every batch on its slowest item, which is
+    // why bumping concurrency from 3→32 didn't speed it up — still ~200/min.)
+    let qi = 0
+    await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
+      while (qi < cres.length) {
+        const c = cres[qi++]
+        const r = await backfillOne(c)
+        done++; if (r) ok++
+      }
+    }))
     cursor = cres[cres.length - 1].ad_id
     console.log(`  … ${done} processed, ${ok} thumbs written (cursor=${cursor})`)
   }

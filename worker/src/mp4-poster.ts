@@ -87,12 +87,15 @@ async function main() {
     if (error) { console.error('query failed:', error.message); break }
     if (!cres?.length) break
 
-    for (let i = 0; i < cres.length; i += CONCURRENCY) {
-      const chunk = cres.slice(i, i + CONCURRENCY)
-      await Promise.all(chunk.map((c: any) => processOne(c)))
-      scanned += chunk.length
-      await sleep(200)   // breathe — yield CPU to anything else on the box
-    }
+    // Streaming worker pool (see image-thumb) — no wave-gating on the slowest video download.
+    let qi = 0
+    await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
+      while (qi < cres.length) {
+        const c = cres[qi++]
+        await processOne(c)
+        scanned++
+      }
+    }))
     cursor = cres[cres.length - 1].ad_id
     console.log(`  scanned ${scanned} · postered ${postered} · failed ${failed}`)
   }
