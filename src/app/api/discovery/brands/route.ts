@@ -54,10 +54,11 @@ export async function GET(req: NextRequest) {
   // crawl (see /api/discovery/brand-spy POST). inIndex just lets us badge the ones we already have.
   const ids = brands.map(b => b.page_id)
   const inIndex = new Set<string>(), spied = new Set<string>()
+  const indexedCount = new Map<string, number>()   // our live crawl count per brand
   if (ids.length) {
     const { data: states } = await admin
       .from('discovery_brand_crawl_state').select('page_id, ads_indexed').in('page_id', ids)
-    for (const r of (states || []) as any[]) if ((r.ads_indexed || 0) > 0) inIndex.add(r.page_id)
+    for (const r of (states || []) as any[]) if ((r.ads_indexed || 0) > 0) { inIndex.add(r.page_id); indexedCount.set(r.page_id, r.ads_indexed) }
     const { data: txs } = await admin
       .from('credit_transactions').select('reference_id')
       .eq('user_id', user.id).eq('action_type', 'brand_spy').eq('status', 'committed').in('reference_id', ids)
@@ -77,9 +78,12 @@ export async function GET(req: NextRequest) {
     brands: brands.map(b => ({
       pageId: b.page_id,
       name: b.name,
-      avatar: b.avatar_url,
+      // Avatar: stored value if the import had one, else derive from the FB page id (public picture endpoint).
+      avatar: b.avatar_url || `https://graph.facebook.com/${b.page_id}/picture?type=square`,
       industry: b.industry,
-      adCount: b.source_ad_count,
+      // Ad count: prefer our LIVE crawl count (accurate, grows as you crawl); fall back to the
+      // imported source count (e.g. Foreplay's "# community ads" when that column is provided).
+      adCount: Math.max(indexedCount.get(b.page_id) || 0, b.source_ad_count || 0),
       country: b.country,
       adLibraryUrl: `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&view_all_page_id=${b.page_id}`,
       isCrawled: inIndex.has(b.page_id),
