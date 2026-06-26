@@ -126,14 +126,18 @@ export default function BrandsPage() {
         </div>
         {brands.map(b => (
           <div key={b.pageId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: '1px solid #f8fafc' }}>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              {b.avatar ? <img src={b.avatar} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            {/* Brand → opens this brand's Meta Ad Library (avatar + name both clickable). */}
+            <a href={b.adLibraryUrl} target="_blank" rel="noopener noreferrer" title="Open in Meta Ad Library"
+              style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, textDecoration: 'none', color: 'inherit' }}>
+              {b.avatar ? <img src={b.avatar} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, background: '#eef2f7' }} />
                 : <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#eef2f7', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>{b.name.slice(0, 1)}</div>}
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+                  onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}>{b.name}</div>
                 {b.isCrawled && <span style={{ fontSize: 10, fontWeight: 700, color: '#059669' }}>● in your index</span>}
               </div>
-            </div>
+            </a>
             <span style={{ width: 160, fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.industry || '—'}</span>
             <span style={{ width: 90, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#374151' }}>{b.adCount.toLocaleString()}</span>
             <div style={{ width: 230, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
