@@ -80,6 +80,11 @@ export async function GET(request: NextRequest) {
 
     const q = (searchParams.get('q') || '').trim()
     const mode = searchParams.get('mode') || 'adcopy'
+    // TEMP timing instrumentation — find where a slow search spends its time. Each lap logs the
+    // cumulative ms since the request started, so the gap between two laps = that step's duration.
+    // Grep Vercel logs for "[dbsearch-timing]". Remove once the slow step is fixed.
+    const _t0 = Date.now()
+    const lap = (label: string) => console.log(`[dbsearch-timing] q="${q}" mode=${mode} :: ${label} @ ${Date.now() - _t0}ms`)
     // When a brand is selected we filter on its exact page_id (a single Meta page
     // can run ads under several display names — partnership/branded-content ads).
     const pageId = (searchParams.get('pageId') || '').trim()
@@ -384,7 +389,9 @@ export async function GET(request: NextRequest) {
                                                    // so loadMore fires more often (smoother)
     const fetchOffset = page * fetchLimit           // window-aligned — no overlap, no skip
     baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
+    lap('before-keyword-query')
     const { data: keywordData, error: kwErr, count: kwCount } = await baseQuery
+    lap(`after-keyword-query (rows=${keywordData?.length ?? 0} err=${kwErr ? kwErr.message : 'none'})`)
 
     if (kwErr) {
       return NextResponse.json({ ads: [], total: 0, totalInDB, source: 'indexed', searchMethod: 'error' })
@@ -659,6 +666,7 @@ export async function GET(request: NextRequest) {
           .upsert({ key: snapKey, payload, updated_at: new Date().toISOString() }, { onConflict: 'key' })
       } catch { /* table not present yet → ignore */ }
     }
+    lap(`DONE total (method=${searchMethod} ads=${transformed.length})`)
     return NextResponse.json(payload)
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
