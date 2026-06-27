@@ -278,12 +278,20 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  // BUG-5: anchor the open panel to the trigger's VIEWPORT position at open time (position:fixed),
+  // so a result-grid reflow underneath can't shift the option rows mid-click — which silently
+  // selected the neighbouring filter ("Supplements" → "Health & Wellness"). Close on scroll so the
+  // fixed panel can't visually detach from its trigger.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const onScroll = () => setOpen(false)
     document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
+    window.addEventListener('scroll', onScroll, true)
+    return () => { document.removeEventListener('mousedown', h); window.removeEventListener('scroll', onScroll, true) }
   }, [])
 
   const visible = searchable
@@ -293,7 +301,12 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={() => {
+          const r = btnRef.current?.getBoundingClientRect()
+          if (r) setPos({ top: r.bottom + 4, left: r.left })
+          setOpen(o => !o)
+        }}
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '7px 12px',
@@ -313,11 +326,11 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
         <span style={{ fontSize: 10, opacity: 0.5 }}>{open ? '▲' : '▼'}</span>
       </button>
 
-      {open && (
+      {open && pos && (
         <div style={{
-          position: 'absolute', top: '100%', left: 0, marginTop: 4,
+          position: 'fixed', top: pos.top, left: pos.left,
           background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 1000,
           minWidth: 200, maxHeight: 320, display: 'flex', flexDirection: 'column',
         }}>
           {searchable && (
