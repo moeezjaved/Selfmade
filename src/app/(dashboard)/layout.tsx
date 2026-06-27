@@ -68,13 +68,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  // Render the dashboard CLIENT-ONLY. Some descendant's first paint diverged server↔client →
-  // hydration #418/#423/#425 → the tree got discarded ("feed vanishes"). Gating the whole layout on
-  // mount means server + first client render emit the same static placeholder (no dynamic content to
-  // mismatch); the real UI renders after mount. Auth-gated dashboard → no SEO cost, one-tick blank.
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
-
+  // NOTE: this layout used to be gated behind a whole-layout `mounted` flag (returned a blank
+  // placeholder until a post-mount effect flipped it). That was meant to dodge hydration #418/#423/
+  // #425 — but those turned out to be browser EXTENSIONS injecting into <html>/<body>, not our code,
+  // so the gate fixed nothing. Worse, it DEADLOCKED: on a direct load of a route whose page uses
+  // next/dynamic(ssr:false) (e.g. /discovery), the layout's setMounted effect never committed and
+  // the page rendered a permanent blank-green screen. Rendering the layout unconditionally fixes it —
+  // the sidebar SSRs immediately; user-dependent bits (avatar/initials) are null→'A' on both server
+  // and first client render, so there's no real mismatch, just a post-load update.
   useEffect(() => {
     let mounted = true
     // getSession() reads the session from LOCAL STORAGE (no network round-trip), so the
@@ -105,9 +106,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const initials = user?.user_metadata?.full_name
     ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.[0].toUpperCase() || 'A'
-
-  // Client-only gate (see note above) — identical static shell on server + first client render.
-  if (!mounted) return <div className="flex min-h-screen bg-dark" />
 
   return (
     <div className="flex min-h-screen bg-dark">
