@@ -1420,6 +1420,16 @@ export default function DiscoveryPage() {
       const dbRes = await fetch(`/api/discovery/db-search?${dbParams}`)
       const dbData = await dbRes.json()
 
+      // BUG-2: the API returns searchMethod:'error' (or a non-200) when the query TIMED OUT under
+      // load — that is NOT a legitimate empty result. Surface a retry banner instead of the
+      // misleading "No ads found" empty state, which is indistinguishable from a real zero-result.
+      if (!dbRes.ok || dbData.searchMethod === 'error') {
+        setError('Search hit a snag — the index was busy. Try that term again in a moment.')
+        setHasMore(false)
+        if (reset) setDbTotal(0)
+        return
+      }
+
       if (!dbData.error && dbData.ads?.length > 0) {
         // We have indexed results — use them
         const classified = dbData.ads.map((ad: any) => classifyAd({

@@ -3,6 +3,13 @@ import { useEffect } from 'react'
 
 export default function ErrorTracker() {
   useEffect(() => {
+    // BUG-1: signal that the client bundle hydrated. The root-layout watchdog script reloads ONCE
+    // if this never flips within a few seconds — the reported failure mode was "the app's own JS
+    // never fires / React root stays empty on direct load" (systemic, intermittent). This effect
+    // running proves React booted; if it doesn't, the watchdog recovers the user instead of leaving
+    // a permanent blank screen.
+    ;(window as any).__hydrated = true
+
     const log = async (message: string, stack?: string, extra?: Record<string, unknown>) => {
       try {
         await fetch('/api/errors/log', {

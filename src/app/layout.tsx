@@ -20,6 +20,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <head>
+        {/* BUG-1 hydration watchdog. The reported failure: on a direct load/refresh the client bundle
+            sometimes never hydrates (React root stays empty, app JS never fires) — systemic and
+            intermittent. This runs before React; if ErrorTracker hasn't flipped window.__hydrated
+            within 6s, it reloads ONCE (sessionStorage-guarded so a hard-broken page can't loop), which
+            recovers the intermittent case instead of leaving a permanent blank screen. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{if(window.top!==window.self)return;var K='__hydration_retry';" +
+              "setTimeout(function(){if(window.__hydrated)return;var n=0;try{n=+(sessionStorage.getItem(K)||0)}catch(e){}" +
+              "if(n<1){try{sessionStorage.setItem(K,String(n+1))}catch(e){}location.reload()}},6000);" +
+              "var iv=setInterval(function(){if(window.__hydrated){try{sessionStorage.removeItem(K)}catch(e){}clearInterval(iv)}},1000);}catch(e){}})();",
+          }}
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com"/>
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/>
         <link
