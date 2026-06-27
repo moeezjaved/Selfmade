@@ -1,19 +1,25 @@
 'use client'
 /**
- * Discovery route shell. The real page (DiscoveryClient) is loaded with ssr:false so it is NEVER
- * server-rendered — the canonical, bulletproof way to disable SSR for a component. The earlier
- * runtime mounted-gate *should* have been equivalent, but #418/#423/#425 persisted in incognito, so
- * we remove the component from the server render entirely: the server emits only the static
- * placeholder below, the client loads + renders the page after hydration → there is no hydration
- * step for the page to fail. (Dashboard is auth-gated — no SEO cost to client-only rendering.)
+ * Discovery route shell. DiscoveryClient is client-only (masonic virtualizer + render-time
+ * window access) and must never server-render. We gate it behind a post-mount flag with a
+ * STATIC import — NOT next/dynamic(ssr:false).
+ *
+ * Why: next/dynamic(ssr:false) wraps the component in a lazy/Suspense boundary. Nested under the
+ * dashboard layout's own whole-layout mount-gate, that boundary DEADLOCKED hydration on cold load
+ * — the layout's setMounted effect never committed, so /discovery rendered BLANK on a direct URL
+ * load or refresh (it only worked via client-side nav, when the layout was already mounted).
+ * /dashboard (same layout, no ssr:false page) always worked, which pinned the cause to the dynamic
+ * boundary. A plain post-mount conditional has no Suspense: SSR + first client render emit the same
+ * placeholder (nothing to mismatch), then DiscoveryClient mounts on the client. The static import is
+ * server-safe because DiscoveryClient's window access is inside handlers/render, never top-level —
+ * and the gate guarantees it never renders on the server.
  */
-import dynamic from 'next/dynamic'
-
-const DiscoveryClient = dynamic(() => import('./DiscoveryClient'), {
-  ssr: false,
-  loading: () => <div style={{ minHeight: '100vh', background: '#f8fafc' }} />,
-})
+import { useState, useEffect } from 'react'
+import DiscoveryClient from './DiscoveryClient'
 
 export default function DiscoveryPage() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  if (!mounted) return <div style={{ minHeight: '100vh', background: '#f8fafc' }} />
   return <DiscoveryClient />
 }
