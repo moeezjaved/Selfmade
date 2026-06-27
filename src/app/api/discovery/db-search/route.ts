@@ -467,7 +467,12 @@ export async function GET(request: NextRequest) {
     // every exact match keeps its place; semantic only fills the empty slots. That
     // avoids the old replace-mode bug that capped "Mars Men" at 84 of 331 creatives.
     // SKIP brand mode (a brand's ad copy rarely resembles its own name semantically).
-    if (q && mode !== 'brand' && ads.length < limit && process.env.OPENAI_API_KEY) {
+    // GATED behind SEMANTIC_SEARCH_ENABLED: with embeddings only ~1.3% populated, this path adds a
+    // slow OpenAI+RPC round-trip (~9s on "nike"-style cold queries) that returns nothing useful and
+    // can surface as a fake "error/empty". Keep it OFF until the embed-backfill fills the corpus,
+    // then set SEMANTIC_SEARCH_ENABLED=1 in the env to turn it on. Also hard-capped by a timeout
+    // below so it can never hang the request even when enabled.
+    if (process.env.SEMANTIC_SEARCH_ENABLED === '1' && q && mode !== 'brand' && ads.length < limit && process.env.OPENAI_API_KEY) {
       try {
         const embRes = await getOpenAI().embeddings.create({
           model: 'text-embedding-3-small',
