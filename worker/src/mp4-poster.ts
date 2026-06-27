@@ -26,6 +26,7 @@ import { supabase } from './db.js'
 import { uploadBufferToR2 } from './r2.js'
 import { imageHash } from './hash.js'
 import { spawn } from 'child_process'
+import sharp from 'sharp'
 
 const CONCURRENCY = Math.max(1, parseInt(process.env.MP4POSTER_CONCURRENCY ?? '2', 10))
 const BATCH = Math.max(20, parseInt(process.env.MP4POSTER_BATCH ?? '120', 10))
@@ -61,14 +62,36 @@ function extractFrame(url: string): Promise<Buffer | null> {
   })
 }
 
-async function processOne(c: { id: string; ad_id: string; position: number; r2_url: string }): Promise<void> {
-  const buf = await extractFrame(c.r2_url)
-  if (!buf) { failed++; return }              // unreadable / dead mp4 → leave placeholder
-  const h = await imageHash(buf).catch(() => null)
-  const url = await uploadBufferToR2(buf, `posters/${h || c.id}.jpg`, 'image/jpeg')
-  if (!url) { failed++; return }
-  await (supabase as any).from('discovery_creatives').update({ poster_url: url }).eq('id', c.id)
-  postered++
+// Read width/height from a (poster) JPEG buffer. The poster is 480×H where H preserves the source
+// video's aspect, so its dims give the card the EXACT shape — the masonry then sizes video cards to
+// their real aspect (tall reels tall, landscape wide) instead of the flat 125% fallback.
+async function dimsOf(buf: Buffer): Promise<{ width: number; height: number } | null> {
+  try { const m = await sharp(buf, { failOn: 'none' }).metadata(); return (m.width && m.height) ? { width: m.width, height: m.height } : null }
+  catch { return null }
+}
+
+// Targets videos missing width (ALL of them currently). Two cases:
+//  • no poster yet  → extract a frame, upload it, stamp poster_url + dims (from the frame)
+//  • postered, no dims → fetch the small existing poster, stamp dims only (no mp4 re-download)
+async function processOne(c: { id: string; ad_id: string; position: number; r2_url: string; poster_url: string | null; width: number | null }): Promise<void> {
+  try {
+    const update: Record<string, any> = {}
+    let dimSrc: Buffer | null = null
+    if (!c.poster_url) {
+      const buf = await extractFrame(c.r2_url)
+      if (!buf) { failed++; return }            // unreadable / dead mp4 → leave placeholder
+      const h = await imageHash(buf).catch(() => null)
+      const url = await uploadBufferToR2(buf, `posters/${h || c.id}.jpg`, 'image/jpeg')
+      if (!url) { failed++; return }
+      update.poster_url = url
+      dimSrc = buf
+      postered++
+    } else {
+      try { const r = await fetch(c.poster_url); if (r.ok) dimSrc = Buffer.from(await r.arrayBuffer()) } catch { /* poster gone → skip dims */ }
+    }
+    if (c.width == null && dimSrc) { const d = await dimsOf(dimSrc); if (d) { update.width = d.width; update.height = d.height } }
+    if (Object.keys(update).length) await (supabase as any).from('discovery_creatives').update(update).eq('id', c.id)
+  } catch { failed++ }
 }
 
 async function main() {
@@ -77,11 +100,14 @@ async function main() {
   // POSTER_ORDER=asc → a 2nd droplet works oldest-first while the primary works newest-first (default).
   const ASC = (process.env.POSTER_ORDER || 'desc').toLowerCase() === 'asc'
   for (;;) {
+    // Target videos missing DIMS (currently all of them). This both posters un-postered videos AND
+    // backfills dims on already-postered ones — so the grid sizes every video card correctly.
+    // Backed by the partial index dc_vid_undim (migration 050); rows drop out as dims are stamped.
     let q = (supabase as any)
       .from('discovery_creatives')
-      .select('id, ad_id, position, r2_url')
+      .select('id, ad_id, position, r2_url, poster_url, width')
       .eq('asset_type', 'video')
-      .is('poster_url', null)
+      .is('width', null)
       .order('ad_id', { ascending: ASC })   // default newest-first; asc = oldest-first for box 2
       .limit(BATCH)
     if (cursor) q = ASC ? q.gt('ad_id', cursor) : q.lt('ad_id', cursor)
