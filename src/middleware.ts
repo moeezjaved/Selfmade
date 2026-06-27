@@ -84,7 +84,10 @@ export async function middleware(request: NextRequest) {
       }
     )
 
-    const userRes = await withTimeout(supabase.auth.getUser())
+    // 2.5s cap (not the 4s default): under heavy DB/worker load getUser() can stall, and middleware
+    // runs on EVERY request — a long stall delays (and can truncate) the page's server render. Fail
+    // open fast; per-route server components + RLS still enforce real auth.
+    const userRes = await withTimeout(supabase.auth.getUser(), 2500)
     if (!userRes) {
       // Supabase didn't answer in 4s — fail open. Per-page server components
       // will still re-check auth using their own (non-edge) Supabase clients.
@@ -109,7 +112,8 @@ export async function middleware(request: NextRequest) {
             .select('subscription_status, trial_ends_at')
             .eq('user_id', user.id)
             .single()
-        )
+        ),
+        1500,   // tight: this DB read is the most load-sensitive middleware step; fail open fast
       )
 
       if (profileRes?.data) {
