@@ -556,6 +556,10 @@ export async function GET(request: NextRequest) {
     // ── Transform results ────────────────────────────────────
     // matchReason = the same match TIER used for ranking (literal > exact_tag >
     // synonym > keyword > related > semantic), so provenance and ordering agree.
+    // BUG-4: strip leaked {{mustache}} template tokens (e.g. "{{product.brand}}") at the SOURCE so a
+    // raw token can never reach any consumer of this payload (grid card, ad-detail, future exports).
+    const stripTpl = (s: any) =>
+      typeof s === 'string' ? s.replace(/\{\{[^}]*\}\}/g, '').replace(/[ \t]{2,}/g, ' ').trim() : s
     const transformed = ads.map((ad: any) => {
       const cres = creativesByAd[ad.ad_id] || []
       const imgC = cres.find((c) => c.asset_type === 'image')
@@ -575,10 +579,10 @@ export async function GET(request: NextRequest) {
       pageName: (pageId && ad.page_id === pageId) ? (canonicalName || ad.page_name) : ad.page_name,
       isAffiliate: !!(pageId && ad.page_id !== pageId),
       affiliateOf: (pageId && ad.page_id !== pageId) ? (canonicalName || brandName || null) : null,
-      body: ad.body,
-      title: ad.title,
-      caption: ad.caption,
-      description: ad.description,
+      body: stripTpl(ad.body),
+      title: stripTpl(ad.title),
+      caption: stripTpl(ad.caption),
+      description: stripTpl(ad.description),
       snapshotUrl: ad.snapshot_url,
       // Poster fallback chain — last two are the crawler's RAW Meta media (Meta's own video
       // preview image / first image), so VIDEO ads that have no R2 creative yet still show a
