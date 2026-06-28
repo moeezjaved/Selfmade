@@ -62,8 +62,13 @@ export async function GET(request: NextRequest) {
 
     if (!isEval) {
       const supabase = await createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      // PERF: use the LOCAL session (decoded from the cookie, no network) instead of getUser()
+      // (which POSTs to the Supabase auth server ~300-500ms). Middleware already validated the JWT
+      // via getUser() for this exact request, so re-validating here was pure redundant latency on
+      // every search. getSession is sufficient for this soft gate — actual data reads use the
+      // admin/replica client and the request is already authenticated upstream.
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const admin = createReadClient()   // serving reads → replica when SUPABASE_READ_URL set
