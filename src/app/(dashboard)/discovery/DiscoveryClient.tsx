@@ -910,7 +910,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
               style={{
                 position: 'absolute', inset: 0, width: '100%', height: '100%',
                 objectFit: 'cover', display: 'block',
-                opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease', zIndex: 2,
+                opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.12s linear', zIndex: 2,
               }}
             />
           )}
@@ -940,7 +940,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
                   decoding="async"
                   onLoad={() => setImgLoaded(true)}
                   onError={() => setImgLoaded(true)}
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease' }}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.12s linear' }}
                 />
               )}
             </div>
