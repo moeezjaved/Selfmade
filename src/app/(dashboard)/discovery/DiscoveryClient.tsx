@@ -1120,7 +1120,10 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
     <>
     {showSaveModal && <SaveModal ad={ad} onClose={() => { setShowSaveModal(false); setIsSaved(true) }} />}
     <div
-      className="animate-fade-up"
+      /* NO entrance animation here: masonic virtualizes + remounts cards on every scroll tick, so an
+         `animate-fade-up` (opacity 0→1) would REPLAY on each remount = the "flashing/flickering" during
+         scroll. The fade is a one-time entrance effect that virtualization turns into a per-scroll strobe.
+         Cards just appear; no fade. (Diagnosed via instrumentation 2026-06-29.) */
       style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'box-shadow .2s, transform .2s', cursor: 'default' }}
       onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 10px 28px rgba(0,0,0,0.12)'; e.currentTarget.style.transform = 'translateY(-3px)' }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none' }}

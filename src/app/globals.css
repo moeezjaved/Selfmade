@@ -280,6 +280,11 @@
   .animate-fade-up { animation:fadeUp 0.3s ease forwards; }
 }
 
+/* Respect reduced-motion: no entrance fades for users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up { animation: none; }
+}
+
 @layer utilities {
   .text-primary { color: var(--text-primary) !important; }
   .text-secondary { color: var(--text-secondary) !important; }
