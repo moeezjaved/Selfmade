@@ -1271,7 +1271,9 @@ export default function DiscoveryPage() {
   const [query, setQuery] = useState('')
   const [searchMode, setSearchMode] = useState<'adcopy' | 'brand' | 'category'>('adcopy')
   const [rawAds, setRawAds] = useState<Ad[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)  // start in loading → grid shows the skeleton from
+  // the first render (not the empty state) until the initial fetch lands, so the load reads as a
+  // smooth skeleton→cards instead of blank/empty→sudden-burst.
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState('')
@@ -1664,7 +1666,25 @@ export default function DiscoveryPage() {
   // server HTML and the first client render are identical (nothing dynamic), so there's no hydration
   // step to fail. After mount the real UI renders client-side. (Dashboard = auth-gated, no SEO cost.)
   if (!mounted) {
-    return <div style={{ minHeight: '100vh', background: '#f8fafc' }} />
+    // Skeleton (not blank grey) for the pre-mount frame, identical to the route-level loading skeleton
+    // and the grid skeleton below → the whole load reads as one continuous skeleton→cards, with no
+    // flash of empty space between the chunk loading and the data landing.
+    return (
+      <div style={{ minHeight: '100vh', background: '#f8fafc', padding: '14px 24px' }}>
+        <div style={{ height: 38, width: 360, maxWidth: '60%', background: '#e9edf2', borderRadius: 10, marginBottom: 16 }} className="shimmer" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 14, alignItems: 'start' }}>
+          {Array.from({ length: 15 }).map((_, i) => (
+            <div key={i} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e9edf2', overflow: 'hidden' }}>
+              <div style={{ aspectRatio: i % 3 === 0 ? '3 / 4' : i % 3 === 1 ? '1 / 1' : '4 / 5', background: '#e9edf2' }} className="shimmer" />
+              <div style={{ padding: 12 }}>
+                <div style={{ height: 10, background: '#e9edf2', borderRadius: 6, marginBottom: 7, width: '72%' }} className="shimmer" />
+                <div style={{ height: 9, background: '#eef1f5', borderRadius: 6, width: '45%' }} className="shimmer" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
