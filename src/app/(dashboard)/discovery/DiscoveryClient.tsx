@@ -1453,6 +1453,18 @@ export default function DiscoveryPage() {
         const classified = dbData.ads.map((ad: any) => classifyAd({
           ...ad, mediaType: ad.format || '',
         }))
+        // PRELOAD this page's thumbnails into the browser cache NOW. The page is fetched ~2.5 screens
+        // AHEAD of the viewport (eager prefetch + 2500px sentinel), so kicking off the image loads here
+        // means each card's image is already decoded by the time it scrolls into view → it renders
+        // instantly instead of the grey-placeholder-then-flash pop-in. (The slow weserv image proxy
+        // ~1.2s is why cards were appearing before their image; warming the cache early hides it.)
+        if (typeof window !== 'undefined') {
+          for (const a of classified) {
+            const c = (a as any).creatives?.[0]
+            const u = c && (c.asset_type === 'video' ? c.poster_url : c.r2_url)
+            if (u) { const im = new window.Image(); im.decoding = 'async'; im.src = cdnSrc(u) }
+          }
+        }
         const applyResults = () => {
           // Cross-page dedup: drop ads whose hash was already shown
           setRawAds(prev => {
