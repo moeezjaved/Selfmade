@@ -277,6 +277,10 @@
   .shimmer { position: relative; overflow: hidden; background: #e8f0e4; }
   .shimmer::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent); animation:shimmer 1.5s infinite; }
   .live-dot { width:8px; height:8px; border-radius:50%; background:#2d7a2d; animation:livepulse 2s infinite; }
+  /* One-time entrance fade. ONLY safe on NON-virtualized lists (e.g. /saved). Do NOT put this on a
+     masonic/react-window item — the virtualizer remounts items on scroll, replaying this fade every
+     time = a flicker/strobe. The Discovery feed card deliberately does NOT use this. See
+     project_grid_flash_fix. For a virtualized list, gate the fade to true-first-appearance instead. */
   .animate-fade-up { animation:fadeUp 0.3s ease forwards; }
 }
 
