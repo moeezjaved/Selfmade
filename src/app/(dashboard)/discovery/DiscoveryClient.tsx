@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef, useCallback, useMemo, Component, Fragment } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Component, Fragment, startTransition } from 'react'
 import type { ReactNode } from 'react'
 import { Masonry } from 'masonic'
 import { cleanCopy } from '@/lib/cleanCopy'
@@ -1453,31 +1453,40 @@ export default function DiscoveryPage() {
         const classified = dbData.ads.map((ad: any) => classifyAd({
           ...ad, mediaType: ad.format || '',
         }))
-        // Cross-page dedup: drop ads whose hash was already shown
-        setRawAds(prev => {
-          if (reset) return classified
-          // Key by creative hash (so the SAME creative reused across many ad_ids
-          // shows once), falling back to ad id (so a re-fetched page can't dupe an
-          // ad that happens to have no hash yet). Both guard the offset-pagination
-          // overlap where page N re-returns creatives already shown on page N-1.
-          const dedupKey = (a: Ad) =>
-            (a as any).image_hash || (a as any).video_hash || `id:${a.id}`
-          const seen = new Set<string>()
-          for (const a of prev) seen.add(dedupKey(a))
-          const newOnes = classified.filter((a: Ad) => {
-            const k = dedupKey(a)
-            if (seen.has(k)) return false
-            seen.add(k)
-            return true
+        const applyResults = () => {
+          // Cross-page dedup: drop ads whose hash was already shown
+          setRawAds(prev => {
+            if (reset) return classified
+            // Key by creative hash (so the SAME creative reused across many ad_ids
+            // shows once), falling back to ad id (so a re-fetched page can't dupe an
+            // ad that happens to have no hash yet). Both guard the offset-pagination
+            // overlap where page N re-returns creatives already shown on page N-1.
+            const dedupKey = (a: Ad) =>
+              (a as any).image_hash || (a as any).video_hash || `id:${a.id}`
+            const seen = new Set<string>()
+            for (const a of prev) seen.add(dedupKey(a))
+            const newOnes = classified.filter((a: Ad) => {
+              const k = dedupKey(a)
+              if (seen.has(k)) return false
+              seen.add(k)
+              return true
+            })
+            return [...prev, ...newOnes]
           })
-          return [...prev, ...newOnes]
-        })
-        setHasMore(dbData.hasMore)
-        setDbPage(page)
-        setDbTotal(dbData.total || 0)
-        setTotalInDB(dbData.totalInDB || 0)
-        setSearchSource('indexed')
-        setNextCursor(null)
+          setHasMore(dbData.hasMore)
+          setDbPage(page)
+          setDbTotal(dbData.total || 0)
+          setTotalInDB(dbData.totalInDB || 0)
+          setSearchSource('indexed')
+          setNextCursor(null)
+        }
+        // A fresh search (reset) is urgent → render immediately. A loadMore APPEND is non-urgent:
+        // wrap it in startTransition so React renders the ~15 new overscan cards at LOW priority and
+        // can interrupt that render to keep the scroll at 60fps — the cards just appear a beat later
+        // instead of the render blocking the main thread and hitching the scroll. This is the fix for
+        // the jank when a page loads in mid-scroll (confirmed app-side: still janky in incognito).
+        if (reset) applyResults()
+        else startTransition(applyResults)
         return
       }
 
