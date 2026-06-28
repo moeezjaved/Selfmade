@@ -2172,12 +2172,13 @@ export default function DiscoveryPage() {
                 items={filteredAds}
                 columnGutter={12}
                 columnCount={gridCols}
-                // Mount ~1.5 screens ahead — enough that lazy thumbnails start fetching before they
-                // scroll into view, without the SCROLL JANK of overscanBy={3} (which mounted ~3
-                // screens of image cards per scroll frame → main-thread churn / stutter on scroll).
-                // The 2500px IntersectionObserver sentinel still preloads the next PAGE early, so this
-                // only governs how many cards are in the DOM, not how early data loads.
-                overscanBy={1.5}
+                // Mount ~3 screens ahead so each card's image preloads with plenty of lead time and is
+                // already decoded before it scrolls into view → NO grey-placeholder-then-flash pop-in.
+                // (Lowering this to 1.5 to chase "scroll jank" was a mistake — the actual jank was the
+                // SimplyTrends browser extension; cutting overscan just removed the image preload and
+                // re-introduced the pop-in. With the extension gone and the loadMore append wrapped in
+                // startTransition, 3 screens render fine.)
+                overscanBy={3}
                 itemKey={(ad: Ad, i: number) => ad?.id ?? `_${i}`}
                 render={MasonryCard}
                 onRender={handleMasonryRender}
