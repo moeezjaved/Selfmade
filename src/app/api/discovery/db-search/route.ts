@@ -80,11 +80,6 @@ export async function GET(request: NextRequest) {
 
     const q = (searchParams.get('q') || '').trim()
     const mode = searchParams.get('mode') || 'adcopy'
-    // TEMP timing instrumentation — find where a slow search spends its time. Each lap logs the
-    // cumulative ms since the request started, so the gap between two laps = that step's duration.
-    // Grep Vercel logs for "[dbsearch-timing]". Remove once the slow step is fixed.
-    const _t0 = Date.now()
-    const lap = (label: string) => console.log(`[dbsearch-timing] q="${q}" mode=${mode} :: ${label} @ ${Date.now() - _t0}ms`)
     // When a brand is selected we filter on its exact page_id (a single Meta page
     // can run ads under several display names — partnership/branded-content ads).
     const pageId = (searchParams.get('pageId') || '').trim()
@@ -204,19 +199,17 @@ export async function GET(request: NextRequest) {
     // Hash alone is not enough — R2 upload may have failed even when hash exists.
     let baseQuery = admin
       .from('discovery_ads_index')
-      // INNER-JOIN discovery_creatives in ONE query: enforces has-creative (covers
-      // append-only ads with no thumbnail_url/hash on the index row) AND carries the
-      // creatives for dedup + thumbnails, AND gives the has-creative total via
-      // count:'planned' — replacing 3 sequential round-trips with one. The embed only
-      // timed out before the (page_id,performance_score)/(page_id,days_running)
-      // composite indexes existed (the brand sort scanned the whole score index);
-      // with those in place it's sub-second. Brand mode must use page_id=eq (NOT the
-      // seed_terms affiliate OR) — the unindexed array-contains makes the join 9s+.
-      // count=exact for brand mode (page_id=eq is indexed → fast + ACCURATE: the
-      // planner estimate is garbage, e.g. ~1,000 for hims's real 2,959 has-creative
-      // ads). Keyword/browse stay 'planned' (exact would scan too much).
-      .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash,width,height,poster_url)',
+      // PRE-COMPUTED has-creative flag (migration 052) instead of a discovery_creatives!inner JOIN.
+      // The inner join enforced "only ads with a creative" by scanning discovery_creatives for every
+      // candidate. Fine when matches have creatives — but for a term whose (expanded) match set is
+      // broad and mostly un-drained (e.g. "nike"), it scanned the whole set hunting for a qualifying
+      // page and blew the 8s statement timeout. `has_creative` (indexed boolean) makes that an
+      // INSTANT filter. We still EMBED discovery_creatives (LEFT, not inner) to carry creatives for
+      // dedup + thumbnails — but only for the ≤80 rows we return, so it's cheap.
+      // count=exact for brand mode (page_id=eq is indexed → accurate); keyword/browse stay 'planned'.
+      .select('*, discovery_creatives(asset_type,position,r2_url,hash,width,height,poster_url)',
         { count: (q && mode === 'brand') ? 'exact' : 'planned' })
+      .eq('has_creative', true)
 
     // Country filter — match against the ARRAY of countries the ad targeted
     // (covers multi-country ads correctly). Falls back to legacy 'country'
@@ -389,9 +382,7 @@ export async function GET(request: NextRequest) {
                                                    // so loadMore fires more often (smoother)
     const fetchOffset = page * fetchLimit           // window-aligned — no overlap, no skip
     baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
-    lap('before-keyword-query')
     const { data: keywordData, error: kwErr, count: kwCount } = await baseQuery
-    lap(`after-keyword-query (rows=${keywordData?.length ?? 0} err=${kwErr ? kwErr.message : 'none'})`)
 
     if (kwErr) {
       return NextResponse.json({ ads: [], total: 0, totalInDB, source: 'indexed', searchMethod: 'error' })
@@ -666,7 +657,6 @@ export async function GET(request: NextRequest) {
           .upsert({ key: snapKey, payload, updated_at: new Date().toISOString() }, { onConflict: 'key' })
       } catch { /* table not present yet → ignore */ }
     }
-    lap(`DONE total (method=${searchMethod} ads=${transformed.length})`)
     return NextResponse.json(payload)
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
