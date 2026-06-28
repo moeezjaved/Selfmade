@@ -353,7 +353,15 @@ export async function GET(request: NextRequest) {
       //      older/established → already drained → have creatives → the join lands immediately.
       // Index-backed by discovery_ads_perf_score_idx (perf_score DESC NULLS LAST, ad_id) from 038,
       // so we MUST pass nullsFirst:false to match it (NULLS LAST → scored ads first, no full sort).
-      baseQuery = baseQuery.order('performance_score', { ascending: false, nullsFirst: false })
+      //
+      // BROWSE ONLY (no q). For a SEARCH this ORDER BY is the nike-timeout culprit: with a query the
+      // GIN-indexed OR is selective and a BitmapOr returns the candidate pool in ~0.3s — but ORDER BY
+      // performance_score makes the planner instead walk the perf_score index top-down for LIMIT
+      // matching rows, and for a near-zero-result term ("nike") it walks millions → 8s timeout
+      // (proven: same query without the ORDER BY = 332ms). The client-side qualityScore re-ranks the
+      // pool anyway, so for searches we skip the DB perf-order and let the BitmapOr drive. has_creative
+      // already removed the inner-join "wade" this perf-order was compensating for.
+      if (!q) baseQuery = baseQuery.order('performance_score', { ascending: false, nullsFirst: false })
     }
     // Stable tiebreaker — without a unique final sort key, rows that tie on the sort
     // column(s) come back in arbitrary (non-deterministic) order across requests, so
