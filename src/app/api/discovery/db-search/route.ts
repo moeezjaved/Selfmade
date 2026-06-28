@@ -363,11 +363,13 @@ export async function GET(request: NextRequest) {
       // already removed the inner-join "wade" this perf-order was compensating for.
       if (!q) baseQuery = baseQuery.order('performance_score', { ascending: false, nullsFirst: false })
     }
-    // Stable tiebreaker — without a unique final sort key, rows that tie on the sort
-    // column(s) come back in arbitrary (non-deterministic) order across requests, so
-    // offset-based pages overlap/shuffle and some creatives never appear. ad_id makes
-    // every page boundary deterministic.
-    baseQuery = baseQuery.order('ad_id', { ascending: true })
+    // Stable tiebreaker for BROWSE pagination — without a unique final sort key, offset pages shuffle.
+    // BROWSE ONLY, same reason as the perf-order above: for a SEARCH, ORDER BY ad_id (the PK) also
+    // tempts the planner to walk the PK index for LIMIT matching rows instead of using the selective
+    // BitmapOr — which is exactly why nike (0 results) still timed out after the perf-order fix.
+    // Searches fetch the BitmapOr pool (fast, ~0.3s) and the client dedups by creative hash, so they
+    // don't need the DB tiebreaker for correctness.
+    if (!q) baseQuery = baseQuery.order('ad_id', { ascending: true })
 
     // Page STRAIGHT THROUGH the has-creative results (the inner-join already filtered
     // to displayable ads), `limit` per page. CRITICAL: do NOT multiply the offset by
