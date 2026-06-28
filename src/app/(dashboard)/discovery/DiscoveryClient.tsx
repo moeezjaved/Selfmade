@@ -286,13 +286,18 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
   const ref = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
 
+  // Only listen while the panel is OPEN. Previously these (mousedown + a capture-phase scroll
+  // listener) were attached on mount for EVERY dropdown — so 6+ filter dropdowns each fired a
+  // scroll handler on every grid scroll event, adding real jank. Gating on `open` means zero scroll
+  // listeners during normal scrolling (panels are closed), and the scroll handler is passive.
   useEffect(() => {
+    if (!open) return
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
     const onScroll = () => setOpen(false)
     document.addEventListener('mousedown', h)
-    window.addEventListener('scroll', onScroll, true)
-    return () => { document.removeEventListener('mousedown', h); window.removeEventListener('scroll', onScroll, true) }
-  }, [])
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true })
+    return () => { document.removeEventListener('mousedown', h); window.removeEventListener('scroll', onScroll, { capture: true } as any) }
+  }, [open])
 
   const visible = searchable
     ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
@@ -2146,11 +2151,12 @@ export default function DiscoveryPage() {
                 items={filteredAds}
                 columnGutter={12}
                 columnCount={gridCols}
-                // Mount ~3 screens ahead so a card's thumbnail starts fetching
-                // before it scrolls into view → no blank cards mid-scroll. (Was 1.5,
-                // throttled down only to dodge the old masonic crash, which is now
-                // fixed at the source via gridKey, so we can preload aggressively.)
-                overscanBy={3}
+                // Mount ~1.5 screens ahead — enough that lazy thumbnails start fetching before they
+                // scroll into view, without the SCROLL JANK of overscanBy={3} (which mounted ~3
+                // screens of image cards per scroll frame → main-thread churn / stutter on scroll).
+                // The 2500px IntersectionObserver sentinel still preloads the next PAGE early, so this
+                // only governs how many cards are in the DOM, not how early data loads.
+                overscanBy={1.5}
                 itemKey={(ad: Ad, i: number) => ad?.id ?? `_${i}`}
                 render={MasonryCard}
                 onRender={handleMasonryRender}
