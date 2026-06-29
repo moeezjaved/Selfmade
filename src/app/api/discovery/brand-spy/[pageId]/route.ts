@@ -248,6 +248,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
     .slice(0, 10)
     .map((a) => ({ adId: a.ad_id, score: Math.round(a.performance_score || 0), days: a.days_running || 0, active: !!a.is_active, hook: hookOf(a.body) || '(no text)', thumb: thumbOf(a), snapshot_url: a.snapshot_url }))
 
+  // Swap the displayed thumbnails (hooks + topAds only — ~90 ads max) to PERMANENT R2 copies where
+  // available. thumbOf() resolves the raw fbcdn.net URL, which is signed + EXPIRES → broken images on
+  // older ads. We resolve R2 for just the shown ad_ids (bounded), keeping the raw URL as fallback.
+  const shownIds = Array.from(new Set([...hooks.map((h) => h.adId), ...topAds.map((t) => t.adId)]))
+  if (shownIds.length) {
+    const { data: cre } = await admin
+      .from('discovery_creatives')
+      .select('ad_id, asset_type, r2_url, poster_url, position')
+      .in('ad_id', shownIds)
+      .order('position', { ascending: true })
+    const r2thumb = new Map<string, string>()
+    for (const c of (cre || []) as any[]) {
+      if (r2thumb.has(c.ad_id)) continue
+      const t = c.poster_url || (c.asset_type !== 'video' ? c.r2_url : null)
+      if (t) r2thumb.set(c.ad_id, t)
+    }
+    for (const h of hooks) { const t = r2thumb.get(h.adId); if (t) h.thumb = t }
+    for (const t of topAds) { const r = r2thumb.get(t.adId); if (r) t.thumb = r }
+  }
+
   const startsSorted = ads.map((a) => a.start_date).filter(Boolean).sort() as string[]
   const seenSorted = ads.map((a) => a.last_seen).filter(Boolean).sort() as string[]
   const dataAsOf = seenSorted[seenSorted.length - 1] || null   // freshest snapshot we hold
