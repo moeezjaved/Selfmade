@@ -17,7 +17,8 @@
  * Admin UI manages the table via REST API on the Vercel side.
  */
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { anonymizeProxy, closeAnonymizedProxy } from 'proxy-chain'
+import { Server } from 'proxy-chain'
+import { isBlockedMediaHost, isBlockedTelemetryHost } from './proxy-chain.js'
 
 export interface PoolProxy {
   id: string
@@ -108,10 +109,26 @@ export async function pickProxy(): Promise<PoolProxy | null> {
  */
 export async function openProxyChain(p: PoolProxy): Promise<{ url: string; close: () => Promise<void> }> {
   const upstream = `http://${encodeURIComponent(p.username)}:${encodeURIComponent(p.password)}@${p.host}:${p.port}`
-  const local = await anonymizeProxy(upstream)
+  // Filtering local server (NOT plain anonymizeProxy): reject media + Google-telemetry hosts so they
+  // never consume IPRoyal bytes on the POOL path. Without this, Chromium's google.com / mtalk /
+  // googleapis chatter was forwarded straight upstream — 693281a only filtered the proxy-CHAIN path,
+  // but the crawl tries the POOL first (pickProxy), so the telemetry leak survived the rebuild.
+  // Mirrors proxy-chain.ts's filtering Server.
+  const server = new Server({
+    port: 0,
+    verbose: false,
+    prepareRequestFunction: ({ hostname }: any) => {
+      if (hostname && (isBlockedMediaHost(hostname) || isBlockedTelemetryHost(hostname))) {
+        throw new Error(`blocked-host:${hostname}`)   // refused before any upstream connect → 0 IPRoyal
+      }
+      return { upstreamProxyUrl: upstream }
+    },
+  })
+  server.on('error', () => { /* swallow per-connection errors (rejected media/telemetry) */ })
+  await server.listen()
   return {
-    url: local,
-    close: async () => { try { await closeAnonymizedProxy(local, true) } catch { /* ignore */ } },
+    url: `http://127.0.0.1:${server.port}`,
+    close: async () => { try { await server.close(true) } catch { /* ignore */ } },
   }
 }
 
