@@ -38,3 +38,7 @@ returns void language sql as $$
 $$;
 
 grant execute on function enqueue_spy_classify(text) to service_role;
+
+-- RLS bypass applies to service_role, but PostgREST still needs the table GRANT or REST returns 403
+-- ("permission denied"). The spy-worker polls/claims via REST with the service key, so grant it.
+grant select, insert, update, delete on spy_classify_queue to service_role;
