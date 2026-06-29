@@ -271,6 +271,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   const startsSorted = ads.map((a) => a.start_date).filter(Boolean).sort() as string[]
   const seenSorted = ads.map((a) => a.last_seen).filter(Boolean).sort() as string[]
   const dataAsOf = seenSorted[seenSorted.length - 1] || null   // freshest snapshot we hold
+  // Auto-classify-on-spy: if this brand has ads but NO AI-DNA yet (its ads aren't classified),
+  // enqueue it so the droplet spy-classify-worker fills Personas/USPs/Desires/Emotions/Themes within
+  // minutes — no manual run, no waiting on the global backlog. Idempotent + best-effort (the enqueue
+  // RPC no-ops if already pending/processing, and a failure here must never break the page).
+  const dnaEmpty = !topUSPs.length && !topDesires.length && !topEmotions.length && !topThemes.length && !topPersonas.length
+  if (dnaEmpty && total > 0) {
+    try { await admin.rpc('enqueue_spy_classify', { p_page_id: pageId }) } catch { /* best-effort */ }
+  }
+
   return NextResponse.json({
     brand: { pageId, name: name || pageId, picture: null },
     summary: {
