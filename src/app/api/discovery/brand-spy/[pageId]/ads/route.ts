@@ -60,9 +60,35 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   let total: number | null = null
   if (page === 0) { const { count } = await base().select('ad_id', { count: 'exact', head: true }); total = count ?? null }
 
+  // Prefer the PERMANENT R2-rehosted creative over the raw Meta CDN URL. The raw thumbnail_url /
+  // raw_image_urls are signed fbcdn.net links that EXPIRE (oh=/oe= tokens) — so older ads render as
+  // broken images. R2 copies (poster_url / r2_url, filled by the thumb+poster backfills) never expire.
+  // We still fall back to the raw URL when an ad hasn't been drained to R2 yet, preserving the
+  // "every freshly-spied ad shows immediately" behaviour this route was built for.
+  const adIds = (data || []).map((a: any) => a.ad_id)
+  const r2map = new Map<string, { thumb: string | null; video: string | null }>()
+  if (adIds.length) {
+    const { data: cre } = await admin
+      .from('discovery_creatives')
+      .select('ad_id, asset_type, r2_url, poster_url, position')
+      .in('ad_id', adIds)
+      .order('position', { ascending: true })
+    for (const c of (cre || []) as any[]) {
+      if (r2map.has(c.ad_id)) continue   // keep the first (lowest-position) creative per ad
+      const isVideo = c.asset_type === 'video'
+      r2map.set(c.ad_id, {
+        thumb: c.poster_url || (!isVideo ? c.r2_url : null) || null,   // R2 thumbnail / poster frame
+        video: isVideo ? c.r2_url : null,
+      })
+    }
+  }
+
   const ads = (data || []).map((a: any) => {
-    const thumb = a.thumbnail_url || (a.raw_image_urls?.[0]) || (a.raw_video_preview_urls?.[0]) || null
-    const video = a.video_url || (a.raw_video_urls?.[0]) || null
+    const r2 = r2map.get(a.ad_id)
+    const rawThumb = a.thumbnail_url || (a.raw_image_urls?.[0]) || (a.raw_video_preview_urls?.[0]) || null
+    const rawVideo = a.video_url || (a.raw_video_urls?.[0]) || null
+    const thumb = r2?.thumb || rawThumb     // permanent R2 first, expiring raw URL only as fallback
+    const video = r2?.video || rawVideo
     return {
       id: a.ad_id, pageName: a.page_name, body: a.body, caption: a.caption,
       snapshotUrl: `https://www.facebook.com/ads/library/?id=${a.ad_id}`,
