@@ -57,9 +57,16 @@ export async function GET() {
   // work-queue. Falls back to the legacy calc if the RPC isn't deployed yet.
   let qCreativeAds: number | null = null
   try {
-    const { data: cc } = await admin.rpc('discovery_ads_with_creative_count')
-    if (typeof cc === 'number') qCreativeAds = cc
-  } catch { /* RPC not deployed → legacy fallback below */ }
+    // ACCURATE creative coverage = ads with has_creative=true — the SAME flag that drives Discovery
+    // serving, backed by the partial index dai_has_creative (migration 052) so this exact count is
+    // fast. It matches distinct ad_id in discovery_creatives. The old RPC
+    // discovery_ads_with_creative_count() returned a stale/wrong ~780K (vs the real ~2.31M), which
+    // made the dashboard report a 98%-drained corpus as only 24% drained.
+    const { count: ccExact } = await admin.from('discovery_ads_index')
+      .select('*', { count: 'exact', head: true })
+      .eq('has_creative', true)
+    if (typeof ccExact === 'number') qCreativeAds = ccExact
+  } catch { /* fall back to legacy estimate below */ }
   let qPending = 0
   try {
     const { count } = await admin.from('creative_queue').select('*', { count: 'exact', head: true })
