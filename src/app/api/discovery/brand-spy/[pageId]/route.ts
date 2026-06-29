@@ -22,14 +22,18 @@ import { createAdminClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; title?: string | null; snapshot_url: string | null; link_url?: string | null; thumbnail_url?: string | null; raw_image_urls?: string[] | null; raw_video_preview_urls?: string[] | null; performance_score?: number | null; persona?: string | null; usp?: string | null; desire?: string | null; emotion?: string[] | null; themes?: string[] | null; cta?: string | null }
+type Ad = { ad_id: string; format: string | null; start_date: string | null; last_seen: string | null; is_active: boolean | null; days_running: number | null; hook_type: string | null; angle: string | null; body: string | null; title?: string | null; snapshot_url: string | null; link_url?: string | null; thumbnail_url?: string | null; raw_image_urls?: string[] | null; raw_video_preview_urls?: string[] | null; performance_score?: number | null; persona?: string | null; usp?: string | null; desire?: string | null; emotion?: string[] | null; themes?: string[] | null; topics?: string[] | null; cta?: string | null }
 
 // link_url (migration 045) feeds the Landing Pages tab. RESILIENT: if the column isn't applied yet
 // the select falls back to SELECT_BASE so the dashboard never 500s on deploy/migration ordering.
 // The classifier DNA columns (persona/usp/desire/emotion/themes/cta/title) power the Atria-style
-// Overview chip rows; they're in the rich SELECT only so a missing column degrades to empty, not 500.
-const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, title, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score, link_url, persona, usp, desire, emotion, themes, cta'
-const SELECT_BASE = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score'
+// SELECT_BASE = SELECT minus ONLY link_url (the one genuinely-optional, migration-gated column).
+// CRITICAL: the DNA columns (persona/usp/desire/emotion/themes/cta/title/topics) MUST live in the
+// base too — they all exist. The old base omitted them, so when SELECT errored on a missing link_url
+// the fallback silently stripped ALL DNA → every Overview/USPs/Desires/Emotions/Themes panel rendered
+// empty even though the data was in the DB. Only link_url may be absent; nothing else gets dropped.
+const SELECT = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, title, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score, link_url, persona, usp, desire, emotion, themes, topics, cta'
+const SELECT_BASE = 'ad_id, page_name, format, start_date, last_seen, is_active, days_running, hook_type, angle, body, title, snapshot_url, thumbnail_url, raw_image_urls, raw_video_preview_urls, performance_score, persona, usp, desire, emotion, themes, topics, cta'
 
 // Real thumbnail (image) for a hook/card — the crawler's captured media, proxied through weserv
 // (hotlink-safe). snapshot_url is a LIBRARY LINK, not an image, so it can't be used as a thumbnail.
@@ -136,7 +140,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   const topUSPs = tally(ads.map((a) => a.usp)).slice(0, 40)
   const topDesires = tally(ads.map((a) => a.desire)).slice(0, 40)
   const topEmotions = tallyArr(ads.map((a) => a.emotion)).slice(0, 40)
-  const topThemes = tallyArr(ads.map((a) => a.themes)).slice(0, 40)
+  // Themes panel: the AI classifier writes `topics`, while `themes` is the heuristic column (often
+  // empty). Prefer themes per-ad, fall back to topics, so the panel is populated either way.
+  const topThemes = tallyArr(ads.map((a) => (a.themes && a.themes.length ? a.themes : a.topics))).slice(0, 40)
   const topCTAs = tally(ads.map((a) => a.cta)).slice(0, 40)
   // Distinct-count tiles (Hooks / Ad copy / Headlines / Landing pages), like Atria's overview row.
   const distinct = (xs: (string | null | undefined)[]) => new Set(xs.map((x) => (x || '').trim()).filter(Boolean)).size
