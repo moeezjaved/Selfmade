@@ -96,47 +96,11 @@ async function keyset(baseQs, label) {     // keyset-paginate by ad_id (stable u
   }
   return out;
 }
-// Keyset by (created_at, ad_id) for the new-ads scan. WHY created_at not indexed_at:
-//   • indexed_at gets BUMPED on every re-crawl (upsert), so `indexed_at > lastRan` matches every
-//     RE-crawled ad too — hundreds of thousands of rows — and the planner won't keyset-walk that
-//     cleanly under ORDER BY → 57014 timeout at 2.5M+.
-//   • created_at is the migration-054 trigger column: stamped ONCE on genuine INSERT, never on
-//     re-crawl, NULL for the pre-trigger backfill corpus. So `created_at > lastRan` is exactly the
-//     set of brand-new ads since the last run (a few thousand), and the partial index
-//     dai_created_at_only_idx (created_at, ad_id) where created_at is not null serves it as a pure
-//     index range scan. Composite cursor so same-timestamp batch inserts aren't skipped.
-async function keysetSince(selectQs, sinceTs, label) {
-  const out = []; let cTs = null, cId = null, nextHb = 50000;
-  for (;;) {
-    let q = selectQs + '&order=created_at.asc,ad_id.asc&limit=1000';
-    if (cTs == null) q += '&created_at=gt.' + encodeURIComponent(sinceTs);
-    else q += `&or=(created_at.gt.${encodeURIComponent(cTs)},and(created_at.eq.${encodeURIComponent(cTs)},ad_id.gt.${encodeURIComponent(cId)}))`;
-    const d = await getJSON(q);
-    if (!Array.isArray(d) || !d.length) break;
-    out.push(...d); cTs = d[d.length - 1].created_at; cId = d[d.length - 1].ad_id;
-    if (label && out.length >= nextHb) { console.log(`[rollup] ${label}: fetched ${out.length} @ +${((Date.now() - t0) / 1000) | 0}s`); nextHb += 50000; }
-    if (d.length < 1000) break;
-  }
-  return out;
-}
-// Generic keyset ordered by an arbitrary indexed column `col` (+ ad_id tiebreak). For the nearGate
-// scan: static filters (is_active + start_date window) live in selectQs and bound the set; ordering
-// by start_date lets the planner range-scan dai_active_start_ad_idx instead of walking the ad_id PK
-// and heap-checking is_active/start_date on every row (the 57014 timeout). col values may repeat, so
-// the composite cursor (col, ad_id) is required.
-async function keysetByCol(selectQs, col, label) {
-  const out = []; let cVal = null, cId = null, nextHb = 50000;
-  for (;;) {
-    let q = selectQs + `&order=${col}.asc,ad_id.asc&limit=1000`;
-    if (cVal != null) q += `&or=(${col}.gt.${encodeURIComponent(cVal)},and(${col}.eq.${encodeURIComponent(cVal)},ad_id.gt.${encodeURIComponent(cId)}))`;
-    const d = await getJSON(q);
-    if (!Array.isArray(d) || !d.length) break;
-    out.push(...d); cVal = d[d.length - 1][col]; cId = d[d.length - 1].ad_id;
-    if (label && out.length >= nextHb) { console.log(`[rollup] ${label}: fetched ${out.length} @ +${((Date.now() - t0) / 1000) | 0}s`); nextHb += 50000; }
-    if (d.length < 1000) break;
-  }
-  return out;
-}
+// NOTE: the new-ads and nearGate scans are bounded sets fetched in a SINGLE ordered request (see
+// their call sites). We deliberately do NOT keyset-paginate them: PostgREST's or=() cursor expands
+// to (col > X OR (col = X AND ad_id > Y)), which the planner can't collapse into an index range scan,
+// so it re-scans per page and times out (57014) past ~20 pages. The full-corpus FULL pass still uses
+// keyset() by ad_id (clean gt cursor, no OR) since it's genuinely unbounded.
 const count = async qs => { const r = await fetch(REST + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=exact' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
 const countPlanned = async qs => { const r = await fetch(REST + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=planned' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
 async function setFlag(mins = 5) { await fetch(REST + 'system_flags?on_conflict=key', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'crawl_paused', until: new Date(Date.now() + mins * 60_000).toISOString(), updated_at: new Date().toISOString() }) }); }
@@ -214,8 +178,12 @@ if (FULL) {
   const cp = cal.cutpoints, Q = cp.length - 1;
   const pctOf = v => { let lo = 0, hi = cp.length; while (lo < hi) { const m = (lo + hi) >> 1; if (cp[m] <= v) lo = m + 1; else hi = m; } return Math.min(1, lo / Q); };
 
-  // (a) brands with NEW ads since last run (created_at = insert-only trigger col → clean watermark)
-  const newAds = await keysetSince('discovery_ads_index?select=ad_id,page_id,created_at', lastRan, 'new-ads');
+  // (a) brands with NEW ads since last run (created_at = insert-only trigger col → clean watermark).
+  // Single indexed fetch via dai_created_at_only_idx (a day's inserts ≈ a few thousand; one big run
+  // ≈ 7K) — same reasoning as nearGate below: avoid PostgREST's or=() keyset, which times out past
+  // ~20 pages. 200K cap covers even a heavy crawl day; warn if ever exceeded.
+  const newAds = await getJSON(`discovery_ads_index?select=ad_id,page_id,created_at&created_at=gt.${encodeURIComponent(lastRan)}&order=created_at.asc,ad_id.asc&limit=200000`);
+  if (Array.isArray(newAds) && newAds.length >= 200000) console.warn('[rollup] new-ads hit the 200K cap — widen the fetch; some new ads skipped this run');
   const touched = new Set(newAds.map(r => r.page_id));
   // (b) tier-threshold crossers: an active ad crosses the 7/14d gate when realDays
   //     (≈ now − start_date) hits 7 or 14, i.e. it STARTED ~7 or ~14 days ago. So we
@@ -223,7 +191,14 @@ if (FULL) {
   //     (covers both gates + margin) — a tiny, indexed slice, not all recent actives.
   const d6 = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
   const d16 = new Date(Date.now() - 16 * 864e5).toISOString().slice(0, 10);
-  const nearGate = await keysetByCol(`discovery_ads_index?select=ad_id,page_id,start_date,stop_date,last_seen,days_running&is_active=is.true&start_date=gte.${d16}&start_date=lte.${d6}`, 'start_date', 'near-gate');
+  // nearGate is bounded — active ads in a 10-day start_date window (~tens of thousands). A SINGLE
+  // indexed fetch (dai_active_start_ad_idx: 1K rows = 243ms, the whole set ~1-2s) beats keyset
+  // pagination: PostgREST's or=() cursor expands to (start_date>X OR (start_date=X AND ad_id>Y)),
+  // which the planner CAN'T collapse into a range scan → it re-scans per page and the ~20th page
+  // blows the REST timeout (57014). One ordered fetch avoids the OR entirely. The cap is a safety
+  // net; the window can't realistically exceed it, and we warn if it ever does.
+  const nearGate = await getJSON(`discovery_ads_index?select=ad_id,page_id,start_date,stop_date,last_seen,days_running&is_active=is.true&start_date=gte.${d16}&start_date=lte.${d6}&order=start_date.asc,ad_id.asc&limit=100000`);
+  if (Array.isArray(nearGate) && nearGate.length >= 100000) console.warn('[rollup] near-gate hit the 100K cap — widen the fetch; some tier-crossers skipped this run');
   const newAdBrands = touched.size;
   for (const a of nearGate) { const rd = realDays(a); const sd = a.days_running ?? 0; if ((rd >= 7 && sd < 7) || (rd >= 14 && sd < 14)) touched.add(a.page_id); }
   const crosserBrands = touched.size - newAdBrands;
