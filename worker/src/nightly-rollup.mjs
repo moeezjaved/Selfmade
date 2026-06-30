@@ -119,6 +119,24 @@ async function keysetSince(selectQs, sinceTs, label) {
   }
   return out;
 }
+// Generic keyset ordered by an arbitrary indexed column `col` (+ ad_id tiebreak). For the nearGate
+// scan: static filters (is_active + start_date window) live in selectQs and bound the set; ordering
+// by start_date lets the planner range-scan dai_active_start_ad_idx instead of walking the ad_id PK
+// and heap-checking is_active/start_date on every row (the 57014 timeout). col values may repeat, so
+// the composite cursor (col, ad_id) is required.
+async function keysetByCol(selectQs, col, label) {
+  const out = []; let cVal = null, cId = null, nextHb = 50000;
+  for (;;) {
+    let q = selectQs + `&order=${col}.asc,ad_id.asc&limit=1000`;
+    if (cVal != null) q += `&or=(${col}.gt.${encodeURIComponent(cVal)},and(${col}.eq.${encodeURIComponent(cVal)},ad_id.gt.${encodeURIComponent(cId)}))`;
+    const d = await getJSON(q);
+    if (!Array.isArray(d) || !d.length) break;
+    out.push(...d); cVal = d[d.length - 1][col]; cId = d[d.length - 1].ad_id;
+    if (label && out.length >= nextHb) { console.log(`[rollup] ${label}: fetched ${out.length} @ +${((Date.now() - t0) / 1000) | 0}s`); nextHb += 50000; }
+    if (d.length < 1000) break;
+  }
+  return out;
+}
 const count = async qs => { const r = await fetch(REST + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=exact' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
 const countPlanned = async qs => { const r = await fetch(REST + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=planned' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
 async function setFlag(mins = 5) { await fetch(REST + 'system_flags?on_conflict=key', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'crawl_paused', until: new Date(Date.now() + mins * 60_000).toISOString(), updated_at: new Date().toISOString() }) }); }
@@ -205,7 +223,7 @@ if (FULL) {
   //     (covers both gates + margin) — a tiny, indexed slice, not all recent actives.
   const d6 = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
   const d16 = new Date(Date.now() - 16 * 864e5).toISOString().slice(0, 10);
-  const nearGate = await keyset(`discovery_ads_index?select=ad_id,page_id,start_date,stop_date,last_seen,days_running&is_active=is.true&start_date=gte.${d16}&start_date=lte.${d6}`, 'near-gate');
+  const nearGate = await keysetByCol(`discovery_ads_index?select=ad_id,page_id,start_date,stop_date,last_seen,days_running&is_active=is.true&start_date=gte.${d16}&start_date=lte.${d6}`, 'start_date', 'near-gate');
   const newAdBrands = touched.size;
   for (const a of nearGate) { const rd = realDays(a); const sd = a.days_running ?? 0; if ((rd >= 7 && sd < 7) || (rd >= 14 && sd < 14)) touched.add(a.page_id); }
   const crosserBrands = touched.size - newAdBrands;
