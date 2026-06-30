@@ -82,6 +82,16 @@ function recordClosed(connectionId: number, stats: any) {
   if (bytes > 0) hostBytes.set(host, (hostBytes.get(host) || 0) + bytes)
 }
 
+/** Real IPRoyal-billed bytes so far this run = compressed wire bytes (trgRx+trgTx).
+ *  This is the ACTUAL cost — unlike the decompressed JSON length the crawler tallies as
+ *  "KB GraphQL" (body.length), which overstates cost by the gzip ratio (~5-10×). Snapshot
+ *  this before/after a brand to get that brand's true IPRoyal spend. */
+export function getProxyBytesTotal(): number {
+  let t = 0
+  for (const b of hostBytes.values()) t += b
+  return t
+}
+
 /** Print a per-host breakdown of IPRoyal bytes (and flag any media leak). */
 export function logProxyUsage(): void {
   if (hostBytes.size === 0) return
