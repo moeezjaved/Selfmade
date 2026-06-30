@@ -8,3 +8,10 @@
 -- psql -f, so CONCURRENTLY is fine here.
 create index concurrently if not exists dai_created_at_only_idx
   on discovery_ads_index (created_at, ad_id) where created_at is not null;
+
+-- The tier-crosser (nearGate) scan keysets by (start_date, ad_id) over active ads in a 10-day
+-- start_date window. start_date is day-granularity so many rows share a value — the plain
+-- (start_date) where is_active index would still heap-sort the ad_id tiebreak. This composite
+-- serves the keyset as a pure index range scan.
+create index concurrently if not exists dai_active_start_ad_idx
+  on discovery_ads_index (start_date, ad_id) where is_active;
