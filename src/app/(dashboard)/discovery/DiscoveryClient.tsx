@@ -1157,14 +1157,32 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
             ↗ Affiliate
           </span>
         )}
-        {/* Performance tier badge — only the top tiers (winning/optimized) to avoid noise */}
+        {/* Performance tier badge — hover shows HOW it's scored, with this ad's real signals.
+            (A user's #1 question is "how do you know it's winning?" — answer it on hover.) */}
         {(ad.performanceTier === 'winning' || ad.performanceTier === 'optimized') && (
-          <span title={`Performance tier: ${ad.performanceTier}`}
-            style={{ flexShrink: 0, fontSize: 9, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: 100, textTransform: 'uppercase',
-              color: ad.performanceTier === 'winning' ? '#166534' : '#92600a',
-              background: ad.performanceTier === 'winning' ? '#dcfce7' : '#fef9c3',
-              border: `1px solid ${ad.performanceTier === 'winning' ? '#bbf7d0' : '#fde68a'}` }}>
-            {ad.performanceTier === 'winning' ? '🏆 Winning' : '⚡ Optimized'}
+          <span className="tier-badge-wrap" style={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
+            <span
+              style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: 100, textTransform: 'uppercase', cursor: 'help',
+                color: ad.performanceTier === 'winning' ? '#166534' : '#92600a',
+                background: ad.performanceTier === 'winning' ? '#dcfce7' : '#fef9c3',
+                border: `1px solid ${ad.performanceTier === 'winning' ? '#bbf7d0' : '#fde68a'}` }}>
+              {ad.performanceTier === 'winning' ? '🏆 Winning' : '⚡ Optimized'}
+            </span>
+            <span className="tier-tooltip" style={{ position: 'absolute', top: 'calc(100% + 3px)', left: 0, width: 212, zIndex: 60,
+              background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 10px 28px rgba(0,0,0,0.16)', padding: '10px 11px',
+              fontSize: 11, lineHeight: 1.45, color: '#334155', textTransform: 'none', letterSpacing: 0, fontWeight: 400, textAlign: 'left' }}>
+              <div style={{ fontWeight: 800, fontSize: 11.5, color: '#0f172a', marginBottom: 5 }}>
+                {ad.performanceTier === 'winning' ? '🏆 Why “Winning”?' : '⚡ Why “Optimized”?'}
+              </div>
+              <div style={{ marginBottom: 6 }}>A percentile rank across our <b>entire</b> library — it rewards <b>proven</b> ads, not guesses:</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 6 }}>
+                <span>📅 <b>{ad.daysRunning}d</b> running <span style={{ color: '#94a3b8' }}>— longevity (40%)</span></span>
+                <span>🔁 creative reused <b>{ad.creativeReuseCount ?? 0}×</b> <span style={{ color: '#94a3b8' }}>— re-run = it works (25%)</span></span>
+                <span>📊 brand runs <b>{ad.brandActiveAds ?? 0}</b> active ads <span style={{ color: '#94a3b8' }}>— scale (20%)</span></span>
+              </div>
+              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>Score {Math.round((ad.performanceScore ?? 0) * 100)}/100 · must run ≥14 days to qualify</div>
+              <div style={{ fontSize: 10, color: '#64748b', borderTop: '1px solid #f1f5f9', paddingTop: 5 }}>ⓘ Meta doesn’t publish impressions — so we rank by public signals advertisers can’t fake (how long it runs, how often it’s reused, brand scale).</div>
+            </span>
           </span>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, position: 'relative' }}>
