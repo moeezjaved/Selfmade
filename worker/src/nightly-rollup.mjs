@@ -96,20 +96,25 @@ async function keyset(baseQs, label) {     // keyset-paginate by ad_id (stable u
   }
   return out;
 }
-// Keyset by (indexed_at, ad_id) for the new-ads scan. The ad_id-ordered keyset above heap-checks
-// indexed_at on every row (the planner won't use the indexed_at index under ORDER BY ad_id) → it
-// times out at 2.5M+. Ordering by indexed_at uses the indexed_at index directly → index range scan.
-// Composite cursor (indexed_at, ad_id) so same-timestamp batch inserts aren't skipped.
+// Keyset by (created_at, ad_id) for the new-ads scan. WHY created_at not indexed_at:
+//   • indexed_at gets BUMPED on every re-crawl (upsert), so `indexed_at > lastRan` matches every
+//     RE-crawled ad too — hundreds of thousands of rows — and the planner won't keyset-walk that
+//     cleanly under ORDER BY → 57014 timeout at 2.5M+.
+//   • created_at is the migration-054 trigger column: stamped ONCE on genuine INSERT, never on
+//     re-crawl, NULL for the pre-trigger backfill corpus. So `created_at > lastRan` is exactly the
+//     set of brand-new ads since the last run (a few thousand), and the partial index
+//     dai_created_at_only_idx (created_at, ad_id) where created_at is not null serves it as a pure
+//     index range scan. Composite cursor so same-timestamp batch inserts aren't skipped.
 async function keysetSince(selectQs, sinceTs, label) {
-  const out = []; let cTs = null, cId = null, nextHb = 100000;
+  const out = []; let cTs = null, cId = null, nextHb = 50000;
   for (;;) {
-    let q = selectQs + '&order=indexed_at.asc,ad_id.asc&limit=1000';
-    if (cTs == null) q += '&indexed_at=gt.' + encodeURIComponent(sinceTs);
-    else q += `&or=(indexed_at.gt.${encodeURIComponent(cTs)},and(indexed_at.eq.${encodeURIComponent(cTs)},ad_id.gt.${encodeURIComponent(cId)}))`;
+    let q = selectQs + '&order=created_at.asc,ad_id.asc&limit=1000';
+    if (cTs == null) q += '&created_at=gt.' + encodeURIComponent(sinceTs);
+    else q += `&or=(created_at.gt.${encodeURIComponent(cTs)},and(created_at.eq.${encodeURIComponent(cTs)},ad_id.gt.${encodeURIComponent(cId)}))`;
     const d = await getJSON(q);
     if (!Array.isArray(d) || !d.length) break;
-    out.push(...d); cTs = d[d.length - 1].indexed_at; cId = d[d.length - 1].ad_id;
-    if (label && out.length >= nextHb) { console.log(`[rollup] ${label}: fetched ${out.length} @ +${((Date.now() - t0) / 1000) | 0}s`); nextHb += 100000; }
+    out.push(...d); cTs = d[d.length - 1].created_at; cId = d[d.length - 1].ad_id;
+    if (label && out.length >= nextHb) { console.log(`[rollup] ${label}: fetched ${out.length} @ +${((Date.now() - t0) / 1000) | 0}s`); nextHb += 50000; }
     if (d.length < 1000) break;
   }
   return out;
@@ -191,8 +196,8 @@ if (FULL) {
   const cp = cal.cutpoints, Q = cp.length - 1;
   const pctOf = v => { let lo = 0, hi = cp.length; while (lo < hi) { const m = (lo + hi) >> 1; if (cp[m] <= v) lo = m + 1; else hi = m; } return Math.min(1, lo / Q); };
 
-  // (a) brands with NEW ads since last run (indexed_at is insert-only → clean watermark)
-  const newAds = await keysetSince('discovery_ads_index?select=ad_id,page_id,indexed_at', lastRan, 'new-ads');
+  // (a) brands with NEW ads since last run (created_at = insert-only trigger col → clean watermark)
+  const newAds = await keysetSince('discovery_ads_index?select=ad_id,page_id,created_at', lastRan, 'new-ads');
   const touched = new Set(newAds.map(r => r.page_id));
   // (b) tier-threshold crossers: an active ad crosses the 7/14d gate when realDays
   //     (≈ now − start_date) hits 7 or 14, i.e. it STARTED ~7 or ~14 days ago. So we
