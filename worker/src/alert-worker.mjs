@@ -1,0 +1,66 @@
+/**
+ * alert-worker — brand-tracking new-ad alerts (the retention #1).
+ *
+ * Every ~30 min: for each followed brand, find ads INSERTED since that follow's watermark
+ * (created_at > last_notified_at), collapse variants by copy_sig into "concepts" so "47 new ads"
+ * becomes "3 new concepts" (no spam), write one notification per (user, brand), and advance the
+ * watermark. The in-app bell + Following feed read `notifications`. Email is Phase 2 (Resend).
+ *
+ * Run (droplet):
+ *   docker run -d --name alert-worker --restart unless-stopped --init \
+ *     --env-file <env> -v /opt/worker/src:/app/src selfmade-worker npx tsx src/alert-worker.mjs
+ */
+const U = (process.env.SUPABASE_URL || '').split('\n')[0].replace(/\/$/, '')
+const K = process.env.SUPABASE_SERVICE_ROLE_KEY
+const H = { apikey: K, Authorization: 'Bearer ' + K, 'Content-Type': 'application/json' }
+const EVERY = Math.max(300000, parseInt(process.env.ALERT_EVERY_MS || '1800000', 10))  // 30 min default
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const enc = encodeURIComponent
+
+if (!U || !K) { console.error('missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY'); process.exit(1) }
+
+async function getJSON(path) {
+  const r = await fetch(`${U}/rest/v1/${path}`, { headers: H })
+  if (!r.ok) throw new Error(`${path} → ${r.status}`)
+  return r.json()
+}
+async function write(method, path, body) {
+  const r = await fetch(`${U}/rest/v1/${path}`, { method, headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify(body) })
+  if (!r.ok) console.warn(`${method} ${path} → ${r.status} ${(await r.text()).slice(0, 120)}`)
+}
+
+async function tick() {
+  let follows
+  try { follows = await getJSON('followed_brands?select=id,user_id,page_id,brand_name,last_notified_at') }
+  catch (e) { console.warn('fetch follows failed:', e.message); return }
+  if (!Array.isArray(follows) || !follows.length) return
+
+  let made = 0
+  for (const f of follows) {
+    const since = f.last_notified_at || '1970-01-01T00:00:00Z'
+    let ads
+    try {
+      ads = await getJSON(`discovery_ads_index?select=ad_id,copy_sig,created_at&page_id=eq.${enc(f.page_id)}&created_at=gt.${enc(since)}&has_creative=is.true&order=created_at.desc&limit=300`)
+    } catch (e) { console.warn(`brand ${f.page_id} query failed: ${e.message}`); continue }
+    if (!Array.isArray(ads) || !ads.length) continue
+
+    // Collapse variants by copy signature → distinct CONCEPTS (so the alert isn't "47 near-dup ads").
+    const concepts = new Set()
+    for (const a of ads) concepts.add(a.copy_sig || a.ad_id)
+
+    await write('POST', 'notifications', {
+      user_id: f.user_id, type: 'new_ad', page_id: f.page_id,
+      brand_name: f.brand_name, ad_count: concepts.size, sample_ad_id: ads[0].ad_id,
+    })
+    // Advance the watermark to the newest ad we just notified about → no duplicate alerts next run.
+    await write('PATCH', `followed_brands?id=eq.${enc(f.id)}`, { last_notified_at: ads[0].created_at })
+    made++
+  }
+  if (made) console.log(`📢 ${made} new-ad notification(s) created across ${follows.length} follows`)
+}
+
+console.log(`🔔 alert-worker up — checking followed brands every ${Math.round(EVERY / 60000)} min`)
+for (;;) {
+  try { await tick() } catch (e) { console.warn('tick error:', e?.message || e) }
+  await sleep(EVERY)
+}
