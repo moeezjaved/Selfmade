@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { CreditCounter } from '@/components/credits/CreditCounter'
+import { NotificationBell } from '@/components/NotificationBell'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -113,13 +114,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* ── SIDEBAR ── */}
       <aside style={{width:232,flexShrink:0,background:"#243d20",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column",position:"fixed",top:0,left:0,bottom:0,zIndex:50}}>
 
-        {/* Logo */}
-        <div style={{padding:"18px 20px",borderBottom:"1px solid rgba(223,254,149,0.08)"}}>
+        {/* Logo + notification bell */}
+        <div style={{padding:"18px 20px",borderBottom:"1px solid rgba(223,254,149,0.08)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
           <Link href="/dashboard">
             <div className="text-lime font-black text-2xl tracking-tight font-serif italic">
               <img src="/logo.png" alt="Selfmade" style={{height:42,width:"auto",display:"block"}}/>
             </div>
           </Link>
+          <NotificationBell />
         </div>
 
         {/* Nav */}
