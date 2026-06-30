@@ -96,6 +96,24 @@ async function keyset(baseQs, label) {     // keyset-paginate by ad_id (stable u
   }
   return out;
 }
+// Keyset by (indexed_at, ad_id) for the new-ads scan. The ad_id-ordered keyset above heap-checks
+// indexed_at on every row (the planner won't use the indexed_at index under ORDER BY ad_id) → it
+// times out at 2.5M+. Ordering by indexed_at uses the indexed_at index directly → index range scan.
+// Composite cursor (indexed_at, ad_id) so same-timestamp batch inserts aren't skipped.
+async function keysetSince(selectQs, sinceTs, label) {
+  const out = []; let cTs = null, cId = null, nextHb = 100000;
+  for (;;) {
+    let q = selectQs + '&order=indexed_at.asc,ad_id.asc&limit=1000';
+    if (cTs == null) q += '&indexed_at=gt.' + encodeURIComponent(sinceTs);
+    else q += `&or=(indexed_at.gt.${encodeURIComponent(cTs)},and(indexed_at.eq.${encodeURIComponent(cTs)},ad_id.gt.${encodeURIComponent(cId)}))`;
+    const d = await getJSON(q);
+    if (!Array.isArray(d) || !d.length) break;
+    out.push(...d); cTs = d[d.length - 1].indexed_at; cId = d[d.length - 1].ad_id;
+    if (label && out.length >= nextHb) { console.log(`[rollup] ${label}: fetched ${out.length} @ +${((Date.now() - t0) / 1000) | 0}s`); nextHb += 100000; }
+    if (d.length < 1000) break;
+  }
+  return out;
+}
 const count = async qs => { const r = await fetch(REST + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=exact' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
 const countPlanned = async qs => { const r = await fetch(REST + qs, { headers: { ...H, Range: '0-0', Prefer: 'count=planned' } }); return +((r.headers.get('content-range') || '').split('/')[1] || 0); };
 async function setFlag(mins = 5) { await fetch(REST + 'system_flags?on_conflict=key', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'crawl_paused', until: new Date(Date.now() + mins * 60_000).toISOString(), updated_at: new Date().toISOString() }) }); }
@@ -174,7 +192,7 @@ if (FULL) {
   const pctOf = v => { let lo = 0, hi = cp.length; while (lo < hi) { const m = (lo + hi) >> 1; if (cp[m] <= v) lo = m + 1; else hi = m; } return Math.min(1, lo / Q); };
 
   // (a) brands with NEW ads since last run (indexed_at is insert-only → clean watermark)
-  const newAds = await keyset('discovery_ads_index?select=ad_id,page_id&indexed_at=gt.' + encodeURIComponent(lastRan), 'new-ads');
+  const newAds = await keysetSince('discovery_ads_index?select=ad_id,page_id,indexed_at', lastRan, 'new-ads');
   const touched = new Set(newAds.map(r => r.page_id));
   // (b) tier-threshold crossers: an active ad crosses the 7/14d gate when realDays
   //     (≈ now − start_date) hits 7 or 14, i.e. it STARTED ~7 or ~14 days ago. So we
