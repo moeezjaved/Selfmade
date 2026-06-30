@@ -1336,7 +1336,12 @@ async function main() {
       .select('page_id, term, countries, category, categories, industry, ads_found, priority, full_crawled_at')
       .eq('is_active', true)
       .not('page_id', 'is', null)
+      // Never-crawled brands first (last_crawled_at null), and WITHIN those, NEWEST-ADDED first
+      // (created_at desc) — so a freshly-imported batch of good brands jumps ahead of the older
+      // junk import instead of waiting behind 48K never-crawled locals. Crawled brands re-enter
+      // oldest-first for the re-crawl cadence.
       .order('last_crawled_at', { ascending: true, nullsFirst: true })
+      .order('created_at', { ascending: false, nullsFirst: false })
       .limit(20)
     brands = (data || []).map((b: any) => ({ page_id: b.page_id, term: b.term, countries: Array.isArray(b.countries) ? b.countries : [], categories: manualCats(b), industry: b.industry || null, ads_found: b.ads_found ?? null, priority: b.priority ?? 5, full_crawled_at: b.full_crawled_at ?? null }))
   }
