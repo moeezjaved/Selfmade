@@ -29,7 +29,7 @@ import path from 'node:path'
 import { randomBytes, createHash } from 'node:crypto'
 import { supabase } from './db.js'
 import { isCacheableAsset, readAsset, writeAsset } from './asset-cache.js'
-import { startProxyChain, proxyChainEnabled } from './proxy-chain.js'
+import { startProxyChain, proxyChainEnabled, getProxyBytesTotal } from './proxy-chain.js'
 import { pickProxy, openProxyChain, recordEvent, proxyPoolEnabled, type PoolProxy } from './proxy-pool.js'
 import { detectIndustries, detectThemes, normalizePlatforms } from './classify.js'
 
@@ -92,7 +92,8 @@ interface RunMetrics {
   adsDiscovered: number
   adsNew: number
   adsAlreadySeen: number
-  bytesThroughProxy: number
+  bytesThroughProxy: number          // decompressed JSON length (body.length) — NOT the IPRoyal bill
+  proxyBytesStart: number            // getProxyBytesTotal() snapshot at brand start → real compressed delta
   blockedMedia: number       // video/image/font requests aborted (never hit IPRoyal)
   cacheHits: number          // JS/CSS served from disk cache (0 IPRoyal)
   cacheMiss: number          // JS/CSS fetched + cached (paid IPRoyal once)
@@ -590,7 +591,7 @@ async function crawlBrand(opts: {
     sessionId,
     startedAt: Date.now(),
     adsDiscovered: 0, adsNew: 0, adsAlreadySeen: 0,
-    bytesThroughProxy: 0, blockedMedia: 0, cacheHits: 0, cacheMiss: 0,
+    bytesThroughProxy: 0, proxyBytesStart: getProxyBytesTotal(), blockedMedia: 0, cacheHits: 0, cacheMiss: 0,
     responsesCaptured: 0, cursorsSeen: 0, scrollCount: 0,
     successWindow: [],
     softGateSuspect: false,
@@ -838,7 +839,10 @@ async function crawlBrand(opts: {
       if (metrics.successWindow.length > SUCCESS_RATE_WINDOW) {
         metrics.successWindow.shift()
       }
-      console.log(`  📦 captured ${ads.length} ads (${newCount} new) + ${cursors.length} cursors | ${(metrics.bytesThroughProxy / 1024).toFixed(1)} KB GraphQL | ${metrics.blockedMedia} media blocked | JS/CSS cache ${metrics.cacheHits} hit / ${metrics.cacheMiss} miss (0 IPRoyal)`)
+      // Real IPRoyal cost = compressed wire bytes (getProxyBytesTotal delta), NOT body.length
+      // (decompressed JSON, ~5-10× larger). Show the real number so cost is never misread again.
+      const realKB = (getProxyBytesTotal() - metrics.proxyBytesStart) / 1024
+      console.log(`  📦 captured ${ads.length} ads (${newCount} new) + ${cursors.length} cursors | ${realKB.toFixed(1)} KB IPRoyal (real) · ${(metrics.bytesThroughProxy / 1024).toFixed(1)} KB JSON | ${metrics.blockedMedia} media blocked | JS/CSS cache ${metrics.cacheHits} hit / ${metrics.cacheMiss} miss`)
     } catch (e: any) {
       console.warn(`  ⚠️ response handler: ${e?.message?.slice(0, 100)}`)
     }
