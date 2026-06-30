@@ -1296,6 +1296,7 @@ export default function DiscoveryPage() {
   const [searchInput, setSearchInput] = useState('')
   const [query, setQuery] = useState('')
   const [searchMode, setSearchMode] = useState<'adcopy' | 'brand' | 'category'>('adcopy')
+  const [chipTip, setChipTip] = useState<{ label: string; top: number; left: number } | null>(null)  // preset-chip explainer popup
   const [rawAds, setRawAds] = useState<Ad[]>([])
   const [loading, setLoading] = useState(true)  // start in loading → grid shows the skeleton from
   // the first render (not the empty state) until the initial fetch lands, so the load reads as a
@@ -1926,15 +1927,25 @@ export default function DiscoveryPage() {
         {/* Preset chips (GetHookd-style quick filter combos) */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 2 }}>
           {[
-            { label: '🏆 Best of the Month', apply: () => { setTiers(['winning']); setNiches([]); setTimeDays(0); setSort('performance') } },
-            { label: '🔥 Winning ads', apply: () => { setTiers(['winning']); setSort('performance') } },
+            { label: '🏆 Best of the Month', tip: 'The top-percentile ads of the last 30 days. "Winning" = ranked across our whole library by how long an ad runs (advertisers kill losers fast), how often the brand re-runs the same creative, and brand scale — must run ≥14 days. Meta doesn’t publish impressions, so we rank by signals advertisers can’t fake.', apply: () => { setTiers(['winning']); setNiches([]); setTimeDays(0); setSort('performance') } },
+            { label: '🔥 Winning ads', tip: 'Ads in the top percentile of our library. Scored by longevity (how long it runs), creative reuse (how often the brand re-runs it), and brand scale — must run ≥14 days to qualify. Meta hides impressions, so we rank by public signals advertisers can’t fake.', apply: () => { setTiers(['winning']); setSort('performance') } },
             { label: '📊 Brands · 100+ active ads', apply: () => { setMinBrandAdsStr('100') } },
             { label: '💄 Beauty ads', apply: () => { setNiches(['Beauty']) } },
             { label: '👗 Fashion ads', apply: () => { setNiches(['Fashion']) } },
-          ].map(p => (
+          ].map((p: { label: string; tip?: string; apply: () => void }) => (
             <button key={p.label} onClick={p.apply}
-              style={{ padding: '5px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, background: '#fff', color: '#374151', border: '1px solid #e2e8f0', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+              onMouseEnter={p.tip ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setChipTip({ label: p.label, top: r.bottom + 5, left: Math.min(r.left, window.innerWidth - 280) }) } : undefined}
+              onMouseLeave={p.tip ? () => setChipTip(null) : undefined}
+              style={{ position: 'relative', padding: '5px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, background: '#fff', color: '#374151', border: '1px solid #e2e8f0', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
               {p.label}
+              {p.tip && chipTip?.label === p.label && (
+                <span style={{ position: 'fixed', top: chipTip.top, left: chipTip.left, width: 270, zIndex: 9999,
+                  background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 10px 30px rgba(0,0,0,0.18)', padding: '11px 12px',
+                  fontSize: 11.5, lineHeight: 1.5, color: '#475569', fontWeight: 400, textAlign: 'left', pointerEvents: 'none' }}>
+                  <span style={{ display: 'block', fontWeight: 800, fontSize: 12, color: '#0f172a', marginBottom: 5 }}>How “Winning” is calculated</span>
+                  {p.tip}
+                </span>
+              )}
             </button>
           ))}
         </div>
