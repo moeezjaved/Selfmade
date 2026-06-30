@@ -10,6 +10,8 @@
  *   docker run -d --name alert-worker --restart unless-stopped --init \
  *     --env-file <env> -v /opt/worker/src:/app/src selfmade-worker npx tsx src/alert-worker.mjs
  */
+import { sendEmail, getUserEmail, newAdEmail, emailEnabled } from './email.mjs'
+
 const U = (process.env.SUPABASE_URL || '').split('\n')[0].replace(/\/$/, '')
 const K = process.env.SUPABASE_SERVICE_ROLE_KEY
 const H = { apikey: K, Authorization: 'Bearer ' + K, 'Content-Type': 'application/json' }
@@ -35,7 +37,16 @@ async function tick() {
   catch (e) { console.warn('fetch follows failed:', e.message); return }
   if (!Array.isArray(follows) || !follows.length) return
 
-  let made = 0
+  // Who opted into instant email (so we only fetch addresses + send for them).
+  const wantsEmail = new Map()
+  if (emailEnabled) {
+    try {
+      const prefs = await getJSON('notification_prefs?select=user_id,instant_email&instant_email=is.true')
+      for (const p of (prefs || [])) wantsEmail.set(p.user_id, true)
+    } catch { /* prefs optional */ }
+  }
+
+  let made = 0, mailed = 0
   for (const f of follows) {
     const since = f.last_notified_at || '1970-01-01T00:00:00Z'
     let ads
@@ -52,11 +63,16 @@ async function tick() {
       user_id: f.user_id, type: 'new_ad', page_id: f.page_id,
       brand_name: f.brand_name, ad_count: concepts.size, sample_ad_id: ads[0].ad_id,
     })
+    // Instant email (opt-in). One email per brand per cycle = naturally debounced by the watermark.
+    if (wantsEmail.has(f.user_id)) {
+      const to = await getUserEmail(f.user_id)
+      if (to) { const { subject, html } = newAdEmail({ brandName: f.brand_name, adCount: concepts.size, pageId: f.page_id }); if (await sendEmail({ to, subject, html })) mailed++ }
+    }
     // Advance the watermark to the newest ad we just notified about → no duplicate alerts next run.
     await write('PATCH', `followed_brands?id=eq.${enc(f.id)}`, { last_notified_at: ads[0].created_at })
     made++
   }
-  if (made) console.log(`📢 ${made} new-ad notification(s) created across ${follows.length} follows`)
+  if (made) console.log(`📢 ${made} new-ad notification(s) created${mailed ? `, ${mailed} emailed` : ''} across ${follows.length} follows`)
 }
 
 console.log(`🔔 alert-worker up — checking followed brands every ${Math.round(EVERY / 60000)} min`)
