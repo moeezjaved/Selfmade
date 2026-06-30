@@ -312,9 +312,6 @@
 /* Discovery card hover overlay — show Clone/Scripts button on hover */
 .ad-card-visual:hover .hover-overlay { opacity: 1 !important; }
 
-/* "Why Winning?" tier-badge explainer popup — hidden until the badge is hovered. */
-.tier-badge-wrap .tier-tooltip { opacity: 0; visibility: hidden; transform: translateY(-3px); transition: opacity .12s ease, transform .12s ease; pointer-events: none; }
-.tier-badge-wrap:hover .tier-tooltip { opacity: 1; visibility: visible; transform: translateY(0); }
 
 /* Discovery thumbnail loading skeleton — soft shimmer while the creative loads,
    so cards don't flash collapsed/black then pop to full size. */
