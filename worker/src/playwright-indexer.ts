@@ -47,7 +47,7 @@ const SUCCESS_RATE_WINDOW = 50  // last N ads checked
 // Per-brand budget
 const PER_BRAND_TIME_BUDGET_MS = 240_000  // 4 min — we hit this often during pagination
 const MAX_SCROLLS_PER_BRAND = 60          // hard cap (was 30 — most listings have ~1500 ads)
-const EMPTY_BRAND_BAIL_SCROLLS = 5        // if 0 ads + no pagination template after this many
+const EMPTY_BRAND_BAIL_SCROLLS = 3        // if 0 ads + no pagination template after this many
                                           // scrolls, the page has nothing (personal acct / inactive
                                           // advertiser — ~86% of the cold queue). Bail instead of
                                           // grinding the full 60 / 4-min time budget on a dead brand.
@@ -857,7 +857,18 @@ async function crawlBrand(opts: {
   let abortReason = ''
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
-    await sleep(8_000)  // initial render
+    // Adaptive initial wait: poll (up to 8s) for the first real ad-library GraphQL response instead
+    // of a blind 8s sleep. responsesCaptured/allAds/template only advance when actual ad data or a
+    // pagination template arrives, so this NEVER proceeds before the page has data (no false-empties)
+    // — it just stops waiting once the data is already here. Responsive brands go in ~2-3s; slow ones
+    // still get the full 8s. Saves several seconds on the ~third of brands that respond fast.
+    {
+      const renderDeadline = Date.now() + 8_000
+      while (Date.now() < renderDeadline) {
+        if (metrics.responsesCaptured > 0 || allAds.size > 0 || tplState.template) break
+        await sleep(400)
+      }
+    }
 
     const startMs = Date.now()
     const maxScrolls = opts.maxScrolls ?? (opts.full ? 600 : MAX_SCROLLS_PER_BRAND)
