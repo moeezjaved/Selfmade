@@ -47,7 +47,7 @@ const SUCCESS_RATE_WINDOW = 50  // last N ads checked
 // Per-brand budget
 const PER_BRAND_TIME_BUDGET_MS = 240_000  // 4 min — we hit this often during pagination
 const MAX_SCROLLS_PER_BRAND = 60          // hard cap (was 30 — most listings have ~1500 ads)
-const EMPTY_BRAND_BAIL_SCROLLS = 3        // if 0 ads + no pagination template after this many
+const EMPTY_BRAND_BAIL_SCROLLS = 5        // if 0 ads + no pagination template after this many
                                           // scrolls, the page has nothing (personal acct / inactive
                                           // advertiser — ~86% of the cold queue). Bail instead of
                                           // grinding the full 60 / 4-min time budget on a dead brand.
