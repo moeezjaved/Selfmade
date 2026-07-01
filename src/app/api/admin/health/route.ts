@@ -39,7 +39,7 @@ export async function GET() {
     qMissing,
     qFailed,
   ] = await Promise.all([
-    countWhere(admin),
+    exactTotal(admin),
     countWhere(admin, ['thumbnail_url', 'not.is', null]),
     countWhere(admin, ['video_url', 'not.is', null]),
     countWhere(admin, ['raw_image_urls', 'not.is', null], ['thumbnail_url', 'is', null]),
@@ -418,6 +418,20 @@ export async function GET() {
     })),
     alerts,
   })
+}
+
+// TOTAL is the headline number, so it must be truthful — NOT the reltuples estimate, which drifts
+// high after brand-culling deletes (it read 3.06M when the exact count was 2.59M). An unfiltered
+// count(*) is a single index/heap scan (~1-2s); if it times out under heavy crawl-write load we fall
+// back to the estimate so the dashboard still renders rather than 504-ing.
+async function exactTotal(admin: any): Promise<number> {
+  try {
+    const { count, error } = await admin
+      .from('discovery_ads_index')
+      .select('*', { count: 'exact', head: true })
+    if (!error && typeof count === 'number' && count > 0) return count
+  } catch { /* fall through to the estimate */ }
+  return countWhere(admin)
 }
 
 async function countWhere(admin: any, ...filters: [string, string, any][]): Promise<number> {
