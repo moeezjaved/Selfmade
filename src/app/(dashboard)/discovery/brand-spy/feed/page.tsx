@@ -21,7 +21,12 @@ export default function BrandSpyFeed() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/discovery/db-search?sort=newest&limit=60&country=ALL')
+      // Use sort=recent (last_seen DESC) — the ONE index-backed browse sort (~0.2s). sort=newest
+      // (start_date DESC) has no index for the has-creative browse set → it times out server-side and
+      // the route returns ads:[] (the "No recent ads" you saw). last_seen DESC = most-recently-active
+      // ads, exactly right for a "what are competitors running now" monitor; each card still shows the
+      // real launch-age badge from start_date.
+      const res = await fetch('/api/discovery/db-search?sort=recent&limit=60&country=ALL')
       const j = await res.json()
       setAds((j.ads || j.results || []).filter((a: Ad) => thumbOf(a)))
     } catch { setAds([]) } finally { setLoading(false) }
