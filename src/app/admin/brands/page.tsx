@@ -193,7 +193,7 @@ export default function BrandsPage() {
   }
 
   // Put an auto-removed brand back into the crawl rotation (re-activates + re-queues it).
-  const restoreBrand = async (id: string, page_id: string | null, name?: string) => {
+  const restoreBrand = async (id: string | null, page_id: string | null, name?: string) => {
     if (!confirm(`Restore "${name || page_id}" to the crawl rotation? It will re-crawl on the next cron tick.`)) return
     await fetch('/api/admin/brands', {
       method: 'PATCH',
@@ -709,6 +709,11 @@ export default function BrandsPage() {
           brand={previewBrand}
           data={previewData}
           loading={previewLoading}
+          removed={view === 'removed'}
+          onRestore={async () => {
+            await restoreBrand(null, previewBrand.page_id, previewBrand.brand_name)
+            setPreviewBrand(null); setPreviewData(null)
+          }}
           onClose={() => { setPreviewBrand(null); setPreviewData(null) }}
         />
       )}
@@ -757,10 +762,12 @@ function CategoryEditor({ categories, onSave }: { categories: string[]; onSave: 
 }
 
 // ── PreviewDrawer ────────────────────────────────────────
-function PreviewDrawer({ brand, data, loading, onClose }: {
+function PreviewDrawer({ brand, data, loading, removed, onRestore, onClose }: {
   brand: { page_id: string; brand_name: string }
   data: any
   loading: boolean
+  removed?: boolean
+  onRestore?: () => void
   onClose: () => void
 }) {
   return (
@@ -773,9 +780,22 @@ function PreviewDrawer({ brand, data, loading, onClose }: {
             <div style={{ fontSize: 16, fontWeight: 800 }}>{brand.brand_name}</div>
             <div style={{ fontSize: 11, color: '#888', fontFamily: 'ui-monospace, monospace' }}>{brand.page_id}</div>
           </div>
-          <button onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#666' }}>×</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {removed && onRestore && (
+              <button onClick={onRestore}
+                style={{ padding: '6px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#166534', fontFamily: 'inherit' }}>
+                ♻️ Restore to crawl
+              </button>
+            )}
+            <button onClick={onClose}
+              style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#666' }}>×</button>
+          </div>
         </div>
+        {removed && (
+          <div style={{ padding: '8px 18px', background: '#fef2f2', color: '#991b1b', fontSize: 12, fontWeight: 600 }}>
+            🗑️ Auto-removed as empty. If you see real ads below, it was a false positive — click Restore.
+          </div>
+        )}
         <div style={{ padding: 18 }}>
           {loading && <div style={{ color: '#666' }}>Loading sample ads from Meta…</div>}
           {data?.error && <div style={{ color: '#c0392b' }}>Error: {data.error}</div>}
