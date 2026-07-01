@@ -64,6 +64,9 @@ export async function GET(req: NextRequest) {
     termsQuery = termsQuery.gte('crawling_at', crawlingCutoff).order('crawling_at', { ascending: false }).limit(1000)
   } else if (view === 'spy') {
     termsQuery = termsQuery.gte('priority', 9).order('crawling_at', { ascending: false, nullsFirst: false }).limit(1000)
+  } else if (view === 'removed') {
+    // Auto-removed empty brands (1-strike). Kept (soft-delete) so a human can Restore false-positives.
+    termsQuery = termsQuery.eq('is_active', false).eq('notes', 'auto_removed_empty').order('last_crawled_at', { ascending: false }).limit(1000)
   } else if (STATE_VIEWS.includes(view)) {
     termsQuery = (stateIds && stateIds.length) ? termsQuery.in('page_id', stateIds).limit(1000) : termsQuery.eq('page_id', '__none__')
   } else {
@@ -89,6 +92,7 @@ export async function GET(req: NextRequest) {
     { count: inProgressCount },
     { count: newAdsCount },
     { count: softGatedCount },
+    { count: removedCount },
   ] = await Promise.all([
     termsQuery,
     // Accurate summary counts. The two list queries above are capped at PostgREST's
@@ -124,6 +128,8 @@ export async function GET(req: NextRequest) {
     admin.from('discovery_brand_crawl_state').select('*', { count: 'exact', head: true }).not('cursor', 'is', null),
     admin.from('discovery_brand_crawl_state').select('*', { count: 'exact', head: true }).gt('last_run_added', 0),
     admin.from('discovery_brand_crawl_state').select('*', { count: 'exact', head: true }).not('soft_gate_at', 'is', null),
+    admin.from('discovery_crawl_terms').select('*', { count: 'exact', head: true })
+      .or('term_type.eq.brand,page_id.not.is.null').eq('is_active', false).eq('notes', 'auto_removed_empty'),
   ])
 
   // Build a map: page_id → state
@@ -212,6 +218,7 @@ export async function GET(req: NextRequest) {
       in_progress: inProgressCount ?? 0,
       new_ads: newAdsCount ?? 0,
       soft_gated: softGatedCount ?? 0,
+      removed: removedCount ?? 0,
     },
     view,
   })
@@ -290,6 +297,16 @@ export async function PATCH(req: NextRequest) {
   if (action === 'toggle' && id != null) {
     await admin.from('discovery_crawl_terms').update({ is_active }).eq('id', id)
     return NextResponse.json({ success: true })
+  }
+
+  // Restore an auto-removed (empty-bailed) brand: re-activate, clear the removal tag, and null
+  // last_crawled_at so it re-enters the never-crawled priority for a fresh crawl. priority 7 gives
+  // it a prompt retry ahead of the default pool.
+  if (action === 'restore' && (id != null || page_id)) {
+    const upd = { is_active: true, notes: null, last_crawled_at: null, priority: 7 }
+    const target = admin.from('discovery_crawl_terms').update(upd)
+    await (id != null ? target.eq('id', id) : target.eq('page_id', page_id))
+    return NextResponse.json({ success: true, message: 'Restored — re-crawls on the next cron tick (≤15 min).' })
   }
 
   if (action === 'update_categories' && id != null && Array.isArray(categories)) {
