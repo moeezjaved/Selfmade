@@ -1460,8 +1460,14 @@ async function main() {
       // no ads nothing in discovery_ads_index is orphaned. `continue` skips the cadence
       // update (the row is gone).
       if (removeBrand) {
-        await (supabase as any).from('discovery_crawl_terms').delete().eq('page_id', brand.page_id)
-        console.log(`  🗑️  REMOVED from brand list: "${brand.term}" (page_id=${brand.page_id}) — empty, no ad history`)
+        // SOFT removal (was a hard DELETE). Deactivate + tag so the scheduler skips it
+        // (all pickNextBrand selects require is_active=true) but the row STAYS, reviewable in
+        // the admin "Removed" tab where a human can Restore a false-positive (a real brand that
+        // was slow to load). The queue still self-cleans in one pass; nothing is lost.
+        await (supabase as any).from('discovery_crawl_terms')
+          .update({ is_active: false, notes: 'auto_removed_empty' })
+          .eq('page_id', brand.page_id)
+        console.log(`  🗑️  REMOVED (soft) from crawl list: "${brand.term}" (page_id=${brand.page_id}) — empty, no ad history`)
         continue
       }
 

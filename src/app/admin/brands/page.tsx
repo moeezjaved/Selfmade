@@ -62,6 +62,7 @@ interface Summary {
   in_progress?: number
   new_ads?: number
   soft_gated?: number
+  removed?: number
 }
 
 const VIEWS: { key: string; label: string; sumKey?: keyof Summary }[] = [
@@ -74,6 +75,7 @@ const VIEWS: { key: string; label: string; sumKey?: keyof Summary }[] = [
   { key: 'spy', label: '🎯 Spied', sumKey: 'spy' },
   { key: 'never', label: 'Never crawled', sumKey: 'never_crawled' },
   { key: 'fully', label: '✅ Fully crawled', sumKey: 'fully_crawled' },
+  { key: 'removed', label: '🗑️ Removed', sumKey: 'removed' },
 ]
 
 const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }> = {
@@ -187,6 +189,17 @@ export default function BrandsPage() {
   const deleteBrand = async (id: string) => {
     if (!confirm('Delete this brand from the crawl rotation?')) return
     await fetch(`/api/admin/brands?id=${id}`, { method: 'DELETE' })
+    load()
+  }
+
+  // Put an auto-removed brand back into the crawl rotation (re-activates + re-queues it).
+  const restoreBrand = async (id: string, page_id: string | null, name?: string) => {
+    if (!confirm(`Restore "${name || page_id}" to the crawl rotation? It will re-crawl on the next cron tick.`)) return
+    await fetch('/api/admin/brands', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'restore', id, page_id }),
+    })
     load()
   }
 
@@ -661,7 +674,13 @@ export default function BrandsPage() {
                           🔍 Preview
                         </button>
                       )}
-                      {t.page_id && (
+                      {view === 'removed' && (
+                        <button onClick={() => restoreBrand(t.id, t.page_id, t.brand_name)}
+                          style={{ padding: '4px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', color: '#166534', fontFamily: 'inherit' }}>
+                          ♻️ Restore
+                        </button>
+                      )}
+                      {t.page_id && view !== 'removed' && (
                         <button onClick={() => forceRecrawl(t.page_id!, t.brand_name)}
                           style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#1a3a1a', fontFamily: 'inherit' }}>
                           Re-crawl now
