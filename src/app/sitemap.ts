@@ -20,6 +20,6 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
     priority: Math.min(0.9, 0.4 + Math.min(0.5, b.adCount / 200)),   // more ads → higher priority
   }))
   // Include the hub page in the first chunk.
-  if (id === 0) entries.unshift({ url: `${SITE_URL}/brands`, changeFrequency: 'daily', priority: 0.8 })
+  if (id === 0) entries.unshift({ url: `${SITE_URL}/brands/directory`, changeFrequency: 'daily', priority: 0.8 })
   return entries
 }

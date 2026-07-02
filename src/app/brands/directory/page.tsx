@@ -1,6 +1,7 @@
 /**
- * /brands — the SEO hub. Links out to the top brand pages (internal linking → Google crawls the tree
- * deep + spreads link equity), and ranks for head terms like "facebook ad library" / "competitor ads".
+ * /brands/directory — the public SEO hub. Links out to the top brand pages (internal linking → Google
+ * crawls the tree deep + spreads link equity), and ranks for head terms like "facebook ad library".
+ * (Lives at /brands/directory because /brands is the authenticated in-app brand catalog.)
  */
 import type { Metadata } from 'next'
 import Link from 'next/link'
@@ -13,7 +14,7 @@ const titleCase = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase())
 export const metadata: Metadata = {
   title: 'Facebook Ad Library — Spy on Any Brand\'s Ads | Selfmade',
   description: 'Browse the Facebook & Instagram ads of thousands of brands from the Meta Ad Library. See active campaigns, winning creatives, and longest-running ads. Free ad spy on Selfmade.',
-  alternates: { canonical: `${SITE_URL}/brands` },
+  alternates: { canonical: `${SITE_URL}/brands/directory` },
   robots: { index: true, follow: true },
 }
 

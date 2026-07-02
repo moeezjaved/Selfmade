@@ -17,6 +17,14 @@
 import { unstable_cache } from 'next/cache'
 import { createReadClient } from '@/lib/supabase/server'
 
+// Build-safe client: createReadClient throws "supabaseUrl is required" if env is absent (e.g. a
+// build step without env, or a transient hiccup). Returning null → the SEO functions degrade to
+// empty/fallback so a deploy can never fail on it (pages then generate on-demand at runtime).
+function readClientSafe(): ReturnType<typeof createReadClient> | null {
+  if (!(process.env.SUPABASE_READ_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+  try { return createReadClient() } catch { return null }
+}
+
 // Only brands with >= this many ads get an SEO page (quality-first — content-rich pages rank, thin
 // ones get penalized). Env-tunable so we can lower it as the domain earns authority. Default 100.
 export const MIN_INDEXABLE_ADS = parseInt(process.env.SEO_MIN_ADS || '100', 10)
@@ -55,7 +63,8 @@ export function slugify(s: string): string {
 // ad-count one, so every URL is unique and stable.
 export const getIndexableBrands = unstable_cache(
   async (): Promise<BrandRef[]> => {
-    const db = createReadClient()
+    const db = readClientSafe()
+    if (!db) return []
     const { data, error } = await db
       .from('discovery_brand_crawl_state')
       .select('page_id, brand_name, ads_indexed')
@@ -95,7 +104,8 @@ export async function resolveSlug(slug: string): Promise<BrandRef | null> {
 // per page_id (revalidate ~6h via unstable_cache; the route also sets ISR revalidate).
 export const getBrandPage = unstable_cache(
   async (ref: BrandRef): Promise<BrandPage> => {
-    const db = createReadClient()
+    const db = readClientSafe()
+    if (!db) return { ref, niche: null, activeCount: 0, longestRunningDays: 0, ads: [], indexable: ref.adCount >= MIN_INDEXABLE_ADS, content: null }
     const { data: rows } = await db
       .from('discovery_ads_index')
       .select('ad_id, body, start_date, is_active, days_running, performance_tier, niche, discovery_creatives(asset_type,r2_url,poster_url,position,width,height)')
