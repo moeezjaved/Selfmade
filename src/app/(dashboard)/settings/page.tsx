@@ -9,6 +9,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
+  // Notification prefs (migration 054): how the user hears about new ads on brands they follow.
+  const [prefs, setPrefs] = useState<{ in_app: boolean; instant_email: boolean; digest_frequency: string }>({ in_app: true, instant_email: false, digest_frequency: 'weekly' })
+  const [prefsSaved, setPrefsSaved] = useState(false)
+  const [prefsSaving, setPrefsSaving] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -23,9 +27,20 @@ export default function SettingsPage() {
       const meta = (user.user_metadata || {}) as Record<string, string>
       setFullName(meta.full_name || meta.name || '')
       setLoading(false)
+      // load notification prefs (non-blocking)
+      fetch('/api/notifications/prefs').then(r => r.json()).then(j => { if (!cancelled && j.prefs) setPrefs(j.prefs) }).catch(() => {})
     })()
     return () => { cancelled = true }
   }, [])
+
+  const savePrefs = async (next: typeof prefs) => {
+    setPrefs(next)
+    setPrefsSaving(true); setPrefsSaved(false)
+    try {
+      await fetch('/api/notifications/prefs', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) })
+      setPrefsSaved(true); setTimeout(() => setPrefsSaved(false), 1800)
+    } finally { setPrefsSaving(false) }
+  }
 
   const saveProfile = async () => {
     setSaving(true)
@@ -83,6 +98,45 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Notifications — controls the new-ad alerts + weekly digest for followed brands */}
+      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
+        <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Notifications</div>
+          <span style={{fontSize:12,color:prefsSaved?'#16a34a':'#9ca3af'}}>{prefsSaving ? 'Saving…' : prefsSaved ? '✓ Saved' : ''}</span>
+        </div>
+        <div style={{padding:22,display:'flex',flexDirection:'column',gap:4}}>
+          <ToggleRow
+            label="In-app alerts"
+            hint="Show a bell notification when a brand you follow launches a new ad."
+            checked={prefs.in_app}
+            onChange={(v) => savePrefs({ ...prefs, in_app: v })}
+          />
+          <div style={{height:1,background:'#f1f5f9',margin:'4px 0'}} />
+          <ToggleRow
+            label="Instant email alerts"
+            hint="Email me (debounced) the moment a followed brand ships new ads."
+            checked={prefs.instant_email}
+            onChange={(v) => savePrefs({ ...prefs, instant_email: v })}
+          />
+          <div style={{height:1,background:'#f1f5f9',margin:'4px 0'}} />
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 0',gap:12}}>
+            <div>
+              <div style={{fontSize:14,fontWeight:600,color:'#1a3a1a'}}>Weekly digest</div>
+              <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>A summary of what your followed brands + niche shipped.</div>
+            </div>
+            <select
+              value={prefs.digest_frequency}
+              onChange={(e) => savePrefs({ ...prefs, digest_frequency: e.target.value })}
+              style={{padding:'7px 12px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#f8fcf6',color:'#1a3a1a',fontSize:13,fontFamily:'inherit',fontWeight:600,cursor:'pointer'}}
+            >
+              <option value="weekly">Weekly</option>
+              <option value="daily">Daily</option>
+              <option value="off">Off</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
         <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>
           <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Connected Accounts</div>
@@ -100,6 +154,23 @@ export default function SettingsPage() {
         <div style={{fontSize:13,color:'#7a9a7a',marginBottom:14}}>Sign out of your Selfmade account.</div>
         <button onClick={signOut} style={{background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.25)',color:'#c0392b',padding:'8px 18px',borderRadius:100,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Sign Out</button>
       </div>
+    </div>
+  )
+}
+
+function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 0',gap:12}}>
+      <div>
+        <div style={{fontSize:14,fontWeight:600,color:'#1a3a1a'}}>{label}</div>
+        <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>{hint}</div>
+      </div>
+      <button
+        role="switch" aria-checked={checked} onClick={() => onChange(!checked)}
+        style={{width:44,height:26,borderRadius:100,border:'none',cursor:'pointer',flexShrink:0,padding:0,position:'relative',background:checked?'#1a3a1a':'#d1d5db',transition:'background .15s'}}
+      >
+        <span style={{position:'absolute',top:3,left:checked?21:3,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'left .15s'}} />
+      </button>
     </div>
   )
 }
