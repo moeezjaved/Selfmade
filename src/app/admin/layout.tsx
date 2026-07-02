@@ -14,6 +14,7 @@ const NAV = [
   { href: '/admin/invite-codes', label: 'Invite Codes', icon: '🎟' },
   { href: '/admin/indexer', label: 'Ad Indexer', icon: '🕷️' },
   { href: '/admin/brands', label: 'Brands', icon: '🏷️' },
+  { href: '/admin/seo', label: 'SEO', icon: '🔍' },
   { href: '/admin/countries', label: 'Countries', icon: '🌍' },
   { href: '/admin/seeds', label: 'Seeds', icon: '🌱' },
   { href: '/admin/workers', label: 'Workers', icon: '⚙️' },

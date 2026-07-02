@@ -17,7 +17,9 @@
 import { unstable_cache } from 'next/cache'
 import { createReadClient } from '@/lib/supabase/server'
 
-export const MIN_INDEXABLE_ADS = 5           // < this → render but noindex (thin-content guard)
+// Only brands with >= this many ads get an SEO page (quality-first — content-rich pages rank, thin
+// ones get penalized). Env-tunable so we can lower it as the domain earns authority. Default 100.
+export const MIN_INDEXABLE_ADS = parseInt(process.env.SEO_MIN_ADS || '100', 10)
 export const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
 
 export type BrandRef = { pageId: string; slug: string; name: string; adCount: number }
@@ -26,6 +28,7 @@ export type BrandAd = {
   ad_id: string; body: string | null; start_date: string | null; is_active: boolean
   days_running: number | null; performance_tier: string | null; creatives: BrandCreative[]
 }
+export type BrandContent = { headline: string | null; intro_md: string | null; meta_description: string | null }
 export type BrandPage = {
   ref: BrandRef
   niche: string | null
@@ -33,6 +36,7 @@ export type BrandPage = {
   longestRunningDays: number
   ads: BrandAd[]        // display sample (deduped, best-first)
   indexable: boolean    // adCount >= MIN_INDEXABLE_ADS
+  content: BrandContent | null   // unique AI copy (seo-content-worker); null → page uses the template
 }
 
 export function slugify(s: string): string {
@@ -121,10 +125,24 @@ export const getBrandPage = unstable_cache(
       })
     }
     const activeCount = ads.filter((a) => a.is_active).length
+
+    // Unique AI copy (seo-content-worker) if generated; graceful null → the page falls back to the
+    // template. Missing table (pre-migration) also degrades to null.
+    let content: BrandContent | null = null
+    try {
+      const { data: c } = await db
+        .from('brand_seo_content')
+        .select('headline, intro_md, meta_description')
+        .eq('page_id', ref.pageId)
+        .maybeSingle()
+      if (c) content = c as BrandContent
+    } catch { /* table not present yet → template fallback */ }
+
     return {
       ref, niche, activeCount, longestRunningDays: longest,
       ads: ads.slice(0, 48),
       indexable: ref.adCount >= MIN_INDEXABLE_ADS,
+      content,
     }
   },
   ['seo-brand-page-v1'],

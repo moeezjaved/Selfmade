@@ -34,6 +34,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               "var iv=setInterval(function(){if(window.__hydrated){try{sessionStorage.removeItem(K)}catch(e){}clearInterval(iv)}},1000);}catch(e){}})();",
           }}
         />
+        {/* Google Analytics 4 — set NEXT_PUBLIC_GA_ID (e.g. G-XXXXXXX) in env to enable. */}
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <>
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`} />
+            <script dangerouslySetInnerHTML={{ __html:
+              `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${process.env.NEXT_PUBLIC_GA_ID}');` }} />
+          </>
+        )}
         <link rel="preconnect" href="https://fonts.googleapis.com"/>
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/>
         <link

@@ -35,9 +35,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const name = titleCase(ref.name)
   const year = 2026
   const indexable = ref.adCount >= MIN_INDEXABLE_ADS
+  const page = await getBrandPage(ref)   // cached — reused by the component below
   return {
     title: `${name} Facebook Ads — See All ${ref.adCount.toLocaleString()} Ads (${year}) | Selfmade`,
-    description: `Browse ${name}'s Facebook & Instagram ads from the Meta Ad Library — ${ref.adCount.toLocaleString()} ads, active campaigns, and their longest-running winners. Free ad spy on Selfmade.`,
+    // Unique AI meta description if generated, else the templated one.
+    description: page.content?.meta_description
+      || `Browse ${name}'s Facebook & Instagram ads from the Meta Ad Library — ${ref.adCount.toLocaleString()} ads, active campaigns, and their longest-running winners. Free ad spy on Selfmade.`,
     alternates: { canonical: `${SITE_URL}/brands/${ref.slug}` },
     robots: indexable ? { index: true, follow: true } : { index: false, follow: true },
     openGraph: {
@@ -90,11 +93,13 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
 
       {/* Hero */}
       <header style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.1, marginBottom: 10 }}>{name} Facebook Ads</h1>
+        <h1 style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.1, marginBottom: 10 }}>{page.content?.headline || `${name} Facebook Ads`}</h1>
         <p style={{ fontSize: 16, color: '#4b5563', maxWidth: 720, lineHeight: 1.5 }}>
-          Every ad {name} is running on Facebook & Instagram, pulled live from the Meta Ad Library.
-          See their active campaigns, creative angles, and longest-running winners — the ones that keep
-          running because they convert.
+          {page.content?.intro_md || (
+            <>Every ad {name} is running on Facebook & Instagram, pulled live from the Meta Ad Library.
+            See their active campaigns, creative angles, and longest-running winners — the ones that keep
+            running because they convert.</>
+          )}
         </p>
         <div style={{ display: 'flex', gap: 24, marginTop: 18, flexWrap: 'wrap' }}>
           <Stat label="Total ads" value={ref.adCount.toLocaleString()} />
