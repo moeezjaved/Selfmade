@@ -87,7 +87,7 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
       {/* Breadcrumb / nav */}
       <nav style={{ fontSize: 13, color: '#6b7280', marginBottom: 18 }}>
         <Link href="/" style={{ color: '#6b7280', textDecoration: 'none' }}>Selfmade</Link>
-        {' › '}<Link href="/brands" style={{ color: '#6b7280', textDecoration: 'none' }}>Brands</Link>
+        {' › '}<Link href="/brands/directory" style={{ color: "#6b7280", textDecoration: "none" }}>Brands</Link>
         {' › '}<span style={{ color: '#111' }}>{name}</span>
       </nav>
 
