@@ -36,6 +36,22 @@ export async function GET() {
   return NextResponse.json({ brands: enriched })
 }
 
+// A user's brand slots are capped by their plan (trial 1, core 3, plus 10, business unlimited).
+// Returns { used, limit } so the UI can show "2 / 3 brands". limit -1 = unlimited.
+async function brandQuota(admin: ReturnType<typeof createAdminClient>, userId: string) {
+  const [{ data: prof }, { count }] = await Promise.all([
+    admin.from('user_profiles').select('plan_id').eq('id', userId).maybeSingle(),
+    admin.from('brands').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+  ])
+  let limit = 1
+  const planId = (prof as any)?.plan_id
+  if (planId) {
+    const { data: plan } = await admin.from('plans').select('brand_limit').eq('id', planId).maybeSingle()
+    if (plan && typeof (plan as any).brand_limit === 'number') limit = (plan as any).brand_limit
+  }
+  return { used: count || 0, limit }
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -43,6 +59,15 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const b = await req.json()
   if (!b.name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })
+
+  // Enforce the plan's brand-slot cap before inserting.
+  const { used, limit } = await brandQuota(admin, user.id)
+  if (limit >= 0 && used >= limit) {
+    return NextResponse.json(
+      { error: 'brand_limit_reached', used, limit, message: `Your plan includes ${limit} brand${limit === 1 ? '' : 's'}. Upgrade to add more.` },
+      { status: 402 },
+    )
+  }
 
   const { data, error } = await admin.from('brands').insert({
     user_id: user.id,
@@ -52,5 +77,17 @@ export async function POST(req: NextRequest) {
     preferred_words: ARR(b.preferred_words), avoid_words: ARR(b.avoid_words),
   }).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json({ brand: data })
+
+  // Seed products from detected/uploaded images (from the URL-detect flow), so the new brand is
+  // immediately usable in Clone. image_urls holds the product photos; one product row per brand init.
+  const productImages = ARR(b.product_images || b.images)
+  if (productImages.length) {
+    await admin.from('brand_products').insert({
+      brand_id: (data as any).id,
+      name: b.product_name || b.name.trim(),
+      image_urls: productImages.slice(0, 12),
+    }).then(() => {}, () => {})
+  }
+
+  return NextResponse.json({ brand: data, quota: { used: used + 1, limit } })
 }
