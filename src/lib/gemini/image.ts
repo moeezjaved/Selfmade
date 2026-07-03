@@ -92,10 +92,10 @@ export function buildClonePrompt(opts: {
     d.emotion?.length && `emotional tone (${d.emotion.slice(0, 2).join(', ')})`,
   ].filter(Boolean).join(', ')
   return [
-    `TASK: PRODUCT SWAP — not a redesign. Image 1 is a winning ad. Recreate it almost exactly (same layout, composition, background scene, camera angle, lighting, subjects, mood${keep ? `, ${keep}` : ''}, and text placement) but REPLACE ONLY the featured product with the user's product shown in the next attached photo(s).`,
-    `THE USER'S PRODUCT IS MANDATORY AND IS THE HERO: reproduce it faithfully from the photo — exact shape, proportions, packaging, label text, and colors — clearly visible and prominent. It is the ONLY product in the ad.`,
-    `CRITICAL — do NOT omit or shrink away the product, do NOT replace it with a person, model, hand, face, or any different object, and do NOT invent a new lifestyle scene or concept. Keep the SAME subjects and setting as image 1; only the product changes.`,
-    opts.brandName ? `Brand name: "${opts.brandName}".` : '',
+    `TASK: PRODUCT SWAP — not a redesign. Image 1 is a proven winning ad. The image(s) AFTER it are the USER'S PRODUCT${opts.hasLogo ? ' (and the very last image is the brand logo)' : ''}. Recreate image 1 almost exactly — same layout, composition, background scene, props, camera angle, lighting, subjects, mood${keep ? `, ${keep}` : ''}, and text placement — but REPLACE ONLY the featured product with the user's product.`,
+    `THE USER'S PRODUCT IS MANDATORY AND IS THE HERO: reproduce it faithfully from the product photo — exact shape, proportions, packaging, on-label branding/text, and colors — placed in the same spot, angle and scale as the original product, clearly visible and prominent. It is the ONLY product in the ad.`,
+    `CRITICAL — do NOT omit or shrink away the product, do NOT replace it with a person, model, hand, face, fruit, or any different object, and do NOT invent a new lifestyle scene. Keep the SAME subjects and setting as image 1; only the product changes.`,
+    opts.brandName ? `Wherever the original ad shows its own brand name or wordmark, use "${opts.brandName}" instead.` : '',
     opts.newHeadline ? `On-screen headline — render EXACTLY, letter for letter: "${opts.newHeadline}".` : `Keep the headline layout; write short copy relevant to this product.`,
     d.cta ? `Keep a clear call-to-action button ("${d.cta}").` : '',
     brandStyle ? `Secondary styling, only where it does not fight the layout above — ${brandStyle}.` : '',
