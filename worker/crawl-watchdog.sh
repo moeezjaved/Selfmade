@@ -16,6 +16,16 @@ USEAST=$(cat /root/.useast)
 THRESH_MIN=${WATCHDOG_THRESH_MIN:-15}
 NOW=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
+# RESPECT AN INTENTIONAL STOP. If the scheduler container is STOPPED, a human stopped it on purpose
+# (e.g. to halt crawling / save IPRoyal) — Docker's `--restart unless-stopped` already auto-heals a
+# CRASH, so a stopped state is deliberate. The watchdog must NOT restart it, or it resurrects a crawl
+# the operator killed (this once drained the whole IPRoyal balance). Only heal a RUNNING-but-wedged one.
+running=$(docker inspect -f '{{.State.Running}}' scheduler 2>/dev/null || echo "false")
+if [ "$running" != "true" ]; then
+  echo "$NOW watchdog: scheduler is stopped (intentional) — standing down, not restarting"
+  exit 0
+fi
+
 # Count crawls still "running" that started more than THRESH_MIN ago = the wedge signal.
 stuck=$(docker run --rm postgres:17 psql "$USEAST" -At -c \
   "select count(*) from crawler_runs where finished_at is null and status='running' and started_at < now() - interval '${THRESH_MIN} minutes';" \
