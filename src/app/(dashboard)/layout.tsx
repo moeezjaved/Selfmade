@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { CreditCounter } from '@/components/credits/CreditCounter'
 import { NotificationBell } from '@/components/NotificationBell'
+import UpsellModalHost from '@/components/UpsellModal'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -216,6 +217,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <main className="flex-1" style={{minWidth:0,overflowX:"hidden"}}>
           {children}
         </main>
+        <UpsellModalHost />
       </div>
     </div>
   )

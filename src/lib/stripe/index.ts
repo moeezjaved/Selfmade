@@ -164,24 +164,41 @@ export async function handleStripeWebhook(payload: string, signature: string) {
 
     case 'customer.subscription.deleted': {
       const sub = event.data.object as Stripe.Subscription
-      const userId = sub.metadata?.user_id
+      const userId = sub.metadata?.owner_id || sub.metadata?.user_id
       if (!userId) break
-
-      await supabase.from('user_profiles').update({
-        subscription_status: 'canceled',
-      }).eq('user_id', userId)
+      // Suspend to Free (spec §5 dunning / cancel): drop entitlements, keep data + top-up credits.
+      await supabase.from('subscriptions').update({ status: 'canceled', plan: 'free', scheduled_plan: null, updated_at: new Date().toISOString() }).eq('owner_id', userId)
+      await supabase.from('user_profiles').update({ subscription_status: 'canceled' }).eq('user_id', userId)
+      await supabase.rpc('apply_plan', { p_user: userId, p_plan: 'free', p_reset: null })
       break
     }
 
     case 'invoice.payment_failed': {
       const invoice = event.data.object as Stripe.Invoice
       const sub = await stripe.subscriptions.retrieve(invoice.subscription as string)
-      const userId = sub.metadata?.user_id
+      const userId = sub.metadata?.owner_id || sub.metadata?.user_id
       if (!userId) break
+      await supabase.from('subscriptions').update({ status: 'past_due', updated_at: new Date().toISOString() }).eq('owner_id', userId)
+      await supabase.from('user_profiles').update({ subscription_status: 'past_due' }).eq('user_id', userId)
+      break
+    }
 
-      await supabase.from('user_profiles').update({
-        subscription_status: 'past_due',
-      }).eq('user_id', userId)
+    case 'invoice.payment_succeeded': {
+      // Renewal: apply any scheduled downgrade now (downgrade-at-period-end, spec §5).
+      const invoice = event.data.object as Stripe.Invoice
+      if (!invoice.subscription) break
+      const sub = await stripe.subscriptions.retrieve(invoice.subscription as string)
+      const userId = sub.metadata?.owner_id || sub.metadata?.user_id
+      if (!userId) break
+      const periodEnd = new Date((sub as any).current_period_end * 1000).toISOString()
+      const { data: row } = await supabase.from('subscriptions').select('scheduled_plan').eq('owner_id', userId).maybeSingle()
+      const scheduled = (row as any)?.scheduled_plan
+      if (scheduled) {
+        await supabase.from('subscriptions').update({ plan: scheduled, scheduled_plan: null, status: 'active', current_period_end: periodEnd, updated_at: new Date().toISOString() }).eq('owner_id', userId)
+        await supabase.rpc('apply_plan', { p_user: userId, p_plan: scheduled, p_reset: periodEnd })
+      } else {
+        await supabase.from('subscriptions').update({ status: 'active', current_period_end: periodEnd, updated_at: new Date().toISOString() }).eq('owner_id', userId)
+      }
       break
     }
   }
