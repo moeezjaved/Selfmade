@@ -101,7 +101,9 @@ export function buildStudioPrompt(opts: {
         opts.fonts?.heading && `headings "${opts.fonts.heading}"${opts.fonts?.headingWeight ? ` weight ${opts.fonts.headingWeight}` : ''}`,
         opts.fonts?.body && `body "${opts.fonts.body}"${opts.fonts?.bodyWeight ? ` weight ${opts.fonts.bodyWeight}` : ''}`,
       ].filter(Boolean).join(', ')} (or closest match).`
-    : `Typography must be DISTINCTIVE and premium — take direct cues from the reference designs' type treatment (a characterful display/editorial or bold grotesque face with strong weight and size hierarchy). Do NOT default to plain Arial/Helvetica/system fonts.`
+    : (opts.numInspirations > 0
+        ? `No brand fonts are set — so DERIVE the typography from the reference designs (images 1-${opts.numInspirations}): closely echo their typeface CHARACTER (display/serif/grotesque), weight contrast, letter-spacing, case, and headline-to-body hierarchy. Do NOT default to plain Arial/Helvetica/system fonts.`
+        : `Typography must be DISTINCTIVE and premium — a characterful display/editorial or bold grotesque with strong weight and size hierarchy. Do NOT default to plain Arial/Helvetica/system fonts.`)
   const ins = opts.insights || {}
   const insightLine = [
     ins.topHooks?.length && `proven hook styles: ${ins.topHooks.slice(0, 3).join(', ')}`,
