@@ -51,6 +51,11 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [result, setResult] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Iterative edit loop (chat-style) on the generated image — each edit charges credits.
+  const [editText, setEditText] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [history, setHistory] = useState<string[]>([]) // previous images, for undo
+
   // Load the user's brands (+ quota) on open.
   useEffect(() => {
     ;(async () => {
@@ -160,7 +165,34 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     finally { setBusy(false) }
   }
 
+  const applyEdit = async () => {
+    if (!result || !editText.trim()) return
+    setEditing(true); setErr(null)
+    try {
+      const r = await fetch('/api/discovery/edit-image', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image: result, instruction: editText.trim(), tier }),
+      })
+      const j = await r.json()
+      if (!r.ok) {
+        setErr(j.error === 'insufficient_credits' ? 'Not enough credits for this edit.' : j.error || 'Edit failed — try again.')
+        return
+      }
+      setHistory((h) => [...h, result])   // enable undo
+      setResult(j.image)
+      setEditText('')
+    } catch (e: any) { setErr(String(e?.message || e)) }
+    finally { setEditing(false) }
+  }
+
+  const undo = () => setHistory((h) => {
+    if (!h.length) return h
+    setResult(h[h.length - 1])
+    return h.slice(0, -1)
+  })
+
   const cost = tier === 'pro' ? 10 : 5
+  const editCost = tier === 'pro' ? 4 : 2
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -250,18 +282,40 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
             </button>
           </div>
 
-          {/* ── result ── */}
+          {/* ── result + chat-style edit loop ── */}
           {result && (
             <div style={{ padding: 20, borderLeft: '1px solid #1c2620', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <Label>Your cloned ad</Label>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={result} alt="cloned ad" style={{ width: '100%', borderRadius: 12, border: '1px solid #223' }} />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <a href={result} download={`clone-${ad.id}.png`} style={{ ...btnPrimary, flex: 1, textDecoration: 'none', justifyContent: 'center' }}>
-                  <Download size={15} /> Download
-                </a>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Label>Your cloned ad</Label>
+                {history.length > 0 && (
+                  <button onClick={undo} style={{ background: 'transparent', border: '1px solid #2c4030', color: '#9fb0a4', borderRadius: 8, padding: '4px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>↶ Undo</button>
+                )}
               </div>
-              <p style={{ fontSize: 11.5, color: '#8aa', margin: 0 }}>Tweak the headline or swap photos on the left and hit Regenerate to iterate.</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <div style={{ position: 'relative' }}>
+                <img src={result} alt="cloned ad" style={{ width: '100%', borderRadius: 12, border: '1px solid #223', opacity: editing ? 0.5 : 1 }} />
+                {editing && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: LIME, gap: 8, fontSize: 13, fontWeight: 600 }}><Loader2 size={18} className="spin" /> Editing…</div>}
+              </div>
+
+              {/* Edit box — describe a change, each edit charges credits (Imaginetive-style). */}
+              <div style={{ background: '#0a0f0c', border: '1px solid #24331d', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <textarea value={editText} onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) applyEdit() }}
+                  placeholder="Tweak this creative — what to change? (headline, subhead, copy, colors, scene, background…)"
+                  rows={2}
+                  style={{ background: 'transparent', border: 'none', color: '#e8f0e8', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'vertical' }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: '#7a8a7e' }}>{editCost} credits per edit · ⌘↵ to apply</span>
+                  <button onClick={applyEdit} disabled={editing || !editText.trim()} style={{ ...btnPrimary, padding: '8px 14px', fontSize: 12.5, opacity: (editing || !editText.trim()) ? 0.6 : 1 }}>
+                    {editing ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />} Apply edit · {editCost} cr
+                  </button>
+                </div>
+              </div>
+
+              <a href={result} download={`clone-${ad.id}.png`} style={{ ...btnPrimary, textDecoration: 'none', justifyContent: 'center' }}>
+                <Download size={15} /> Download
+              </a>
+              <p style={{ fontSize: 11.5, color: '#8aa', margin: 0 }}>Iterate with edits above, or swap photos on the left and Regenerate for a fresh clone.</p>
             </div>
           )}
         </div>
