@@ -82,9 +82,9 @@ export default function TrendingPage() {
                   <Search size={14} color="#9ca3af" />
                   <input autoFocus value={nicheQuery} onChange={e => setNicheQuery(e.target.value)} placeholder="Search industries…" style={{ border: 'none', outline: 'none', fontSize: 13, flex: 1, fontFamily: 'inherit' }} />
                 </div>
-                <button onClick={() => { setNiche(''); setPickerOpen(false); setNicheQuery('') }} style={nOpt(niche === '')}>All</button>
+                <button onClick={() => { setNiche(''); setDrill(null); setPickerOpen(false); setNicheQuery('') }} style={nOpt(niche === '')}>All</button>
                 {filteredNiches.map(n => (
-                  <button key={n} onClick={() => { setNiche(n); setPickerOpen(false); setNicheQuery('') }} style={nOpt(niche === n)}>{n}</button>
+                  <button key={n} onClick={() => { setNiche(n); setDrill(null); setPickerOpen(false); setNicheQuery('') }} style={nOpt(niche === n)}>{n}</button>
                 ))}
               </div>
             )}
