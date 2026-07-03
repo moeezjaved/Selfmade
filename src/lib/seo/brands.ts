@@ -37,11 +37,14 @@ export type BrandAd = {
   days_running: number | null; performance_tier: string | null; creatives: BrandCreative[]
 }
 export type BrandContent = { headline: string | null; intro_md: string | null; meta_description: string | null }
+export type Tally = { label: string; count: number }
+export type BrandInsights = { topHooks: Tally[]; topEmotions: Tally[]; topAngles: Tally[]; topFormats: Tally[]; topTopics: Tally[]; classified: number }
 export type BrandPage = {
   ref: BrandRef
   niche: string | null
   activeCount: number
   longestRunningDays: number
+  insights: BrandInsights      // creative-DNA teasers (top hooks/emotions/angles/formats) from the ad sample
   ads: BrandAd[]        // display sample (deduped, best-first)
   indexable: boolean    // adCount >= MIN_INDEXABLE_ADS
   content: BrandContent | null   // unique AI copy (seo-content-worker); null → page uses the template
@@ -104,11 +107,12 @@ export async function resolveSlug(slug: string): Promise<BrandRef | null> {
 // per page_id (revalidate ~6h via unstable_cache; the route also sets ISR revalidate).
 export const getBrandPage = unstable_cache(
   async (ref: BrandRef): Promise<BrandPage> => {
+    const EMPTY_INSIGHTS: BrandInsights = { topHooks: [], topEmotions: [], topAngles: [], topFormats: [], topTopics: [], classified: 0 }
     const db = readClientSafe()
-    if (!db) return { ref, niche: null, activeCount: 0, longestRunningDays: 0, ads: [], indexable: ref.adCount >= MIN_INDEXABLE_ADS, content: null }
+    if (!db) return { ref, niche: null, activeCount: 0, longestRunningDays: 0, insights: EMPTY_INSIGHTS, ads: [], indexable: ref.adCount >= MIN_INDEXABLE_ADS, content: null }
     const { data: rows } = await db
       .from('discovery_ads_index')
-      .select('ad_id, body, start_date, is_active, days_running, performance_tier, niche, discovery_creatives(asset_type,r2_url,poster_url,position,width,height)')
+      .select('ad_id, body, start_date, is_active, days_running, performance_tier, niche, hook_type, emotion, angle, format_style, topics, discovery_creatives(asset_type,r2_url,poster_url,position,width,height)')
       .eq('page_id', ref.pageId)
       .eq('has_creative', true)
       .order('performance_score', { ascending: false, nullsFirst: false })
@@ -118,6 +122,10 @@ export const getBrandPage = unstable_cache(
     const seenKey = new Set<string>()
     let niche: string | null = null
     let longest = 0
+    // Creative-DNA frequency tallies over the (top-performing) sample → teasers on the page.
+    const hookF = new Map<string, number>(), emoF = new Map<string, number>(), angF = new Map<string, number>(), fmtF = new Map<string, number>(), topF = new Map<string, number>()
+    const bump = (m: Map<string, number>, k: any) => { if (k) m.set(String(k), (m.get(String(k)) || 0) + 1) }
+    let classified = 0
     for (const r of (rows || []) as any[]) {
       const cres: BrandCreative[] = (r.discovery_creatives || [])
         .slice()
@@ -129,12 +137,22 @@ export const getBrandPage = unstable_cache(
       seenKey.add(key)
       if (!niche && r.niche) niche = r.niche
       if ((r.days_running ?? 0) > longest) longest = r.days_running ?? 0
+      if (r.hook_type || (r.emotion && r.emotion.length)) classified++
+      bump(hookF, r.hook_type); bump(angF, r.angle)
+      bump(fmtF, r.format_style || (first.asset_type === 'video' ? 'Video' : 'Image / Graphic'))
+      for (const e of (r.emotion || [])) bump(emoF, e)
+      for (const t of (r.topics || [])) bump(topF, t)
       ads.push({
         ad_id: r.ad_id, body: r.body, start_date: r.start_date, is_active: !!r.is_active,
         days_running: r.days_running, performance_tier: r.performance_tier, creatives: cres,
       })
     }
     const activeCount = ads.filter((a) => a.is_active).length
+    const topN = (m: Map<string, number>, n: number): Tally[] => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, count]) => ({ label, count }))
+    const insights: BrandInsights = {
+      topHooks: topN(hookF, 4), topEmotions: topN(emoF, 5), topAngles: topN(angF, 3),
+      topFormats: topN(fmtF, 3), topTopics: topN(topF, 6), classified,
+    }
 
     // Unique AI copy (seo-content-worker) if generated; graceful null → the page falls back to the
     // template. Missing table (pre-migration) also degrades to null.
@@ -149,7 +167,7 @@ export const getBrandPage = unstable_cache(
     } catch { /* table not present yet → template fallback */ }
 
     return {
-      ref, niche, activeCount, longestRunningDays: longest,
+      ref, niche, activeCount, longestRunningDays: longest, insights,
       ads: ads.slice(0, 48),
       indexable: ref.adCount >= MIN_INDEXABLE_ADS,
       content,
