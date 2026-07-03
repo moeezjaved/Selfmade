@@ -8,7 +8,8 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-const DEFAULTS = { in_app: true, instant_email: false, digest_frequency: 'weekly' as const }
+// Emails are OPT-IN (they cost 2 credits each), so both default OFF. Only in-app is on by default.
+const DEFAULTS = { in_app: true, instant_email: false, digest_frequency: 'off' as const }
 
 export async function GET() {
   const supabase = await createClient()
@@ -29,7 +30,7 @@ export async function PUT(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({}))
 
-  const digest = ['weekly', 'daily', 'off'].includes(body.digest_frequency) ? body.digest_frequency : 'weekly'
+  const digest = ['weekly', 'daily', 'off'].includes(body.digest_frequency) ? body.digest_frequency : 'off'
   const row = {
     user_id: user.id,
     in_app: body.in_app !== false,                 // default true

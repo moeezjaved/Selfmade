@@ -27,6 +27,30 @@ export async function sendEmail({ to, subject, html }) {
   } catch (e) { console.warn('email send failed:', e?.message || e); return false }
 }
 
+const SB_H = { apikey: K, Authorization: `Bearer ${K}`, 'Content-Type': 'application/json' }
+const rpc = (fn, body) => fetch(`${U}/rest/v1/rpc/${fn}`, { method: 'POST', headers: SB_H, body: JSON.stringify(body) })
+
+/**
+ * Charge N credits (priced by `action` in credit_pricing) for an email, THEN send it, then commit —
+ * or refund if the send fails so we never charge for a non-delivered email. Returns a reason so the
+ * caller can skip users with no credits. reserve_credits() raises 'insufficient_credits'.
+ */
+export async function sendPaidEmail({ to, userId, action, subject, html }) {
+  if (!emailEnabled) return { sent: false, reason: 'no_key' }
+  if (!U || !K || !userId) return { sent: false, reason: 'no_user' }
+  const rr = await rpc('reserve_credits', { p_user: userId, p_action: action })
+  if (!rr.ok) {
+    const t = await rr.text().catch(() => '')
+    return { sent: false, reason: t.includes('insufficient_credits') ? 'insufficient_credits' : 'reserve_failed' }
+  }
+  const tx = await rr.json().catch(() => null)
+  const txId = Array.isArray(tx) ? tx[0]?.id : tx?.id
+  const sent = await sendEmail({ to, subject, html })
+  if (sent) { if (txId) await rpc('commit_credits', { p_tx: txId }).catch(() => {}); return { sent: true } }
+  if (txId) await rpc('refund_credits', { p_tx: txId }).catch(() => {})   // don't charge for a failed send
+  return { sent: false, reason: 'send_failed' }
+}
+
 /** Look up a user's email via the Supabase Auth admin API (service-role only). */
 export async function getUserEmail(userId) {
   if (!U || !K) return null
