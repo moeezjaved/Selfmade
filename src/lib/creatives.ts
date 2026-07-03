@@ -30,7 +30,10 @@ export async function saveGeneration(input: SaveGenerationInput): Promise<{ id: 
     const buf = Buffer.from(input.dataB64, 'base64')
     const ext = input.mimeType.includes('png') ? 'png' : input.mimeType.includes('webp') ? 'webp' : 'jpg'
     const url = await uploadBufferToR2(buf, keyFor(input.userId, ext), input.mimeType || 'image/png')
-    if (!url) return null
+    if (!url) {
+      console.warn('saveGeneration: R2 upload returned null — is R2 configured on this deploy? (R2_ACCOUNT_ID/ACCESS_KEY_ID/SECRET_ACCESS_KEY/BUCKET_NAME/PUBLIC_URL)')
+      return null
+    }
 
     const admin = createAdminClient()
     const { data, error } = await admin.from('creative_generations').insert({
@@ -43,9 +46,10 @@ export async function saveGeneration(input: SaveGenerationInput): Promise<{ id: 
       prompt: input.prompt || null,
       image_url: url,
     }).select('id').single()
-    if (error || !data) return null
+    if (error || !data) { console.warn('saveGeneration: insert failed:', error?.message); return null }
     return { id: (data as any).id, url }
-  } catch {
+  } catch (e: any) {
+    console.warn('saveGeneration: threw:', String(e?.message || e))
     return null
   }
 }
