@@ -59,13 +59,14 @@ export function buildClonePrompt(opts: {
     d.emotion?.length && `emotional tone (${d.emotion.slice(0, 2).join(', ')})`,
   ].filter(Boolean).join(', ')
   return [
-    `Recreate the winning Facebook ad (image 1) for a NEW product (image 2).`,
-    `KEEP EXACTLY: the layout, composition, camera angle, lighting, color palette, and text placement${keep ? `, plus the ${keep}` : ''}.`,
-    `REPLACE: the featured product with the product in image 2 — preserve its EXACT shape, packaging, label, and colors. Do NOT redesign, restyle, or relabel the product.`,
-    opts.brandName ? `Set the brand name to "${opts.brandName}".` : '',
-    opts.colors?.length ? `Use these brand colors where the design allows: ${opts.colors.join(', ')}.` : '',
-    opts.newHeadline ? `Change the main on-screen headline to: "${opts.newHeadline}".` : `Keep the headline layout but make the copy relevant to the new product.`,
-    d.cta ? `Keep a clear call-to-action ("${d.cta}").` : '',
-    `Output ONE photorealistic ad image, same aspect ratio as image 1, ad-ready with legible text.`,
+    `Recreate the winning Facebook ad (image 1) as a template, but featuring the user's real product shown in the OTHER attached image(s).`,
+    `KEEP the ad's layout, composition, camera angle, lighting, color palette, and text placement${keep ? `, plus the ${keep}` : ''}.`,
+    `PRODUCT — this is critical: the product in the attached product photo(s) is the user's ACTUAL product. Place THAT exact product into the ad, reproduced faithfully — same shape, proportions, packaging, label text, and colors. It must be clearly visible and be the ONLY product shown. Do NOT invent, redraw, simplify, or substitute a different-looking product; copy the real one from the photo.`,
+    opts.brandName ? `The brand is "${opts.brandName}".` : '',
+    opts.colors?.length ? `Brand colors to favor where the design allows: ${opts.colors.join(', ')}.` : '',
+    opts.newHeadline ? `On-screen headline — render this text EXACTLY, letter for letter: "${opts.newHeadline}".` : `Keep the headline layout; write short ad copy relevant to this product.`,
+    d.cta ? `Include a clear call-to-action button ("${d.cta}").` : '',
+    `TEXT: spell every word correctly using real English — never output invented, garbled, or misspelled words. Keep all text crisp and legible.`,
+    `Output ONE photorealistic, ad-ready image at the same aspect ratio as image 1.`,
   ].filter(Boolean).join(' ')
 }
