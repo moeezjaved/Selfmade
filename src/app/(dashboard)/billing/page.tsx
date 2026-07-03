@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import PricingSection from '@/components/pricing/PricingSection'
 
 interface Profile {
   subscription_status: string
@@ -85,9 +86,16 @@ export default function BillingPage() {
   const isLocked = isPastDue || isCanceled || (status === 'trialing' && trialEnded) || expired
 
   return (
-    <div style={{ padding: '32px 28px', maxWidth: 680, fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a3a1a', marginBottom: 4 }}>Billing</h1>
-      <p style={{ fontSize: 13, color: '#7a9a7a', marginBottom: 28 }}>Manage your Selfmade subscription</p>
+    <div style={{ padding: '32px 28px', maxWidth: 1120, fontFamily: 'system-ui, sans-serif' }}>
+      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a3a1a', marginBottom: 4 }}>Billing & plans</h1>
+      <p style={{ fontSize: 13, color: '#7a9a7a', marginBottom: 28 }}>Choose a plan, buy top-ups, or manage your subscription.</p>
+
+      {/* Full pricing (shared with the landing page — one source of truth). */}
+      <div style={{ marginBottom: 40 }}>
+        <PricingSection variant="dashboard" />
+      </div>
+
+      <div style={{ maxWidth: 680 }}>
 
       {/* Trial expired / access locked banner */}
       {isLocked && (
@@ -234,6 +242,7 @@ export default function BillingPage() {
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }
