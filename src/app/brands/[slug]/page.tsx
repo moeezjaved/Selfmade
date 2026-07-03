@@ -110,6 +110,33 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
         </div>
       </header>
 
+      {/* Creative-DNA teasers — the intelligence we collect, to make visitors curious for the full set */}
+      {page.insights.classified > 0 && (
+        <section style={{ margin: '4px 0 28px', padding: '20px 22px', background: '#f8fcf6', border: '1px solid #e6ede2', borderRadius: 14 }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: '#1a3a1a', marginBottom: 2 }}>What we found in {name}'s ads</div>
+          <div style={{ fontSize: 13, color: '#5a7a5a', marginBottom: 16 }}>Creative DNA from their top-performing ads — analyzed by AI.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 18 }}>
+            <InsightBlock title="Top hooks" items={page.insights.topHooks} />
+            <InsightBlock title="Emotions they trigger" items={page.insights.topEmotions} />
+            <InsightBlock title="Angles" items={page.insights.topAngles} />
+            <InsightBlock title="Ad formats" items={page.insights.topFormats} />
+          </div>
+          {page.insights.topTopics.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#6b8f6b', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 7 }}>Themes they run</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {page.insights.topTopics.map((t) => (
+                  <span key={t.label} style={{ fontSize: 12, fontWeight: 600, color: '#1a3a1a', background: '#eef6e6', padding: '5px 11px', borderRadius: 100, textTransform: 'capitalize' }}>{t.label}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ marginTop: 16, fontSize: 13, color: '#2d6a00', fontWeight: 700 }}>
+            Unlock the full breakdown — CTAs, personas, hook-by-hook analysis + performance scores for all {ref.adCount.toLocaleString()} ads →
+          </div>
+        </section>
+      )}
+
       {/* Ad grid — free sample */}
       {freeAds.length === 0 ? (
         <p style={{ color: '#6b7280' }}>Ads for this brand are being processed — check back soon.</p>
@@ -172,6 +199,23 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
         </p>
       </section>
     </main>
+    </div>
+  )
+}
+
+function InsightBlock({ title, items }: { title: string; items: { label: string; count: number }[] }) {
+  if (!items.length) return null
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#6b8f6b', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>{title}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {items.map((it) => (
+          <div key={it.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#1a2e1a' }}>{it.label}</span>
+            <span style={{ fontSize: 11, color: '#5a7a5a', background: '#eef6e6', padding: '2px 8px', borderRadius: 100, flexShrink: 0 }}>{it.count}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
