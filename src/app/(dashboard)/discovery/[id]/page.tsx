@@ -4,6 +4,7 @@
  *   [ad preview] [ad info] [save details + Atria-AI clone]
  */
 import { useEffect, useState } from 'react'
+import CloneModal from '../CloneModal'
 import { useParams, useRouter } from 'next/navigation'
 import { X, Bookmark, Link as LinkIcon, Download, Sparkles, ExternalLink } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
@@ -250,6 +251,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 function AiPanel({ ad }: { ad: Ad }) {
   const { balance, pricing } = useCredits()
   const isVideo = ad.format === 'Video' || !!ad.videoUrl
+  const [cloneOpen, setCloneOpen] = useState(false)
   const [script, setScript] = useState<any>(null)
   const [thin, setThin] = useState(false)
   const [gen, setGen] = useState<string | null>(null)
@@ -320,10 +322,11 @@ function AiPanel({ ad }: { ad: Ad }) {
         )
       ) : (
         <>
-          <button style={{ ...ctaS, opacity: 0.5, cursor: 'not-allowed' }} disabled title="Image clone — coming soon">
-            <Sparkles size={16} /> Clone ad · {cost('image_clone', 26)} cr
+          <button style={ctaS} onClick={() => setCloneOpen(true)}>
+            <Sparkles size={16} /> Clone ad · from {cost('image_clone', 5)} cr
           </button>
-          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Image cloning ships once the provider keys are in.</div>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Composite your product onto this winning ad — Standard or Pro.</div>
+          {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName }} onClose={() => setCloneOpen(false)} />}
         </>
       )}
       {err && <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626' }}>{err}</div>}
