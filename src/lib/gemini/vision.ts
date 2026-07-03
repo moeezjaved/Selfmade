@@ -24,7 +24,15 @@ export async function classifyInspiration(
   image: { mimeType: string; dataB64: string },
   nicheVocab?: string[]
 ): Promise<InspirationTags | null> {
-  if (!KEY) return null
+  return (await classifyInspirationDebug(image, nicheVocab)).tags
+}
+
+/** Same as classifyInspiration but returns the failure reason (for admin diagnostics). */
+export async function classifyInspirationDebug(
+  image: { mimeType: string; dataB64: string },
+  nicheVocab?: string[]
+): Promise<{ tags: InspirationTags | null; error?: string }> {
+  if (!KEY) return { tags: null, error: 'GEMINI_API_KEY not set' }
   const nicheLine = nicheVocab?.length
     ? `"niche": pick the SINGLE best match from this list (exact string), or null if none fit: ${JSON.stringify(nicheVocab)}.`
     : `"niche": a short lowercase industry/niche label (e.g. "skincare", "supplements", "apparel"), or null.`
@@ -45,25 +53,28 @@ export async function classifyInspiration(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: image.mimeType, data: image.dataB64 } }] }],
-        generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+        generationConfig: { temperature: 0.1 },
       }),
     })
-    if (!r.ok) return null
+    if (!r.ok) return { tags: null, error: `gemini ${r.status} [${MODEL}]: ${(await r.text().catch(() => '')).slice(0, 200)}` }
     const j = await r.json()
-    const txt = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('')
-    if (!txt) return null
-    const parsed = JSON.parse(txt)
+    let txt = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('').trim()
+    if (!txt) return { tags: null, error: `no text in response (finishReason: ${j?.candidates?.[0]?.finishReason || '?'})` }
+    // Strip ```json fences the model sometimes adds.
+    txt = txt.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '')
+    const jsonSlice = txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1)
+    const parsed = JSON.parse(jsonSlice || txt)
     const asArr = (v: any) => Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, 6) : []
     const fmt = ['image', 'story', 'carousel'].includes(parsed.format) ? parsed.format : 'image'
-    return {
-      niche: typeof parsed.niche === 'string' && parsed.niche.trim() ? parsed.niche.trim() : null,
+    return { tags: {
+      niche: typeof parsed.niche === 'string' && parsed.niche.trim() && parsed.niche.toLowerCase() !== 'null' ? parsed.niche.trim() : null,
       format: fmt,
       aspect: typeof parsed.aspect === 'string' ? parsed.aspect : null,
       palette: asArr(parsed.palette),
       style_tags: asArr(parsed.style_tags),
       layout_type: typeof parsed.layout_type === 'string' ? parsed.layout_type : null,
-    }
-  } catch { return null }
+    } }
+  } catch (e: any) { return { tags: null, error: `parse/throw: ${String(e?.message || e).slice(0, 200)}` } }
 }
 
 /**

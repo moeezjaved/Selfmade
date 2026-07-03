@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/server'
 import { verifyAdminRequest } from '@/lib/admin/auth'
 import { uploadBufferToR2 } from '@/lib/r2'
-import { classifyInspiration } from '@/lib/gemini/vision'
+import { classifyInspirationDebug } from '@/lib/gemini/vision'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
     const url = await uploadBufferToR2(buf, `inspirations/${randomUUID()}.${ext}`, mime)
     if (!url) { errors.push('R2 upload failed (R2 env not set?)'); continue }
 
-    const tags = await classifyInspiration({ mimeType: mime, dataB64: m[2] }, nicheVocab).catch(() => null)
+    const { tags, error: tagErr } = await classifyInspirationDebug({ mimeType: mime, dataB64: m[2] }, nicheVocab).catch((e) => ({ tags: null, error: String(e?.message || e) }))
+    if (!tags && tagErr) errors.push(`tag: ${tagErr}`)
     const { data: row, error } = await admin.from('ad_inspirations').insert({
       r2_url: url,
       niche: tags?.niche || null,
