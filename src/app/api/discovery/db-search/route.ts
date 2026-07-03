@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
     const evalToken = process.env.SEARCH_EVAL_TOKEN
     const isEval = !!evalToken && request.headers.get('x-eval-token') === evalToken
 
+    let userId: string | null = null
     if (!isEval) {
       const supabase = await createClient()
       // PERF: use the LOCAL session (decoded from the cookie, no network) instead of getUser()
@@ -69,6 +70,7 @@ export async function GET(request: NextRequest) {
       // admin/replica client and the request is already authenticated upstream.
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      userId = session.user.id
     }
 
     const admin = createReadClient()   // serving reads → replica when SUPABASE_READ_URL set
@@ -102,6 +104,18 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get('sort') || 'recent'
     const days = parseInt(searchParams.get('days') || '0')
     const page = parseInt(searchParams.get('page') || '0')
+
+    // Free-plan discovery cap (spec §4.2): Free sees ~3 pages/query. Only look up the plan past the
+    // boundary so the common fast path stays unchanged. Returns an empty page + upsell flag → the
+    // feed stops loading and the client can nudge to upgrade.
+    if (!isEval && userId && page >= 3) {
+      const { getEntitlements } = await import('@/lib/entitlements')
+      const { createAdminClient } = await import('@/lib/supabase/server')
+      const ent = await getEntitlements(createAdminClient(), userId)
+      if (ent.discoveryPages !== null && page >= ent.discoveryPages) {
+        return NextResponse.json({ ads: [], hasMore: false, capped: true, upgradeTo: 'starter', message: `Free plan shows ${ent.discoveryPages} pages per search. Upgrade for unlimited results.` })
+      }
+    }
     // 60 (was 40): a fuller first paint so the grid fills a tall screen before the scroll sentinel
     // is in view — no premature "loading more". fetchLimit = 120-row window → ~75-90 unique/page.
     const limit = 60

@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCredits, refreshCredits } from '@/components/credits/CreditCounter'
+import { showUpsell } from '@/components/UpsellModal'
 
 type Brand = { pageId: string; name: string; adCount: number; active: number | null; inactive: number | null; video: number | null; image: number | null; carousel: number | null }
 
@@ -51,7 +52,7 @@ export default function BrandSpyList() {
     try {
       const res = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
       const j = await res.json()
-      if (!res.ok) { setMsg(j.error || 'Failed'); setBusy(null); return }
+      if (!res.ok) { if (showUpsell(j)) { setBusy(null); return } setMsg(j.error || 'Failed'); setBusy(null); return }
       refreshCredits()
       router.push(`/discovery/brand-spy/${j.pageId}`)
     } catch (e) { setMsg(String(e)); setBusy(null) }
