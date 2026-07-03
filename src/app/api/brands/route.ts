@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { persistImagesToR2 } from '@/lib/brand-photos'
+import { sendFirstBrandEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,6 +91,9 @@ export async function POST(req: NextRequest) {
       image_urls: (persisted.length ? persisted : productImages.slice(0, 12)),
     }).then(() => {}, () => {})
   }
+
+  // First-brand lifecycle email (sends once; claim-once guard inside). Never block the response on it.
+  if (user.email) await sendFirstBrandEmail(user.id, user.email, b.name.trim()).catch(() => {})
 
   return NextResponse.json({ brand: data, quota: { used: used + 1, limit } })
 }

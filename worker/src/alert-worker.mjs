@@ -69,8 +69,13 @@ async function tick() {
 
   // ONE bundled email per opted-in user this cycle = 2 credits total (not per brand). Charged before
   // send, refunded on failure; users with no credits are skipped (their in-app notifications stand).
-  let mailed = 0, noCredits = 0
+  // Double opt-in gate: only email users who confirmed their address (better inbox placement).
+  const confirmedRows = await getJSON('user_profiles?select=id&email_confirmed_at=not.is.null').catch(() => [])
+  const confirmed = new Set((confirmedRows || []).map(r => r.id))
+
+  let mailed = 0, noCredits = 0, unconfirmed = 0
   for (const [userId, items] of emailBundle) {
+    if (!confirmed.has(userId)) { unconfirmed++; continue }
     const to = await getUserEmail(userId)
     if (!to) continue
     const { subject, html } = newAdBundleEmail({ items })
@@ -78,7 +83,7 @@ async function tick() {
     if (r.sent) mailed++
     else if (r.reason === 'insufficient_credits') noCredits++
   }
-  if (made) console.log(`📢 ${made} new-ad notification(s)${mailed ? `, ${mailed} bundled email(s) sent (2cr each)` : ''}${noCredits ? `, ${noCredits} skipped (no credits)` : ''} across ${follows.length} follows`)
+  if (made) console.log(`📢 ${made} new-ad notification(s)${mailed ? `, ${mailed} bundled email(s) sent (2cr each)` : ''}${noCredits ? `, ${noCredits} skipped (no credits)` : ''}${unconfirmed ? `, ${unconfirmed} skipped (email unconfirmed)` : ''} across ${follows.length} follows`)
 }
 
 console.log(`🔔 alert-worker up — checking followed brands every ${Math.round(EVERY / 60000)} min`)
