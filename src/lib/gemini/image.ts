@@ -28,8 +28,12 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
   if (!KEY) return { ok: false, error: 'GEMINI_API_KEY not set' }
   const parts: any[] = [{ text: prompt }, ...images.map((i) => ({ inline_data: { mime_type: i.mimeType, data: i.dataB64 } }))]
   const generationConfig: any = { responseModalities: ['IMAGE'] }
-  // gemini image models accept imageConfig.aspectRatio (e.g. "1:1", "4:5", "9:16"). Omit for "original".
-  if (opts?.aspectRatio && opts.aspectRatio !== 'original') generationConfig.imageConfig = { aspectRatio: opts.aspectRatio }
+  // gemini-3-pro-image accepts imageConfig { aspectRatio, imageSize }. imageSize (1K/2K/4K) controls
+  // resolution → cost; default 2K. Only sent for the Pro model (standard model rejects it).
+  const imageConfig: any = {}
+  if (opts?.aspectRatio && opts.aspectRatio !== 'original') imageConfig.aspectRatio = opts.aspectRatio
+  if (tier === 'pro') imageConfig.imageSize = process.env.GEMINI_IMAGE_SIZE || '2K'
+  if (Object.keys(imageConfig).length) generationConfig.imageConfig = imageConfig
   try {
     const r = await fetch(`${BASE}/${modelFor(tier)}:generateContent?key=${KEY}`, {
       method: 'POST',
