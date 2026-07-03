@@ -4,6 +4,7 @@
  * Best-effort: if R2 isn't configured or the upload fails, returns null and the caller still
  * returns the inline data URL (the user gets their image; it just isn't saved to the gallery).
  */
+import { randomUUID } from 'node:crypto'
 import { uploadBufferToR2 } from '@/lib/r2'
 import { createAdminClient } from '@/lib/supabase/server'
 
@@ -20,9 +21,9 @@ export type SaveGenerationInput = {
 }
 
 function keyFor(userId: string, ext: string) {
-  // Unique-ish key without Date.now/Math.random dependence issues in edge/runtime: user + hrtime.
-  const rand = Buffer.from(`${userId}:${process.hrtime.bigint()}`).toString('hex').slice(0, 24)
-  return `creatives/${userId}/${rand}.${ext}`
+  // MUST be globally unique — a colliding key overwrites earlier creatives (immutable cache = all show
+  // the same image). randomUUID guarantees uniqueness.
+  return `creatives/${userId}/${randomUUID()}.${ext}`
 }
 
 export async function saveGeneration(input: SaveGenerationInput): Promise<{ id: string; url: string } | null> {
