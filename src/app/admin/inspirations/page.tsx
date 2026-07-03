@@ -41,7 +41,7 @@ export default function InspirationsAdmin() {
           method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ images: chunk }),
         }).then(r => r.json()).catch((e) => ({ saved: [], errors: [String(e?.message || e)] }))
         if (j.saved?.length) setItems(prev => [...j.saved, ...prev])
-        if (!j.saved?.length && j.errors?.length) setUploadErr(j.errors[0])
+        if (j.errors?.length) setUploadErr(j.errors[0])
         setProgress({ done: Math.min(i + BATCH, dataUrls.length), total: dataUrls.length })
       }
     } finally { setUploading(false); setProgress(null); if (fileRef.current) fileRef.current.value = '' }
@@ -78,8 +78,8 @@ export default function InspirationsAdmin() {
         </div>
       </div>
       {uploadErr && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 16 }}>
-          Upload failed: <b>{uploadErr}</b>{/schema cache|does not exist|find the table/i.test(uploadErr) ? ' — reload the PostgREST schema cache (Supabase → Settings → API → Reload schema cache), then retry.' : ''}
+        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 16 }}>
+          Heads up: <b>{uploadErr}</b>{/schema cache|does not exist|find the table/i.test(uploadErr) ? ' — reload the PostgREST schema cache, then retry.' : /^tag:/.test(uploadErr) ? ' — images still saved, but auto-tagging failed (retrieval falls back to a general pool).' : ''}
         </div>
       )}
 
