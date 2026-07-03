@@ -79,7 +79,7 @@ export function emailShell({ heading, bodyHtml, ctaText, ctaPath }) {
 </div>`
 }
 
-/** One brand's new-ad alert email. */
+/** One brand's new-ad alert email (kept for one-off use). */
 export function newAdEmail({ brandName, adCount, pageId }) {
   return {
     subject: `${brandName || 'A brand you follow'} just launched ${adCount} new ${adCount === 1 ? 'ad' : 'ads'}`,
@@ -88,6 +88,24 @@ export function newAdEmail({ brandName, adCount, pageId }) {
       bodyHtml: `A brand you're tracking just shipped fresh creative. See what they're testing — hooks, angles, and how it compares to their winners.`,
       ctaText: `See the new ${adCount === 1 ? 'ad' : 'ads'} →`,
       ctaPath: pageId ? `/discovery/brand-spy/${pageId}` : '/discovery/following',
+    }),
+  }
+}
+
+/** BUNDLED alert: ALL of a user's followed brands that shipped ads this cycle, in ONE email (2 credits
+ * total, not per-brand). items = [{ brandName, count, pageId }]. */
+export function newAdBundleEmail({ items }) {
+  const nBrands = items.length
+  const totalAds = items.reduce((s, i) => s + (i.count || 0), 0)
+  const rows = items.slice().sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 25)
+    .map((i) => `<div style="padding:9px 0;border-bottom:1px solid #f0f4ee;font-size:14px"><b style="color:#1a2e1a">${i.brandName || 'A brand you follow'}</b> <span style="color:#5a7a5a">— ${i.count} new ${i.count === 1 ? 'concept' : 'concepts'}</span></div>`).join('')
+  return {
+    subject: `${nBrands} ${nBrands === 1 ? 'brand' : 'brands'} you follow launched ${totalAds} new ${totalAds === 1 ? 'ad' : 'ads'}`,
+    html: emailShell({
+      heading: `${nBrands} ${nBrands === 1 ? 'brand' : 'brands'} you follow just shipped new ads`,
+      bodyHtml: `Fresh creative from the competitors you're tracking:<div style="margin-top:14px">${rows}</div>`,
+      ctaText: 'See all the new ads →',
+      ctaPath: '/discovery/following',
     }),
   }
 }
