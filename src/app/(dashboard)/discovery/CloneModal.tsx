@@ -9,6 +9,7 @@
  * auto-detect from the brand's website, or files the user uploads (multiple, swappable).
  */
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Upload, Link2, Loader2, Download, Sparkles, Check } from 'lucide-react'
 
 type Photo = { id: string; src: string; label?: string } // src = data: URL (upload) or http URL (detected/brand)
@@ -48,15 +49,20 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [result, setResult] = useState<string | null>(null)
+  const [results, setResults] = useState<{ url: string; genId: string | null }[]>([])  // generated variations
+  const [activeIdx, setActiveIdx] = useState(0)                    // which variation is open for edit/download
+  const [count, setCount] = useState(1)                            // how many variations to generate
   const [brandId, setBrandId] = useState<string | null>(null)      // selected saved brand (for linking generations)
-  const [genId, setGenId] = useState<string | null>(null)          // current generation id (edit lineage)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [mounted, setMounted] = useState(false)                    // portal guard (SSR-safe)
+  useEffect(() => { setMounted(true) }, [])
 
-  // Iterative edit loop (chat-style) on the generated image — each edit charges credits.
+  // Iterative edit loop (chat-style) — each edit charges credits, applied to the ACTIVE variation.
   const [editText, setEditText] = useState('')
   const [editing, setEditing] = useState(false)
-  const [history, setHistory] = useState<string[]>([]) // previous images, for undo
+  const [history, setHistory] = useState<{ idx: number; url: string }[]>([]) // for undo
+
+  const active = results[activeIdx] || null
 
   // Load the user's brands (+ quota) on open.
   useEffect(() => {
@@ -122,7 +128,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     setErr(null)
     const chosen = photos.filter((p) => selected.includes(p.id)).map((p) => p.src)
     if (chosen.length === 0) { setErr('Add and select at least one product photo.'); return }
-    setBusy(true); setResult(null)
+    setBusy(true); setResults([]); setActiveIdx(0); setHistory([])
     try {
       let useBrandId = brandId
       // If a new brand and "save" is on, persist it first (best-effort; http image URLs only).
@@ -151,40 +157,47 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         }).catch(() => {})
       }
 
-      const r = await fetch('/api/discovery/clone-image', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          adId: ad.id, productImages: chosen, tier, brandId: useBrandId || undefined,
-          brandName: bName.trim() || undefined, colors, newHeadline: headline.trim() || undefined,
-        }),
-      })
-      const j = await r.json()
-      if (!r.ok) {
-        setErr(j.error === 'insufficient_credits' ? 'Not enough credits for this clone.'
+      // Fire `count` clones in parallel — each reserves+charges+saves its own generation, so partial
+      // success is fine (Gemini's inherent randomness makes the variations differ).
+      const body = {
+        adId: ad.id, productImages: chosen, tier, brandId: useBrandId || undefined,
+        brandName: bName.trim() || undefined, colors, newHeadline: headline.trim() || undefined,
+      }
+      const settled = await Promise.all(Array.from({ length: count }, () =>
+        fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+          .then(async (r) => ({ ok: r.ok, j: await r.json().catch(() => ({})) }))
+          .catch(() => ({ ok: false, j: {} as any }))
+      ))
+      const good = settled.filter((s) => s.ok).map((s) => ({ url: s.j.image as string, genId: (s.j.generationId as string) || null }))
+      if (good.length === 0) {
+        const j = settled.find((s) => !s.ok)?.j || {}
+        setErr(j.error === 'insufficient_credits' ? 'Not enough credits.'
           : j.error === 'Image generation not configured (GEMINI_API_KEY)' ? 'Clone isn’t switched on yet (missing API key).'
           : j.error || 'Generation failed — try again.')
         return
       }
-      setResult(j.image); setGenId(j.generationId || null)
+      setResults(good); setActiveIdx(0)
+      if (good.length < count) setErr(`${good.length} of ${count} variations generated (the rest failed).`)
     } catch (e: any) { setErr(String(e?.message || e)) }
     finally { setBusy(false) }
   }
 
   const applyEdit = async () => {
-    if (!result || !editText.trim()) return
+    if (!active || !editText.trim()) return
     setEditing(true); setErr(null)
+    const idx = activeIdx, prevUrl = active.url
     try {
       const r = await fetch('/api/discovery/edit-image', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ image: result, instruction: editText.trim(), tier, parentId: genId || undefined, brandId: brandId || undefined }),
+        body: JSON.stringify({ image: prevUrl, instruction: editText.trim(), tier, parentId: active.genId || undefined, brandId: brandId || undefined }),
       })
       const j = await r.json()
       if (!r.ok) {
         setErr(j.error === 'insufficient_credits' ? 'Not enough credits for this edit.' : j.error || 'Edit failed — try again.')
         return
       }
-      setHistory((h) => [...h, result])   // enable undo
-      setResult(j.image); setGenId(j.generationId || genId)
+      setHistory((h) => [...h, { idx, url: prevUrl }])   // enable undo of this variation
+      setResults((rs) => rs.map((x, i) => i === idx ? { url: j.image, genId: j.generationId || x.genId } : x))
       setEditText('')
     } catch (e: any) { setErr(String(e?.message || e)) }
     finally { setEditing(false) }
@@ -192,16 +205,21 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
   const undo = () => setHistory((h) => {
     if (!h.length) return h
-    setResult(h[h.length - 1])
+    const last = h[h.length - 1]
+    setResults((rs) => rs.map((x, i) => i === last.idx ? { ...x, url: last.url } : x))
     return h.slice(0, -1)
   })
 
   const cost = tier === 'pro' ? 10 : 5
   const editCost = tier === 'pro' ? 4 : 2
+  const hasResults = results.length > 0
 
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(920px, 96vw)', maxHeight: '92vh', overflow: 'auto', background: '#0f1512', border: '1px solid #223', borderRadius: 16, color: '#e8f0e8', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
+  if (!mounted) return null
+  // Rendered through a portal to <body> so the fixed overlay escapes the virtualized ad card's
+  // transform + overflow:hidden (which otherwise clipped it into a narrow strip).
+  return createPortal(
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: hasResults ? 'min(960px, 96vw)' : 'min(560px, 96vw)', maxHeight: '92vh', overflow: 'auto', background: '#0f1512', border: '1px solid #223', borderRadius: 16, color: '#e8f0e8', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
         {/* header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #1c2620', position: 'sticky', top: 0, background: '#0f1512', zIndex: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontWeight: 700, fontSize: 16 }}>
@@ -210,7 +228,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#8aa', cursor: 'pointer' }}><X size={20} /></button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: result ? '1fr 1fr' : '1fr', gap: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: hasResults ? '1fr 1fr' : '1fr', gap: 0 }}>
           {/* ── controls ── */}
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* Brand */}
@@ -274,6 +292,15 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                 <button onClick={() => setTier('default')} style={tierBtn(tier === 'default')}>Standard · 5 cr</button>
                 <button onClick={() => setTier('pro')} style={tierBtn(tier === 'pro')}>Pro · 10 cr</button>
               </div>
+              {/* How many variations to generate (each is its own charge + saved creative). */}
+              <div>
+                <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Variations to generate</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[1, 2, 4, 6, 8].map((n) => (
+                    <button key={n} onClick={() => setCount(n)} style={{ flex: 1, ...tierBtn(count === n), padding: '8px 0' }}>{n}</button>
+                  ))}
+                </div>
+              </div>
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: '#cfe', cursor: 'pointer', background: '#121c15', border: '1px solid #24331d', borderRadius: 10, padding: '10px 12px' }}>
                 <input type="checkbox" checked={emailDaily} onChange={(e) => setEmailDaily(e.target.checked)} style={{ marginTop: 2 }} />
                 <span>📧 <b>Email me new winning ads like this, daily</b><br /><span style={{ color: '#8aa', fontSize: 11.5 }}>Fresh top ads from {ad.pageName || 'this brand'} & its niche — 2 credits per email, cancel anytime in Settings.</span></span>
@@ -283,22 +310,36 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
             {err && <div style={{ background: '#2a1416', border: '1px solid #5a2a2e', color: '#ffb4b4', borderRadius: 10, padding: '10px 12px', fontSize: 12.5 }}>{err}</div>}
 
             <button onClick={generate} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.7 : 1 }}>
-              {busy ? <><Loader2 size={16} className="spin" /> Generating…</> : <><Sparkles size={16} /> {result ? 'Regenerate' : 'Generate clone'} · {cost} cr</>}
+              {busy ? <><Loader2 size={16} className="spin" /> Generating {count > 1 ? `${count} variations` : ''}…</>
+                : <><Sparkles size={16} /> {hasResults ? 'Regenerate' : 'Generate'} {count > 1 ? `${count} variations` : 'clone'} · {cost * count} cr</>}
             </button>
           </div>
 
-          {/* ── result + chat-style edit loop ── */}
-          {result && (
+          {/* ── results + chat-style edit loop ── */}
+          {active && (
             <div style={{ padding: 20, borderLeft: '1px solid #1c2620', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Label>Your cloned ad</Label>
-                {history.length > 0 && (
+                <Label>{results.length > 1 ? `${results.length} variations` : 'Your cloned ad'}</Label>
+                {history.some((h) => h.idx === activeIdx) && (
                   <button onClick={undo} style={{ background: 'transparent', border: '1px solid #2c4030', color: '#9fb0a4', borderRadius: 8, padding: '4px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>↶ Undo</button>
                 )}
               </div>
+
+              {/* Variation thumbnails — click to switch which one you're editing/downloading. */}
+              {results.length > 1 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {results.map((rz, i) => (
+                    <button key={i} onClick={() => setActiveIdx(i)} style={{ width: 54, height: 54, borderRadius: 8, overflow: 'hidden', border: i === activeIdx ? `2px solid ${LIME}` : '2px solid #263', padding: 0, cursor: 'pointer', background: '#0a0f0c' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={rz.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: i === activeIdx ? 1 : 0.6 }} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <div style={{ position: 'relative' }}>
-                <img src={result} alt="cloned ad" style={{ width: '100%', borderRadius: 12, border: '1px solid #223', opacity: editing ? 0.5 : 1 }} />
+                <img src={active.url} alt="cloned ad" style={{ width: '100%', borderRadius: 12, border: '1px solid #223', opacity: editing ? 0.5 : 1 }} />
                 {editing && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: LIME, gap: 8, fontSize: 13, fontWeight: 600 }}><Loader2 size={18} className="spin" /> Editing…</div>}
               </div>
 
@@ -317,16 +358,17 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                 </div>
               </div>
 
-              <a href={result} download={`clone-${ad.id}.png`} style={{ ...btnPrimary, textDecoration: 'none', justifyContent: 'center' }}>
-                <Download size={15} /> Download
+              <a href={active.url} download={`clone-${ad.id}-${activeIdx + 1}.png`} style={{ ...btnPrimary, textDecoration: 'none', justifyContent: 'center' }}>
+                <Download size={15} /> Download{results.length > 1 ? ' this variation' : ''}
               </a>
-              <p style={{ fontSize: 11.5, color: '#8aa', margin: 0 }}>Iterate with edits above, or swap photos on the left and Regenerate for a fresh clone.</p>
+              <p style={{ fontSize: 11.5, color: '#8aa', margin: 0 }}>All variations are saved in <b style={{ color: '#cfe' }}>My Creatives</b>. Edit any above, or Regenerate for fresh ones.</p>
             </div>
           )}
         </div>
       </div>
       <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

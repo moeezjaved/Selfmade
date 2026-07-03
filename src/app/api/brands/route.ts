@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { persistImagesToR2 } from '@/lib/brand-photos'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,10 +83,11 @@ export async function POST(req: NextRequest) {
   // immediately usable in Clone. image_urls holds the product photos; one product row per brand init.
   const productImages = ARR(b.product_images || b.images)
   if (productImages.length) {
+    const persisted = await persistImagesToR2(user.id, productImages)   // copy into R2 → permanent
     await admin.from('brand_products').insert({
       brand_id: (data as any).id,
       name: b.product_name || b.name.trim(),
-      image_urls: productImages.slice(0, 12),
+      image_urls: (persisted.length ? persisted : productImages.slice(0, 12)),
     }).then(() => {}, () => {})
   }
 
