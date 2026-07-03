@@ -166,8 +166,13 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       }
       const settled = await Promise.all(Array.from({ length: count }, () =>
         fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-          .then(async (r) => ({ ok: r.ok, j: await r.json().catch(() => ({})) }))
-          .catch(() => ({ ok: false, j: {} as any }))
+          .then(async (r) => {
+            const text = await r.text()
+            let j: any
+            try { j = JSON.parse(text) } catch { j = { error: `HTTP ${r.status}: ${(text || r.statusText).slice(0, 200)}` } }
+            return { ok: r.ok, j }
+          })
+          .catch((e) => ({ ok: false, j: { error: `Network error: ${String(e?.message || e)}` } }))
       ))
       const good = settled.filter((s) => s.ok).map((s) => ({ url: s.j.image as string, genId: (s.j.generationId as string) || null }))
       if (good.length === 0) {
