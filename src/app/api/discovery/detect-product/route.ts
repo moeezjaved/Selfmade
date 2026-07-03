@@ -80,16 +80,30 @@ export async function POST(req: NextRequest) {
   const logo = logos.find(Boolean) || null
 
   // ── Colors ──────────────────────────────────────────────────────────────
-  const colors = new Set<string>()
-  const tc = meta('theme-color'); if (tc && /^#?[0-9a-f]{3,8}$/i.test(tc)) colors.add((tc.startsWith('#') ? tc : '#' + tc).toLowerCase())
+  // Shopify/modern sites keep brand colors in EXTERNAL CSS, so scan the linked stylesheets (+ inline
+  // <style>) not just the HTML, and parse rgb()/#hex/#rgb. Frequency ranks the real brand palette.
+  let css = ''
+  const cssLinks = Array.from(html.matchAll(/<link[^>]+rel=["']stylesheet["'][^>]*>/gi))
+    .map((t) => t[0].match(/href=["']([^"']+)["']/i)?.[1]).filter(Boolean).slice(0, 4) as string[]
+  await Promise.all(cssLinks.map(async (href) => {
+    const a = abs(href, url); if (!a) return
+    try { const r = await fetch(a, { headers: UA }); if (r.ok) css += (await r.text()).slice(0, 300_000) } catch { /* ignore */ }
+  }))
+  const styleText = Array.from(html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)).map((m) => m[1]).join(' ')
+  const colorText = html + ' ' + styleText + ' ' + css
+
+  const h2 = (n: number) => n.toString(16).padStart(2, '0')
+  const norm = (hex: string) => hex.length === 4 ? '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3] : hex.toLowerCase()
   const colorCount = new Map<string, number>()
-  for (const m of Array.from(html.matchAll(/#([0-9a-fA-F]{6})\b/g))) {
-    const hex = '#' + m[1].toLowerCase()
-    if (/^#(fff|000)/.test(hex) && hex !== '#ffffff' && hex !== '#000000') { /* keep */ }
-    colorCount.set(hex, (colorCount.get(hex) || 0) + 1)
+  const bump = (hex: string) => { const c = norm(hex); if (/^#[0-9a-f]{6}$/.test(c)) colorCount.set(c, (colorCount.get(c) || 0) + 1) }
+  const tc = meta('theme-color'); if (tc && /^#?[0-9a-f]{3,8}$/i.test(tc)) bump(tc.startsWith('#') ? tc : '#' + tc)
+  for (const m of Array.from(colorText.matchAll(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g))) bump('#' + m[1])
+  for (const m of Array.from(colorText.matchAll(/rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/gi))) {
+    bump('#' + h2(+m[1]) + h2(+m[2]) + h2(+m[3]))
   }
-  // Most-used hex colors = likely the brand palette.
-  Array.from(colorCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6).forEach(([h]) => colors.add(h))
+  const colors = new Set<string>()
+  // Most-used colors = the brand palette (keep white/near-black too — they're real roles).
+  Array.from(colorCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8).forEach(([h]) => colors.add(h))
 
   // ── Fonts ───────────────────────────────────────────────────────────────
   const fontSet: string[] = []
