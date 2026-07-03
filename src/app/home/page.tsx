@@ -40,6 +40,11 @@ function Arrow({ c = INK }: { c?: string }) {
 function Check() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="3"><path d="M20 6 9 17l-5-5" /></svg> }
 function X() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5cb" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12" /></svg> }
 
+/** Selfmade wordmark recolored to any solid color via CSS mask (keeps the exact design). */
+function LogoMark({ color, height = 26 }: { color: string; height?: number }) {
+  return <span aria-label="Selfmade" role="img" style={{ display: 'inline-block', height, width: height * 3.35, background: color, WebkitMaskImage: 'url(/logo.png)', maskImage: 'url(/logo.png)', WebkitMaskSize: 'contain', maskSize: 'contain', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat', WebkitMaskPosition: 'left center', maskPosition: 'left center' }} />
+}
+
 function Logo({ dark }: { dark?: boolean }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 21, fontWeight: 800, color: dark ? '#fff' : INK, letterSpacing: '-.02em' }}>
@@ -139,8 +144,7 @@ export default function HomeLanding() {
       {/* NAV */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,.85)', backdropFilter: 'blur(14px)', borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ ...wrap, height: 66, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Selfmade" style={{ height: 26, width: 'auto', filter: 'brightness(0)' }} />
+          <LogoMark color="#000" height={26} />
           <div style={{ display: 'flex', gap: 30 }}>
             {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['#pricing', 'Pricing']].map(([h, l]) => (
               <a key={h} href={h} style={{ fontSize: 14.5, fontWeight: 600, color: '#4b5563', textDecoration: 'none' }}>{l}</a>
@@ -409,8 +413,7 @@ export default function HomeLanding() {
       <footer style={{ background: INK, color: '#fff', padding: '52px 0 34px' }}>
         <div style={{ ...wrap, display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) repeat(3,minmax(0,1fr))', gap: 28 }}>
           <div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Selfmade" style={{ height: 28, width: 'auto' }} />
+            <LogoMark color="#fff" height={28} />
             <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 14, lineHeight: 1.6, maxWidth: 280, marginTop: 12 }}>Find winning ads, make them yours, and launch — the whole ad workflow in one place.</p>
           </div>
           {[['Product', ['Discovery', 'Brand Spy', 'Trending', 'AI Ad Studio', 'Launch Ads']], ['Company', ['About', 'Blog', 'Careers', 'Contact']], ['Legal', ['Privacy', 'Terms', 'Security']]].map(([h, items]) => (
