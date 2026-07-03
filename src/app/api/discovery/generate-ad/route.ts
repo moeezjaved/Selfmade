@@ -42,7 +42,8 @@ async function handle(req: NextRequest) {
   if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
 
   const body = await req.json().catch(() => ({}))
-  const { productImageB64, productImages, productMimeType, newHeadline, brandName, colors, brandId, aspectRatio } = body || {}
+  const { productImageB64, productImages, productMimeType, newHeadline, brandName, colors, brandId, aspectRatio, angle } = body || {}
+  const nicheOverride = typeof body.niche === 'string' && body.niche.trim() ? body.niche.trim() : null
   const rawProducts: string[] = Array.isArray(productImages) && productImages.length
     ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
     : (productImageB64 ? [String(productImageB64)] : [])
@@ -65,8 +66,9 @@ async function handle(req: NextRequest) {
     let kitColors: string[] | undefined = Array.isArray(colors) ? colors.slice(0, 4) : undefined
     let kitFonts: any, kitPalette: any, logoUrl: string | null = null, productDesc: string | undefined
     let industries: string[] | null = null
+    let brandNm: string | undefined = brandName, website: string | undefined
     if (brandId) {
-      const { data: brand } = await admin.from('brands').select('brand_kit, industry, description').eq('id', String(brandId)).maybeSingle()
+      const { data: brand } = await admin.from('brands').select('name, website, brand_kit, industry, description').eq('id', String(brandId)).maybeSingle()
       const kit = (brand as any)?.brand_kit || {}
       if (!kitColors?.length && Array.isArray(kit.colors)) kitColors = kit.colors.slice(0, 4)
       if (kit.fonts) kitFonts = kit.fonts
@@ -74,6 +76,8 @@ async function handle(req: NextRequest) {
       if (kit.logo) logoUrl = kit.logo
       industries = (brand as any)?.industry || null
       productDesc = (brand as any)?.description || undefined
+      brandNm = brandNm || (brand as any)?.name
+      website = (brand as any)?.website || undefined
     }
     if (!kitPalette && body.palette && typeof body.palette === 'object') kitPalette = body.palette
     if (!kitFonts && body.fonts && typeof body.fonts === 'object') kitFonts = body.fonts
@@ -89,13 +93,13 @@ async function handle(req: NextRequest) {
     }))).filter(Boolean) as { mimeType: string; dataB64: string }[]
     if (products.length === 0) { await refund(); return NextResponse.json({ error: 'could not load product image(s)' }, { status: 502 }) }
 
-    // Niche: brand.industry → niche_map. If none, DETECT it from the product photo (no user input),
-    // and persist so it's instant next time.
-    let niche = await resolveBrandNiche(admin, industries)
+    // Niche resolution: explicit user override → brand.industry → AI detect (brand name/desc lead,
+    // product photo secondary). Persist a detected niche so it's instant next time.
+    let niche = nicheOverride || await resolveBrandNiche(admin, industries)
     if (!niche) {
       const { data: nc } = await admin.from('niche_counts').select('niche').limit(100)
       const vocab = (nc || []).map((r: any) => r.niche).filter(Boolean)
-      niche = await inferNiche(products[0], vocab).catch(() => null)
+      niche = await inferNiche(products[0], vocab, { brandName: brandNm, description: productDesc, website }).catch(() => null)
       if (niche && brandId) admin.from('brands').update({ industry: [niche] }).eq('id', String(brandId)).then(() => {}, () => {})
     }
     const insights = await getNicheInsights(admin, niche)
@@ -103,17 +107,22 @@ async function handle(req: NextRequest) {
     // Aspect: Studio has no source ad, so 'original'/none → let the prompt default (4:5).
     const resolvedAspect = (!aspectRatio || aspectRatio === 'original') ? undefined : aspectRatio
 
-    // Retrieve inspiration references (aesthetic ground truth).
+    // Retrieve inspiration references (aesthetic ground truth). Keep each ref paired with its fetched
+    // image so we can report exactly which designs (and why) were used.
     const inspirations = await pickInspirations(admin, { niche, aspect: resolvedAspect, limit: 4 })
-    const inspImgs = (await Promise.all(inspirations.map((i) => fetchImageB64(i.r2_url)))).filter(Boolean) as { mimeType: string; dataB64: string }[]
-    const styleTags = Array.from(new Set(inspirations.flatMap((i) => i.style_tags || []))).slice(0, 6)
+    const fetched = (await Promise.all(inspirations.map(async (i) => ({ ref: i, img: await fetchImageB64(i.r2_url) }))))
+      .filter((x) => x.img) as { ref: typeof inspirations[number]; img: { mimeType: string; dataB64: string } }[]
+    const inspImgs = fetched.map((x) => x.img)
+    const usedRefs = fetched.map((x) => x.ref)
+    const styleTags = Array.from(new Set(usedRefs.flatMap((i) => i.style_tags || []))).slice(0, 6)
 
     const logoImg = logoUrl ? await fetchImageB64(logoUrl) : null
 
     const prompt = buildStudioPrompt({
-      brandName, newHeadline, aspectRatio: resolvedAspect, hasLogo: !!logoImg,
+      brandName: brandNm, newHeadline, aspectRatio: resolvedAspect, hasLogo: !!logoImg,
       numInspirations: inspImgs.length, numProducts: products.length,
       palette: kitPalette, colors: kitColors, fonts: kitFonts, styleTags, insights, productDesc,
+      angle: typeof angle === 'string' && angle.trim() ? angle.trim() : undefined,
     })
     console.log(`generate-ad [niche:${niche || 'none'} refs:${inspImgs.length} sample:${insights.sampleSize}] prompt:`, prompt)
 
@@ -132,6 +141,13 @@ async function handle(req: NextRequest) {
     return NextResponse.json({
       image: `data:${gen.mimeType};base64,${gen.dataB64}`, url: saved?.url || null, generationId: saved?.id || null,
       niche, inspirations: inspImgs.length, insightsUsed: { hooks: insights.topHooks, angles: insights.topAngles },
+      // Which references were used + why (for the transparency panel).
+      references: usedRefs.map((r) => ({
+        url: r.r2_url, niche: r.niche, aspect: r.aspect, layout_type: r.layout_type, style_tags: r.style_tags || [],
+        why: [r.niche && r.niche === niche ? `same niche (${r.niche})` : r.niche ? `niche ${r.niche}` : null,
+              r.aspect && resolvedAspect && r.aspect === resolvedAspect ? `matches ${r.aspect}` : r.aspect ? `${r.aspect}` : null,
+              r.layout_type].filter(Boolean).join(' · '),
+      })),
     })
   } catch (e: any) {
     await refund()

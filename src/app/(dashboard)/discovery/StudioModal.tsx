@@ -34,6 +34,9 @@ export default function StudioModal({ onClose }: { onClose: () => void }) {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [headline, setHeadline] = useState('')
+  const [angle, setAngle] = useState('')
+  const [nicheOverride, setNicheOverride] = useState('')   // '' = auto-detect
+  const [niches, setNiches] = useState<string[]>([])
   const [aspect, setAspect] = useState<'4:5' | '1:1' | '9:16' | '16:9'>('4:5')
   const [imageSize, setImageSize] = useState<'2K' | '4K'>('2K')
   const [count, setCount] = useState(2)
@@ -42,7 +45,7 @@ export default function StudioModal({ onClose }: { onClose: () => void }) {
   const [err, setErr] = useState<string | null>(null)
   const [results, setResults] = useState<{ url: string; genId: string | null }[]>([])
   const [activeIdx, setActiveIdx] = useState(0)
-  const [meta, setMeta] = useState<{ niche: string | null; inspirations: number } | null>(null)
+  const [meta, setMeta] = useState<{ niche: string | null; inspirations: number; references?: any[] } | null>(null)
   const [editText, setEditText] = useState('')
   const [editing, setEditing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -61,6 +64,7 @@ export default function StudioModal({ onClose }: { onClose: () => void }) {
         setBrands(bs)
         if (bs.length === 0) setMode('new'); else pickBrand(bs[0])
       } catch { /* non-fatal */ }
+      fetch('/api/discovery/niches').then(r => r.json()).then(j => setNiches(j.niches || [])).catch(() => {})
     })()
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -113,7 +117,8 @@ export default function StudioModal({ onClose }: { onClose: () => void }) {
       const body = {
         brandId: useBrandId || undefined, productImages: chosen, brandName: bName.trim() || undefined,
         colors, palette: palette || undefined, fonts, logo: logo || undefined,
-        newHeadline: headline.trim() || undefined, aspectRatio: aspect, imageSize,
+        newHeadline: headline.trim() || undefined, angle: angle.trim() || undefined,
+        niche: nicheOverride || undefined, aspectRatio: aspect, imageSize,
       }
       const settled = await Promise.all(Array.from({ length: count }, () =>
         fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
@@ -123,7 +128,7 @@ export default function StudioModal({ onClose }: { onClose: () => void }) {
       const bad = settled.find((s) => !s.ok)
       if (good.length === 0) { setErr(bad?.j?.error === 'insufficient_credits' ? 'Not enough credits.' : bad?.j?.error || 'Generation failed — try again.'); return }
       const first = settled.find((s) => s.ok)?.j
-      if (first) setMeta({ niche: first.niche || null, inspirations: first.inspirations || 0 })
+      if (first) setMeta({ niche: first.niche || null, inspirations: first.inspirations || 0, references: first.references || [] })
       setResults(good); setActiveIdx(0); flyToCreatives(good[0]?.url)
       if (bad && good.length < count) setErr(`${good.length}/${count} generated — the rest failed. Credits for failures were refunded.`)
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
@@ -204,7 +209,15 @@ export default function StudioModal({ onClose }: { onClose: () => void }) {
             {/* Options */}
             <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <Label>3 · Options</Label>
+              <input value={angle} onChange={(e) => setAngle(e.target.value)} placeholder="Angle / what's this ad about? (e.g. quit nicotine naturally — 92% success)" style={input} />
               <input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="On-screen headline (optional — AI writes one otherwise)" style={input} />
+              <div>
+                <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Industry <span style={{ color: '#5f6f63' }}>· auto-detected if left on Auto</span></div>
+                <select value={nicheOverride} onChange={(e) => setNicheOverride(e.target.value)} style={{ ...input, width: '100%', appearance: 'auto' }}>
+                  <option value="">✨ Auto-detect</option>
+                  {niches.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
               <div>
                 <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Aspect ratio</div>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -244,7 +257,23 @@ export default function StudioModal({ onClose }: { onClose: () => void }) {
               {editing && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: LIME, gap: 8, fontSize: 13, fontWeight: 600 }}><Loader2 size={18} className="spin" /> Editing…</div>}
             </div>
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {meta && <div style={{ fontSize: 11.5, color: '#8aa' }}>Tuned to {meta.niche ? <b style={{ color: '#cfe' }}>{meta.niche}</b> : 'your industry'} · inspired by {meta.inspirations} reference design{meta.inspirations === 1 ? '' : 's'}.</div>}
+              {meta && (
+                <div style={{ fontSize: 11.5, color: '#8aa' }}>
+                  <div>Tuned to {meta.niche ? <b style={{ color: '#cfe' }}>{meta.niche}</b> : 'your industry'} · inspired by {meta.inspirations} reference design{meta.inspirations === 1 ? '' : 's'}.</div>
+                  {!!meta.references?.length && (
+                    <div style={{ display: 'flex', gap: 6, marginTop: 7 }}>
+                      {meta.references.map((r, i) => (
+                        <a key={i} href={r.url} target="_blank" rel="noreferrer" title={`Why: ${r.why || 'style match'}`}
+                          style={{ display: 'block', width: 40, height: 50, borderRadius: 6, overflow: 'hidden', border: '1px solid #263', flexShrink: 0 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={r.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </a>
+                      ))}
+                      <span style={{ alignSelf: 'center', color: '#6f7f73', fontSize: 10.5 }}>hover to see why each was picked</span>
+                    </div>
+                  )}
+                </div>
+              )}
               {results.length > 1 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {results.map((r, i) => (

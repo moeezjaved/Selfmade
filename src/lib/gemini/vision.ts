@@ -83,28 +83,38 @@ export async function classifyInspirationDebug(
  * niche vocabulary we actually filter on (falls back to null → global insights).
  */
 export async function inferNiche(
-  image: { mimeType: string; dataB64: string },
-  nicheVocab: string[]
+  image: { mimeType: string; dataB64: string } | null,
+  nicheVocab: string[],
+  context?: { brandName?: string; description?: string; website?: string }
 ): Promise<string | null> {
   if (!KEY || !nicheVocab.length) return null
+  // Brand NAME/DESCRIPTION are far more reliable than the product photo alone (a sleek nicotine
+  // device can look like skincare). Lead with the text context; the photo is a secondary signal.
+  const ctx = [
+    context?.brandName && `Brand name: ${context.brandName}`,
+    context?.description && `Brand description: ${String(context.description).slice(0, 400)}`,
+    context?.website && `Website: ${context.website}`,
+  ].filter(Boolean).join('\n')
   const prompt = [
-    'Look at this product photo and pick the SINGLE best-matching industry/niche for it.',
+    'Pick the SINGLE best-matching industry/niche for this brand/product.',
+    ctx ? `Use the brand context as the PRIMARY signal (the product photo can be misleading):\n${ctx}` : 'Judge from the product photo.',
     `Choose the exact string from this list, or "none" if truly nothing fits: ${JSON.stringify(nicheVocab)}.`,
     'Return ONLY JSON: {"niche": "<exact list value or none>"}.',
   ].join('\n')
+  const parts: any[] = [{ text: prompt }]
+  if (image) parts.push({ inline_data: { mime_type: image.mimeType, data: image.dataB64 } })
   try {
     const r = await fetch(`${BASE}/${MODEL}:generateContent?key=${KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: image.mimeType, data: image.dataB64 } }] }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json' },
-      }),
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0 } }),
     })
     if (!r.ok) return null
     const j = await r.json()
-    const txt = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('')
-    const niche = JSON.parse(txt || '{}')?.niche
+    let txt = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('').trim()
+    txt = txt.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '')
+    const slice = txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1)
+    const niche = JSON.parse(slice || '{}')?.niche
     if (typeof niche !== 'string' || !niche.trim() || niche.toLowerCase() === 'none') return null
     // Only accept an exact vocab match (case-insensitive) so retrieval keys line up.
     return nicheVocab.find((n) => n.toLowerCase() === niche.trim().toLowerCase()) || null

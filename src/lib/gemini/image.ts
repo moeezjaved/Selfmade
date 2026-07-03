@@ -84,6 +84,7 @@ export function buildStudioPrompt(opts: {
   styleTags?: string[]
   insights?: { topHooks?: string[]; topAngles?: string[]; topFormats?: string[]; topEmotions?: string[]; topCtas?: string[] }
   productDesc?: string
+  angle?: string          // user-supplied concept/positioning ("quit nicotine naturally — 92% success")
 }): string {
   const n = opts.numInspirations
   const firstProductIdx = n + 1
@@ -100,7 +101,7 @@ export function buildStudioPrompt(opts: {
         opts.fonts?.heading && `headings "${opts.fonts.heading}"${opts.fonts?.headingWeight ? ` weight ${opts.fonts.headingWeight}` : ''}`,
         opts.fonts?.body && `body "${opts.fonts.body}"${opts.fonts?.bodyWeight ? ` weight ${opts.fonts.bodyWeight}` : ''}`,
       ].filter(Boolean).join(', ')} (or closest match).`
-    : ''
+    : `Typography must be DISTINCTIVE and premium — take direct cues from the reference designs' type treatment (a characterful display/editorial or bold grotesque face with strong weight and size hierarchy). Do NOT default to plain Arial/Helvetica/system fonts.`
   const ins = opts.insights || {}
   const insightLine = [
     ins.topHooks?.length && `proven hook styles: ${ins.topHooks.slice(0, 3).join(', ')}`,
@@ -119,17 +120,19 @@ export function buildStudioPrompt(opts: {
       ? `Images 1-${n} are REFERENCE DESIGNS for inspiration ONLY — study their design sophistication: composition, typography energy, color grading, use of negative space, and premium finish. Match that CALIBER of design, but create an ORIGINAL layout. Do NOT copy any single reference or reuse its product, text, or people.`
       : `Aim for a premium, agency-quality, scroll-stopping design.`,
     `Image${opts.numProducts > 1 ? `s ${firstProductIdx}-${firstProductIdx + opts.numProducts - 1}` : ` ${firstProductIdx}`} ${opts.numProducts > 1 ? 'are' : 'is'} the USER'S PRODUCT and it is the HERO of the ad.`,
-    `Render the product 1:1 from the photo(s): match its EXACT silhouette, proportions, materials, textures, and on-label branding/text. Do NOT reshape, restyle, or invent a different product. It is the only product shown.`,
+    `Render the product 1:1 from the photo(s): match its EXACT silhouette, proportions, materials, textures, and on-label branding/text. Do NOT reshape, restyle, or invent a different product.`,
+    `Show the product at a NATURAL, believable scale — sized like a real product photo, roughly a third to half of the frame at most. Do NOT oversize it, do NOT let it dominate or look larger-than-life; leave breathing room and negative space around it. It is the only product shown.`,
     opts.productDesc ? `The product is: ${opts.productDesc}.` : '',
+    opts.angle ? `The ad's core message/angle is: ${opts.angle}. Build the concept, headline, and supporting copy around THIS.` : '',
     insightLine ? `Ground the concept in what wins in this industry — ${insightLine}.` : '',
     styleLine,
     paletteLine, fontLine,
     opts.newHeadline
-      ? `Headline — render EXACTLY, letter for letter: "${opts.newHeadline}".`
-      : `Write a short, punchy, original headline that fits the angle. Spell everything correctly in real English.`,
+      ? `Headline — render EXACTLY, letter for letter: "${opts.newHeadline}". Show this headline in ONE place only.`
+      : `Write ONE short, punchy, original headline that fits the angle, and show it in ONE place only. Spell everything correctly in real English.`,
     cta ? `Include a clear call-to-action button ("${cta}").` : `Include a clear call-to-action button.`,
     logoLine,
-    `No gibberish text, no watermarks, no other brands' logos, no duplicate products.`,
+    `CRITICAL: render every piece of text ONCE — never repeat the headline, subhead, or any text block in two places. No gibberish text, no watermarks, no other brands' logos, no duplicate products.`,
     opts.aspectRatio && opts.aspectRatio !== 'original' ? `Compose at a ${opts.aspectRatio} aspect ratio.` : `Compose at a 4:5 aspect ratio.`,
     `Output ONE photorealistic, polished, ready-to-publish ad image.`,
   ].filter(Boolean).join(' ')
