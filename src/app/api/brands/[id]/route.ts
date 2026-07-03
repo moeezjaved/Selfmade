@@ -5,8 +5,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { persistImagesToR2 } from '@/lib/brand-photos'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 const ARR = (v: any) => Array.isArray(v) ? v.map(String) : (v ? [String(v)] : [])
 
 async function owned(admin: any, brandId: string, userId: string) {
@@ -60,6 +62,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ product: data })
   }
+  // Add product photos to the brand (upload data: URLs or auto-detected http URLs). Copies them
+  // into R2 and appends to the brand's primary product (creates one if none), so the photos persist
+  // and can be re-used by Clone. Returns the merged photo list.
+  if (b.resource === 'photos') {
+    const incoming = ARR(b.images)
+    if (!incoming.length) return NextResponse.json({ error: 'images required' }, { status: 400 })
+    const persisted = await persistImagesToR2(user.id, incoming)
+    const add = persisted.length ? persisted : incoming
+    const { data: prod } = await admin.from('brand_products').select('id, image_urls').eq('brand_id', params.id).order('created_at', { ascending: true }).limit(1).maybeSingle()
+    if (prod) {
+      const merged = Array.from(new Set([...((prod as any).image_urls || []), ...add])).slice(0, 24)
+      await admin.from('brand_products').update({ image_urls: merged }).eq('id', (prod as any).id)
+      return NextResponse.json({ image_urls: merged })
+    }
+    const { data } = await admin.from('brand_products').insert({ brand_id: params.id, name: 'Product', image_urls: add.slice(0, 24) }).select('image_urls').single()
+    return NextResponse.json({ image_urls: (data as any)?.image_urls || add })
+  }
   if (b.resource === 'asset') {
     const { data, error } = await admin.from('brand_assets').insert({
       brand_id: params.id, type: b.type, value: b.value || null,
@@ -79,7 +98,17 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!(await owned(admin, params.id, user.id))) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const productId = req.nextUrl.searchParams.get('productId')
   const assetId = req.nextUrl.searchParams.get('assetId')
-  if (productId) await admin.from('brand_products').delete().eq('id', productId).eq('brand_id', params.id)
+  const photoUrl = req.nextUrl.searchParams.get('photoUrl')
+  if (photoUrl) {
+    // Remove a single product photo from whichever product row holds it.
+    const { data: prods } = await admin.from('brand_products').select('id, image_urls').eq('brand_id', params.id)
+    for (const p of (prods || []) as any[]) {
+      if ((p.image_urls || []).includes(photoUrl)) {
+        await admin.from('brand_products').update({ image_urls: (p.image_urls || []).filter((u: string) => u !== photoUrl) }).eq('id', p.id)
+      }
+    }
+  }
+  else if (productId) await admin.from('brand_products').delete().eq('id', productId).eq('brand_id', params.id)
   else if (assetId) await admin.from('brand_assets').delete().eq('id', assetId).eq('brand_id', params.id)
   else await admin.from('brands').delete().eq('id', params.id)  // delete the whole brand (cascades)
   return NextResponse.json({ success: true })

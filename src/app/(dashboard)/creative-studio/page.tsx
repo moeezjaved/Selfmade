@@ -6,8 +6,12 @@
  *  • Brands tab: view/edit/delete the brands that feed Clone & Script (name, site, voice, products),
  *    with the plan's brand-slot quota and add-brand (URL auto-detect / manual).
  */
-import { useCallback, useEffect, useState } from 'react'
-import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload } from 'lucide-react'
+
+async function fileToDataUrl(f: File): Promise<string> {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) })
+}
 
 const DARK = '#1a3a1a', LIME = '#dffe95'
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }
@@ -222,7 +226,11 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
   const [website, setWebsite] = useState(brand.website || '')
   const [tone, setTone] = useState(brand.tone || '')
   const [usps, setUsps] = useState((brand.usps || []).join(', '))
+  const [photos, setPhotos] = useState<string[]>((brand.products || []).flatMap((p) => p.image_urls || []))
   const [busy, setBusy] = useState(false)
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [detectSite, setDetectSite] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const save = async () => {
     setBusy(true)
@@ -233,17 +241,64 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
     setBusy(false); onSaved()
   }
 
+  const addPhotos = async (images: string[]) => {
+    if (!images.length) return
+    setPhotoBusy(true)
+    const r = await fetch(`/api/brands/${brand.id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resource: 'photos', images }) })
+    const j = await r.json()
+    if (Array.isArray(j.image_urls)) setPhotos(j.image_urls)
+    setPhotoBusy(false)
+  }
+  const onUpload = async (files: FileList | null) => {
+    if (!files?.length) return
+    addPhotos(await Promise.all(Array.from(files).slice(0, 8).map(fileToDataUrl)))
+  }
+  const detect = async () => {
+    if (!detectSite.trim()) return
+    setPhotoBusy(true)
+    try {
+      const r = await fetch('/api/discovery/detect-product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: detectSite.trim() }) })
+      const j = await r.json()
+      if (Array.isArray(j.images) && j.images.length) await addPhotos(j.images.slice(0, 8))
+    } finally { setPhotoBusy(false); setDetectSite('') }
+  }
+  const removePhoto = async (url: string) => {
+    setPhotos((p) => p.filter((u) => u !== url))
+    await fetch(`/api/brands/${brand.id}?photoUrl=${encodeURIComponent(url)}`, { method: 'DELETE' })
+  }
+
   return (
     <Overlay onClose={onClose}>
-      <div style={{ padding: 22, width: 460, maxWidth: '92vw', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: 22, width: 480, maxWidth: '92vw', maxHeight: '88vh', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ fontWeight: 800, fontSize: 16, color: '#111' }}>Edit brand</div>
         <Field label="Brand name"><input value={name} onChange={(e) => setName(e.target.value)} style={input} /></Field>
         <Field label="Website"><input value={website} onChange={(e) => setWebsite(e.target.value)} style={input} /></Field>
         <Field label="Voice / tone"><input value={tone} onChange={(e) => setTone(e.target.value)} placeholder="e.g. bold, playful, premium" style={input} /></Field>
         <Field label="USPs (comma-separated)"><input value={usps} onChange={(e) => setUsps(e.target.value)} placeholder="fast shipping, 30-day guarantee" style={input} /></Field>
+
+        <Field label="Product photos">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {photos.map((u) => (
+              <div key={u} style={{ position: 'relative', width: 64, height: 64 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={u} alt="" style={{ width: '100%', height: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+                <button onClick={() => removePhoto(u)} title="Remove" style={{ position: 'absolute', top: -6, right: -6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b91c1c' }}><X size={12} /></button>
+              </div>
+            ))}
+            <button onClick={() => fileRef.current?.click()} disabled={photoBusy} style={{ width: 64, height: 64, borderRadius: 8, border: '2px dashed #cbd5cb', background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: '#6b7280', fontSize: 10 }}>
+              {photoBusy ? <Loader2 size={16} className="spin" /> : <><Upload size={15} /> Add</>}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => onUpload(e.target.files)} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input value={detectSite} onChange={(e) => setDetectSite(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && detect()} placeholder="…or detect from a website URL" style={{ ...input, flex: 1 }} />
+            <button onClick={detect} disabled={photoBusy || !detectSite.trim()} style={btnGhost}><Link2 size={14} /> Detect</button>
+          </div>
+        </Field>
+
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <button onClick={save} disabled={busy || !name.trim()} style={{ ...btn, flex: 1, justifyContent: 'center', opacity: (busy || !name.trim()) ? 0.6 : 1 }}>{busy ? <Loader2 size={15} className="spin" /> : 'Save changes'}</button>
-          <button onClick={onClose} style={btnGhost}>Cancel</button>
+          <button onClick={onClose} style={btnGhost}>Done</button>
         </div>
       </div>
     </Overlay>
