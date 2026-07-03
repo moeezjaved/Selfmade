@@ -112,7 +112,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const tier: 'pro' = 'pro'   // Pro-only (Nano Banana Pro)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const editCost = 12   // Pro edit — matches image_edit_pro
+  const editCost = 10   // Pro edit — matches image_edit_pro
 
   const applyEdit = async () => {
     if (!instr.trim()) return

@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { reserveCredits, commitCredits, refundCredits, getActionCost, InsufficientCreditsError } from '@/lib/credits'
+import { requireUnder } from '@/lib/entitlements'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 20
@@ -148,6 +149,14 @@ export async function POST(req: NextRequest) {
     await ensureTracked(admin, pageId, name, false)
     return NextResponse.json({ pageId, charged: false, alreadySpied: true })
   }
+
+  // Plan gate (spec §4.2): cap the number of tracked brands by the plan's brandSpy entitlement.
+  const { data: tracked } = await admin
+    .from('credit_transactions').select('reference_id')
+    .eq('user_id', user.id).eq('action_type', ACTION).eq('status', 'committed')
+  const trackedCount = new Set((tracked || []).map((t: any) => t.reference_id).filter(Boolean)).size
+  const gate = await requireUnder(admin, user.id, 'brandSpy', trackedCount)
+  if (gate) return NextResponse.json(gate, { status: 402 })
 
   // First time this user spies this brand (directory OR manual) → charge, queue a fresh
   // thorough re-crawl, commit. Reserve→commit→refund on failure.

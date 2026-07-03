@@ -49,6 +49,7 @@ const NAV = [
       { href: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',    badge: null },
       { href: '/activity',   icon: ClipboardList,   label: 'Activity Log', badge: null },
       { href: '/settings',   icon: Settings,        label: 'Settings',     badge: null },
+      { href: '/pricing',    icon: CreditCard,      label: 'Plans & Pricing', badge: null },
       { href: '/billing',    icon: CreditCard,      label: 'Billing',      badge: null },
     ],
   },

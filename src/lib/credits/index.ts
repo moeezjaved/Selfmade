@@ -70,15 +70,17 @@ export async function grantCredits(
 /** Current balance + plan + reset date (also lazily applies a due monthly reset). */
 export async function getBalance(admin: SupabaseClient, userId: string) {
   await admin.rpc('ensure_monthly_reset', { p_user: userId })
-  const { data } = await admin
-    .from('user_profiles')
-    .select('credits_balance, plan_id, credits_reset_at')
-    .eq('user_id', userId)
-    .maybeSingle()
+  const [{ data: prof }, { data: wallet }] = await Promise.all([
+    admin.from('user_profiles').select('credits_balance, plan_id, credits_reset_at').eq('user_id', userId).maybeSingle(),
+    admin.from('credit_wallets').select('plan_credits_balance, topup_credits_balance, plan_credits_reset_at').eq('owner_id', userId).maybeSingle(),
+  ])
+  const plan_credits = (wallet as any)?.plan_credits_balance ?? 0
+  const topup_credits = (wallet as any)?.topup_credits_balance ?? 0
   return {
-    balance: data?.credits_balance ?? 0,
-    plan: data?.plan_id ?? 'trial',
-    reset_at: data?.credits_reset_at ?? null,
+    balance: wallet ? plan_credits + topup_credits : (prof?.credits_balance ?? 0),
+    plan_credits, topup_credits,
+    plan: prof?.plan_id ?? 'free',
+    reset_at: (wallet as any)?.plan_credits_reset_at ?? prof?.credits_reset_at ?? null,
   }
 }
 
