@@ -81,15 +81,20 @@ async function handle(req: NextRequest) {
     // didn't pass colors explicitly.
     let kitColors: string[] | undefined = Array.isArray(colors) ? colors.slice(0, 4) : undefined
     let kitFonts: { heading?: string | null; body?: string | null } | undefined
+    let logoUrl: string | null = null
     if (brandId) {
       const { data: brand } = await admin.from('brands').select('brand_kit').eq('id', String(brandId)).maybeSingle()
       const kit = (brand as any)?.brand_kit || {}
       if (!kitColors?.length && Array.isArray(kit.colors)) kitColors = kit.colors.slice(0, 4)
       if (kit.fonts) kitFonts = kit.fonts
+      if (kit.logo) logoUrl = kit.logo
     }
+    // Allow a logo passed directly (new-brand flow before it's saved).
+    if (!logoUrl && typeof body.logo === 'string' && body.logo.trim()) logoUrl = body.logo.trim()
+    const logoImg = logoUrl ? await fetchImageB64(logoUrl) : null
 
     const prompt = buildClonePrompt({
-      brandName, colors: kitColors, newHeadline, aspectRatio, fonts: kitFonts,
+      brandName, colors: kitColors, newHeadline, aspectRatio, fonts: kitFonts, hasLogo: !!logoImg,
       dna: { hook_type: (ad as any).hook_type, format_style: (ad as any).format_style, angle: (ad as any).angle, emotion: (ad as any).emotion, cta: (ad as any).cta },
     })
     console.log(`clone-image [${useTier}] prompt:`, prompt)   // proof the prompt is sent each generation
@@ -104,7 +109,9 @@ async function handle(req: NextRequest) {
     }))).filter(Boolean) as { mimeType: string; dataB64: string }[]
     if (products.length === 0) { await refund(); return NextResponse.json({ error: 'could not load product image(s)' }, { status: 502 }) }
 
-    const gen = await generateImage(prompt, [refImg, ...products], useTier, { aspectRatio })
+    // Order matters: [reference ad, ...product photos, logo?] — the prompt references the FINAL image as the logo.
+    const genImages = logoImg ? [refImg, ...products, logoImg] : [refImg, ...products]
+    const gen = await generateImage(prompt, genImages, useTier, { aspectRatio })
     if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})

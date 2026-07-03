@@ -55,12 +55,15 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
  * fidelity guardrail keeps the product exact — the two levers that make a clone usable, not just pretty.
  */
 export function buildClonePrompt(opts: {
-  brandName?: string; colors?: string[]; newHeadline?: string; aspectRatio?: string
+  brandName?: string; colors?: string[]; newHeadline?: string; aspectRatio?: string; hasLogo?: boolean
   fonts?: { heading?: string | null; body?: string | null }
   dna?: { hook_type?: string | null; format_style?: string | null; angle?: string | null; emotion?: string[] | null; cta?: string | null }
 }): string {
   const fontLine = (opts.fonts?.heading || opts.fonts?.body)
     ? `Use on-brand typography: ${[opts.fonts?.heading && `headings in "${opts.fonts.heading}"`, opts.fonts?.body && `body text in "${opts.fonts.body}"`].filter(Boolean).join(', ')} (or the closest available match).`
+    : ''
+  const logoLine = opts.hasLogo
+    ? `The FINAL attached image is the brand's real logo — place it cleanly and legibly as the brand mark (small, in a top corner). Reproduce it faithfully; do not distort, recolor, or invent a different logo/wordmark.`
     : ''
   const d = opts.dna || {}
   const keep = [
@@ -76,6 +79,7 @@ export function buildClonePrompt(opts: {
     opts.brandName ? `The brand is "${opts.brandName}".` : '',
     opts.colors?.length ? `Brand colors to favor where the design allows: ${opts.colors.join(', ')}.` : '',
     fontLine,
+    logoLine,
     opts.newHeadline ? `On-screen headline — render this text EXACTLY, letter for letter: "${opts.newHeadline}".` : `Keep the headline layout; write short ad copy relevant to this product.`,
     d.cta ? `Include a clear call-to-action button ("${d.cta}").` : '',
     `TEXT: spell every word correctly using real English — never output invented, garbled, or misspelled words. Keep all text crisp and legible.`,

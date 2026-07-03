@@ -39,6 +39,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [detecting, setDetecting] = useState(false)
   const [colors, setColors] = useState<string[]>([])
   const [fonts, setFonts] = useState<{ heading?: string | null; body?: string | null }>({})
+  const [logo, setLogo] = useState<string | null>(null)
   const [saveAsBrand, setSaveAsBrand] = useState(true)
 
   // photos + selection (up to 4 go to the model)
@@ -119,6 +120,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       if (j.brandName && !bName.trim()) setBName(j.brandName)
       if (Array.isArray(j.colors)) setColors(j.colors)
       if (j.fonts) setFonts(j.fonts)
+      if (j.logo) setLogo(j.logo)
       addPhotos((j.images || []).map((u: string) => ({ id: uid(), src: u, label: 'detected' })))
       if (!j.images?.length) setErr('No product photos found on that page — upload manually.')
     } catch (e: any) { setErr(String(e?.message || e)) }
@@ -140,7 +142,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         const httpImgs = chosen.filter((s) => /^https?:\/\//i.test(s))
         const rb = await fetch('/api/brands', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name: bName.trim(), website: bSite.trim() || null, product_images: httpImgs, brand_kit: { colors, fonts } }),
+          body: JSON.stringify({ name: bName.trim(), website: bSite.trim() || null, product_images: httpImgs, brand_kit: { colors, fonts, logo } }),
         })
         const jb = await rb.json()
         if (rb.status === 402 && jb.error === 'brand_limit_reached') {
@@ -166,7 +168,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       const body = {
         adId: ad.id, productImages: chosen, tier, brandId: useBrandId || undefined,
         brandName: bName.trim() || undefined, colors, newHeadline: headline.trim() || undefined,
-        aspectRatio: aspect,
+        aspectRatio: aspect, logo: logo || undefined,
       }
       const settled = await Promise.all(Array.from({ length: count }, () =>
         fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
@@ -267,9 +269,16 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                     </button>
                   </div>
                   {/* Detected Brand Kit — colors + fonts, shown so the user can see/trust what we captured. */}
-                  {(colors.length > 0 || fonts.heading) && (
+                  {(colors.length > 0 || fonts.heading || logo) && (
                     <div style={{ background: '#0a0f0c', border: '1px solid #24331d', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#b8c8bc' }}>🎨 Brand kit detected</div>
+                      {logo && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={logo} alt="logo" style={{ height: 22, maxWidth: 90, objectFit: 'contain', background: '#fff', borderRadius: 4, padding: 2 }} />
+                          <span style={{ fontSize: 10.5, color: '#6f7f73' }}>logo — used in the ad</span>
+                        </div>
+                      )}
                       {colors.length > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {colors.slice(0, 8).map((c, i) => <span key={i} title={c} style={{ width: 20, height: 20, borderRadius: 5, background: c, border: '1px solid #2c4030' }} />)}
