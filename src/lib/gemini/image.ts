@@ -123,7 +123,7 @@ export function buildStudioPrompt(opts: {
       : `Aim for a premium, agency-quality, scroll-stopping design.`,
     `Image${opts.numProducts > 1 ? `s ${firstProductIdx}-${firstProductIdx + opts.numProducts - 1}` : ` ${firstProductIdx}`} ${opts.numProducts > 1 ? 'are' : 'is'} the USER'S PRODUCT and it is the HERO of the ad.`,
     `Render the product 1:1 from the photo(s): match its EXACT silhouette, proportions, materials, textures, and on-label branding/text. Do NOT reshape, restyle, or invent a different product.`,
-    `Show the product at a NATURAL, believable scale — sized like a real product photo, roughly a third to half of the frame at most. Do NOT oversize it, do NOT let it dominate or look larger-than-life; leave breathing room and negative space around it. It is the only product shown.`,
+    `SIZE THE PRODUCT REALISTICALLY — this is critical. Render it at its true real-world size RELATIVE TO the scene: a small handheld device must look small in a hand, in correct proportion to fingers, faces, furniture, and surroundings. Keep it to roughly a QUARTER of the frame; never enlarge it, never make it larger-than-life, never let it dominate the composition. If a person holds it, it must look natural in their grip, not oversized. Leave clear negative space around it. It is the only product shown.`,
     opts.productDesc ? `The product is: ${opts.productDesc}.` : '',
     opts.angle ? `The ad's core message/angle is: ${opts.angle}. Build the concept, headline, and supporting copy around THIS.` : '',
     insightLine ? `Ground the concept in what wins in this industry — ${insightLine}.` : '',
