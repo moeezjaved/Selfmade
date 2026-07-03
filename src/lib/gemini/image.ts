@@ -28,6 +28,9 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
   if (!KEY) return { ok: false, error: 'GEMINI_API_KEY not set' }
   const parts: any[] = [{ text: prompt }, ...images.map((i) => ({ inline_data: { mime_type: i.mimeType, data: i.dataB64 } }))]
   const generationConfig: any = { responseModalities: ['IMAGE'] }
+  // Lower temperature → more faithful to the reference/product (less "creative" drift). Env-tunable.
+  const temp = parseFloat(process.env.GEMINI_IMAGE_TEMP || '0.35')
+  if (!Number.isNaN(temp)) generationConfig.temperature = temp
   // gemini-3-pro-image accepts imageConfig { aspectRatio, imageSize }. imageSize (1K/2K/4K) controls
   // resolution → cost; default 2K. Only sent for the Pro model (standard model rejects it).
   const imageConfig: any = {}
@@ -93,7 +96,7 @@ export function buildClonePrompt(opts: {
   ].filter(Boolean).join(', ')
   return [
     `TASK: PRODUCT SWAP — not a redesign. Image 1 is a proven winning ad. The image(s) AFTER it are the USER'S PRODUCT${opts.hasLogo ? ' (and the very last image is the brand logo)' : ''}. Recreate image 1 almost exactly — same layout, composition, background scene, props, camera angle, lighting, subjects, mood${keep ? `, ${keep}` : ''}, and text placement — but REPLACE ONLY the featured product with the user's product.`,
-    `THE USER'S PRODUCT IS MANDATORY AND IS THE HERO: reproduce it faithfully from the product photo — exact shape, proportions, packaging, on-label branding/text, and colors — placed in the same spot, angle and scale as the original product, clearly visible and prominent. It is the ONLY product in the ad.`,
+    `THE USER'S PRODUCT IS MANDATORY AND IS THE HERO: copy it 1:1 from the product photo — match its EXACT silhouette, dimensions/proportions, cap and mouthpiece shape, materials, textures, on-label branding/text, and colors. Do NOT resize, reshape, restyle, re-proportion, beautify, or "improve" it — treat the photo as the ground truth. Place it in the same spot, angle and scale as the product it replaces. It is the ONLY product in the ad.`,
     `CRITICAL — do NOT omit or shrink away the product, do NOT replace it with a person, model, hand, face, fruit, or any different object, and do NOT invent a new lifestyle scene. Keep the SAME subjects and setting as image 1; only the product changes.`,
     opts.brandName ? `Wherever the original ad shows its own brand name or wordmark, use "${opts.brandName}" instead.` : '',
     opts.newHeadline ? `On-screen headline — render EXACTLY, letter for letter: "${opts.newHeadline}".` : `Keep the headline layout; write short copy relevant to this product.`,
