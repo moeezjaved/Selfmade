@@ -131,6 +131,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const [img, setImg] = useState(gen.image_url)
   const [genId, setGenId] = useState(gen.id)
   const [instr, setInstr] = useState('')
+  const [vidRes, setVidRes] = useState<'1080p' | '4K'>('1080p')
   const tier: 'pro' = 'pro'   // Pro-only (Nano Banana Pro)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -155,12 +156,12 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
     await fetch(`/api/creatives?id=${gen.id}`, { method: 'DELETE' })
     onChanged(); onClose()
   }
-  const animate = async (style: string) => {
+  const animate = async (style: string, resolution: '1080p' | '4K') => {
     setBusy(true); setErr(null)
     try {
       const r = await fetch('/api/discovery/animate', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ image: img, style, parentId: genId }),
+        body: JSON.stringify({ image: img, style, resolution, parentId: genId }),
       })
       const j = await r.json()
       if (!r.ok) { setErr(j.error === 'insufficient_credits' ? 'Not enough credits for a video.' : j.error || 'Could not start video.'); return }
@@ -193,12 +194,17 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                 placeholder="Tweak this creative — headline, subhead, colors, scene, background…" style={{ ...input, resize: 'vertical' }} />
               {err && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{err}</div>}
               <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · {editCost} cr</button>
-              {/* Animate → Veo video (async; lands back in the gallery). */}
+              {/* Animate → Veo video (async; lands back in the gallery). User picks 1080p or 4K. */}
               <div style={{ borderTop: '1px solid #eef2ec', paddingTop: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>🎬 Animate to video · 80 cr</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>🎬 Animate to video · {vidRes === '4K' ? 240 : 100} cr</div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  {(['1080p', '4K'] as const).map((rz) => (
+                    <button key={rz} onClick={() => setVidRes(rz)} style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: `1px solid ${vidRes === rz ? DARK : '#cbd5cb'}`, background: vidRes === rz ? '#eef5eb' : '#fff', color: DARK, fontWeight: 700, fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit' }}>{rz}{rz === '4K' ? ' HD' : ''}</button>
+                  ))}
+                </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {(['subtle', 'hero', 'lifestyle'] as const).map((s) => (
-                    <button key={s} onClick={() => animate(s)} disabled={busy} style={{ ...btnGhost, flex: 1, justifyContent: 'center', fontSize: 11.5, textTransform: 'capitalize', padding: '8px 4px' }}>{s}</button>
+                    <button key={s} onClick={() => animate(s, vidRes)} disabled={busy} style={{ ...btnGhost, flex: 1, justifyContent: 'center', fontSize: 11.5, textTransform: 'capitalize', padding: '8px 4px' }}>{s}</button>
                   ))}
                 </div>
               </div>

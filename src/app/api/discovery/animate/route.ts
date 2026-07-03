@@ -26,11 +26,15 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!veoEnabled) return NextResponse.json({ error: 'Video generation not configured (GEMINI_API_KEY)' }, { status: 503 })
 
-  const { image, style, aspectRatio, brandId, sourceAdId, parentId } = await req.json().catch(() => ({}))
+  const { image, style, aspectRatio, brandId, sourceAdId, parentId, resolution } = await req.json().catch(() => ({}))
   if (!image) return NextResponse.json({ error: 'image required' }, { status: 400 })
+  // User picks 1080p or 4K → sets the Veo resolution + the price.
+  const is4k = resolution === '4K' || resolution === '4k'
+  const veoRes = is4k ? '4k' : '1080p'
+  const action = is4k ? 'video_clone_4k' : 'video_clone'
 
   const admin = createAdminClient()
-  const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: 'video_clone' })
+  const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: action })
   if (rErr) {
     const insufficient = String(rErr.message || '').includes('insufficient_credits')
     return NextResponse.json({ error: insufficient ? 'insufficient_credits' : 'reserve_failed' }, { status: insufficient ? 402 : 500 })
@@ -42,7 +46,7 @@ export async function POST(req: NextRequest) {
     const img = await toB64(String(image))
     if (!img) { await refund(); return NextResponse.json({ error: 'could not read the image' }, { status: 422 }) }
 
-    const started = await startVideo(buildAnimatePrompt(style || 'subtle'), img, { aspectRatio })
+    const started = await startVideo(buildAnimatePrompt(style || 'subtle'), img, { aspectRatio, resolution: veoRes })
     if (!started.ok) { await refund(); return NextResponse.json({ error: started.error }, { status: 502 }) }
 
     const { data: row } = await admin.from('creative_generations').insert({
