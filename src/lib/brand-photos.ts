@@ -5,6 +5,7 @@
  * bucket means the brand's photos keep working forever. Best-effort per image; on R2 failure an
  * http source is kept as-is so the user still sees something.
  */
+import { randomUUID } from 'node:crypto'
 import { uploadToR2, uploadBufferToR2 } from '@/lib/r2'
 
 export async function persistImagesToR2(userId: string, images: string[]): Promise<string[]> {
@@ -12,7 +13,7 @@ export async function persistImagesToR2(userId: string, images: string[]): Promi
   const list = (images || []).filter((s) => typeof s === 'string' && s.trim()).slice(0, 24)
   for (let i = 0; i < list.length; i++) {
     const src = list[i]
-    const base = `brand-products/${userId}/${Buffer.from(`${userId}:${i}:${process.hrtime.bigint()}`).toString('hex').slice(0, 26)}`
+    const base = `brand-products/${userId}/${randomUUID()}`
     try {
       const m = /^data:([^;]+);base64,([\s\S]*)$/i.exec(src)
       if (m) {
