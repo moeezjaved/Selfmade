@@ -258,12 +258,20 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
     addPhotos(await Promise.all(Array.from(files).slice(0, 8).map(fileToDataUrl)))
   }
   const detect = async () => {
-    if (!detectSite.trim()) return
+    const site = (detectSite.trim() || website.trim())
+    if (!site) return
     setPhotoBusy(true)
     try {
-      const r = await fetch('/api/discovery/detect-product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: detectSite.trim() }) })
+      const r = await fetch('/api/discovery/detect-product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: site }) })
       const j = await r.json()
-      if (Array.isArray(j.images) && j.images.length) await addPhotos(j.images.slice(0, 8))
+      // Fill the WHOLE brand kit from the fresh crawl — colors, fonts, logo — not just photos, so an
+      // empty/old brand gets its kit populated. Only overwrite empty fields (don't clobber edits).
+      if (Array.isArray(j.colors) && j.colors.length && !colors.trim()) setColors(j.colors.join(', '))
+      if (j.fonts?.heading && !hFont.trim()) setHFont(j.fonts.heading)
+      if (j.fonts?.body && !bFont.trim()) setBFont(j.fonts.body)
+      if (j.logo && !logo.trim()) setLogo(j.logo)
+      // Re-crawl products (Shopify /products.json is fetched fresh every time → new products appear).
+      if (Array.isArray(j.images) && j.images.length) await addPhotos(j.images.slice(0, 12))
     } finally { setPhotoBusy(false); setDetectSite('') }
   }
   const removePhoto = async (url: string) => {

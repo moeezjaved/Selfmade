@@ -48,8 +48,10 @@ async function handle(req: NextRequest) {
     ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
     : (productImageB64 ? [String(productImageB64)] : [])
   if (!adId || rawProducts.length === 0) return NextResponse.json({ error: 'adId and at least one product image required' }, { status: 400 })
-  const useTier: 'default' | 'pro' = tier === 'pro' ? 'pro' : 'default'
-  const action = useTier === 'pro' ? 'image_clone_pro' : 'image_clone'
+  // Clone is Pro-only now; resolution picks the price: 2K → image_clone_pro (15), 4K → image_clone_4k (25).
+  const useTier: 'default' | 'pro' = 'pro'
+  const imageSize = body.imageSize === '4K' ? '4K' : '2K'
+  const action = imageSize === '4K' ? 'image_clone_4k' : 'image_clone_pro'
 
   const admin = createAdminClient()
 
@@ -111,7 +113,7 @@ async function handle(req: NextRequest) {
 
     // Order matters: [reference ad, ...product photos, logo?] — the prompt references the FINAL image as the logo.
     const genImages = logoImg ? [refImg, ...products, logoImg] : [refImg, ...products]
-    const gen = await generateImage(prompt, genImages, useTier, { aspectRatio })
+    const gen = await generateImage(prompt, genImages, useTier, { aspectRatio, imageSize })
     if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
