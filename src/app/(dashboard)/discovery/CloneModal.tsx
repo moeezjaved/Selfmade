@@ -49,6 +49,8 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [result, setResult] = useState<string | null>(null)
+  const [brandId, setBrandId] = useState<string | null>(null)      // selected saved brand (for linking generations)
+  const [genId, setGenId] = useState<string | null>(null)          // current generation id (edit lineage)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Iterative edit loop (chat-style) on the generated image — each edit charges credits.
@@ -82,6 +84,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
   const pickBrand = (b: Brand) => {
     setMode('pick')
+    setBrandId(b.id)
     setBName(b.name); setBSite(b.website || '')
     const imgs = (b.products || []).flatMap((p) => p.image_urls || [])
     const ph = imgs.slice(0, 8).map((u) => ({ id: uid(), src: u, label: 'saved' }))
@@ -121,6 +124,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     if (chosen.length === 0) { setErr('Add and select at least one product photo.'); return }
     setBusy(true); setResult(null)
     try {
+      let useBrandId = brandId
       // If a new brand and "save" is on, persist it first (best-effort; http image URLs only).
       if (mode === 'new' && saveAsBrand && bName.trim()) {
         const httpImgs = chosen.filter((s) => /^https?:\/\//i.test(s))
@@ -136,6 +140,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
           return
         }
         if (jb.quota) setQuota(jb.quota)
+        if (jb.brand?.id) { useBrandId = jb.brand.id; setBrandId(jb.brand.id) }
       }
 
       // Opt into daily "new winning ads like this" emails (follows the ad's brand + email alerts on).
@@ -149,7 +154,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       const r = await fetch('/api/discovery/clone-image', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          adId: ad.id, productImages: chosen, tier,
+          adId: ad.id, productImages: chosen, tier, brandId: useBrandId || undefined,
           brandName: bName.trim() || undefined, colors, newHeadline: headline.trim() || undefined,
         }),
       })
@@ -160,7 +165,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
           : j.error || 'Generation failed — try again.')
         return
       }
-      setResult(j.image)
+      setResult(j.image); setGenId(j.generationId || null)
     } catch (e: any) { setErr(String(e?.message || e)) }
     finally { setBusy(false) }
   }
@@ -171,7 +176,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     try {
       const r = await fetch('/api/discovery/edit-image', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ image: result, instruction: editText.trim(), tier }),
+        body: JSON.stringify({ image: result, instruction: editText.trim(), tier, parentId: genId || undefined, brandId: brandId || undefined }),
       })
       const j = await r.json()
       if (!r.ok) {
@@ -179,7 +184,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         return
       }
       setHistory((h) => [...h, result])   // enable undo
-      setResult(j.image)
+      setResult(j.image); setGenId(j.generationId || genId)
       setEditText('')
     } catch (e: any) { setErr(String(e?.message || e)) }
     finally { setEditing(false) }
@@ -217,7 +222,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                     <button key={b.id} onClick={() => pickBrand(b)}
                       style={chip(mode === 'pick' && bName === b.name)}>{b.name}</button>
                   ))}
-                  <button onClick={() => { setMode('new'); setBName(''); setBSite(''); setPhotos([]); setSelected([]) }}
+                  <button onClick={() => { setMode('new'); setBrandId(null); setBName(''); setBSite(''); setPhotos([]); setSelected([]) }}
                     style={chip(mode === 'new')}>＋ New brand</button>
                 </div>
               )}

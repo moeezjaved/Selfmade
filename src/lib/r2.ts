@@ -82,3 +82,27 @@ export async function uploadToR2(
     return null
   }
 }
+
+/**
+ * Upload an in-memory buffer (e.g. a base64 image decoded from Gemini) to R2.
+ * Returns the public R2 URL on success, null on failure or if R2 isn't configured.
+ */
+export async function uploadBufferToR2(
+  body: Buffer,
+  key: string,
+  contentType: string,
+): Promise<string | null> {
+  const client = getClient()
+  const bucket = process.env.R2_BUCKET_NAME
+  const publicUrl = process.env.R2_PUBLIC_URL?.replace(/\/$/, '')
+  if (!client || !bucket || !publicUrl) return null
+  try {
+    await client.send(new PutObjectCommand({
+      Bucket: bucket, Key: key, Body: body, ContentType: contentType,
+      CacheControl: 'public, max-age=31536000, immutable',
+    }))
+    return `${publicUrl}/${key}`
+  } catch {
+    return null
+  }
+}

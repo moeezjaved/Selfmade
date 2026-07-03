@@ -1,95 +1,326 @@
 'use client'
-import { useState } from 'react'
+/**
+ * My Creatives — the hub for everything the user generates.
+ *  • Generations tab: gallery of saved clones/edits/inspired ads → open any to re-edit (credits),
+ *    download, or delete.
+ *  • Brands tab: view/edit/delete the brands that feed Clone & Script (name, site, voice, products),
+ *    with the plan's brand-slot quota and add-brand (URL auto-detect / manual).
+ */
+import { useCallback, useEffect, useState } from 'react'
+import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2 } from 'lucide-react'
 
-export default function CreativeStudioPage() {
-  const [step, setStep] = useState<'input'|'loading'|'results'>('input')
-  const [product, setProduct] = useState('')
-  const [winner, setWinner] = useState('')
-  const [results, setResults] = useState<any[]>([])
+const DARK = '#1a3a1a', LIME = '#dffe95'
+const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }
+const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 9, border: 'none', background: DARK, color: LIME, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }
+const btnGhost: React.CSSProperties = { ...btn, background: '#fff', color: DARK, border: '1px solid #cbd5cb' }
+const input: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid #d1d5db', borderRadius: 9, fontSize: 13, fontFamily: 'inherit', color: '#111', outline: 'none' }
 
-  const generate = async () => {
-    if (!product || !winner) return
-    setStep('loading')
-    await new Promise(r => setTimeout(r, 2500))
-    setResults([
-      {n:1,angle:'Pain Point Direct',hook:'Still struggling with '+product+'?',body:'Most people don\'t know this simple trick that changed everything. Try it risk-free.',cta:'Learn More',img:'High contrast before/after split image'},
-      {n:2,angle:'Social Proof',hook:'10,000+ customers can\'t be wrong',body:'See why everyone is switching to '+product+'. Real results, real people.',cta:'Shop Now',img:'Grid of customer testimonials with star ratings'},
-      {n:3,angle:'Curiosity Gap',hook:'The secret behind '+product,body:'We\'re not supposed to share this but... here\'s exactly what makes it work.',cta:'Discover Why',img:'Mysterious close-up product shot with blur effect'},
-      {n:4,angle:'Urgency/Scarcity',hook:'Only 48 hours left',body:'Our biggest sale of the year ends soon. Get '+product+' before it\'s gone.',cta:'Get Offer',img:'Bold countdown timer graphic with red accents'},
-      {n:5,angle:'Education/Value',hook:'3 things you need to know about '+product,body:'We break down exactly what to look for, what to avoid, and why it matters.',cta:'Read More',img:'Clean infographic-style with icons and numbers'},
-      {n:6,angle:'Direct Response',hook:'Get '+product+' today',body:'Free shipping. 30-day guarantee. No questions asked. Order now.',cta:'Buy Now',img:'Clean product shot on white with price badge'},
-    ])
-    setStep('results')
-  }
+type Gen = { id: string; image_url: string; type: string; tier: string; prompt?: string | null; brand_name?: string | null; source_ad_id?: string | null; created_at: string }
+type Product = { id: string; name?: string | null; image_urls?: string[] }
+type Brand = { id: string; name: string; website?: string | null; tone?: string | null; usps?: string[]; products?: Product[] }
+
+export default function MyCreativesPage() {
+  const [tab, setTab] = useState<'generations' | 'brands'>('generations')
+  return (
+    <div style={{ padding: 28 }}>
+      <div style={{ marginBottom: 18 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111', margin: 0 }}>My Creatives</h1>
+        <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Every ad you generate lives here — re-edit, download, and manage the brands behind them.</p>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid #dde7dd' }}>
+        <Tab on={tab === 'generations'} onClick={() => setTab('generations')}><Sparkles size={15} /> Generations</Tab>
+        <Tab on={tab === 'brands'} onClick={() => setTab('brands')}><Store size={15} /> Brands</Tab>
+      </div>
+      {tab === 'generations' ? <Generations /> : <Brands />}
+    </div>
+  )
+}
+
+function Tab({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 16px', border: 'none', background: 'transparent', borderBottom: on ? `2px solid ${DARK}` : '2px solid transparent', color: on ? '#111' : '#6b7280', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginBottom: -1 }}>
+      {children}
+    </button>
+  )
+}
+
+/* ───────────────────────── Generations gallery ───────────────────────── */
+function Generations() {
+  const [gens, setGens] = useState<Gen[] | null>(null)
+  const [filter, setFilter] = useState<'all' | 'clone' | 'edit' | 'inspired'>('all')
+  const [open, setOpen] = useState<Gen | null>(null)
+
+  const load = useCallback(async () => {
+    const r = await fetch('/api/creatives')
+    const j = await r.json()
+    setGens(j.creatives || [])
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  const shown = (gens || []).filter((g) => filter === 'all' || g.type === filter)
 
   return (
-    <div style={{padding:28}}>
-      <div style={{marginBottom:24}}>
-        <h1 style={{fontSize:22,fontWeight:800,color:'#1a3a1a'}}>Creative Studio</h1>
-        <p style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Generate 6 strategic ad variation briefs from your winning creative.</p>
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {(['all', 'clone', 'edit', 'inspired'] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)} style={{ padding: '5px 12px', borderRadius: 20, border: `1px solid ${filter === f ? DARK : '#cbd5cb'}`, background: filter === f ? DARK : '#fff', color: filter === f ? LIME : '#374151', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize' }}>{f}</button>
+        ))}
       </div>
 
-      {step==='input' && (
-        <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,padding:28,maxWidth:580}}>
-          <div style={{marginBottom:16}}>
-            <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6b8f6b',marginBottom:6}}>What product/service are you advertising?</label>
-            <input value={product} onChange={e=>setProduct(e.target.value)} placeholder="e.g. Hair loss treatment, SaaS tool for HR teams..." style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'#f8fcf6',color:'#1a3a1a',fontSize:14,fontFamily:'inherit',outline:'none'}}/>
+      {gens === null ? <div style={{ color: '#9ca3af' }}>Loading…</div>
+        : shown.length === 0 ? (
+          <div style={{ ...card, padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+            No creatives yet. Open <b style={{ color: DARK }}>Discovery</b>, hover any ad and hit <b style={{ color: DARK }}>Clone ad</b> — it’ll show up here.
           </div>
-          <div style={{marginBottom:20}}>
-            <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6b8f6b',marginBottom:6}}>Describe your current best-performing ad</label>
-            <textarea value={winner} onChange={e=>setWinner(e.target.value)} placeholder="What does the ad say? What image does it use? Why do you think it works?" style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'#f8fcf6',color:'#1a3a1a',fontSize:14,fontFamily:'inherit',outline:'none',resize:'vertical',minHeight:100,lineHeight:1.6}}/>
-          </div>
-          <button onClick={generate} disabled={!product||!winner} style={{background:product&&winner?'#dffe95':'rgba(223,254,149,0.2)',color:product&&winner?'#10211f':'rgba(255,255,255,0.3)',border:'none',padding:'12px 28px',borderRadius:100,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:product&&winner?'pointer':'not-allowed'}}>
-            ✦ Generate 6 Variations
-          </button>
-        </div>
-      )}
-
-      {step==='loading' && (
-        <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,padding:48,textAlign:'center',maxWidth:580}}>
-          <div style={{width:48,height:48,border:'3px solid rgba(223,254,149,0.2)',borderTopColor:'#dffe95',borderRadius:'50%',animation:'spin 1s linear infinite',margin:'0 auto 20px'}}/>
-          <div style={{fontSize:16,fontWeight:700,color:'#1a3a1a',marginBottom:8}}>Generating variations…</div>
-          <div style={{fontSize:13,color:'#7a9a7a'}}>Claude is analysing your winning ad and creating 6 strategic briefs</div>
-          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        </div>
-      )}
-
-      {step==='results' && (
-        <>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-            <div style={{fontSize:14,color:'#6b8f6b'}}>6 variation briefs generated</div>
-            <button onClick={()=>{setStep('input');setResults([])}} style={{background:'none',border:'1.5px solid rgba(255,255,255,0.1)',color:'#6b8f6b',padding:'7px 16px',borderRadius:100,fontSize:13,fontFamily:'inherit',cursor:'pointer'}}>← Start Over</button>
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:14}}>
-            {results.map(r => (
-              <div key={r.n} style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:16,padding:22}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
-                  <div style={{width:28,height:28,borderRadius:8,background:'rgba(223,254,149,0.1)',border:'1px solid rgba(74,138,0,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#1a3a1a'}}>V{r.n}</div>
-                  <div style={{fontSize:13,fontWeight:700,color:'#1a3a1a'}}>{r.angle}</div>
-                </div>
-                <div style={{marginBottom:10}}>
-                  <div style={{fontSize:10,fontWeight:700,color:'#8aaa8a',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>Hook</div>
-                  <div style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>{r.hook}</div>
-                </div>
-                <div style={{marginBottom:10}}>
-                  <div style={{fontSize:10,fontWeight:700,color:'#8aaa8a',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>Body Copy</div>
-                  <div style={{fontSize:13,color:'#5a7a5a',lineHeight:1.6}}>{r.body}</div>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  <div style={{background:'#f8fcf6',borderRadius:8,padding:'8px 10px'}}>
-                    <div style={{fontSize:10,fontWeight:700,color:'#8aaa8a',marginBottom:3}}>CTA</div>
-                    <div style={{fontSize:12,fontWeight:700,color:'#1a3a1a'}}>{r.cta}</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+            {shown.map((g) => (
+              <div key={g.id} style={card}>
+                <button onClick={() => setOpen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: 'pointer', background: '#f1f5f1', aspectRatio: '1', overflow: 'hidden' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={g.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </button>
+                <div style={{ padding: '9px 11px' }}>
+                  <div style={{ display: 'flex', gap: 5, marginBottom: 5 }}>
+                    <Badge>{g.type}</Badge>{g.tier === 'pro' && <Badge tone="pro">Pro</Badge>}
                   </div>
-                  <div style={{background:'#f8fcf6',borderRadius:8,padding:'8px 10px'}}>
-                    <div style={{fontSize:10,fontWeight:700,color:'#8aaa8a',marginBottom:3}}>Image Direction</div>
-                    <div style={{fontSize:11,color:'#5a7a5a',lineHeight:1.4}}>{r.img}</div>
-                  </div>
+                  <div style={{ fontSize: 12, color: '#374151', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.brand_name || g.prompt || 'Untitled'}</div>
                 </div>
               </div>
             ))}
           </div>
-        </>
-      )}
+        )}
+      {open && <GenerationModal gen={open} onClose={() => setOpen(null)} onChanged={load} />}
+    </div>
+  )
+}
+
+function Badge({ children, tone }: { children: React.ReactNode; tone?: 'pro' }) {
+  return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, textTransform: 'capitalize', background: tone === 'pro' ? DARK : '#eef5eb', color: tone === 'pro' ? LIME : '#3f6b3f' }}>{children}</span>
+}
+
+/* Full-view + re-edit (reuses the credit-charged edit endpoint; new edits are saved as generations). */
+function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () => void; onChanged: () => void }) {
+  const [img, setImg] = useState(gen.image_url)
+  const [genId, setGenId] = useState(gen.id)
+  const [instr, setInstr] = useState('')
+  const [tier, setTier] = useState<'default' | 'pro'>(gen.tier === 'pro' ? 'pro' : 'default')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const editCost = tier === 'pro' ? 4 : 2
+
+  const applyEdit = async () => {
+    if (!instr.trim()) return
+    setBusy(true); setErr(null)
+    try {
+      const r = await fetch('/api/discovery/edit-image', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image: img, instruction: instr.trim(), tier, parentId: genId }),
+      })
+      const j = await r.json()
+      if (!r.ok) { setErr(j.error === 'insufficient_credits' ? 'Not enough credits for this edit.' : j.error || 'Edit failed.'); return }
+      setImg(j.image); if (j.generationId) setGenId(j.generationId); setInstr('')
+      onChanged()
+    } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
+  }
+  const del = async () => {
+    if (!confirm('Delete this creative?')) return
+    await fetch(`/api/creatives?id=${gen.id}`, { method: 'DELETE' })
+    onChanged(); onClose()
+  }
+
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', maxWidth: 900 }}>
+        <div style={{ background: '#0d120e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'relative' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={img} alt="" style={{ maxWidth: '100%', maxHeight: '78vh', borderRadius: 8, opacity: busy ? 0.5 : 1 }} />
+          {busy && <div style={{ position: 'absolute', color: LIME, display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}><Loader2 size={18} className="spin" /> Editing…</div>}
+        </div>
+        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Edit creative</div>
+          <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) applyEdit() }}
+            placeholder="Tweak this creative — headline, subhead, colors, scene, background…" style={{ ...input, resize: 'vertical' }} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['default', 'pro'] as const).map((t) => (
+              <button key={t} onClick={() => setTier(t)} style={{ flex: 1, padding: 8, borderRadius: 8, border: `1px solid ${tier === t ? DARK : '#cbd5cb'}`, background: tier === t ? '#eef5eb' : '#fff', color: DARK, fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>{t === 'pro' ? 'Pro · 4cr' : 'Standard · 2cr'}</button>
+            ))}
+          </div>
+          {err && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{err}</div>}
+          <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · {editCost} cr</button>
+          <a href={img} download={`creative-${gen.id}.png`} style={{ ...btnGhost, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download</a>
+          <button onClick={del} style={{ ...btnGhost, justifyContent: 'center', color: '#b91c1c', borderColor: '#f0c4c4' }}><Trash2 size={15} /> Delete</button>
+        </div>
+      </div>
+    </Overlay>
+  )
+}
+
+/* ───────────────────────── Brands manager ───────────────────────── */
+function Brands() {
+  const [brands, setBrands] = useState<Brand[] | null>(null)
+  const [edit, setEdit] = useState<Brand | null>(null)
+  const [adding, setAdding] = useState(false)
+
+  const load = useCallback(async () => {
+    const r = await fetch('/api/brands')
+    const j = await r.json()
+    setBrands(j.brands || [])
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  const del = async (id: string) => {
+    if (!confirm('Delete this brand and its products?')) return
+    await fetch(`/api/brands/${id}`, { method: 'DELETE' })
+    load()
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: '#6b7280' }}>Brands feed Clone & Script — voice, USPs, and product photos. Slots are set by your plan.</div>
+        <button onClick={() => setAdding(true)} style={btn}><Plus size={15} /> Add brand</button>
+      </div>
+      {brands === null ? <div style={{ color: '#9ca3af' }}>Loading…</div>
+        : brands.length === 0 ? <div style={{ ...card, padding: 40, textAlign: 'center', color: '#9ca3af' }}>No brands yet. Add one to start cloning ads with your product.</div>
+          : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+              {brands.map((b) => {
+                const imgs = (b.products || []).flatMap((p) => p.image_urls || []).slice(0, 4)
+                return (
+                  <div key={b.id} style={{ ...card, padding: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>{b.name}</div>
+                        {b.website && <div style={{ fontSize: 12, color: '#6b7280' }}>{b.website}</div>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => setEdit(b)} title="Edit" style={{ ...btnGhost, padding: 7 }}><Pencil size={14} /></button>
+                        <button onClick={() => del(b.id)} title="Delete" style={{ ...btnGhost, padding: 7, color: '#b91c1c', borderColor: '#f0c4c4' }}><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+                      {imgs.length ? imgs.map((u, i) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={i} src={u} alt="" style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+                      )) : <div style={{ fontSize: 12, color: '#9ca3af' }}>No product photos yet</div>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+      {edit && <BrandModal brand={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); load() }} />}
+      {adding && <AddBrandModal onClose={() => setAdding(false)} onSaved={() => { setAdding(false); load() }} />}
+    </div>
+  )
+}
+
+function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(brand.name)
+  const [website, setWebsite] = useState(brand.website || '')
+  const [tone, setTone] = useState(brand.tone || '')
+  const [usps, setUsps] = useState((brand.usps || []).join(', '))
+  const [busy, setBusy] = useState(false)
+
+  const save = async () => {
+    setBusy(true)
+    await fetch(`/api/brands/${brand.id}`, {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, website, tone, usps: usps.split(',').map((s) => s.trim()).filter(Boolean) }),
+    })
+    setBusy(false); onSaved()
+  }
+
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ padding: 22, width: 460, maxWidth: '92vw', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ fontWeight: 800, fontSize: 16, color: '#111' }}>Edit brand</div>
+        <Field label="Brand name"><input value={name} onChange={(e) => setName(e.target.value)} style={input} /></Field>
+        <Field label="Website"><input value={website} onChange={(e) => setWebsite(e.target.value)} style={input} /></Field>
+        <Field label="Voice / tone"><input value={tone} onChange={(e) => setTone(e.target.value)} placeholder="e.g. bold, playful, premium" style={input} /></Field>
+        <Field label="USPs (comma-separated)"><input value={usps} onChange={(e) => setUsps(e.target.value)} placeholder="fast shipping, 30-day guarantee" style={input} /></Field>
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button onClick={save} disabled={busy || !name.trim()} style={{ ...btn, flex: 1, justifyContent: 'center', opacity: (busy || !name.trim()) ? 0.6 : 1 }}>{busy ? <Loader2 size={15} className="spin" /> : 'Save changes'}</button>
+          <button onClick={onClose} style={btnGhost}>Cancel</button>
+        </div>
+      </div>
+    </Overlay>
+  )
+}
+
+function AddBrandModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState('')
+  const [website, setWebsite] = useState('')
+  const [imgs, setImgs] = useState<string[]>([])
+  const [detecting, setDetecting] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const detect = async () => {
+    if (!website.trim()) return
+    setDetecting(true); setErr(null)
+    try {
+      const r = await fetch('/api/discovery/detect-product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: website.trim() }) })
+      const j = await r.json()
+      if (!r.ok) { setErr(j.error || 'Could not read that site.'); return }
+      if (j.brandName && !name.trim()) setName(j.brandName)
+      setImgs((j.images || []).slice(0, 8))
+    } catch (e: any) { setErr(String(e?.message || e)) } finally { setDetecting(false) }
+  }
+  const save = async () => {
+    setBusy(true); setErr(null)
+    try {
+      const r = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), website: website.trim() || null, product_images: imgs }) })
+      const j = await r.json()
+      if (r.status === 402 && j.error === 'brand_limit_reached') { setErr(`You've used all ${j.limit} brand slots on your plan. Upgrade to add more.`); return }
+      if (!r.ok) { setErr(j.error || 'Could not save brand.'); return }
+      onSaved()
+    } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
+  }
+
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ padding: 22, width: 460, maxWidth: '92vw', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ fontWeight: 800, fontSize: 16, color: '#111' }}>Add a brand</div>
+        <Field label="Website (we’ll auto-detect your product)">
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={website} onChange={(e) => setWebsite(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && detect()} placeholder="yourstore.com" style={{ ...input, flex: 1 }} />
+            <button onClick={detect} disabled={detecting || !website.trim()} style={btnGhost}>{detecting ? <Loader2 size={14} className="spin" /> : <Link2 size={14} />} Detect</button>
+          </div>
+        </Field>
+        <Field label="Brand name"><input value={name} onChange={(e) => setName(e.target.value)} style={input} /></Field>
+        {imgs.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {imgs.map((u, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={i} src={u} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+            ))}
+          </div>
+        )}
+        {err && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button onClick={save} disabled={busy || !name.trim()} style={{ ...btn, flex: 1, justifyContent: 'center', opacity: (busy || !name.trim()) ? 0.6 : 1 }}>{busy ? <Loader2 size={15} className="spin" /> : 'Save brand'}</button>
+          <button onClick={onClose} style={btnGhost}>Cancel</button>
+        </div>
+      </div>
+    </Overlay>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label style={{ display: 'block' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#4b5563', marginBottom: 5 }}>{label}</div>{children}</label>
+}
+
+function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', maxHeight: '92vh', position: 'relative', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
+        <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, zIndex: 3, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={18} /></button>
+        {children}
+      </div>
+      <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
