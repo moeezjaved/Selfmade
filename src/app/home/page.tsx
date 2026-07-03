@@ -19,23 +19,35 @@ function adImg(url: string, w = 400): string {
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${w}&q=72&output=webp`
 }
 
-/** Fade-up on scroll into view. */
+/** Fade-rise on scroll into view (0.6s ease-out). */
 function Reveal({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
   const ref = useRef<HTMLDivElement>(null)
   const [seen, setSeen] = useState(false)
   useEffect(() => {
     const el = ref.current; if (!el) return
-    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setSeen(true); o.disconnect() } }, { threshold: 0.12 })
+    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setSeen(true); o.disconnect() } }, { threshold: 0.15 })
     o.observe(el); return () => o.disconnect()
   }, [])
-  return <div ref={ref} style={{ opacity: seen ? 1 : 0, transform: seen ? 'none' : 'translateY(26px)', transition: `opacity .6s ease ${delay}ms, transform .6s ease ${delay}ms`, ...style }}>{children}</div>
+  return <div ref={ref} style={{ opacity: seen ? 1 : 0, transform: seen ? 'none' : 'translateY(32px)', transition: `opacity .6s cubic-bezier(0,0,.2,1) ${delay}ms, transform .6s cubic-bezier(0,0,.2,1) ${delay}ms`, ...style }}>{children}</div>
+}
+
+/** Masked headline reveal — content slides up from below a clip. */
+function Mask({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [seen, setSeen] = useState(false)
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setSeen(true); o.disconnect() } }, { threshold: 0.4 })
+    o.observe(el); return () => o.disconnect()
+  }, [])
+  return <span ref={ref} className={`mask${seen ? ' in' : ''}`} style={style}><span style={{ transitionDelay: `${delay}ms` }}>{children}</span></span>
 }
 const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: INK, padding: '13px 24px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', border: 'none', cursor: 'pointer' }
 const btnDark: React.CSSProperties = { ...btnPrimary, background: INK, color: '#fff' }
 const wrap: React.CSSProperties = { maxWidth: 1120, margin: '0 auto', padding: '0 24px' }
 
 function Arrow({ c = INK }: { c?: string }) {
-  return <span style={{ display: 'inline-flex', width: 22, height: 22, borderRadius: '50%', background: 'rgba(0,0,0,.12)', alignItems: 'center', justifyContent: 'center' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="3"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+  return <span className="arrow-ic" style={{ display: 'inline-flex', width: 22, height: 22, borderRadius: '50%', background: 'rgba(0,0,0,.12)', alignItems: 'center', justifyContent: 'center' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="3"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
 }
 function Check() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="3"><path d="M20 6 9 17l-5-5" /></svg> }
 function X() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5cb" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12" /></svg> }
@@ -97,10 +109,10 @@ function HeroMock({ ads }: { ads: string[] }) {
           ))}
         </div>
       </div>
-      <div style={{ position: 'absolute', top: -18, right: -18, background: '#fff', borderRadius: 14, boxShadow: '0 14px 34px rgba(14,27,18,.16)', padding: '10px 14px' }}>
+      <div className="float-idle" style={{ position: 'absolute', top: -18, right: -18, background: '#fff', borderRadius: 14, boxShadow: '0 14px 34px rgba(14,27,18,.16)', padding: '10px 14px' }}>
         <div style={{ fontSize: 20, fontWeight: 800, color: INK }}>3M+</div><div style={{ fontSize: 11, color: '#6b7280' }}>ads indexed</div>
       </div>
-      <div style={{ position: 'absolute', bottom: -16, left: -18, background: INK, color: '#fff', borderRadius: 14, boxShadow: '0 14px 34px rgba(14,27,18,.22)', padding: '10px 14px' }}>
+      <div className="float-idle" style={{ position: 'absolute', bottom: -16, left: -18, background: INK, color: '#fff', borderRadius: 14, boxShadow: '0 14px 34px rgba(14,27,18,.22)', padding: '10px 14px', animationDelay: '2s' }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: LIME }}>Clone in 1 click</div><div style={{ fontSize: 11, opacity: .7 }}>→ your product, your brand</div>
       </div>
     </div>
@@ -113,9 +125,11 @@ function FAQItem({ q, a }: { q: string; a: string }) {
     <div style={{ borderBottom: '1px solid #eef0ee' }}>
       <button onClick={() => setOpen(o => !o)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: '20px 4px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
         <span style={{ fontSize: 16.5, fontWeight: 700, color: INK }}>{q}</span>
-        <span style={{ fontSize: 24, color: '#9ca3af', flexShrink: 0 }}>{open ? '−' : '+'}</span>
+        <span style={{ fontSize: 26, color: '#9ca3af', flexShrink: 0, lineHeight: 1, transition: 'transform .3s cubic-bezier(0,0,.2,1)', transform: open ? 'rotate(45deg)' : 'none' }}>+</span>
       </button>
-      {open && <p style={{ padding: '0 4px 22px', margin: 0, color: '#4b5563', fontSize: 15, lineHeight: 1.6, maxWidth: 760 }}>{a}</p>}
+      <div style={{ overflow: 'hidden', maxHeight: open ? 240 : 0, opacity: open ? 1 : 0, transition: 'max-height .35s cubic-bezier(0,0,.2,1), opacity .3s cubic-bezier(0,0,.2,1)' }}>
+        <p style={{ padding: '0 4px 22px', margin: 0, color: '#4b5563', fontSize: 15, lineHeight: 1.6, maxWidth: 760 }}>{a}</p>
+      </div>
     </div>
   )
 }
@@ -133,12 +147,36 @@ export default function HomeLanding() {
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", color: INK, background: '#fff', overflowX: 'hidden' }}>
       <style>{`
+        /* ── ambient loops ── */
         @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-        @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-        .lift{transition:transform .22s ease, box-shadow .22s ease}
+        @keyframes float-idle{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+        @keyframes soft-pulse{0%,100%{opacity:.55}50%{opacity:1}}
+        .float-idle{animation:float-idle 4s ease-in-out infinite}
+        .soft-pulse{animation:soft-pulse 2s ease-in-out infinite}
+        /* ── marquees: two directions (ad gallery 36s) + slow (strips 40s), pause on hover ── */
+        @keyframes ticker-left{from{transform:translateX(0)}to{transform:translateX(-33.333%)}}
+        @keyframes ticker-right{from{transform:translateX(-33.333%)}to{transform:translateX(0)}}
+        @keyframes ticker-slow{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+        .marquee-left{animation:ticker-left 36s linear infinite}
+        .marquee-right{animation:ticker-right 36s linear infinite}
+        .marquee-slow{animation:ticker-slow 40s linear infinite}
+        .marquee-left:hover,.marquee-right:hover,.marquee-slow:hover{animation-play-state:paused}
+        /* ── hover micro-interactions (0.22s ease-out) ── */
+        .lift{transition:transform .22s cubic-bezier(0,0,.2,1), box-shadow .22s cubic-bezier(0,0,.2,1)}
         .lift:hover{transform:translateY(-6px);box-shadow:0 18px 44px rgba(14,27,18,.14)}
-        .glow:hover{box-shadow:0 0 0 3px rgba(223,254,149,.5), 0 18px 44px rgba(14,27,18,.16)}
-        @keyframes sheen{0%{background-position:-200% 0}100%{background-position:200% 0}}
+        .btn{transition:transform .22s cubic-bezier(0,0,.2,1), box-shadow .22s cubic-bezier(0,0,.2,1), opacity .22s cubic-bezier(0,0,.2,1)}
+        .btn:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 12px 28px rgba(14,27,18,.18)}
+        .btn:active{transform:translateY(0) scale(.99)}
+        .navlink{transition:opacity .22s cubic-bezier(0,0,.2,1)}
+        .navlink:hover{opacity:.6}
+        .arrowp .arrow-ic{transition:transform .22s cubic-bezier(0,0,.2,1)}
+        .arrowp:hover .arrow-ic{transform:translateX(3px)}
+        /* ── masked headline reveal (line slides up) ── */
+        .mask{display:block;overflow:hidden}
+        .mask>span{display:block;transform:translateY(110%);transition:transform .7s cubic-bezier(.22,1,.36,1)}
+        .mask.in>span{transform:none}
+        /* ── reduced motion ── */
+        @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}.mask>span{transform:none!important}}
       `}</style>
 
       {/* NAV */}
@@ -147,12 +185,12 @@ export default function HomeLanding() {
           <LogoMark color="#000" height={26} />
           <div style={{ display: 'flex', gap: 30 }}>
             {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['#pricing', 'Pricing']].map(([h, l]) => (
-              <a key={h} href={h} style={{ fontSize: 14.5, fontWeight: 600, color: '#4b5563', textDecoration: 'none' }}>{l}</a>
+              <a key={h} href={h} className="navlink" style={{ fontSize: 14.5, fontWeight: 600, color: '#4b5563', textDecoration: 'none' }}>{l}</a>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <Link href="/login" style={{ fontSize: 14.5, fontWeight: 700, color: INK, textDecoration: 'none' }}>Log in</Link>
-            <Link href="/signup" style={{ ...btnPrimary, padding: '9px 18px', fontSize: 14 }}>Start for free <Arrow /></Link>
+            <Link href="/login" className="navlink" style={{ fontSize: 14.5, fontWeight: 700, color: INK, textDecoration: 'none' }}>Log in</Link>
+            <Link href="/signup" className="btn arrowp" style={{ ...btnPrimary, padding: '9px 18px', fontSize: 14 }}>Start for free <Arrow /></Link>
           </div>
         </div>
       </nav>
@@ -162,15 +200,16 @@ export default function HomeLanding() {
         <div style={{ display: 'inline-flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: '#6b7280', marginBottom: 26 }}>
           <span>🗂️ 3M+ ads indexed</span><span>·</span><span>🏷️ 611K brands tracked</span><span>·</span><span>⭐ 4.9 on G2 <i style={{ color: '#c0392b' }}>(TODO)</i></span>
         </div>
-        <h1 style={{ fontSize: 'clamp(38px,6vw,64px)', fontWeight: 800, lineHeight: 1.05, letterSpacing: '-.03em', margin: '0 auto', maxWidth: 900 }}>
-          Find winning ads. Make them <span style={{ fontStyle: 'italic', color: GREEN }}>yours.</span> Launch in minutes.
+        <h1 style={{ fontSize: 'clamp(38px,6vw,64px)', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-.03em', margin: '0 auto', maxWidth: 900 }}>
+          <Mask>Find winning ads.</Mask>
+          <Mask delay={120}>Make them <span style={{ fontStyle: 'italic', color: GREEN }}>yours.</span> Launch in minutes.</Mask>
         </h1>
         <p style={{ fontSize: 'clamp(16px,2vw,19px)', color: '#4b5563', maxWidth: 640, margin: '22px auto 28px', lineHeight: 1.55 }}>
           Selfmade turns 3M+ proven Meta ads into your next winner — spy on what's working, clone or generate your own with AI, and launch. The whole ad workflow in one place.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/signup" style={btnPrimary}>Start for free <Arrow /></Link>
-          <a href="#how" style={btnDark}>See how it works <Arrow c="#fff" /></a>
+          <Link href="/signup" className="btn arrowp" style={btnPrimary}>Start for free <Arrow /></Link>
+          <a href="#how" className="btn arrowp" style={btnDark}>See how it works <Arrow c="#fff" /></a>
         </div>
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center', flexWrap: 'wrap', marginTop: 20, fontSize: 13.5, color: '#6b7280', fontWeight: 600 }}>
           {['No card to start', '50 free credits', 'Cancel anytime'].map(t => <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check /> {t}</span>)}
@@ -208,17 +247,19 @@ export default function HomeLanding() {
       </section>
 
       {/* TRUSTED-BY strip (placeholder logos) */}
-      <section style={{ ...wrap, padding: '20px 24px 50px', textAlign: 'center' }}>
+      <section style={{ padding: '20px 0 50px', textAlign: 'center' }}>
         <div style={{ fontSize: 12.5, color: '#9ca3af', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 18 }}>Trusted by fast-moving DTC & agency teams <i>(logos TODO)</i></div>
-        <div style={{ display: 'flex', gap: 34, justifyContent: 'center', flexWrap: 'wrap', opacity: .5, fontWeight: 800, fontSize: 18, color: '#6b7280' }}>
-          {['NORTHBOUND', 'Lumen', 'GoodStuff', 'Verdant', 'Halcyon', 'MOXIE'].map(b => <span key={b}>{b}</span>)}
+        <div style={{ overflow: 'hidden', maskImage: 'linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)' }}>
+          <div className="marquee-slow" style={{ display: 'flex', gap: 48, width: 'max-content', opacity: .5, fontWeight: 800, fontSize: 18, color: '#6b7280' }}>
+            {[...Array(2)].flatMap((_, k) => ['NORTHBOUND', 'Lumen', 'GoodStuff', 'Verdant', 'Halcyon', 'MOXIE', 'Kindred', 'Northstar'].map(b => <span key={b + k} style={{ flexShrink: 0 }}>{b}</span>))}
+          </div>
         </div>
       </section>
 
       {/* COMPARISON — named competitors */}
       <section id="compare" style={{ ...wrap, padding: '30px 24px 60px' }}>
         <h2 style={{ fontSize: 'clamp(28px,4vw,40px)', fontWeight: 800, textAlign: 'center', letterSpacing: '-.02em', margin: '0 0 8px' }}>
-          Everything, in <span style={{ fontStyle: 'italic', color: GREEN }}>one</span> place.
+          <Mask style={{ display: 'inline-block' }}>Everything, in <span style={{ fontStyle: 'italic', color: GREEN }}>one</span> place.</Mask>
         </h2>
         <p style={{ textAlign: 'center', color: '#6b7280', margin: '0 0 32px' }}>Others do a slice. Selfmade covers discover → create → launch.</p>
         <div style={{ overflowX: 'auto' }}>
@@ -265,7 +306,7 @@ export default function HomeLanding() {
             <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: GREEN }}>Meet Mello</div>
             <h2 style={{ fontSize: 'clamp(26px,3.6vw,38px)', fontWeight: 800, letterSpacing: '-.02em', margin: '6px 0 10px' }}>Your AI ad <span style={{ fontStyle: 'italic', color: GREEN }}>strategist</span>.</h2>
             <p style={{ color: '#374151', fontSize: 16, lineHeight: 1.55, maxWidth: 520, margin: 0 }}>Ask Mello what to make. It pulls your industry’s winning DNA — hooks, angles, formats — drafts the concept, and generates the ad in your brand. No blank canvas, ever.</p>
-            <div style={{ marginTop: 18 }}><Link href="/signup" style={btnDark}>Ask Mello <Arrow c="#fff" /></Link></div>
+            <div style={{ marginTop: 18 }}><Link href="/signup" className="btn arrowp" style={btnDark}>Ask Mello <Arrow c="#fff" /></Link></div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center' }}><Mello /></div>
         </Panel>
@@ -281,7 +322,7 @@ export default function HomeLanding() {
           <div key={i} style={{ marginBottom: 48 }}>
             <div style={{ textAlign: 'center', marginBottom: 22 }}>
               <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9ca3af' }}>{kick}</div>
-              <h2 style={{ fontSize: 'clamp(26px,4vw,40px)', fontWeight: 800, letterSpacing: '-.02em', margin: '6px 0 8px' }}>{title.split(' ').slice(0, -1).join(' ')} <span style={{ fontStyle: 'italic', color: GREEN }}>{title.split(' ').slice(-1)}</span></h2>
+              <h2 style={{ fontSize: 'clamp(26px,4vw,40px)', fontWeight: 800, letterSpacing: '-.02em', margin: '6px 0 8px' }}><Mask style={{ display: 'inline-block' }}>{title.split(' ').slice(0, -1).join(' ')} <span style={{ fontStyle: 'italic', color: GREEN }}>{title.split(' ').slice(-1)}</span></Mask></h2>
               <p style={{ color: '#6b7280', maxWidth: 620, margin: '0 auto', fontSize: 16, lineHeight: 1.55 }}>{body}</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr)) 220px', gap: 14, alignItems: 'stretch' }}>
@@ -310,9 +351,9 @@ export default function HomeLanding() {
           <svg width="220" height="70" viewBox="0 0 220 70" style={{ marginBottom: 8 }}>
             {[15, 35, 55].map((y, i) => <path key={i} d={`M0 ${y}Q80 ${y} 110 35`} stroke={LIME} strokeWidth="2" fill="none" opacity=".5" />)}
             {[15, 35, 55].map((y, i) => <path key={'r' + i} d={`M220 ${y}Q140 ${y} 110 35`} stroke={LIME} strokeWidth="2" fill="none" opacity=".5" />)}
-            <circle cx="110" cy="35" r="16" fill={LIME} />
+            <circle cx="110" cy="35" r="16" fill={LIME} className="soft-pulse" />
           </svg>
-          <h2 style={{ fontSize: 'clamp(26px,4vw,40px)', fontWeight: 800, letterSpacing: '-.02em', margin: '4px auto 12px', maxWidth: 640 }}>One platform for your <span style={{ fontStyle: 'italic', color: LIME }}>whole</span> ad workflow.</h2>
+          <h2 style={{ fontSize: 'clamp(26px,4vw,40px)', fontWeight: 800, letterSpacing: '-.02em', margin: '4px auto 12px', maxWidth: 640 }}><Mask style={{ display: 'inline-block' }}>One platform for your <span style={{ fontStyle: 'italic', color: LIME }}>whole</span> ad workflow.</Mask></h2>
           <p style={{ color: 'rgba(255,255,255,.72)', maxWidth: 560, margin: '0 auto 22px', fontSize: 16 }}>Stop stitching together a spy tool, a designer, and a launcher. Selfmade is all three — talking to each other.</p>
           <Link href="/signup" style={btnPrimary}>Start for free <Arrow /></Link>
           <div style={{ marginTop: 40, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 20, padding: 26, maxWidth: 620, margin: '40px auto 0', display: 'flex', gap: 16, alignItems: 'center', textAlign: 'left' }}>
@@ -339,41 +380,44 @@ export default function HomeLanding() {
           <h2 style={{ fontSize: 'clamp(24px,3.4vw,34px)', fontWeight: 800, letterSpacing: '-.02em', margin: 0 }}>Real winning ads, indexed daily</h2>
           <p style={{ color: '#9ca3af', fontSize: 14.5, margin: '6px 0 0' }}>A live peek at what&rsquo;s running — pulled straight from Discovery.</p>
         </div>
-        <div style={{ overflow: 'hidden', maskImage: 'linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)' }}>
-          <div style={{ display: 'flex', gap: 14, width: 'max-content', animation: 'marquee 40s linear infinite' }}>
-            {(() => {
-              const tiles = marqueeAds.length ? marqueeAds : marqueeGrad
-              return [...tiles, ...tiles].map((t, i) => (
-                <div key={i} style={{ width: 150, aspectRatio: '3/4', borderRadius: 14, overflow: 'hidden', background: marqueeAds.length ? '#0d120e' : `linear-gradient(160deg,#fff,${t})`, border: '1px solid #eef0ee', flexShrink: 0, position: 'relative' }}>
-                  {marqueeAds.length && /* eslint-disable-next-line @next/next/no-img-element */
+        {([['left', ads.length ? ads.slice(0, 8) : marqueeGrad.slice(0, 8)], ['right', ads.length ? ads.slice(8, 16) : marqueeGrad.slice(2, 10)]] as [string, string[]][]).map(([dir, tiles], row) => (
+          <div key={dir} style={{ overflow: 'hidden', maskImage: 'linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)', marginTop: row ? 14 : 0 }}>
+            <div className={dir === 'left' ? 'marquee-left' : 'marquee-right'} style={{ display: 'flex', gap: 14, width: 'max-content' }}>
+              {[...tiles, ...tiles, ...tiles].map((t, i) => (
+                <div key={i} style={{ width: 150, aspectRatio: '3/4', borderRadius: 14, overflow: 'hidden', background: ads.length ? '#0d120e' : `linear-gradient(160deg,#fff,${t})`, border: '1px solid #eef0ee', flexShrink: 0, position: 'relative' }}>
+                  {ads.length && /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={adImg(t, 240)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                   <span style={{ position: 'absolute', top: 8, left: 8, background: LIME, color: INK, fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 10 }}>Discovery</span>
                 </div>
-              ))
-            })()}
+              ))}
+            </div>
           </div>
-        </div>
+        ))}
       </section>
 
       {/* SERVICES */}
       <section style={{ ...wrap, padding: '40px 24px' }}>
         <Panel grad="linear-gradient(135deg,#f7d9ee,#dbeafe)" style={{ textAlign: 'center' }}>
-          <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 10px' }}>Not just software. A creative team in your <span style={{ fontStyle: 'italic', color: GREEN }}>pocket</span>.</h2>
+          <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 10px' }}><Mask style={{ display: 'inline-block' }}>Not just software. A creative team in your <span style={{ fontStyle: 'italic', color: GREEN }}>pocket</span>.</Mask></h2>
           <p style={{ color: '#374151', maxWidth: 560, margin: '0 auto', fontSize: 16, lineHeight: 1.55 }}>Discovery finds the angle, the Studio designs it, Mello strategizes, and Launch ships it — the work of a whole ad team, on tap.</p>
         </Panel>
       </section>
 
       {/* TESTIMONIAL WALL (placeholder, auto-scroll) */}
-      <section style={{ ...wrap, padding: '40px 24px' }}>
-        <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, textAlign: 'center', letterSpacing: '-.02em', margin: '0 0 8px' }}>Loved by <span style={{ fontStyle: 'italic', color: GREEN }}>builders</span>.</h2>
-        <p style={{ textAlign: 'center', color: '#9ca3af', margin: '0 0 26px', fontSize: 14 }}>(placeholder wall — swap for real reviews)</p>
-        <div style={{ columnCount: 3, columnGap: 14 }}>
-          {['Cloned a competitor’s top ad in a minute — it converted better than our agency’s.', 'The industry insights are unreal. I know what to make before I open the editor.', 'Mello wrote the angle, the Studio designed it, I launched it. Same afternoon.', 'Finally one tool instead of five tabs.', 'The 4K exports look agency-grade.', 'Brand Spy is addictive — I check it every morning.'].map((t, i) => (
-            <div key={i} style={{ breakInside: 'avoid', marginBottom: 14, border: '1px solid #eef0ee', borderRadius: 16, padding: 18 }}>
-              <p style={{ margin: '0 0 12px', fontSize: 14.5, color: INK, lineHeight: 1.5 }}>“{t}”</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)` }} /><span style={{ fontSize: 12.5, color: '#9ca3af' }}>Verified user <i>(placeholder)</i></span></div>
-            </div>
-          ))}
+      <section style={{ padding: '40px 0' }}>
+        <div style={{ ...wrap, textAlign: 'center' }}>
+          <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 8px' }}><Mask style={{ display: 'inline-block' }}>Loved by <span style={{ fontStyle: 'italic', color: GREEN }}>builders</span>.</Mask></h2>
+          <p style={{ color: '#9ca3af', margin: '0 0 26px', fontSize: 14 }}>(placeholder wall — swap for real reviews)</p>
+        </div>
+        <div style={{ overflow: 'hidden', maskImage: 'linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)' }}>
+          <div className="marquee-slow" style={{ display: 'flex', gap: 14, width: 'max-content', padding: '0 7px' }}>
+            {[...Array(2)].flatMap((_, k) => ['Cloned a competitor’s top ad in a minute — it converted better than our agency’s.', 'The industry insights are unreal. I know what to make before I open the editor.', 'Mello wrote the angle, the Studio designed it, I launched it. Same afternoon.', 'Finally one tool instead of five tabs.', 'The 4K exports look agency-grade.', 'Brand Spy is addictive — I check it every morning.'].map((t, i) => (
+              <div key={t + k} className="lift" style={{ width: 300, flexShrink: 0, border: '1px solid #eef0ee', borderRadius: 16, padding: 18, background: '#fff' }}>
+                <p style={{ margin: '0 0 12px', fontSize: 14.5, color: INK, lineHeight: 1.5 }}>“{t}”</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)` }} /><span style={{ fontSize: 12.5, color: '#9ca3af' }}>Verified user <i>(placeholder)</i></span></div>
+              </div>
+            )))}
+          </div>
         </div>
       </section>
 
@@ -392,7 +436,7 @@ export default function HomeLanding() {
       {/* FINAL CTA */}
       <section style={{ ...wrap, padding: '20px 24px 50px' }}>
         <Panel grad={`linear-gradient(135deg,${LIME},#a8e63d)`} style={{ textAlign: 'center', padding: '56px 40px' }}>
-          <h2 style={{ fontSize: 'clamp(30px,5vw,52px)', fontWeight: 800, letterSpacing: '-.03em', margin: '0 auto 14px', maxWidth: 720, color: INK }}>Your next winning ad is <span style={{ fontStyle: 'italic' }}>already</span> in here.</h2>
+          <h2 style={{ fontSize: 'clamp(30px,5vw,52px)', fontWeight: 800, letterSpacing: '-.03em', margin: '0 auto 14px', maxWidth: 720, color: INK }}><Mask style={{ display: 'inline-block' }}>Your next winning ad is <span style={{ fontStyle: 'italic' }}>already</span> in here.</Mask></h2>
           <p style={{ color: 'rgba(14,27,18,.7)', margin: '0 auto 24px', maxWidth: 460, fontSize: 16 }}>Start free with 50 credits. Find a winner, make it yours, launch today.</p>
           <Link href="/signup" style={btnDark}>Start for free <Arrow c="#fff" /></Link>
         </Panel>
@@ -400,7 +444,7 @@ export default function HomeLanding() {
 
       {/* FAQ */}
       <section style={{ ...wrap, padding: '20px 24px 60px', maxWidth: 820 }}>
-        <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, textAlign: 'center', letterSpacing: '-.02em', margin: '0 0 24px' }}>Questions? <span style={{ fontStyle: 'italic', color: GREEN }}>Answered</span>.</h2>
+        <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, textAlign: 'center', letterSpacing: '-.02em', margin: '0 0 24px' }}><Mask style={{ display: 'inline-block' }}>Questions? <span style={{ fontStyle: 'italic', color: GREEN }}>Answered</span>.</Mask></h2>
         {[['Where do the ads come from?', 'We index millions of real, running ads from the Meta Ad Library — so you’re learning from ads with actual spend behind them, not mockups.'],
           ['Do I need design skills?', 'No. Clone a proven ad onto your product with one click, or describe what you want and the AI Ad Studio generates it in your brand — no editor required.'],
           ['Will the ads match my brand?', 'Yes. Set a Brand Kit (colors, fonts, logo, products) once — or let Selfmade auto-detect it from your site — and every generation stays on-brand.'],
