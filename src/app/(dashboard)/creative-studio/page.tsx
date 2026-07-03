@@ -108,7 +108,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const [img, setImg] = useState(gen.image_url)
   const [genId, setGenId] = useState(gen.id)
   const [instr, setInstr] = useState('')
-  const [tier, setTier] = useState<'default' | 'pro'>(gen.tier === 'pro' ? 'pro' : 'default')
+  const tier: 'pro' = 'pro'   // Pro-only (Nano Banana Pro)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const editCost = tier === 'pro' ? 4 : 2
@@ -146,11 +146,6 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
           <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) applyEdit() }}
             placeholder="Tweak this creative — headline, subhead, colors, scene, background…" style={{ ...input, resize: 'vertical' }} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            {(['default', 'pro'] as const).map((t) => (
-              <button key={t} onClick={() => setTier(t)} style={{ flex: 1, padding: 8, borderRadius: 8, border: `1px solid ${tier === t ? DARK : '#cbd5cb'}`, background: tier === t ? '#eef5eb' : '#fff', color: DARK, fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>{t === 'pro' ? 'Pro · 4cr' : 'Standard · 2cr'}</button>
-            ))}
-          </div>
           {err && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{err}</div>}
           <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · {editCost} cr</button>
           <a href={img} download={`creative-${gen.id}.png`} style={{ ...btnGhost, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download</a>
