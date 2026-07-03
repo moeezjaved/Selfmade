@@ -77,8 +77,13 @@ export function buildClonePrompt(opts: {
       ].filter(Boolean).join(', ')} (or the closest available match).`
     : ''
   const logoLine = opts.hasLogo
-    ? `The FINAL attached image is the brand's real logo — place it cleanly and legibly as the brand mark (small, in a top corner). Reproduce it faithfully; do not distort, recolor, or invent a different logo/wordmark.`
+    ? `If the FINAL attached image is a simple brand logo/wordmark, place it small in a top corner. If it is NOT a clean logo (e.g. a photo or a person), ignore it completely — never add a person or scene from it.`
     : ''
+  // Brand styling is SECONDARY — one demoted line so it never overrides the product swap.
+  const brandStyle = [
+    paletteLine ? paletteLine.replace('Use this exact brand palette:', 'brand colors:') : (opts.colors?.length ? `brand colors ${opts.colors.join(', ')}` : ''),
+    fontLine ? fontLine.replace('Use on-brand typography:', 'fonts:') : '',
+  ].filter(Boolean).join(' ')
   const d = opts.dna || {}
   const keep = [
     d.hook_type && `hook style (${d.hook_type})`,
@@ -87,19 +92,17 @@ export function buildClonePrompt(opts: {
     d.emotion?.length && `emotional tone (${d.emotion.slice(0, 2).join(', ')})`,
   ].filter(Boolean).join(', ')
   return [
-    `Recreate the winning Facebook ad (image 1) as a template, but featuring the user's real product shown in the OTHER attached image(s).`,
-    `KEEP the ad's layout, composition, camera angle, lighting, color palette, and text placement${keep ? `, plus the ${keep}` : ''}.`,
-    `PRODUCT — this is critical: the product in the attached product photo(s) is the user's ACTUAL product. Place THAT exact product into the ad, reproduced faithfully — same shape, proportions, packaging, label text, and colors. It must be clearly visible and be the ONLY product shown. Do NOT invent, redraw, simplify, or substitute a different-looking product; copy the real one from the photo.`,
-    opts.brandName ? `The brand is "${opts.brandName}".` : '',
-    paletteLine || (opts.colors?.length ? `Brand colors to favor where the design allows: ${opts.colors.join(', ')}.` : ''),
-    fontLine,
+    `TASK: PRODUCT SWAP — not a redesign. Image 1 is a winning ad. Recreate it almost exactly (same layout, composition, background scene, camera angle, lighting, subjects, mood${keep ? `, ${keep}` : ''}, and text placement) but REPLACE ONLY the featured product with the user's product shown in the next attached photo(s).`,
+    `THE USER'S PRODUCT IS MANDATORY AND IS THE HERO: reproduce it faithfully from the photo — exact shape, proportions, packaging, label text, and colors — clearly visible and prominent. It is the ONLY product in the ad.`,
+    `CRITICAL — do NOT omit or shrink away the product, do NOT replace it with a person, model, hand, face, or any different object, and do NOT invent a new lifestyle scene or concept. Keep the SAME subjects and setting as image 1; only the product changes.`,
+    opts.brandName ? `Brand name: "${opts.brandName}".` : '',
+    opts.newHeadline ? `On-screen headline — render EXACTLY, letter for letter: "${opts.newHeadline}".` : `Keep the headline layout; write short copy relevant to this product.`,
+    d.cta ? `Keep a clear call-to-action button ("${d.cta}").` : '',
+    brandStyle ? `Secondary styling, only where it does not fight the layout above — ${brandStyle}.` : '',
     logoLine,
-    opts.newHeadline ? `On-screen headline — render this text EXACTLY, letter for letter: "${opts.newHeadline}".` : `Keep the headline layout; write short ad copy relevant to this product.`,
-    d.cta ? `Include a clear call-to-action button ("${d.cta}").` : '',
-    `TEXT: spell every word correctly using real English — never output invented, garbled, or misspelled words. Keep all text crisp and legible.`,
-    `Do NOT include: watermarks, timestamps, logos of other brands, extra or duplicate products, or any placeholder/gibberish text.`,
+    `Spell all text correctly in real English (no gibberish). No watermarks, no other brands' logos, no extra or duplicate products.`,
     opts.aspectRatio && opts.aspectRatio !== 'original'
-      ? `Compose the final image at a ${opts.aspectRatio} aspect ratio.`
+      ? `Compose at a ${opts.aspectRatio} aspect ratio.`
       : `Keep the same aspect ratio as image 1.`,
     `Output ONE photorealistic, ad-ready image.`,
   ].filter(Boolean).join(' ')
