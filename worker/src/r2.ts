@@ -10,8 +10,16 @@
  * the time. Removed to kill log noise + make the data flow obvious.
  */
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { NodeHttpHandler } from '@smithy/node-http-handler'
+import { Agent } from 'node:https'
 import sharp from 'sharp'
 import { config } from './config.js'
+
+// R2 upload socket pool. The AWS SDK defaults to maxSockets=50, which caps concurrent uploads — at
+// drain concurrency 24+ the pool saturates, hundreds of uploads queue ("socket usage at capacity=50"),
+// and the backpressure surfaces as `saveCreatives failed: fetch failed`. Raising it (+ keepAlive) lets
+// the drain actually use the box instead of being upload-bound. Env-tunable via R2_MAX_SOCKETS.
+const R2_MAX_SOCKETS = parseInt(process.env.R2_MAX_SOCKETS || '256', 10)
 
 const client = new S3Client({
   region: 'auto',
@@ -20,6 +28,9 @@ const client = new S3Client({
     accessKeyId: config.r2.accessKeyId,
     secretAccessKey: config.r2.secretAccessKey,
   },
+  requestHandler: new NodeHttpHandler({
+    httpsAgent: new Agent({ keepAlive: true, maxSockets: R2_MAX_SOCKETS }),
+  }),
 })
 
 /**
