@@ -148,7 +148,7 @@ export const getBrandPage = unstable_cache(
       })
     }
     const activeCount = ads.filter((a) => a.is_active).length
-    const topN = (m: Map<string, number>, n: number): Tally[] => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, count]) => ({ label, count }))
+    const topN = (m: Map<string, number>, n: number): Tally[] => Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, count]) => ({ label, count }))
     const insights: BrandInsights = {
       topHooks: topN(hookF, 4), topEmotions: topN(emoF, 5), topAngles: topN(angF, 3),
       topFormats: topN(fmtF, 3), topTopics: topN(topF, 6), classified,
