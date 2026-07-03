@@ -340,8 +340,8 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
       if (j.fonts?.heading && (!hFont.trim() || badFont(hFont))) setHFont(j.fonts.heading)
       if (j.fonts?.body && (!bFont.trim() || badFont(bFont))) setBFont(j.fonts.body)
       if (j.logo && !logo.trim()) setLogo(j.logo)
-      // Prefer the ACCURATE product photos (Shopify /products.json) over homepage lifestyle images.
-      const prod = (Array.isArray(j.productImages) && j.productImages.length) ? j.productImages : (j.images || [])
+      // Accurate product shots first (Shopify /products.json), then fill with the rest of the images.
+      const prod = Array.from(new Set([...(j.productImages || []), ...(j.images || [])]))
       const found = prod.length
       const before = photos.length
       const merged = found ? await addPhotos(prod.slice(0, 24)) : photos
@@ -487,7 +487,7 @@ function AddBrandModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
       const j = await r.json()
       if (!r.ok) { setErr(j.error || 'Could not read that site.'); return }
       if (j.brandName && !name.trim()) setName(j.brandName)
-      setImgs(((Array.isArray(j.productImages) && j.productImages.length ? j.productImages : j.images) || []).slice(0, 24))
+      setImgs(Array.from(new Set([...(j.productImages || []), ...(j.images || [])])).slice(0, 24))
       setKit({ colors: j.colors || [], fonts: j.fonts || {}, logo: j.logo || null, palette: j.palette || {} } as any)
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setDetecting(false) }
   }
