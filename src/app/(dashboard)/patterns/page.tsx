@@ -1,4 +1,5 @@
 'use client'
+import UpgradeGate from '@/components/UpgradeGate'
 /** Pattern Detection — what repeats among WINNING ads in a niche. Creative
  *  intelligence built on the Creative DNA + Winner Score. */
 import { useEffect, useState, useCallback } from 'react'
@@ -44,6 +45,9 @@ function Card({ title, buckets }: { title: string; buckets: Bucket[] }) {
 }
 
 export default function PatternsPage() {
+  return <UpgradeGate feature="aiInsights" name="AI Insights"><PatternsInner /></UpgradeGate>
+}
+function PatternsInner() {
   const [niche, setNiche] = useState('Supplements')
   const [topic, setTopic] = useState('')
   const [topicInput, setTopicInput] = useState('')

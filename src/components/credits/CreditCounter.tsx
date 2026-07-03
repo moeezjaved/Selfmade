@@ -68,7 +68,7 @@ export function CreditCounter({ compact = false }: { compact?: boolean }) {
   const { balance, loading, plan } = useCredits()
   const low = balance < 15  // below the priciest action (image_clone)
   return (
-    <a href="/settings/billing"
+    <a href="/billing"
        title={`Plan: ${plan} · ${balance} credits`}
        style={{
          display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none',

@@ -294,7 +294,7 @@ Real per-action API costs (verified July 2026):
 |---|---|---|---|
 | AI script | ~$0.001 (LLM) | 5 | huge |
 | Transcribe | ~$0.002 | 2 | huge |
-| Image Clone 2K (default) | $0.134 | 15 | plan ~93%, top-up ~5–8× |
+| Image Clone 2K (default) | **~$0.15 (verified in production)** | 15 | plan ~95%, top-up ~7.6× |
 | Image Clone 4K | $0.24 | 25 | plan ~89%, top-up ~5× |
 
 **Worst-case plan cost** (every credit spent on the most expensive action = 2K image, 15 cr):

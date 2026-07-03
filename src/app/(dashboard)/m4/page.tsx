@@ -1,5 +1,6 @@
 'use client'
 import React, { useState } from 'react'
+import UpgradeGate from '@/components/UpgradeGate'
 
 type Step = 'welcome' | 'pixel' | 'creatives' | 'retargeting' | 'interests' | 'budget' | 'review' | 'grades'
 interface Creative { id: string; name: string; pack: number; type?: string; hash?: string; uploading?: boolean; uploaded?: boolean; mimeType?: string }
@@ -154,6 +155,9 @@ function InterestSearch({onAdd}: {onAdd: (interest: {id:string,name:string,topic
 }
 
 export default function M4Page() {
+  return <UpgradeGate feature="launch" name="Launch Ads"><M4Inner /></UpgradeGate>
+}
+function M4Inner() {
   const [step, setStep] = useState<Step>('welcome')
   const [loading, setLoading] = useState(false)
   const [grades, setGrades] = useState<Grade[]>([])
