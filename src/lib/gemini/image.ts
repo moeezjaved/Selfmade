@@ -69,6 +69,72 @@ export function nearestAspect(w?: number | null, h?: number | null): string | un
   return best
 }
 
+/**
+ * Build the AI Ad Studio prompt — an ORIGINAL ad design (not a copy of any reference). The attached
+ * images are: [inspiration ref designs..., user product photos..., logo?]. Inspirations set the
+ * AESTHETIC bar; the industry insights set the WINNING STRUCTURE; the brand kit sets identity; the
+ * product stays pixel-faithful. This is the inverse of clone: here creativity/brand lead, but the
+ * product is still rendered exactly.
+ */
+export function buildStudioPrompt(opts: {
+  brandName?: string; newHeadline?: string; aspectRatio?: string; hasLogo?: boolean
+  numInspirations: number; numProducts: number
+  palette?: BrandPalette; colors?: string[]
+  fonts?: { heading?: string | null; body?: string | null; headingWeight?: string | null; bodyWeight?: string | null }
+  styleTags?: string[]
+  insights?: { topHooks?: string[]; topAngles?: string[]; topFormats?: string[]; topEmotions?: string[]; topCtas?: string[] }
+  productDesc?: string
+}): string {
+  const n = opts.numInspirations
+  const firstProductIdx = n + 1
+  const pal = opts.palette
+  const paletteLine = pal && (pal.accent || pal.background || pal.heading || pal.cta)
+    ? `Brand palette (use consistently): ${[
+        pal.background && `background ${pal.background}`, pal.accent && `accent ${pal.accent}`,
+        pal.heading && `headline ${pal.heading}`, pal.body && `body ${pal.body}`,
+        pal.cta && `CTA button ${pal.cta}${pal.ctaText ? ` / ${pal.ctaText} label` : ''}`, pal.icon && `icons ${pal.icon}`,
+      ].filter(Boolean).join(', ')}.`
+    : (opts.colors?.length ? `Brand colors: ${opts.colors.join(', ')}.` : '')
+  const fontLine = (opts.fonts?.heading || opts.fonts?.body)
+    ? `Typography: ${[
+        opts.fonts?.heading && `headings "${opts.fonts.heading}"${opts.fonts?.headingWeight ? ` weight ${opts.fonts.headingWeight}` : ''}`,
+        opts.fonts?.body && `body "${opts.fonts.body}"${opts.fonts?.bodyWeight ? ` weight ${opts.fonts.bodyWeight}` : ''}`,
+      ].filter(Boolean).join(', ')} (or closest match).`
+    : ''
+  const ins = opts.insights || {}
+  const insightLine = [
+    ins.topHooks?.length && `proven hook styles: ${ins.topHooks.slice(0, 3).join(', ')}`,
+    ins.topAngles?.length && `winning angles: ${ins.topAngles.slice(0, 3).join(', ')}`,
+    ins.topFormats?.length && `formats that perform: ${ins.topFormats.slice(0, 2).join(', ')}`,
+    ins.topEmotions?.length && `emotional tone: ${ins.topEmotions.slice(0, 2).join(', ')}`,
+  ].filter(Boolean).join('; ')
+  const styleLine = opts.styleTags?.length ? `Aesthetic direction: ${opts.styleTags.slice(0, 5).join(', ')}.` : ''
+  const cta = ins.topCtas?.[0]
+  const logoLine = opts.hasLogo
+    ? `The FINAL attached image is the brand logo — place it small and tasteful in a corner. If it isn't a clean logo, ignore it (never add a person/scene from it).`
+    : ''
+  return [
+    `TASK: Design ONE brand-new, breathtaking, scroll-stopping advertisement for the user's product${opts.brandName ? ` (brand "${opts.brandName}")` : ''}.`,
+    n > 0
+      ? `Images 1-${n} are REFERENCE DESIGNS for inspiration ONLY — study their design sophistication: composition, typography energy, color grading, use of negative space, and premium finish. Match that CALIBER of design, but create an ORIGINAL layout. Do NOT copy any single reference or reuse its product, text, or people.`
+      : `Aim for a premium, agency-quality, scroll-stopping design.`,
+    `Image${opts.numProducts > 1 ? `s ${firstProductIdx}-${firstProductIdx + opts.numProducts - 1}` : ` ${firstProductIdx}`} ${opts.numProducts > 1 ? 'are' : 'is'} the USER'S PRODUCT and it is the HERO of the ad.`,
+    `Render the product 1:1 from the photo(s): match its EXACT silhouette, proportions, materials, textures, and on-label branding/text. Do NOT reshape, restyle, or invent a different product. It is the only product shown.`,
+    opts.productDesc ? `The product is: ${opts.productDesc}.` : '',
+    insightLine ? `Ground the concept in what wins in this industry — ${insightLine}.` : '',
+    styleLine,
+    paletteLine, fontLine,
+    opts.newHeadline
+      ? `Headline — render EXACTLY, letter for letter: "${opts.newHeadline}".`
+      : `Write a short, punchy, original headline that fits the angle. Spell everything correctly in real English.`,
+    cta ? `Include a clear call-to-action button ("${cta}").` : `Include a clear call-to-action button.`,
+    logoLine,
+    `No gibberish text, no watermarks, no other brands' logos, no duplicate products.`,
+    opts.aspectRatio && opts.aspectRatio !== 'original' ? `Compose at a ${opts.aspectRatio} aspect ratio.` : `Compose at a 4:5 aspect ratio.`,
+    `Output ONE photorealistic, polished, ready-to-publish ad image.`,
+  ].filter(Boolean).join(' ')
+}
+
 export function buildClonePrompt(opts: {
   brandName?: string; colors?: string[]; newHeadline?: string; aspectRatio?: string; hasLogo?: boolean
   palette?: BrandPalette

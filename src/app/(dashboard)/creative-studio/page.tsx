@@ -6,9 +6,11 @@
  *  • Brands tab: view/edit/delete the brands that feed Clone & Script (name, site, voice, products),
  *    with the plan's brand-slot quota and add-brand (URL auto-detect / manual).
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload } from 'lucide-react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2 } from 'lucide-react'
 import { creativeFilename } from '@/lib/filename'
+import StudioModal from '../discovery/StudioModal'
 
 async function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) })
@@ -26,18 +28,38 @@ type BrandKit = { colors?: string[]; extraColors?: string[]; palette?: Record<st
 type Brand = { id: string; name: string; website?: string | null; tone?: string | null; usps?: string[]; products?: Product[]; brand_kit?: BrandKit }
 
 export default function MyCreativesPage() {
+  return <Suspense fallback={null}><MyCreativesInner /></Suspense>
+}
+
+function MyCreativesInner() {
   const [tab, setTab] = useState<'generations' | 'brands'>('generations')
+  const [studio, setStudio] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+  const params = useSearchParams()
+  const router = useRouter()
+
+  // Deep-link from the "Create Ad" sidebar item (/creative-studio?studio=1) opens the modal.
+  useEffect(() => {
+    if (params.get('studio')) { setStudio(true); router.replace('/creative-studio') }
+  }, [params, router])
+
   return (
     <div style={{ padding: 28 }}>
-      <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111', margin: 0 }}>My Creatives</h1>
-        <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Every ad you generate lives here — re-edit, download, and manage the brands behind them.</p>
+      <div style={{ marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111', margin: 0 }}>My Creatives</h1>
+          <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Every ad you generate lives here — re-edit, download, and manage the brands behind them.</p>
+        </div>
+        <button onClick={() => setStudio(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 18px', borderRadius: 11, border: 'none', background: DARK, color: LIME, fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+          <Wand2 size={16} /> Create new ad
+        </button>
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid #dde7dd' }}>
         <Tab on={tab === 'generations'} onClick={() => setTab('generations')}><Sparkles size={15} /> Generations</Tab>
         <Tab on={tab === 'brands'} onClick={() => setTab('brands')}><Store size={15} /> Brands</Tab>
       </div>
-      {tab === 'generations' ? <Generations /> : <Brands />}
+      {tab === 'generations' ? <Generations key={reloadKey} /> : <Brands />}
+      {studio && <StudioModal onClose={() => { setStudio(false); setReloadKey(k => k + 1); setTab('generations') }} />}
     </div>
   )
 }
