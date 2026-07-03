@@ -59,6 +59,16 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
  */
 export type BrandPalette = { background?: string; accent?: string; heading?: string; body?: string; icon?: string; cta?: string; ctaText?: string }
 
+/** Map real pixel dimensions to the nearest Gemini-supported aspect ratio (so "Original" matches the ad). */
+export function nearestAspect(w?: number | null, h?: number | null): string | undefined {
+  if (!w || !h) return undefined
+  const r = w / h
+  const RATIOS: [string, number][] = [['1:1', 1], ['4:5', 0.8], ['5:4', 1.25], ['3:4', 0.75], ['4:3', 1.3333], ['9:16', 0.5625], ['16:9', 1.7778], ['2:3', 0.6667], ['3:2', 1.5]]
+  let best = '1:1', bd = Infinity
+  for (const [name, val] of RATIOS) { const d = Math.abs(val - r); if (d < bd) { bd = d; best = name } }
+  return best
+}
+
 export function buildClonePrompt(opts: {
   brandName?: string; colors?: string[]; newHeadline?: string; aspectRatio?: string; hasLogo?: boolean
   palette?: BrandPalette
