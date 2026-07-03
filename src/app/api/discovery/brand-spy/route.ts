@@ -78,8 +78,12 @@ export async function GET(req: NextRequest) {
 
   // scope=all (directory) → fast crawl_state read (approximate counts; used by the add-modal).
   const build = (cols: string) => {
-    let qq = admin.from('discovery_brand_crawl_state').select(cols).gt('ads_indexed', 0).order('ads_indexed', { ascending: false }).limit(limit)
+    let qq = admin.from('discovery_brand_crawl_state').select(cols).order('ads_indexed', { ascending: false, nullsFirst: false }).limit(limit)
+    // When SEARCHING a specific brand, show name matches even if ads_indexed is 0/stale (e.g. "hims"
+    // had ads in the index but a 0 summary count → it was invisible). Spying re-crawls + fixes the count.
+    // For BROWSE (no query), keep the >0 filter so junk brands don't fill the directory.
     if (q) qq = qq.ilike('brand_name', `%${q}%`)
+    else qq = qq.gt('ads_indexed', 0)
     return qq
   }
   let { data, error } = await build('page_id, brand_name, ads_indexed, active_count, video_count, image_count, carousel_count')
