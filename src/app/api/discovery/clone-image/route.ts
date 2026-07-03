@@ -41,7 +41,7 @@ async function handle(req: NextRequest) {
   if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
 
   const body = await req.json().catch(() => ({}))
-  const { adId, productImageB64, productImages, productMimeType, tier, newHeadline, brandName, colors, brandId } = body || {}
+  const { adId, productImageB64, productImages, productMimeType, tier, newHeadline, brandName, colors, brandId, aspectRatio } = body || {}
   // Accept one legacy base64 photo OR an array of product photos (data: URLs and/or http URLs).
   // Multiple angles help Nano Banana hold the product's exact shape/label across the clone.
   const rawProducts: string[] = Array.isArray(productImages) && productImages.length
@@ -78,7 +78,7 @@ async function handle(req: NextRequest) {
     if (!refImg) { await refund(); return NextResponse.json({ error: 'could not load reference image' }, { status: 502 }) }
 
     const prompt = buildClonePrompt({
-      brandName, colors: Array.isArray(colors) ? colors.slice(0, 4) : undefined, newHeadline,
+      brandName, colors: Array.isArray(colors) ? colors.slice(0, 4) : undefined, newHeadline, aspectRatio,
       dna: { hook_type: (ad as any).hook_type, format_style: (ad as any).format_style, angle: (ad as any).angle, emotion: (ad as any).emotion, cta: (ad as any).cta },
     })
     console.log(`clone-image [${useTier}] prompt:`, prompt)   // proof the prompt is sent each generation
@@ -93,7 +93,7 @@ async function handle(req: NextRequest) {
     }))).filter(Boolean) as { mimeType: string; dataB64: string }[]
     if (products.length === 0) { await refund(); return NextResponse.json({ error: 'could not load product image(s)' }, { status: 502 }) }
 
-    const gen = await generateImage(prompt, [refImg, ...products], useTier)
+    const gen = await generateImage(prompt, [refImg, ...products], useTier, { aspectRatio })
     if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
