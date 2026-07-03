@@ -103,35 +103,61 @@ export async function handleStripeWebhook(payload: string, signature: string) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
-      const userId = session.metadata?.user_id
-      if (!userId) break
+      const ownerId = session.metadata?.owner_id || session.metadata?.user_id
 
-      // Fetch the real subscription so we get the actual status + trial_end
+      // ── Top-up pack (one-time payment) → grant credits + FIFO purchase row ──
+      if (session.mode === 'payment' && session.metadata?.topup_pack && ownerId) {
+        const credits = parseInt(session.metadata.topup_credits || '0', 10)
+        const amount = parseFloat(session.metadata.amount_usd || '0')
+        if (credits > 0) {
+          await supabase.rpc('grant_topup_pack', { p_user: ownerId, p_credits: credits, p_amount: amount, p_stripe: session.payment_intent as string })
+        }
+        break
+      }
+
+      // ── Subscription plan upgrade ──
+      const userId = ownerId
+      if (!userId) break
       const subscriptionId = session.subscription as string
       const sub = await stripe.subscriptions.retrieve(subscriptionId)
+      const plan = session.metadata?.plan
+      const cycle = session.metadata?.cycle || 'monthly'
+      const periodEnd = new Date((sub as any).current_period_end * 1000).toISOString()
+
+      await supabase.from('subscriptions').upsert({
+        owner_id: userId, plan: plan || undefined, billing_cycle: cycle, status: sub.status,
+        stripe_customer_id: session.customer as string, stripe_subscription_id: subscriptionId,
+        current_period_start: new Date((sub as any).current_period_start * 1000).toISOString(),
+        current_period_end: periodEnd, trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+        scheduled_plan: null, updated_at: new Date().toISOString(),
+      }, { onConflict: 'owner_id' })
 
       await supabase.from('user_profiles').update({
-        stripe_subscription_id: subscriptionId,
-        stripe_customer_id: session.customer as string,
+        stripe_subscription_id: subscriptionId, stripe_customer_id: session.customer as string,
         subscription_status: sub.status,
-        // Update trial_ends_at so the app knows the new trial window
-        trial_ends_at: sub.trial_end
-          ? new Date(sub.trial_end * 1000).toISOString()
-          : null,
+        trial_ends_at: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
       }).eq('user_id', userId)
+
+      // Flip the plan + refill plan credits to the new allotment immediately (spec §5).
+      if (plan) await supabase.rpc('apply_plan', { p_user: userId, p_plan: plan, p_reset: periodEnd })
       break
     }
 
     case 'customer.subscription.updated': {
       const sub = event.data.object as Stripe.Subscription
-      const userId = sub.metadata?.user_id
+      const userId = sub.metadata?.owner_id || sub.metadata?.user_id
       if (!userId) break
+      const periodEnd = new Date((sub as any).current_period_end * 1000).toISOString()
+
+      await supabase.from('subscriptions').update({
+        status: sub.status, current_period_end: periodEnd,
+        trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+        updated_at: new Date().toISOString(),
+      }).eq('owner_id', userId)
 
       await supabase.from('user_profiles').update({
         subscription_status: sub.status,
-        trial_ends_at: sub.trial_end
-          ? new Date(sub.trial_end * 1000).toISOString()
-          : null,
+        trial_ends_at: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
       }).eq('user_id', userId)
       break
     }
