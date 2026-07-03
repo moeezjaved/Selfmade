@@ -356,6 +356,38 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
     await fetch(`/api/brands/${brand.id}?photoUrl=${encodeURIComponent(url)}`, { method: 'DELETE' })
   }
 
+  // Auto-detect + PERSIST the brand kit the first time a brand with a website has no colors yet, so it
+  // never opens empty and survives reopen even if the user forgets to hit Save.
+  useEffect(() => {
+    const site = (brand.website || '').trim()
+    if (!site || Object.keys(palette).length > 0) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await fetch('/api/discovery/detect-product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: site }) })
+        const j = await r.json()
+        if (!r.ok || cancelled) return
+        const nextPalette = j.palette && Object.keys(j.palette).length ? j.palette : palette
+        const nextH = j.fonts?.heading || hFont
+        const nextB = j.fonts?.body || bFont
+        const nextLogo = logo || j.logo || ''
+        setPalette(nextPalette); if (j.fonts?.heading) setHFont(nextH); if (j.fonts?.body) setBFont(nextB); if (!logo && j.logo) setLogo(nextLogo)
+        // Persist immediately so a reopen shows it.
+        await fetch(`/api/brands/${brand.id}`, {
+          method: 'PATCH', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ brand_kit: {
+            palette: nextPalette, extraColors: extra,
+            colors: Array.from(new Set([...Object.values(nextPalette).filter(Boolean) as string[], ...extra])),
+            fonts: { heading: nextH || null, headingWeight: hWeight, body: nextB || null, bodyWeight: bWeight },
+            logo: nextLogo || null,
+          } }),
+        })
+      } catch { /* non-fatal */ }
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <Overlay onClose={onClose}>
       <div style={{ padding: 22, width: 480, maxWidth: '92vw', maxHeight: '88vh', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
