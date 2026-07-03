@@ -23,7 +23,8 @@ export default async function BrandsHub() {
   const top = brands.slice(0, 600)
 
   return (
-    <main style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 20px 64px', fontFamily: 'system-ui, sans-serif', color: '#111' }}>
+    <div style={{ background: '#ffffff', minHeight: '100vh' }}>
+    <main style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 20px 64px', fontFamily: 'inherit', color: '#1a3a1a' }}>
       <h1 style={{ fontSize: 34, fontWeight: 800, marginBottom: 10 }}>Facebook Ad Library — spy on any brand</h1>
       <p style={{ fontSize: 16, color: '#4b5563', maxWidth: 720, lineHeight: 1.5, marginBottom: 28 }}>
         Browse the live Facebook & Instagram ads of {brands.length.toLocaleString()}+ brands. See what your
@@ -38,5 +39,6 @@ export default async function BrandsHub() {
         ))}
       </section>
     </main>
+    </div>
   )
 }
