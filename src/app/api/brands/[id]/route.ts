@@ -42,6 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (b[k] !== undefined) update[k] = b[k] || null
   for (const k of ['industry', 'usps', 'preferred_words', 'avoid_words'])
     if (b[k] !== undefined) update[k] = ARR(b[k])
+  if (b.brand_kit !== undefined && typeof b.brand_kit === 'object') update.brand_kit = b.brand_kit
   await admin.from('brands').update(update).eq('id', params.id)
   return NextResponse.json({ success: true })
 }

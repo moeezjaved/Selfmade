@@ -56,8 +56,12 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
  */
 export function buildClonePrompt(opts: {
   brandName?: string; colors?: string[]; newHeadline?: string; aspectRatio?: string
+  fonts?: { heading?: string | null; body?: string | null }
   dna?: { hook_type?: string | null; format_style?: string | null; angle?: string | null; emotion?: string[] | null; cta?: string | null }
 }): string {
+  const fontLine = (opts.fonts?.heading || opts.fonts?.body)
+    ? `Use on-brand typography: ${[opts.fonts?.heading && `headings in "${opts.fonts.heading}"`, opts.fonts?.body && `body text in "${opts.fonts.body}"`].filter(Boolean).join(', ')} (or the closest available match).`
+    : ''
   const d = opts.dna || {}
   const keep = [
     d.hook_type && `hook style (${d.hook_type})`,
@@ -71,6 +75,7 @@ export function buildClonePrompt(opts: {
     `PRODUCT — this is critical: the product in the attached product photo(s) is the user's ACTUAL product. Place THAT exact product into the ad, reproduced faithfully — same shape, proportions, packaging, label text, and colors. It must be clearly visible and be the ONLY product shown. Do NOT invent, redraw, simplify, or substitute a different-looking product; copy the real one from the photo.`,
     opts.brandName ? `The brand is "${opts.brandName}".` : '',
     opts.colors?.length ? `Brand colors to favor where the design allows: ${opts.colors.join(', ')}.` : '',
+    fontLine,
     opts.newHeadline ? `On-screen headline — render this text EXACTLY, letter for letter: "${opts.newHeadline}".` : `Keep the headline layout; write short ad copy relevant to this product.`,
     d.cta ? `Include a clear call-to-action button ("${d.cta}").` : '',
     `TEXT: spell every word correctly using real English — never output invented, garbled, or misspelled words. Keep all text crisp and legible.`,
