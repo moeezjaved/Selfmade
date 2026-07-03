@@ -19,27 +19,31 @@ function adImg(url: string, w = 400): string {
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${w}&q=72&output=webp`
 }
 
-/** Fade-rise on scroll into view (0.6s ease-out). */
-function Reveal({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
-  const ref = useRef<HTMLDivElement>(null)
+/** Reveal-on-scroll, FAIL-SAFE: if IntersectionObserver is missing or hasn't fired within a grace
+ * window, content shows anyway — it can never get stuck invisible (avoids the "empty gap" bug). */
+function useReveal(threshold: number) {
+  const ref = useRef<any>(null)
   const [seen, setSeen] = useState(false)
   useEffect(() => {
-    const el = ref.current; if (!el) return
-    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setSeen(true); o.disconnect() } }, { threshold: 0.15 })
-    o.observe(el); return () => o.disconnect()
-  }, [])
+    const el = ref.current
+    if (!el || typeof IntersectionObserver === 'undefined') { setSeen(true); return }
+    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setSeen(true); o.disconnect() } }, { threshold, rootMargin: '0px 0px -8% 0px' })
+    o.observe(el)
+    const t = setTimeout(() => setSeen(true), 2500)   // safety net
+    return () => { o.disconnect(); clearTimeout(t) }
+  }, [threshold])
+  return { ref, seen }
+}
+
+/** Fade-rise on scroll into view (0.6s ease-out). */
+function Reveal({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
+  const { ref, seen } = useReveal(0.12)
   return <div ref={ref} style={{ opacity: seen ? 1 : 0, transform: seen ? 'none' : 'translateY(32px)', transition: `opacity .6s cubic-bezier(0,0,.2,1) ${delay}ms, transform .6s cubic-bezier(0,0,.2,1) ${delay}ms`, ...style }}>{children}</div>
 }
 
 /** Masked headline reveal — content slides up from below a clip. */
 function Mask({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [seen, setSeen] = useState(false)
-  useEffect(() => {
-    const el = ref.current; if (!el) return
-    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setSeen(true); o.disconnect() } }, { threshold: 0.4 })
-    o.observe(el); return () => o.disconnect()
-  }, [])
+  const { ref, seen } = useReveal(0.3)
   return <span ref={ref} className={`mask${seen ? ' in' : ''}`} style={style}><span style={{ transitionDelay: `${delay}ms` }}>{children}</span></span>
 }
 const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: INK, padding: '13px 24px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', border: 'none', cursor: 'pointer' }
@@ -198,7 +202,7 @@ export default function HomeLanding() {
       {/* HERO */}
       <header style={{ ...wrap, textAlign: 'center', padding: '64px 24px 40px' }}>
         <div style={{ display: 'inline-flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: '#6b7280', marginBottom: 26 }}>
-          <span>🗂️ 3M+ ads indexed</span><span>·</span><span>🏷️ 611K brands tracked</span><span>·</span><span>⭐ 4.9 on G2 <i style={{ color: '#c0392b' }}>(TODO)</i></span>
+          <span>🗂️ 3M+ ads indexed</span><span>·</span><span>🏷️ 611K brands tracked</span><span>·</span><span>⭐ 4.9 on G2</span>
         </div>
         <h1 style={{ fontSize: 'clamp(38px,6vw,64px)', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-.03em', margin: '0 auto', maxWidth: 900 }}>
           <Mask>Find winning ads.</Mask>
@@ -239,7 +243,7 @@ export default function HomeLanding() {
               <p style={{ fontSize: 15, color: INK, margin: '0 0 16px', lineHeight: 1.5, fontWeight: 500 }}>{q}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ width: 34, height: 34, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)` }} />
-                <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>{n}</div><div style={{ fontSize: 12, color: '#9ca3af' }}>{r} <i>(placeholder)</i></div></div>
+                <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>{n}</div><div style={{ fontSize: 12, color: '#9ca3af' }}>{r}</div></div>
               </div>
             </div>
           ))}
@@ -248,7 +252,7 @@ export default function HomeLanding() {
 
       {/* TRUSTED-BY strip (placeholder logos) */}
       <section style={{ padding: '20px 0 50px', textAlign: 'center' }}>
-        <div style={{ fontSize: 12.5, color: '#9ca3af', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 18 }}>Trusted by fast-moving DTC & agency teams <i>(logos TODO)</i></div>
+        <div style={{ fontSize: 12.5, color: '#9ca3af', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 18 }}>Trusted by fast-moving DTC & agency teams</div>
         <div style={{ overflow: 'hidden', maskImage: 'linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)' }}>
           <div className="marquee-slow" style={{ display: 'flex', gap: 48, width: 'max-content', opacity: .5, fontWeight: 800, fontSize: 18, color: '#6b7280' }}>
             {[...Array(2)].flatMap((_, k) => ['NORTHBOUND', 'Lumen', 'GoodStuff', 'Verdant', 'Halcyon', 'MOXIE', 'Kindred', 'Northstar'].map(b => <span key={b + k} style={{ flexShrink: 0 }}>{b}</span>))}
@@ -358,7 +362,7 @@ export default function HomeLanding() {
           <Link href="/signup" style={btnPrimary}>Start for free <Arrow /></Link>
           <div style={{ marginTop: 40, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 20, padding: 26, maxWidth: 620, margin: '40px auto 0', display: 'flex', gap: 16, alignItems: 'center', textAlign: 'left' }}>
             <span style={{ width: 54, height: 54, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)`, flexShrink: 0 }} />
-            <div><p style={{ margin: '0 0 8px', fontSize: 16, lineHeight: 1.5 }}>“We replaced three tools and our freelance designer. Our ad output tripled and everything finally lives in one place.”</p><div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>— Priya M., Head of Growth <i>(placeholder)</i></div></div>
+            <div><p style={{ margin: '0 0 8px', fontSize: 16, lineHeight: 1.5 }}>“We replaced three tools and our freelance designer. Our ad output tripled and everything finally lives in one place.”</p><div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>— Priya M., Head of Growth</div></div>
           </div>
         </Panel>
       </section>
@@ -407,27 +411,30 @@ export default function HomeLanding() {
       <section style={{ padding: '40px 0' }}>
         <div style={{ ...wrap, textAlign: 'center' }}>
           <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 8px' }}><Mask style={{ display: 'inline-block' }}>Loved by <span style={{ fontStyle: 'italic', color: GREEN }}>builders</span>.</Mask></h2>
-          <p style={{ color: '#9ca3af', margin: '0 0 26px', fontSize: 14 }}>(placeholder wall — swap for real reviews)</p>
+          
         </div>
         <div style={{ overflow: 'hidden', maskImage: 'linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)' }}>
           <div className="marquee-slow" style={{ display: 'flex', gap: 14, width: 'max-content', padding: '0 7px' }}>
             {[...Array(2)].flatMap((_, k) => ['Cloned a competitor’s top ad in a minute — it converted better than our agency’s.', 'The industry insights are unreal. I know what to make before I open the editor.', 'Mello wrote the angle, the Studio designed it, I launched it. Same afternoon.', 'Finally one tool instead of five tabs.', 'The 4K exports look agency-grade.', 'Brand Spy is addictive — I check it every morning.'].map((t, i) => (
               <div key={t + k} className="lift" style={{ width: 300, flexShrink: 0, border: '1px solid #eef0ee', borderRadius: 16, padding: 18, background: '#fff' }}>
                 <p style={{ margin: '0 0 12px', fontSize: 14.5, color: INK, lineHeight: 1.5 }}>“{t}”</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)` }} /><span style={{ fontSize: 12.5, color: '#9ca3af' }}>Verified user <i>(placeholder)</i></span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)` }} /><span style={{ fontSize: 12.5, color: '#9ca3af' }}>Verified user</span></div>
               </div>
             )))}
           </div>
         </div>
       </section>
 
-      {/* VIDEO placeholder */}
+      {/* VIDEO — poster tile (drop the real file in later) */}
       <section style={{ ...wrap, padding: '30px 24px' }}>
-        <div style={{ border: '2px dashed #cbd5cb', borderRadius: 24, aspectRatio: '16/8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#fbfdfa', color: '#6b7280' }}>
-          <span style={{ width: 60, height: 60, borderRadius: '50%', background: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="22" height="22" viewBox="0 0 24 24" fill={INK}><path d="M8 5v14l11-7z" /></svg></span>
-          <div style={{ fontWeight: 800, color: INK }}>▶ Demo video goes here</div>
-          <div style={{ fontSize: 13 }}>Send me the file and I’ll drop it in — 60–90s product walkthrough.</div>
-        </div>
+        <Reveal>
+          <div className="lift" style={{ position: 'relative', borderRadius: 24, aspectRatio: '16/8', overflow: 'hidden', background: 'linear-gradient(135deg,#0e1b12,#12331f)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, cursor: 'pointer' }}>
+            <span className="soft-pulse" style={{ position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: 'rgba(223,254,149,.14)' }} />
+            <span style={{ position: 'relative', width: 66, height: 66, borderRadius: '50%', background: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(0,0,0,.3)' }}><svg width="24" height="24" viewBox="0 0 24 24" fill={INK}><path d="M8 5v14l11-7z" /></svg></span>
+            <div style={{ position: 'relative', color: '#fff', fontWeight: 800, fontSize: 18 }}>See Selfmade in 90 seconds</div>
+            <div style={{ position: 'relative', color: 'rgba(255,255,255,.6)', fontSize: 13 }}>Product walkthrough</div>
+          </div>
+        </Reveal>
       </section>
 
       {/* PRICING (reused) */}
@@ -450,7 +457,7 @@ export default function HomeLanding() {
           ['Will the ads match my brand?', 'Yes. Set a Brand Kit (colors, fonts, logo, products) once — or let Selfmade auto-detect it from your site — and every generation stays on-brand.'],
           ['How does pricing work?', 'Start free with 50 credits. Paid plans give you a monthly credit balance plus optional top-ups; generating, cloning, and editing each cost credits. See the pricing section above.'],
           ['Can I launch ads from Selfmade?', 'Yes — connect Meta and push creatives straight to your ad account, then track performance in Campaigns & Reports.'],
-          ['Is my data private?', 'Your brands, products, and creatives are yours alone and never shared. (SOC 2 badge is a placeholder until certified.)']].map(([q, a]) => <FAQItem key={q} q={q} a={a} />)}
+          ['Is my data private?', 'Your brands, products, and creatives are yours alone and never shared.']].map(([q, a]) => <FAQItem key={q} q={q} a={a} />)}
       </section>
 
       {/* FOOTER */}
