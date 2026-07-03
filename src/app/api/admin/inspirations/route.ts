@@ -36,17 +36,18 @@ export async function POST(request: NextRequest) {
   const nicheVocab = (nc || []).map((r: any) => r.niche).filter(Boolean)
 
   const saved: any[] = []
+  const errors: string[] = []
   for (const src of images.slice(0, 30)) {   // cap per request; the UI batches
     const m = /^data:([^;]+);base64,([\s\S]*)$/i.exec(src)
-    if (!m) continue
+    if (!m) { errors.push('not a data URL'); continue }
     const mime = m[1] || 'image/jpeg'
     const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg'
     const buf = Buffer.from(m[2], 'base64')
     const url = await uploadBufferToR2(buf, `inspirations/${randomUUID()}.${ext}`, mime)
-    if (!url) continue
+    if (!url) { errors.push('R2 upload failed (R2 env not set?)'); continue }
 
     const tags = await classifyInspiration({ mimeType: mime, dataB64: m[2] }, nicheVocab).catch(() => null)
-    const { data: row } = await admin.from('ad_inspirations').insert({
+    const { data: row, error } = await admin.from('ad_inspirations').insert({
       r2_url: url,
       niche: tags?.niche || null,
       format: tags?.format || 'image',
@@ -56,9 +57,11 @@ export async function POST(request: NextRequest) {
       layout_type: tags?.layout_type || null,
       tagged: !!tags,
     }).select('id, r2_url, niche, format, aspect, palette, style_tags, layout_type, tagged').single()
+    if (error) { errors.push(`db: ${error.message}`); continue }
     if (row) saved.push(row)
   }
-  return NextResponse.json({ saved, count: saved.length })
+  if (saved.length === 0 && errors.length) console.warn('inspirations upload — all failed:', errors)
+  return NextResponse.json({ saved, count: saved.length, errors: errors.slice(0, 3) })
 }
 
 export async function DELETE(request: NextRequest) {

@@ -14,6 +14,7 @@ export default function InspirationsAdmin() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [uploadErr, setUploadErr] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -31,15 +32,16 @@ export default function InspirationsAdmin() {
   const handleFiles = async (files: FileList | File[]) => {
     const imgs = Array.from(files).filter(f => f.type.startsWith('image/'))
     if (!imgs.length) return
-    setUploading(true); setProgress({ done: 0, total: imgs.length })
+    setUploading(true); setProgress({ done: 0, total: imgs.length }); setUploadErr(null)
     try {
       const dataUrls = await Promise.all(imgs.map(fileToDataUrl))
       for (let i = 0; i < dataUrls.length; i += BATCH) {
         const chunk = dataUrls.slice(i, i + BATCH)
         const j = await fetch('/api/admin/inspirations', {
           method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ images: chunk }),
-        }).then(r => r.json()).catch(() => ({ saved: [] }))
+        }).then(r => r.json()).catch((e) => ({ saved: [], errors: [String(e?.message || e)] }))
         if (j.saved?.length) setItems(prev => [...j.saved, ...prev])
+        if (!j.saved?.length && j.errors?.length) setUploadErr(j.errors[0])
         setProgress({ done: Math.min(i + BATCH, dataUrls.length), total: dataUrls.length })
       }
     } finally { setUploading(false); setProgress(null); if (fileRef.current) fileRef.current.value = '' }
@@ -75,6 +77,11 @@ export default function InspirationsAdmin() {
           {progress ? `${progress.done} / ${progress.total} processed — auto-tagging with AI…` : 'JPG / PNG / WebP · uploads in batches, tags each automatically'}
         </div>
       </div>
+      {uploadErr && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 16 }}>
+          Upload failed: <b>{uploadErr}</b>{/schema cache|does not exist|find the table/i.test(uploadErr) ? ' — reload the PostgREST schema cache (Supabase → Settings → API → Reload schema cache), then retry.' : ''}
+        </div>
+      )}
 
       {/* Grid */}
       {loading ? <div style={{ color: '#aaa' }}>Loading…</div> : (
