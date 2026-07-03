@@ -48,6 +48,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
   const [headline, setHeadline] = useState('')
   const [aspect, setAspect] = useState<'original' | '1:1' | '4:5' | '9:16'>('original')
+  const [imageSize, setImageSize] = useState<'2K' | '4K'>('2K')
   const tier: 'pro' = 'pro'   // Pro (Nano Banana Pro) always — best product fidelity + text
   const [emailDaily, setEmailDaily] = useState(true)
 
@@ -168,7 +169,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       const body = {
         adId: ad.id, productImages: chosen, tier, brandId: useBrandId || undefined,
         brandName: bName.trim() || undefined, colors, newHeadline: headline.trim() || undefined,
-        aspectRatio: aspect, logo: logo || undefined,
+        aspectRatio: aspect, logo: logo || undefined, imageSize,
       }
       const settled = await Promise.all(Array.from({ length: count }, () =>
         fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
@@ -224,8 +225,8 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     return h.slice(0, -1)
   })
 
-  const cost = 15        // Pro clone (Nano Banana Pro @ 2K) — matches credit_pricing image_clone_pro
-  const editCost = 10    // Pro edit — matches image_edit_pro
+  const cost = imageSize === '4K' ? 25 : 15   // 2K → image_clone_pro (15) · 4K → image_clone_4k (25)
+  const editCost = 10                          // Pro edit — matches image_edit_pro
   const hasResults = results.length > 0
 
   if (!mounted) return null
@@ -330,6 +331,14 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                   {([['original', 'Original'], ['1:1', 'Square'], ['4:5', 'Feed 4:5'], ['9:16', 'Story']] as const).map(([v, label]) => (
                     <button key={v} onClick={() => setAspect(v)} style={{ flex: 1, ...tierBtn(aspect === v), padding: '8px 0', fontSize: 11.5 }}>{label}</button>
                   ))}
+                </div>
+              </div>
+              {/* Resolution — 2K is plenty for feed; 4K is an HD download (costs more). */}
+              <div>
+                <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Resolution</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => setImageSize('2K')} style={{ flex: 1, ...tierBtn(imageSize === '2K'), padding: '8px 0' }}>2K · 15 cr</button>
+                  <button onClick={() => setImageSize('4K')} style={{ flex: 1, ...tierBtn(imageSize === '4K'), padding: '8px 0' }}>4K HD · 25 cr</button>
                 </div>
               </div>
               {/* How many variations to generate (each is its own charge + saved creative). */}

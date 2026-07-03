@@ -24,7 +24,7 @@ export type GenResult = { ok: true; mimeType: string; dataB64: string } | { ok: 
  * Generate/edit an image from a text prompt + N reference images (e.g. [winning ad, product photo]).
  * Returns the first image part (base64). The caller uploads it to R2.
  */
-export async function generateImage(prompt: string, images: ImageInput[], tier: 'default' | 'pro' = 'default', opts?: { aspectRatio?: string }): Promise<GenResult> {
+export async function generateImage(prompt: string, images: ImageInput[], tier: 'default' | 'pro' = 'default', opts?: { aspectRatio?: string; imageSize?: string }): Promise<GenResult> {
   if (!KEY) return { ok: false, error: 'GEMINI_API_KEY not set' }
   const parts: any[] = [{ text: prompt }, ...images.map((i) => ({ inline_data: { mime_type: i.mimeType, data: i.dataB64 } }))]
   const generationConfig: any = { responseModalities: ['IMAGE'] }
@@ -32,7 +32,7 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
   // resolution → cost; default 2K. Only sent for the Pro model (standard model rejects it).
   const imageConfig: any = {}
   if (opts?.aspectRatio && opts.aspectRatio !== 'original') imageConfig.aspectRatio = opts.aspectRatio
-  if (tier === 'pro') imageConfig.imageSize = process.env.GEMINI_IMAGE_SIZE || '2K'
+  if (tier === 'pro') imageConfig.imageSize = opts?.imageSize || process.env.GEMINI_IMAGE_SIZE || '2K'
   if (Object.keys(imageConfig).length) generationConfig.imageConfig = imageConfig
   try {
     const r = await fetch(`${BASE}/${modelFor(tier)}:generateContent?key=${KEY}`, {
