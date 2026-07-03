@@ -368,14 +368,16 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                   ))}
                 </div>
               </div>
-              {/* Resolution — 2K is plenty for feed; 4K is an HD download (costs more). */}
-              <div>
-                <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Resolution</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => setImageSize('2K')} style={{ flex: 1, ...tierBtn(imageSize === '2K'), padding: '8px 0' }}>2K · 15 cr</button>
-                  <button onClick={() => setImageSize('4K')} style={{ flex: 1, ...tierBtn(imageSize === '4K'), padding: '8px 0' }}>4K HD · 25 cr</button>
+              {/* Image resolution — static only (animation always uses a 2K base then animates it). */}
+              {outputMode === 'static' && (
+                <div>
+                  <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Resolution</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setImageSize('2K')} style={{ flex: 1, ...tierBtn(imageSize === '2K'), padding: '8px 0' }}>2K · 15 cr</button>
+                    <button onClick={() => setImageSize('4K')} style={{ flex: 1, ...tierBtn(imageSize === '4K'), padding: '8px 0' }}>4K HD · 25 cr</button>
+                  </div>
                 </div>
-              </div>
+              )}
               {/* Static: variations. */}
               {outputMode === 'static' && (
                 <div>
