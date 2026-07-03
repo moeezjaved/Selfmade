@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateImage, buildClonePrompt, geminiEnabled } from '@/lib/gemini/image'
 import { saveGeneration } from '@/lib/creatives'
+import { sendFirstAdEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -91,6 +92,10 @@ export async function POST(req: NextRequest) {
       userId: user.id, dataB64: gen.dataB64, mimeType: gen.mimeType, type: 'clone', tier: useTier,
       brandId: brandId || null, sourceAdId: String(adId), prompt: newHeadline || null,
     })
+
+    // First-ad lifecycle email (once; claim-once guard inside). Best-effort — never fail the clone.
+    if (user.email) await sendFirstAdEmail(user.id, user.email, saved?.url || undefined).catch(() => {})
+
     return NextResponse.json({ image: `data:${gen.mimeType};base64,${gen.dataB64}`, url: saved?.url || null, generationId: saved?.id || null, tier: useTier })
   } catch (e: any) {
     await refund()

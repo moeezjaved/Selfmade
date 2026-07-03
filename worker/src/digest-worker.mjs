@@ -42,7 +42,12 @@ async function run() {
 
   // OPT-IN ONLY: send only to users who explicitly chose weekly/daily. No prefs row = not opted in.
   const prefs = await getJSON('notification_prefs?select=user_id,digest_frequency').catch(() => [])
-  const optedIn = new Set((prefs || []).filter(p => ['weekly', 'daily'].includes(p.digest_frequency)).map(p => p.user_id))
+  // Double opt-in gate: and only to users who confirmed their email (deliverability).
+  const confirmedRows = await getJSON('user_profiles?select=id&email_confirmed_at=not.is.null').catch(() => [])
+  const confirmed = new Set((confirmedRows || []).map(r => r.id))
+  const optedIn = new Set((prefs || [])
+    .filter(p => ['weekly', 'daily'].includes(p.digest_frequency) && confirmed.has(p.user_id))
+    .map(p => p.user_id))
 
   const follows = await getJSON('followed_brands?select=user_id,page_id,brand_name').catch(() => [])
   const byUser = new Map()
