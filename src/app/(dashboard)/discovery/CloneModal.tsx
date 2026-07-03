@@ -48,7 +48,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [selected, setSelected] = useState<string[]>([])
 
   const [outputMode, setOutputMode] = useState<'static' | 'animated'>('static')   // image vs Veo video
-  const [animStyle, setAnimStyle] = useState<'subtle' | 'hero' | 'lifestyle'>('subtle')
+  const [animStyle, setAnimStyle] = useState<'zoom' | 'shine'>('zoom')
   const [animRes, setAnimRes] = useState<'1080p' | '4K'>('1080p')
   const [videoQueued, setVideoQueued] = useState(false)
   const [headline, setHeadline] = useState('')
@@ -183,12 +183,14 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         const r = await fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
         const j = await r.json().catch(() => ({}))
         if (!r.ok) { setErr(j.error === 'insufficient_credits' ? 'Not enough credits.' : j.error || 'Base image failed — try again.'); return }
+        // Animation needs a fetchable image URL (the worker renders from R2), so use the saved url.
+        if (!j.url) { setErr('Couldn’t save the base image for animation — try again.'); return }
         const ar = await fetch('/api/discovery/animate', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ image: j.image, style: animStyle, resolution: animRes, brandId: useBrandId || undefined, sourceAdId: ad.id }),
+          body: JSON.stringify({ image: j.url, style: animStyle, resolution: animRes, brandId: useBrandId || undefined, sourceAdId: ad.id, parentId: j.generationId }),
         })
         const aj = await ar.json().catch(() => ({}))
-        if (!ar.ok) { setErr(aj.error === 'insufficient_credits' ? 'Not enough credits for the video.' : aj.error || 'Could not start the video.'); return }
+        if (!ar.ok) { setErr(aj.error === 'insufficient_credits' ? 'Not enough credits for the animation.' : aj.error || 'Could not start the animation.'); return }
         flyToCreatives(j.url)
         setVideoQueued(true)
         return
@@ -249,7 +251,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   })
 
   const cost = imageSize === '4K' ? 25 : 15   // 2K → image_clone_pro (15) · 4K → image_clone_4k (25)
-  const vidCost = animRes === '4K' ? 240 : 100
+  const vidCost = animRes === '4K' ? 25 : 15
   const totalCost = outputMode === 'animated' ? cost + vidCost : cost * count
   const editCost = 10                          // Pro edit — matches image_edit_pro
   const hasResults = results.length > 0
@@ -395,18 +397,18 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                   <div>
                     <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Motion style</div>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      {(['subtle', 'hero', 'lifestyle'] as const).map((s) => (
-                        <button key={s} onClick={() => setAnimStyle(s)} style={{ flex: 1, ...tierBtn(animStyle === s), padding: '8px 0', textTransform: 'capitalize' }}>{s}</button>
+                      {([['zoom', 'Slow zoom'], ['shine', 'Shine sweep']] as const).map(([s, label]) => (
+                        <button key={s} onClick={() => setAnimStyle(s)} style={{ flex: 1, ...tierBtn(animStyle === s), padding: '8px 0' }}>{label}</button>
                       ))}
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Video resolution</div>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => setAnimRes('1080p')} style={{ flex: 1, ...tierBtn(animRes === '1080p'), padding: '8px 0' }}>1080p · 100 cr</button>
-                      <button onClick={() => setAnimRes('4K')} style={{ flex: 1, ...tierBtn(animRes === '4K'), padding: '8px 0' }}>4K · 240 cr</button>
+                      <button onClick={() => setAnimRes('1080p')} style={{ flex: 1, ...tierBtn(animRes === '1080p'), padding: '8px 0' }}>1080p · 15 cr</button>
+                      <button onClick={() => setAnimRes('4K')} style={{ flex: 1, ...tierBtn(animRes === '4K'), padding: '8px 0' }}>4K · 25 cr</button>
                     </div>
-                    <div style={{ fontSize: 10.5, color: '#6f7f73', marginTop: 5 }}>Generates the ad image, then animates it (~1–2 min). Lands in My Creatives.</div>
+                    <div style={{ fontSize: 10.5, color: '#6f7f73', marginTop: 5 }}>Adds subtle motion to the ad (keeps it exact) → a short MP4 in My Creatives (~1 min).</div>
                   </div>
                 </>
               )}
