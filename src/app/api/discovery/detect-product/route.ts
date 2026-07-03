@@ -53,21 +53,24 @@ export async function POST(req: NextRequest) {
   Array.from(html.matchAll(/srcset=["']([^"']+)["']/gi)).forEach((m) => push(m[1].split(',')[0].trim().split(' ')[0])) // first srcset
   Array.from(html.matchAll(/(https?:)?\/\/cdn\.shopify\.com\/[^\s"'<>)]+\.(?:jpg|jpeg|png|webp)/gi)).forEach((m) => push(m[0])) // shopify CDN
 
-  // Shopify /products.json → EVERY product's images (the big win for stores like shopauranow).
+  // Shopify /products.json → EVERY product's images (the big win + the ACCURATE product shots).
   let shopify = false
+  const productImgs = new Set<string>()          // accurate product photos only (not homepage junk)
+  const pushProd = (u?: string | null) => { const a = u && abs(u, url); if (a && !JUNK.test(a)) { const c = a.split('?')[0]; productImgs.add(c); imgs.add(c) } }
   try {
-    const pr = await fetch(`${origin}/products.json?limit=50`, { headers: UA })
+    const pr = await fetch(`${origin}/products.json?limit=100`, { headers: UA })
     if (pr.ok) {
       const j = await pr.json().catch(() => null) as any
       const products = j?.products || []
       if (Array.isArray(products) && products.length) {
         shopify = true
-        for (const p of products) for (const im of (p.images || [])) push(im?.src)
+        for (const p of products) for (const im of (p.images || [])) pushProd(im?.src)
       }
     }
   } catch { /* not shopify or blocked — fine */ }
 
-  const images = Array.from(imgs).slice(0, 24)
+  const productImages = Array.from(productImgs).slice(0, 24)   // real products (Shopify)
+  const images = Array.from(imgs).slice(0, 24)                 // everything (fallback)
 
   // ── Logo ────────────────────────────────────────────────────────────────
   // The real brand mark, so ads use it instead of an invented wordmark. Prefer JSON-LD org logo,
@@ -141,7 +144,7 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    brandName, images, colors: colorList, fonts, logo, palette, shopify,
+    brandName, images, productImages, colors: colorList, fonts, logo, palette, shopify,
     brandKit: { colors: colorList, fonts, logo, palette },
     source: url,
   })

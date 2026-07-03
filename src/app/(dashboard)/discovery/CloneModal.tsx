@@ -128,7 +128,8 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       if (j.fonts) setFonts(j.fonts)
       if (j.logo) setLogo(j.logo)
       if (j.palette) setPalette(j.palette)
-      addPhotos((j.images || []).map((u: string) => ({ id: uid(), src: u, label: 'detected' })))
+      const prodSrc = (Array.isArray(j.productImages) && j.productImages.length) ? j.productImages : (j.images || [])
+      addPhotos(prodSrc.map((u: string) => ({ id: uid(), src: u, label: 'detected' })))
       if (!j.images?.length) setErr('No product photos found on that page — upload manually.')
     } catch (e: any) { setErr(String(e?.message || e)) }
     finally { setDetecting(false) }

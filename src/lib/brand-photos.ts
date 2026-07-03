@@ -9,7 +9,7 @@ import { uploadToR2, uploadBufferToR2 } from '@/lib/r2'
 
 export async function persistImagesToR2(userId: string, images: string[]): Promise<string[]> {
   const out: string[] = []
-  const list = (images || []).filter((s) => typeof s === 'string' && s.trim()).slice(0, 12)
+  const list = (images || []).filter((s) => typeof s === 'string' && s.trim()).slice(0, 24)
   for (let i = 0; i < list.length; i++) {
     const src = list[i]
     const base = `brand-products/${userId}/${Buffer.from(`${userId}:${i}:${process.hrtime.bigint()}`).toString('hex').slice(0, 26)}`
