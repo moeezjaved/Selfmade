@@ -109,7 +109,10 @@ export async function POST(req: NextRequest) {
   const fontSet: string[] = []
   const addFont = (f?: string | null) => {
     const name = (f || '').replace(/["']/g, '').split(',')[0].trim()
-    if (name && !/inherit|initial|sans-serif|serif|monospace|system-ui|-apple-system/i.test(name) && !fontSet.includes(name)) fontSet.push(name)
+    // Skip generic families AND CSS variables / functions (var(--font-x)) that leak from stylesheets.
+    if (name && name.length > 1 && !name.includes('(') && !name.startsWith('--')
+      && !/inherit|initial|sans-serif|serif|monospace|system-ui|-apple-system|blinkmacsystemfont/i.test(name)
+      && !fontSet.includes(name)) fontSet.push(name)
   }
   Array.from(html.matchAll(/fonts\.googleapis\.com\/css2?\?[^"']*family=([^"'&:]+)/gi)).forEach((m) => addFont(decodeURIComponent(m[1]).replace(/\+/g, ' ')))
   Array.from(html.matchAll(/font-family\s*:\s*([^;"'}]+)/gi)).forEach((m) => addFont(m[1]))
