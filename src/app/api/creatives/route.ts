@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get('type')
 
   let q = admin.from('creative_generations')
-    .select('id, brand_id, source_ad_id, parent_id, type, tier, prompt, image_url, created_at')
+    .select('id, brand_id, source_ad_id, parent_id, type, tier, prompt, image_url, media_type, status, created_at')
     .eq('user_id', user.id).order('created_at', { ascending: false }).limit(300)
   if (brandId) q = q.eq('brand_id', brandId)
   if (type) q = q.eq('type', type)
