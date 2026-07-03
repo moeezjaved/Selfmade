@@ -158,6 +158,56 @@ agency deals via founder outreach, and instrument activation + churn.
 
 ---
 
+## 7. How the bootstrappers actually operated (the cadence behind the strategy)
+
+The strategy above is *what*. This is *the rhythm*. None of these companies had a big team early —
+they won by doing a small number of things **every single day/week without missing.**
+
+- **Foreplay (Zach Murray):** shipped a sharp free-ish hook, then showed up daily on Twitter/X + in
+  media-buyer communities answering questions and posting ad breakdowns. The engine was *consistency of
+  presence*, not volume of channels. One product wedge + daily community presence → 30k users.
+- **Motion:** treated content like a product. The *Thumbstop* newsletter went out on a **fixed weekly
+  cadence** — reliability is what compounded a list to 50k. Plus one flagship event/year (the Summit).
+- **Minea:** made the affiliate program the growth loop — recruit affiliates weekly, they market for you.
+
+**The pattern = a fixed weekly content beat + daily audience presence + a compounding loop (SEO/affiliate).**
+For a solo founder the whole job is protecting that rhythm from the product work.
+
+### Daily plan (~60–90 min total, before you touch code)
+| Slot | Time | What |
+|---|---|---|
+| **Morning: presence (30 min)** | 1st thing | Post **1 ad teardown / insight** on X + LinkedIn (pull a winner from your own corpus — you have 5M ads, this is free content forever). Reply to 5–10 media-buyer posts with genuine value. |
+| **Midday: community (20 min)** | lunch | Answer 2–3 questions in a media-buyer Discord/Slack/r/PPC/FB group. No pitching — just be the most useful person in the room. Drop your teardown link only where it fits. |
+| **Evening: pipeline (15 min)** | EOD | DM/email **2 warm agency or brand leads** (demo offer). Reply to every trial signup personally. Log 1 activation/churn metric. |
+| **Always-on** | — | Every teardown ends with a soft CTA to the free tool/waitlist. |
+
+The daily block is deliberately small so it survives busy build days. **Missing a day is the only real failure mode.**
+
+### Weekly plan
+| Day | Focus | Deliverable |
+|---|---|---|
+| **Mon** | Content production | Write the week's **teardown newsletter** (your Thumbstop). Batch 3–5 short posts from it. |
+| **Tue** | SEO / moat | Ship/expand **programmatic-SEO pages** off the corpus. Check indexation + top landing pages in Search Console. |
+| **Wed** | Product-led growth | Improve one **activation** step (time-to-first-clone). Ship one free-tool/extension improvement. |
+| **Thu** | Sales | **Send the newsletter.** Founder-led outreach: 5–10 agency/brand demos booked or run. |
+| **Fri** | Loops + review | Recruit 2–3 **affiliates**. Review the week's numbers (signups, free→paid, churn, top content). Pick next week's teardown topics. |
+| **Weekend** | Light presence only | Keep posting (scheduled), rest the rest. |
+
+### Weekly scorecard (track these 6 — nothing else early)
+1. Free signups  2. Free→paid conversion %  3. New MRR  4. **Monthly churn %** (the one that decides everything)
+5. Activation rate (% who clone an ad in week 1)  6. Newsletter subs + open rate.
+
+### Monthly beats
+- **Month 1:** launch the newsletter + free tool, build waitlist (pre-launch).
+- **Month 2:** Product Hunt launch + open free plan.
+- **Month 3:** launch the 30%-lifetime affiliate program; publish first customer case study.
+- **Every month after:** one "big rock" (a flagship teardown series, a mini-tool, an integration) + keep the weekly rhythm.
+
+**The honest math:** this cadence is ~10 focused hours/week on GTM. That's the price of the base-case
+trajectory — the revenue model assumes you protect it. Skip the weekly beat and you fall to the conservative line.
+
+---
+
 ## Summary
 - **Market:** validated, bootstrappable (Foreplay: 7-figure ARR, $0 VC). Beachhead = daily-spying DTC marketers + small agencies.
 - **Wedge:** the only spy→clone→launch→track tool, at 1/5 Atria's price, on a 5M-ad SEO moat.

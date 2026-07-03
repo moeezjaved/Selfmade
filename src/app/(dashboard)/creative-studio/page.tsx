@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload } from 'lucide-react'
+import { creativeFilename } from '@/lib/filename'
 
 async function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) })
@@ -131,7 +132,6 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const [img, setImg] = useState(gen.image_url)
   const [genId, setGenId] = useState(gen.id)
   const [instr, setInstr] = useState('')
-  const [vidRes, setVidRes] = useState<'1080p' | '4K'>('1080p')
   const tier: 'pro' = 'pro'   // Pro-only (Nano Banana Pro)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -156,18 +156,6 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
     await fetch(`/api/creatives?id=${gen.id}`, { method: 'DELETE' })
     onChanged(); onClose()
   }
-  const animate = async (style: string, resolution: '1080p' | '4K') => {
-    setBusy(true); setErr(null)
-    try {
-      const r = await fetch('/api/discovery/animate', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ image: img, style, resolution, parentId: genId }),
-      })
-      const j = await r.json()
-      if (!r.ok) { setErr(j.error === 'insufficient_credits' ? 'Not enough credits for a video.' : j.error || 'Could not start video.'); return }
-      onChanged(); onClose()   // the gallery shows a "Generating video…" card + polls to completion
-    } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
-  }
   const isVideo = gen.media_type === 'video'
 
   return (
@@ -184,7 +172,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
           {isVideo ? (
             <>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Your video</div>
-              <a href={img || ''} download={`creative-${gen.id}.mp4`} style={{ ...btn, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download MP4</a>
+              <a href={img || ''} download={creativeFilename({ brand: gen.brand_name, ext: 'mp4', kind: gen.type, date: new Date(gen.created_at) })} style={{ ...btn, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download MP4</a>
             </>
           ) : (
             <>
@@ -194,21 +182,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                 placeholder="Tweak this creative — headline, subhead, colors, scene, background…" style={{ ...input, resize: 'vertical' }} />
               {err && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{err}</div>}
               <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · {editCost} cr</button>
-              {/* Animate → short motion MP4 (droplet FFmpeg; keeps the ad exact). 1080p 15 / 4K 25. */}
-              <div style={{ borderTop: '1px solid #eef2ec', paddingTop: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>🎬 Animate · {vidRes === '4K' ? 25 : 15} cr</div>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                  {(['1080p', '4K'] as const).map((rz) => (
-                    <button key={rz} onClick={() => setVidRes(rz)} style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: `1px solid ${vidRes === rz ? DARK : '#cbd5cb'}`, background: vidRes === rz ? '#eef5eb' : '#fff', color: DARK, fontWeight: 700, fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit' }}>{rz}{rz === '4K' ? ' HD' : ''}</button>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {([['zoom', 'Slow zoom'], ['shine', 'Shine sweep']] as const).map(([s, label]) => (
-                    <button key={s} onClick={() => animate(s, vidRes)} disabled={busy} style={{ ...btnGhost, flex: 1, justifyContent: 'center', fontSize: 11.5, padding: '8px 4px' }}>{label}</button>
-                  ))}
-                </div>
-              </div>
-              <a href={img || ''} download={`creative-${gen.id}.png`} style={{ ...btnGhost, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download</a>
+              <a href={img || ''} download={creativeFilename({ brand: gen.brand_name, ext: (img || '').match(/\.(jpg|jpeg|webp|png)(\?|$)/i)?.[1] || 'png', kind: gen.type, date: new Date(gen.created_at) })} style={{ ...btnGhost, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download</a>
             </>
           )}
           <button onClick={del} style={{ ...btnGhost, justifyContent: 'center', color: '#b91c1c', borderColor: '#f0c4c4' }}><Trash2 size={15} /> Delete</button>
