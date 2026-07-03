@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { verifyAdminRequest } from '@/lib/admin/auth'
+import { getAuthUsers } from '@/lib/admin/users'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,12 +24,12 @@ export async function GET(request: NextRequest) {
 
   const userIds = Array.from(new Set(rows.map((r: any) => r.user_id).filter(Boolean)))
   const brandIds = Array.from(new Set(rows.map((r: any) => r.brand_id).filter(Boolean)))
-  const [{ data: emails }, { data: profiles }, { data: brands }] = await Promise.all([
-    userIds.length ? admin.schema('auth').from('users').select('id, email').in('id', userIds) : Promise.resolve({ data: [] } as any),
+  const [authUsers, { data: profiles }, { data: brands }] = await Promise.all([
+    userIds.length ? getAuthUsers(admin) : Promise.resolve(new Map()),
     userIds.length ? admin.from('user_profiles').select('user_id, full_name').in('user_id', userIds) : Promise.resolve({ data: [] } as any),
     brandIds.length ? admin.from('brands').select('id, name').in('id', brandIds) : Promise.resolve({ data: [] } as any),
   ])
-  const emailMap = Object.fromEntries((emails || []).map((e: any) => [e.id, e.email]))
+  const emailMap = Object.fromEntries(Array.from(authUsers.entries()).map(([id, u]: any) => [id, u.email]))
   const nameMap = Object.fromEntries((profiles || []).map((p: any) => [p.user_id, p.full_name]))
   const brandMap = Object.fromEntries((brands || []).map((b: any) => [b.id, b.name]))
 

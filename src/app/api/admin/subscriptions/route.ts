@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { verifyAdminRequest } from '@/lib/admin/auth'
+import { getAuthUsers } from '@/lib/admin/users'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,12 +18,12 @@ export async function GET(request: NextRequest) {
   const ids = (profiles || []).map((p: any) => p.user_id)
   if (ids.length === 0) return NextResponse.json({ rows: [] })
 
-  const [{ data: emails }, { data: wallets }, { data: subs }] = await Promise.all([
-    admin.schema('auth').from('users').select('id, email, last_sign_in_at').in('id', ids),
+  const [authUsers, { data: wallets }, { data: subs }] = await Promise.all([
+    getAuthUsers(admin),
     admin.from('credit_wallets').select('owner_id, plan_credits_balance, topup_credits_balance').in('owner_id', ids),
     admin.from('subscriptions').select('owner_id, plan, status, billing_cycle, current_period_end').in('owner_id', ids),
   ])
-  const emailMap = Object.fromEntries((emails || []).map((e: any) => [e.id, e]))
+  const emailMap = Object.fromEntries(Array.from(authUsers.entries()).map(([id, u]: any) => [id, u]))
   const walletMap = Object.fromEntries((wallets || []).map((w: any) => [w.owner_id, w]))
   const subMap = Object.fromEntries((subs || []).map((s: any) => [s.owner_id, s]))
 
