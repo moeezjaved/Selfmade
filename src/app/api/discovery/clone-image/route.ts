@@ -25,6 +25,16 @@ async function fetchImageB64(url: string): Promise<{ mimeType: string; dataB64: 
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    return await handle(req)
+  } catch (e: any) {
+    // Last-resort guard so an uncaught throw returns a readable message (not an empty 500).
+    console.error('clone-image fatal:', e)
+    return NextResponse.json({ error: `server error: ${String(e?.message || e)}` }, { status: 500 })
+  }
+}
+
+async function handle(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
