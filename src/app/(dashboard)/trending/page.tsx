@@ -9,6 +9,8 @@ import { Flame, Search, Sparkles, Play, ChevronDown, Loader2 } from 'lucide-reac
 import CloneModal from '../discovery/CloneModal'
 
 type Ad = { adId: string; pageId: string; pageName: string; image: string | null; isVideo: boolean; score: number; format: string | null; hook: string | null; saves: number; isActive: boolean; daysRunning: number | null }
+type BrandW = { pageId: string; pageName: string; adCount: number; activeCount: number; avgScore: number; image: string | null }
+type FormatW = { format: string; count: number; samples: string[] }
 
 const DARK = '#14281a'
 
@@ -29,20 +31,29 @@ export default function TrendingPage() {
   const [nicheQuery, setNicheQuery] = useState('')
   const [cloneAd, setCloneAd] = useState<Ad | null>(null)
   const [visible, setVisible] = useState(12)
+  const [brands, setBrands] = useState<BrandW[]>([])
+  const [formats, setFormats] = useState<FormatW[]>([])
+  const [brandFilter, setBrandFilter] = useState<{ pageId: string; pageName: string } | null>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetch('/api/discovery/niches').then(r => r.json()).then(j => setNiches(j.niches || [])).catch(() => {})
   }, [])
 
-  const load = useCallback(async (n: string) => {
+  const load = useCallback(async (n: string, pageId?: string) => {
     setLoading(true); setVisible(12)
     try {
-      const j = await fetch(`/api/discovery/trending?niche=${encodeURIComponent(n)}&limit=48`).then(r => r.json())
+      const j = await fetch(`/api/discovery/trending?niche=${encodeURIComponent(n)}${pageId ? `&pageId=${encodeURIComponent(pageId)}` : ''}&limit=48`).then(r => r.json())
       setAds(j.ads || [])
     } catch { setAds([]) } finally { setLoading(false) }
   }, [])
-  useEffect(() => { load(niche) }, [niche, load])
+  useEffect(() => { load(niche, brandFilter?.pageId) }, [niche, brandFilter, load])
+
+  // Brands + formats re-scope with the industry filter (not the brand drill-down).
+  useEffect(() => {
+    fetch(`/api/discovery/trending/brands?niche=${encodeURIComponent(niche)}`).then(r => r.json()).then(j => setBrands(j.brands || [])).catch(() => setBrands([]))
+    fetch(`/api/discovery/trending/formats?niche=${encodeURIComponent(niche)}`).then(r => r.json()).then(j => setFormats(j.formats || [])).catch(() => setFormats([]))
+  }, [niche])
 
   // Close the industry picker on outside click.
   useEffect(() => {
@@ -81,10 +92,37 @@ export default function TrendingPage() {
       </div>
       <p style={{ fontSize: 13.5, color: '#6b7280', marginTop: 6 }}>Stay ahead of your competition — the top-performing ads {niche ? `in ${niche}` : 'across every industry'} right now.</p>
 
+      {/* Brands to Watch */}
+      {brands.length > 0 && (
+        <section style={{ marginTop: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#171717', margin: 0 }}>Brands to Watch</h2>
+          <p style={{ fontSize: 12.5, color: '#9ca3af', margin: '2px 0 12px' }}>Brands with the most top-performing ads {niche ? `in ${niche}` : 'right now'} — click to see their creatives.</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {brands.map(b => {
+              const on = brandFilter?.pageId === b.pageId
+              return (
+                <button key={b.pageId} onClick={() => setBrandFilter(on ? null : { pageId: b.pageId, pageName: b.pageName })}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 6px', borderRadius: 22, border: `1px solid ${on ? DARK : '#e5e7eb'}`, background: on ? '#eef5eb' : '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {b.image
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={img(b.image, 64)} alt="" style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                    : <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#1a3a1a', color: '#dffe95', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>{initials(b.pageName)}</span>}
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{b.pageName}</span>
+                  <span style={{ fontSize: 11.5, color: '#9ca3af' }}>{b.adCount} ads</span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Section */}
-      <div style={{ marginTop: 22, marginBottom: 14 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: '#171717', margin: 0 }}>Top trending ads this week</h2>
-        <p style={{ fontSize: 12.5, color: '#9ca3af', margin: '2px 0 0' }}>Ranked by performance + how fresh and active they are.</p>
+      <div style={{ marginTop: 26, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#171717', margin: 0 }}>{brandFilter ? `Top ads from ${brandFilter.pageName}` : 'Top trending ads this week'}</h2>
+          <p style={{ fontSize: 12.5, color: '#9ca3af', margin: '2px 0 0' }}>Ranked by performance + how fresh and active they are.</p>
+        </div>
+        {brandFilter && <button onClick={() => setBrandFilter(null)} style={{ padding: '7px 14px', borderRadius: 20, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>← All trending</button>}
       </div>
 
       {loading ? (
@@ -126,6 +164,30 @@ export default function TrendingPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Popular Visual Formats */}
+      {formats.length > 0 && (
+        <section style={{ marginTop: 40, borderTop: '1px solid #f0f0f0', paddingTop: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#171717', margin: 0 }}>Popular visual formats</h2>
+          <p style={{ fontSize: 12.5, color: '#9ca3af', margin: '2px 0 14px' }}>The ad formats top performers are using {niche ? `in ${niche}` : 'right now'} — set an Angle in the Studio to match one.</p>
+          <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 8 }}>
+            {formats.map(f => (
+              <div key={f.format} style={{ width: 210, flexShrink: 0, border: '1px solid #eef0ee', borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: f.samples.length >= 2 ? '1fr 1fr' : '1fr', gap: 2, aspectRatio: '16/10', background: '#0d120e' }}>
+                  {(f.samples.length ? f.samples.slice(0, f.samples.length >= 3 ? 3 : f.samples.length) : []).map((s, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={i} src={img(s, 220)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', gridColumn: f.samples.length === 3 && i === 0 ? 'span 2' : undefined }} />
+                  ))}
+                </div>
+                <div style={{ padding: '10px 12px' }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#111', textTransform: 'capitalize' }}>{f.format}</div>
+                  <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 2 }}>{f.count} top ad{f.count === 1 ? '' : 's'}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {cloneAd && <CloneModal ad={{ id: cloneAd.adId, pageId: cloneAd.pageId, pageName: cloneAd.pageName }} onClose={() => setCloneAd(null)} />}
