@@ -44,7 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.12em', color: '#555', textTransform: 'uppercase', marginBottom: '4px' }}>Selfmade</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#fff' }}>Admin</div>
         </div>
-        <nav style={{ flex: 1, padding: '12px 12px' }}>
+        <nav style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 12px' }}>
           {NAV.map(item => {
             const active = item.href === '/admin' ? pathname === '/admin' : pathname.startsWith(item.href)
             return (
