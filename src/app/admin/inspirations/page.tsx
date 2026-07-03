@@ -47,6 +47,22 @@ export default function InspirationsAdmin() {
     } finally { setUploading(false); setProgress(null); if (fileRef.current) fileRef.current.value = '' }
   }
 
+  const [retagging, setRetagging] = useState<{ done: number; remaining: number } | null>(null)
+  const untaggedCount = items.filter(i => !i.tagged).length
+  const retag = async () => {
+    setRetagging({ done: 0, remaining: untaggedCount }); setUploadErr(null)
+    let done = 0
+    for (let i = 0; i < 100; i++) {   // safety cap; each call handles 8
+      const j = await fetch('/api/admin/inspirations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'retag' }) }).then(r => r.json()).catch(() => null)
+      if (!j) break
+      done += j.retagged || 0
+      setRetagging({ done, remaining: j.remaining || 0 })
+      if (j.errors?.length && !j.retagged) setUploadErr(j.errors[0])
+      if (!j.remaining || (!j.retagged && j.remaining)) break   // stop if done, or if a batch made no progress
+    }
+    setRetagging(null); load()
+  }
+
   const del = async (id: string) => {
     if (!confirm('Remove this inspiration?')) return
     setItems(prev => prev.filter(i => i.id !== id))
@@ -55,10 +71,19 @@ export default function InspirationsAdmin() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111', margin: 0 }}>Inspiration Library</h1>
-      <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 20 }}>
-        The curated designs the AI Ad Studio takes inspiration from. Drag in your best ads — each is auto-tagged (niche, layout, style) so we match the right references per user industry. {items.length} active.
-      </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111', margin: 0 }}>Inspiration Library</h1>
+          <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 20 }}>
+            The curated designs the AI Ad Studio takes inspiration from. Drag in your best ads — each is auto-tagged (niche, layout, style) so we match the right references per user industry. {items.length} active{untaggedCount ? `, ${untaggedCount} untagged` : ''}.
+          </p>
+        </div>
+        {untaggedCount > 0 && (
+          <button onClick={retag} disabled={!!retagging} style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid #2563eb', background: retagging ? '#eff6ff' : '#2563eb', color: retagging ? '#2563eb' : '#fff', fontWeight: 700, fontSize: 13, cursor: retagging ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>
+            {retagging ? `Tagging… ${retagging.done} done, ${retagging.remaining} left` : `✨ Re-tag ${untaggedCount} untagged`}
+          </button>
+        )}
+      </div>
 
       {/* Dropzone */}
       <div
