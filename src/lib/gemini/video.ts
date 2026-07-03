@@ -8,7 +8,7 @@
 const KEY = process.env.GEMINI_API_KEY
 const MODEL = process.env.GEMINI_VIDEO_MODEL || 'veo-3.1-fast-generate-preview'
 const RES = process.env.GEMINI_VIDEO_RES || '720p'
-const DURATION = parseInt(process.env.GEMINI_VIDEO_DURATION || '6', 10)   // short ad clip (seconds)
+const DURATION = process.env.GEMINI_VIDEO_DURATION ? parseInt(process.env.GEMINI_VIDEO_DURATION, 10) : null   // omit → Veo default (~8s); Veo rejects some res/duration combos (e.g. 1080p @ 6s)
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
 export const veoEnabled = !!KEY
@@ -22,7 +22,7 @@ export async function startVideo(prompt: string, image: { mimeType: string; data
   const ar = opts?.aspectRatio && opts.aspectRatio !== 'original' ? opts.aspectRatio : '9:16'
   const body = {
     instances: [{ prompt, image: { bytesBase64Encoded: image.dataB64, mimeType: image.mimeType || 'image/png' } }],
-    parameters: { aspectRatio: ar, resolution: opts?.resolution || RES, durationSeconds: DURATION, sampleCount: 1 },
+    parameters: { aspectRatio: ar, resolution: opts?.resolution || RES, sampleCount: 1, ...(DURATION ? { durationSeconds: DURATION } : {}) },
   }
   try {
     const r = await fetch(`${BASE}/models/${MODEL}:predictLongRunning?key=${KEY}`, {
