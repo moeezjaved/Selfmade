@@ -27,11 +27,11 @@ const CMP: { group: string; rows: { label: string; get: (p: PlanId) => string }[
   { group: 'Intelligence', rows: [
     { label: 'Patterns / AI insights', get: (p) => PLANS[p].aiInsights ? '✓' : '—' },
   ]},
-  { group: 'Creation', rows: [
-    { label: 'Monthly credits', get: (p) => PLANS[p].monthlyCredits === null ? 'Custom' : PLANS[p].monthlyCredits!.toLocaleString() },
-    { label: 'Scripts · transcribe', get: (p) => p === 'free' ? 'Preview' : '✓' },
-    { label: 'Ask Mello (AI agent)', get: (p) => PLANS[p].aiInsights ? '✓' : '—' },
-    { label: 'Image Clone', get: (p) => PLANS[p].aiInsights ? '✓' : '—' },
+  { group: 'Creation — available on every tier, gated by credits', rows: [
+    { label: 'Monthly credits', get: (p) => PLANS[p].monthlyCredits === null ? 'Custom' : PLANS[p].monthlyCredits!.toLocaleString() + (p === 'free' && PLANS[p].welcomeCredits ? ` (+${PLANS[p].welcomeCredits} welcome)` : '') },
+    { label: 'Ask Mello · Scripts · Transcribe', get: () => '✓' },
+    { label: 'Image Clone (2K, Nano Banana Pro)', get: () => '✓' },
+    { label: 'Video Clone', get: () => '✓' },
     { label: 'Buy top-up credits', get: (p) => PLANS[p].canBuyCredits ? '✓' : '—' },
   ]},
   { group: 'Launch & analytics', rows: [
@@ -118,7 +118,7 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
                   plan.monthlyCredits === null ? 'Custom credits' : `${plan.monthlyCredits.toLocaleString()} credits/mo`,
                   plan.brandSpy === Infinity ? 'Unlimited brand spy' : `${plan.brandSpy} tracked brands`,
                   `${plan.seats} seat${plan.seats > 1 ? 's' : ''}`,
-                  plan.aiInsights ? 'AI Insights + Image Clone' : 'AI creation (credits)',
+                  plan.aiInsights ? 'AI Insights + Patterns' : 'AI creation (credits)',
                   plan.campaigns ? 'Campaigns + Reports' : plan.launch ? 'Launch ads' : 'Discovery + Spy',
                 ].map((f, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>

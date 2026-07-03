@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import UpgradeGate from '@/components/UpgradeGate'
 
 const DATE_RANGES = [
   { label: 'Last 7 days', value: 'last_7d' },
@@ -68,6 +69,9 @@ function ColHeader({ children, style }: { children: React.ReactNode; style?: Rea
 }
 
 export default function CampaignsPage() {
+  return <UpgradeGate feature="campaigns" name="Campaigns"><CampaignsInner /></UpgradeGate>
+}
+function CampaignsInner() {
   const [campaigns, setCampaigns] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [currency, setCurrency] = useState('USD')
