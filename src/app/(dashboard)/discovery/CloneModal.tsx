@@ -266,6 +266,19 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                       {detecting ? <Loader2 size={14} className="spin" /> : <Link2 size={14} />} Detect
                     </button>
                   </div>
+                  {/* Detected Brand Kit — colors + fonts, shown so the user can see/trust what we captured. */}
+                  {(colors.length > 0 || fonts.heading) && (
+                    <div style={{ background: '#0a0f0c', border: '1px solid #24331d', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#b8c8bc' }}>🎨 Brand kit detected</div>
+                      {colors.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {colors.slice(0, 8).map((c, i) => <span key={i} title={c} style={{ width: 20, height: 20, borderRadius: 5, background: c, border: '1px solid #2c4030' }} />)}
+                        </div>
+                      )}
+                      {fonts.heading && <div style={{ fontSize: 11.5, color: '#9fb0a4' }}>Aa <b style={{ color: '#cfe' }}>{fonts.heading}</b>{fonts.body && fonts.body !== fonts.heading ? ` · ${fonts.body}` : ''}</div>}
+                      <div style={{ fontSize: 10.5, color: '#6f7f73' }}>Saved with the brand — edit anytime in My Creatives → Brands.</div>
+                    </div>
+                  )}
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#9fb0a4', cursor: 'pointer' }}>
                     <input type="checkbox" checked={saveAsBrand} onChange={(e) => setSaveAsBrand(e.target.checked)} />
                     Save as a brand for reuse{quota ? ` (${quota.used}/${quota.limit === -1 ? '∞' : quota.limit} used)` : ''}
