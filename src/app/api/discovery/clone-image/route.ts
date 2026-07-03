@@ -81,6 +81,7 @@ async function handle(req: NextRequest) {
       brandName, colors: Array.isArray(colors) ? colors.slice(0, 4) : undefined, newHeadline,
       dna: { hook_type: (ad as any).hook_type, format_style: (ad as any).format_style, angle: (ad as any).angle, emotion: (ad as any).emotion, cta: (ad as any).cta },
     })
+    console.log(`clone-image [${useTier}] prompt:`, prompt)   // proof the prompt is sent each generation
 
     // Normalize each product photo to base64. data: URLs are decoded inline; http(s) URLs are fetched.
     // Cap at 4 so the payload stays within Gemini's part limit alongside the reference ad.
