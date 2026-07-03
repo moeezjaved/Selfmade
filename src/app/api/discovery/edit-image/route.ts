@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateImage, geminiEnabled } from '@/lib/gemini/image'
+import { saveGeneration } from '@/lib/creatives'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
 
-  const { image, instruction, tier } = await req.json().catch(() => ({}))
+  const { image, instruction, tier, parentId, brandId } = await req.json().catch(() => ({}))
   if (!image || !instruction?.trim()) return NextResponse.json({ error: 'image and instruction required' }, { status: 400 })
   const useTier: 'default' | 'pro' = tier === 'pro' ? 'pro' : 'default'
   const action = useTier === 'pro' ? 'image_edit_pro' : 'image_edit'
@@ -64,7 +65,12 @@ export async function POST(req: NextRequest) {
     if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).catch(() => {})
-    return NextResponse.json({ image: `data:${gen.mimeType};base64,${gen.dataB64}`, tier: useTier })
+
+    const saved = await saveGeneration({
+      userId: user.id, dataB64: gen.dataB64, mimeType: gen.mimeType, type: 'edit', tier: useTier,
+      brandId: brandId || null, parentId: parentId || null, prompt: String(instruction).trim(),
+    })
+    return NextResponse.json({ image: `data:${gen.mimeType};base64,${gen.dataB64}`, url: saved?.url || null, generationId: saved?.id || null, tier: useTier })
   } catch (e: any) {
     await refund()
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 })

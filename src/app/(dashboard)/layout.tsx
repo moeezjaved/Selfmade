@@ -39,8 +39,8 @@ const NAV = [
   {
     label: 'AI Gen',
     items: [
-      { href: '/creative-studio', icon: Sparkles, label: 'Creative Studio', badge: null },
-      { href: '/brands',          icon: Store,    label: 'Brands',          badge: null },
+      { href: '/creative-studio', icon: Sparkles, label: 'My Creatives', badge: 'NEW' },
+      { href: '/brands',          icon: Store,    label: 'Brands',       badge: null },
     ],
   },
   {

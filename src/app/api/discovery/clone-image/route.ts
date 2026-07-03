@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateImage, buildClonePrompt, geminiEnabled } from '@/lib/gemini/image'
+import { saveGeneration } from '@/lib/creatives'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
   if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
 
   const body = await req.json().catch(() => ({}))
-  const { adId, productImageB64, productImages, productMimeType, tier, newHeadline, brandName, colors } = body || {}
+  const { adId, productImageB64, productImages, productMimeType, tier, newHeadline, brandName, colors, brandId } = body || {}
   // Accept one legacy base64 photo OR an array of product photos (data: URLs and/or http URLs).
   // Multiple angles help Nano Banana hold the product's exact shape/label across the clone.
   const rawProducts: string[] = Array.isArray(productImages) && productImages.length
@@ -84,7 +85,13 @@ export async function POST(req: NextRequest) {
     if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).catch(() => {})
-    return NextResponse.json({ image: `data:${gen.mimeType};base64,${gen.dataB64}`, tier: useTier })
+
+    // Persist to "My Creatives" (best-effort — the user still gets the inline image if R2 is off).
+    const saved = await saveGeneration({
+      userId: user.id, dataB64: gen.dataB64, mimeType: gen.mimeType, type: 'clone', tier: useTier,
+      brandId: brandId || null, sourceAdId: String(adId), prompt: newHeadline || null,
+    })
+    return NextResponse.json({ image: `data:${gen.mimeType};base64,${gen.dataB64}`, url: saved?.url || null, generationId: saved?.id || null, tier: useTier })
   } catch (e: any) {
     await refund()
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 })
