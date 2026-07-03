@@ -102,9 +102,30 @@ export async function POST(req: NextRequest) {
   const fonts = { heading: fontSet[0] || null, body: fontSet[1] || fontSet[0] || null }
 
   const colorList = Array.from(colors).slice(0, 6)
+
+  // ── Named palette ─────────────────────────────────────────────────────────
+  // Assign detected colors to brand roles by luminance + saturation (best-effort; editable after).
+  const rgb = (h: string) => { const m = /^#?([0-9a-f]{6})$/i.exec(h); if (!m) return null; const n = parseInt(m[1], 16); return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 } }
+  const lum = (h: string) => { const c = rgb(h); if (!c) return 0; return (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255 }
+  const sat = (h: string) => { const c = rgb(h); if (!c) return 0; const mx = Math.max(c.r, c.g, c.b), mn = Math.min(c.r, c.g, c.b); return mx === 0 ? 0 : (mx - mn) / mx }
+  const valid = colorList.filter((c) => rgb(c))
+  const byLumAsc = [...valid].sort((a, b) => lum(a) - lum(b))
+  const bySat = [...valid].sort((a, b) => sat(b) - sat(a))
+  const accent = bySat[0] || '#1a3a1a'
+  const cta = bySat.find((c) => c !== accent) || accent
+  const palette = {
+    background: byLumAsc[byLumAsc.length - 1] && lum(byLumAsc[byLumAsc.length - 1]) > 0.6 ? byLumAsc[byLumAsc.length - 1] : '#ffffff',
+    heading: byLumAsc[0] || '#111111',
+    body: byLumAsc[1] || byLumAsc[0] || '#333333',
+    accent,
+    cta,
+    ctaText: lum(cta) < 0.5 ? '#ffffff' : '#111111',
+    icon: accent,
+  }
+
   return NextResponse.json({
-    brandName, images, colors: colorList, fonts, logo, shopify,
-    brandKit: { colors: colorList, fonts, logo },
+    brandName, images, colors: colorList, fonts, logo, palette, shopify,
+    brandKit: { colors: colorList, fonts, logo, palette },
     source: url,
   })
 }

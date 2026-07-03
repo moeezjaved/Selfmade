@@ -40,6 +40,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [colors, setColors] = useState<string[]>([])
   const [fonts, setFonts] = useState<{ heading?: string | null; body?: string | null }>({})
   const [logo, setLogo] = useState<string | null>(null)
+  const [palette, setPalette] = useState<any>(null)
   const [saveAsBrand, setSaveAsBrand] = useState(true)
 
   // photos + selection (up to 4 go to the model)
@@ -122,6 +123,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       if (Array.isArray(j.colors)) setColors(j.colors)
       if (j.fonts) setFonts(j.fonts)
       if (j.logo) setLogo(j.logo)
+      if (j.palette) setPalette(j.palette)
       addPhotos((j.images || []).map((u: string) => ({ id: uid(), src: u, label: 'detected' })))
       if (!j.images?.length) setErr('No product photos found on that page — upload manually.')
     } catch (e: any) { setErr(String(e?.message || e)) }
@@ -143,7 +145,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         const httpImgs = chosen.filter((s) => /^https?:\/\//i.test(s))
         const rb = await fetch('/api/brands', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name: bName.trim(), website: bSite.trim() || null, product_images: httpImgs, brand_kit: { colors, fonts, logo } }),
+          body: JSON.stringify({ name: bName.trim(), website: bSite.trim() || null, product_images: httpImgs, brand_kit: { colors, fonts, logo, palette } }),
         })
         const jb = await rb.json()
         if (rb.status === 402 && jb.error === 'brand_limit_reached') {
@@ -169,7 +171,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       const body = {
         adId: ad.id, productImages: chosen, tier, brandId: useBrandId || undefined,
         brandName: bName.trim() || undefined, colors, newHeadline: headline.trim() || undefined,
-        aspectRatio: aspect, logo: logo || undefined, imageSize,
+        aspectRatio: aspect, logo: logo || undefined, imageSize, palette: palette || undefined,
       }
       const settled = await Promise.all(Array.from({ length: count }, () =>
         fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })

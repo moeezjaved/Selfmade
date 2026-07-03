@@ -54,13 +54,27 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
  * caller: [reference ad, product photo]. The DNA makes the clone copy the WINNING STRUCTURE, and the
  * fidelity guardrail keeps the product exact — the two levers that make a clone usable, not just pretty.
  */
+export type BrandPalette = { background?: string; accent?: string; heading?: string; body?: string; icon?: string; cta?: string; ctaText?: string }
+
 export function buildClonePrompt(opts: {
   brandName?: string; colors?: string[]; newHeadline?: string; aspectRatio?: string; hasLogo?: boolean
-  fonts?: { heading?: string | null; body?: string | null }
+  palette?: BrandPalette
+  fonts?: { heading?: string | null; body?: string | null; headingWeight?: string | null; bodyWeight?: string | null }
   dna?: { hook_type?: string | null; format_style?: string | null; angle?: string | null; emotion?: string[] | null; cta?: string | null }
 }): string {
+  const pal = opts.palette
+  const paletteLine = pal && (pal.accent || pal.background || pal.heading || pal.cta)
+    ? `Use this exact brand palette: ${[
+        pal.background && `background ${pal.background}`, pal.accent && `accent ${pal.accent}`,
+        pal.heading && `headline text ${pal.heading}`, pal.body && `body text ${pal.body}`,
+        pal.cta && `CTA button ${pal.cta}${pal.ctaText ? ` with ${pal.ctaText} label` : ''}`, pal.icon && `icons ${pal.icon}`,
+      ].filter(Boolean).join(', ')}. Apply them consistently and on-brand.`
+    : ''
   const fontLine = (opts.fonts?.heading || opts.fonts?.body)
-    ? `Use on-brand typography: ${[opts.fonts?.heading && `headings in "${opts.fonts.heading}"`, opts.fonts?.body && `body text in "${opts.fonts.body}"`].filter(Boolean).join(', ')} (or the closest available match).`
+    ? `Use on-brand typography: ${[
+        opts.fonts?.heading && `headings in "${opts.fonts.heading}"${opts.fonts?.headingWeight ? ` weight ${opts.fonts.headingWeight}` : ''}`,
+        opts.fonts?.body && `body text in "${opts.fonts.body}"${opts.fonts?.bodyWeight ? ` weight ${opts.fonts.bodyWeight}` : ''}`,
+      ].filter(Boolean).join(', ')} (or the closest available match).`
     : ''
   const logoLine = opts.hasLogo
     ? `The FINAL attached image is the brand's real logo — place it cleanly and legibly as the brand mark (small, in a top corner). Reproduce it faithfully; do not distort, recolor, or invent a different logo/wordmark.`
@@ -77,7 +91,7 @@ export function buildClonePrompt(opts: {
     `KEEP the ad's layout, composition, camera angle, lighting, color palette, and text placement${keep ? `, plus the ${keep}` : ''}.`,
     `PRODUCT — this is critical: the product in the attached product photo(s) is the user's ACTUAL product. Place THAT exact product into the ad, reproduced faithfully — same shape, proportions, packaging, label text, and colors. It must be clearly visible and be the ONLY product shown. Do NOT invent, redraw, simplify, or substitute a different-looking product; copy the real one from the photo.`,
     opts.brandName ? `The brand is "${opts.brandName}".` : '',
-    opts.colors?.length ? `Brand colors to favor where the design allows: ${opts.colors.join(', ')}.` : '',
+    paletteLine || (opts.colors?.length ? `Brand colors to favor where the design allows: ${opts.colors.join(', ')}.` : ''),
     fontLine,
     logoLine,
     opts.newHeadline ? `On-screen headline — render this text EXACTLY, letter for letter: "${opts.newHeadline}".` : `Keep the headline layout; write short ad copy relevant to this product.`,
