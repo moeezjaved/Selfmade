@@ -42,14 +42,14 @@ export async function POST(req: NextRequest) {
   const imgs = new Set<string>()
   const push = (u?: string | null) => { const a = u && abs(u, url); if (a && !/sprite|icon|logo|favicon|pixel|1x1/i.test(a)) imgs.add(a) }
   push(meta('og:image'))
-  for (const m of html.matchAll(/"image"\s*:\s*"([^"]+)"/gi)) push(m[1])                 // JSON-LD product image
-  for (const m of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) push(m[1])
+  Array.from(html.matchAll(/"image"\s*:\s*"([^"]+)"/gi)).forEach((m) => push(m[1]))       // JSON-LD product image
+  Array.from(html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)).forEach((m) => push(m[1]))
   const images = Array.from(imgs).slice(0, 12)
 
   // Colors: theme-color + any hex colors in inline styles/CSS vars (rough brand palette).
   const colors = new Set<string>()
   const tc = meta('theme-color'); if (tc && /^#?[0-9a-f]{3,8}$/i.test(tc)) colors.add(tc.startsWith('#') ? tc : '#' + tc)
-  for (const m of html.matchAll(/#([0-9a-fA-F]{6})\b/g)) { colors.add('#' + m[1].toLowerCase()); if (colors.size >= 8) break }
+  for (const m of Array.from(html.matchAll(/#([0-9a-fA-F]{6})\b/g))) { colors.add('#' + m[1].toLowerCase()); if (colors.size >= 8) break }
 
   return NextResponse.json({ brandName, images, colors: Array.from(colors).slice(0, 6), source: url })
 }
