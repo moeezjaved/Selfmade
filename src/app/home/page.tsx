@@ -7,10 +7,29 @@
  * except video, which is left as a labelled placeholder.
  */
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import PricingSection from '@/components/pricing/PricingSection'
 
 const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
+
+/** R2 loads directly; anything else via weserv (resized, hotlink-safe). */
+function adImg(url: string, w = 400): string {
+  if (!url) return ''
+  if (/r2\.dev|r2\.cloudflarestorage|\/\/pub-|\/\/cdn\./.test(url)) return url
+  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${w}&q=72&output=webp`
+}
+
+/** Fade-up on scroll into view. */
+function Reveal({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [seen, setSeen] = useState(false)
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setSeen(true); o.disconnect() } }, { threshold: 0.12 })
+    o.observe(el); return () => o.disconnect()
+  }, [])
+  return <div ref={ref} style={{ opacity: seen ? 1 : 0, transform: seen ? 'none' : 'translateY(26px)', transition: `opacity .6s ease ${delay}ms, transform .6s ease ${delay}ms`, ...style }}>{children}</div>
+}
 const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: INK, padding: '13px 24px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', border: 'none', cursor: 'pointer' }
 const btnDark: React.CSSProperties = { ...btnPrimary, background: INK, color: '#fff' }
 const wrap: React.CSSProperties = { maxWidth: 1120, margin: '0 auto', padding: '0 24px' }
@@ -48,13 +67,14 @@ function Mello({ size = 150 }: { size?: number }) {
   )
 }
 
-function Panel({ children, grad, style }: { children: React.ReactNode; grad: string; style?: React.CSSProperties }) {
-  return <div style={{ background: grad, borderRadius: 32, padding: '48px 40px', ...style }}>{children}</div>
+function Panel({ children, grad, style, className }: { children: React.ReactNode; grad: string; style?: React.CSSProperties; className?: string }) {
+  return <div className={className} style={{ background: grad, borderRadius: 32, padding: '48px 40px', ...style }}>{children}</div>
 }
 
-/** Fake browser mockup showing the discovery grid + floating stat cards. */
-function HeroMock() {
-  const cards = [['#c7f0a3', '#a8e63d'], ['#bfe0ff', '#7fb8f5'], ['#f7c9e8', '#ec8fd0'], ['#ffe6b0', '#f5c15c'], ['#d7c9ff', '#a98ff0'], ['#c7f0a3', '#8fd66a']]
+/** Browser mockup showing the REAL discovery grid + floating stat cards. */
+function HeroMock({ ads }: { ads: string[] }) {
+  const fallback = [['#c7f0a3', '#a8e63d'], ['#bfe0ff', '#7fb8f5'], ['#f7c9e8', '#ec8fd0'], ['#ffe6b0', '#f5c15c'], ['#d7c9ff', '#a98ff0'], ['#c7f0a3', '#8fd66a']]
+  const slots = Array.from({ length: 6 }, (_, i) => ads[i] || null)
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 30px 80px rgba(14,27,18,.18)', overflow: 'hidden', border: '1px solid #eef0ee' }}>
@@ -63,9 +83,11 @@ function HeroMock() {
           <span style={{ marginLeft: 12, fontSize: 11, color: '#9ca3af', background: '#fff', border: '1px solid #eef0ee', borderRadius: 6, padding: '3px 12px' }}>tryselfmade.ai/discovery</span>
         </div>
         <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, background: '#fbfdfa' }}>
-          {cards.map(([a, b], i) => (
-            <div key={i} style={{ aspectRatio: '3/4', borderRadius: 10, background: `linear-gradient(160deg, ${a}, ${b})`, position: 'relative' }}>
-              <span style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(14,27,18,.75)', color: '#fff', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 10 }}>🔥 9{i}</span>
+          {slots.map((u, i) => (
+            <div key={i} style={{ aspectRatio: '3/4', borderRadius: 10, overflow: 'hidden', background: u ? '#0d120e' : `linear-gradient(160deg, ${fallback[i][0]}, ${fallback[i][1]})`, position: 'relative' }}>
+              {u && /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={adImg(u, 300)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+              <span style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(14,27,18,.78)', color: '#fff', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 10 }}>🔥 9{i}</span>
             </div>
           ))}
         </div>
@@ -94,15 +116,31 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 }
 
 export default function HomeLanding() {
-  const marquee = ['#c7f0a3', '#bfe0ff', '#f7c9e8', '#ffe6b0', '#d7c9ff', '#a8e63d', '#7fb8f5', '#ec8fd0', '#f5c15c', '#a98ff0']
+  const marqueeGrad = ['#c7f0a3', '#bfe0ff', '#f7c9e8', '#ffe6b0', '#d7c9ff', '#a8e63d', '#7fb8f5', '#ec8fd0', '#f5c15c', '#a98ff0']
+  const [ads, setAds] = useState<string[]>([])
+  useEffect(() => {
+    fetch('/api/discovery/trending?limit=30')
+      .then(r => r.json())
+      .then(j => setAds((j.ads || []).map((a: any) => a.image).filter(Boolean)))
+      .catch(() => {})
+  }, [])
+  const marqueeAds = ads.slice(6, 6 + 12)
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", color: INK, background: '#fff', overflowX: 'hidden' }}>
-      <style>{`@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
+      <style>{`
+        @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+        .lift{transition:transform .22s ease, box-shadow .22s ease}
+        .lift:hover{transform:translateY(-6px);box-shadow:0 18px 44px rgba(14,27,18,.14)}
+        .glow:hover{box-shadow:0 0 0 3px rgba(223,254,149,.5), 0 18px 44px rgba(14,27,18,.16)}
+        @keyframes sheen{0%{background-position:-200% 0}100%{background-position:200% 0}}
+      `}</style>
 
       {/* NAV */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,.85)', backdropFilter: 'blur(14px)', borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ ...wrap, height: 66, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Logo />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Selfmade" style={{ height: 26, width: 'auto', filter: 'brightness(0)' }} />
           <div style={{ display: 'flex', gap: 30 }}>
             {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['#pricing', 'Pricing']].map(([h, l]) => (
               <a key={h} href={h} style={{ fontSize: 14.5, fontWeight: 600, color: '#4b5563', textDecoration: 'none' }}>{l}</a>
@@ -133,8 +171,20 @@ export default function HomeLanding() {
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center', flexWrap: 'wrap', marginTop: 20, fontSize: 13.5, color: '#6b7280', fontWeight: 600 }}>
           {['No card to start', '50 free credits', 'Cancel anytime'].map(t => <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check /> {t}</span>)}
         </div>
-        <div style={{ maxWidth: 720, margin: '52px auto 0' }}><HeroMock /></div>
+        <div style={{ maxWidth: 720, margin: '52px auto 0' }}><HeroMock ads={ads} /></div>
       </header>
+
+      {/* META-EXPERTS positioning band */}
+      <section style={{ ...wrap, padding: '30px 24px 20px' }}>
+        <Reveal>
+          <div style={{ textAlign: 'center', maxWidth: 860, margin: '0 auto' }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: GREEN, marginBottom: 12 }}>Built by Meta ad experts</div>
+            <p style={{ fontSize: 'clamp(22px,3.2vw,32px)', fontWeight: 700, lineHeight: 1.35, letterSpacing: '-.01em', margin: 0, color: INK }}>
+              Our agents know <span style={{ fontStyle: 'italic', color: GREEN }}>what&rsquo;s working</span>, catch <span style={{ fontStyle: 'italic', color: GREEN }}>what&rsquo;s missing</span>, and tell you <span style={{ fontStyle: 'italic', color: GREEN }}>exactly what ads to make next</span>.
+            </p>
+          </div>
+        </Reveal>
+      </section>
 
       {/* TESTIMONIAL CARDS (placeholder) */}
       <section style={{ ...wrap, padding: '40px 24px' }}>
@@ -142,7 +192,7 @@ export default function HomeLanding() {
           {[['“Went from a blank canvas to 5 on-brand ads before my coffee got cold.”', 'Jordan P.', 'DTC founder'],
             ['“The clone feature alone paid for the year. I just feed it winners.”', 'Amara K.', 'Growth lead'],
             ['“It’s like having a creative strategist that never sleeps.”', 'Devin R.', 'Agency owner']].map(([q, n, r], i) => (
-            <div key={i} style={{ border: '1px solid #eef0ee', borderRadius: 20, padding: 22, background: '#fff' }}>
+            <div key={i} className="lift" style={{ border: '1px solid #eef0ee', borderRadius: 20, padding: 22, background: '#fff' }}>
               <p style={{ fontSize: 15, color: INK, margin: '0 0 16px', lineHeight: 1.5, fontWeight: 500 }}>{q}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ width: 34, height: 34, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)` }} />
@@ -232,15 +282,19 @@ export default function HomeLanding() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr)) 220px', gap: 14, alignItems: 'stretch' }}>
               {steps.map((s, j) => (
-                <Panel key={j} grad={grad} style={{ padding: '26px 22px', minHeight: 150, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#fff', color: INK, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>{j + 1}</div>
-                  <div style={{ fontSize: 16.5, fontWeight: 700, color: INK, lineHeight: 1.35 }}>{s}</div>
-                </Panel>
+                <Reveal key={j} delay={j * 110} style={{ display: 'flex' }}>
+                  <Panel grad={grad} className="lift" style={{ padding: '26px 22px', minHeight: 150, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#fff', color: INK, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>{j + 1}</div>
+                    <div style={{ fontSize: 16.5, fontWeight: 700, color: INK, lineHeight: 1.35 }}>{s}</div>
+                  </Panel>
+                </Reveal>
               ))}
-              <div style={{ background: INK, borderRadius: 32, padding: '26px 22px', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <div style={{ fontSize: 44, fontWeight: 800, color: LIME, lineHeight: 1 }}>{stat}</div>
-                <div style={{ fontSize: 14, opacity: .75, marginTop: 6 }}>{statSub}</div>
-              </div>
+              <Reveal delay={steps.length * 110} style={{ display: 'flex' }}>
+                <div className="lift" style={{ flex: 1, background: INK, borderRadius: 32, padding: '26px 22px', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <div style={{ fontSize: 44, fontWeight: 800, color: LIME, lineHeight: 1 }}>{stat}</div>
+                  <div style={{ fontSize: 14, opacity: .75, marginTop: 6 }}>{statSub}</div>
+                </div>
+              </Reveal>
             </div>
           </div>
         ))}
@@ -268,7 +322,7 @@ export default function HomeLanding() {
       <section style={{ ...wrap, padding: '30px 24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 14 }}>
           {[['3M+', 'ads indexed'], ['611K', 'brands tracked'], ['36', 'industries'], ['2K / 4K', 'ad exports']].map(([n, l]) => (
-            <div key={n} style={{ border: '1px solid #eef0ee', borderRadius: 20, padding: '28px 20px', textAlign: 'center' }}>
+            <div key={n} className="lift" style={{ border: '1px solid #eef0ee', borderRadius: 20, padding: '28px 20px', textAlign: 'center' }}>
               <div style={{ fontSize: 34, fontWeight: 800, color: INK }}>{n}</div><div style={{ fontSize: 13.5, color: '#6b7280', marginTop: 4 }}>{l}</div>
             </div>
           ))}
@@ -278,15 +332,21 @@ export default function HomeLanding() {
       {/* AD MARQUEE */}
       <section style={{ padding: '40px 0' }}>
         <div style={{ ...wrap, textAlign: 'center', marginBottom: 22 }}>
-          <h2 style={{ fontSize: 'clamp(24px,3.4vw,34px)', fontWeight: 800, letterSpacing: '-.02em', margin: 0 }}>Ads people actually made with Selfmade <i style={{ fontWeight: 400, fontSize: 15, color: '#9ca3af' }}>(sample)</i></h2>
+          <h2 style={{ fontSize: 'clamp(24px,3.4vw,34px)', fontWeight: 800, letterSpacing: '-.02em', margin: 0 }}>Real winning ads, indexed daily</h2>
+          <p style={{ color: '#9ca3af', fontSize: 14.5, margin: '6px 0 0' }}>A live peek at what&rsquo;s running — pulled straight from Discovery.</p>
         </div>
         <div style={{ overflow: 'hidden', maskImage: 'linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)' }}>
-          <div style={{ display: 'flex', gap: 14, width: 'max-content', animation: 'marquee 34s linear infinite' }}>
-            {[...marquee, ...marquee].map((c, i) => (
-              <div key={i} style={{ width: 150, aspectRatio: '3/4', borderRadius: 14, background: `linear-gradient(160deg,#fff,${c})`, border: '1px solid #eef0ee', flexShrink: 0, position: 'relative' }}>
-                <span style={{ position: 'absolute', top: 8, left: 8, background: LIME, color: INK, fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 10 }}>Selfmade</span>
-              </div>
-            ))}
+          <div style={{ display: 'flex', gap: 14, width: 'max-content', animation: 'marquee 40s linear infinite' }}>
+            {(() => {
+              const tiles = marqueeAds.length ? marqueeAds : marqueeGrad
+              return [...tiles, ...tiles].map((t, i) => (
+                <div key={i} style={{ width: 150, aspectRatio: '3/4', borderRadius: 14, overflow: 'hidden', background: marqueeAds.length ? '#0d120e' : `linear-gradient(160deg,#fff,${t})`, border: '1px solid #eef0ee', flexShrink: 0, position: 'relative' }}>
+                  {marqueeAds.length && /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={adImg(t, 240)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  <span style={{ position: 'absolute', top: 8, left: 8, background: LIME, color: INK, fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 10 }}>Discovery</span>
+                </div>
+              ))
+            })()}
           </div>
         </div>
       </section>
@@ -349,7 +409,8 @@ export default function HomeLanding() {
       <footer style={{ background: INK, color: '#fff', padding: '52px 0 34px' }}>
         <div style={{ ...wrap, display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) repeat(3,minmax(0,1fr))', gap: 28 }}>
           <div>
-            <Logo dark />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Selfmade" style={{ height: 28, width: 'auto' }} />
             <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 14, lineHeight: 1.6, maxWidth: 280, marginTop: 12 }}>Find winning ads, make them yours, and launch — the whole ad workflow in one place.</p>
           </div>
           {[['Product', ['Discovery', 'Brand Spy', 'Trending', 'AI Ad Studio', 'Launch Ads']], ['Company', ['About', 'Blog', 'Careers', 'Contact']], ['Legal', ['Privacy', 'Terms', 'Security']]].map(([h, items]) => (
