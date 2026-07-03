@@ -19,7 +19,7 @@ const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center',
 const btnGhost: React.CSSProperties = { ...btn, background: '#fff', color: DARK, border: '1px solid #cbd5cb' }
 const input: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid #d1d5db', borderRadius: 9, fontSize: 13, fontFamily: 'inherit', color: '#111', outline: 'none' }
 
-type Gen = { id: string; image_url: string; type: string; tier: string; prompt?: string | null; brand_name?: string | null; source_ad_id?: string | null; created_at: string }
+type Gen = { id: string; image_url: string | null; type: string; tier: string; prompt?: string | null; brand_name?: string | null; source_ad_id?: string | null; media_type?: string; status?: string; created_at: string }
 type Product = { id: string; name?: string | null; image_urls?: string[] }
 type BrandKit = { colors?: string[]; extraColors?: string[]; palette?: Record<string, string>; fonts?: { heading?: string | null; body?: string | null; headingWeight?: string | null; bodyWeight?: string | null }; logo?: string | null }
 type Brand = { id: string; name: string; website?: string | null; tone?: string | null; usps?: string[]; products?: Product[]; brand_kit?: BrandKit }
@@ -62,6 +62,21 @@ function Generations() {
   }, [])
   useEffect(() => { load() }, [load])
 
+  // Poll any in-flight video jobs until they finish, then refresh the gallery.
+  useEffect(() => {
+    const processing = (gens || []).filter((g) => g.status === 'processing')
+    if (processing.length === 0) return
+    const t = setInterval(async () => {
+      let anyDone = false
+      await Promise.all(processing.map(async (g) => {
+        const r = await fetch(`/api/discovery/animate/status?id=${g.id}`).then((x) => x.json()).catch(() => ({}))
+        if (r.done) anyDone = true
+      }))
+      if (anyDone) load()
+    }, 8000)
+    return () => clearInterval(t)
+  }, [gens, load])
+
   const shown = (gens || []).filter((g) => filter === 'all' || g.type === filter)
 
   return (
@@ -81,9 +96,16 @@ function Generations() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
             {shown.map((g) => (
               <div key={g.id} style={card}>
-                <button onClick={() => setOpen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: 'pointer', background: '#f1f5f1', aspectRatio: '1', overflow: 'hidden' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={g.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button onClick={() => g.status !== 'processing' && setOpen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: g.status === 'processing' ? 'default' : 'pointer', background: '#0d120e', aspectRatio: '1', overflow: 'hidden', position: 'relative' }}>
+                  {g.status === 'processing' ? (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', justifyContent: 'center', color: LIME, fontSize: 12, fontWeight: 600 }}><Loader2 size={20} className="spin" /> Generating video…</div>
+                  ) : g.media_type === 'video' && g.image_url ? (
+                    <video src={g.image_url} muted loop autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={g.image_url || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  )}
+                  {g.media_type === 'video' && g.status !== 'processing' && <span style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.6)', color: '#fff', borderRadius: 6, fontSize: 10, fontWeight: 700, padding: '2px 6px' }}>🎬 Video</span>}
                 </button>
                 <div style={{ padding: '9px 11px' }}>
                   <div style={{ display: 'flex', gap: 5, marginBottom: 5 }}>
@@ -133,23 +155,56 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
     await fetch(`/api/creatives?id=${gen.id}`, { method: 'DELETE' })
     onChanged(); onClose()
   }
+  const animate = async (style: string) => {
+    setBusy(true); setErr(null)
+    try {
+      const r = await fetch('/api/discovery/animate', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image: img, style, parentId: genId }),
+      })
+      const j = await r.json()
+      if (!r.ok) { setErr(j.error === 'insufficient_credits' ? 'Not enough credits for a video.' : j.error || 'Could not start video.'); return }
+      onChanged(); onClose()   // the gallery shows a "Generating video…" card + polls to completion
+    } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
+  }
+  const isVideo = gen.media_type === 'video'
 
   return (
     <Overlay onClose={onClose}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', maxWidth: 900 }}>
         <div style={{ background: '#0d120e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'relative' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img} alt="" style={{ maxWidth: '100%', maxHeight: '78vh', borderRadius: 8, opacity: busy ? 0.5 : 1 }} />
-          {busy && <div style={{ position: 'absolute', color: LIME, display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}><Loader2 size={18} className="spin" /> Editing…</div>}
+          {isVideo
+            ? <video src={img || ''} controls autoPlay loop style={{ maxWidth: '100%', maxHeight: '78vh', borderRadius: 8 }} />
+            // eslint-disable-next-line @next/next/no-img-element
+            : <img src={img || ''} alt="" style={{ maxWidth: '100%', maxHeight: '78vh', borderRadius: 8, opacity: busy ? 0.5 : 1 }} />}
+          {busy && !isVideo && <div style={{ position: 'absolute', color: LIME, display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}><Loader2 size={18} className="spin" /> Working…</div>}
         </div>
         <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Edit creative</div>
-          <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) applyEdit() }}
-            placeholder="Tweak this creative — headline, subhead, colors, scene, background…" style={{ ...input, resize: 'vertical' }} />
-          {err && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{err}</div>}
-          <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · {editCost} cr</button>
-          <a href={img} download={`creative-${gen.id}.png`} style={{ ...btnGhost, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download</a>
+          {isVideo ? (
+            <>
+              <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Your video</div>
+              <a href={img || ''} download={`creative-${gen.id}.mp4`} style={{ ...btn, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download MP4</a>
+            </>
+          ) : (
+            <>
+              <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Edit creative</div>
+              <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) applyEdit() }}
+                placeholder="Tweak this creative — headline, subhead, colors, scene, background…" style={{ ...input, resize: 'vertical' }} />
+              {err && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{err}</div>}
+              <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · {editCost} cr</button>
+              {/* Animate → Veo video (async; lands back in the gallery). */}
+              <div style={{ borderTop: '1px solid #eef2ec', paddingTop: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>🎬 Animate to video · 80 cr</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['subtle', 'hero', 'lifestyle'] as const).map((s) => (
+                    <button key={s} onClick={() => animate(s)} disabled={busy} style={{ ...btnGhost, flex: 1, justifyContent: 'center', fontSize: 11.5, textTransform: 'capitalize', padding: '8px 4px' }}>{s}</button>
+                  ))}
+                </div>
+              </div>
+              <a href={img || ''} download={`creative-${gen.id}.png`} style={{ ...btnGhost, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download</a>
+            </>
+          )}
           <button onClick={del} style={{ ...btnGhost, justifyContent: 'center', color: '#b91c1c', borderColor: '#f0c4c4' }}><Trash2 size={15} /> Delete</button>
         </div>
       </div>
