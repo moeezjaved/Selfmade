@@ -33,18 +33,9 @@ async function write(method, path, body) {
 
 async function tick() {
   let follows
-  try { follows = await getJSON('followed_brands?select=id,user_id,page_id,brand_name,last_notified_at') }
+  try { follows = await getJSON('followed_brands?select=id,user_id,page_id,brand_name,last_notified_at,email_alerts') }
   catch (e) { console.warn('fetch follows failed:', e.message); return }
   if (!Array.isArray(follows) || !follows.length) return
-
-  // Who opted into instant email (so we only fetch addresses + send for them).
-  const wantsEmail = new Map()
-  if (emailEnabled) {
-    try {
-      const prefs = await getJSON('notification_prefs?select=user_id,instant_email&instant_email=is.true')
-      for (const p of (prefs || [])) wantsEmail.set(p.user_id, true)
-    } catch { /* prefs optional */ }
-  }
 
   let made = 0
   // Collect every opted-in user's brands-with-new-ads so we can send ONE bundled email per user
@@ -66,7 +57,8 @@ async function tick() {
       user_id: f.user_id, type: 'new_ad', page_id: f.page_id,
       brand_name: f.brand_name, ad_count: concepts.size, sample_ad_id: ads[0].ad_id,
     })
-    if (wantsEmail.has(f.user_id)) {
+    // Per-brand email opt-in: only bundle brands the user turned email alerts ON for.
+    if (emailEnabled && f.email_alerts) {
       if (!emailBundle.has(f.user_id)) emailBundle.set(f.user_id, [])
       emailBundle.get(f.user_id).push({ brandName: f.brand_name, count: concepts.size, pageId: f.page_id })
     }
