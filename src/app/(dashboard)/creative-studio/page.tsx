@@ -21,7 +21,8 @@ const input: React.CSSProperties = { width: '100%', padding: '9px 11px', border:
 
 type Gen = { id: string; image_url: string; type: string; tier: string; prompt?: string | null; brand_name?: string | null; source_ad_id?: string | null; created_at: string }
 type Product = { id: string; name?: string | null; image_urls?: string[] }
-type Brand = { id: string; name: string; website?: string | null; tone?: string | null; usps?: string[]; products?: Product[] }
+type BrandKit = { colors?: string[]; fonts?: { heading?: string | null; body?: string | null } }
+type Brand = { id: string; name: string; website?: string | null; tone?: string | null; usps?: string[]; products?: Product[]; brand_kit?: BrandKit }
 
 export default function MyCreativesPage() {
   const [tab, setTab] = useState<'generations' | 'brands'>('generations')
@@ -221,17 +222,24 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
   const [website, setWebsite] = useState(brand.website || '')
   const [tone, setTone] = useState(brand.tone || '')
   const [usps, setUsps] = useState((brand.usps || []).join(', '))
+  const [colors, setColors] = useState((brand.brand_kit?.colors || []).join(', '))
+  const [hFont, setHFont] = useState(brand.brand_kit?.fonts?.heading || '')
+  const [bFont, setBFont] = useState(brand.brand_kit?.fonts?.body || '')
   const [photos, setPhotos] = useState<string[]>((brand.products || []).flatMap((p) => p.image_urls || []))
   const [busy, setBusy] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [detectSite, setDetectSite] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const colorList = colors.split(',').map((s) => s.trim()).filter(Boolean)
   const save = async () => {
     setBusy(true)
     await fetch(`/api/brands/${brand.id}`, {
       method: 'PATCH', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, website, tone, usps: usps.split(',').map((s) => s.trim()).filter(Boolean) }),
+      body: JSON.stringify({
+        name, website, tone, usps: usps.split(',').map((s) => s.trim()).filter(Boolean),
+        brand_kit: { colors: colorList, fonts: { heading: hFont || null, body: bFont || null } },
+      }),
     })
     setBusy(false); onSaved()
   }
@@ -271,6 +279,22 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
         <Field label="Voice / tone"><input value={tone} onChange={(e) => setTone(e.target.value)} placeholder="e.g. bold, playful, premium" style={input} /></Field>
         <Field label="USPs (comma-separated)"><input value={usps} onChange={(e) => setUsps(e.target.value)} placeholder="fast shipping, 30-day guarantee" style={input} /></Field>
 
+        {/* Brand Kit — colors + fonts, auto-detected from the site, used to keep every ad on-brand. */}
+        <Field label="Brand colors (comma-separated hex)">
+          <input value={colors} onChange={(e) => setColors(e.target.value)} placeholder="#1a3a1a, #dffe95" style={input} />
+          {colorList.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              {colorList.slice(0, 8).map((c, i) => (
+                <span key={i} title={c} style={{ width: 26, height: 26, borderRadius: 6, background: c, border: '1px solid #e2e8f0', display: 'inline-block' }} />
+              ))}
+            </div>
+          )}
+        </Field>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Field label="Heading font"><input value={hFont} onChange={(e) => setHFont(e.target.value)} placeholder="Plus Jakarta Sans" style={input} /></Field>
+          <Field label="Body font"><input value={bFont} onChange={(e) => setBFont(e.target.value)} placeholder="Open Sans" style={input} /></Field>
+        </div>
+
         <Field label="Product photos">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {photos.map((u) => (
@@ -304,6 +328,7 @@ function AddBrandModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
   const [name, setName] = useState('')
   const [website, setWebsite] = useState('')
   const [imgs, setImgs] = useState<string[]>([])
+  const [kit, setKit] = useState<BrandKit>({})
   const [detecting, setDetecting] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -316,13 +341,14 @@ function AddBrandModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
       const j = await r.json()
       if (!r.ok) { setErr(j.error || 'Could not read that site.'); return }
       if (j.brandName && !name.trim()) setName(j.brandName)
-      setImgs((j.images || []).slice(0, 8))
+      setImgs((j.images || []).slice(0, 12))
+      setKit({ colors: j.colors || [], fonts: j.fonts || {} })
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setDetecting(false) }
   }
   const save = async () => {
     setBusy(true); setErr(null)
     try {
-      const r = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), website: website.trim() || null, product_images: imgs }) })
+      const r = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), website: website.trim() || null, product_images: imgs, brand_kit: kit }) })
       const j = await r.json()
       if (r.status === 402 && j.error === 'brand_limit_reached') { setErr(`You've used all ${j.limit} brand slots on your plan. Upgrade to add more.`); return }
       if (!r.ok) { setErr(j.error || 'Could not save brand.'); return }

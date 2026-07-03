@@ -77,8 +77,19 @@ async function handle(req: NextRequest) {
     const refImg = await fetchImageB64(refUrl)
     if (!refImg) { await refund(); return NextResponse.json({ error: 'could not load reference image' }, { status: 502 }) }
 
+    // Pull the saved brand's kit (colors + fonts) so every ad stays on-brand, even if the caller
+    // didn't pass colors explicitly.
+    let kitColors: string[] | undefined = Array.isArray(colors) ? colors.slice(0, 4) : undefined
+    let kitFonts: { heading?: string | null; body?: string | null } | undefined
+    if (brandId) {
+      const { data: brand } = await admin.from('brands').select('brand_kit').eq('id', String(brandId)).maybeSingle()
+      const kit = (brand as any)?.brand_kit || {}
+      if (!kitColors?.length && Array.isArray(kit.colors)) kitColors = kit.colors.slice(0, 4)
+      if (kit.fonts) kitFonts = kit.fonts
+    }
+
     const prompt = buildClonePrompt({
-      brandName, colors: Array.isArray(colors) ? colors.slice(0, 4) : undefined, newHeadline, aspectRatio,
+      brandName, colors: kitColors, newHeadline, aspectRatio, fonts: kitFonts,
       dna: { hook_type: (ad as any).hook_type, format_style: (ad as any).format_style, angle: (ad as any).angle, emotion: (ad as any).emotion, cta: (ad as any).cta },
     })
     console.log(`clone-image [${useTier}] prompt:`, prompt)   // proof the prompt is sent each generation
