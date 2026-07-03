@@ -72,6 +72,18 @@ async function run() {
     const rows = Array.from(perBrand.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10)
       .map(([name, n]) => `<div style="padding:9px 0;border-bottom:1px solid #f0f4ee;font-size:14px"><b style="color:#1a2e1a">${name}</b> <span style="color:#5a7a5a">— ${n} new ${n === 1 ? 'ad' : 'ads'}</span></div>`).join('')
 
+    // WINNER ALERTS (personalized): followed-brand ads that CROSSED a longevity milestone this week
+    // (still active + days_running just past 60 or 90). Advertisers kill losers fast, so an ad this
+    // old is a validated winner. Weekly cadence naturally dedups (the 60-67 / 90-97 bands = "this week").
+    let winners = []
+    try {
+      winners = await getJSON(`discovery_ads_index?select=page_name,days_running&page_id=in.(${pageIds.map(enc).join(',')})&is_active=is.true&has_creative=is.true&or=(and(days_running.gte.60,days_running.lte.67),and(days_running.gte.90,days_running.lte.97))&order=days_running.desc&limit=8`)
+    } catch { /* winners optional */ }
+    const winnersHtml = (Array.isArray(winners) && winners.length) ? `<div style="margin-top:22px;padding:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px">
+      <div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:8px">🏆 New proven winners from brands you follow</div>
+      ${winners.map(w => `<div style="padding:6px 0;font-size:13px;color:#78350f"><b>${w.page_name || 'A brand you follow'}</b> — an ad just crossed <b>${w.days_running >= 90 ? 90 : 60} days</b> live (${w.days_running}d)</div>`).join('')}
+    </div>` : ''
+
     // "Brands to follow in <niche>" — drives more follows (= more retention).
     const { industry, recs } = await nicheRecs(pageIds)
     const recsHtml = recs.length ? `<div style="margin-top:22px;padding:16px;background:#f4f7f2;border-radius:10px">
@@ -81,7 +93,7 @@ async function run() {
 
     const html = emailShell({
       heading: `${total} new ${total === 1 ? 'ad' : 'ads'} from brands you follow this week`,
-      bodyHtml: `Here's what your tracked brands shipped over the last 7 days:<div style="margin-top:14px">${rows}</div>${recsHtml}`,
+      bodyHtml: `Here's what your tracked brands shipped over the last 7 days:<div style="margin-top:14px">${rows}</div>${winnersHtml}${recsHtml}`,
       ctaText: 'Open your feed →',
       ctaPath: '/discovery/following',
     })
