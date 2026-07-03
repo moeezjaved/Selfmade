@@ -10,7 +10,7 @@
  *   docker run -d --name alert-worker --restart unless-stopped --init \
  *     --env-file <env> -v /opt/worker/src:/app/src selfmade-worker npx tsx src/alert-worker.mjs
  */
-import { sendPaidEmail, getUserEmail, newAdEmail, emailEnabled } from './email.mjs'
+import { sendPaidEmail, getUserEmail, newAdBundleEmail, emailEnabled } from './email.mjs'
 
 const U = (process.env.SUPABASE_URL || '').split('\n')[0].replace(/\/$/, '')
 const K = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -46,7 +46,10 @@ async function tick() {
     } catch { /* prefs optional */ }
   }
 
-  let made = 0, mailed = 0, noCredits = 0
+  let made = 0
+  // Collect every opted-in user's brands-with-new-ads so we can send ONE bundled email per user
+  // (2 credits total), instead of one email per brand. In-app notifications stay per-brand.
+  const emailBundle = new Map()   // user_id -> [{ brandName, count, pageId }]
   for (const f of follows) {
     const since = f.last_notified_at || '1970-01-01T00:00:00Z'
     let ads
@@ -63,23 +66,27 @@ async function tick() {
       user_id: f.user_id, type: 'new_ad', page_id: f.page_id,
       brand_name: f.brand_name, ad_count: concepts.size, sample_ad_id: ads[0].ad_id,
     })
-    // Instant email (opt-in, costs 2 credits). One email per brand per cycle = naturally debounced by
-    // the watermark. sendPaidEmail charges before sending and refunds if the send fails; users with no
-    // credits are simply skipped (the in-app notification still lands).
     if (wantsEmail.has(f.user_id)) {
-      const to = await getUserEmail(f.user_id)
-      if (to) {
-        const { subject, html } = newAdEmail({ brandName: f.brand_name, adCount: concepts.size, pageId: f.page_id })
-        const r = await sendPaidEmail({ to, userId: f.user_id, action: 'email_alert', subject, html })
-        if (r.sent) mailed++
-        else if (r.reason === 'insufficient_credits') noCredits++
-      }
+      if (!emailBundle.has(f.user_id)) emailBundle.set(f.user_id, [])
+      emailBundle.get(f.user_id).push({ brandName: f.brand_name, count: concepts.size, pageId: f.page_id })
     }
     // Advance the watermark to the newest ad we just notified about → no duplicate alerts next run.
     await write('PATCH', `followed_brands?id=eq.${enc(f.id)}`, { last_notified_at: ads[0].created_at })
     made++
   }
-  if (made) console.log(`📢 ${made} new-ad notification(s) created${mailed ? `, ${mailed} emailed (2cr each)` : ''}${noCredits ? `, ${noCredits} skipped (no credits)` : ''} across ${follows.length} follows`)
+
+  // ONE bundled email per opted-in user this cycle = 2 credits total (not per brand). Charged before
+  // send, refunded on failure; users with no credits are skipped (their in-app notifications stand).
+  let mailed = 0, noCredits = 0
+  for (const [userId, items] of emailBundle) {
+    const to = await getUserEmail(userId)
+    if (!to) continue
+    const { subject, html } = newAdBundleEmail({ items })
+    const r = await sendPaidEmail({ to, userId, action: 'email_alert', subject, html })
+    if (r.sent) mailed++
+    else if (r.reason === 'insufficient_credits') noCredits++
+  }
+  if (made) console.log(`📢 ${made} new-ad notification(s)${mailed ? `, ${mailed} bundled email(s) sent (2cr each)` : ''}${noCredits ? `, ${noCredits} skipped (no credits)` : ''} across ${follows.length} follows`)
 }
 
 console.log(`🔔 alert-worker up — checking followed brands every ${Math.round(EVERY / 60000)} min`)
