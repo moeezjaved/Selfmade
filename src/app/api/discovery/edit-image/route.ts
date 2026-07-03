@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: insufficient ? 'insufficient_credits' : 'reserve_failed' }, { status: insufficient ? 402 : 500 })
   }
   const txId = Array.isArray(tx) ? tx[0]?.id : (tx as any)?.id
-  const refund = async () => { if (txId) await admin.rpc('refund_credits', { p_tx: txId }).catch(() => {}) }
+  const refund = async () => { if (txId) await admin.rpc('refund_credits', { p_tx: txId }).then(() => {}, () => {}) }
 
   try {
     const cur = await toB64(String(image))
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const gen = await generateImage(buildEditPrompt(String(instruction).trim()), [cur], useTier)
     if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
 
-    if (txId) await admin.rpc('commit_credits', { p_tx: txId }).catch(() => {})
+    if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 
     const saved = await saveGeneration({
       userId: user.id, dataB64: gen.dataB64, mimeType: gen.mimeType, type: 'edit', tier: useTier,
