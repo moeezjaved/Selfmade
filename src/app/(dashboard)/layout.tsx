@@ -163,6 +163,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    data-nav={item.href === '/creative-studio' ? 'creatives' : undefined}
                     className={cn('sidebar-link', isActive && 'active')}
                   >
                     <item.icon size={16} className="flex-shrink-0"/>

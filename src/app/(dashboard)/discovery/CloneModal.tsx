@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Upload, Link2, Loader2, Download, Sparkles, Check } from 'lucide-react'
+import { flyToCreatives } from '@/lib/flyToCreatives'
 
 type Photo = { id: string; src: string; label?: string } // src = data: URL (upload) or http URL (detected/brand)
 type Brand = { id: string; name: string; website?: string | null; products?: { image_urls?: string[] }[] }
@@ -177,6 +178,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         return
       }
       setResults(good); setActiveIdx(0)
+      flyToCreatives(good[0]?.url)   // "saved to My Creatives" flourish
       if (good.length < count) setErr(`${good.length} of ${count} variations generated (the rest failed).`)
     } catch (e: any) { setErr(String(e?.message || e)) }
     finally { setBusy(false) }
@@ -199,6 +201,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       setHistory((h) => [...h, { idx, url: prevUrl }])   // enable undo of this variation
       setResults((rs) => rs.map((x, i) => i === idx ? { url: j.image, genId: j.generationId || x.genId } : x))
       setEditText('')
+      flyToCreatives(j.image)   // edited version is a new saved creative
     } catch (e: any) { setErr(String(e?.message || e)) }
     finally { setEditing(false) }
   }
