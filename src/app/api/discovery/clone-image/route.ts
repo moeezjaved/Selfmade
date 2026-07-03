@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { generateImage, buildClonePrompt, geminiEnabled } from '@/lib/gemini/image'
+import { generateImage, buildClonePrompt, geminiEnabled, nearestAspect } from '@/lib/gemini/image'
 import { saveGeneration } from '@/lib/creatives'
 import { sendFirstAdEmail } from '@/lib/email'
 
@@ -68,16 +68,21 @@ async function handle(req: NextRequest) {
     // Reference ad: creative image + classified DNA.
     const { data: ad } = await admin
       .from('discovery_ads_index')
-      .select('hook_type, format_style, angle, emotion, cta, page_name, discovery_creatives(asset_type, r2_url, poster_url, position)')
+      .select('hook_type, format_style, angle, emotion, cta, page_name, discovery_creatives(asset_type, r2_url, poster_url, position, width, height)')
       .eq('ad_id', String(adId))
       .maybeSingle()
     if (!ad) { await refund(); return NextResponse.json({ error: 'ad not found' }, { status: 404 }) }
 
     const cres = ((ad as any).discovery_creatives || []).slice().sort((a: any, b: any) => (a.position || 0) - (b.position || 0))
-    const refUrl = cres.map((c: any) => c.asset_type === 'video' ? c.poster_url : c.r2_url).find(Boolean)
+    const refCre = cres.find((c: any) => (c.asset_type === 'video' ? c.poster_url : c.r2_url))
+    const refUrl = refCre ? (refCre.asset_type === 'video' ? refCre.poster_url : refCre.r2_url) : null
     if (!refUrl) { await refund(); return NextResponse.json({ error: 'reference ad has no image' }, { status: 422 }) }
     const refImg = await fetchImageB64(refUrl)
     if (!refImg) { await refund(); return NextResponse.json({ error: 'could not load reference image' }, { status: 502 }) }
+    // "Original" → match the reference ad's real shape (nearest supported ratio); else use the picked ratio.
+    const resolvedAspect = (!aspectRatio || aspectRatio === 'original')
+      ? (nearestAspect(refCre?.width, refCre?.height) || 'original')
+      : aspectRatio
 
     // Pull the saved brand's kit (colors + fonts) so every ad stays on-brand, even if the caller
     // didn't pass colors explicitly.
@@ -99,7 +104,7 @@ async function handle(req: NextRequest) {
     const logoImg = logoUrl ? await fetchImageB64(logoUrl) : null
 
     const prompt = buildClonePrompt({
-      brandName, colors: kitColors, newHeadline, aspectRatio, fonts: kitFonts, palette: kitPalette, hasLogo: !!logoImg,
+      brandName, colors: kitColors, newHeadline, aspectRatio: resolvedAspect, fonts: kitFonts, palette: kitPalette, hasLogo: !!logoImg,
       dna: { hook_type: (ad as any).hook_type, format_style: (ad as any).format_style, angle: (ad as any).angle, emotion: (ad as any).emotion, cta: (ad as any).cta },
     })
     console.log(`clone-image [${useTier}] prompt:`, prompt)   // proof the prompt is sent each generation
@@ -116,7 +121,7 @@ async function handle(req: NextRequest) {
 
     // Order matters: [reference ad, ...product photos, logo?] — the prompt references the FINAL image as the logo.
     const genImages = logoImg ? [refImg, ...products, logoImg] : [refImg, ...products]
-    const gen = await generateImage(prompt, genImages, useTier, { aspectRatio, imageSize })
+    const gen = await generateImage(prompt, genImages, useTier, { aspectRatio: resolvedAspect, imageSize })
     if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
