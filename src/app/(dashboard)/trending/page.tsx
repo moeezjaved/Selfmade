@@ -5,7 +5,7 @@
  * Each card ties straight into generation with a "Clone" action (our edge over Motion).
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Flame, Search, Sparkles, Play, ChevronDown, Loader2 } from 'lucide-react'
+import { Flame, Search, Sparkles, Play, ChevronDown, Loader2, ArrowUpRight } from 'lucide-react'
 import CloneModal from '../discovery/CloneModal'
 
 type Ad = { adId: string; pageId: string; pageName: string; image: string | null; isVideo: boolean; score: number; format: string | null; hook: string | null; saves: number; isActive: boolean; daysRunning: number | null }
@@ -33,21 +33,22 @@ export default function TrendingPage() {
   const [visible, setVisible] = useState(12)
   const [brands, setBrands] = useState<BrandW[]>([])
   const [formats, setFormats] = useState<FormatW[]>([])
-  const [brandFilter, setBrandFilter] = useState<{ pageId: string; pageName: string } | null>(null)
+  const [drill, setDrill] = useState<{ kind: 'brand' | 'format'; id: string; label: string } | null>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetch('/api/discovery/niches').then(r => r.json()).then(j => setNiches(j.niches || [])).catch(() => {})
   }, [])
 
-  const load = useCallback(async (n: string, pageId?: string) => {
+  const load = useCallback(async (n: string, d?: { kind: 'brand' | 'format'; id: string } | null) => {
     setLoading(true); setVisible(12)
+    const param = d ? (d.kind === 'brand' ? `&pageId=${encodeURIComponent(d.id)}` : `&format=${encodeURIComponent(d.id)}`) : ''
     try {
-      const j = await fetch(`/api/discovery/trending?niche=${encodeURIComponent(n)}${pageId ? `&pageId=${encodeURIComponent(pageId)}` : ''}&limit=48`).then(r => r.json())
+      const j = await fetch(`/api/discovery/trending?niche=${encodeURIComponent(n)}${param}&limit=48`).then(r => r.json())
       setAds(j.ads || [])
     } catch { setAds([]) } finally { setLoading(false) }
   }, [])
-  useEffect(() => { load(niche, brandFilter?.pageId) }, [niche, brandFilter, load])
+  useEffect(() => { load(niche, drill) }, [niche, drill, load])
 
   // Brands + formats re-scope with the industry filter (not the brand drill-down).
   useEffect(() => {
@@ -99,9 +100,9 @@ export default function TrendingPage() {
           <p style={{ fontSize: 12.5, color: '#9ca3af', margin: '2px 0 12px' }}>Brands with the most top-performing ads {niche ? `in ${niche}` : 'right now'} — click to see their creatives.</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {brands.map(b => {
-              const on = brandFilter?.pageId === b.pageId
+              const on = drill?.kind === 'brand' && drill.id === b.pageId
               return (
-                <button key={b.pageId} onClick={() => setBrandFilter(on ? null : { pageId: b.pageId, pageName: b.pageName })}
+                <button key={b.pageId} onClick={() => setDrill(on ? null : { kind: 'brand', id: b.pageId, label: b.pageName })}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 6px', borderRadius: 22, border: `1px solid ${on ? DARK : '#e5e7eb'}`, background: on ? '#eef5eb' : '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
                   {b.image
                     // eslint-disable-next-line @next/next/no-img-element
@@ -119,10 +120,10 @@ export default function TrendingPage() {
       {/* Section */}
       <div style={{ marginTop: 26, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#171717', margin: 0 }}>{brandFilter ? `Top ads from ${brandFilter.pageName}` : 'Top trending ads this week'}</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#171717', margin: 0, textTransform: drill?.kind === 'format' ? 'capitalize' : 'none' }}>{drill ? (drill.kind === 'format' ? `Top ${drill.label} ads` : `Top ads from ${drill.label}`) : 'Top trending ads this week'}</h2>
           <p style={{ fontSize: 12.5, color: '#9ca3af', margin: '2px 0 0' }}>Ranked by performance + how fresh and active they are.</p>
         </div>
-        {brandFilter && <button onClick={() => setBrandFilter(null)} style={{ padding: '7px 14px', borderRadius: 20, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>← All trending</button>}
+        {drill && <button onClick={() => setDrill(null)} style={{ padding: '7px 14px', borderRadius: 20, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>← All trending</button>}
       </div>
 
       {loading ? (
@@ -173,18 +174,22 @@ export default function TrendingPage() {
           <p style={{ fontSize: 12.5, color: '#9ca3af', margin: '2px 0 14px' }}>The ad formats top performers are using {niche ? `in ${niche}` : 'right now'} — set an Angle in the Studio to match one.</p>
           <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 8 }}>
             {formats.map(f => (
-              <div key={f.format} style={{ width: 210, flexShrink: 0, border: '1px solid #eef0ee', borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
+              <button key={f.format} onClick={() => { setDrill({ kind: 'format', id: f.format, label: f.format }); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                style={{ width: 210, flexShrink: 0, border: '1px solid #eef0ee', borderRadius: 14, overflow: 'hidden', background: '#fff', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: f.samples.length >= 2 ? '1fr 1fr' : '1fr', gap: 2, aspectRatio: '16/10', background: '#0d120e' }}>
                   {(f.samples.length ? f.samples.slice(0, f.samples.length >= 3 ? 3 : f.samples.length) : []).map((s, i) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img key={i} src={img(s, 220)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', gridColumn: f.samples.length === 3 && i === 0 ? 'span 2' : undefined }} />
                   ))}
                 </div>
-                <div style={{ padding: '10px 12px' }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#111', textTransform: 'capitalize' }}>{f.format}</div>
-                  <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 2 }}>{f.count} top ad{f.count === 1 ? '' : 's'}</div>
+                <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#111', textTransform: 'capitalize' }}>{f.format}</div>
+                    <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 2 }}>{f.count} top ad{f.count === 1 ? '' : 's'}</div>
+                  </div>
+                  <ArrowUpRight size={16} color="#9ca3af" />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>
