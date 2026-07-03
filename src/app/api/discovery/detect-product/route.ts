@@ -69,6 +69,16 @@ export async function POST(req: NextRequest) {
 
   const images = Array.from(imgs).slice(0, 24)
 
+  // ── Logo ────────────────────────────────────────────────────────────────
+  // The real brand mark, so ads use it instead of an invented wordmark. Prefer JSON-LD org logo,
+  // then <img> tagged "logo", then apple-touch-icon.
+  const logos: string[] = []
+  const pushLogo = (u?: string | null) => { const a = u && abs(u, url); if (a && !/pixel|1x1/i.test(a)) logos.push(a.split('?')[0]) }
+  Array.from(html.matchAll(/"logo"\s*:\s*(?:"([^"]+)"|\{[^}]*"url"\s*:\s*"([^"]+)")/gi)).forEach((m) => pushLogo(m[1] || m[2]))
+  Array.from(html.matchAll(/<img[^>]*(?:class|id|alt|src)=["'][^"']*logo[^"']*["'][^>]*>/gi)).forEach((tag) => pushLogo(tag[0].match(/\bsrc=["']([^"']+)["']/i)?.[1]))
+  pushLogo(html.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i)?.[1])
+  const logo = logos.find(Boolean) || null
+
   // ── Colors ──────────────────────────────────────────────────────────────
   const colors = new Set<string>()
   const tc = meta('theme-color'); if (tc && /^#?[0-9a-f]{3,8}$/i.test(tc)) colors.add((tc.startsWith('#') ? tc : '#' + tc).toLowerCase())
@@ -93,8 +103,8 @@ export async function POST(req: NextRequest) {
 
   const colorList = Array.from(colors).slice(0, 6)
   return NextResponse.json({
-    brandName, images, colors: colorList, fonts, shopify,
-    brandKit: { colors: colorList, fonts },
+    brandName, images, colors: colorList, fonts, logo, shopify,
+    brandKit: { colors: colorList, fonts, logo },
     source: url,
   })
 }

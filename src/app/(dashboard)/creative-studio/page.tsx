@@ -21,7 +21,7 @@ const input: React.CSSProperties = { width: '100%', padding: '9px 11px', border:
 
 type Gen = { id: string; image_url: string; type: string; tier: string; prompt?: string | null; brand_name?: string | null; source_ad_id?: string | null; created_at: string }
 type Product = { id: string; name?: string | null; image_urls?: string[] }
-type BrandKit = { colors?: string[]; fonts?: { heading?: string | null; body?: string | null } }
+type BrandKit = { colors?: string[]; fonts?: { heading?: string | null; body?: string | null }; logo?: string | null }
 type Brand = { id: string; name: string; website?: string | null; tone?: string | null; usps?: string[]; products?: Product[]; brand_kit?: BrandKit }
 
 export default function MyCreativesPage() {
@@ -225,6 +225,7 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
   const [colors, setColors] = useState((brand.brand_kit?.colors || []).join(', '))
   const [hFont, setHFont] = useState(brand.brand_kit?.fonts?.heading || '')
   const [bFont, setBFont] = useState(brand.brand_kit?.fonts?.body || '')
+  const [logo, setLogo] = useState(brand.brand_kit?.logo || '')
   const [photos, setPhotos] = useState<string[]>((brand.products || []).flatMap((p) => p.image_urls || []))
   const [busy, setBusy] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
@@ -238,7 +239,7 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
       method: 'PATCH', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         name, website, tone, usps: usps.split(',').map((s) => s.trim()).filter(Boolean),
-        brand_kit: { colors: colorList, fonts: { heading: hFont || null, body: bFont || null } },
+        brand_kit: { colors: colorList, fonts: { heading: hFont || null, body: bFont || null }, logo: logo || null },
       }),
     })
     setBusy(false); onSaved()
@@ -294,6 +295,13 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
           <Field label="Heading font"><input value={hFont} onChange={(e) => setHFont(e.target.value)} placeholder="Plus Jakarta Sans" style={input} /></Field>
           <Field label="Body font"><input value={bFont} onChange={(e) => setBFont(e.target.value)} placeholder="Open Sans" style={input} /></Field>
         </div>
+        <Field label="Logo URL (used as the brand mark in ads)">
+          <input value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="https://…/logo.png" style={input} />
+          {logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logo} alt="logo" style={{ height: 28, maxWidth: 140, objectFit: 'contain', marginTop: 8, background: '#f8fafc', borderRadius: 6, padding: 3, border: '1px solid #e2e8f0' }} />
+          )}
+        </Field>
 
         <Field label="Product photos">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -342,7 +350,7 @@ function AddBrandModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
       if (!r.ok) { setErr(j.error || 'Could not read that site.'); return }
       if (j.brandName && !name.trim()) setName(j.brandName)
       setImgs((j.images || []).slice(0, 12))
-      setKit({ colors: j.colors || [], fonts: j.fonts || {} })
+      setKit({ colors: j.colors || [], fonts: j.fonts || {}, logo: j.logo || null })
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setDetecting(false) }
   }
   const save = async () => {
