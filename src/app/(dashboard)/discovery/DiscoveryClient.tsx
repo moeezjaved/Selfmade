@@ -26,6 +26,7 @@ class MasonryBoundary extends Component<{ children: ReactNode }, { k: number; er
   }
 }
 import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download, Copy } from 'lucide-react'
+import CloneModal from './CloneModal'
 import { useRouter } from 'next/navigation'
 import BrandDrawer from './BrandDrawer'
 
@@ -817,6 +818,7 @@ const cdnSrcSet = (url: string) =>
 // ── CarouselViewer ─ swipeable preview for multi-image ads ──
 function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: string; iframeVisible: boolean }) {
   const router = useRouter()
+  const [cloneOpen, setCloneOpen] = useState(false)
   // Build slide list: prefer creatives[] (full carousel), fall back to legacy single image/video
   type Slide = { type: 'image' | 'video'; url: string; width?: number | null; height?: number | null; poster?: string | null }
   const slides: Slide[] = useMemo(() => {
@@ -877,6 +879,8 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   // and the video only downloads on click (preload off) → fast + cheap.
   const posterSrc = (slide?.type === 'video' && slide.poster) ? cdnSrc(slide.poster) : undefined
   return (
+    <>
+    {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName }} onClose={() => setCloneOpen(false)} />}
     <div
       className="ad-card-visual"
       onClick={() => router.push(`/discovery/${ad.id}`)}
@@ -1040,7 +1044,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         )}
         {slide.type !== 'video' && (
         <button
-          onClick={(e) => { e.stopPropagation(); /* Clone wired up later */ }}
+          onClick={(e) => { e.stopPropagation(); setCloneOpen(true) }}
           style={{
             pointerEvents: 'auto',
             background: '#dffe95',
@@ -1066,6 +1070,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         )}
       </div>
     </div>
+    </>
   )
 }
 
