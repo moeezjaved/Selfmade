@@ -293,6 +293,7 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
   const [photos, setPhotos] = useState<string[]>((brand.products || []).flatMap((p) => p.image_urls || []))
   const [busy, setBusy] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoMsg, setPhotoMsg] = useState<string | null>(null)
   const [detectSite, setDetectSite] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -312,33 +313,41 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
     setBusy(false); onSaved()
   }
 
-  const addPhotos = async (images: string[]) => {
-    if (!images.length) return
+  const addPhotos = async (images: string[]): Promise<string[]> => {
+    if (!images.length) return photos
     setPhotoBusy(true)
     const r = await fetch(`/api/brands/${brand.id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resource: 'photos', images }) })
     const j = await r.json()
-    if (Array.isArray(j.image_urls)) setPhotos(j.image_urls)
-    setPhotoBusy(false)
+    const merged = Array.isArray(j.image_urls) ? j.image_urls : photos
+    setPhotos(merged); setPhotoBusy(false)
+    return merged
   }
   const onUpload = async (files: FileList | null) => {
     if (!files?.length) return
     addPhotos(await Promise.all(Array.from(files).slice(0, 8).map(fileToDataUrl)))
   }
+  const badFont = (v: string) => v.includes('(') || v.startsWith('--')
   const detect = async () => {
     const site = (detectSite.trim() || website.trim())
     if (!site) return
-    setPhotoBusy(true)
+    setPhotoBusy(true); setPhotoMsg(null)
     try {
       const r = await fetch('/api/discovery/detect-product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: site }) })
       const j = await r.json()
-      // Fill the WHOLE brand kit from the fresh crawl — colors, fonts, logo — not just photos, so an
-      // empty/old brand gets its kit populated. Only overwrite empty fields (don't clobber edits).
+      if (!r.ok) { setPhotoMsg(j.error || 'Could not read that site.'); return }
+      // Refresh the kit: fill empty fields; also overwrite a font that leaked as a CSS var(...).
       if (j.palette && Object.keys(palette).length === 0) setPalette(j.palette)
-      if (j.fonts?.heading && !hFont.trim()) setHFont(j.fonts.heading)
-      if (j.fonts?.body && !bFont.trim()) setBFont(j.fonts.body)
+      if (j.fonts?.heading && (!hFont.trim() || badFont(hFont))) setHFont(j.fonts.heading)
+      if (j.fonts?.body && (!bFont.trim() || badFont(bFont))) setBFont(j.fonts.body)
       if (j.logo && !logo.trim()) setLogo(j.logo)
-      // Re-crawl products (Shopify /products.json is fetched fresh every time → new products appear).
-      if (Array.isArray(j.images) && j.images.length) await addPhotos(j.images.slice(0, 12))
+      // Products re-crawled fresh (dedupes against saved — only NEW ones add).
+      const found = Array.isArray(j.images) ? j.images.length : 0
+      const before = photos.length
+      const merged = found ? await addPhotos(j.images.slice(0, 24)) : photos
+      const added = Math.max(0, merged.length - before)
+      setPhotoMsg(found === 0 ? 'No product images found on that page.'
+        : added > 0 ? `Added ${added} new photo${added > 1 ? 's' : ''} (${found} found).`
+        : `No new photos — the ${found} found are already saved.`)
     } finally { setPhotoBusy(false); setDetectSite('') }
   }
   const removePhoto = async (url: string) => {
@@ -413,9 +422,10 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
             <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => onUpload(e.target.files)} />
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <input value={detectSite} onChange={(e) => setDetectSite(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && detect()} placeholder="…or detect from a website URL" style={{ ...input, flex: 1 }} />
-            <button onClick={detect} disabled={photoBusy || !detectSite.trim()} style={btnGhost}><Link2 size={14} /> Detect</button>
+            <input value={detectSite} onChange={(e) => setDetectSite(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && detect()} placeholder="…or detect from a website URL (blank = brand site)" style={{ ...input, flex: 1 }} />
+            <button onClick={detect} disabled={photoBusy} style={btnGhost}>{photoBusy ? <Loader2 size={13} className="spin" /> : <Link2 size={14} />} Detect</button>
           </div>
+          {photoMsg && <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 6 }}>{photoMsg}</div>}
         </Field>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
