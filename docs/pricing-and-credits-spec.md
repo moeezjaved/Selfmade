@@ -23,9 +23,10 @@ Launch + Campaigns + ROAS analytics** — so we undercut Atria ($129–959) 4–
 | **Patterns / AI Insights** | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Top Picks** (curated packs) | Preview | ✅ | ✅ | ✅ | ✅ |
 | **Saved Ads / Following / Boards** | 1 board, 25 saves | ✅ | ✅ | ✅ (team boards) | ✅ |
-| **Ask Mello** (AI agent) | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Scripts / Transcribe** | Preview | ✅ (credits) | ✅ | ✅ | ✅ |
-| **Image Clone** | ❌ | ❌ | ✅ (credits) | ✅ | ✅ |
+| **Ask Mello** (AI agent) | ✅ *credits* | ✅ *credits* | ✅ | ✅ | ✅ |
+| **Scripts / Transcribe** | ✅ *credits* | ✅ | ✅ | ✅ | ✅ |
+| **Image Clone** (Nano Banana Pro) | ✅ *credits* | ✅ | ✅ | ✅ | ✅ |
+| **Video Clone** | ✅ *credits* | ✅ | ✅ | ✅ | ✅ |
 | **Launch Ads** | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Campaigns / Scale & Insights / Deep Reports** | ❌ | ❌ | ❌ | ✅ | ✅ |
 | **Monthly credits** | **20** | **150** | **500** | **2,000** | Custom |
@@ -68,12 +69,18 @@ Extend the existing costs. One shared currency across all generative/analytic ac
 | URL / brand analyze | 3 |
 | Review mining | 3 |
 | Ask Mello (per message) | 1 |
-| **Image Clone — 1K** (standard Nano Banana) | **10** |
 | **Image Clone — 2K** (Nano Banana Pro, **default**) | **15** |
 | **Image Clone — 4K / HD** (Nano Banana Pro) | **25** |
-| Video Clone (future) | 30 |
+| **Video Clone** (short AI clip) | **40** *(verify vs real video model cost)* |
 
 (Assets generated *via* Mello also charge the asset's own cost, e.g. Mello-triggered 2K Image Clone = 1 + 15.)
+
+> **We only generate on Nano Banana Pro** — the standard 1K model is not offered (its text rendering is too
+> weak for ad creatives). So there is no "10-credit / 1K" tier; the minimum image action is **2K = 15 credits**.
+
+> **All creation tools (Mello, Scripts, Transcribe, Image Clone, Video Clone) are available on EVERY tier,
+> including Free** — they are gated by **credits, not by feature flag.** This is the product-led-growth hook:
+> anyone can experience the AI creation, and the monthly credit cap is the natural throttle → hit the wall → upgrade.
 
 ### 2.3.1 Image Clone — model & resolution (drives the credit cost above)
 The clone pipeline uses **Nano Banana Pro (Gemini 3 Pro Image, `gemini-3-pro-image-preview`)** — chosen for
@@ -111,6 +118,13 @@ On billing-cycle rollover (per subscription, driven by Stripe `invoice.paid` or 
 - Write a ledger row: `type='plan_grant', bucket='plan', delta=monthly_credits`.
 - Separately, **expire top-up credits** older than 12 months: reduce `topup_credits_balance`, write `type='expire', bucket='topup'`.
 
+### 2.5.1 Free welcome bonus (one-time)
+On **signup to the Free plan**, grant `welcomeCredits` (60) into the **top-up bucket** — so it rolls over and
+survives the first monthly reset. This lets a new user *test the AI creation* end-to-end — e.g. 1 Image Clone (15)
++ 1 Video Clone (40) = 55 — before the 20/mo Free cap applies. **One-time only**, never re-granted. Ledger:
+`type='welcome', bucket='topup'`. (Without this, a Free user's 20/mo can't afford a 40-credit video — the bonus
+is what makes "test everything free" real while capping the CAC per signup.)
+
 ---
 
 ## 3. Top-ups (credit refills)
@@ -142,12 +156,15 @@ Define plans as a config map the whole app reads from. Example shape:
 
 ```ts
 export const PLANS = {
-  free:       { brandSpy: 1,   monthlyCredits: 20,   seats: 1,  aiInsights: false, launch: false, campaigns: false, api: false, discoveryPages: 3,   canBuyCredits: false, canClone: false },
-  starter:    { brandSpy: 15,  monthlyCredits: 150,  seats: 1,  aiInsights: false, launch: false, campaigns: false, api: false, discoveryPages: null, canBuyCredits: true,  canClone: false },
-  pro:        { brandSpy: 50,  monthlyCredits: 500,  seats: 3,  aiInsights: true,  launch: true,  campaigns: false, api: true,  discoveryPages: null, canBuyCredits: true,  canClone: true  },
-  business:   { brandSpy: 150, monthlyCredits: 2000, seats: 10, aiInsights: true,  launch: true,  campaigns: true,  api: true,  discoveryPages: null, canBuyCredits: true,  canClone: true  },
-  enterprise: { brandSpy: Infinity, monthlyCredits: null /*custom*/, seats: 15, aiInsights: true, launch: true, campaigns: true, api: true, discoveryPages: null, canBuyCredits: true, canClone: true },
+  free:       { brandSpy: 1,   monthlyCredits: 20,   welcomeCredits: 60, seats: 1,  aiInsights: false, launch: false, campaigns: false, api: false, discoveryPages: 3,   canBuyCredits: false },
+  starter:    { brandSpy: 15,  monthlyCredits: 150,  seats: 1,  aiInsights: false, launch: false, campaigns: false, api: false, discoveryPages: null, canBuyCredits: true },
+  pro:        { brandSpy: 50,  monthlyCredits: 500,  seats: 3,  aiInsights: true,  launch: true,  campaigns: false, api: true,  discoveryPages: null, canBuyCredits: true },
+  business:   { brandSpy: 150, monthlyCredits: 2000, seats: 10, aiInsights: true,  launch: true,  campaigns: true,  api: true,  discoveryPages: null, canBuyCredits: true },
+  enterprise: { brandSpy: Infinity, monthlyCredits: null /*custom*/, seats: 15, aiInsights: true, launch: true, campaigns: true, api: true, discoveryPages: null, canBuyCredits: true },
 } as const
+// Creation tools (Mello, Scripts, Transcribe, Image Clone, Video Clone) are available on EVERY tier —
+// gated by CREDIT BALANCE, not a feature flag. No canClone/canMello flags. `welcomeCredits` = one-time
+// signup grant (Free only) so a new user can test ~1 image + 1 video before the 20/mo cap kicks in.
 ```
 
 ### 4.2 Enforcement points (server-side, never trust the client)
@@ -156,7 +173,7 @@ export const PLANS = {
 | Add a brand to Brand Spy | `count(active spied brands) < plan.brandSpy` else 402/upsell |
 | Open Patterns / AI Insights | `plan.aiInsights === true` |
 | Launch Ads / create campaign | `plan.launch` / `plan.campaigns` |
-| Any credit action (script, clone, Mello, transcribe) | balance ≥ cost (reserve/commit/refund); `plan.canClone` for Image/Video Clone |
+| Any credit action (Mello, script, transcribe, image/video clone) | balance ≥ cost (reserve/commit/refund). **Available on ALL tiers** — no feature flag, credit-gated only |
 | Invite a teammate | `count(members) < plan.seats` |
 | API / MCP request | `plan.api === true` (check on the API key's org) |
 | Buy top-up | `plan.canBuyCredits === true` |
@@ -293,9 +310,10 @@ mispriced action. No account should ever be underwater given the caps above, but
 ## Summary of the decisions locked in this spec
 - **Tiers:** Free $0 · Starter $39 · Pro $99 (Most Popular) · Business $249 · Enterprise custom. Annual = 25% off.
 - **Credit buckets:** plan credits **reset monthly, do NOT roll over**; **top-up credits roll over (12-month expiry)**; spend **plan-first**.
-- **Monthly credits:** 20 / 150 / 500 / 2,000 / custom.
+- **Monthly credits:** 20 / 150 / 500 / 2,000 / custom. **Free gets a one-time 60-credit welcome bonus** (rollover) to test creation.
 - **Top-up packs:** 250/$19 · 750/$49 · 2,000/$119, priced above in-plan value to nudge upgrades.
-- **Image Clone:** Nano Banana **Pro**, **default 2K (15 cr / $0.134)**; 1K = 10 cr, 4K/HD = 25 cr (opt-in). Never batch/3rd-party for interactive clones.
-- **Upgrade triggers:** AI Insights (Pro+), Launch (Pro+), Campaigns (Business+), brand-spy count, credits, seats, API/MCP.
+- **Creation = credit-gated on ALL tiers (PLG):** Mello, Scripts, Transcribe, Image Clone, Video Clone available everywhere incl. Free — the credit cap is the throttle, not a feature flag.
+- **Image Clone:** Nano Banana **Pro only** (no standard-1K), **default 2K (15 cr / $0.134)**, 4K/HD = 25 cr. **Video Clone = 40 cr** (verify vs video model cost). Never batch/3rd-party for interactive clones.
+- **Upgrade triggers (the paid unlocks):** brand-spy count · AI Insights (Pro+) · Launch (Pro+) · Campaigns/Scale/Reports (Business+) · seats · API/MCP · bigger credit pool.
 - **Trial:** 7-day, all paid tiers. **Enforcement:** server-side, structured upsell responses.
-- **Margins verified:** 89–96% on plans worst-case, 5–8× on top-ups. No loss scenario.
+- **Margins verified:** 89–96% on plans worst-case, 5–8× on top-ups. Free CAC per signup capped by the one-time bonus (~1 image + 1 video ≈ $0.60–1.20). No loss scenario.
