@@ -65,3 +65,37 @@ export async function classifyInspiration(
     }
   } catch { return null }
 }
+
+/**
+ * Infer the coarse niche of a product from its photo — so the Ad Studio can pull the right industry
+ * insights + inspiration references WITHOUT the user ever setting an industry. Constrained to the
+ * niche vocabulary we actually filter on (falls back to null → global insights).
+ */
+export async function inferNiche(
+  image: { mimeType: string; dataB64: string },
+  nicheVocab: string[]
+): Promise<string | null> {
+  if (!KEY || !nicheVocab.length) return null
+  const prompt = [
+    'Look at this product photo and pick the SINGLE best-matching industry/niche for it.',
+    `Choose the exact string from this list, or "none" if truly nothing fits: ${JSON.stringify(nicheVocab)}.`,
+    'Return ONLY JSON: {"niche": "<exact list value or none>"}.',
+  ].join('\n')
+  try {
+    const r = await fetch(`${BASE}/${MODEL}:generateContent?key=${KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: image.mimeType, data: image.dataB64 } }] }],
+        generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+      }),
+    })
+    if (!r.ok) return null
+    const j = await r.json()
+    const txt = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('')
+    const niche = JSON.parse(txt || '{}')?.niche
+    if (typeof niche !== 'string' || !niche.trim() || niche.toLowerCase() === 'none') return null
+    // Only accept an exact vocab match (case-insensitive) so retrieval keys line up.
+    return nicheVocab.find((n) => n.toLowerCase() === niche.trim().toLowerCase()) || null
+  } catch { return null }
+}

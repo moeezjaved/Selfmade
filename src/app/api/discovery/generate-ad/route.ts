@@ -12,6 +12,7 @@ import { generateImage, buildStudioPrompt, geminiEnabled } from '@/lib/gemini/im
 import { saveGeneration } from '@/lib/creatives'
 import { resolveBrandNiche, getNicheInsights } from '@/lib/studio/insights'
 import { pickInspirations } from '@/lib/studio/inspiration'
+import { inferNiche } from '@/lib/gemini/vision'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -78,7 +79,25 @@ async function handle(req: NextRequest) {
     if (!kitFonts && body.fonts && typeof body.fonts === 'object') kitFonts = body.fonts
     if (!logoUrl && typeof body.logo === 'string' && body.logo.trim()) logoUrl = body.logo.trim()
 
-    const niche = await resolveBrandNiche(admin, industries)
+    // Product photos → base64 (cap 3 to leave room for up to 4 inspirations + logo). Done first so
+    // we can auto-detect the niche from the product when the brand has no industry set.
+    const products = (await Promise.all(rawProducts.slice(0, 3).map(async (src) => {
+      const m = /^data:([^;]+);base64,([\s\S]*)$/i.exec(src)
+      if (m) return { mimeType: m[1] || productMimeType || 'image/png', dataB64: m[2] }
+      if (/^https?:\/\//i.test(src)) return await fetchImageB64(src)
+      return { mimeType: productMimeType || 'image/png', dataB64: src.replace(/^data:[^;]+;base64,/, '') }
+    }))).filter(Boolean) as { mimeType: string; dataB64: string }[]
+    if (products.length === 0) { await refund(); return NextResponse.json({ error: 'could not load product image(s)' }, { status: 502 }) }
+
+    // Niche: brand.industry → niche_map. If none, DETECT it from the product photo (no user input),
+    // and persist so it's instant next time.
+    let niche = await resolveBrandNiche(admin, industries)
+    if (!niche) {
+      const { data: nc } = await admin.from('niche_counts').select('niche').limit(100)
+      const vocab = (nc || []).map((r: any) => r.niche).filter(Boolean)
+      niche = await inferNiche(products[0], vocab).catch(() => null)
+      if (niche && brandId) admin.from('brands').update({ industry: [niche] }).eq('id', String(brandId)).then(() => {}, () => {})
+    }
     const insights = await getNicheInsights(admin, niche)
 
     // Aspect: Studio has no source ad, so 'original'/none → let the prompt default (4:5).
@@ -88,15 +107,6 @@ async function handle(req: NextRequest) {
     const inspirations = await pickInspirations(admin, { niche, aspect: resolvedAspect, limit: 4 })
     const inspImgs = (await Promise.all(inspirations.map((i) => fetchImageB64(i.r2_url)))).filter(Boolean) as { mimeType: string; dataB64: string }[]
     const styleTags = Array.from(new Set(inspirations.flatMap((i) => i.style_tags || []))).slice(0, 6)
-
-    // Product photos → base64 (cap 3 to leave room for up to 4 inspirations + logo).
-    const products = (await Promise.all(rawProducts.slice(0, 3).map(async (src) => {
-      const m = /^data:([^;]+);base64,([\s\S]*)$/i.exec(src)
-      if (m) return { mimeType: m[1] || productMimeType || 'image/png', dataB64: m[2] }
-      if (/^https?:\/\//i.test(src)) return await fetchImageB64(src)
-      return { mimeType: productMimeType || 'image/png', dataB64: src.replace(/^data:[^;]+;base64,/, '') }
-    }))).filter(Boolean) as { mimeType: string; dataB64: string }[]
-    if (products.length === 0) { await refund(); return NextResponse.json({ error: 'could not load product image(s)' }, { status: 502 }) }
 
     const logoImg = logoUrl ? await fetchImageB64(logoUrl) : null
 
