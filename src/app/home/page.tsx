@@ -460,22 +460,75 @@ export default function HomeLanding() {
           ['Is my data private?', 'Your brands, products, and creatives are yours alone and never shared.']].map(([q, a]) => <FAQItem key={q} q={q} a={a} />)}
       </section>
 
-      {/* FOOTER */}
-      <footer style={{ background: INK, color: '#fff', padding: '52px 0 34px' }}>
-        <div style={{ ...wrap, display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) repeat(3,minmax(0,1fr))', gap: 28 }}>
-          <div>
-            <LogoMark color="#fff" height={28} />
-            <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 14, lineHeight: 1.6, maxWidth: 280, marginTop: 12 }}>Find winning ads, make them yours, and launch — the whole ad workflow in one place.</p>
-          </div>
-          {[['Product', ['Discovery', 'Brand Spy', 'Trending', 'AI Ad Studio', 'Launch Ads']], ['Company', ['About', 'Blog', 'Careers', 'Contact']], ['Legal', ['Privacy', 'Terms', 'Security']]].map(([h, items]) => (
-            <div key={h as string}>
-              <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>{h as string}</div>
-              {(items as string[]).map(it => <a key={it} href="#" style={{ display: 'block', color: 'rgba(255,255,255,.75)', fontSize: 14, textDecoration: 'none', padding: '4px 0' }}>{it}</a>)}
-            </div>
-          ))}
-        </div>
-        <div style={{ ...wrap, borderTop: '1px solid rgba(255,255,255,.1)', marginTop: 34, paddingTop: 18, fontSize: 13, color: 'rgba(255,255,255,.5)' }}>© {new Date().getFullYear()} Selfmade. All rights reserved.</div>
-      </footer>
+      {/* FOOTER — Atria-style programmatic-SEO link farm */}
+      <SeoFooter />
     </div>
+  )
+}
+
+const slug = (s: string) => s.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+
+function FootCol({ title, links }: { title: string; links: { label: string; href: string }[] }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#111', marginBottom: 12 }}>{title}</div>
+      <div style={{ display: 'grid', gap: 2 }}>
+        {links.map(l => <a key={l.label} href={l.href} className="navlink" style={{ color: '#6b7280', fontSize: 13.5, textDecoration: 'none', padding: '3px 0' }}>{l.label}</a>)}
+      </div>
+    </div>
+  )
+}
+
+function SeoFooter() {
+  const alternatives = ['Atria', 'Foreplay', 'Motion', 'GetHookd', 'AdCreative.ai', 'Minea', 'BigSpy', 'PiPiADS', 'Dropispy', 'AdSpy', 'PowerAdSpy', 'Meta Ad Library']
+  const industries = ['Skincare', 'Supplements', 'Beauty', 'Apparel', 'Fitness', 'Health & Wellness', 'Hair Care', 'Pets', 'Home Goods', 'Food & Beverage', 'Jewelry', 'Baby & Kids', 'Personal Care', 'Cosmetics', 'Fragrance', 'Footwear', 'Accessories', 'Electronics']
+  const formats = ['Demo', 'Testimonial', 'Listicle', 'UGC', 'Before & After', 'Split Screen', 'Unboxing', 'Founder Story', 'Comparison', 'Problem–Solution', 'Statistic', 'Offer & Promo']
+  const cta: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: INK, padding: '11px 20px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }
+  return (
+    <footer style={{ marginTop: 40 }}>
+      {/* top: brand + product/company + start CTA (white) */}
+      <div style={{ background: '#fbfdfa', borderTop: '1px solid #eef0ee' }}>
+        <div style={{ ...wrap, padding: '52px 24px 40px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.6fr) repeat(2,minmax(0,1fr)) minmax(0,1.2fr)', gap: 28 }}>
+            <div>
+              <LogoMark color="#000" height={26} />
+              <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.6, maxWidth: 280, marginTop: 12 }}>Find winning ads, make them yours, and launch — the whole ad workflow in one place.</p>
+            </div>
+            <FootCol title="Product" links={[['Discovery', '/discovery'], ['Brand Spy', '/discovery/brand-spy'], ['Trending', '/trending'], ['AI Ad Studio', '/creative-studio'], ['Launch Ads', '/m4'], ['Pricing', '#pricing']].map(([label, href]) => ({ label, href }))} />
+            <FootCol title="Company" links={[['About', '/about'], ['Blog', '/blog'], ['Careers', '/careers'], ['Contact', '/contact'], ['Privacy', '/privacy'], ['Terms', '/terms']].map(([label, href]) => ({ label, href }))} />
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#111', marginBottom: 8 }}>Start free today</div>
+              <p style={{ color: '#6b7280', fontSize: 13.5, margin: '0 0 12px', maxWidth: 260 }}>50 credits, no card. Find a winner and make it yours.</p>
+              <Link href="/signup" className="btn arrowp" style={cta}>Start for free <Arrow /></Link>
+            </div>
+          </div>
+
+          {/* SEO grids */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32, marginTop: 44, paddingTop: 36, borderTop: '1px solid #eef0ee' }}>
+            <FootCol title="Selfmade alternatives" links={alternatives.map(a => ({ label: `${a} Alternative`, href: `/alternatives/${slug(a)}` }))} />
+            <FootCol title="Winning Meta ads by industry" links={industries.map(i => ({ label: `${i} Ads`, href: `/ads/${slug(i)}` }))} />
+            <FootCol title="Winning ad formats" links={formats.map(f => ({ label: `${f} Ads`, href: `/ads/format/${slug(f)}` }))} />
+          </div>
+        </div>
+      </div>
+
+      {/* black band: legal + giant wordmark */}
+      <div style={{ background: INK, color: '#fff' }}>
+        <div style={{ ...wrap, padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <a href="#" aria-label="LinkedIn" className="navlink" style={{ color: '#fff', display: 'inline-flex' }}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM10 9h3.8v1.7h.05c.53-1 1.83-2.05 3.77-2.05C21.4 8.65 22 11 22 14.2V21h-4v-6c0-1.43-.03-3.27-2-3.27-2 0-2.3 1.56-2.3 3.17V21h-4z" /></svg></a>
+            <a href="#" aria-label="X" className="navlink" style={{ color: '#fff', display: 'inline-flex' }}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7 8 8.2 12h-6.4l-5-7.3L6 22H2.9l7.5-8.6L2.5 2h6.6l4.5 6.7L18.9 2zm-1.1 18h1.7L7.3 3.8H5.5z" /></svg></a>
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,.6)' }}>Selfmade, Inc. © {new Date().getFullYear()} All rights reserved.</p>
+          <div style={{ display: 'flex', gap: 22 }}>
+            <a href="/privacy" className="navlink" style={{ color: 'rgba(255,255,255,.75)', fontSize: 13, textDecoration: 'none' }}>Privacy</a>
+            <a href="/terms" className="navlink" style={{ color: 'rgba(255,255,255,.75)', fontSize: 13, textDecoration: 'none' }}>Terms</a>
+          </div>
+        </div>
+        <div style={{ overflow: 'hidden', padding: '0 24px 20px' }}>
+          <LogoMark color="rgba(255,255,255,.12)" height={110} />
+        </div>
+      </div>
+    </footer>
   )
 }
