@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import PricingSection from '@/components/pricing/PricingSection'
 
 export default function LandingPage() {
   return (
@@ -192,25 +193,12 @@ export default function LandingPage() {
       <section id="pricing" style={{ padding: '100px 48px', textAlign: 'center', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(168,230,61,0.3)', borderRadius: 100, padding: '6px 18px', fontSize: 12, fontWeight: 800, color: '#dffe95', marginBottom: 16 }}>PRICING</div>
         <h2 style={{ fontSize: 50, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 12 }}>
-          One plan.<br />
-          <span style={{ color: '#3a7000', fontStyle: 'italic' }}>Everything included.</span>
+          Plans for<br />
+          <span style={{ color: '#3a7000', fontStyle: 'italic' }}>every stage.</span>
         </h2>
-        <p style={{ fontSize: 17, color: '#666', marginBottom: 48 }}>No agency. No contracts. Cancel anytime.</p>
+        <p style={{ fontSize: 17, color: '#666', marginBottom: 48 }}>Start free. Scale as you grow. Cancel anytime.</p>
 
-        <div style={{ background: 'rgba(255,255,255,0.8)', border: '1.5px solid rgba(125,214,0,0.4)', borderRadius: 32, padding: 48, maxWidth: 460, margin: '0 auto', boxShadow: '0 24px 80px rgba(125,214,0,0.12), 0 4px 20px rgba(0,0,0,0.06)', backdropFilter: 'blur(16px)' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#3a7000', letterSpacing: '.1em', marginBottom: 8 }}>SELFMADE PRO</div>
-          <div style={{ fontSize: 60, fontWeight: 900, letterSpacing: '-0.04em', color: '#0a0a0a', lineHeight: 1 }}>$49<span style={{ fontSize: 18, fontWeight: 500, color: '#999' }}>/mo</span></div>
-          <div style={{ fontSize: 13, color: '#aaa', marginBottom: 28 }}>7-day free trial · Cancel anytime</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28, textAlign: 'left' }}>
-            {['Live KPI Dashboard', 'AI Recommendations', 'Approval-First AI', 'Launch Ads (M4 Method)', 'Scale & Insights', 'Creative Studio', 'Deep Reports', 'Multiple Accounts', 'Activity Log'].map(f => (
-              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#333' }}>
-                <span style={{ background: '#dffe95', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, flexShrink: 0, color: '#10211f' }}>✓</span>
-                {f}
-              </div>
-            ))}
-          </div>
-          <Link href="/signup" style={{ display: 'block', background: '#dffe95', color: '#10211f', padding: '15px 32px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', textAlign: 'center',  }}>Start Free Trial →</Link>
-        </div>
+        <PricingSection variant="landing" />
       </section>
 
       {/* FAQ */}
