@@ -10,13 +10,17 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const admin = createAdminClient()
   const userId = params.id
 
-  const [authRes, profileRes, campaignsRes, draftsRes, scaleRes, errorsRes] = await Promise.all([
+  const [authRes, profileRes, campaignsRes, draftsRes, scaleRes, errorsRes, followsRes, creativesRes, brandsRes] = await Promise.all([
     admin.auth.admin.getUserById(userId),
     admin.from('user_profiles').select('*').eq('user_id', userId).single(),
     admin.from('campaigns').select('id, name, status, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
     admin.from('campaign_drafts').select('id, created_at').eq('user_id', userId).limit(1),
     admin.from('activity_logs').select('id').eq('user_id', userId).ilike('action_type', '%scale%').limit(1),
     admin.from('error_logs').select('id, error_message, page_url, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(20),
+    // Brands this user follows (spy/alerts) + their AI creatives.
+    admin.from('followed_brands').select('page_id, brand_name, email_alerts, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
+    admin.from('creative_generations').select('id, type, tier, media_type, status, prompt, image_url, brand_id, source_ad_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(60),
+    admin.from('brands').select('id, name').eq('user_id', userId),
   ])
 
   const authUser = authRes.data?.user
@@ -26,6 +30,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const launched = campaigns.some((c: any) => c.status === 'ACTIVE' || c.status === 'PAUSED')
   const adPlanClicked = (draftsRes.data?.length || 0) > 0
   const scaleClicked = (scaleRes.data?.length || 0) > 0
+
+  // Map brand_id → name so each creative shows which brand it belongs to.
+  const brandNames = new Map<string, string>((brandsRes.data || []).map((b: any) => [b.id, b.name]))
+  const creatives = (creativesRes.data || []).map((c: any) => ({
+    ...c,
+    brand_name: c.brand_id ? brandNames.get(c.brand_id) || null : null,
+  }))
+  const follows = followsRes.data || []
 
   return NextResponse.json({
     id: userId,
@@ -45,6 +57,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     campaigns_count: campaigns.length,
     campaigns,
     errors: errorsRes.data || [],
+    follows,
+    creatives,
   })
 }
 

@@ -10,6 +10,8 @@ interface UserDetail {
   campaigns_count: number;
   campaigns: { id: string; name: string; status: string; created_at: string }[];
   errors: { id: string; error_message: string; page_url: string | null; created_at: string }[];
+  follows: { page_id: string; brand_name: string | null; email_alerts: boolean; created_at: string }[];
+  creatives: { id: string; type: string; tier: string; media_type: string | null; status: string | null; prompt: string | null; image_url: string | null; brand_name: string | null; source_ad_id: string | null; created_at: string }[];
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -168,6 +170,46 @@ export default function UserProfile({ params }: { params: { id: string } }) {
               ))}
             </tbody>
           </table>
+        </Section>
+      )}
+
+      {/* Followed Brands */}
+      {user.follows.length > 0 && (
+        <Section title={`Following Brands (${user.follows.length})`}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {user.follows.map(f => (
+              <div key={f.page_id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: '#f7f9f7', border: '1px solid #e5e9e5', borderRadius: '20px', fontSize: '13px', color: '#222' }}>
+                <span style={{ fontWeight: 600 }}>{f.brand_name || f.page_id}</span>
+                {f.email_alerts && <span title="Daily email alerts on" style={{ fontSize: '11px' }}>📧</span>}
+                <span style={{ fontSize: '11px', color: '#aaa' }}>{fmt(f.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Creatives */}
+      {user.creatives.length > 0 && (
+        <Section title={`AI Creatives (${user.creatives.length})`}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
+            {user.creatives.map(c => (
+              <a key={c.id} href={c.image_url || '#'} target="_blank" rel="noreferrer"
+                style={{ display: 'block', textDecoration: 'none', border: '1px solid #eee', borderRadius: '10px', overflow: 'hidden', background: '#fafafa' }}>
+                <div style={{ position: 'relative', aspectRatio: '1', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {c.media_type === 'video'
+                    ? <video src={c.image_url || ''} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    // eslint-disable-next-line @next/next/no-img-element
+                    : c.image_url ? <img src={c.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <span style={{ color: c.status === 'processing' ? '#dffe95' : '#666', fontSize: '11px' }}>{c.status === 'processing' ? '⏳ processing' : 'no image'}</span>}
+                  <span style={{ position: 'absolute', top: 5, left: 5, background: 'rgba(0,0,0,.65)', color: '#fff', borderRadius: 5, fontSize: 9, fontWeight: 700, padding: '2px 5px', textTransform: 'capitalize' }}>{c.type}</span>
+                </div>
+                <div style={{ padding: '7px 8px' }}>
+                  <div style={{ fontSize: 11.5, color: '#333', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.brand_name || c.prompt || 'Untitled'}</div>
+                  <div style={{ fontSize: 10, color: '#aaa', marginTop: 2 }}>{fmt(c.created_at)}</div>
+                </div>
+              </a>
+            ))}
+          </div>
         </Section>
       )}
 
