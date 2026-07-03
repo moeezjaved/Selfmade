@@ -194,17 +194,17 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                 placeholder="Tweak this creative — headline, subhead, colors, scene, background…" style={{ ...input, resize: 'vertical' }} />
               {err && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{err}</div>}
               <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · {editCost} cr</button>
-              {/* Animate → Veo video (async; lands back in the gallery). User picks 1080p or 4K. */}
+              {/* Animate → short motion MP4 (droplet FFmpeg; keeps the ad exact). 1080p 15 / 4K 25. */}
               <div style={{ borderTop: '1px solid #eef2ec', paddingTop: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>🎬 Animate to video · {vidRes === '4K' ? 240 : 100} cr</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>🎬 Animate · {vidRes === '4K' ? 25 : 15} cr</div>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                   {(['1080p', '4K'] as const).map((rz) => (
                     <button key={rz} onClick={() => setVidRes(rz)} style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: `1px solid ${vidRes === rz ? DARK : '#cbd5cb'}`, background: vidRes === rz ? '#eef5eb' : '#fff', color: DARK, fontWeight: 700, fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit' }}>{rz}{rz === '4K' ? ' HD' : ''}</button>
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {(['subtle', 'hero', 'lifestyle'] as const).map((s) => (
-                    <button key={s} onClick={() => animate(s, vidRes)} disabled={busy} style={{ ...btnGhost, flex: 1, justifyContent: 'center', fontSize: 11.5, textTransform: 'capitalize', padding: '8px 4px' }}>{s}</button>
+                  {([['zoom', 'Slow zoom'], ['shine', 'Shine sweep']] as const).map(([s, label]) => (
+                    <button key={s} onClick={() => animate(s, vidRes)} disabled={busy} style={{ ...btnGhost, flex: 1, justifyContent: 'center', fontSize: 11.5, padding: '8px 4px' }}>{label}</button>
                   ))}
                 </div>
               </div>
