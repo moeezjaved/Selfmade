@@ -91,6 +91,8 @@ export const ACTION_COSTS: Record<string, number> = {
   ask_mello: 1,
   image_clone_pro: 15,      // 2K Nano Banana Pro — DEFAULT ad clone
   image_clone_4k: 25,       // 4K / HD download
+  image_studio_pro: 15,     // 2K AI Ad Studio — original ad from inspiration + industry insights
+  image_studio_4k: 25,      // 4K / HD Studio ad
   image_edit_pro: 10,       // iterative edit (one 2K Pro image)
   video_clone: 40,          // short AI video clip
 }
