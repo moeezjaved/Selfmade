@@ -19,32 +19,40 @@ function adImg(url: string, w = 400): string {
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${w}&q=72&output=webp`
 }
 
-/** Reveal-on-scroll, FAIL-SAFE: if IntersectionObserver is missing or hasn't fired within a grace
- * window, content shows anyway — it can never get stuck invisible (avoids the "empty gap" bug). */
+/**
+ * Reveal-on-scroll that CANNOT get stuck invisible. Default (server render + no-JS) = VISIBLE.
+ * After mount, JS only *arms* (hides) elements that are still below the fold, then reveals them on
+ * scroll. Above-the-fold elements are never hidden (no flash). If JS never runs, everything shows.
+ *   returns `hidden` (true only while armed & awaiting scroll).
+ */
 function useReveal(threshold: number) {
   const ref = useRef<any>(null)
-  const [seen, setSeen] = useState(false)
+  const [state, setState] = useState<'shown' | 'armed'>('shown')
   useEffect(() => {
     const el = ref.current
-    if (!el || typeof IntersectionObserver === 'undefined') { setSeen(true); return }
-    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setSeen(true); o.disconnect() } }, { threshold, rootMargin: '0px 0px -8% 0px' })
+    if (!el || typeof IntersectionObserver === 'undefined') return   // stay shown
+    const rect = el.getBoundingClientRect()
+    const inView = rect.top < window.innerHeight * 0.9 && rect.bottom > 0
+    if (inView) return   // already visible → don't hide it (no flash)
+    setState('armed')    // below fold → hide, then animate in on scroll
+    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setState('shown'); o.disconnect() } }, { threshold, rootMargin: '0px 0px -8% 0px' })
     o.observe(el)
-    const t = setTimeout(() => setSeen(true), 2500)   // safety net
+    const t = setTimeout(() => setState('shown'), 3000)   // belt-and-suspenders
     return () => { o.disconnect(); clearTimeout(t) }
   }, [threshold])
-  return { ref, seen }
+  return { ref, hidden: state === 'armed' }
 }
 
-/** Fade-rise on scroll into view (0.6s ease-out). */
+/** Fade-rise on scroll into view (0.6s ease-out). Visible by default; animates from below when armed. */
 function Reveal({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
-  const { ref, seen } = useReveal(0.12)
-  return <div ref={ref} style={{ opacity: seen ? 1 : 0, transform: seen ? 'none' : 'translateY(32px)', transition: `opacity .6s cubic-bezier(0,0,.2,1) ${delay}ms, transform .6s cubic-bezier(0,0,.2,1) ${delay}ms`, ...style }}>{children}</div>
+  const { ref, hidden } = useReveal(0.12)
+  return <div ref={ref} style={{ opacity: hidden ? 0 : 1, transform: hidden ? 'translateY(32px)' : 'none', transition: `opacity .6s cubic-bezier(0,0,.2,1) ${delay}ms, transform .6s cubic-bezier(0,0,.2,1) ${delay}ms`, ...style }}>{children}</div>
 }
 
-/** Masked headline reveal — content slides up from below a clip. */
+/** Masked headline reveal — content slides up from below a clip. Visible by default. */
 function Mask({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
-  const { ref, seen } = useReveal(0.3)
-  return <span ref={ref} className={`mask${seen ? ' in' : ''}`} style={style}><span style={{ transitionDelay: `${delay}ms` }}>{children}</span></span>
+  const { ref, hidden } = useReveal(0.3)
+  return <span ref={ref} className={`mask${hidden ? '' : ' in'}`} style={style}><span style={{ transitionDelay: `${delay}ms` }}>{children}</span></span>
 }
 const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: INK, padding: '13px 24px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', border: 'none', cursor: 'pointer' }
 const btnDark: React.CSSProperties = { ...btnPrimary, background: INK, color: '#fff' }
