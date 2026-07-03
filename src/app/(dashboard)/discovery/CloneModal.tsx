@@ -220,8 +220,8 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     return h.slice(0, -1)
   })
 
-  const cost = tier === 'pro' ? 10 : 5
-  const editCost = tier === 'pro' ? 4 : 2
+  const cost = 20        // Pro clone (Nano Banana Pro @ 2K) — matches credit_pricing image_clone_pro
+  const editCost = 12    // Pro edit — matches image_edit_pro
   const hasResults = results.length > 0
 
   if (!mounted) return null
