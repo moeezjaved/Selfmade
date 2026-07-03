@@ -33,7 +33,7 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ['IMAGE'] } }),
     })
-    if (!r.ok) return { ok: false, error: `gemini ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}` }
+    if (!r.ok) return { ok: false, error: `gemini ${r.status} [${modelFor(tier)}]: ${(await r.text().catch(() => '')).slice(0, 240)}` }
     const j = await r.json()
     const out = (j?.candidates?.[0]?.content?.parts || []).find((p: any) => p.inline_data || p.inlineData)
     const inline = out?.inline_data || out?.inlineData
