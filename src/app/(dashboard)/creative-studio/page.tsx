@@ -21,7 +21,7 @@ const input: React.CSSProperties = { width: '100%', padding: '9px 11px', border:
 
 type Gen = { id: string; image_url: string; type: string; tier: string; prompt?: string | null; brand_name?: string | null; source_ad_id?: string | null; created_at: string }
 type Product = { id: string; name?: string | null; image_urls?: string[] }
-type BrandKit = { colors?: string[]; fonts?: { heading?: string | null; body?: string | null }; logo?: string | null }
+type BrandKit = { colors?: string[]; extraColors?: string[]; palette?: Record<string, string>; fonts?: { heading?: string | null; body?: string | null; headingWeight?: string | null; bodyWeight?: string | null }; logo?: string | null }
 type Brand = { id: string; name: string; website?: string | null; tone?: string | null; usps?: string[]; products?: Product[]; brand_kit?: BrandKit }
 
 export default function MyCreativesPage() {
@@ -222,9 +222,12 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
   const [website, setWebsite] = useState(brand.website || '')
   const [tone, setTone] = useState(brand.tone || '')
   const [usps, setUsps] = useState((brand.usps || []).join(', '))
-  const [colors, setColors] = useState((brand.brand_kit?.colors || []).join(', '))
+  const [palette, setPalette] = useState<Record<string, string>>({ ...(brand.brand_kit?.palette || {}) })
+  const [extra, setExtra] = useState<string[]>(brand.brand_kit?.extraColors || [])
   const [hFont, setHFont] = useState(brand.brand_kit?.fonts?.heading || '')
+  const [hWeight, setHWeight] = useState(brand.brand_kit?.fonts?.headingWeight || '700')
   const [bFont, setBFont] = useState(brand.brand_kit?.fonts?.body || '')
+  const [bWeight, setBWeight] = useState(brand.brand_kit?.fonts?.bodyWeight || '400')
   const [logo, setLogo] = useState(brand.brand_kit?.logo || '')
   const [photos, setPhotos] = useState<string[]>((brand.products || []).flatMap((p) => p.image_urls || []))
   const [busy, setBusy] = useState(false)
@@ -232,14 +235,17 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
   const [detectSite, setDetectSite] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const colorList = colors.split(',').map((s) => s.trim()).filter(Boolean)
+  const flatColors = Array.from(new Set([...Object.values(palette).filter(Boolean), ...extra]))
   const save = async () => {
     setBusy(true)
     await fetch(`/api/brands/${brand.id}`, {
       method: 'PATCH', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         name, website, tone, usps: usps.split(',').map((s) => s.trim()).filter(Boolean),
-        brand_kit: { colors: colorList, fonts: { heading: hFont || null, body: bFont || null }, logo: logo || null },
+        brand_kit: {
+          palette, extraColors: extra, colors: flatColors, logo: logo || null,
+          fonts: { heading: hFont || null, headingWeight: hWeight, body: bFont || null, bodyWeight: bWeight },
+        },
       }),
     })
     setBusy(false); onSaved()
@@ -266,7 +272,7 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
       const j = await r.json()
       // Fill the WHOLE brand kit from the fresh crawl — colors, fonts, logo — not just photos, so an
       // empty/old brand gets its kit populated. Only overwrite empty fields (don't clobber edits).
-      if (Array.isArray(j.colors) && j.colors.length && !colors.trim()) setColors(j.colors.join(', '))
+      if (j.palette && Object.keys(palette).length === 0) setPalette(j.palette)
       if (j.fonts?.heading && !hFont.trim()) setHFont(j.fonts.heading)
       if (j.fonts?.body && !bFont.trim()) setBFont(j.fonts.body)
       if (j.logo && !logo.trim()) setLogo(j.logo)
@@ -288,20 +294,40 @@ function BrandModal({ brand, onClose, onSaved }: { brand: Brand; onClose: () => 
         <Field label="Voice / tone"><input value={tone} onChange={(e) => setTone(e.target.value)} placeholder="e.g. bold, playful, premium" style={input} /></Field>
         <Field label="USPs (comma-separated)"><input value={usps} onChange={(e) => setUsps(e.target.value)} placeholder="fast shipping, 30-day guarantee" style={input} /></Field>
 
-        {/* Brand Kit — colors + fonts, auto-detected from the site, used to keep every ad on-brand. */}
-        <Field label="Brand colors (comma-separated hex)">
-          <input value={colors} onChange={(e) => setColors(e.target.value)} placeholder="#1a3a1a, #dffe95" style={input} />
-          {colorList.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              {colorList.slice(0, 8).map((c, i) => (
-                <span key={i} title={c} style={{ width: 26, height: 26, borderRadius: 6, background: c, border: '1px solid #e2e8f0', display: 'inline-block' }} />
-              ))}
+        {/* Brand Kit — named color roles + typography, applied to every generated ad. */}
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#111', marginTop: 4 }}>🎨 Brand kit — colors</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {([['background', 'Background'], ['accent', 'Accent'], ['heading', 'Heading'], ['body', 'Body'], ['icon', 'Icon'], ['cta', 'CTA'], ['ctaText', 'CTA text']] as const).map(([key, label]) => (
+            <div key={key}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 4 }}>{label}</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input type="color" value={palette[key] || '#ffffff'} onChange={(e) => setPalette((p) => ({ ...p, [key]: e.target.value }))} style={{ width: 34, height: 34, border: '1px solid #e2e8f0', borderRadius: 8, padding: 0, cursor: 'pointer', flexShrink: 0 }} />
+                <input value={palette[key] || ''} onChange={(e) => setPalette((p) => ({ ...p, [key]: e.target.value }))} placeholder="#000000" style={{ ...input, flex: 1, fontSize: 12, padding: '7px 8px' }} />
+              </div>
             </div>
-          )}
+          ))}
+        </div>
+        <Field label="Extra colors">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            {extra.map((c, i) => (
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f5f8f2', borderRadius: 8, padding: '3px 6px', fontSize: 11 }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, background: c, border: '1px solid #e2e8f0' }} />{c}
+                <button onClick={() => setExtra((e) => e.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b91c1c', padding: 0 }}><X size={11} /></button>
+              </span>
+            ))}
+            <input type="color" onChange={(e) => setExtra((x) => Array.from(new Set([...x, e.target.value])))} style={{ width: 30, height: 30, border: '1px dashed #cbd5cb', borderRadius: 8, padding: 0, cursor: 'pointer' }} title="Add color" />
+          </div>
         </Field>
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#111', marginTop: 4 }}>Typography</div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <Field label="Heading font"><input value={hFont} onChange={(e) => setHFont(e.target.value)} placeholder="Plus Jakarta Sans" style={input} /></Field>
-          <Field label="Body font"><input value={bFont} onChange={(e) => setBFont(e.target.value)} placeholder="Open Sans" style={input} /></Field>
+          <Field label="Heading font">
+            <input value={hFont} onChange={(e) => setHFont(e.target.value)} placeholder="Plus Jakarta Sans" style={input} />
+            <select value={hWeight} onChange={(e) => setHWeight(e.target.value)} style={{ ...input, marginTop: 6 }}>{['300', '400', '500', '600', '700', '800', '900'].map((w) => <option key={w} value={w}>Weight {w}</option>)}</select>
+          </Field>
+          <Field label="Body font">
+            <input value={bFont} onChange={(e) => setBFont(e.target.value)} placeholder="Open Sans" style={input} />
+            <select value={bWeight} onChange={(e) => setBWeight(e.target.value)} style={{ ...input, marginTop: 6 }}>{['300', '400', '500', '600', '700'].map((w) => <option key={w} value={w}>Weight {w}</option>)}</select>
+          </Field>
         </div>
         <Field label="Logo URL (used as the brand mark in ads)">
           <input value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="https://…/logo.png" style={input} />
@@ -358,7 +384,7 @@ function AddBrandModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
       if (!r.ok) { setErr(j.error || 'Could not read that site.'); return }
       if (j.brandName && !name.trim()) setName(j.brandName)
       setImgs((j.images || []).slice(0, 12))
-      setKit({ colors: j.colors || [], fonts: j.fonts || {}, logo: j.logo || null })
+      setKit({ colors: j.colors || [], fonts: j.fonts || {}, logo: j.logo || null, palette: j.palette || {} } as any)
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setDetecting(false) }
   }
   const save = async () => {

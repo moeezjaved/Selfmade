@@ -82,21 +82,24 @@ async function handle(req: NextRequest) {
     // Pull the saved brand's kit (colors + fonts) so every ad stays on-brand, even if the caller
     // didn't pass colors explicitly.
     let kitColors: string[] | undefined = Array.isArray(colors) ? colors.slice(0, 4) : undefined
-    let kitFonts: { heading?: string | null; body?: string | null } | undefined
+    let kitFonts: any
+    let kitPalette: any
     let logoUrl: string | null = null
     if (brandId) {
       const { data: brand } = await admin.from('brands').select('brand_kit').eq('id', String(brandId)).maybeSingle()
       const kit = (brand as any)?.brand_kit || {}
       if (!kitColors?.length && Array.isArray(kit.colors)) kitColors = kit.colors.slice(0, 4)
       if (kit.fonts) kitFonts = kit.fonts
+      if (kit.palette) kitPalette = kit.palette
       if (kit.logo) logoUrl = kit.logo
     }
-    // Allow a logo passed directly (new-brand flow before it's saved).
+    // Allow a palette/logo passed directly (new-brand flow before it's saved).
+    if (!kitPalette && body.palette && typeof body.palette === 'object') kitPalette = body.palette
     if (!logoUrl && typeof body.logo === 'string' && body.logo.trim()) logoUrl = body.logo.trim()
     const logoImg = logoUrl ? await fetchImageB64(logoUrl) : null
 
     const prompt = buildClonePrompt({
-      brandName, colors: kitColors, newHeadline, aspectRatio, fonts: kitFonts, hasLogo: !!logoImg,
+      brandName, colors: kitColors, newHeadline, aspectRatio, fonts: kitFonts, palette: kitPalette, hasLogo: !!logoImg,
       dna: { hook_type: (ad as any).hook_type, format_style: (ad as any).format_style, angle: (ad as any).angle, emotion: (ad as any).emotion, cta: (ad as any).cta },
     })
     console.log(`clone-image [${useTier}] prompt:`, prompt)   // proof the prompt is sent each generation
