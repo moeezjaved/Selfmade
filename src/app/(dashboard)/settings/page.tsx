@@ -114,15 +114,15 @@ export default function SettingsPage() {
           <div style={{height:1,background:'#f1f5f9',margin:'4px 0'}} />
           <ToggleRow
             label="Instant email alerts"
-            hint="Email me (debounced) the moment a followed brand ships new ads."
+            hint="Email me the moment a followed brand ships new ads. Costs 2 credits per email."
             checked={prefs.instant_email}
             onChange={(v) => savePrefs({ ...prefs, instant_email: v })}
           />
           <div style={{height:1,background:'#f1f5f9',margin:'4px 0'}} />
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 0',gap:12}}>
             <div>
-              <div style={{fontSize:14,fontWeight:600,color:'#1a3a1a'}}>Weekly digest</div>
-              <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>A summary of what your followed brands + niche shipped.</div>
+              <div style={{fontSize:14,fontWeight:600,color:'#1a3a1a'}}>Email digest</div>
+              <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>What your followed brands shipped + brands to follow in your niche. Costs 2 credits per email.</div>
             </div>
             <select
               value={prefs.digest_frequency}
