@@ -588,6 +588,32 @@ function TimelineTab({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a
 
 const TABS = [['overview', 'Overview'], ['library', 'Ad Library'], ['hooks', 'Hooks'], ['personas', 'Personas'], ['angles', 'Ad angles'], ['usps', 'USPs'], ['desires', 'Desires'], ['emotions', 'Emotions'], ['themes', 'Themes'], ['tests', 'Creative Tests'], ['timeline', 'Timeline'], ['landing', 'Landing Pages']] as const
 
+// Per-brand email alerts — opt in right from the brand you're spying. Costs 2 credits per email.
+function EmailAlertToggle({ pageId, brandName }: { pageId: string; brandName?: string }) {
+  const [on, setOn] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    fetch('/api/follows').then(r => r.json()).then(j => {
+      const b = (j.brands || []).find((x: any) => String(x.page_id) === String(pageId))
+      setOn(!!b?.email_alerts)
+    }).catch(() => setOn(false))
+  }, [pageId])
+  const toggle = async () => {
+    if (on == null || busy) return
+    const next = !on
+    setBusy(true); setOn(next)
+    try {
+      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'set_email', pageId, brandName, email_alerts: next }) })
+    } catch { setOn(!next) } finally { setBusy(false) }
+  }
+  return (
+    <button onClick={toggle} title="Get emailed when this brand launches new ads (2 credits per email)"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 100, cursor: on == null ? 'default' : 'pointer', border: '1px solid', borderColor: on ? '#1a3a1a' : '#d1d5db', background: on ? '#1a3a1a' : '#fff', color: on ? '#dffe95' : '#374151', opacity: on == null ? 0.5 : 1 }}>
+      🔔 {on ? 'Email alerts on' : 'Email me new ads'} <span style={{ opacity: 0.7, fontWeight: 600 }}>· 2 cr</span>
+    </button>
+  )
+}
+
 export default function BrandSpyDetail() {
   const { pageId } = useParams<{ pageId: string }>()
   const [d, setD] = useState<Spy | null>(null)
@@ -631,7 +657,10 @@ export default function BrandSpyDetail() {
           <button onClick={() => setTab('library')} style={{ fontSize: 13, fontWeight: 700, color: '#2075ff', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View all ads →</button>
         </div>
       </div>
-      <h1 style={{ fontSize: 26, fontWeight: 800, color: '#111', margin: '4px 0 2px' }}>{d.brand.name}</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', margin: '4px 0 2px' }}>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#111', margin: 0 }}>{d.brand.name}</h1>
+        <EmailAlertToggle pageId={pageId} brandName={d.brand.name} />
+      </div>
       <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 18 }}>
         {s.firstSeen ? `Earliest ad ${new Date(s.firstSeen).toLocaleDateString()}` : 'Spying since first crawl'}
         {s.dataAsOf ? <span> · <span style={{ color: '#16a34a', fontWeight: 600 }}>data as of {new Date(s.dataAsOf).toLocaleString()}</span></span> : null}
