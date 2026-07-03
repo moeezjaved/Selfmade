@@ -81,7 +81,8 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
   }
 
   return (
-    <main style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 20px 64px', fontFamily: 'system-ui, sans-serif', color: '#111' }}>
+    <div style={{ background: '#ffffff', minHeight: '100vh' }}>
+    <main style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 20px 64px', fontFamily: 'inherit', color: '#1a3a1a' }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {/* Breadcrumb / nav */}
@@ -139,7 +140,7 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
             moment {name} launches a new ad. Free to start.
           </p>
           <Link href={`/login?next=/discovery/brand-spy/${ref.pageId}`}
-            style={{ display: 'inline-block', background: '#111', color: '#fff', fontWeight: 700, fontSize: 15, padding: '12px 28px', borderRadius: 10, textDecoration: 'none' }}>
+            style={{ display: 'inline-block', background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 15, padding: '13px 30px', borderRadius: 100, textDecoration: 'none' }}>
             Unlock {name}'s ads — free →
           </Link>
         </div>
@@ -171,6 +172,7 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
         </p>
       </section>
     </main>
+    </div>
   )
 }
 
