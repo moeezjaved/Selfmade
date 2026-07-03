@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
   const niche = (req.nextUrl.searchParams.get('niche') || '').trim()
   const pageId = (req.nextUrl.searchParams.get('pageId') || '').trim()
+  const format = (req.nextUrl.searchParams.get('format') || '').trim()
   const limit = Math.min(parseInt(req.nextUrl.searchParams.get('limit') || '48'), 96)
 
   // Candidate pool: top performers with a creative, scoped by niche. Ordered by performance_score
@@ -29,6 +30,7 @@ export async function GET(req: NextRequest) {
     .limit(Math.max(limit * 3, 120))
   if (niche) q = q.eq('niche', niche)
   if (pageId) q = q.eq('page_id', pageId)
+  if (format) q = q.eq('format_style', format)
   const { data: rows, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
