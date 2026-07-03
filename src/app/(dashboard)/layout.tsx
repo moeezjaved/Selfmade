@@ -12,7 +12,7 @@ import type { UserProfile } from '@/types'
 import {
   LayoutDashboard, Megaphone, Sparkles, TrendingUp,
   ClipboardList, Settings, CreditCard, BarChart2,
-  Rocket, LogOut, Compass, Bookmark, Heart, Star, Store, Radar, Wand2,
+  Rocket, LogOut, Compass, Bookmark, Heart, Star, Store, Radar, Wand2, Flame,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,7 +22,7 @@ const NAV = [
     items: [
       { href: '/discovery',            icon: Compass,   label: 'Discovery',     badge: 'NEW' },
       { href: '/discovery/brand-spy',  icon: Radar,     label: 'Brand Spy',     badge: 'NEW' },
-      { href: '/patterns',             icon: BarChart2, label: 'Patterns',      badge: 'NEW' },
+      { href: '/trending',             icon: Flame,     label: 'Trending',      badge: 'NEW' },
       { href: '/discovery/top-picks',  icon: Star,      label: 'Top Picks',     badge: null },
       { href: '/discovery/saved',      icon: Bookmark,  label: 'Saved Ads',     badge: null },
       { href: '/discovery/following',  icon: Heart,     label: 'Following',      badge: null },
