@@ -45,6 +45,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [selected, setSelected] = useState<string[]>([])
 
   const [headline, setHeadline] = useState('')
+  const [aspect, setAspect] = useState<'original' | '1:1' | '4:5' | '9:16'>('original')
   const [tier, setTier] = useState<'default' | 'pro'>('default')
   const [emailDaily, setEmailDaily] = useState(true)
 
@@ -163,6 +164,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       const body = {
         adId: ad.id, productImages: chosen, tier, brandId: useBrandId || undefined,
         brandName: bName.trim() || undefined, colors, newHeadline: headline.trim() || undefined,
+        aspectRatio: aspect,
       }
       const settled = await Promise.all(Array.from({ length: count }, () =>
         fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
@@ -296,6 +298,16 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
             <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <Label>3 · Options</Label>
               <input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="New on-screen headline (optional)" style={input} />
+              <div style={{ fontSize: 11, color: '#8aa', marginTop: -4 }}>💡 Type your headline here for accurate on-image text — otherwise the model writes (and sometimes misspells) its own.</div>
+              {/* Aspect ratio */}
+              <div>
+                <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Aspect ratio</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {([['original', 'Original'], ['1:1', 'Square'], ['4:5', 'Feed 4:5'], ['9:16', 'Story']] as const).map(([v, label]) => (
+                    <button key={v} onClick={() => setAspect(v)} style={{ flex: 1, ...tierBtn(aspect === v), padding: '8px 0', fontSize: 11.5 }}>{label}</button>
+                  ))}
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setTier('default')} style={tierBtn(tier === 'default')}>Standard · 5 cr</button>
                 <button onClick={() => setTier('pro')} style={tierBtn(tier === 'pro')}>Pro · 10 cr</button>

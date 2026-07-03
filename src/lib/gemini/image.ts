@@ -24,14 +24,17 @@ export type GenResult = { ok: true; mimeType: string; dataB64: string } | { ok: 
  * Generate/edit an image from a text prompt + N reference images (e.g. [winning ad, product photo]).
  * Returns the first image part (base64). The caller uploads it to R2.
  */
-export async function generateImage(prompt: string, images: ImageInput[], tier: 'default' | 'pro' = 'default'): Promise<GenResult> {
+export async function generateImage(prompt: string, images: ImageInput[], tier: 'default' | 'pro' = 'default', opts?: { aspectRatio?: string }): Promise<GenResult> {
   if (!KEY) return { ok: false, error: 'GEMINI_API_KEY not set' }
   const parts: any[] = [{ text: prompt }, ...images.map((i) => ({ inline_data: { mime_type: i.mimeType, data: i.dataB64 } }))]
+  const generationConfig: any = { responseModalities: ['IMAGE'] }
+  // gemini image models accept imageConfig.aspectRatio (e.g. "1:1", "4:5", "9:16"). Omit for "original".
+  if (opts?.aspectRatio && opts.aspectRatio !== 'original') generationConfig.imageConfig = { aspectRatio: opts.aspectRatio }
   try {
     const r = await fetch(`${BASE}/${modelFor(tier)}:generateContent?key=${KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ['IMAGE'] } }),
+      body: JSON.stringify({ contents: [{ parts }], generationConfig }),
     })
     if (!r.ok) return { ok: false, error: `gemini ${r.status} [${modelFor(tier)}]: ${(await r.text().catch(() => '')).slice(0, 240)}` }
     const j = await r.json()
@@ -48,7 +51,7 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
  * fidelity guardrail keeps the product exact — the two levers that make a clone usable, not just pretty.
  */
 export function buildClonePrompt(opts: {
-  brandName?: string; colors?: string[]; newHeadline?: string
+  brandName?: string; colors?: string[]; newHeadline?: string; aspectRatio?: string
   dna?: { hook_type?: string | null; format_style?: string | null; angle?: string | null; emotion?: string[] | null; cta?: string | null }
 }): string {
   const d = opts.dna || {}
@@ -67,6 +70,10 @@ export function buildClonePrompt(opts: {
     opts.newHeadline ? `On-screen headline — render this text EXACTLY, letter for letter: "${opts.newHeadline}".` : `Keep the headline layout; write short ad copy relevant to this product.`,
     d.cta ? `Include a clear call-to-action button ("${d.cta}").` : '',
     `TEXT: spell every word correctly using real English — never output invented, garbled, or misspelled words. Keep all text crisp and legible.`,
-    `Output ONE photorealistic, ad-ready image at the same aspect ratio as image 1.`,
+    `Do NOT include: watermarks, timestamps, logos of other brands, extra or duplicate products, or any placeholder/gibberish text.`,
+    opts.aspectRatio && opts.aspectRatio !== 'original'
+      ? `Compose the final image at a ${opts.aspectRatio} aspect ratio.`
+      : `Keep the same aspect ratio as image 1.`,
+    `Output ONE photorealistic, ad-ready image.`,
   ].filter(Boolean).join(' ')
 }
