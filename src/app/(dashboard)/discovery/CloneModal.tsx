@@ -46,7 +46,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
   const [headline, setHeadline] = useState('')
   const [aspect, setAspect] = useState<'original' | '1:1' | '4:5' | '9:16'>('original')
-  const [tier, setTier] = useState<'default' | 'pro'>('default')
+  const tier: 'pro' = 'pro'   // Pro (Nano Banana Pro) always — best product fidelity + text
   const [emailDaily, setEmailDaily] = useState(true)
 
   const [busy, setBusy] = useState(false)
@@ -307,10 +307,6 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                     <button key={v} onClick={() => setAspect(v)} style={{ flex: 1, ...tierBtn(aspect === v), padding: '8px 0', fontSize: 11.5 }}>{label}</button>
                   ))}
                 </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setTier('default')} style={tierBtn(tier === 'default')}>Standard · 5 cr</button>
-                <button onClick={() => setTier('pro')} style={tierBtn(tier === 'pro')}>Pro · 10 cr</button>
               </div>
               {/* How many variations to generate (each is its own charge + saved creative). */}
               <div>
