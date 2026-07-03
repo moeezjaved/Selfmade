@@ -29,8 +29,13 @@ export async function POST(req: NextRequest) {
   if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
 
   const body = await req.json().catch(() => ({}))
-  const { adId, productImageB64, productMimeType, tier, newHeadline, brandName, colors } = body || {}
-  if (!adId || !productImageB64) return NextResponse.json({ error: 'adId and productImageB64 required' }, { status: 400 })
+  const { adId, productImageB64, productImages, productMimeType, tier, newHeadline, brandName, colors } = body || {}
+  // Accept one legacy base64 photo OR an array of product photos (data: URLs and/or http URLs).
+  // Multiple angles help Nano Banana hold the product's exact shape/label across the clone.
+  const rawProducts: string[] = Array.isArray(productImages) && productImages.length
+    ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
+    : (productImageB64 ? [String(productImageB64)] : [])
+  if (!adId || rawProducts.length === 0) return NextResponse.json({ error: 'adId and at least one product image required' }, { status: 400 })
   const useTier: 'default' | 'pro' = tier === 'pro' ? 'pro' : 'default'
   const action = useTier === 'pro' ? 'image_clone_pro' : 'image_clone'
 
@@ -64,9 +69,18 @@ export async function POST(req: NextRequest) {
       brandName, colors: Array.isArray(colors) ? colors.slice(0, 4) : undefined, newHeadline,
       dna: { hook_type: (ad as any).hook_type, format_style: (ad as any).format_style, angle: (ad as any).angle, emotion: (ad as any).emotion, cta: (ad as any).cta },
     })
-    const product = { mimeType: productMimeType || 'image/png', dataB64: String(productImageB64).replace(/^data:[^;]+;base64,/, '') }
 
-    const gen = await generateImage(prompt, [refImg, product], useTier)
+    // Normalize each product photo to base64. data: URLs are decoded inline; http(s) URLs are fetched.
+    // Cap at 4 so the payload stays within Gemini's part limit alongside the reference ad.
+    const products = (await Promise.all(rawProducts.slice(0, 4).map(async (src) => {
+      const m = /^data:([^;]+);base64,([\s\S]*)$/i.exec(src)
+      if (m) return { mimeType: m[1] || productMimeType || 'image/png', dataB64: m[2] }
+      if (/^https?:\/\//i.test(src)) return await fetchImageB64(src)
+      return { mimeType: productMimeType || 'image/png', dataB64: src.replace(/^data:[^;]+;base64,/, '') }
+    }))).filter(Boolean) as { mimeType: string; dataB64: string }[]
+    if (products.length === 0) { await refund(); return NextResponse.json({ error: 'could not load product image(s)' }, { status: 502 }) }
+
+    const gen = await generateImage(prompt, [refImg, ...products], useTier)
     if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).catch(() => {})
