@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Upload, Link2, Loader2, Download, Sparkles, Check } from 'lucide-react'
 import { flyToCreatives } from '@/lib/flyToCreatives'
+import { creativeFilename } from '@/lib/filename'
 
 type Photo = { id: string; src: string; label?: string } // src = data: URL (upload) or http URL (detected/brand)
 type Brand = { id: string; name: string; website?: string | null; products?: { image_urls?: string[] }[] }
@@ -47,10 +48,6 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [photos, setPhotos] = useState<Photo[]>([])
   const [selected, setSelected] = useState<string[]>([])
 
-  const [outputMode, setOutputMode] = useState<'static' | 'animated'>('static')   // image vs Veo video
-  const [animStyle, setAnimStyle] = useState<'zoom' | 'shine'>('zoom')
-  const [animRes, setAnimRes] = useState<'1080p' | '4K'>('1080p')
-  const [videoQueued, setVideoQueued] = useState(false)
   const [headline, setHeadline] = useState('')
   const [aspect, setAspect] = useState<'original' | '1:1' | '4:5' | '9:16'>('original')
   const [imageSize, setImageSize] = useState<'2K' | '4K'>('2K')
@@ -179,24 +176,6 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         aspectRatio: aspect, logo: logo || undefined, imageSize, palette: palette || undefined,
       }
 
-      // ── Animated: generate the base clone image, then kick off the Veo video (async). ──
-      if (outputMode === 'animated') {
-        const r = await fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-        const j = await r.json().catch(() => ({}))
-        if (!r.ok) { setErr(j.error === 'insufficient_credits' ? 'Not enough credits.' : j.error || 'Base image failed — try again.'); return }
-        // Animation needs a fetchable image URL (the worker renders from R2), so use the saved url.
-        if (!j.url) { setErr('Couldn’t save the base image for animation — try again.'); return }
-        const ar = await fetch('/api/discovery/animate', {
-          method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ image: j.url, style: animStyle, resolution: animRes, brandId: useBrandId || undefined, sourceAdId: ad.id, parentId: j.generationId }),
-        })
-        const aj = await ar.json().catch(() => ({}))
-        if (!ar.ok) { setErr(aj.error === 'insufficient_credits' ? 'Not enough credits for the animation.' : aj.error || 'Could not start the animation.'); return }
-        flyToCreatives(j.url)
-        setVideoQueued(true)
-        return
-      }
-
       const settled = await Promise.all(Array.from({ length: count }, () =>
         fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
           .then(async (r) => {
@@ -252,8 +231,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   })
 
   const cost = imageSize === '4K' ? 25 : 15   // 2K → image_clone_pro (15) · 4K → image_clone_4k (25)
-  const vidCost = animRes === '4K' ? 25 : 15
-  const totalCost = outputMode === 'animated' ? cost + vidCost : cost * count
+  const totalCost = cost * count
   const editCost = 10                          // Pro edit — matches image_edit_pro
   const hasResults = results.length > 0
 
@@ -274,16 +252,6 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         <div style={{ display: 'grid', gridTemplateColumns: hasResults ? '1fr 1fr' : '1fr', gap: 0 }}>
           {/* ── controls ── */}
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {/* Output mode — static image or an animated Veo video. */}
-            {!videoQueued && (
-              <div style={{ display: 'flex', gap: 8, background: '#0a0f0c', border: '1px solid #24331d', borderRadius: 12, padding: 4 }}>
-                {(['static', 'animated'] as const).map((m) => (
-                  <button key={m} onClick={() => setOutputMode(m)} style={{ flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, background: outputMode === m ? LIME : 'transparent', color: outputMode === m ? '#14281a' : '#9fb0a4' }}>
-                    {m === 'static' ? '🖼 Static image' : '🎬 Animated video'}
-                  </button>
-                ))}
-              </div>
-            )}
             {/* Brand */}
             <section>
               <Label>1 · Your brand</Label>
@@ -371,48 +339,23 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                   ))}
                 </div>
               </div>
-              {/* Image resolution — static only (animation always uses a 2K base then animates it). */}
-              {outputMode === 'static' && (
-                <div>
-                  <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Resolution</div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => setImageSize('2K')} style={{ flex: 1, ...tierBtn(imageSize === '2K'), padding: '8px 0' }}>2K · 15 cr</button>
-                    <button onClick={() => setImageSize('4K')} style={{ flex: 1, ...tierBtn(imageSize === '4K'), padding: '8px 0' }}>4K HD · 25 cr</button>
-                  </div>
+              {/* Image resolution. */}
+              <div>
+                <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Resolution</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => setImageSize('2K')} style={{ flex: 1, ...tierBtn(imageSize === '2K'), padding: '8px 0' }}>2K · 15 cr</button>
+                  <button onClick={() => setImageSize('4K')} style={{ flex: 1, ...tierBtn(imageSize === '4K'), padding: '8px 0' }}>4K HD · 25 cr</button>
                 </div>
-              )}
-              {/* Static: variations. */}
-              {outputMode === 'static' && (
-                <div>
-                  <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Variations to generate</div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {[1, 2, 4, 6, 8].map((n) => (
-                      <button key={n} onClick={() => setCount(n)} style={{ flex: 1, ...tierBtn(count === n), padding: '8px 0' }}>{n}</button>
-                    ))}
-                  </div>
+              </div>
+              {/* Variations. */}
+              <div>
+                <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Variations to generate</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[1, 2, 4, 6, 8].map((n) => (
+                    <button key={n} onClick={() => setCount(n)} style={{ flex: 1, ...tierBtn(count === n), padding: '8px 0' }}>{n}</button>
+                  ))}
                 </div>
-              )}
-              {/* Animated: motion style + video resolution. */}
-              {outputMode === 'animated' && (
-                <>
-                  <div>
-                    <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Motion style</div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {([['zoom', 'Slow zoom'], ['shine', 'Shine sweep']] as const).map(([s, label]) => (
-                        <button key={s} onClick={() => setAnimStyle(s)} style={{ flex: 1, ...tierBtn(animStyle === s), padding: '8px 0' }}>{label}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Video resolution</div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => setAnimRes('1080p')} style={{ flex: 1, ...tierBtn(animRes === '1080p'), padding: '8px 0' }}>1080p · 15 cr</button>
-                      <button onClick={() => setAnimRes('4K')} style={{ flex: 1, ...tierBtn(animRes === '4K'), padding: '8px 0' }}>4K · 25 cr</button>
-                    </div>
-                    <div style={{ fontSize: 10.5, color: '#6f7f73', marginTop: 5 }}>Adds subtle motion to the ad (keeps it exact) → a short MP4 in My Creatives (~1 min).</div>
-                  </div>
-                </>
-              )}
+              </div>
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: '#cfe', cursor: 'pointer', background: '#121c15', border: '1px solid #24331d', borderRadius: 10, padding: '10px 12px' }}>
                 <input type="checkbox" checked={emailDaily} onChange={(e) => setEmailDaily(e.target.checked)} style={{ marginTop: 2 }} />
                 <span>📧 <b>Email me new winning ads like this, daily</b><br /><span style={{ color: '#8aa', fontSize: 11.5 }}>Fresh top ads from {ad.pageName || 'this brand'} & its niche — 2 credits per email, cancel anytime in Settings.</span></span>
@@ -421,19 +364,10 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
             {err && <div style={{ background: '#2a1416', border: '1px solid #5a2a2e', color: '#ffb4b4', borderRadius: 10, padding: '10px 12px', fontSize: 12.5 }}>{err}</div>}
 
-            {videoQueued ? (
-              <div style={{ background: '#121c15', border: '1px solid #24331d', borderRadius: 12, padding: 16, textAlign: 'center' }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: LIME, marginBottom: 6 }}>🎬 Your video is generating</div>
-                <div style={{ fontSize: 12.5, color: '#9fb0a4', lineHeight: 1.5 }}>It’ll appear in <b style={{ color: '#cfe' }}>My Creatives</b> in ~1–2 minutes. You can close this.</div>
-              </div>
-            ) : (
-              <button onClick={generate} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.7 : 1 }}>
-                {busy ? <><Loader2 size={16} className="spin" /> {outputMode === 'animated' ? 'Starting video…' : `Generating ${count > 1 ? `${count} variations` : ''}…`}</>
-                  : outputMode === 'animated'
-                    ? <><Sparkles size={16} /> Generate video · {totalCost} cr</>
-                    : <><Sparkles size={16} /> {hasResults ? 'Regenerate' : 'Generate'} {count > 1 ? `${count} variations` : 'clone'} · {totalCost} cr</>}
-              </button>
-            )}
+            <button onClick={generate} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.7 : 1 }}>
+              {busy ? <><Loader2 size={16} className="spin" /> {`Generating ${count > 1 ? `${count} variations` : ''}…`}</>
+                : <><Sparkles size={16} /> {hasResults ? 'Regenerate' : 'Generate'} {count > 1 ? `${count} variations` : 'clone'} · {totalCost} cr</>}
+            </button>
           </div>
 
           {/* ── results + chat-style edit loop ── */}
@@ -479,7 +413,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                 </div>
               </div>
 
-              <a href={active.url} download={`clone-${ad.id}-${activeIdx + 1}.png`} style={{ ...btnPrimary, textDecoration: 'none', justifyContent: 'center' }}>
+              <a href={active.url} download={creativeFilename({ brand: bName.trim() || ad.pageName, index: activeIdx + 1, kind: 'clone' })} style={{ ...btnPrimary, textDecoration: 'none', justifyContent: 'center' }}>
                 <Download size={15} /> Download{results.length > 1 ? ' this variation' : ''}
               </a>
               <p style={{ fontSize: 11.5, color: '#8aa', margin: 0 }}>All variations are saved in <b style={{ color: '#cfe' }}>My Creatives</b>. Edit any above, or Regenerate for fresh ones.</p>
