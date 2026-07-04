@@ -2,6 +2,11 @@ import type { MetadataRoute } from 'next'
 import { getPopulatedBrands, SITE_URL } from '@/lib/seo/brands'
 import { createAdminClient } from '@/lib/supabase/server'
 
+// Generate at RUNTIME, not at build. The Vercel build env returns empty from the DB (no service-role
+// key at build), so a static sitemap captured an empty snapshot — no /ads or brand URLs. Runtime has
+// full env + live data. force-dynamic also means the sitemap can NEVER time out the build again.
+export const dynamic = 'force-dynamic'
+
 // Single sitemap served at /sitemap.xml (what robots + GSC reference). Includes: the marketing
 // landing, the 12 competitor /alternatives pages (always live), the live /ads galleries (industry +
 // format, only when they have >= 6 real ads — never list thin pages), and the /brands directory set.
