@@ -8,6 +8,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
+import { pickIntro, pickOutro, galleryJsonLd } from '@/lib/seo/pages'
 import type { Metadata } from 'next'
 
 export const revalidate = 3600   // refresh hourly (keeps "Updated" fresh + picks up new crawls)
@@ -57,8 +58,16 @@ export default async function AdsCategoryPage({ params }: { params: { category: 
   const { niche, ads, siblings } = await getData(params.category)
   if (!niche || ads.length === 0) notFound()
 
+  const ld = galleryJsonLd({
+    path: `/ads/${params.category}`, name: `Winning ${niche} Ads on Meta — ${monthYear()}`,
+    description: `Browse ${ads.length}+ real ${niche} ads running on Meta right now, ranked by performance.`,
+    platform: 'Meta', platformSlug: 'meta', category: niche, categorySlug: params.category,
+    count: ads.length, isoDate: new Date().toISOString(), ads,
+  })
+
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", background: '#fff', color: INK, minHeight: '100vh' }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
       <nav style={{ borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/home">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 24, filter: 'brightness(0)' }} /></Link>
@@ -69,9 +78,7 @@ export default async function AdsCategoryPage({ params }: { params: { category: 
       <header style={{ maxWidth: 900, margin: '0 auto', padding: '48px 24px 24px' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '.06em' }}>Ad examples · Updated {monthYear()}</div>
         <h1 style={{ fontSize: 'clamp(30px,5vw,46px)', fontWeight: 800, letterSpacing: '-.02em', margin: '8px 0 12px' }}>Winning {niche} ads on Meta</h1>
-        <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6, maxWidth: 680 }}>
-          The top-performing {niche.toLowerCase()} ads running on Meta right now — pulled live from {ads.length}+ real, spending campaigns and ranked by performance. Use them for inspiration, then <Link href="/signup" style={{ color: INK, fontWeight: 700 }}>clone or generate your own</Link> with Selfmade in minutes.
-        </p>
+        <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6, maxWidth: 680 }}>{pickIntro(params.category, niche, 'Meta', ads.length)}</p>
       </header>
 
       <section style={{ maxWidth: 1120, margin: '0 auto', padding: '12px 24px 20px' }}>
@@ -96,6 +103,11 @@ export default async function AdsCategoryPage({ params }: { params: { category: 
           <p style={{ color: 'rgba(14,27,18,.7)', margin: '0 0 20px', fontSize: 16 }}>Clone any winner onto your product, or generate an original — free to start.</p>
           <Link href="/signup" style={{ background: INK, color: '#fff', padding: '13px 26px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none' }}>Start for free →</Link>
         </div>
+      </section>
+
+      {/* SEO body / outro */}
+      <section style={{ maxWidth: 780, margin: '0 auto', padding: '10px 24px 20px' }}>
+        <p style={{ fontSize: 15, color: '#6b7280', lineHeight: 1.7 }}>{pickOutro(params.category, niche, 'Meta')}</p>
       </section>
 
       {/* sibling internal links */}
