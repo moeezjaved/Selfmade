@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675" fill="none">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1200" y2="675" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0ea5e9"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs>
+  <rect width="1200" height="675" fill="url(#g)"/>
+  <circle cx="980" cy="180" r="210" fill="#dffe95" opacity="0.15"/>
+  <g transform="translate(820,320)" stroke="#0e2a2f" stroke-width="14" stroke-linecap="round" fill="none"><path d="M40 120 C40 40 120 10 170 40 C220 10 300 40 300 120 C300 200 170 280 170 280 C170 280 40 200 40 120 Z" fill="#dffe95" stroke="none"/><path d="M150 90 l-40 55 h45 l-15 60 60 -75 h-45 z" fill="#0e2a2f"/></g>
+  <text x="80" y="150" fill="#dffe95" font-family="Inter,Arial,sans-serif" font-size="26" font-weight="800" letter-spacing="4">SELFMADE · PLAYBOOK</text>
+  <text x="76" y="300" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="86" font-weight="800" letter-spacing="-3">7 hooks that</text>
+  <text x="76" y="390" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="86" font-weight="800" letter-spacing="-3">stop the</text>
+  <text x="76" y="480" fill="#dffe95" font-style="italic" font-family="Inter,Arial,sans-serif" font-size="86" font-weight="800" letter-spacing="-3">scroll</text>
+</svg>
