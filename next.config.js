@@ -5,11 +5,11 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      // Legacy ad-gallery URLs → platform-scoped structure (future-proofs TikTok).
-      { source: '/ads/format/:format', destination: '/ads/meta/format/:format', permanent: true },
-      { source: '/ads/meta', destination: '/ads', permanent: false },
-      { source: '/ads/tiktok', destination: '/ads', permanent: false },
-      { source: '/ads/:category((?!meta$|tiktok$|format$)[^/]+)', destination: '/ads/meta/:category', permanent: true },
+      // The brief redirect-era /ads/meta/* structure → back to the canonical flat /ads/* URLs.
+      // (Meta is the only platform today; TikTok will get a literal /ads/tiktok/* prefix.)
+      { source: '/ads/meta/format/:format', destination: '/ads/format/:format', permanent: true },
+      { source: '/ads/meta/:category', destination: '/ads/:category', permanent: true },
+      { source: '/ads/meta', destination: '/ads', permanent: true },
     ]
   },
 }

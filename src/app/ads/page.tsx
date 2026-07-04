@@ -28,9 +28,9 @@ async function getLive() {
   }
   const { data: nc } = await admin.from('niche_counts').select('niche').limit(200)
   const niches = Array.from(new Set((nc || []).map((r: any) => r.niche).filter(Boolean))) as string[]
-  const inds = (await Promise.all(niches.map(async (n) => ({ label: n, url: `/ads/meta/${toSlug(n)}`, ads: await count('niche', n) }))))
+  const inds = (await Promise.all(niches.map(async (n) => ({ label: n, url: `/ads/${toSlug(n)}`, ads: await count('niche', n) }))))
     .filter((x) => x.ads >= MIN).sort((a, b) => b.ads - a.ads)
-  const fmts = (await Promise.all(HOOKS.map(async (h) => ({ label: h, url: `/ads/meta/format/${toSlug(h)}`, ads: await count('hook_type', h) }))))
+  const fmts = (await Promise.all(HOOKS.map(async (h) => ({ label: h, url: `/ads/format/${toSlug(h)}`, ads: await count('hook_type', h) }))))
     .filter((x) => x.ads >= MIN).sort((a, b) => b.ads - a.ads)
   return { inds, fmts }
 }

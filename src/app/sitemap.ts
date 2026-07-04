@@ -29,8 +29,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return (count || 0) >= 6 ? { url: `${SITE_URL}${path}`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 } : null
     }
     const [ind, fmt] = await Promise.all([
-      Promise.all(INDUSTRIES.map((n) => live('niche', n, `/ads/meta/${toSlug(n)}`))),
-      Promise.all(FORMATS.map((h) => live('hook_type', h, `/ads/meta/format/${toSlug(h)}`))),
+      Promise.all(INDUSTRIES.map((n) => live('niche', n, `/ads/${toSlug(n)}`))),
+      Promise.all(FORMATS.map((h) => live('hook_type', h, `/ads/format/${toSlug(h)}`))),
     ])
     entries.push(...([...ind, ...fmt].filter(Boolean) as MetadataRoute.Sitemap))
   } catch { /* DB unreachable → still ship the rest */ }

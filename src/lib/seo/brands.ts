@@ -28,10 +28,11 @@ function readClientSafe(): ReturnType<typeof createReadClient> | null {
 // Only brands with >= this many ads get an SEO page (quality-first — content-rich pages rank, thin
 // ones get penalized). Env-tunable so we can lower it as the domain earns authority. Default 100.
 export const MIN_INDEXABLE_ADS = parseInt(process.env.SEO_MIN_ADS || '100', 10)
-// A page is only indexed/sitemapped when it actually renders this many REAL ads (with creatives).
-// The `ads_indexed` counter overcounts (crawl-seen ads that may lack creatives), so empty "being
-// processed" pages must never be exposed to Google — noindex until genuinely populated.
-export const MIN_BRAND_ADS = parseInt(process.env.SEO_MIN_BRAND_ADS || '3', 10)
+// A brand page is only indexed/sitemapped when the brand has this many REAL ads (with creatives) in
+// the index. The `ads_indexed` counter overcounts (crawl-seen ads that may lack creatives), so we
+// count actual has_creative ads. Pages BELOW the threshold still exist but stay noindex until they
+// reach it. (Set by Moeez, 2026-07-04: minimum 200.)
+export const MIN_BRAND_ADS = parseInt(process.env.SEO_MIN_BRAND_ADS || '200', 10)
 export const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
 
 export type BrandRef = { pageId: string; slug: string; name: string; adCount: number }
@@ -196,10 +197,16 @@ export const getBrandPage = unstable_cache(
       if (c) content = c as BrandContent
     } catch { /* table not present yet → template fallback */ }
 
+    // Index only when the brand has >= MIN_BRAND_ADS REAL ads (with creatives) in the index — the
+    // render sample is capped at 48, so we head-count the true total rather than ads.length.
+    const { count: realAdCount } = await db.from('discovery_ads_index')
+      .select('ad_id', { count: 'exact', head: true })
+      .eq('page_id', ref.pageId).eq('has_creative', true)
+
     return {
       ref, niche, activeCount, longestRunningDays: longest, insights,
       ads: ads.slice(0, 48),
-      indexable: ads.length >= MIN_BRAND_ADS,   // real rendered ads — never index an empty page
+      indexable: (realAdCount || 0) >= MIN_BRAND_ADS,   // >=200 real ads — pages below this exist but stay noindex
       content,
     }
   },
