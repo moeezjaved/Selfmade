@@ -7,7 +7,7 @@
  * though authors are admins.
  */
 import { unstable_cache } from 'next/cache'
-import { createReadClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 export { slugify, readingTimeMin, renderMarkdown } from '@/lib/blog-markdown'
 
 export const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
@@ -19,9 +19,11 @@ export type BlogPost = {
 }
 export type BlogCard = Pick<BlogPost, 'slug' | 'title' | 'excerpt' | 'cover_image_url' | 'author' | 'published_at' | 'tags'>
 
-function readClientSafe(): ReturnType<typeof createReadClient> | null {
-  if (!(process.env.SUPABASE_READ_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null
-  try { return createReadClient() } catch { return null }
+// Use the PRIMARY (createAdminClient → NEXT_PUBLIC_SUPABASE_URL), same as /ads + the admin API + the
+// seed — NOT createReadClient, whose SUPABASE_READ_URL can point at a stale replica missing blog_posts.
+function readClientSafe(): ReturnType<typeof createAdminClient> | null {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+  try { return createAdminClient() } catch { return null }
 }
 
 // ── Public reads (cached; blog_posts table absent → empty, so the build never fails) ──
