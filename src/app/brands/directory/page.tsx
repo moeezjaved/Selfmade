@@ -5,7 +5,7 @@
  */
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { getIndexableBrands, SITE_URL } from '@/lib/seo/brands'
+import { getPopulatedBrands, SITE_URL } from '@/lib/seo/brands'
 import BrandSearch from './BrandSearch'
 
 export const revalidate = 21600
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 }
 
 export default async function BrandsHub() {
-  const brands = await getIndexableBrands()
+  const brands = await getPopulatedBrands()
   const top = brands.slice(0, 600)
 
   return (

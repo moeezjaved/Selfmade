@@ -9,7 +9,7 @@ const nextConfig = {
       { source: '/ads/format/:format', destination: '/ads/meta/format/:format', permanent: true },
       { source: '/ads/meta', destination: '/ads', permanent: false },
       { source: '/ads/tiktok', destination: '/ads', permanent: false },
-      { source: '/ads/:category((?!meta$|tiktok$|format$).+)', destination: '/ads/meta/:category', permanent: true },
+      { source: '/ads/:category((?!meta$|tiktok$|format$)[^/]+)', destination: '/ads/meta/:category', permanent: true },
     ]
   },
 }

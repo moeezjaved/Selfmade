@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next'
-import { getIndexableBrands, SITE_URL } from '@/lib/seo/brands'
+import { getPopulatedBrands, SITE_URL } from '@/lib/seo/brands'
 import { createAdminClient } from '@/lib/supabase/server'
 
 // Single sitemap served at /sitemap.xml (what robots + GSC reference). Includes: the marketing
@@ -35,7 +35,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entries.push(...([...ind, ...fmt].filter(Boolean) as MetadataRoute.Sitemap))
   } catch { /* DB unreachable → still ship the rest */ }
 
-  const brands = await getIndexableBrands().catch(() => [] as { slug: string; adCount: number }[])
+  const brands = await getPopulatedBrands().catch(() => [] as { slug: string; adCount: number }[])
   entries.push(...brands.map((b) => ({
     url: `${SITE_URL}/brands/${b.slug}`,
     changeFrequency: 'weekly' as const,
