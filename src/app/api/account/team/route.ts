@@ -33,11 +33,15 @@ export async function GET() {
   const { data: invites } = await admin.from('org_invites').select('id, email, role, token, created_at').eq('org_id', org.orgId).eq('status', 'pending').order('created_at', { ascending: false })
   const seats = await getSeatInfo(admin, org.orgId, org.ownerId)
   const site = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
+  // debug: what the plan lookup sees for the org owner (visible at /api/account/team)
+  const { data: subRow } = await admin.from('subscriptions').select('owner_id, plan, status').eq('owner_id', org.ownerId).maybeSingle()
+  const { data: profRow } = await admin.from('user_profiles').select('plan_id').eq('user_id', org.ownerId).maybeSingle()
   return NextResponse.json({
     org: { id: org.orgId, name: org.name, role: org.role },
     members: withEmail,
     invites: (invites || []).map((i: any) => ({ ...i, link: `${site}/join?token=${i.token}` })),
     seats,
+    _debug: { ownerId: org.ownerId, callerId: c.user.id, subscription: subRow || null, profile_plan: profRow?.plan_id || null },
   })
 }
 
