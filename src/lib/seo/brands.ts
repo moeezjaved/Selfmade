@@ -105,34 +105,15 @@ export const getIndexableBrands = unstable_cache(
 // Per-brand head-count (bounded concurrency), cached 6h to spare the DB (it's under backfill load).
 export const getPopulatedBrands = unstable_cache(
   async (): Promise<BrandRef[]> => {
-    const db = readClientSafe()
-    if (!db) return []
-    // Real ads (has_creative) are a SUBSET of ads_indexed, so a brand can only clear the
-    // MIN_BRAND_ADS real-ad bar if ads_indexed is already >= it. Pre-filter to that necessary
-    // condition (cuts thousands of candidates → the few hundred that could qualify), then cap —
-    // this is what stops the /sitemap.xml build step from timing out (60s static-worker limit).
-    // Top candidates by ads_indexed. Bounded small so the per-brand head-counts COMPLETE fast (even
-    // under crawl/drain load on the primary) and the unstable_cache result actually persists — a set
-    // large enough to blow the sitemap's timeout never finishes, so it never caches and re-runs every
-    // request. Raise this cap once the backfill load is off the primary.
-    const all = (await getIndexableBrands())
-      .filter((b) => b.adCount >= MIN_BRAND_ADS)
-      .slice(0, 60)
-    const out: BrandRef[] = []
-    const CONC = 16
-    for (let i = 0; i < all.length; i += CONC) {
-      const batch = all.slice(i, i + CONC)
-      const flags = await Promise.all(batch.map(async (b) => {
-        const { count } = await db.from('discovery_ads_index')
-          .select('ad_id', { count: 'exact', head: true })
-          .eq('page_id', b.pageId).eq('has_creative', true)
-        return (count || 0) >= MIN_BRAND_ADS
-      }))
-      batch.forEach((b, j) => { if (flags[j]) out.push(b) })
-    }
-    return out
+    // Real ads (has_creative) are a SUBSET of ads_indexed, so ads_indexed >= MIN_BRAND_ADS is the
+    // necessary condition. Drain is ~98% done (missing_creative ≈ 67K of 3.36M), so has_creative is
+    // set on ~every ad and realAdCount ≈ ads_indexed — this filter is a close, INSTANT proxy (no
+    // per-brand count queries, which were timing out the sitemap under backfill load on the primary).
+    // The page's own realAdCount>=200 head-count stays the authoritative noindex guard per brand, so
+    // any ~2% straggler that isn't truly populated renders noindex and Google drops it anyway.
+    return (await getIndexableBrands()).filter((b) => b.adCount >= MIN_BRAND_ADS)
   },
-  ['seo-populated-brands-v1'],
+  ['seo-populated-brands-v2'],
   { revalidate: 21600, tags: ['seo-brands'] },
 )
 
