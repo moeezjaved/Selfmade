@@ -1,0 +1,43 @@
+/**
+ * Organization / team-seat helpers. One shared workspace per org. Every user belongs to exactly one
+ * org (their own, auto-created as owner, until they accept an invite into another). Roles: owner,
+ * admin, member. Seat limits come from the plan; paid overage is Stage 2 (billing).
+ */
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { getPlanId } from '@/lib/entitlements'
+
+export type Role = 'owner' | 'admin' | 'member'
+export type OrgCtx = { orgId: string; name: string; ownerId: string; role: Role }
+
+// Included seats per plan (paid overage added in Stage 2). Keyed by normalized PlanId.
+const SEATS: Record<string, number> = { free: 1, starter: 1, pro: 3, business: 8, enterprise: 25 }
+export function includedSeats(planId: string): number { return SEATS[planId] ?? 1 }
+export const canManage = (role: Role) => role === 'owner' || role === 'admin'
+
+/** The caller's org + role. Lazily creates a personal org (owner) the first time. */
+export async function getUserOrg(admin: SupabaseClient, userId: string): Promise<OrgCtx> {
+  const db = admin as any
+  // newest membership wins → accepting a team invite switches you into that team.
+  const { data: m } = await db.from('org_members')
+    .select('role, organizations(id, name, owner_id)')
+    .eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (m?.organizations) {
+    const o = m.organizations
+    return { orgId: o.id, name: o.name, ownerId: o.owner_id, role: m.role as Role }
+  }
+  // none yet → create the user's own org
+  const { data: org } = await db.from('organizations').insert({ owner_id: userId, name: 'My Team' }).select().single()
+  await db.from('org_members').insert({ org_id: org.id, user_id: userId, role: 'owner' })
+  return { orgId: org.id, name: org.name, ownerId: userId, role: 'owner' }
+}
+
+/** Seat usage for an org: members + pending invites vs the owner's plan limit. */
+export async function getSeatInfo(admin: SupabaseClient, orgId: string, ownerId: string): Promise<{ used: number; limit: number; planId: string }> {
+  const db = admin as any
+  const planId = await getPlanId(admin, ownerId)
+  const [{ count: members }, { count: pending }] = await Promise.all([
+    db.from('org_members').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
+    db.from('org_invites').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'pending'),
+  ])
+  return { used: (members || 0) + (pending || 0), limit: includedSeats(planId), planId }
+}
