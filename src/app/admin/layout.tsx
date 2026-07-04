@@ -12,6 +12,7 @@ const NAV = [
   { href: '/admin/credit-pricing', label: 'Credit Pricing', icon: '◆' },
   { href: '/admin/experts', label: 'Experts', icon: '⭐' },
   { href: '/admin/blog', label: 'Blog', icon: '✍️' },
+  { href: '/admin/mcp', label: 'MCP Server', icon: '🔌' },
   { href: '/admin/brand-directory', label: 'Brand Directory', icon: '📇' },
   { href: '/admin/funnel', label: 'Funnel', icon: '▽' },
   { href: '/admin/errors', label: 'Error Logs', icon: '⚠' },
