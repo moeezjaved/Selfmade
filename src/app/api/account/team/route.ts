@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getUserOrg, getSeatInfo, canManage, type Role } from '@/lib/org'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, emailEnabled } from '@/lib/email'
 import { randomBytes } from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -65,8 +65,8 @@ export async function POST(request: NextRequest) {
     <p style="margin:0 0 20px"><a href="${link}" style="display:inline-block;background:#0e1b12;color:#dffe95;padding:13px 26px;border-radius:100px;text-decoration:none;font-weight:800;font-size:15px">Join the team →</a></p>
     <p style="color:#9ca3af;font-size:13px;margin:0">Or paste this link into your browser:<br>${link}</p>
   </div>`
-  sendEmail(em, `You're invited to ${org.name} on Selfmade`, html).catch(() => {})
-  return NextResponse.json({ invite: data, link })
+  const emailed = await sendEmail(em, `You're invited to ${org.name} on Selfmade`, html).catch(() => false)
+  return NextResponse.json({ invite: data, link, emailed, emailEnabled })
 }
 
 export async function DELETE(request: NextRequest) {
