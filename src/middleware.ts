@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isFreeEmail } from '@/lib/email-domains'
+
+// Business-email rule start. Accounts created BEFORE this are grandfathered (existing Gmail users
+// keep working); free-domain accounts created after — only possible via Google, since email signup
+// already blocks them — are sent to /business-email-required and can't enter the app.
+const BIZ_EMAIL_CUTOFF = Date.parse('2026-07-04T00:00:00Z')
 
 const PROTECTED = [
   '/dashboard',
@@ -97,6 +103,14 @@ export async function middleware(request: NextRequest) {
 
     if (PROTECTED.some(p => pathname.startsWith(p)) && !user) {
       return NextResponse.redirect(new URL('/login', request.url))
+    }
+
+    // Business-email gate — block NEW free-domain accounts (new personal-Gmail Google signups) from
+    // the app; grandfather anyone created before the cutoff. Only enforced on protected routes so
+    // blocked users can still reach public pages + sign out.
+    if (user?.email && user.created_at && Date.parse(user.created_at) > BIZ_EMAIL_CUTOFF
+        && isFreeEmail(user.email) && PROTECTED.some(p => pathname.startsWith(p))) {
+      return NextResponse.redirect(new URL('/business-email-required', request.url))
     }
 
     if ((pathname === '/login' || pathname === '/signup') && user) {
