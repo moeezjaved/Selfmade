@@ -74,7 +74,7 @@ export const getIndexableBrands = unstable_cache(
     if (!db) return []
     const { data, error } = await db
       .from('discovery_brand_crawl_state')
-      .select('page_id, brand_name, ads_indexed, image_count, video_count')
+      .select('page_id, brand_name, ads_indexed')
       .gte('ads_indexed', MIN_INDEXABLE_ADS)
       .order('ads_indexed', { ascending: false })
       .limit(50000)
@@ -84,8 +84,6 @@ export const getIndexableBrands = unstable_cache(
     for (const b of data as any[]) {
       const name = (b.brand_name || '').trim()
       if (!name || !b.page_id) continue
-      // Only sitemap brands with REAL crawled creatives — never the empty "being processed" pages.
-      if (((b.image_count || 0) + (b.video_count || 0)) < MIN_BRAND_ADS) continue
       let slug = slugify(name)
       if (!slug) continue
       if (seen.has(slug)) {
@@ -99,6 +97,32 @@ export const getIndexableBrands = unstable_cache(
   },
   ['seo-indexable-brands-v1'],
   { revalidate: 3600, tags: ['seo-brands'] },
+)
+
+// POPULATED brands only — those that actually render >= MIN_BRAND_ADS real ads (with creatives).
+// Used for the sitemap + the directory links so neither exposes empty "being processed" pages.
+// Per-brand head-count (bounded concurrency), cached 6h to spare the DB (it's under backfill load).
+export const getPopulatedBrands = unstable_cache(
+  async (): Promise<BrandRef[]> => {
+    const db = readClientSafe()
+    if (!db) return []
+    const all = await getIndexableBrands()
+    const out: BrandRef[] = []
+    const CONC = 12
+    for (let i = 0; i < all.length; i += CONC) {
+      const batch = all.slice(i, i + CONC)
+      const flags = await Promise.all(batch.map(async (b) => {
+        const { count } = await db.from('discovery_ads_index')
+          .select('ad_id', { count: 'exact', head: true })
+          .eq('page_id', b.pageId).eq('has_creative', true)
+        return (count || 0) >= MIN_BRAND_ADS
+      }))
+      batch.forEach((b, j) => { if (flags[j]) out.push(b) })
+    }
+    return out
+  },
+  ['seo-populated-brands-v1'],
+  { revalidate: 21600, tags: ['seo-brands'] },
 )
 
 // Resolve a slug → its brand ref (from the cached indexable list). Also matches a bare slug against
