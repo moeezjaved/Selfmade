@@ -499,8 +499,8 @@ function FootCol({ title, links }: { title: string; links: { label: string; href
 }
 
 function SeoFooter() {
-  // Only competitors with real /alternatives/[slug] pages (avoid dead footer links).
-  const alternatives = ['Atria', 'Foreplay', 'Motion', 'GetHookd']
+  // All competitors now have real /alternatives/[slug] comparison pages.
+  const alternatives = ['Atria', 'Foreplay', 'Motion', 'GetHookd', 'AdCreative.ai', 'Minea', 'BigSpy', 'PiPiADS', 'Dropispy', 'AdSpy', 'PowerAdSpy', 'Meta Ad Library']
   const industries = ['Skincare', 'Supplements', 'Beauty', 'Apparel', 'Fitness', 'Health & Wellness', 'Hair Care', 'Pets', 'Home Goods', 'Food & Beverage', 'Jewelry', 'Baby & Kids', 'Personal Care', 'Cosmetics', 'Fragrance', 'Footwear', 'Accessories', 'Electronics']
   // Ad-format pages driven by the classifier's real hook_type taxonomy (/ads/format/[slug]).
   const formats = ['Testimonial', 'Before & After', 'Unboxing', 'Social Proof', 'Question', 'Educational', 'Story', 'Announcement', 'Urgency', 'Discount', 'Us vs Them', 'Pain Point']
