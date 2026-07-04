@@ -26,16 +26,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]
 
   // /ads galleries — include only those with >= 6 real ads (matches each page's thin-content guard).
+  // Use a cheap limit(6) EXISTENCE check, NOT count:'exact' — an exact count scans millions of rows
+  // and times out under crawl/drain load (that's what left the sitemap empty). limit(6) stops after
+  // 6 index hits. Niches come from niche_counts so the strings always match the data (like the pages).
   try {
     const admin = createAdminClient()
-    const live = async (col: string, val: string, path: string) => {
-      const { count } = await admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true })
-        .eq(col, val).eq('has_creative', true).gt('performance_score', 0)
-      return (count || 0) >= 6 ? { url: `${SITE_URL}${path}`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 } : null
+    const has6 = async (col: string, val: string) => {
+      const { data } = await admin.from('discovery_ads_index').select('ad_id')
+        .eq(col, val).eq('has_creative', true).gt('performance_score', 0).limit(6)
+      return (data?.length || 0) >= 6
     }
+    const mk = (path: string) => ({ url: `${SITE_URL}${path}`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 })
+    const { data: ncs } = await admin.from('niche_counts').select('niche')
+    const niches = Array.from(new Set([...(ncs || []).map((r: any) => r.niche).filter(Boolean), ...INDUSTRIES])) as string[]
+    const seen = new Set<string>()
     const [ind, fmt] = await Promise.all([
-      Promise.all(INDUSTRIES.map((n) => live('niche', n, `/ads/${toSlug(n)}`))),
-      Promise.all(FORMATS.map((h) => live('hook_type', h, `/ads/format/${toSlug(h)}`))),
+      Promise.all(niches.map(async (n) => {
+        const s = toSlug(n); if (seen.has(s)) return null; seen.add(s)
+        return (await has6('niche', n)) ? mk(`/ads/${s}`) : null
+      })),
+      Promise.all(FORMATS.map(async (h) => (await has6('hook_type', h)) ? mk(`/ads/format/${toSlug(h)}`) : null)),
     ])
     entries.push(...([...ind, ...fmt].filter(Boolean) as MetadataRoute.Sitemap))
   } catch { /* DB unreachable → still ship the rest */ }
