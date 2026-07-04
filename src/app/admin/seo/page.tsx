@@ -68,6 +68,62 @@ export default function AdminSeo() {
           </div>
         </>
       )}
+
+      <ProgrammaticSeo />
+    </div>
+  )
+}
+
+/** Coverage for the programmatic /ads + /alternatives pages (live vs thin, ad counts). */
+function ProgrammaticSeo() {
+  const [p, setP] = useState<any>(null)
+  useEffect(() => { fetch('/api/admin/seo/programmatic').then(r => r.json()).then(setP).catch(() => {}) }, [])
+  if (!p) return <div style={{ marginTop: 28, fontSize: 13, color: '#9ca3af' }}>Loading ad/comparison page coverage…</div>
+  const s = p.summary
+  return (
+    <div style={{ marginTop: 32, borderTop: '1px solid #eee', paddingTop: 24 }}>
+      <h2 style={{ fontSize: 17, fontWeight: 800, color: '#1a3a1a', margin: '0 0 4px' }}>SEO — Ad &amp; Comparison Pages</h2>
+      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
+        <code>/ads/[industry]</code>, <code>/ads/format/[hook]</code>, and <code>/alternatives/[competitor]</code>. A page goes <b>live</b> (indexable) at ≥{p.min_ads} real ads; below that it&rsquo;s <b>noindex</b> (thin-content guard).
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12, marginBottom: 20 }}>
+        <KPI label="Total pages" value={String(s.total)} />
+        <KPI label="Live (indexed)" value={String(s.live)} sub={`${Math.round(s.live / s.total * 100)}% of pages`} />
+        <KPI label="Thin (noindex)" value={String(s.thin)} />
+        <KPI label="Comparison pages" value={String(s.alternatives)} sub="always live" />
+        <KPI label="Industry / Format live" value={`${s.industriesLive} / ${s.formatsLive}`} />
+      </div>
+      {s.thin > 0 && (
+        <div style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', padding: '8px 12px', borderRadius: 8, marginBottom: 20 }}>
+          {s.thin} pages are still thin (&lt;{p.min_ads} ads) and noindex&rsquo;d. They go live automatically as the classifier (E) processes more ads in those niches/formats.
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <SeoTable title={`Industries (${p.industries.filter((x: any) => x.live).length}/${p.industries.length} live)`} rows={p.industries} />
+        <SeoTable title={`Formats (${p.formats.filter((x: any) => x.live).length}/${p.formats.length} live)`} rows={p.formats} />
+      </div>
+      <div style={{ marginTop: 20 }}>
+        <SeoTable title={`Comparison pages (${p.alternatives.length})`} rows={p.alternatives} />
+      </div>
+    </div>
+  )
+}
+
+function SeoTable({ title, rows }: { title: string; rows: any[] }) {
+  return (
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{title}</div>
+      <div style={{ border: '1px solid #e6e6e6', borderRadius: 10, overflow: 'hidden' }}>
+        {rows.map((r: any, i: number) => (
+          <div key={r.url} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '7px 12px', fontSize: 12.5, borderBottom: '1px solid #f1f5f9', background: i % 2 ? '#fafafa' : '#fff' }}>
+            <a href={r.url} target="_blank" rel="noreferrer" style={{ color: '#374151', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</a>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              {r.ads != null && <span style={{ color: '#9ca3af' }}>{r.ads} ads</span>}
+              <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: r.live ? '#dcfce7' : '#fef3c7', color: r.live ? '#16a34a' : '#b45309' }}>{r.live ? 'LIVE' : 'thin'}</span>
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
