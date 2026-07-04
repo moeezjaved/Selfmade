@@ -34,7 +34,7 @@ export default async function BlogIndex() {
       {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />}
       <nav style={{ borderBottom: '1px solid rgba(255,255,255,.07)', position: 'sticky', top: 0, background: 'rgba(10,13,12,.8)', backdropFilter: 'blur(12px)', zIndex: 50 }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', padding: '15px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Link href="/home">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0) invert(1)' }} /></Link>
+          <Link href="/">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0) invert(1)' }} /></Link>
           <Link href="/signup" style={{ background: LIME, color: '#0a0d0c', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Start for free</Link>
         </div>
       </nav>

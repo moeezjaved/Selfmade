@@ -25,7 +25,7 @@ export default function BusinessEmailRequired() {
         </button>
         <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 16 }}>Think this is a mistake? <a href="mailto:support@tryselfmade.ai" style={{ color: INK, fontWeight: 700 }}>Contact support</a>.</p>
       </div>
-      <p style={{ fontSize: 13, color: '#6b7280', marginTop: 20 }}><Link href="/home" style={{ color: INK, fontWeight: 700, textDecoration: 'underline' }}>← Back to Selfmade</Link></p>
+      <p style={{ fontSize: 13, color: '#6b7280', marginTop: 20 }}><Link href="/" style={{ color: INK, fontWeight: 700, textDecoration: 'underline' }}>← Back to Selfmade</Link></p>
     </div>
   )
 }
