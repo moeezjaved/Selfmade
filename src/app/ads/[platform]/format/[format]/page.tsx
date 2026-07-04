@@ -14,6 +14,7 @@ import type { Metadata } from 'next'
 export const revalidate = 3600
 
 const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
+const PLATFORMS: Record<string,string> = { meta: 'Meta' }
 // The classifier's hook_type values (worker/src/classify-core.ts HOOKS).
 const HOOKS = ['Question', 'Before & After', 'Testimonial', 'Story', 'Announcement', 'Educational', 'Urgency', 'Discount', 'Unboxing', 'Us vs Them', 'Social Proof', 'Pain Point']
 const toSlug = (s: string) => s.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -40,26 +41,28 @@ const getData = cache(async (format: string) => {
   return { hook, ads }
 })
 
-export async function generateMetadata({ params }: { params: { format: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: { platform: string; format: string } }): Promise<Metadata> {
+  const pf = PLATFORMS[params.platform]
   const { hook, ads } = await getData(params.format)
-  if (!hook) return { title: 'Ad formats — Selfmade' }
-  const title = `Winning ${hook} Ads on Meta — ${monthYear()} | Selfmade`
-  const description = `Top-performing ${hook.toLowerCase()} ads running on Meta right now — real examples ranked by performance. Get ideas, then clone or generate your own with Selfmade.`
+  if (!hook || !pf) return { title: 'Ad formats — Selfmade' }
+  const title = `Winning ${hook} Ads on ${pf} — ${monthYear()} | Selfmade`
+  const description = `Top-performing ${hook.toLowerCase()} ads running on ${pf} right now — real examples ranked by performance. Get ideas, then clone or generate your own with Selfmade.`
   return { title: { absolute: title }, description,
-    alternates: { canonical: `/ads/format/${params.format}` },
+    alternates: { canonical: `/ads/${params.platform}/format/${params.format}` },
     robots: ads.length < 6 ? { index: false, follow: true } : undefined,
     openGraph: { title, description, images: ads[0]?.image ? [img(ads[0].image, 800)] : [] },
   }
 }
 
-export default async function AdsFormatPage({ params }: { params: { format: string } }) {
+export default async function AdsFormatPage({ params }: { params: { platform: string; format: string } }) {
+  const pf = PLATFORMS[params.platform]
   const { hook, ads } = await getData(params.format)
-  if (!hook) notFound()   // invalid format → 404; valid-but-thin renders (noindex) instead
+  if (!hook || !pf) notFound()   // invalid format → 404; valid-but-thin renders (noindex) instead
 
   const ld = ads.length > 0 ? galleryJsonLd({
-    path: `/ads/format/${params.format}`, name: `Winning ${hook} Ads on Meta — ${monthYear()}`,
-    description: `Browse ${ads.length}+ real ${hook} ads running on Meta right now, ranked by performance.`,
-    platform: 'Meta', platformSlug: 'meta', category: `${hook}`, categorySlug: params.format,
+    path: `/ads/${params.platform}/format/${params.format}`, name: `Winning ${hook} Ads on ${pf} — ${monthYear()}`,
+    description: `Browse ${ads.length}+ real ${hook} ads running on ${pf} right now, ranked by performance.`,
+    platform: pf, platformSlug: params.platform, category: `${hook}`, categorySlug: params.format,
     count: ads.length, isoDate: new Date().toISOString(), ads,
   }) : null
 
@@ -75,8 +78,8 @@ export default async function AdsFormatPage({ params }: { params: { format: stri
 
       <header style={{ maxWidth: 900, margin: '0 auto', padding: '48px 24px 24px' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '.06em' }}>Ad format · Updated {monthYear()}</div>
-        <h1 style={{ fontSize: 'clamp(30px,5vw,46px)', fontWeight: 800, letterSpacing: '-.02em', margin: '8px 0 12px' }}>Winning {hook} ads on Meta</h1>
-        <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6, maxWidth: 680 }}>{pickIntro(params.format, hook, 'Meta', ads.length)}</p>
+        <h1 style={{ fontSize: 'clamp(30px,5vw,46px)', fontWeight: 800, letterSpacing: '-.02em', margin: '8px 0 12px' }}>Winning {hook} ads on {pf}</h1>
+        <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6, maxWidth: 680 }}>{pickIntro(params.format, hook, pf, ads.length)}</p>
       </header>
 
       {ads.length === 0 && (
@@ -111,14 +114,14 @@ export default async function AdsFormatPage({ params }: { params: { format: stri
       </section>
 
       <section style={{ maxWidth: 780, margin: '0 auto', padding: '10px 24px 20px' }}>
-        <p style={{ fontSize: 15, color: '#6b7280', lineHeight: 1.7 }}>{pickOutro(params.format, hook, 'Meta')}</p>
+        <p style={{ fontSize: 15, color: '#6b7280', lineHeight: 1.7 }}>{pickOutro(params.format, hook, pf)}</p>
       </section>
 
       <section style={{ maxWidth: 1120, margin: '0 auto', padding: '20px 24px 60px', borderTop: '1px solid #f0f2ef' }}>
         <div style={{ fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#9ca3af', margin: '20px 0 12px' }}>Winning ads by format</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {HOOKS.filter((h) => h !== hook).map((h) => (
-            <Link key={h} href={`/ads/format/${toSlug(h)}`} style={{ fontSize: 13.5, color: '#374151', background: '#f6f8f5', border: '1px solid #eef0ee', borderRadius: 20, padding: '6px 13px', textDecoration: 'none' }}>{h} Ads</Link>
+            <Link key={h} href={`/ads/${params.platform}/format/${toSlug(h)}`} style={{ fontSize: 13.5, color: '#374151', background: '#f6f8f5', border: '1px solid #eef0ee', borderRadius: 20, padding: '6px 13px', textDecoration: 'none' }}>{h} Ads</Link>
           ))}
         </div>
       </section>
