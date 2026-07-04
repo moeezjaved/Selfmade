@@ -134,8 +134,8 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
 
       {/* comparison grid */}
       <h3 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', margin: '56px 0 18px', textAlign: 'center' }}>Compare features</h3>
-      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table style={{ width: '100%', minWidth: 560, borderCollapse: 'collapse', fontSize: 12.5 }}>
           <thead>
             <tr style={{ background: '#f5f8f2' }}>
               <th style={{ textAlign: 'left', padding: '12px 16px', fontWeight: 700, color: '#555' }}></th>
