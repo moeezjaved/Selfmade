@@ -205,7 +205,7 @@ export default function HomeLanding() {
       {/* NAV */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,.85)', backdropFilter: 'blur(14px)', borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ ...wrap, height: 66, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <LogoMark color="#000" height={26} />
+          <LogoMark color="#000" height={32} />
           <div style={{ display: 'flex', gap: 30 }}>
             {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['#pricing', 'Pricing']].map(([h, l]) => (
               <a key={h} href={h} className="navlink" style={{ fontSize: 14.5, fontWeight: 600, color: '#4b5563', textDecoration: 'none' }}>{l}</a>
@@ -512,7 +512,7 @@ function SeoFooter() {
         <div style={{ ...wrap, padding: '52px 24px 40px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.6fr) repeat(2,minmax(0,1fr)) minmax(0,1.2fr)', gap: 28 }}>
             <div>
-              <LogoMark color="#000" height={26} />
+              <LogoMark color="#000" height={38} />
               <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.6, maxWidth: 280, marginTop: 12 }}>Find winning ads, make them yours, and launch — the whole ad workflow in one place.</p>
             </div>
             <FootCol title="Product" links={[['Discovery', '/discovery'], ['Brand Spy', '/discovery/brand-spy'], ['Trending', '/trending'], ['AI Ad Studio', '/creative-studio'], ['Launch Ads', '/m4'], ['Pricing', '#pricing']].map(([label, href]) => ({ label, href }))} />
