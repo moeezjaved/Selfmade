@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getUserOrg, getSeatInfo, canManage, type Role } from '@/lib/org'
+import { sendEmail } from '@/lib/email'
 import { randomBytes } from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -55,7 +56,17 @@ export async function POST(request: NextRequest) {
   const { data, error } = await admin.from('org_invites').insert({ org_id: org.orgId, email: em, role: r, token, invited_by: user.id }).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const site = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
-  return NextResponse.json({ invite: data, link: `${site}/join?token=${token}` })
+  const link = `${site}/join?token=${token}`
+  // Send the invite email (best-effort — the link is also returned so it works even if email fails).
+  const inviter = user.email || 'A teammate'
+  const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0e1b12">
+    <h2 style="font-size:22px;margin:0 0 12px">You're invited to ${org.name} on Selfmade</h2>
+    <p style="font-size:15px;line-height:1.6;color:#374151;margin:0 0 20px"><b>${inviter}</b> invited you to join their team on <b>Selfmade</b> — spy on 3M+ winning Meta ads, clone or generate your own with AI, and launch. One shared workspace.</p>
+    <p style="margin:0 0 20px"><a href="${link}" style="display:inline-block;background:#0e1b12;color:#dffe95;padding:13px 26px;border-radius:100px;text-decoration:none;font-weight:800;font-size:15px">Join the team →</a></p>
+    <p style="color:#9ca3af;font-size:13px;margin:0">Or paste this link into your browser:<br>${link}</p>
+  </div>`
+  sendEmail(em, `You're invited to ${org.name} on Selfmade`, html).catch(() => {})
+  return NextResponse.json({ invite: data, link })
 }
 
 export async function DELETE(request: NextRequest) {
