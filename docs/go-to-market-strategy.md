@@ -208,6 +208,106 @@ trajectory — the revenue model assumes you protect it. Skip the weekly beat an
 
 ---
 
+## 8. Creator marketing (amplifier on the affiliate channel)
+
+Strong *fit* here because the product is visually demoable (spy → clone on screen) and the ICP lives inside
+creator content. But do it the bootstrapped way — **alignment first, cash last.**
+
+### Target the RIGHT creators (relevance > reach)
+Not generic influencers. Marketing/media-buyer creators whose audience *is* your ICP. Go **micro/mid (5k–50k
+engaged), not mega** — in B2B SaaS an 8k-media-buyer audience converts far better and cheaper than 500k random.
+
+| Tier | Who | Why |
+|---|---|---|
+| Paid-media educators | Facebook/TikTok-ads teachers (YouTube + X) | audience = buyers with intent |
+| DTC-founder creators | "build a brand" YouTubers/X | need spy + create |
+| Agency-owner influencers | agency owners w/ an audience | buyer intent + team seats ($$) |
+| Ad-teardown creators | people already breaking down ads | your corpus IS their content |
+
+**Find them free:** search who already makes "spy on ads" / teardown content; copy the partner lists of
+Foreplay, Motion, Triple Whale, Minea — that list *is* your target list. Your build-in-public presence warms it.
+
+### The ladder — lead with alignment, not upfront cash
+1. **Seed free access** to 10–20 aligned creators, no strings. Genuinely useful → some post organically (cheapest, most credible content).
+2. **Affiliate over sponsorship** — route them into the **30%-lifetime program**. Zero upfront, pays on results, keeps paying (Minea's model).
+3. **Product-integrated content, not ad reads** — co-create "watch me find a winner and clone it in 60s." Doubles as your own video content.
+4. **Flat-fee only after data** — once affiliate/seeding shows who converts *payers*, pay upfront to the proven few. Never big cash on a guess — that's where bootstrapped budgets die.
+
+### Measure ruthlessly
+Unique link/code per creator → track **signup → free-to-paid → retained** per creator (not clicks). Kill
+non-converters; double down on payer-drivers. One aligned creator > ten random ones.
+
+### Outreach DM template (seed offer)
+> Hey [name] — I've been following your [ad teardowns / paid-media content] and it's some of the sharpest in
+> the space. I built **Self Made**, a tool that lets you search 5M+ live ads, see what's actually spending,
+> and clone the winners into your own ad in a couple clicks. I'd love to just *give you a free Pro account* —
+> no ask, no strings. If you find it useful and want to share it, I run a 30% lifetime affiliate program, but
+> honestly I'd rather you just try it first. Want me to set you up?
+
+**Caution:** creator marketing is a *multiplier on top of* a working product + the newsletter/SEO engine — not
+a substitute. One-off cash sponsorships rarely pay back in SaaS; the seed → affiliate → co-created-content
+version does, because it compounds and de-risks the spend.
+
+---
+
+## 9. Five-year revenue, profit & exit model
+
+Extends the 24-month model to a full horizon. **Heavily assumption-driven** — treat as a calibrated map, not a
+promise. Bootstrapped means slower growth but **you own ~100% (no dilution), so the profit and the exit are
+almost entirely yours** — that's the whole point of this path (Foreplay's founder still owns his company).
+
+### Exit ARR (run-rate at each year-end)
+| Year | Conservative | **Base** | Optimistic |
+|---|---|---|---|
+| Y1 | $48k | **$114k** | $216k |
+| Y2 | $216k | **$576k** | $1.2M |
+| Y3 | $500k | **$1.5M** | $3.0M |
+| Y4 | $1.0M | **$3.0M** | $6.0M |
+| Y5 | $1.8M | **$5.0M** | $10M *(Foreplay-class ceiling)* |
+
+Growth *rate* decelerates each year (law of large numbers + churn) even as absolute ARR climbs — that's normal
+and realistic, not pessimism.
+
+### Base-case P&L (the money you actually keep)
+Bootstrapped + lean = very high margins. COGS ~12% (AI image gen, proxies/IPRoyal, DB, hosting); the rest is a
+small team you add only as revenue funds it.
+
+| Year | Revenue collected | Costs | **Net profit** | Margin | Team |
+|---|---|---|---|---|---|
+| Y1 | ~$45k | ~$30k | **~$15k** | ~33% | you (solo) |
+| Y2 | ~$300k | ~$200k | **~$100k** | ~33% | +1–2 (support, editor) |
+| Y3 | ~$950k | ~$600k | **~$350k** | ~37% | ~4–5 |
+| Y4 | ~$2.1M | ~$1.2M | **~$900k** | ~43% | ~8 |
+| Y5 | ~$3.9M | ~$1.9M | **~$2.0M** | ~50% | ~12 |
+
+- **Cumulative 5-yr net profit (base): ~$3.4M** — while *also* building a ~$5M-ARR asset you own outright.
+- **Year 1 is thin on purpose** — you reinvest, and your "salary" is modest. The payoff is compounding + equity, not Y1 cash. If you keep it leaner (no early hires), Y1–2 take-home is higher but growth is slower — a real trade-off you control.
+
+### The exit (Year 4–5 is the sweet spot)
+Sell while growth is still strong — buyers pay for trajectory, not just size. Bootstrapped SMB/martech SaaS
+with good retention typically trades at **~3–6× ARR** (higher for high-growth + high-margin + a data moat like
+your corpus).
+
+| Scenario (Y5) | ARR | Multiple | **Exit value** | Your take (≈100%, pre-tax) |
+|---|---|---|---|---|
+| Conservative | $1.8M | 3–4× | **$5–7M** | ~$5–7M |
+| **Base** | $5.0M | 4–6× | **$20–30M** | ~$20–30M |
+| Optimistic | $10M | 6–8× | **$60–80M** | ~$60–80M |
+
+**Likely buyers:** a bigger martech/ad-intelligence player (Triple Whale, Motion, Semrush, HubSpot-type),
+a PE roll-up, or a marketplace sale (Acquire.com) at the lower end. **You don't have to sell** — at Y5 base
+you're taking home ~$2M/yr in profit, so "keep it as a cash machine" is a legitimate third option.
+
+### The honest caveats (same as the 24-month model, magnified over 5 years)
+- **Churn is the master variable.** Over 5 years, 4% vs 8% monthly churn is the difference between the base and
+  conservative columns. Retention features earn their keep every single year.
+- **Competition compounds too** — Atria/Foreplay/Motion won't stand still. Your defensibility is the 5M-ad
+  corpus + end-to-end loop + SEO moat, not features.
+- **These are models.** No verified niche churn/ARPU/multiple data exists for *your* funnel yet — replace every
+  assumption with real numbers by month 6 and re-run this.
+
+---
+
 ## Summary
 - **Market:** validated, bootstrappable (Foreplay: 7-figure ARR, $0 VC). Beachhead = daily-spying DTC marketers + small agencies.
 - **Wedge:** the only spy→clone→launch→track tool, at 1/5 Atria's price, on a 5M-ad SEO moat.
