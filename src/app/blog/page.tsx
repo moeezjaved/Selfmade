@@ -30,7 +30,7 @@ export default async function BlogIndex() {
   } : null
 
   return (
-    <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", background: BG, color: '#f4f7f4', minHeight: '100vh' }}>
+    <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", backgroundColor: BG, backgroundImage: `radial-gradient(900px 440px at 15% -6%, rgba(168,85,247,.16), transparent 60%), radial-gradient(760px 400px at 96% 4%, rgba(219,39,119,.13), transparent 60%), radial-gradient(700px 500px at 60% 0%, rgba(223,254,149,.06), transparent 55%)`, color: '#f4f7f4', minHeight: '100vh' }}>
       {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />}
       <nav style={{ borderBottom: '1px solid rgba(255,255,255,.07)', position: 'sticky', top: 0, background: 'rgba(10,13,12,.8)', backdropFilter: 'blur(12px)', zIndex: 50 }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', padding: '15px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -41,7 +41,7 @@ export default async function BlogIndex() {
 
       <header style={{ maxWidth: 1160, margin: '0 auto', padding: '54px 24px 30px' }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: LIME, textTransform: 'uppercase', letterSpacing: '.1em' }}>The Selfmade Blog</div>
-        <h1 style={{ fontSize: 'clamp(34px,5.5vw,56px)', fontWeight: 800, letterSpacing: '-.03em', margin: '12px 0 10px', lineHeight: 1.05 }}>What makes Meta ads win</h1>
+        <h1 style={{ fontSize: 'clamp(36px,6vw,62px)', fontWeight: 800, letterSpacing: '-.03em', margin: '12px 0 10px', lineHeight: 1.02, color: '#ffffff' }}>What makes Meta ads win</h1>
         <p style={{ fontSize: 18, color: '#9aa39c', lineHeight: 1.6, maxWidth: 620 }}>Playbooks, teardowns, and data from inside a 3M+ ad library. Steal what works.</p>
       </header>
 
