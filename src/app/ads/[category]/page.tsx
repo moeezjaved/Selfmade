@@ -14,6 +14,9 @@ import type { Metadata } from 'next'
 export const revalidate = 3600   // refresh hourly (keeps "Updated" fresh + picks up new crawls)
 
 const LIME = '#dffe95', INK = '#0e1b12'
+// Categories the footer links — always valid pages (render a noindex "indexing more" state when
+// thin, never 404), so footer links can't break. Merged with the live niche taxonomy.
+const FOOTER_INDUSTRIES = ['Skincare', 'Supplements', 'Beauty', 'Apparel', 'Fitness', 'Health & Wellness', 'Hair Care', 'Pets', 'Home Goods', 'Food & Beverage', 'Jewelry', 'Baby & Kids', 'Personal Care', 'Cosmetics', 'Fragrance', 'Footwear', 'Accessories', 'Electronics']
 const toSlug = (s: string) => s.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 const monthYear = () => new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 function img(url: string, w = 400) {
@@ -26,7 +29,7 @@ function img(url: string, w = 400) {
 const getData = cache(async (category: string) => {
   const admin = createAdminClient()
   const { data: nc } = await admin.from('niche_counts').select('niche')
-  const niches = (nc || []).map((r: any) => r.niche).filter(Boolean) as string[]
+  const niches = Array.from(new Set([...(nc || []).map((r: any) => r.niche).filter(Boolean), ...FOOTER_INDUSTRIES])) as string[]
   const niche = niches.find((n) => toSlug(n) === category)
   if (!niche) return { niche: null, ads: [], siblings: niches }
   const { data } = await admin.from('discovery_ads_index')
@@ -46,8 +49,7 @@ export async function generateMetadata({ params }: { params: { category: string 
   if (!niche) return { title: 'Ad examples — Selfmade' }
   const title = `Winning ${niche} Ads on Meta — ${monthYear()} | Selfmade`
   const description = `See the top-performing ${niche.toLowerCase()} ads running on Meta right now — real examples ranked by performance. Get ideas, then clone or generate your own with Selfmade.`
-  return {
-    title, description,
+  return { title: { absolute: title }, description,
     alternates: { canonical: `/ads/${params.category}` },
     robots: ads.length < 6 ? { index: false, follow: true } : undefined,   // thin-content guard
     openGraph: { title, description, images: ads[0]?.image ? [img(ads[0].image, 800)] : [] },
@@ -56,18 +58,19 @@ export async function generateMetadata({ params }: { params: { category: string 
 
 export default async function AdsCategoryPage({ params }: { params: { category: string } }) {
   const { niche, ads, siblings } = await getData(params.category)
-  if (!niche || ads.length === 0) notFound()
+  if (!niche) notFound()   // invalid slug → 404; a valid-but-thin niche renders (noindex) instead
 
-  const ld = galleryJsonLd({
+  // Emit JSON-LD only when there are real ads (never an empty ItemList).
+  const ld = ads.length > 0 ? galleryJsonLd({
     path: `/ads/${params.category}`, name: `Winning ${niche} Ads on Meta — ${monthYear()}`,
     description: `Browse ${ads.length}+ real ${niche} ads running on Meta right now, ranked by performance.`,
     platform: 'Meta', platformSlug: 'meta', category: niche, categorySlug: params.category,
     count: ads.length, isoDate: new Date().toISOString(), ads,
-  })
+  }) : null
 
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", background: '#fff', color: INK, minHeight: '100vh' }}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />}
       <nav style={{ borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/home">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 24, filter: 'brightness(0)' }} /></Link>
@@ -80,6 +83,14 @@ export default async function AdsCategoryPage({ params }: { params: { category: 
         <h1 style={{ fontSize: 'clamp(30px,5vw,46px)', fontWeight: 800, letterSpacing: '-.02em', margin: '8px 0 12px' }}>Winning {niche} ads on Meta</h1>
         <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6, maxWidth: 680 }}>{pickIntro(params.category, niche, 'Meta', ads.length)}</p>
       </header>
+
+      {ads.length === 0 && (
+        <section style={{ maxWidth: 780, margin: '0 auto', padding: '4px 24px 8px' }}>
+          <div style={{ background: '#fbfdfa', border: '1px solid #eef0ee', borderRadius: 14, padding: '20px 22px', color: '#4b5563', fontSize: 15 }}>
+            We&rsquo;re still indexing top {niche.toLowerCase()} ads — fresh winners appear here as our crawler and classifier process them. In the meantime, explore other categories below or <Link href="/signup" style={{ color: INK, fontWeight: 700 }}>start free</Link> and search 3M+ ads yourself.
+          </div>
+        </section>
+      )}
 
       <section style={{ maxWidth: 1120, margin: '0 auto', padding: '12px 24px 20px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14 }}>

@@ -45,8 +45,7 @@ export async function generateMetadata({ params }: { params: { format: string } 
   if (!hook) return { title: 'Ad formats — Selfmade' }
   const title = `Winning ${hook} Ads on Meta — ${monthYear()} | Selfmade`
   const description = `Top-performing ${hook.toLowerCase()} ads running on Meta right now — real examples ranked by performance. Get ideas, then clone or generate your own with Selfmade.`
-  return {
-    title, description,
+  return { title: { absolute: title }, description,
     alternates: { canonical: `/ads/format/${params.format}` },
     robots: ads.length < 6 ? { index: false, follow: true } : undefined,
     openGraph: { title, description, images: ads[0]?.image ? [img(ads[0].image, 800)] : [] },
@@ -55,18 +54,18 @@ export async function generateMetadata({ params }: { params: { format: string } 
 
 export default async function AdsFormatPage({ params }: { params: { format: string } }) {
   const { hook, ads } = await getData(params.format)
-  if (!hook || ads.length === 0) notFound()
+  if (!hook) notFound()   // invalid format → 404; valid-but-thin renders (noindex) instead
 
-  const ld = galleryJsonLd({
+  const ld = ads.length > 0 ? galleryJsonLd({
     path: `/ads/format/${params.format}`, name: `Winning ${hook} Ads on Meta — ${monthYear()}`,
     description: `Browse ${ads.length}+ real ${hook} ads running on Meta right now, ranked by performance.`,
     platform: 'Meta', platformSlug: 'meta', category: `${hook}`, categorySlug: params.format,
     count: ads.length, isoDate: new Date().toISOString(), ads,
-  })
+  }) : null
 
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", background: '#fff', color: INK, minHeight: '100vh' }}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />}
       <nav style={{ borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/home">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 24, filter: 'brightness(0)' }} /></Link>
@@ -79,6 +78,14 @@ export default async function AdsFormatPage({ params }: { params: { format: stri
         <h1 style={{ fontSize: 'clamp(30px,5vw,46px)', fontWeight: 800, letterSpacing: '-.02em', margin: '8px 0 12px' }}>Winning {hook} ads on Meta</h1>
         <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6, maxWidth: 680 }}>{pickIntro(params.format, hook, 'Meta', ads.length)}</p>
       </header>
+
+      {ads.length === 0 && (
+        <section style={{ maxWidth: 780, margin: '0 auto', padding: '4px 24px 8px' }}>
+          <div style={{ background: '#fbfdfa', border: '1px solid #eef0ee', borderRadius: 14, padding: '20px 22px', color: '#4b5563', fontSize: 15 }}>
+            We&rsquo;re still indexing top {hook.toLowerCase()} ads — new examples appear here as our classifier processes them. Explore other formats below or <Link href="/signup" style={{ color: INK, fontWeight: 700 }}>start free</Link> to search 3M+ ads yourself.
+          </div>
+        </section>
+      )}
 
       <section style={{ maxWidth: 1120, margin: '0 auto', padding: '12px 24px 20px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14 }}>

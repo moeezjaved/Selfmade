@@ -59,7 +59,7 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
   if (!c) return { title: 'Alternatives — Selfmade' }
   const title = `The best ${c.name} alternative — Selfmade`
   const description = `Looking for a ${c.name} alternative? Selfmade covers discovery like ${c.name}, then lets you clone or AI-generate the ad and launch — the whole workflow in one place.`
-  return { title, description, alternates: { canonical: `/alternatives/${params.slug}` }, openGraph: { title, description } }
+  return { title: { absolute: title }, description, alternates: { canonical: `/alternatives/${params.slug}` }, openGraph: { title, description } }
 }
 
 export default function AlternativePage({ params }: { params: { slug: string } }) {

@@ -29,21 +29,21 @@ function adImg(url: string, w = 400): string {
  *     anything already in view on load — so headlines slide up on load, below-fold reveals on scroll.
  */
 function AnimGate() {
-  return <script dangerouslySetInnerHTML={{ __html: "try{if(!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.classList.add('anim')}catch(e){}" }} />
+  return <script dangerouslySetInnerHTML={{ __html: "try{document.documentElement.classList.add('js')}catch(e){}" }} />
 }
 
 function useScrollReveal() {
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') { document.documentElement.classList.remove('anim'); return }
+    if (typeof IntersectionObserver === 'undefined') { document.documentElement.classList.remove('js'); return }
     const els = Array.from(document.querySelectorAll<HTMLElement>('.reveal, .mask'))
     const io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) } })
+      entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target) } })
     }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' })
     els.forEach((el) => io.observe(el))
     // Safety net: reveal anything still hidden after a grace period (never leave content hidden).
-    const t = setTimeout(() => els.forEach((el) => el.classList.add('in')), 2600)
+    const t = setTimeout(() => els.forEach((el) => el.classList.add('in-view')), 2600)
     // Also reveal anything already in view on the very next frame (headlines slide up on load).
-    requestAnimationFrame(() => els.forEach((el) => { const r = el.getBoundingClientRect(); if (r.top < window.innerHeight && r.bottom > 0) el.classList.add('in') }))
+    requestAnimationFrame(() => els.forEach((el) => { const r = el.getBoundingClientRect(); if (r.top < window.innerHeight && r.bottom > 0) el.classList.add('in-view') }))
     return () => { io.disconnect(); clearTimeout(t) }
   }, [])
 }
@@ -194,12 +194,12 @@ export default function HomeLanding() {
         .reveal{transition:opacity .6s cubic-bezier(0,0,.2,1), transform .6s cubic-bezier(0,0,.2,1)}
         .mask{display:block;overflow:hidden}
         .mask>span{display:block;transition:transform .7s cubic-bezier(.22,1,.36,1)}
-        html.anim .reveal{opacity:0;transform:translateY(32px)}
-        html.anim .reveal.in{opacity:1;transform:none}
-        html.anim .mask>span{transform:translateY(110%)}
-        html.anim .mask.in>span{transform:none}
+        html.js .reveal{opacity:0;transform:translateY(28px)}
+        html.js .reveal.in-view{opacity:1;transform:none}
+        html.js .mask>span{transform:translateY(110%)}
+        html.js .mask.in-view>span{transform:none}
         /* ── reduced motion ── */
-        @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}html.anim .reveal,html.anim .mask>span{opacity:1!important;transform:none!important}}
+        @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}html.js .reveal,html.js .mask>span{opacity:1!important;transform:none!important}}
       `}</style>
 
       {/* NAV */}
@@ -516,7 +516,7 @@ function SeoFooter() {
               <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.6, maxWidth: 280, marginTop: 12 }}>Find winning ads, make them yours, and launch — the whole ad workflow in one place.</p>
             </div>
             <FootCol title="Product" links={[['Discovery', '/discovery'], ['Brand Spy', '/discovery/brand-spy'], ['Trending', '/trending'], ['AI Ad Studio', '/creative-studio'], ['Launch Ads', '/m4'], ['Pricing', '#pricing']].map(([label, href]) => ({ label, href }))} />
-            <FootCol title="Company" links={[['About', '/about'], ['Blog', '/blog'], ['Careers', '/careers'], ['Contact', '/contact'], ['Privacy', '/privacy'], ['Terms', '/terms']].map(([label, href]) => ({ label, href }))} />
+            <FootCol title="Company" links={[['About', '/about'], ['Contact', '/contact'], ['Privacy', '/privacy'], ['Terms', '/terms']].map(([label, href]) => ({ label, href }))} />
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, color: '#111', marginBottom: 8 }}>Start free today</div>
               <p style={{ color: '#6b7280', fontSize: 13.5, margin: '0 0 12px', maxWidth: 260 }}>50 credits, no card. Find a winner and make it yours.</p>
