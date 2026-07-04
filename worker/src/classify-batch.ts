@@ -16,7 +16,10 @@
  * caption's tags across visual variants. The gate is self-healing (re-picks any ad
  * missing either output), so partial failures never leave permanent holes.
  *
- *   npx tsx src/classify-batch.ts [--wave=40000] [--once]
+ *   npx tsx src/classify-batch.ts [--wave=40000] [--once] [--sync]
+ *   --sync (or CLASSIFY_SYNC=1, CLASSIFY_CONCURRENCY=N): real-time parallel completions instead of
+ *   the 24h Batch API — a wave finishes in minutes (full price, self-throttles on 429). Use to drain
+ *   a backlog fast; drop --sync for cheap steady-state cron ticks.
  *   (requires migration 017 — copy_sig + is_classifiable generated columns)
  *
  * Restart-safe: on start it adopts any batch already in flight (or recently
@@ -39,9 +42,28 @@ const ONCE = process.argv.includes('--once')
 const PAGE_ID = (process.env.CLASSIFY_PAGE_ID || '').trim()   // set → classify ONLY this brand (deep spy)
 const POLL_MS = 30_000
 
+// ── SYNC mode ────────────────────────────────────────────────────────────────
+// --sync (or CLASSIFY_SYNC=1): skip the 24h Batch API and fire real-time /chat/completions calls
+// through a concurrency pool. A wave finishes in MINUTES instead of up to a day — the right mode for
+// draining a backlog. Trade-off: no 50% Batch discount (full price), and it consumes your RPM/TPM
+// limits, so it self-throttles on 429 (fetchRetry). Bigger --wave here just means fewer DB round-trips;
+// it's NOT bound by the 2M enqueued-token Batch limit (that only applies to the async path).
+const SYNC = process.argv.includes('--sync') || process.env.CLASSIFY_SYNC === '1'
+const CONCURRENCY = Math.max(1, parseInt(process.env.CLASSIFY_CONCURRENCY || '40', 10))
+
 let tIn = 0, tOut = 0, cacheHits = 0
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-const estCost = () => (tIn / 1e6 * provider.priceIn + tOut / 1e6 * provider.priceOut) * 0.5  // Batch API = 50%
+// Batch API = 50% off; sync = full price.
+const estCost = () => (tIn / 1e6 * provider.priceIn + tOut / 1e6 * provider.priceOut) * (SYNC ? 1 : 0.5)
+
+/** Run `fn` over `items` with at most `n` in flight at once. */
+async function pool<T, R>(items: T[], n: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length)
+  let next = 0
+  const worker = async () => { while (next < items.length) { const i = next++; out[i] = await fn(items[i], i) } }
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker))
+  return out
+}
 
 /**
  * Scan up to WAVE work-eligible ads and reduce to UNIQUE COPY SIGNATURES, keeping
@@ -99,6 +121,27 @@ async function submitBatch(items: CreativeItem[]): Promise<string> {
   return id
 }
 
+/** SYNC path: fire all requests through a concurrency pool of real-time completions, applying each
+ *  result as it returns. No 24h batch wait. Returns sigs applied. */
+async function classifySync(items: CreativeItem[]): Promise<number> {
+  const requests = chunk(items, SIGS_PER_REQUEST).map((group, i) => ({ customId: `r${i}`, prompt: buildMergedPrompt(group) }))
+  console.log(`  ⚡ [sync ${provider.name}/${provider.model}] ${requests.length} requests @ concurrency ${CONCURRENCY} (${items.length} copy sigs)`)
+  let applied = 0, done = 0
+  await pool(requests, CONCURRENCY, async (req) => {
+    let r
+    try { r = await provider.complete(req) }
+    catch (e: any) { console.warn(`  ⚠️ request failed (skipped): ${e?.message || e}`); return }
+    tIn += r.inTok; tOut += r.outTok
+    for (const c of r.items) {
+      if (!c?.id) continue
+      try { await propagateClassification(String(c.id), c); applied++ } catch { /* skip one */ }
+    }
+    if (++done % 25 === 0) console.log(`  … ${done}/${requests.length} reqs | applied ${applied} | est $${estCost().toFixed(2)}`)
+  })
+  console.log(`  ✅ sync wave: applied ${applied} sigs | est $${estCost().toFixed(3)} (full-price)`)
+  return applied
+}
+
 /** Poll until the batch ends, then apply every result. Returns sigs applied. */
 async function drainBatch(id: string): Promise<number> {
   let st = await provider.isDone(id)
@@ -146,8 +189,9 @@ async function adoptExistingBatches(): Promise<void> {
 }
 
 async function main() {
-  console.log(`Per-copy-signature batch classify — ${provider.name}/${provider.model}, wave=${WAVE}, perReq=${SIGS_PER_REQUEST}`)
-  await adoptExistingBatches()
+  console.log(`Per-copy-signature classify — ${provider.name}/${provider.model}, wave=${WAVE}, perReq=${SIGS_PER_REQUEST}, mode=${SYNC ? `SYNC×${CONCURRENCY}` : 'batch(24h)'}`)
+  // Batch adoption only matters for the async path (in-flight batches to resume). Sync has none.
+  if (!SYNC) await adoptExistingBatches()
 
   let totalApplied = 0
   while (true) {
@@ -166,12 +210,16 @@ async function main() {
     if (cached.size) console.log(`  cache: reused ${cached.size} sigs, ${misses.length} to classify`)
 
     if (misses.length) {
-      const id = await submitBatch(misses)
-      totalApplied += await drainBatch(id)
+      if (SYNC) {
+        totalApplied += await classifySync(misses)
+      } else {
+        const id = await submitBatch(misses)
+        totalApplied += await drainBatch(id)
+      }
     }
     if (ONCE) break
   }
-  console.log(`🏁 done — applied ${totalApplied} sigs (${cacheHits} cache-reused) | ${provider.name}/${provider.model} est $${estCost().toFixed(2)} (batch-priced, in=${tIn} out=${tOut})`)
+  console.log(`🏁 done — applied ${totalApplied} sigs (${cacheHits} cache-reused) | ${provider.name}/${provider.model} est $${estCost().toFixed(2)} (${SYNC ? 'sync/full-price' : 'batch-priced'}, in=${tIn} out=${tOut})`)
   process.exit(0)
 }
 main().catch(e => { console.error(e); process.exit(1) })

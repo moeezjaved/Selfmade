@@ -15,6 +15,27 @@ export interface SubmitRequest { customId: string; prompt: string }
 export interface BatchResult { items: any[]; inTok: number; outTok: number }
 export interface BatchListing { id: string; done: boolean }
 
+// fetch with retry on 429 (rate limit) + 5xx — honors Retry-After, else exponential backoff. Used by
+// the SYNC path (classify-batch --sync), which fires many concurrent /chat/completions and WILL hit
+// rate limits; the async Batch path never needs this (the queue absorbs bursts server-side).
+export async function fetchRetry(url: string, opts: any, tries = 6): Promise<Response> {
+  let delay = 1000
+  for (let i = 0; i < tries; i++) {
+    let res: Response
+    try { res = await fetch(url, opts) }
+    catch (e) { if (i === tries - 1) throw e; await new Promise(r => setTimeout(r, delay)); delay = Math.min(delay * 2, 30_000); continue }
+    if (res.status === 429 || res.status >= 500) {
+      if (i === tries - 1) return res
+      const ra = parseInt(res.headers.get('retry-after') || '0', 10)
+      await new Promise(r => setTimeout(r, ra > 0 ? ra * 1000 : delay))
+      delay = Math.min(delay * 2, 30_000)
+      continue
+    }
+    return res
+  }
+  return fetch(url, opts)   // unreachable; satisfies types
+}
+
 export interface ClassifyProvider {
   name: string
   model: string
@@ -24,6 +45,8 @@ export interface ClassifyProvider {
   isDone(batchId: string): Promise<{ done: boolean; status: string; counts?: any }>
   results(batchId: string): Promise<BatchResult[]>
   list(limit?: number): Promise<BatchListing[]>
+  // SYNC path: one real-time completion (no 24h batch wait). Same prompt/parse as the batch path.
+  complete(request: SubmitRequest): Promise<BatchResult>
 }
 
 // ── Anthropic (Message Batches API) ──────────────────────────────────────────
@@ -69,6 +92,16 @@ class AnthropicProvider implements ClassifyProvider {
   async list(limit = 20): Promise<BatchListing[]> {
     const d = await (await fetch(`${this.base}?limit=${limit}`, { headers: this.h() })).json()
     return (d.data || []).map((b: any) => ({ id: b.id, done: b.processing_status === 'ended' }))
+  }
+  async complete(req: SubmitRequest): Promise<BatchResult> {
+    const res = await fetchRetry('https://api.anthropic.com/v1/messages', {
+      method: 'POST', headers: this.h(),
+      body: JSON.stringify({ model: this.model, max_tokens: 6000, messages: [{ role: 'user', content: req.prompt }] }),
+    })
+    const data = await res.json()
+    if (!data.content) throw new Error(`anthropic complete failed: ${JSON.stringify(data).slice(0, 200)}`)
+    const u = data.usage || {}
+    return { items: parseClassification(data.content?.[0]?.text || ''), inTok: u.input_tokens || 0, outTok: u.output_tokens || 0 }
   }
 }
 
@@ -163,6 +196,22 @@ class OpenAIProvider implements ClassifyProvider {
     const d = await (await fetch(`${this.base}/batches?limit=${limit}`, { headers: this.auth() })).json()
     const terminal = ['completed', 'failed', 'expired', 'cancelled']
     return (d.data || []).map((b: any) => ({ id: b.id, done: terminal.includes(b.status) }))
+  }
+  async complete(req: SubmitRequest): Promise<BatchResult> {
+    const res = await fetchRetry(`${this.base}/chat/completions`, {
+      method: 'POST', headers: { ...this.auth(), 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [{ role: 'user', content: req.prompt }],
+        response_format: { type: 'json_schema', json_schema: OPENAI_SCHEMA },
+      }),
+    })
+    const body = await res.json()
+    const msg = body?.choices?.[0]?.message
+    let items: any[] = []
+    if (msg && !msg.refusal) { try { items = JSON.parse(msg.content || '{}').results || [] } catch { items = [] } }
+    const u = body.usage || {}
+    return { items, inTok: u.prompt_tokens || 0, outTok: u.completion_tokens || 0 }
   }
 }
 
