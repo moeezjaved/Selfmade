@@ -14,6 +14,7 @@ import type { Metadata } from 'next'
 export const revalidate = 3600   // refresh hourly (keeps "Updated" fresh + picks up new crawls)
 
 const LIME = '#dffe95', INK = '#0e1b12'
+const PLATFORMS: Record<string,string> = { meta: 'Meta' }
 // Categories the footer links — always valid pages (render a noindex "indexing more" state when
 // thin, never 404), so footer links can't break. Merged with the live niche taxonomy.
 const FOOTER_INDUSTRIES = ['Skincare', 'Supplements', 'Beauty', 'Apparel', 'Fitness', 'Health & Wellness', 'Hair Care', 'Pets', 'Home Goods', 'Food & Beverage', 'Jewelry', 'Baby & Kids', 'Personal Care', 'Cosmetics', 'Fragrance', 'Footwear', 'Accessories', 'Electronics']
@@ -44,27 +45,29 @@ const getData = cache(async (category: string) => {
   return { niche, ads, siblings: niches }
 })
 
-export async function generateMetadata({ params }: { params: { category: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: { platform: string; category: string } }): Promise<Metadata> {
+  const pf = PLATFORMS[params.platform]
   const { niche, ads } = await getData(params.category)
-  if (!niche) return { title: 'Ad examples — Selfmade' }
-  const title = `Winning ${niche} Ads on Meta — ${monthYear()} | Selfmade`
-  const description = `See the top-performing ${niche.toLowerCase()} ads running on Meta right now — real examples ranked by performance. Get ideas, then clone or generate your own with Selfmade.`
+  if (!niche || !pf) return { title: 'Ad examples — Selfmade' }
+  const title = `Winning ${niche} Ads on ${pf} — ${monthYear()} | Selfmade`
+  const description = `See the top-performing ${niche.toLowerCase()} ads running on ${pf} right now — real examples ranked by performance. Get ideas, then clone or generate your own with Selfmade.`
   return { title: { absolute: title }, description,
-    alternates: { canonical: `/ads/${params.category}` },
+    alternates: { canonical: `/ads/${params.platform}/${params.category}` },
     robots: ads.length < 6 ? { index: false, follow: true } : undefined,   // thin-content guard
     openGraph: { title, description, images: ads[0]?.image ? [img(ads[0].image, 800)] : [] },
   }
 }
 
-export default async function AdsCategoryPage({ params }: { params: { category: string } }) {
+export default async function AdsCategoryPage({ params }: { params: { platform: string; category: string } }) {
+  const pf = PLATFORMS[params.platform]
   const { niche, ads, siblings } = await getData(params.category)
-  if (!niche) notFound()   // invalid slug → 404; a valid-but-thin niche renders (noindex) instead
+  if (!niche || !pf) notFound()   // invalid slug → 404; a valid-but-thin niche renders (noindex) instead
 
   // Emit JSON-LD only when there are real ads (never an empty ItemList).
   const ld = ads.length > 0 ? galleryJsonLd({
-    path: `/ads/${params.category}`, name: `Winning ${niche} Ads on Meta — ${monthYear()}`,
-    description: `Browse ${ads.length}+ real ${niche} ads running on Meta right now, ranked by performance.`,
-    platform: 'Meta', platformSlug: 'meta', category: niche, categorySlug: params.category,
+    path: `/ads/${params.platform}/${params.category}`, name: `Winning ${niche} Ads on ${pf} — ${monthYear()}`,
+    description: `Browse ${ads.length}+ real ${niche} ads running on ${pf} right now, ranked by performance.`,
+    platform: pf, platformSlug: params.platform, category: niche, categorySlug: params.category,
     count: ads.length, isoDate: new Date().toISOString(), ads,
   }) : null
 
@@ -80,8 +83,8 @@ export default async function AdsCategoryPage({ params }: { params: { category: 
 
       <header style={{ maxWidth: 900, margin: '0 auto', padding: '48px 24px 24px' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '.06em' }}>Ad examples · Updated {monthYear()}</div>
-        <h1 style={{ fontSize: 'clamp(30px,5vw,46px)', fontWeight: 800, letterSpacing: '-.02em', margin: '8px 0 12px' }}>Winning {niche} ads on Meta</h1>
-        <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6, maxWidth: 680 }}>{pickIntro(params.category, niche, 'Meta', ads.length)}</p>
+        <h1 style={{ fontSize: 'clamp(30px,5vw,46px)', fontWeight: 800, letterSpacing: '-.02em', margin: '8px 0 12px' }}>Winning {niche} ads on {pf}</h1>
+        <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6, maxWidth: 680 }}>{pickIntro(params.category, niche, pf, ads.length)}</p>
       </header>
 
       {ads.length === 0 && (
@@ -118,7 +121,7 @@ export default async function AdsCategoryPage({ params }: { params: { category: 
 
       {/* SEO body / outro */}
       <section style={{ maxWidth: 780, margin: '0 auto', padding: '10px 24px 20px' }}>
-        <p style={{ fontSize: 15, color: '#6b7280', lineHeight: 1.7 }}>{pickOutro(params.category, niche, 'Meta')}</p>
+        <p style={{ fontSize: 15, color: '#6b7280', lineHeight: 1.7 }}>{pickOutro(params.category, niche, pf)}</p>
       </section>
 
       {/* sibling internal links */}
@@ -126,7 +129,7 @@ export default async function AdsCategoryPage({ params }: { params: { category: 
         <div style={{ fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#9ca3af', margin: '20px 0 12px' }}>Winning ads by industry</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {siblings.filter((n) => n !== niche).map((n) => (
-            <Link key={n} href={`/ads/${toSlug(n)}`} style={{ fontSize: 13.5, color: '#374151', background: '#f6f8f5', border: '1px solid #eef0ee', borderRadius: 20, padding: '6px 13px', textDecoration: 'none' }}>{n} Ads</Link>
+            <Link key={n} href={`/ads/${params.platform}/${toSlug(n)}`} style={{ fontSize: 13.5, color: '#374151', background: '#f6f8f5', border: '1px solid #eef0ee', borderRadius: 20, padding: '6px 13px', textDecoration: 'none' }}>{n} Ads</Link>
           ))}
         </div>
       </section>

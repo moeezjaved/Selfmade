@@ -527,8 +527,8 @@ function SeoFooter() {
           {/* SEO grids */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32, marginTop: 44, paddingTop: 36, borderTop: '1px solid #eef0ee' }}>
             <FootCol title="Selfmade alternatives" links={alternatives.map(a => ({ label: `${a} Alternative`, href: `/alternatives/${slug(a)}` }))} />
-            <FootCol title="Winning Meta ads by industry" links={industries.map(i => ({ label: `${i} Ads`, href: `/ads/${slug(i)}` }))} />
-            <FootCol title="Winning ad formats" links={formats.map(f => ({ label: `${f} Ads`, href: `/ads/format/${slug(f)}` }))} />
+            <FootCol title="Winning Meta ads by industry" links={industries.map(i => ({ label: `${i} Ads`, href: `/ads/meta/${slug(i)}` }))} />
+            <FootCol title="Winning ad formats" links={formats.map(f => ({ label: `${f} Ads`, href: `/ads/meta/format/${slug(f)}` }))} />
           </div>
         </div>
       </div>

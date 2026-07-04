@@ -29,12 +29,12 @@ export async function GET(request: NextRequest) {
 
   const industries = (await Promise.all(niches.map(async (n) => {
     const ads = await countFor('niche', n)
-    return { label: n, url: `/ads/${toSlug(n)}`, ads, live: ads >= MIN }
+    return { label: n, url: `/ads/meta/${toSlug(n)}`, ads, live: ads >= MIN }
   }))).sort((a, b) => b.ads - a.ads)
 
   const formats = (await Promise.all(HOOKS.map(async (h) => {
     const ads = await countFor('hook_type', h)
-    return { label: h, url: `/ads/format/${toSlug(h)}`, ads, live: ads >= MIN }
+    return { label: h, url: `/ads/meta/format/${toSlug(h)}`, ads, live: ads >= MIN }
   }))).sort((a, b) => b.ads - a.ads)
 
   const alternatives = ALTERNATIVES.map((a) => ({ label: a, url: `/alternatives/${toSlug(a)}`, live: true, ads: null }))
