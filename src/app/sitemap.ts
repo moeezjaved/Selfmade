@@ -35,7 +35,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entries.push(...([...ind, ...fmt].filter(Boolean) as MetadataRoute.Sitemap))
   } catch { /* DB unreachable → still ship the rest */ }
 
-  const brands = await getPopulatedBrands().catch(() => [] as { slug: string; adCount: number }[])
+  // Time-box the populated-brands lookup so a slow DB can NEVER hang the /sitemap.xml build step
+  // again (Vercel kills the static worker at 60s → the whole deploy errors). On timeout we ship the
+  // sitemap without brand URLs rather than fail the build; the next revalidation picks them up.
+  const withTimeout = <T,>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
+    Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))])
+  const brands = await withTimeout(
+    getPopulatedBrands().catch(() => [] as any[]),
+    25000,
+    [] as any[],
+  )
   entries.push(...brands.map((b) => ({
     url: `${SITE_URL}/brands/${b.slug}`,
     changeFrequency: 'weekly' as const,
