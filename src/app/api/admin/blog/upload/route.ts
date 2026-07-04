@@ -4,7 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminRequest } from '@/lib/admin/auth'
-import { uploadToR2, isR2Configured } from '@/lib/r2'
+import { uploadBufferToR2, isR2Configured } from '@/lib/r2'
 import { randomUUID } from 'crypto'
 
 export const runtime = 'nodejs'
@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
   const type = file.type || 'image/jpeg'
   const ext = (type.split('/')[1] || 'jpg').replace('jpeg', 'jpg').replace('svg+xml', 'svg').replace('+xml', '')
   const key = `blog/${randomUUID()}.${ext}`
-  const buffer = await file.arrayBuffer()
-  const url = await uploadToR2(buffer, key, type)
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const url = await uploadBufferToR2(buffer, key, type)
   if (!url) return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   return NextResponse.json({ url })
 }
