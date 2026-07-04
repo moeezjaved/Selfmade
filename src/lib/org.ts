@@ -10,7 +10,8 @@ export type Role = 'owner' | 'admin' | 'member'
 export type OrgCtx = { orgId: string; name: string; ownerId: string; role: Role }
 
 // Included seats per plan (paid overage added in Stage 2). Keyed by normalized PlanId.
-const SEATS: Record<string, number> = { free: 1, starter: 1, pro: 3, business: 8, enterprise: 25 }
+// Included seats — MUST match the /pricing table (source of truth customers buy against).
+const SEATS: Record<string, number> = { free: 1, starter: 1, pro: 3, business: 10, enterprise: 25 }
 export function includedSeats(planId: string): number { return SEATS[planId] ?? 1 }
 export const canManage = (role: Role) => role === 'owner' || role === 'admin'
 
