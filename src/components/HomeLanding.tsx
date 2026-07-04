@@ -163,6 +163,7 @@ export default function HomeLanding() {
       .catch(() => {})
   }, [])
   const marqueeAds = ads.slice(6, 6 + 12)
+  const [menuOpen, setMenuOpen] = useState(false)
   useScrollReveal()
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", color: INK, background: '#fff', overflowX: 'hidden' }}>
@@ -205,8 +206,11 @@ export default function HomeLanding() {
         /* ── reduced motion ── */
         @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}html.js .reveal,html.js .mask>span{opacity:1!important;transform:none!important}}
         /* ── responsive / mobile ── */
+        .nav-burger{display:none}                          /* hamburger hidden on desktop */
         @media (max-width: 820px){
           .nav-mid{display:none!important}                 /* hide center nav links on tablet/mobile */
+          .nav-burger{display:inline-block!important}      /* show hamburger */
+          .nav-hide-sm{display:none!important}             /* 'Log in' moves into the menu */
           .g-collapse{grid-template-columns:1fr!important} /* 2-col panels stack */
           .g-foot{grid-template-columns:1fr 1fr!important} /* 4-col footer → 2-col */
           .panel{padding:32px 22px!important}
@@ -227,10 +231,19 @@ export default function HomeLanding() {
             ))}
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <Link href="/login" className="navlink" style={{ fontSize: 14.5, fontWeight: 700, color: INK, textDecoration: 'none' }}>Log in</Link>
+            <Link href="/login" className="navlink nav-hide-sm" style={{ fontSize: 14.5, fontWeight: 700, color: INK, textDecoration: 'none' }}>Log in</Link>
             <Link href="/signup" className="btn arrowp" style={{ ...btnPrimary, padding: '9px 18px', fontSize: 14 }}>Start for free <Arrow /></Link>
+            <button className="nav-burger" aria-label="Menu" onClick={() => setMenuOpen(o => !o)} style={{ background: 'none', border: 'none', fontSize: 25, lineHeight: 1, cursor: 'pointer', color: INK, padding: '4px 2px' }}>{menuOpen ? '✕' : '☰'}</button>
           </div>
         </div>
+        {/* mobile dropdown (shown via hamburger ≤820px) */}
+        {menuOpen && (
+          <div className="nav-menu" style={{ borderTop: '1px solid #f0f2ef', background: '#fff', padding: '10px 24px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['/pricing', 'Pricing'], ['/blog', 'Blog'], ['/login', 'Log in']].map(([h, l]) => (
+              <a key={h} href={h} onClick={() => setMenuOpen(false)} style={{ fontSize: 16, fontWeight: 700, color: INK, textDecoration: 'none', padding: '11px 4px', borderBottom: '1px solid #f6f7f5' }}>{l}</a>
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* HERO */}
