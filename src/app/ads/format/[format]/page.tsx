@@ -8,6 +8,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
+import { pickIntro, pickOutro, galleryJsonLd } from '@/lib/seo/pages'
 import type { Metadata } from 'next'
 
 export const revalidate = 3600
@@ -56,8 +57,16 @@ export default async function AdsFormatPage({ params }: { params: { format: stri
   const { hook, ads } = await getData(params.format)
   if (!hook || ads.length === 0) notFound()
 
+  const ld = galleryJsonLd({
+    path: `/ads/format/${params.format}`, name: `Winning ${hook} Ads on Meta — ${monthYear()}`,
+    description: `Browse ${ads.length}+ real ${hook} ads running on Meta right now, ranked by performance.`,
+    platform: 'Meta', platformSlug: 'meta', category: `${hook}`, categorySlug: params.format,
+    count: ads.length, isoDate: new Date().toISOString(), ads,
+  })
+
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", background: '#fff', color: INK, minHeight: '100vh' }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
       <nav style={{ borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/home">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 24, filter: 'brightness(0)' }} /></Link>
@@ -68,9 +77,7 @@ export default async function AdsFormatPage({ params }: { params: { format: stri
       <header style={{ maxWidth: 900, margin: '0 auto', padding: '48px 24px 24px' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '.06em' }}>Ad format · Updated {monthYear()}</div>
         <h1 style={{ fontSize: 'clamp(30px,5vw,46px)', fontWeight: 800, letterSpacing: '-.02em', margin: '8px 0 12px' }}>Winning {hook} ads on Meta</h1>
-        <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6, maxWidth: 680 }}>
-          The best-performing <b>{hook.toLowerCase()}</b> ads running on Meta right now — {ads.length}+ real examples ranked by performance. Study the format, then <Link href="/signup" style={{ color: INK, fontWeight: 700 }}>clone or generate your own</Link> with Selfmade.
-        </p>
+        <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6, maxWidth: 680 }}>{pickIntro(params.format, hook, 'Meta', ads.length)}</p>
       </header>
 
       <section style={{ maxWidth: 1120, margin: '0 auto', padding: '12px 24px 20px' }}>
@@ -94,6 +101,10 @@ export default async function AdsFormatPage({ params }: { params: { format: stri
           <p style={{ color: 'rgba(14,27,18,.7)', margin: '0 0 20px', fontSize: 16 }}>Clone a winner onto your product, or generate an original — free to start.</p>
           <Link href="/signup" style={{ background: INK, color: '#fff', padding: '13px 26px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none' }}>Start for free →</Link>
         </div>
+      </section>
+
+      <section style={{ maxWidth: 780, margin: '0 auto', padding: '10px 24px 20px' }}>
+        <p style={{ fontSize: 15, color: '#6b7280', lineHeight: 1.7 }}>{pickOutro(params.format, hook, 'Meta')}</p>
       </section>
 
       <section style={{ maxWidth: 1120, margin: '0 auto', padding: '20px 24px 60px', borderTop: '1px solid #f0f2ef' }}>
