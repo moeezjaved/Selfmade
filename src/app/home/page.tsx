@@ -42,8 +42,12 @@ function useScrollReveal() {
     els.forEach((el) => io.observe(el))
     // Safety net: reveal anything still hidden after a grace period (never leave content hidden).
     const t = setTimeout(() => els.forEach((el) => el.classList.add('in-view')), 2600)
-    // Also reveal anything already in view on the very next frame (headlines slide up on load).
-    requestAnimationFrame(() => els.forEach((el) => { const r = el.getBoundingClientRect(); if (r.top < window.innerHeight && r.bottom > 0) el.classList.add('in-view') }))
+    // Reveal what's already in view on load — but via a DOUBLE rAF so the hidden state (opacity:0,
+    // translateY) paints for one frame FIRST; otherwise the browser batches it into the same frame as
+    // `.in-view` and the transition is skipped (content just pops in with no visible slide/fade).
+    requestAnimationFrame(() => requestAnimationFrame(() => els.forEach((el) => {
+      const r = el.getBoundingClientRect(); if (r.top < window.innerHeight && r.bottom > 0) el.classList.add('in-view')
+    })))
     return () => { io.disconnect(); clearTimeout(t) }
   }, [])
 }
@@ -207,7 +211,7 @@ export default function HomeLanding() {
         <div style={{ ...wrap, height: 66, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <LogoMark color="#000" height={32} />
           <div style={{ display: 'flex', gap: 30 }}>
-            {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['#pricing', 'Pricing']].map(([h, l]) => (
+            {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['/pricing', 'Pricing'], ['/blog', 'Blog']].map(([h, l]) => (
               <a key={h} href={h} className="navlink" style={{ fontSize: 14.5, fontWeight: 600, color: '#4b5563', textDecoration: 'none' }}>{l}</a>
             ))}
           </div>
@@ -516,7 +520,7 @@ function SeoFooter() {
               <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.6, maxWidth: 280, marginTop: 12 }}>Find winning ads, make them yours, and launch — the whole ad workflow in one place.</p>
             </div>
             <FootCol title="Product" links={[['Discovery', '/discovery'], ['Brand Spy', '/discovery/brand-spy'], ['Trending', '/trending'], ['AI Ad Studio', '/creative-studio'], ['Launch Ads', '/m4'], ['Pricing', '#pricing']].map(([label, href]) => ({ label, href }))} />
-            <FootCol title="Company" links={[['About', '/about'], ['Contact', '/contact'], ['Privacy', '/privacy'], ['Terms', '/terms']].map(([label, href]) => ({ label, href }))} />
+            <FootCol title="Company" links={[['Blog', '/blog'], ['About', '/about'], ['Contact', '/contact'], ['Privacy', '/privacy'], ['Terms', '/terms']].map(([label, href]) => ({ label, href }))} />
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, color: '#111', marginBottom: 8 }}>Start free today</div>
               <p style={{ color: '#6b7280', fontSize: 13.5, margin: '0 0 12px', maxWidth: 260 }}>50 credits, no card. Find a winner and make it yours.</p>

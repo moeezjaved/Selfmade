@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { getPopulatedBrands, SITE_URL } from '@/lib/seo/brands'
+import { getPublishedPosts } from '@/lib/blog'
 import { createAdminClient } from '@/lib/supabase/server'
 
 // Generate at RUNTIME, not at build. The Vercel build env returns empty from the DB (no service-role
@@ -21,9 +22,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date()
   const entries: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/home`, lastModified: now, changeFrequency: 'weekly', priority: 1 },
+    { url: `${SITE_URL}/blog`, changeFrequency: 'daily', priority: 0.8 },
     { url: `${SITE_URL}/brands/directory`, changeFrequency: 'daily', priority: 0.8 },
     ...ALTERNATIVES.map((s) => ({ url: `${SITE_URL}/alternatives/${s}`, lastModified: now, changeFrequency: 'monthly' as const, priority: 0.8 })),
   ]
+
+  // Published blog posts.
+  try {
+    const posts = await getPublishedPosts()
+    entries.push(...posts.map((p) => ({ url: `${SITE_URL}/blog/${p.slug}`, lastModified: p.published_at ? new Date(p.published_at) : now, changeFrequency: 'monthly' as const, priority: 0.7 })))
+  } catch { /* blog table absent → skip */ }
 
   // /ads galleries — include only those with >= 6 real ads (matches each page's thin-content guard).
   // Use a cheap limit(6) EXISTENCE check, NOT count:'exact' — an exact count scans millions of rows
