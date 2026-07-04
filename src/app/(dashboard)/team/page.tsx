@@ -12,12 +12,17 @@ type Data = { org: { name: string; role: string }; members: Member[]; invites: I
 
 export default function TeamPage() {
   const [d, setD] = useState<Data | null>(null)
+  const [err, setErr] = useState('')
   const [email, setEmail] = useState(''); const [role, setRole] = useState('member')
   const [msg, setMsg] = useState(''); const [copied, setCopied] = useState('')
 
   const load = useCallback(async () => {
-    const j = await fetch('/api/account/team').then(r => r.json()).catch(() => null)
-    if (j && !j.error) setD(j)
+    try {
+      const r = await fetch('/api/account/team')
+      const j = await r.json().catch(() => ({}))
+      if (r.ok && !j.error) { setD(j); setErr('') }
+      else setErr(j.error || `Failed to load team (HTTP ${r.status})`)
+    } catch (e: any) { setErr(e?.message || 'Network error') }
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -31,6 +36,7 @@ export default function TeamPage() {
   const remove = async (id: string) => { if (confirm('Remove this member?')) { await fetch(`/api/account/team?member=${id}`, { method: 'DELETE' }); load() } }
   const copy = (t: string, tag: string) => { navigator.clipboard.writeText(t); setCopied(tag); setTimeout(() => setCopied(''), 1500) }
 
+  if (err) return <div style={{ padding: 28, fontFamily: "'Inter',sans-serif" }}><div style={{ color: '#dc2626', fontWeight: 700, marginBottom: 6 }}>Couldn’t load your team</div><div style={{ color: '#6b7280', fontSize: 14 }}>{err}</div><button onClick={() => { setErr(''); load() }} style={{ marginTop: 12, background: '#0e1b12', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 100, fontWeight: 800, cursor: 'pointer' }}>Retry</button></div>
   if (!d) return <div style={{ padding: 28, color: '#6b7280', fontFamily: "'Inter',sans-serif" }}>Loading team…</div>
   const canManage = d.org.role === 'owner' || d.org.role === 'admin'
   const seatsLeft = Math.max(0, d.seats.limit - d.seats.used)

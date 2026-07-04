@@ -19,12 +19,13 @@ export const canManage = (role: Role) => role === 'owner' || role === 'admin'
 export async function getUserOrg(admin: SupabaseClient, userId: string): Promise<OrgCtx> {
   const db = admin as any
   // newest membership wins → accepting a team invite switches you into that team.
+  // Two plain queries (no PostgREST FK-embed, which can fail before the relationship cache warms).
   const { data: m } = await db.from('org_members')
-    .select('role, organizations(id, name, owner_id)')
+    .select('role, org_id')
     .eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-  if (m?.organizations) {
-    const o = m.organizations
-    return { orgId: o.id, name: o.name, ownerId: o.owner_id, role: m.role as Role }
+  if (m?.org_id) {
+    const { data: o } = await db.from('organizations').select('id, name, owner_id').eq('id', m.org_id).maybeSingle()
+    if (o) return { orgId: o.id, name: o.name, ownerId: o.owner_id, role: m.role as Role }
   }
   // none yet → create the user's own org
   const { data: org } = await db.from('organizations').insert({ owner_id: userId, name: 'My Team' }).select().single()
