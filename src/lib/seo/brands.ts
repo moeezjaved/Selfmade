@@ -113,7 +113,7 @@ export const getPopulatedBrands = unstable_cache(
     // this is what stops the /sitemap.xml build step from timing out (60s static-worker limit).
     const all = (await getIndexableBrands())
       .filter((b) => b.adCount >= MIN_BRAND_ADS)
-      .slice(0, 3000)
+      .slice(0, 300)   // top candidates by ads_indexed — keeps the per-brand head-counts fast under DB load
     const out: BrandRef[] = []
     const CONC = 16
     for (let i = 0; i < all.length; i += CONC) {
