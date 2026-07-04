@@ -57,7 +57,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))])
   const brands = await withTimeout(
     getPopulatedBrands().catch(() => [] as any[]),
-    25000,
+    10000,
     [] as any[],
   )
   entries.push(...brands.map((b) => ({
