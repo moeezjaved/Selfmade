@@ -519,7 +519,7 @@ function SeoFooter() {
               <LogoMark color="#000" height={38} />
               <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.6, maxWidth: 280, marginTop: 12 }}>Find winning ads, make them yours, and launch — the whole ad workflow in one place.</p>
             </div>
-            <FootCol title="Product" links={[['Discovery', '/discovery'], ['Brand Spy', '/discovery/brand-spy'], ['Trending', '/trending'], ['AI Ad Studio', '/creative-studio'], ['Launch Ads', '/m4'], ['Pricing', '#pricing']].map(([label, href]) => ({ label, href }))} />
+            <FootCol title="Product" links={[['Discovery', '/discovery'], ['Brand Spy', '/discovery/brand-spy'], ['Trending', '/trending'], ['AI Ad Studio', '/creative-studio'], ['Launch Ads', '/m4'], ['API & MCP', '/mcp'], ['Pricing', '#pricing']].map(([label, href]) => ({ label, href }))} />
             <FootCol title="Company" links={[['Blog', '/blog'], ['About', '/about'], ['Contact', '/contact'], ['Privacy', '/privacy'], ['Terms', '/terms']].map(([label, href]) => ({ label, href }))} />
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, color: '#111', marginBottom: 8 }}>Start free today</div>
