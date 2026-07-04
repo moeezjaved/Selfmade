@@ -12,3 +12,7 @@ next-env.d.ts
 worker/node_modules
 worker/dist
 worker/.env
+
+# Vercel env pulls (may contain secrets — never commit)
+.env.probe
+.env*.local
