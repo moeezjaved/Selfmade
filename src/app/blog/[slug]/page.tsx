@@ -55,7 +55,7 @@ export default async function BlogPost({ params }: { params: { slug: string } })
   }
 
   return (
-    <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", backgroundColor: BG, backgroundImage: `radial-gradient(1000px 480px at 12% -6%, rgba(168,85,247,.14), transparent 60%), radial-gradient(820px 420px at 98% 2%, rgba(219,39,119,.11), transparent 60%)`, backgroundRepeat: 'no-repeat', color: '#e8ece7', minHeight: '100vh' }}>
+    <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", backgroundColor: '#070a09', backgroundImage: `radial-gradient(rgba(223,254,149,.045) 1.1px, transparent 1.1px), radial-gradient(1100px 560px at 10% -8%, rgba(223,254,149,.10), transparent 58%), radial-gradient(860px 460px at 98% 0%, rgba(34,197,94,.11), transparent 58%)`, backgroundSize: '22px 22px, 100% 100%, 100% 100%', backgroundRepeat: 'repeat, no-repeat, no-repeat', color: '#e8ece7', minHeight: '100vh' }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
       <style>{`
         .prose{font-size:18px;line-height:1.8;color:#c7cdc6}
