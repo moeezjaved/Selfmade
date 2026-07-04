@@ -499,9 +499,9 @@ function FootCol({ title, links }: { title: string; links: { label: string; href
 }
 
 function SeoFooter() {
-  const alternatives = ['Atria', 'Foreplay', 'Motion', 'GetHookd', 'AdCreative.ai', 'Minea', 'BigSpy', 'PiPiADS', 'Dropispy', 'AdSpy', 'PowerAdSpy', 'Meta Ad Library']
+  // Only competitors with real /alternatives/[slug] pages (avoid dead footer links).
+  const alternatives = ['Atria', 'Foreplay', 'Motion', 'GetHookd']
   const industries = ['Skincare', 'Supplements', 'Beauty', 'Apparel', 'Fitness', 'Health & Wellness', 'Hair Care', 'Pets', 'Home Goods', 'Food & Beverage', 'Jewelry', 'Baby & Kids', 'Personal Care', 'Cosmetics', 'Fragrance', 'Footwear', 'Accessories', 'Electronics']
-  const formats = ['Demo', 'Testimonial', 'Listicle', 'UGC', 'Before & After', 'Split Screen', 'Unboxing', 'Founder Story', 'Comparison', 'Problem–Solution', 'Statistic', 'Offer & Promo']
   const cta: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: INK, padding: '11px 20px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }
   return (
     <footer style={{ marginTop: 40 }}>
@@ -525,8 +525,8 @@ function SeoFooter() {
           {/* SEO grids */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32, marginTop: 44, paddingTop: 36, borderTop: '1px solid #eef0ee' }}>
             <FootCol title="Selfmade alternatives" links={alternatives.map(a => ({ label: `${a} Alternative`, href: `/alternatives/${slug(a)}` }))} />
-            <FootCol title="Winning Meta ads by industry" links={industries.map(i => ({ label: `${i} Ads`, href: `/ads/${slug(i)}` }))} />
-            <FootCol title="Winning ad formats" links={formats.map(f => ({ label: `${f} Ads`, href: `/ads/format/${slug(f)}` }))} />
+            <FootCol title="Winning Meta ads by industry" links={industries.slice(0, 9).map(i => ({ label: `${i} Ads`, href: `/ads/${slug(i)}` }))} />
+            <FootCol title="More ad examples" links={industries.slice(9).map(i => ({ label: `${i} Ads`, href: `/ads/${slug(i)}` }))} />
           </div>
         </div>
       </div>
