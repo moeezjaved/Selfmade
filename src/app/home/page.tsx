@@ -502,6 +502,8 @@ function SeoFooter() {
   // Only competitors with real /alternatives/[slug] pages (avoid dead footer links).
   const alternatives = ['Atria', 'Foreplay', 'Motion', 'GetHookd']
   const industries = ['Skincare', 'Supplements', 'Beauty', 'Apparel', 'Fitness', 'Health & Wellness', 'Hair Care', 'Pets', 'Home Goods', 'Food & Beverage', 'Jewelry', 'Baby & Kids', 'Personal Care', 'Cosmetics', 'Fragrance', 'Footwear', 'Accessories', 'Electronics']
+  // Ad-format pages driven by the classifier's real hook_type taxonomy (/ads/format/[slug]).
+  const formats = ['Testimonial', 'Before & After', 'Unboxing', 'Social Proof', 'Question', 'Educational', 'Story', 'Announcement', 'Urgency', 'Discount', 'Us vs Them', 'Pain Point']
   const cta: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: INK, padding: '11px 20px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }
   return (
     <footer style={{ marginTop: 40 }}>
@@ -525,8 +527,8 @@ function SeoFooter() {
           {/* SEO grids */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 32, marginTop: 44, paddingTop: 36, borderTop: '1px solid #eef0ee' }}>
             <FootCol title="Selfmade alternatives" links={alternatives.map(a => ({ label: `${a} Alternative`, href: `/alternatives/${slug(a)}` }))} />
-            <FootCol title="Winning Meta ads by industry" links={industries.slice(0, 9).map(i => ({ label: `${i} Ads`, href: `/ads/${slug(i)}` }))} />
-            <FootCol title="More ad examples" links={industries.slice(9).map(i => ({ label: `${i} Ads`, href: `/ads/${slug(i)}` }))} />
+            <FootCol title="Winning Meta ads by industry" links={industries.map(i => ({ label: `${i} Ads`, href: `/ads/${slug(i)}` }))} />
+            <FootCol title="Winning ad formats" links={formats.map(f => ({ label: `${f} Ads`, href: `/ads/format/${slug(f)}` }))} />
           </div>
         </div>
       </div>
