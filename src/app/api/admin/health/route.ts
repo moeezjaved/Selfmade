@@ -84,6 +84,18 @@ export async function GET() {
   // Real "no creative yet" = total − with_creative (replaces the stale thumbnail calc).
   const qMissingReal = qCreativeAds != null ? Math.max(0, qTotal - qCreativeAds) : qMissing
 
+  // ── REAL thumb/poster backlog ──────────────────────────────────────────────
+  // Thumbnails/posters live in discovery_creatives.poster_url (what the grid renders), NOT the dead
+  // discovery_ads_index.thumbnail_url column. Counting the legacy column read a PHANTOM ~2.7M "missing"
+  // even after 6M posters were generated. This counts the true remaining work the backfills target
+  // (asset_type='image', poster_url null, r2_url present). Best-effort — null if unreachable.
+  let qThumbBacklog: number | null = null
+  try {
+    const { count } = await admin.from('discovery_creatives').select('*', { count: 'exact', head: true })
+      .eq('asset_type', 'image').is('poster_url', null).not('r2_url', 'is', null)
+    qThumbBacklog = count ?? null
+  } catch { /* discovery_creatives unreachable → null */ }
+
   // ── Crawler runs (1h + 24h) ──
   const [{ data: runs1h }, { data: runs24h }] = await Promise.all([
     admin.from('crawler_runs').select('id, status').gte('started_at', hourAgo).limit(500),
@@ -265,12 +277,16 @@ export async function GET() {
     minutesSinceLastRun === null ? 'unknown'
     : minutesSinceLastRun < 60 ? 'up' : 'down'
 
-  // Worker liveness: check if any thumbnails were added in last hour
-  const { count: recentThumbs } = await admin
-    .from('discovery_ads_index')
-    .select('*', { count: 'estimated', head: true })
-    .gte('indexed_at', hourAgo)
-    .not('thumbnail_url', 'is', null)
+  // Worker liveness: has the drain/thumb worker done anything in the last hour? The old check looked
+  // at discovery_ads_index.thumbnail_url, a column nothing writes anymore — so the worker ALWAYS read
+  // "idle" even while draining. Real signal: rows the worker claimed out of creative_queue recently.
+  let recentThumbs: number | null = null
+  try {
+    const { count } = await admin.from('creative_queue')
+      .select('*', { count: 'estimated', head: true })
+      .gte('claimed_at', hourAgo)
+    recentThumbs = count ?? null
+  } catch { recentThumbs = null }
   const worker_status: 'up' | 'idle' | 'unknown' =
     recentThumbs === null ? 'unknown'
     : recentThumbs > 0 ? 'up' : 'idle'
@@ -364,6 +380,8 @@ export async function GET() {
       pending: qPending,
       failed: qFailed,
       thumbed_pct: qTotal > 0 ? Math.round((qWithCreative / qTotal) * 1000) / 10 : 0,
+      // Real thumb/poster backlog from discovery_creatives.poster_url (not the dead thumbnail_url).
+      thumb_backlog: qThumbBacklog,
     },
     activity: {
       runs_1h: (runs1h ?? []).length,
@@ -394,7 +412,7 @@ export async function GET() {
       worker: {
         status: worker_status,
         recent_thumbnails_added: recentThumbs ?? 0,
-        note: 'Inferred from new thumbnails added in last 60 min',
+        note: 'Inferred from creative_queue rows claimed in last 60 min',
       },
     },
     currently_running: currentlyRunning ? {
