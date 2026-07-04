@@ -111,9 +111,13 @@ export const getPopulatedBrands = unstable_cache(
     // MIN_BRAND_ADS real-ad bar if ads_indexed is already >= it. Pre-filter to that necessary
     // condition (cuts thousands of candidates → the few hundred that could qualify), then cap —
     // this is what stops the /sitemap.xml build step from timing out (60s static-worker limit).
+    // Top candidates by ads_indexed. Bounded small so the per-brand head-counts COMPLETE fast (even
+    // under crawl/drain load on the primary) and the unstable_cache result actually persists — a set
+    // large enough to blow the sitemap's timeout never finishes, so it never caches and re-runs every
+    // request. Raise this cap once the backfill load is off the primary.
     const all = (await getIndexableBrands())
       .filter((b) => b.adCount >= MIN_BRAND_ADS)
-      .slice(0, 300)   // top candidates by ads_indexed — keeps the per-brand head-counts fast under DB load
+      .slice(0, 60)
     const out: BrandRef[] = []
     const CONC = 16
     for (let i = 0; i < all.length; i += CONC) {
