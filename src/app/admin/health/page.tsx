@@ -43,6 +43,13 @@ interface HealthData {
     thumbed_pct: number
     thumb_backlog?: number | null
   }
+  classify?: {
+    classifiable: number | null
+    done: number | null
+    backlog: number | null
+    pct_done: number | null
+    pct_left: number | null
+  }
   activity: {
     runs_1h: number
     runs_24h: number
@@ -359,6 +366,17 @@ export default function HealthDashboard() {
               <KPI label="Pending (queue)" value={(data.queue.pending ?? 0).toLocaleString()} tone={(data.queue.pending ?? 0) > 0 ? 'warn' : 'good'} hint="Ads enqueued in creative_queue waiting for the drain — the LIVE drainable backlog. Shrinks in real time as the worker processes it. 0 = drain caught up." />
               <KPI label="Marked failed" value={data.queue.failed.toLocaleString()} tone={data.queue.failed > 1000 ? 'warn' : 'neutral'} hint="Ads the worker tried 3 times and gave up on (usually a 1087-byte placeholder = ad expired/deleted before we could grab it). Reset by setting creative_extraction_failed_at = NULL." />
               <KPI label="Thumb backlog" value={data.queue.thumb_backlog == null ? '—' : data.queue.thumb_backlog.toLocaleString()} tone={(data.queue.thumb_backlog ?? 0) > 0 ? 'warn' : 'good'} hint="REAL images still needing a thumbnail = discovery_creatives with asset_type='image', poster_url NULL, r2_url present (what image-thumb-backfill targets). NOT the dead discovery_ads_index.thumbnail_url column, which read a phantom ~2.7M even after 6M posters were generated." />
+              <KPI
+                label="E backlog (OpenAI)"
+                value={data.classify?.backlog == null ? '—' : `${data.classify.backlog.toLocaleString()}${data.classify.pct_left != null ? ` · ${data.classify.pct_left}% left` : ''}`}
+                tone={(data.classify?.backlog ?? 0) > 0 ? 'warn' : 'good'}
+                hint="Ads OpenAI (E) hasn't classified yet = is_classifiable AND (not ai_classified OR topics null) — the exact gate classify-batch.ts drains. Run E in --sync mode to clear it fast." />
+              <KPI
+                label="E classified"
+                value={data.classify?.pct_done == null ? '—' : `${data.classify.pct_done}%`}
+                sub={data.classify?.done != null && data.classify?.classifiable != null ? `${data.classify.done.toLocaleString()} / ${data.classify.classifiable.toLocaleString()}` : undefined}
+                tone={(data.classify?.pct_done ?? 0) >= 95 ? 'good' : 'neutral'}
+                hint="Share of classifiable ads (real body text) that E has fully tagged (hooks + topics). 100% = classification caught up." />
             </div>
           </Section>
 

@@ -96,6 +96,23 @@ export async function GET() {
     qThumbBacklog = count ?? null
   } catch { /* discovery_creatives unreachable → null */ }
 
+  // ── E (OpenAI AI classification) progress ──────────────────────────────────
+  // How many classifiable ads has E NOT run yet. Backlog = the exact gate classify-batch.ts uses
+  // (is_classifiable AND not-yet-fully-classified) — same partial index the cron hits, so it's fast.
+  // classifiable = all ads with a real body (is_classifiable). Best-effort — nulls if unreachable.
+  let eClassifiable: number | null = null, eBacklog: number | null = null
+  try {
+    const [{ count: tot }, { count: bl }] = await Promise.all([
+      admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).eq('is_classifiable', true),
+      admin.from('discovery_ads_index').select('*', { count: 'exact', head: true })
+        .eq('is_classifiable', true).or('ai_classified.is.null,ai_classified.eq.false,topics.is.null'),
+    ])
+    eClassifiable = tot ?? null; eBacklog = bl ?? null
+  } catch { /* index unavailable → null */ }
+  const eDone = (eClassifiable != null && eBacklog != null) ? Math.max(0, eClassifiable - eBacklog) : null
+  const ePctLeft = (eClassifiable && eBacklog != null) ? Math.round((eBacklog / eClassifiable) * 1000) / 10 : null
+  const ePctDone = (eClassifiable && eDone != null) ? Math.round((eDone / eClassifiable) * 1000) / 10 : null
+
   // ── Crawler runs (1h + 24h) ──
   const [{ data: runs1h }, { data: runs24h }] = await Promise.all([
     admin.from('crawler_runs').select('id, status').gte('started_at', hourAgo).limit(500),
@@ -382,6 +399,14 @@ export async function GET() {
       thumbed_pct: qTotal > 0 ? Math.round((qWithCreative / qTotal) * 1000) / 10 : 0,
       // Real thumb/poster backlog from discovery_creatives.poster_url (not the dead thumbnail_url).
       thumb_backlog: qThumbBacklog,
+    },
+    // E — OpenAI AI classification progress (how many ads it hasn't run yet + %).
+    classify: {
+      classifiable: eClassifiable,
+      done: eDone,
+      backlog: eBacklog,       // ads E hasn't classified yet
+      pct_done: ePctDone,
+      pct_left: ePctLeft,      // e.g. 80 = "80% left"
     },
     activity: {
       runs_1h: (runs1h ?? []).length,
