@@ -30,7 +30,11 @@ export default function TeamPage() {
     setMsg('')
     const j = await fetch('/api/account/team', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, role }) }).then(r => r.json()).catch(() => ({ error: 'failed' }))
     if (j.error) { setMsg(j.error); return }
-    setEmail(''); setMsg('✓ Invite sent — we emailed them (link also below as a backup)'); load()
+    setEmail('')
+    setMsg(j.emailed ? '✓ Invite sent — we emailed them (link also below)'
+      : !j.emailEnabled ? '✓ Invite created. Email isn’t configured (set RESEND_API_KEY) — copy the link below to share.'
+      : '✓ Invite created, but the email didn’t send (Resend rejected — likely the from-domain isn’t verified). Copy the link below.')
+    load()
   }
   const revoke = async (id: string) => { await fetch(`/api/account/team?invite=${id}`, { method: 'DELETE' }); load() }
   const remove = async (id: string) => { if (confirm('Remove this member?')) { await fetch(`/api/account/team?member=${id}`, { method: 'DELETE' }); load() } }
