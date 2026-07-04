@@ -107,9 +107,15 @@ export const getPopulatedBrands = unstable_cache(
   async (): Promise<BrandRef[]> => {
     const db = readClientSafe()
     if (!db) return []
-    const all = await getIndexableBrands()
+    // Real ads (has_creative) are a SUBSET of ads_indexed, so a brand can only clear the
+    // MIN_BRAND_ADS real-ad bar if ads_indexed is already >= it. Pre-filter to that necessary
+    // condition (cuts thousands of candidates → the few hundred that could qualify), then cap —
+    // this is what stops the /sitemap.xml build step from timing out (60s static-worker limit).
+    const all = (await getIndexableBrands())
+      .filter((b) => b.adCount >= MIN_BRAND_ADS)
+      .slice(0, 3000)
     const out: BrandRef[] = []
-    const CONC = 12
+    const CONC = 16
     for (let i = 0; i < all.length; i += CONC) {
       const batch = all.slice(i, i + CONC)
       const flags = await Promise.all(batch.map(async (b) => {
