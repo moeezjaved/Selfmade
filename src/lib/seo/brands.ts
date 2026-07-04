@@ -28,6 +28,10 @@ function readClientSafe(): ReturnType<typeof createReadClient> | null {
 // Only brands with >= this many ads get an SEO page (quality-first — content-rich pages rank, thin
 // ones get penalized). Env-tunable so we can lower it as the domain earns authority. Default 100.
 export const MIN_INDEXABLE_ADS = parseInt(process.env.SEO_MIN_ADS || '100', 10)
+// A page is only indexed/sitemapped when it actually renders this many REAL ads (with creatives).
+// The `ads_indexed` counter overcounts (crawl-seen ads that may lack creatives), so empty "being
+// processed" pages must never be exposed to Google — noindex until genuinely populated.
+export const MIN_BRAND_ADS = parseInt(process.env.SEO_MIN_BRAND_ADS || '3', 10)
 export const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
 
 export type BrandRef = { pageId: string; slug: string; name: string; adCount: number }
@@ -70,7 +74,7 @@ export const getIndexableBrands = unstable_cache(
     if (!db) return []
     const { data, error } = await db
       .from('discovery_brand_crawl_state')
-      .select('page_id, brand_name, ads_indexed')
+      .select('page_id, brand_name, ads_indexed, image_count, video_count')
       .gte('ads_indexed', MIN_INDEXABLE_ADS)
       .order('ads_indexed', { ascending: false })
       .limit(50000)
@@ -80,6 +84,8 @@ export const getIndexableBrands = unstable_cache(
     for (const b of data as any[]) {
       const name = (b.brand_name || '').trim()
       if (!name || !b.page_id) continue
+      // Only sitemap brands with REAL crawled creatives — never the empty "being processed" pages.
+      if (((b.image_count || 0) + (b.video_count || 0)) < MIN_BRAND_ADS) continue
       let slug = slugify(name)
       if (!slug) continue
       if (seen.has(slug)) {
@@ -109,7 +115,7 @@ export const getBrandPage = unstable_cache(
   async (ref: BrandRef): Promise<BrandPage> => {
     const EMPTY_INSIGHTS: BrandInsights = { topHooks: [], topEmotions: [], topAngles: [], topFormats: [], topTopics: [], classified: 0 }
     const db = readClientSafe()
-    if (!db) return { ref, niche: null, activeCount: 0, longestRunningDays: 0, insights: EMPTY_INSIGHTS, ads: [], indexable: ref.adCount >= MIN_INDEXABLE_ADS, content: null }
+    if (!db) return { ref, niche: null, activeCount: 0, longestRunningDays: 0, insights: EMPTY_INSIGHTS, ads: [], indexable: false, content: null }
     const { data: rows } = await db
       .from('discovery_ads_index')
       .select('ad_id, body, start_date, is_active, days_running, performance_tier, niche, hook_type, emotion, angle, format_style, topics, discovery_creatives(asset_type,r2_url,poster_url,position,width,height)')
@@ -169,7 +175,7 @@ export const getBrandPage = unstable_cache(
     return {
       ref, niche, activeCount, longestRunningDays: longest, insights,
       ads: ads.slice(0, 48),
-      indexable: ref.adCount >= MIN_INDEXABLE_ADS,
+      indexable: ads.length >= MIN_BRAND_ADS,   // real rendered ads — never index an empty page
       content,
     }
   },

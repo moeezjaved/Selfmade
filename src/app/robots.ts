@@ -12,6 +12,5 @@ export default function robots(): MetadataRoute.Robots {
       disallow: ['/admin', '/api', '/app/', '/discovery', '/account/', '/login', '/signup', '/onboarding', '/business-email-required', '/*?*'],
     }],
     sitemap: `${SITE_URL}/sitemap.xml`,
-    host: SITE_URL,
   }
 }

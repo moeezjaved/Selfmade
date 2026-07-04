@@ -11,7 +11,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
   resolveSlug, getBrandPage, getIndexableBrands, relatedBrands,
-  SITE_URL, MIN_INDEXABLE_ADS, type BrandAd,
+  SITE_URL, type BrandAd,
 } from '@/lib/seo/brands'
 
 export const revalidate = 21600          // 6h ISR
@@ -34,10 +34,11 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   if (!ref) return { title: 'Brand not found | Selfmade', robots: { index: false, follow: false } }
   const name = titleCase(ref.name)
   const year = 2026
-  const indexable = ref.adCount >= MIN_INDEXABLE_ADS
   const page = await getBrandPage(ref)   // cached — reused by the component below
+  const indexable = page.indexable       // based on REAL rendered ads, not the ads_indexed counter
+  const adsShown = page.ads.length
   return {
-    title: `${name} Facebook Ads — See All ${ref.adCount.toLocaleString()} Ads (${year}) | Selfmade`,
+    title: { absolute: `${name} Facebook Ads — ${adsShown ? `See ${adsShown} Ads ` : ''}(${year}) | Selfmade` },
     // Unique AI meta description if generated, else the templated one.
     description: page.content?.meta_description
       || `Browse ${name}'s Facebook & Instagram ads from the Meta Ad Library — ${ref.adCount.toLocaleString()} ads, active campaigns, and their longest-running winners. Free ad spy on Selfmade.`,
