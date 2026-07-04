@@ -20,39 +20,42 @@ function adImg(url: string, w = 400): string {
 }
 
 /**
- * Reveal-on-scroll that CANNOT get stuck invisible. Default (server render + no-JS) = VISIBLE.
- * After mount, JS only *arms* (hides) elements that are still below the fold, then reveals them on
- * scroll. Above-the-fold elements are never hidden (no flash). If JS never runs, everything shows.
- *   returns `hidden` (true only while armed & awaiting scroll).
+ * Class-based reveal system (Atria pattern) that is FAIL-SAFE:
+ *   • Default CSS = visible. The hidden "before" state only applies under `html.anim`.
+ *   • A before-paint inline script (<AnimGate/>) adds `anim` to <html>, so JS-present visitors get the
+ *     hidden→reveal motion with no flash (script runs before the elements paint). No JS → `anim` never
+ *     added → everything just shows. Content can never get stuck invisible.
+ *   • One IntersectionObserver (useScrollReveal) adds `.in` on scroll-in AND immediately reveals
+ *     anything already in view on load — so headlines slide up on load, below-fold reveals on scroll.
  */
-function useReveal(threshold: number) {
-  const ref = useRef<any>(null)
-  const [state, setState] = useState<'shown' | 'armed'>('shown')
+function AnimGate() {
+  return <script dangerouslySetInnerHTML={{ __html: "try{if(!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.classList.add('anim')}catch(e){}" }} />
+}
+
+function useScrollReveal() {
   useEffect(() => {
-    const el = ref.current
-    if (!el || typeof IntersectionObserver === 'undefined') return   // stay shown
-    const rect = el.getBoundingClientRect()
-    const inView = rect.top < window.innerHeight * 0.9 && rect.bottom > 0
-    if (inView) return   // already visible → don't hide it (no flash)
-    setState('armed')    // below fold → hide, then animate in on scroll
-    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setState('shown'); o.disconnect() } }, { threshold, rootMargin: '0px 0px -8% 0px' })
-    o.observe(el)
-    const t = setTimeout(() => setState('shown'), 3000)   // belt-and-suspenders
-    return () => { o.disconnect(); clearTimeout(t) }
-  }, [threshold])
-  return { ref, hidden: state === 'armed' }
+    if (typeof IntersectionObserver === 'undefined') { document.documentElement.classList.remove('anim'); return }
+    const els = Array.from(document.querySelectorAll<HTMLElement>('.reveal, .mask'))
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) } })
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' })
+    els.forEach((el) => io.observe(el))
+    // Safety net: reveal anything still hidden after a grace period (never leave content hidden).
+    const t = setTimeout(() => els.forEach((el) => el.classList.add('in')), 2600)
+    // Also reveal anything already in view on the very next frame (headlines slide up on load).
+    requestAnimationFrame(() => els.forEach((el) => { const r = el.getBoundingClientRect(); if (r.top < window.innerHeight && r.bottom > 0) el.classList.add('in') }))
+    return () => { io.disconnect(); clearTimeout(t) }
+  }, [])
 }
 
-/** Fade-rise on scroll into view (0.6s ease-out). Visible by default; animates from below when armed. */
+/** Fade-rise on scroll into view (0.6s ease-out). */
 function Reveal({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
-  const { ref, hidden } = useReveal(0.12)
-  return <div ref={ref} style={{ opacity: hidden ? 0 : 1, transform: hidden ? 'translateY(32px)' : 'none', transition: `opacity .6s cubic-bezier(0,0,.2,1) ${delay}ms, transform .6s cubic-bezier(0,0,.2,1) ${delay}ms`, ...style }}>{children}</div>
+  return <div className="reveal" style={{ transitionDelay: `${delay}ms`, ...style }}>{children}</div>
 }
 
-/** Masked headline reveal — content slides up from below a clip. Visible by default. */
+/** Masked headline reveal — line slides up from below a clip. */
 function Mask({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
-  const { ref, hidden } = useReveal(0.3)
-  return <span ref={ref} className={`mask${hidden ? '' : ' in'}`} style={style}><span style={{ transitionDelay: `${delay}ms` }}>{children}</span></span>
+  return <span className="mask" style={style}><span style={{ transitionDelay: `${delay}ms` }}>{children}</span></span>
 }
 const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: INK, padding: '13px 24px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', border: 'none', cursor: 'pointer' }
 const btnDark: React.CSSProperties = { ...btnPrimary, background: INK, color: '#fff' }
@@ -156,8 +159,10 @@ export default function HomeLanding() {
       .catch(() => {})
   }, [])
   const marqueeAds = ads.slice(6, 6 + 12)
+  useScrollReveal()
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", color: INK, background: '#fff', overflowX: 'hidden' }}>
+      <AnimGate />
       <style>{`
         /* ── ambient loops ── */
         @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
@@ -184,11 +189,17 @@ export default function HomeLanding() {
         .arrowp .arrow-ic{transition:transform .22s cubic-bezier(0,0,.2,1)}
         .arrowp:hover .arrow-ic{transform:translateX(3px)}
         /* ── masked headline reveal (line slides up) ── */
+        /* ── reveal system: VISIBLE by default; hidden "before" state only under html.anim (set
+              before paint by <AnimGate/> only when JS runs + motion allowed). Can't get stuck. ── */
+        .reveal{transition:opacity .6s cubic-bezier(0,0,.2,1), transform .6s cubic-bezier(0,0,.2,1)}
         .mask{display:block;overflow:hidden}
-        .mask>span{display:block;transform:translateY(110%);transition:transform .7s cubic-bezier(.22,1,.36,1)}
-        .mask.in>span{transform:none}
+        .mask>span{display:block;transition:transform .7s cubic-bezier(.22,1,.36,1)}
+        html.anim .reveal{opacity:0;transform:translateY(32px)}
+        html.anim .reveal.in{opacity:1;transform:none}
+        html.anim .mask>span{transform:translateY(110%)}
+        html.anim .mask.in>span{transform:none}
         /* ── reduced motion ── */
-        @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}.mask>span{transform:none!important}}
+        @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}html.anim .reveal,html.anim .mask>span{opacity:1!important;transform:none!important}}
       `}</style>
 
       {/* NAV */}
