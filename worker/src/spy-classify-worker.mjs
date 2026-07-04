@@ -43,11 +43,17 @@ async function claimNext() {
 
 // Run the existing classifier for ONE brand. classify-batch.ts honors CLASSIFY_PAGE_ID (this brand
 // only) + --once (one wave then exit), and exits 0 cleanly even when there's nothing left to do.
+// SPY IS PRIORITY: use --sync (real-time parallel completions) so a user who spies a brand gets it
+// classified in MINUTES, not a 24h batch. Volume is tiny (one brand's ads), so full-price is trivial.
+// (Overridable: set SPY_SYNC=0 to fall back to the cheap batch path.)
 function runClassify(pageId) {
+  const sync = process.env.SPY_SYNC !== '0'
+  const args = ['tsx', 'src/classify-batch.ts', '--once']
+  if (sync) args.push('--sync')
   return new Promise((resolve) => {
-    const child = spawn('npx', ['tsx', 'src/classify-batch.ts', '--once'], {
+    const child = spawn('npx', args, {
       cwd: '/app',
-      env: { ...process.env, CLASSIFY_PAGE_ID: pageId },
+      env: { ...process.env, CLASSIFY_PAGE_ID: pageId, CLASSIFY_PROVIDER: process.env.CLASSIFY_PROVIDER || 'openai', CLASSIFY_CONCURRENCY: process.env.CLASSIFY_CONCURRENCY || '40' },
       stdio: 'inherit',
     })
     child.on('exit', (code) => resolve(code === 0))
