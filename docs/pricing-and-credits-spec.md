@@ -30,7 +30,7 @@ Launch + Campaigns + ROAS analytics** — so we undercut Atria ($129–959) 4–
 | **Launch Ads** | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Campaigns / Scale & Insights / Deep Reports** | ❌ | ❌ | ❌ | ✅ | ✅ |
 | **Monthly credits** | **20** | **150** | **500** | **2,000** | Custom |
-| **Seats** | 1 | 1 | 3 | 10 | 15+ |
+| **Seats** | 1 | 1 | 3 | **10** | 25 |
 | **API / MCP access** | ❌ | ❌ | ✅ | ✅ | ✅ (raised limits) |
 | **Exports (CSV / download creatives)** | ❌ | Limited | ✅ | ✅ | ✅ |
 | **Support** | Community | Email | Email | Priority | Dedicated + SSO |
@@ -180,6 +180,32 @@ export const PLANS = {
 | Discovery search (Free) | cap results to `plan.discoveryPages` |
 
 Each failed check returns a **structured upsell response** (`{ error: 'plan_limit', limit: 'brandSpy', current, max, upgradeTo }`) so the UI can show the right "Upgrade to Pro" modal.
+
+### 4.3 Teams & seats (CONFIRMED)
+
+Modeled on Atria's structure, scaled to Self Made's lower price points and small-team ICP.
+
+**Seat counts per plan (hard caps, confirmed):**
+| Free | Starter | Pro | Business | Custom/Enterprise |
+|---|---|---|---|---|
+| 1 | 1 | **3** | **10** | 25 (covers "15+") |
+
+- **Hard caps at launch — no paid per-seat add-on yet.** Hit the limit → upgrade to the next tier (`count(members) < plan.seats`, else 402/upsell). The 3 → 10 → 25 jumps are wide enough to absorb most growth. Add a `$/extra seat` add-on later only if customers ask (Atria charges +$20/seat; we'd do ~$15).
+
+**Data model — ONE shared org workspace (like Atria):**
+- Teammates share the org's **boards, saved ads, following, brands, and Creation/Assets** — one collaborative workspace, not private per-user spaces.
+- The **only** per-member scoping is **connected Meta ad accounts** (which accounts a member can see in Launch/Analytics/Reports). Everything on the discovery/creation side is shared to the whole team.
+- **Credits pool at the ORG level**, never per-seat. One shared plan-credit + top-up balance for the whole team. (Per-seat credit silos frustrate teams and suppress usage; a shared pool drives upgrades as the team grows.)
+
+**Roles (launch with 3; add Guest later):**
+| Role | Can do | Notes |
+|---|---|---|
+| **Owner** | Everything incl. delete org, transfer ownership | Exactly one per org (the creator) |
+| **Admin** | Manage billing, seats, invite/remove members, all features | Cannot delete the org |
+| **Member** | All product features; cannot manage billing/seats | Default for invitees |
+| **Guest** *(later)* | View-only, scoped to specific ad accounts; no Creation/Assets; can't edit reports | **Business+ perk**, ship post-launch (mirrors Atria gating) |
+
+**Enforcement:** seat check on invite; org-scoped credit wallet (one `credit_wallet` row per org, not per user); ad-account visibility join table (`member_id × ad_account_id`) gates Analytics/Launch only.
 
 ---
 
