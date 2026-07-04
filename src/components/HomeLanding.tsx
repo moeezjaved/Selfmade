@@ -104,7 +104,7 @@ function Mello({ size = 150 }: { size?: number }) {
 }
 
 function Panel({ children, grad, style, className }: { children: React.ReactNode; grad: string; style?: React.CSSProperties; className?: string }) {
-  return <div className={className} style={{ background: grad, borderRadius: 32, padding: '48px 40px', ...style }}>{children}</div>
+  return <div className={`panel ${className || ''}`} style={{ background: grad, borderRadius: 32, padding: '48px 40px', ...style }}>{children}</div>
 }
 
 /** Browser mockup showing the REAL discovery grid + floating stat cards. */
@@ -204,13 +204,24 @@ export default function HomeLanding() {
         html.js .mask.in-view>span{transform:none}
         /* ── reduced motion ── */
         @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}html.js .reveal,html.js .mask>span{opacity:1!important;transform:none!important}}
+        /* ── responsive / mobile ── */
+        @media (max-width: 820px){
+          .nav-mid{display:none!important}                 /* hide center nav links on tablet/mobile */
+          .g-collapse{grid-template-columns:1fr!important} /* 2-col panels stack */
+          .g-foot{grid-template-columns:1fr 1fr!important} /* 4-col footer → 2-col */
+          .panel{padding:32px 22px!important}
+        }
+        @media (max-width: 520px){
+          .g-foot{grid-template-columns:1fr!important}      /* footer → 1-col */
+          .g-collapse{gap:16px!important}
+        }
       `}</style>
 
       {/* NAV */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,.85)', backdropFilter: 'blur(14px)', borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ ...wrap, height: 66, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <LogoMark color="#000" height={32} />
-          <div style={{ display: 'flex', gap: 30 }}>
+          <div className="nav-mid" style={{ display: 'flex', gap: 30 }}>
             {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['/pricing', 'Pricing'], ['/blog', 'Blog']].map(([h, l]) => (
               <a key={h} href={h} className="navlink" style={{ fontSize: 14.5, fontWeight: 600, color: '#4b5563', textDecoration: 'none' }}>{l}</a>
             ))}
@@ -328,7 +339,7 @@ export default function HomeLanding() {
 
       {/* MELLO */}
       <section style={{ ...wrap, padding: '20px 24px 30px' }}>
-        <Panel grad="linear-gradient(135deg,#eaffb8,#cdeffb)" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 180px', gap: 24, alignItems: 'center' }}>
+        <Panel grad="linear-gradient(135deg,#eaffb8,#cdeffb)" className="g-collapse" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 180px', gap: 24, alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: GREEN }}>Meet Mello</div>
             <h2 style={{ fontSize: 'clamp(26px,3.6vw,38px)', fontWeight: 800, letterSpacing: '-.02em', margin: '6px 0 10px' }}>Your AI ad <span style={{ fontStyle: 'italic', color: GREEN }}>strategist</span>.</h2>
@@ -352,7 +363,7 @@ export default function HomeLanding() {
               <h2 style={{ fontSize: 'clamp(26px,4vw,40px)', fontWeight: 800, letterSpacing: '-.02em', margin: '6px 0 8px' }}><Mask style={{ display: 'inline-block' }}>{title.split(' ').slice(0, -1).join(' ')} <span style={{ fontStyle: 'italic', color: GREEN }}>{title.split(' ').slice(-1)}</span></Mask></h2>
               <p style={{ color: '#6b7280', maxWidth: 620, margin: '0 auto', fontSize: 16, lineHeight: 1.55 }}>{body}</p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr)) 220px', gap: 14, alignItems: 'stretch' }}>
+            <div className="g-collapse" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr)) 220px', gap: 14, alignItems: 'stretch' }}>
               {steps.map((s, j) => (
                 <Reveal key={j} delay={j * 110} style={{ display: 'flex' }}>
                   <Panel grad={grad} className="lift" style={{ padding: '26px 22px', minHeight: 150, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -514,7 +525,7 @@ function SeoFooter() {
       {/* top: brand + product/company + start CTA (white) */}
       <div style={{ background: '#fbfdfa', borderTop: '1px solid #eef0ee' }}>
         <div style={{ ...wrap, padding: '52px 24px 40px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.6fr) repeat(2,minmax(0,1fr)) minmax(0,1.2fr)', gap: 28 }}>
+          <div className="g-foot" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.6fr) repeat(2,minmax(0,1fr)) minmax(0,1.2fr)', gap: 28 }}>
             <div>
               <LogoMark color="#000" height={38} />
               <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.6, maxWidth: 280, marginTop: 12 }}>Find winning ads, make them yours, and launch — the whole ad workflow in one place.</p>
