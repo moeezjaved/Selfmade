@@ -18,6 +18,7 @@ export default function AdminBlog() {
   const [editing, setEditing] = useState<Post | null>(null)
   const [tagsStr, setTagsStr] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [msg, setMsg] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
 
@@ -42,6 +43,15 @@ export default function AdminBlog() {
     setSaving(false)
     if (j.error) { setMsg('Error: ' + j.error); return }
     setMsg(publish ? '✓ Published' : '✓ Saved'); setEditing(j.post); await load()
+  }
+  const uploadCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return
+    setUploading(true); setMsg('')
+    const fd = new FormData(); fd.append('file', file)
+    const j = await fetch('/api/admin/blog/upload', { method: 'POST', body: fd }).then(r => r.json()).catch(() => ({ error: 'upload failed' }))
+    setUploading(false); e.target.value = ''
+    if (j.error) { setMsg('Error: ' + j.error); return }
+    if (j.url) set('cover_image_url', j.url)
   }
   const del = async (id?: string) => {
     if (!id || !confirm('Delete this post?')) return
@@ -97,8 +107,15 @@ export default function AdminBlog() {
               <input style={inp} value={editing.slug || ''} placeholder="how-to-write-scroll-stopping-ads" onChange={(e) => { setSlugTouched(true); set('slug', e.target.value) }} />
             </div>
             <div>
-              <label style={lbl}>Cover image URL</label>
-              <input style={inp} value={editing.cover_image_url || ''} placeholder="https://…/cover.jpg" onChange={(e) => set('cover_image_url', e.target.value)} />
+              <label style={lbl}>Cover image {uploading && <span style={{ color: '#16a34a' }}>· uploading…</span>}</label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input style={inp} value={editing.cover_image_url || ''} placeholder="Upload → or paste a URL" onChange={(e) => set('cover_image_url', e.target.value)} />
+                <label style={{ flexShrink: 0, background: '#0e1b12', color: '#fff', padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  Upload
+                  <input type="file" accept="image/*" hidden onChange={uploadCover} />
+                </label>
+              </div>
+              {editing.cover_image_url && /* eslint-disable-next-line @next/next/no-img-element */ <img src={editing.cover_image_url} alt="" style={{ marginTop: 8, width: '100%', maxHeight: 150, objectFit: 'cover', borderRadius: 8, border: '1px solid #eef0ee' }} />}
             </div>
             <div>
               <label style={lbl}>Author</label>
