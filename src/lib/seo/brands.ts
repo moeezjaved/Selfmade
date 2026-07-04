@@ -100,9 +100,9 @@ export const getIndexableBrands = unstable_cache(
   { revalidate: 3600, tags: ['seo-brands'] },
 )
 
-// POPULATED brands only — those that actually render >= MIN_BRAND_ADS real ads (with creatives).
-// Used for the sitemap + the directory links so neither exposes empty "being processed" pages.
-// Per-brand head-count (bounded concurrency), cached 6h to spare the DB (it's under backfill load).
+// POPULATED brands only — the sitemap + directory link set, so neither advertises empty "being
+// processed" pages. Uses the ads_indexed>=MIN_BRAND_ADS proxy (instant, zero extra queries); see the
+// note below on why per-brand counting was removed. Cached 6h.
 export const getPopulatedBrands = unstable_cache(
   async (): Promise<BrandRef[]> => {
     // Real ads (has_creative) are a SUBSET of ads_indexed, so ads_indexed >= MIN_BRAND_ADS is the
