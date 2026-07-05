@@ -4,7 +4,7 @@
  * storage-capped by plan.assetsGb (the cap is enforced server-side; the meter here mirrors it).
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { UploadCloud, Trash2, Image as ImageIcon, Film, Music, X } from 'lucide-react'
+import { UploadCloud, Trash2, Image as ImageIcon, Film, Music, X, MoreHorizontal, Share2, Download, FolderPlus } from 'lucide-react'
 
 const INK = '#0e1b12'
 type Asset = { id: string; file_url: string; file_type: string; file_name: string; size_bytes: number; width?: number; height?: number; status: string; uploader_name?: string; uploaded_by?: string; created_at?: string; tags?: string[] }
@@ -83,6 +83,27 @@ export default function AssetsPage() {
     await fetch(`/api/assets?id=${id}`, { method: 'DELETE' }); load()
   }
 
+  // Per-asset actions menu (Add to board / Download / Share).
+  const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [boardSub, setBoardSub] = useState(false)
+  const [boardList, setBoardList] = useState<{ id: string; name: string; emoji: string }[]>([])
+  const openMenu = async (id: string) => {
+    setMenuFor(m => m === id ? null : id); setBoardSub(false)
+    if (!boardList.length) { const r = await fetch('/api/discovery/boards').then(r => r.json()).catch(() => ({})); setBoardList(r.boards || []) }
+  }
+  const shareAsset = (a: Asset) => { navigator.clipboard?.writeText(a.file_url); setMenuFor(null); setMsg('✓ Link copied to clipboard.') }
+  const downloadAsset = async (a: Asset) => {
+    setMenuFor(null)
+    try { const r = await fetch(a.file_url); const b = await r.blob(); const u = URL.createObjectURL(b); const el = document.createElement('a'); el.href = u; el.download = a.file_name || 'asset'; el.click(); URL.revokeObjectURL(u) }
+    catch { window.open(a.file_url, '_blank') }
+  }
+  const addToBoard = async (a: Asset, boardId: string) => {
+    setMenuFor(null); setBoardSub(false)
+    const r = await fetch('/api/discovery/saved', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ board_id: boardId, ad_id: 'asset:' + a.id, page_name: a.file_name || 'Asset', snapshot_url: a.file_url, ad_data: { thumbnailUrl: a.file_url, isAsset: true, mediaType: a.file_type } }) }).then(r => r.json()).catch(() => ({ error: 'failed' }))
+    setMsg(r.error ? `Could not add to board: ${r.error}` : '✓ Added to board.')
+  }
+
   // Video Clone → Assets: animate an image asset into a video (lands in My Creatives).
   const [busyAnimate, setBusyAnimate] = useState<string | null>(null)
   const animate = async (a: Asset) => {
@@ -109,6 +130,7 @@ export default function AssetsPage() {
     sortBy === 'oldest' ? +new Date(a.created_at || 0) - +new Date(b.created_at || 0) :
     +new Date(b.created_at || 0) - +new Date(a.created_at || 0))
   const selStyle: React.CSSProperties = { fontSize: 12.5, fontWeight: 700, color: '#374151', padding: '7px 11px', borderRadius: 100, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }
+  const menuItem: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '7px 9px', borderRadius: 7, fontSize: 12.5, fontWeight: 600, color: '#1f2937', fontFamily: 'inherit' }
 
   return (
     <div style={{ fontFamily: "'Inter',sans-serif", maxWidth: 1100, margin: '0 auto', padding: '28px 24px', color: INK }}>
@@ -185,8 +207,8 @@ export default function AssetsPage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 14 }}>
             {shown.map(a => (
-              <div key={a.id} style={{ background: '#fff', border: '1px solid #eef0ee', borderRadius: 12, overflow: 'hidden' }}>
-                <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: '#0f172a' }}>
+              <div key={a.id} style={{ background: '#fff', border: '1px solid #eef0ee', borderRadius: 12, position: 'relative', overflow: menuFor === a.id ? 'visible' : 'hidden', zIndex: menuFor === a.id ? 5 : 'auto' }}>
+                <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: '#0f172a', overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
                   {a.file_type === 'image' ? (
                     <img src={a.file_url} alt={a.file_name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : a.file_type === 'video' ? (
@@ -212,7 +234,10 @@ export default function AssetsPage() {
                   )}
                 </div>
                 <div style={{ padding: '8px 10px' }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.file_name || 'Untitled'}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.file_name || 'Untitled'}</div>
+                    <button onClick={() => openMenu(a.id)} title="Actions" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2, display: 'flex', flexShrink: 0 }}><MoreHorizontal size={16} /></button>
+                  </div>
                   <div style={{ fontSize: 11, color: '#9ca3af' }}>{a.file_type} · {fmtSize(a.size_bytes)}</div>
                   {/* tags */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, alignItems: 'center' }}>
@@ -231,6 +256,28 @@ export default function AssetsPage() {
                     )}
                   </div>
                 </div>
+                {menuFor === a.id && (
+                  <>
+                    <div onClick={() => setMenuFor(null)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
+                    <div style={{ position: 'absolute', right: 8, bottom: 8, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, boxShadow: '0 8px 26px rgba(0,0,0,0.16)', padding: 5, minWidth: 160, zIndex: 10 }}>
+                      {!boardSub ? (
+                        <>
+                          <button onClick={() => setBoardSub(true)} style={menuItem}><FolderPlus size={14} /> Add to board</button>
+                          <button onClick={() => downloadAsset(a)} style={menuItem}><Download size={14} /> Download</button>
+                          <button onClick={() => shareAsset(a)} style={menuItem}><Share2 size={14} /> Share link</button>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 10, color: '#9ca3af', padding: '3px 9px 5px', fontWeight: 800, letterSpacing: '.05em' }}>ADD TO BOARD</div>
+                          {boardList.length === 0 && <div style={{ fontSize: 12, color: '#9ca3af', padding: '5px 9px' }}>No boards yet</div>}
+                          <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                            {boardList.map(b => <button key={b.id} onClick={() => addToBoard(a, b.id)} style={menuItem}>{b.emoji} {b.name}</button>)}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
