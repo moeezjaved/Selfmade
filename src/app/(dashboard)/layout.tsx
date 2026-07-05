@@ -16,9 +16,10 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const NAV = [
+// Two-rail nav: each AREA is one icon in the thin rail; its `items` fill the panel.
+const AREAS = [
   {
-    label: 'Ad Discovery',
+    key: 'discover', label: 'Ad Discovery', railIcon: Compass, defaultHref: '/discovery',
     items: [
       { href: '/discovery',            icon: Compass,   label: 'Discovery',     badge: 'NEW' },
       { href: '/discovery/brand-spy',  icon: Radar,     label: 'Brand Spy',     badge: 'NEW' },
@@ -29,7 +30,7 @@ const NAV = [
     ],
   },
   {
-    label: 'Analytics & Launch',
+    key: 'analytics', label: 'Analytics & Launch', railIcon: Rocket, defaultHref: '/m4',
     items: [
       { href: '/m4',         icon: Rocket,      label: 'Launch Ads',       badge: 'AI' },
       { href: '/campaigns',  icon: Megaphone,   label: 'Campaigns',        badge: null },
@@ -38,7 +39,7 @@ const NAV = [
     ],
   },
   {
-    label: 'AI Gen',
+    key: 'create', label: 'AI Gen', railIcon: Wand2, defaultHref: '/creative-studio',
     items: [
       { href: '/creative-studio?studio=1', icon: Wand2, label: 'Create Ad',  badge: 'NEW' },
       { href: '/creative-studio', icon: Sparkles, label: 'My Creatives', badge: null },
@@ -46,7 +47,7 @@ const NAV = [
     ],
   },
   {
-    label: 'Account',
+    key: 'account', label: 'Account', railIcon: Settings, defaultHref: '/dashboard',
     items: [
       { href: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',    badge: null },
       { href: '/mcp',        icon: Sparkles,        label: 'API & MCP',    badge: 'NEW' },
@@ -58,6 +59,18 @@ const NAV = [
   },
 ]
 
+// Thin-rail icon button (icon-only, tooltip on hover).
+function RailIcon({ href, active, title, accent, children }: {
+  href: string; active: boolean; title: string; accent?: boolean; children: React.ReactNode
+}) {
+  return (
+    <Link href={href} title={title} aria-label={title}
+      className={cn('rail-icon', accent && 'accent', active && 'active')}>
+      {children}
+    </Link>
+  )
+}
+
 interface DashboardLayoutProps {
   children: React.ReactNode
 }
@@ -67,9 +80,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
   const supabase = createClient()
   // The single active nav item = the longest href that prefixes the current path.
-  const activeHref = NAV.flatMap(s => s.items.map(i => i.href))
+  const activeHref = AREAS.flatMap(s => s.items.map(i => i.href))
     .filter(h => pathname === h || pathname.startsWith(h + '/'))
     .sort((a, b) => b.length - a.length)[0]
+  const melloActive = pathname === '/mello' || pathname.startsWith('/mello/')
+  // Which AREA the panel shows: the one containing the active item (fall back to first, e.g. on /mello).
+  const activeArea = AREAS.find(a => a.items.some(i => i.href === activeHref)) || AREAS[0]
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -115,107 +131,101 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="flex min-h-screen bg-dark">
 
-      {/* ── SIDEBAR ── */}
-      <aside style={{width:232,flexShrink:0,background:"#243d20",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column",position:"fixed",top:0,left:0,bottom:0,zIndex:50}}>
+      {/* ── SIDEBAR (two-rail: thin icon rail + contextual panel) ── */}
+      <aside style={{width:256,flexShrink:0,display:"flex",position:"fixed",top:0,left:0,bottom:0,zIndex:50}}>
 
-        {/* Logo + notification bell */}
-        <div style={{padding:"18px 20px",borderBottom:"1px solid rgba(223,254,149,0.08)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-          <Link href="/dashboard">
-            <div className="text-lime font-black text-2xl tracking-tight font-serif italic">
-              <img src="/logo.png" alt="Selfmade" style={{height:42,width:"auto",display:"block"}}/>
-            </div>
+        {/* Rail 1 — thin icon rail */}
+        <div style={{width:56,flexShrink:0,background:"#1c2f19",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 0",gap:5}}>
+          <Link href="/dashboard" title="Home" style={{marginBottom:8}}>
+            <div style={{width:32,height:32,borderRadius:9,background:"#dffe95",color:"#243d20",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:18,fontStyle:"italic",fontFamily:"Georgia,serif"}}>S</div>
           </Link>
-          <NotificationBell />
+
+          {/* Mello — the AI, pinned top */}
+          <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent>
+            <Sparkles size={18}/>
+          </RailIcon>
+
+          <div style={{width:22,height:1,background:"rgba(255,255,255,0.08)",margin:"5px 0"}}/>
+
+          {/* Top areas */}
+          {AREAS.filter(a => a.key !== 'account').map(a => (
+            <RailIcon key={a.key} href={a.defaultHref} title={a.label} active={!melloActive && activeArea.key === a.key}>
+              <a.railIcon size={18}/>
+            </RailIcon>
+          ))}
+
+          <div style={{flex:1}}/>
+
+          {/* Account pinned bottom */}
+          <RailIcon href="/dashboard" title="Account" active={!melloActive && activeArea.key === 'account'}>
+            <Settings size={18}/>
+          </RailIcon>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 py-3 overflow-y-auto">
-          {/* Mello — primary AI agent, pinned at the top (Raya-style) */}
-          {(() => {
-            const melloActive = pathname === '/mello' || pathname.startsWith('/mello/')
-            return (
-              <div style={{padding:"0 12px 6px"}}>
+        {/* Rail 2 — contextual panel */}
+        <div style={{width:200,flexShrink:0,background:"#243d20",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column"}}>
+
+          {/* Panel header: active area name + bell */}
+          <div style={{padding:"20px 16px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <span style={{fontSize:13,fontWeight:800,color:"#dffe95",letterSpacing:"-.01em"}}>
+              {melloActive ? 'Ask Mello' : activeArea.label}
+            </span>
+            <NotificationBell />
+          </div>
+
+          {/* Items of the active area */}
+          <nav className="flex-1 overflow-y-auto" style={{padding:"2px 0"}}>
+            {activeArea.items.map(item => {
+              // Active = the LONGEST matching href (see activeHref above).
+              const isActive = item.href === activeHref
+              return (
                 <Link
-                  href="/mello"
-                  style={{
-                    display:"flex",alignItems:"center",gap:10,padding:"11px 12px",borderRadius:11,
-                    background: melloActive ? "#dffe95" : "rgba(223,254,149,0.10)",
-                    border: melloActive ? "1px solid #dffe95" : "1px solid rgba(223,254,149,0.18)",
-                    transition:"all .15s",
-                  }}
+                  key={item.href}
+                  href={item.href}
+                  data-nav={item.href === '/creative-studio' ? 'creatives' : undefined}
+                  className={cn('sidebar-link', isActive && 'active')}
                 >
-                  <span style={{width:26,height:26,borderRadius:8,background: melloActive ? "#2d5a27" : "#dffe95",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <Sparkles size={15} color={melloActive ? "#dffe95" : "#2d5a27"} />
-                  </span>
-                  <span style={{flex:1,fontWeight:800,fontSize:14.5,color: melloActive ? "#243d20" : "rgba(255,255,255,0.92)"}}>Ask Mello</span>
-                  <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 7px",borderRadius:99,background: melloActive ? "#2d5a27" : "#dffe95",color: melloActive ? "#dffe95" : "#243d20"}}>AI</span>
+                  <item.icon size={16} className="flex-shrink-0"/>
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge === 'AI' && (
+                    <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 6px",borderRadius:99,background:"#dffe95",color:"#243d20"}}>AI</span>
+                  )}
+                  {(item.badge === 'NEW' || item.badge === 'New') && (
+                    <span title="New" style={{width:6,height:6,borderRadius:99,background:"#dffe95",flexShrink:0}}/>
+                  )}
                 </Link>
-              </div>
-            )
-          })()}
+              )
+            })}
+          </nav>
 
-          {NAV.map(section => (
-            <div key={section.label}>
-              <div style={{padding:"16px 20px 6px",fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:".1em",color:"rgba(255,255,255,0.2)"}}>
-                {section.label}
+          {/* Credits + User */}
+          <div style={{padding:14,borderTop:"1px solid rgba(223,254,149,0.08)"}}>
+            <div style={{marginBottom:12}}><CreditCounter /></div>
+            <div className="flex items-center gap-3 cursor-pointer group">
+              <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">
+                {initials}
               </div>
-              {section.items.map(item => {
-                // Active = the LONGEST matching href, so /discovery/saved highlights
-                // "Saved" (not also "Discovery"); /discovery/<adId> still highlights Discovery.
-                const isActive = item.href === activeHref
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    data-nav={item.href === '/creative-studio' ? 'creatives' : undefined}
-                    className={cn('sidebar-link', isActive && 'active')}
-                  >
-                    <item.icon size={16} className="flex-shrink-0"/>
-                    <span className="flex-1">{item.label}</span>
-                    {item.badge && (
-                      <span className={cn(
-                        'text-[10px] font-bold px-2 py-0.5 rounded-full',
-                        item.badge === 'New' || item.badge === 'NEW'
-                          ? 'bg-lime/20 text-lime border border-lime/30'
-                          : 'bg-lime text-dark'
-                      )}>
-                        {item.badge}
-                      </span>
-                    )}
-                  </Link>
-                )
-              })}
-            </div>
-          ))}
-        </nav>
-
-        {/* Credits + User */}
-        <div style={{padding:16,borderTop:"1px solid rgba(223,254,149,0.08)"}}>
-          <div style={{marginBottom:12}}><CreditCounter /></div>
-          <div className="flex items-center gap-3 cursor-pointer group">
-            <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">
-              {initials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div style={{fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.9)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {user?.user_metadata?.full_name || user?.email || 'User'}
+              <div className="flex-1 min-w-0">
+                <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.9)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {user?.user_metadata?.full_name || user?.email || 'User'}
+                </div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {profile?.subscription_status === 'trialing' ? 'Trial' : 'Pro'} · Active
+                </div>
               </div>
-              <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {profile?.subscription_status === 'trialing' ? 'Trial' : 'Pro'} · Active
-              </div>
+              <button
+                onClick={handleSignOut}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-white/30 hover:text-white/70"
+              >
+                <LogOut size={14}/>
+              </button>
             </div>
-            <button
-              onClick={handleSignOut}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-white/30 hover:text-white/70"
-            >
-              <LogOut size={14}/>
-            </button>
           </div>
         </div>
       </aside>
 
       {/* ── MAIN ── */}
-      <div style={{flex:1,marginLeft:232,display:"flex",flexDirection:"column",minHeight:"100vh",background:"#eef5eb",minWidth:0,maxWidth:"calc(100vw - 232px)",overflowX:"hidden"}}>
+      <div style={{flex:1,marginLeft:256,display:"flex",flexDirection:"column",minHeight:"100vh",background:"#eef5eb",minWidth:0,maxWidth:"calc(100vw - 256px)",overflowX:"hidden"}}>
         <div id="topbar-portal"/>
         <main className="flex-1" style={{minWidth:0,overflowX:"hidden"}}>
           {children}

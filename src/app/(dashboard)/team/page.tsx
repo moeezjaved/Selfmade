@@ -9,7 +9,7 @@ const INK = '#0e1b12', LIME = '#dffe95'
 type Member = { id: string; user_id: string; email: string; role: string; isYou: boolean; accounts: string[] | null; allAccounts: boolean }
 type Invite = { id: string; email: string; role: string; link: string }
 type Account = { account_id: string; account_name: string | null }
-type Data = { org: { name: string; role: string }; members: Member[]; invites: Invite[]; seats: { used: number; limit: number; planId: string }; accountPool: Account[] }
+type Data = { org: { name: string; role: string }; members: Member[]; invites: Invite[]; seats: { used: number; limit: number; planId: string; included: number; extra: number }; accountPool: Account[] }
 
 export default function TeamPage() {
   const [d, setD] = useState<Data | null>(null)
@@ -45,6 +45,18 @@ export default function TeamPage() {
     await fetch('/api/account/team', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId, accountIds: acctSel }) })
     setAcctFor(null); load()
   }
+  const buySeats = async () => {
+    const cur = d?.seats.extra ?? 0
+    const ans = prompt(`How many total PAID extra seats do you want? (you currently have ${cur})\n\nEach adds one seat beyond your plan, billed monthly.`, String(cur + 1))
+    if (ans == null) return
+    const extra = Math.max(0, Math.floor(Number(ans)))
+    if (!Number.isFinite(extra)) return
+    setMsg('Setting up seats…')
+    const j = await fetch('/api/billing/seats', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ extra }) }).then(r => r.json()).catch(() => ({ error: 'failed' }))
+    if (j.url) { window.location.href = j.url; return }        // first purchase → Stripe Checkout
+    if (j.error) { setMsg(j.message || j.error); return }
+    setMsg(`✓ Seats updated — ${j.extra} paid seat${j.extra === 1 ? '' : 's'}.`); load()
+  }
   const revoke = async (id: string) => { await fetch(`/api/account/team?invite=${id}`, { method: 'DELETE' }); load() }
   const remove = async (id: string) => { if (confirm('Remove this member?')) { await fetch(`/api/account/team?member=${id}`, { method: 'DELETE' }); load() } }
   const copy = (t: string, tag: string) => { navigator.clipboard.writeText(t); setCopied(tag); setTimeout(() => setCopied(''), 1500) }
@@ -62,7 +74,11 @@ export default function TeamPage() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fbfdfa', border: '1px solid #eef0ee', borderRadius: 12, padding: '14px 18px', marginBottom: 20 }}>
         <div style={{ fontSize: 26, fontWeight: 800 }}>{d.seats.used}<span style={{ color: '#9ca3af', fontWeight: 600 }}>/{d.seats.limit}</span></div>
-        <div style={{ fontSize: 13.5, color: '#6b7280' }}>seats used ({seatsLeft} left on {d.seats.planId})</div>
+        <div style={{ flex: 1, fontSize: 13.5, color: '#6b7280' }}>
+          seats used ({seatsLeft} left on {d.seats.planId})
+          {d.seats.extra > 0 && <span style={{ color: '#166534' }}> · {d.seats.included} plan + {d.seats.extra} paid</span>}
+        </div>
+        {canManage && <button onClick={buySeats} style={{ background: seatsLeft <= 0 ? INK : 'none', color: seatsLeft <= 0 ? '#fff' : INK, border: seatsLeft <= 0 ? 'none' : `1px solid ${INK}`, padding: '8px 16px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{d.seats.extra > 0 ? 'Manage seats' : '+ Add seats'}</button>}
       </div>
 
       {canManage && (
