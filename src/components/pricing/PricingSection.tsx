@@ -19,7 +19,7 @@ const CMP: { group: string; rows: { label: string; get: (p: PlanId) => string }[
     { label: 'Ad discovery search', get: (p) => PLANS[p].discoveryPages ? `Capped (${PLANS[p].discoveryPages} pages)` : '✓' },
     { label: 'Filters (perf · niche · hook · emotion · angle · format)', get: (p) => p === 'free' ? 'Basic' : '✓' },
     { label: 'Top Picks (curated)', get: (p) => p === 'free' ? 'Preview' : '✓' },
-    { label: 'Saved ads / boards', get: (p) => p === 'free' ? '25 saves' : p === 'business' || p === 'enterprise' ? 'Team boards' : '✓' },
+    { label: 'Saved ads / boards', get: (p) => p === 'free' ? '25 saves' : p === 'pro' || p === 'business' || p === 'enterprise' ? 'Team boards' : '✓' },
   ]},
   { group: 'Brand Spy', rows: [
     { label: 'Brands tracked', get: (p) => PLANS[p].brandSpy === Infinity ? 'Unlimited' : String(PLANS[p].brandSpy) },
