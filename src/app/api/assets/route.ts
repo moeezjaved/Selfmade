@@ -11,6 +11,7 @@ import { getUserOrg, canManage } from '@/lib/org'
 import { getPlanId } from '@/lib/entitlements'
 import { planEntitlements } from '@/lib/plans'
 import { headObjectSize, deleteFromR2, r2PublicUrl } from '@/lib/r2'
+import { embedText } from '@/lib/assets/enrich'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     id: assetId, org_id: org.orgId, brand_id: brandId || null, uploaded_by: user.id,
     file_url: r2PublicUrl(key), r2_key: key, file_type: catOf(String(fileType || '')), mime: fileType || null,
     file_name: fileName || null, size_bytes: realSize, width: width || null, height: height || null,
-    duration_sec: durationSec || null, status: 'ready',
+    duration_sec: durationSec || null, status: 'processing',   // client calls /api/assets/enrich → 'ready'
   }).select().single()
   if (error) { await deleteFromR2(key); return NextResponse.json({ error: error.message }, { status: 500 }) }
   return NextResponse.json({ asset: data })
@@ -56,11 +57,25 @@ export async function GET(req: NextRequest) {
   const { admin, org } = c
   const brandId = req.nextUrl.searchParams.get('brand_id')
   const type = req.nextUrl.searchParams.get('type')
+  const search = req.nextUrl.searchParams.get('q')
 
-  let q = admin.from('assets').select('*').eq('org_id', org.orgId).order('created_at', { ascending: false })
-  if (brandId) q = q.eq('brand_id', brandId)
-  if (type) q = q.eq('file_type', type)
-  const { data: assets } = await q
+  let assets: any[] = []
+  if (search && search.trim()) {
+    // Semantic/visual search: embed the query, cosine-rank the org's assets (spec §10.3).
+    const emb = await embedText(search.trim())
+    if (emb) {
+      const { data } = await admin.rpc('search_assets', { p_org: org.orgId, p_query: emb as any, p_limit: 60 })
+      assets = (data || []) as any[]
+      if (brandId) assets = assets.filter(a => a.brand_id === brandId)
+      if (type) assets = assets.filter(a => a.file_type === type)
+    }
+  } else {
+    let q = admin.from('assets').select('*').eq('org_id', org.orgId).order('created_at', { ascending: false })
+    if (brandId) q = q.eq('brand_id', brandId)
+    if (type) q = q.eq('file_type', type)
+    const { data } = await q
+    assets = (data || []) as any[]
+  }
 
   // storage usage across the WHOLE org (unfiltered) for the meter
   const { data: allRows } = await admin.from('assets').select('size_bytes').eq('org_id', org.orgId)
