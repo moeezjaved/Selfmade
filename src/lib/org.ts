@@ -33,6 +33,23 @@ export async function getUserOrg(admin: SupabaseClient, userId: string): Promise
   return { orgId: org.id, name: org.name, ownerId: userId, role: 'owner' }
 }
 
+/**
+ * Resolve the BILLING account for a user: the owner of the org they belong to (so a whole team
+ * draws from ONE shared credit pool + plan — "credits pool at org level"). Read-only and side-effect
+ * free (unlike getUserOrg, it never lazily creates an org), so it's safe to call on every credit op.
+ * A solo user with no membership resolves to themselves — no behaviour change.
+ */
+export async function resolveBillingOwner(admin: SupabaseClient, userId: string): Promise<string> {
+  const db = admin as any
+  const { data: m } = await db.from('org_members')
+    .select('org_id').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (m?.org_id) {
+    const { data: o } = await db.from('organizations').select('owner_id').eq('id', m.org_id).maybeSingle()
+    if (o?.owner_id) return o.owner_id as string
+  }
+  return userId
+}
+
 /** Seat usage for an org: members + pending invites vs the owner's plan limit. */
 export async function getSeatInfo(admin: SupabaseClient, orgId: string, ownerId: string): Promise<{ used: number; limit: number; planId: string }> {
   const db = admin as any
