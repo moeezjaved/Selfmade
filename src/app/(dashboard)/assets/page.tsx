@@ -8,7 +8,7 @@ import { UploadCloud, Trash2, Image as ImageIcon, Film, Music, X, MoreHorizontal
 import CloneModal from '../discovery/CloneModal'
 
 const INK = '#0e1b12'
-type Asset = { id: string; file_url: string; file_type: string; file_name: string; size_bytes: number; width?: number; height?: number; status: string; uploader_name?: string; uploaded_by?: string; created_at?: string; tags?: string[] }
+type Asset = { id: string; file_url: string; file_type: string; file_name: string; size_bytes: number; width?: number; height?: number; status: string; uploader_name?: string; uploaded_by?: string; created_at?: string; tags?: string[]; scene?: string | null; audio_kind?: string | null; has_captions?: boolean | null; roll?: string | null }
 
 const fmtSize = (b: number) => b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`
 
@@ -24,6 +24,7 @@ export default function AssetsPage() {
   const [sortBy, setSortBy] = useState('recent')   // recent | oldest | name | size
   const [tagFilter, setTagFilter] = useState('')
   const [tagInput, setTagInput] = useState<string | null>(null)   // asset id whose add-tag box is open
+  const [sceneF, setSceneF] = useState(''); const [audioF, setAudioF] = useState(''); const [capF, setCapF] = useState(''); const [rollF, setRollF] = useState('')  // video clip filters
 
   const addTag = async (id: string, tag: string) => {
     const t = tag.trim().slice(0, 40); if (!t) return
@@ -124,9 +125,14 @@ export default function AssetsPage() {
   const uploaders = Array.from(new Set(assets.map(a => a.uploader_name).filter(Boolean))) as string[]
   const allTags = Array.from(new Set(assets.flatMap(a => a.tags || []))).sort()
   // Apply uploader + tag filters + sort client-side. When searching, keep the semantic ranking.
+  const hasVideos = assets.some(a => a.file_type === 'video')
   let shown = assets
     .filter(a => !uploaderF || a.uploader_name === uploaderF)
     .filter(a => !tagFilter || (a.tags || []).includes(tagFilter))
+    .filter(a => !sceneF || a.scene === sceneF)
+    .filter(a => !audioF || a.audio_kind === audioF)
+    .filter(a => !capF || (capF === 'yes' ? a.has_captions === true : a.has_captions === false))
+    .filter(a => !rollF || a.roll === rollF)
   if (!search) shown = [...shown].sort((a, b) =>
     sortBy === 'name' ? (a.file_name || '').localeCompare(b.file_name || '') :
     sortBy === 'size' ? (b.size_bytes || 0) - (a.size_bytes || 0) :
@@ -189,6 +195,29 @@ export default function AssetsPage() {
               {allTags.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           )}
+          {hasVideos && <>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', alignSelf: 'center' }}>Clip:</span>
+            <select value={sceneF} onChange={e => setSceneF(e.target.value)} style={selStyle}>
+              <option value="">Scene: All</option>
+              {['unboxing', 'talking_head', 'lifestyle', 'product_demo', 'other'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            </select>
+            <select value={rollF} onChange={e => setRollF(e.target.value)} style={selStyle}>
+              <option value="">A/B-roll: All</option>
+              <option value="a_roll">A-roll</option>
+              <option value="b_roll">B-roll</option>
+            </select>
+            <select value={capF} onChange={e => setCapF(e.target.value)} style={selStyle}>
+              <option value="">Caption: All</option>
+              <option value="yes">Has captions</option>
+              <option value="no">No captions</option>
+            </select>
+            <select value={audioF} onChange={e => setAudioF(e.target.value)} style={selStyle}>
+              <option value="">Audio: All</option>
+              <option value="voiceover">Voice-over</option>
+              <option value="music">Music</option>
+              <option value="silent">Silent</option>
+            </select>
+          </>}
           <select value={sortBy} onChange={e => setSortBy(e.target.value)} disabled={!!search} style={{ ...selStyle, opacity: search ? 0.5 : 1 }} title={search ? 'Sorted by relevance while searching' : ''}>
             <option value="recent">Sort: Recently added</option>
             <option value="oldest">Sort: Oldest</option>

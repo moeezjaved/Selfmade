@@ -101,6 +101,7 @@ export const ACTION_COSTS: Record<string, number> = {
   image_studio_4k: 25,      // 4K / HD Studio ad
   image_edit_pro: 10,       // iterative edit (one 2K Pro image)
   video_clone: 40,          // short AI video clip
+  asset_ai_tag: 1,          // AI tagging of an uploaded asset (caption/embed + video clip analysis)
 }
 
 // ── Top-up packs — pricing spec §3.1 ──
