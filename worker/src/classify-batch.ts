@@ -222,13 +222,17 @@ async function main() {
     // Set-based cache: reuse tags for any copy already classified (steady-state
     // saver — empty on a fresh corpus). Only the misses cost a model call.
     const cached = await fetchCachedTags(sigs.map(s => s.key))
-    const misses: CreativeItem[] = []
-    for (const s of sigs) {
-      const hit = cached.get(s.key)
-      if (hit) { await propagateClassification(s.key, hit); cacheHits++; totalApplied++ }
-      else misses.push(s)
+    const misses = sigs.filter(s => !cached.has(s.key))
+    const hits = sigs.filter(s => cached.has(s.key))
+    // Propagate cache-hits CONCURRENTLY (was serial — 14k one-at-a-time front-loaded minutes of
+    // silent work before any paid batch could submit). Cache reuse is free classification, so it's
+    // real progress; parallelising it lets the paid batches start promptly too.
+    if (hits.length) {
+      await pool(hits, 20, async (s) => {
+        try { await propagateClassification(s.key, cached.get(s.key)); cacheHits++; totalApplied++ } catch { /* skip one */ }
+      })
+      console.log(`  cache: reused ${hits.length} sigs, ${misses.length} to classify`)
     }
-    if (cached.size) console.log(`  cache: reused ${cached.size} sigs, ${misses.length} to classify`)
 
     if (misses.length) {
       if (SYNC) {
