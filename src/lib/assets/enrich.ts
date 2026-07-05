@@ -43,12 +43,56 @@ export async function embedText(text: string): Promise<number[] | null> {
   } catch { return null }
 }
 
-/** Caption + embed one asset; returns the fields to persist. Best-effort (nulls on failure). */
-export async function enrichAsset(a: { file_url: string; mime: string | null; file_type: string | null; file_name: string | null })
-  : Promise<{ ai_caption: string | null; embedding: number[] | null }> {
-  const caption = a.file_type === 'image' && a.file_url && a.mime ? await captionImage(a.file_url, a.mime) : null
-  // Embed caption + filename so even un-captioned video/audio is findable by name.
+export interface VideoClip { caption: string | null; has_captions: boolean | null; audio_kind: string | null; scene: string | null; roll: string | null }
+
+/**
+ * Analyze a short video with Gemini video understanding → structured clip attributes that power the
+ * Scene / Caption / Audio / A-B-roll filters. Inline (base64) is capped ~18MB per Gemini's request
+ * limit; larger videos are skipped (still searchable by filename). Best-effort — nulls on failure.
+ */
+export async function analyzeVideo(fileUrl: string, mime: string, sizeBytes: number): Promise<VideoClip> {
+  const empty: VideoClip = { caption: null, has_captions: null, audio_kind: null, scene: null, roll: null }
+  if (!GEMINI_KEY || sizeBytes > 18_000_000) return empty
+  try {
+    const res = await fetch(fileUrl, { signal: AbortSignal.timeout(30000) })
+    if (!res.ok) return empty
+    const b64 = Buffer.from(await res.arrayBuffer()).toString('base64')
+    const prompt = `Analyze this short marketing video clip for a media library. Return ONLY minified JSON, no prose:
+{"caption":"1-2 sentence description for search: product, visual style, people/creator, and any on-screen text","has_captions":true or false (are there burned-in captions / on-screen text?),"audio_kind":"voiceover" or "music" or "silent" (dominant audio),"scene":"unboxing" or "talking_head" or "lifestyle" or "product_demo" or "other","roll":"a_roll" (a person talking to camera) or "b_roll" (supplementary/product footage, no direct address)}`
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mime, data: b64 } }] }] }),
+      signal: AbortSignal.timeout(120000),
+    })
+    if (!r.ok) return empty
+    const j = await r.json()
+    const text = (j?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') || '').trim()
+    const m = text.match(/\{[\s\S]*\}/); if (!m) return empty
+    const o = JSON.parse(m[0])
+    const oneOf = (v: any, allow: string[]) => (typeof v === 'string' && allow.includes(v)) ? v : null
+    return {
+      caption: typeof o.caption === 'string' ? o.caption.slice(0, 600) : null,
+      has_captions: typeof o.has_captions === 'boolean' ? o.has_captions : null,
+      audio_kind: oneOf(o.audio_kind, ['voiceover', 'music', 'silent']),
+      scene: oneOf(o.scene, ['unboxing', 'talking_head', 'lifestyle', 'product_demo', 'other']),
+      roll: oneOf(o.roll, ['a_roll', 'b_roll']),
+    }
+  } catch { return empty }
+}
+
+/** Caption + embed + (for video) clip attributes. Returns the fields to persist. Best-effort. */
+export async function enrichAsset(a: { file_url: string; mime: string | null; file_type: string | null; file_name: string | null; size_bytes?: number })
+  : Promise<{ ai_caption: string | null; embedding: number[] | null } & Partial<VideoClip>> {
+  let caption: string | null = null
+  let clip: VideoClip = { caption: null, has_captions: null, audio_kind: null, scene: null, roll: null }
+  if (a.file_type === 'image' && a.file_url && a.mime) {
+    caption = await captionImage(a.file_url, a.mime)
+  } else if (a.file_type === 'video' && a.file_url && a.mime) {
+    clip = await analyzeVideo(a.file_url, a.mime, a.size_bytes || 0)
+    caption = clip.caption
+  }
+  // Embed caption + filename so even un-captioned/large video/audio is findable by name.
   const text = [caption, a.file_name].filter(Boolean).join(' — ')
   const embedding = text ? await embedText(text) : null
-  return { ai_caption: caption, embedding }
+  return { ai_caption: caption, embedding, has_captions: clip.has_captions, audio_kind: clip.audio_kind, scene: clip.scene, roll: clip.roll }
 }
