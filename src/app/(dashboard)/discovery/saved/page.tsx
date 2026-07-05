@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, ExternalLink, Bookmark } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
 
-interface Board { id: string; name: string; emoji: string; discovery_saved_ads?: { count: number }[] }
+interface Board { id: string; name: string; emoji: string; visibility?: string; isMine?: boolean; discovery_saved_ads?: { count: number }[] }
 interface SavedAd { id: string; ad_id: string; page_name: string; snapshot_url: string; ad_data: any; saved_at: string }
 
 export default function SavedAdsPage() {
@@ -16,6 +16,8 @@ export default function SavedAdsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [selectedEmoji, setSelectedEmoji] = useState('📋')
+  const [canTeam, setCanTeam] = useState(false)       // plan.teamBoards — may this org make shared boards?
+  const [newBoardTeam, setNewBoardTeam] = useState(false)
   // Atria-style toolbar filters (client-side — the whole board is already in memory)
   const [q, setQ] = useState('')
   const [fmt, setFmt] = useState('')        // '' | 'video' | 'image'
@@ -28,6 +30,7 @@ export default function SavedAdsPage() {
     const res = await fetch('/api/discovery/boards')
     const data = await res.json()
     setBoards(data.boards || [])
+    setCanTeam(!!data.canTeam)
     if (data.boards?.length && !selectedBoard) {
       setSelectedBoard(data.boards[0].id)
     }
@@ -58,15 +61,18 @@ export default function SavedAdsPage() {
     const res = await fetch('/api/discovery/boards', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newBoardName.trim(), emoji: selectedEmoji }),
+      body: JSON.stringify({ name: newBoardName.trim(), emoji: selectedEmoji, visibility: newBoardTeam ? 'team' : 'personal' }),
     })
     const data = await res.json()
     if (data.board) {
-      setBoards(prev => [data.board, ...prev])
+      setBoards(prev => [{ ...data.board, isMine: true }, ...prev])
       setSelectedBoard(data.board.id)
       setNewBoardName('')
       setShowCreate(false)
       setSelectedEmoji('📋')
+      setNewBoardTeam(false)
+    } else if (data.error === 'plan_limit') {
+      alert(data.message || 'Team boards are a Pro feature — upgrade to share boards with your team.')
     }
     setCreating(false)
   }
@@ -157,6 +163,11 @@ export default function SavedAdsPage() {
                 placeholder="Board name…"
                 style={{ width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 7, fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: 8 }}
               />
+              <label title={canTeam ? 'Everyone in your team can see this board' : 'Team boards are a Pro feature'}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: canTeam ? '#374151' : '#9ca3af', marginBottom: 8, cursor: canTeam ? 'pointer' : 'not-allowed' }}>
+                <input type="checkbox" checked={newBoardTeam} disabled={!canTeam} onChange={e => setNewBoardTeam(e.target.checked)} />
+                <span>👥 Share with team {canTeam ? '' : '(Pro)'}</span>
+              </label>
               <button onClick={createBoard} disabled={creating || !newBoardName.trim()}
                 style={{ width: '100%', padding: '7px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: creating ? 0.7 : 1 }}>
                 {creating ? 'Creating…' : 'Create Board'}
@@ -173,8 +184,8 @@ export default function SavedAdsPage() {
               <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
               <div style={{ fontSize: 13, color: '#6b7280' }}>No boards yet.<br />Create one to start saving ads.</div>
             </div>
-          ) : (
-            boards.map(board => (
+          ) : (() => {
+            const btn = (board: Board) => (
               <button key={board.id} onClick={() => setSelectedBoard(board.id)}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px',
@@ -185,17 +196,28 @@ export default function SavedAdsPage() {
                 <span style={{ fontSize: 18, flexShrink: 0 }}>{board.emoji}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{board.name}</div>
-                  <div style={{ fontSize: 11, color: '#6b7280' }}>{adCount(board)} ads</div>
+                  <div style={{ fontSize: 11, color: '#6b7280' }}>{adCount(board)} ads{board.visibility === 'team' && !board.isMine ? ' · shared' : ''}</div>
                 </div>
-                <button onClick={e => { e.stopPropagation(); deleteBoard(board.id) }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 4 }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#dc2626')}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}>
-                  <Trash2 size={12} />
-                </button>
+                {(board.isMine || board.visibility !== 'team') && (
+                  <button onClick={e => { e.stopPropagation(); deleteBoard(board.id) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 4 }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#dc2626')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}>
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </button>
-            ))
-          )}
+            )
+            const team = boards.filter(b => b.visibility === 'team')
+            const mine = boards.filter(b => b.visibility !== 'team')
+            const hdr = (t: string) => <div style={{ padding: '10px 18px 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9ca3af' }}>{t}</div>
+            return (
+              <>
+                {team.length > 0 && <>{hdr('👥 Team boards')}{team.map(btn)}</>}
+                {mine.length > 0 && <>{team.length > 0 && hdr('My boards')}{mine.map(btn)}</>}
+              </>
+            )
+          })()}
         </div>
       </div>
 
