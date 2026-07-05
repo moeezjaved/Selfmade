@@ -168,6 +168,14 @@ async function drainBatch(id: string): Promise<number> {
     await sleep(POLL_MS)
     st = await provider.isDone(id)
   }
+  // LOUD on non-success — a batch that ends 'failed'/'expired' yields 0 results and would otherwise
+  // apply 0 SILENTLY (this masked a token_limit_exceeded that froze E for a whole session). The most
+  // common cause is the org's 2M enqueued-token batch cap — lower CLASSIFY_BATCH_CONCURRENCY or raise
+  // the OpenAI limit.
+  if (st.status && !['completed', 'ended'].includes(st.status)) {
+    console.warn(`  ⛔ ${id} ended as '${st.status}' → 0 results applied. If 'failed', likely token_limit_exceeded (2M enqueued cap) — reduce CLASSIFY_BATCH_CONCURRENCY.`)
+    return 0
+  }
   const results = await provider.results(id)
   let applied = 0
   for (const r of results) {
