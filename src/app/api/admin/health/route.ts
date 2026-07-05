@@ -96,19 +96,40 @@ export async function GET() {
     qThumbBacklog = count ?? null
   } catch { /* discovery_creatives unreachable → null */ }
 
+  // ── REAL poster backlog (VIDEOS) ───────────────────────────────────────────
+  // Videos need a poster FRAME (extracted from the R2 mp4 by poster-backfill/mp4-poster). Backlog =
+  // asset_type='video', poster_url null, r2_url present (the mp4 exists to extract from). Separate
+  // from the image thumb backlog above — different worker, different remaining count.
+  let qPosterBacklog: number | null = null
+  try {
+    const { count } = await admin.from('discovery_creatives').select('*', { count: 'exact', head: true })
+      .eq('asset_type', 'video').is('poster_url', null).not('r2_url', 'is', null)
+    qPosterBacklog = count ?? null
+  } catch { /* discovery_creatives unreachable → null */ }
+
   // ── E (OpenAI AI classification) progress ──────────────────────────────────
   // How many classifiable ads has E NOT run yet. Backlog = the exact gate classify-batch.ts uses
   // (is_classifiable AND not-yet-fully-classified) — same partial index the cron hits, so it's fast.
   // classifiable = all ads with a real body (is_classifiable). Best-effort — nulls if unreachable.
-  let eClassifiable: number | null = null, eBacklog: number | null = null
-  try {
-    const [{ count: tot }, { count: bl }] = await Promise.all([
-      admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).eq('is_classifiable', true),
-      admin.from('discovery_ads_index').select('*', { count: 'exact', head: true })
-        .eq('is_classifiable', true).or('ai_classified.is.null,ai_classified.eq.false,topics.is.null'),
-    ])
-    eClassifiable = tot ?? null; eBacklog = bl ?? null
-  } catch { /* index unavailable → null */ }
+  let eClassifiable: number | null = null, eBacklog: number | null = null, eErr: string | null = null
+  // Count helper: try EXACT first (accurate); if it errors (statement timeout on the 2.8M table,
+  // missing partial index, permission, or an absent column), fall back to ESTIMATED so one slow/failed
+  // count doesn't blank the whole E panel. Captures the FIRST real error so the dashboard can show WHY
+  // it read "—" instead of failing silently.
+  const eCount = async (build: (q: any) => any): Promise<number | null> => {
+    try {
+      const { count, error } = await build(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }))
+      if (!error) return count ?? null
+      eErr = eErr || (error.message || String(error))
+    } catch (e: any) { eErr = eErr || (e?.message || String(e)) }
+    try {
+      const { count } = await build(admin.from('discovery_ads_index').select('*', { count: 'estimated', head: true }))
+      return count ?? null
+    } catch (e: any) { eErr = eErr || (e?.message || String(e)); return null }
+  }
+  // Run independently (not one shared try) so a failure on one still yields the other.
+  eClassifiable = await eCount(q => q.eq('is_classifiable', true))
+  eBacklog = await eCount(q => q.eq('is_classifiable', true).or('ai_classified.is.null,ai_classified.eq.false,topics.is.null'))
   const eDone = (eClassifiable != null && eBacklog != null) ? Math.max(0, eClassifiable - eBacklog) : null
   const ePctLeft = (eClassifiable && eBacklog != null) ? Math.round((eBacklog / eClassifiable) * 1000) / 10 : null
   const ePctDone = (eClassifiable && eDone != null) ? Math.round((eDone / eClassifiable) * 1000) / 10 : null
@@ -398,7 +419,8 @@ export async function GET() {
       failed: qFailed,
       thumbed_pct: qTotal > 0 ? Math.round((qWithCreative / qTotal) * 1000) / 10 : 0,
       // Real thumb/poster backlog from discovery_creatives.poster_url (not the dead thumbnail_url).
-      thumb_backlog: qThumbBacklog,
+      thumb_backlog: qThumbBacklog,     // images missing a thumbnail
+      poster_backlog: qPosterBacklog,   // videos missing a poster frame
     },
     // E — OpenAI AI classification progress (how many ads it hasn't run yet + %).
     classify: {
@@ -407,6 +429,7 @@ export async function GET() {
       backlog: eBacklog,       // ads E hasn't classified yet
       pct_done: ePctDone,
       pct_left: ePctLeft,      // e.g. 80 = "80% left"
+      error: eErr,             // why E read "—" (timeout / missing column / permission), else null
     },
     activity: {
       runs_1h: (runs1h ?? []).length,
