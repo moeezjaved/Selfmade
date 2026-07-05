@@ -100,7 +100,7 @@ export function ChatMessage({ msg, onWidgetAnswer, onFeedback, widgetLocked }: {
 
   const showThinking = (msg.thinking_steps?.length || 0) > 0
   const hasTools = (msg.tool_calls?.length || 0) > 0
-  const empty = !msg.content && !hasTools && !msg.interactive_widget && !msg.error
+  const empty = !msg.content && !hasTools && !msg.interactive_widget && !msg.error && !(msg.plan?.length)
   return (
     <div style={{ display: 'flex', gap: 10, margin: '14px 0' }}>
       <div style={{ width: 28, height: 28, borderRadius: 8, background: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
@@ -108,6 +108,14 @@ export function ChatMessage({ msg, onWidgetAnswer, onFeedback, widgetLocked }: {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         {showThinking && msg.thinking_steps!.map((t, i) => <ThinkingBlock key={i} durationMs={t.duration_ms} />)}
+        {(msg.plan?.length || 0) > 0 && (
+          <div style={{ margin: '4px 0 8px', padding: '8px 11px', background: 'rgba(45,90,39,0.06)', border: '1px solid rgba(45,90,39,0.15)', borderRadius: 10 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, color: '#2d5a27', letterSpacing: '.05em', marginBottom: 4 }}>PLAN</div>
+            <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: '#3f5140', lineHeight: 1.55 }}>
+              {msg.plan!.map((s, i) => <li key={i}>{s}</li>)}
+            </ol>
+          </div>
+        )}
         {hasTools && (
           <div style={{ margin: '4px 0 6px' }}>
             {msg.tool_calls!.map((c, i) => <ToolStep key={i} call={c} />)}

@@ -15,6 +15,7 @@ export interface MelloMessage {
   role: 'user' | 'assistant'
   content: string
   thinking_steps?: { duration_ms: number }[]
+  plan?: string[]
   tool_calls?: ToolCallView[]
   interactive_widget?: any
   widget_answered?: boolean
@@ -46,6 +47,9 @@ export function useChatStream(opts: { onTitle?: (title: string) => void } = {}) 
     switch (ev.type) {
       case 'thinking':
         patchLast(m => ({ ...m, thinking_steps: [...(m.thinking_steps || []), { duration_ms: ev.duration_ms }] }))
+        break
+      case 'plan':
+        patchLast(m => ({ ...m, plan: ev.steps }))
         break
       case 'tool_start':
         patchLast(m => ({ ...m, tool_calls: [...(m.tool_calls || []), { tool: ev.tool, label: ev.label, status: 'running' }] }))

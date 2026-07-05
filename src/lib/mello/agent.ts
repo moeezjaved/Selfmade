@@ -32,8 +32,37 @@ export interface AgentResult {
 }
 
 const MODEL = process.env.MELLO_MODEL || 'gpt-4o'
+// Planner can be a reasoning-tier model (o-series / gpt-5) — it's a single non-streaming call, so it
+// gets deeper reasoning without the streaming/tool-calling fragility of running the main loop on one.
+const PLANNER_MODEL = process.env.MELLO_PLANNER_MODEL || 'gpt-4o-mini'
+const isReasoning = (m: string) => /^(o\d|gpt-5)/i.test(m)
 // Deeper multi-step reasoning: allow longer tool chains (resolve → pull → compare → reflect → answer).
 const MAX_ROUNDS = parseInt(process.env.MELLO_MAX_ROUNDS || '12', 10)
+
+/**
+ * Stage-3 planner: for non-trivial requests, draft a short numbered plan the executor follows and the
+ * UI shows. Skips trivial turns (greetings / one-shot lookups). Best-effort — null on failure/trivial.
+ */
+async function makePlan(userMessage: string, history: HistoryMsg[]): Promise<string[] | null> {
+  if (userMessage.trim().length < 24) return null
+  try {
+    const params: any = {
+      model: PLANNER_MODEL,
+      messages: [
+        { role: 'system', content: 'You are the planner for Mello, an ad-analytics agent whose tools cover: live Meta performance, ad-library search, competitor/niche analysis, trending winners, boards, and the user\'s uploaded assets. For the user request, output a SHORT numbered plan (2-4 steps), one terse line each, of what to do — which tools, in what order. No preamble, no explanation. If the request is trivial (a greeting or a single obvious lookup), output exactly: NONE' },
+        ...history.slice(-4).map(h => ({ role: h.role, content: h.content })),
+        { role: 'user', content: userMessage },
+      ],
+    }
+    if (isReasoning(PLANNER_MODEL)) params.max_completion_tokens = 500
+    else { params.max_tokens = 220; params.temperature = 0.2 }
+    const res: any = await openai().chat.completions.create(params)
+    const text = (res.choices?.[0]?.message?.content || '').trim()
+    if (!text || /^none\b/i.test(text)) return null
+    const steps = String(text).split('\n').map((l: string) => l.replace(/^\s*\d+[.)]\s*/, '').replace(/^[-*]\s*/, '').trim()).filter(Boolean).slice(0, 5)
+    return steps.length ? steps : null
+  } catch { return null }
+}
 
 export async function runAgent(opts: {
   userId: string
@@ -50,6 +79,13 @@ export async function runAgent(opts: {
     { role: 'user', content: userMessage },
   ]
 
+  // ── Stage 3: plan → execute → reflect. Draft a visible plan for non-trivial turns, then execute it. ──
+  const plan = await makePlan(userMessage, history)
+  if (plan) {
+    send({ type: 'plan', steps: plan })
+    messages.push({ role: 'system', content: `Plan for this turn:\n${plan.map((s, i) => `${i + 1}. ${s}`).join('\n')}\nExecute it step by step with tools. After the tools return, REFLECT: did you get what each step needed? If a step's data is thin/empty, adjust before answering. Then give the final answer.` })
+  }
+
   const recordedToolCalls: RecordedToolCall[] = []
   const thinkingSteps: { duration_ms: number }[] = []
   let finalText = ''
@@ -61,15 +97,11 @@ export async function runAgent(opts: {
     let assistantContent = ''
     const toolCalls: Record<number, { id: string; name: string; args: string }> = {}
 
-    const stream = await openai().chat.completions.create({
-      model: MODEL,
-      stream: true,
-      temperature: 0.4,
-      max_tokens: 1800,
-      messages,
-      tools: TOOLS,
-      tool_choice: 'auto',
-    })
+    const createParams: any = { model: MODEL, stream: true, messages, tools: TOOLS, tool_choice: 'auto' }
+    // Reasoning-tier executors reject temperature and use max_completion_tokens.
+    if (isReasoning(MODEL)) createParams.max_completion_tokens = 2200
+    else { createParams.temperature = 0.4; createParams.max_tokens = 1800 }
+    const stream: any = await openai().chat.completions.create(createParams)
 
     for await (const chunk of stream) {
       const choice = chunk.choices?.[0]
