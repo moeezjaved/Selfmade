@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, ExternalLink, Bookmark } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
 
-interface Board { id: string; name: string; emoji: string; visibility?: string; isMine?: boolean; discovery_saved_ads?: { count: number }[] }
-interface SavedAd { id: string; ad_id: string; page_name: string; snapshot_url: string; ad_data: any; saved_at: string }
+interface Board { id: string; name: string; emoji: string; visibility?: string; isMine?: boolean; parent_board_id?: string | null; discovery_saved_ads?: { count: number }[] }
+interface SavedAd { id: string; ad_id: string; page_name: string; snapshot_url: string; ad_data: any; saved_at: string; tags?: string[] }
 
 export default function SavedAdsPage() {
   const [boards, setBoards] = useState<Board[]>([])
@@ -23,6 +23,19 @@ export default function SavedAdsPage() {
   const [fmt, setFmt] = useState('')        // '' | 'video' | 'image'
   const [status, setStatus] = useState('')  // '' | 'active' | 'inactive'
   const [sortBy, setSortBy] = useState('recent')  // recent | oldest | brand
+  const [tagFilter, setTagFilter] = useState('')  // '' = all; else a single tag
+  const [tagInput, setTagInput] = useState<string | null>(null)  // saved_ad_id whose add-tag box is open
+
+  const addTag = async (savedId: string, tag: string) => {
+    const t = tag.trim().slice(0, 40); if (!t) return
+    setSavedAds(prev => prev.map(a => a.id === savedId ? { ...a, tags: Array.from(new Set([...(a.tags || []), t])) } : a))
+    setTagInput(null)
+    await fetch('/api/discovery/saved/tags', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ saved_ad_id: savedId, tag: t }) })
+  }
+  const removeTag = async (savedId: string, tag: string) => {
+    setSavedAds(prev => prev.map(a => a.id === savedId ? { ...a, tags: (a.tags || []).filter(x => x !== tag) } : a))
+    await fetch(`/api/discovery/saved/tags?saved_ad_id=${savedId}&tag=${encodeURIComponent(tag)}`, { method: 'DELETE' })
+  }
 
   const EMOJIS = ['📋', '⭐', '🔥', '💡', '🎯', '🚀', '💎', '🎨', '📱', '🛒', '💄', '👗', '🏋️', '🍕', '✈️', '🏠']
 
@@ -77,6 +90,15 @@ export default function SavedAdsPage() {
     setCreating(false)
   }
 
+  const createSub = async (parent: Board) => {
+    const name = prompt(`New sub-board under "${parent.name}"`)?.trim(); if (!name) return
+    const res = await fetch('/api/discovery/boards', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, emoji: '📁', visibility: parent.visibility || 'personal', parent_board_id: parent.id }) })
+    const data = await res.json()
+    if (data.board) { setBoards(prev => [{ ...data.board, isMine: true }, ...prev]); setSelectedBoard(data.board.id) }
+    else if (data.error === 'plan_limit') alert(data.message || 'Team boards are a Pro feature.')
+  }
+
   const deleteBoard = async (id: string) => {
     if (!confirm('Delete this board? All saved ads in it will be removed.')) return
     await fetch(`/api/discovery/boards?id=${id}`, { method: 'DELETE' })
@@ -100,11 +122,13 @@ export default function SavedAdsPage() {
     .filter(s => !q || `${s.page_name || ''} ${s.ad_data?.title || ''} ${s.ad_data?.body || ''}`.toLowerCase().includes(q.toLowerCase()))
     .filter(s => !fmt || fmtOf(s) === fmt)
     .filter(s => !status || (status === 'active' ? !!s.ad_data?.isActive : !s.ad_data?.isActive))
+    .filter(s => !tagFilter || (s.tags || []).includes(tagFilter))
     .sort((a, b) =>
       sortBy === 'brand' ? (a.page_name || '').localeCompare(b.page_name || '') :
       sortBy === 'oldest' ? +new Date(a.saved_at) - +new Date(b.saved_at) :
       +new Date(b.saved_at) - +new Date(a.saved_at))
   const selStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#374151', padding: '7px 10px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }
+  const allTags = Array.from(new Set(savedAds.flatMap(s => s.tags || []))).sort()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -185,36 +209,46 @@ export default function SavedAdsPage() {
               <div style={{ fontSize: 13, color: '#6b7280' }}>No boards yet.<br />Create one to start saving ads.</div>
             </div>
           ) : (() => {
-            const btn = (board: Board) => (
+            const btn = (board: Board, depth = 0) => (
               <button key={board.id} onClick={() => setSelectedBoard(board.id)}
                 style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px',
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: `9px 18px 9px ${18 + depth * 20}px`,
                   background: selectedBoard === board.id ? '#f0fdf4' : 'none',
                   border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
                   borderLeft: `3px solid ${selectedBoard === board.id ? '#1a3a1a' : 'transparent'}`,
                 }}>
-                <span style={{ fontSize: 18, flexShrink: 0 }}>{board.emoji}</span>
+                <span style={{ fontSize: depth ? 14 : 18, flexShrink: 0 }}>{board.emoji}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{board.name}</div>
+                  <div style={{ fontSize: depth ? 12.5 : 13, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{board.name}</div>
                   <div style={{ fontSize: 11, color: '#6b7280' }}>{adCount(board)} ads{board.visibility === 'team' && !board.isMine ? ' · shared' : ''}</div>
                 </div>
+                {depth === 0 && (board.isMine || board.visibility !== 'team') && (
+                  <span onClick={e => { e.stopPropagation(); createSub(board) }} title="Add sub-board"
+                    style={{ cursor: 'pointer', color: '#c7cdd4', padding: 3, display: 'flex' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#1a3a1a')} onMouseLeave={e => (e.currentTarget.style.color = '#c7cdd4')}>
+                    <Plus size={13} />
+                  </span>
+                )}
                 {(board.isMine || board.visibility !== 'team') && (
-                  <button onClick={e => { e.stopPropagation(); deleteBoard(board.id) }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 4 }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#dc2626')}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}>
+                  <span onClick={e => { e.stopPropagation(); deleteBoard(board.id) }}
+                    style={{ cursor: 'pointer', color: '#d1d5db', padding: 3, display: 'flex' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#dc2626')} onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}>
                     <Trash2 size={12} />
-                  </button>
+                  </span>
                 )}
               </button>
             )
+            // Render top-level boards with their sub-boards nested beneath.
+            const tree = (list: Board[]) => list.filter(b => !b.parent_board_id).map(p => (
+              <div key={p.id}>{btn(p, 0)}{list.filter(c => c.parent_board_id === p.id).map(c => btn(c, 1))}</div>
+            ))
             const team = boards.filter(b => b.visibility === 'team')
             const mine = boards.filter(b => b.visibility !== 'team')
             const hdr = (t: string) => <div style={{ padding: '10px 18px 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9ca3af' }}>{t}</div>
             return (
               <>
-                {team.length > 0 && <>{hdr('👥 Team boards')}{team.map(btn)}</>}
-                {mine.length > 0 && <>{team.length > 0 && hdr('My boards')}{mine.map(btn)}</>}
+                {team.length > 0 && <>{hdr('👥 Team boards')}{tree(team)}</>}
+                {mine.length > 0 && <>{team.length > 0 && hdr('My boards')}{tree(mine)}</>}
               </>
             )
           })()}
@@ -264,6 +298,12 @@ export default function SavedAdsPage() {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
+              {allTags.length > 0 && (
+                <select value={tagFilter} onChange={e => setTagFilter(e.target.value)} style={selStyle}>
+                  <option value="">🏷 Tag: All</option>
+                  {allTags.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              )}
               <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={selStyle}>
                 <option value="recent">Sort: Recently added</option>
                 <option value="oldest">Sort: Oldest</option>
@@ -332,6 +372,23 @@ export default function SavedAdsPage() {
                         {body && <div style={{ fontSize: 11.5, color: '#4b5563', marginTop: 2, lineHeight: 1.45, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{body}</div>}
                       </div>
                     )}
+                    {/* tags (cross-cutting, click to filter) */}
+                    <div style={{ padding: '0 12px 12px', display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+                      {(saved.tags || []).map(t => (
+                        <span key={t} onClick={() => setTagFilter(t)} title="Filter by this tag"
+                          style={{ fontSize: 10.5, fontWeight: 700, color: '#1e40af', background: '#dbeafe', padding: '2px 6px 2px 8px', borderRadius: 100, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                          {t}
+                          <span onClick={e => { e.stopPropagation(); removeTag(saved.id, t) }} style={{ cursor: 'pointer', color: '#93a3c4', fontWeight: 800 }}>×</span>
+                        </span>
+                      ))}
+                      {tagInput === saved.id ? (
+                        <input autoFocus onBlur={() => setTagInput(null)}
+                          onKeyDown={e => { if (e.key === 'Enter') addTag(saved.id, (e.target as HTMLInputElement).value); if (e.key === 'Escape') setTagInput(null) }}
+                          placeholder="tag…" style={{ fontSize: 10.5, padding: '2px 7px', border: '1px solid #c7d2fe', borderRadius: 100, outline: 'none', width: 72, fontFamily: 'inherit' }} />
+                      ) : (
+                        <button onClick={() => setTagInput(saved.id)} style={{ fontSize: 10.5, fontWeight: 700, color: '#6b7280', background: '#f1f5f9', border: 'none', padding: '2px 8px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit' }}>+ tag</button>
+                      )}
+                    </div>
                   </div>
                 )
               })}

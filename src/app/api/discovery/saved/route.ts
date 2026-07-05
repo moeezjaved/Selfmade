@@ -37,7 +37,17 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ads: data || [] })
+
+  // Attach cross-cutting tags (spec §10.2) to each saved ad.
+  const ads = (data || []) as any[]
+  if (ads.length) {
+    const { data: tagRows } = await admin.from('saved_ad_tags')
+      .select('saved_ad_id, tag').in('saved_ad_id', ads.map(a => a.id))
+    const byAd: Record<string, string[]> = {}
+    for (const t of tagRows || []) (byAd[t.saved_ad_id] ||= []).push(t.tag)
+    for (const a of ads) a.tags = byAd[a.id] || []
+  }
+  return NextResponse.json({ ads })
 }
 
 // POST /api/discovery/saved — save an ad to a board (stamps org_id so team boards can aggregate).
