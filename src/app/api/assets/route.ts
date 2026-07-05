@@ -77,6 +77,14 @@ export async function GET(req: NextRequest) {
     assets = (data || []) as any[]
   }
 
+  // Resolve uploader display names (for the Uploader filter) — distinct ids only.
+  const uids = Array.from(new Set(assets.map(a => a.uploaded_by).filter(Boolean)))
+  const nameById: Record<string, string> = {}
+  await Promise.all(uids.map(async (id: string) => {
+    try { const { data } = await admin.auth.admin.getUserById(id); nameById[id] = data?.user?.user_metadata?.full_name || data?.user?.email || 'Member' } catch { nameById[id] = 'Member' }
+  }))
+  for (const a of assets) a.uploader_name = a.uploaded_by ? (nameById[a.uploaded_by] || 'Member') : 'Member'
+
   // storage usage across the WHOLE org (unfiltered) for the meter
   const { data: allRows } = await admin.from('assets').select('size_bytes').eq('org_id', org.orgId)
   const usedBytes = (allRows || []).reduce((s: number, r: any) => s + Number(r.size_bytes || 0), 0)

@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { UploadCloud, Trash2, Image as ImageIcon, Film, Music, X } from 'lucide-react'
 
 const INK = '#0e1b12'
-type Asset = { id: string; file_url: string; file_type: string; file_name: string; size_bytes: number; width?: number; height?: number; status: string }
+type Asset = { id: string; file_url: string; file_type: string; file_name: string; size_bytes: number; width?: number; height?: number; status: string; uploader_name?: string; uploaded_by?: string; created_at?: string }
 
 const fmtSize = (b: number) => b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`
 
@@ -19,6 +19,8 @@ export default function AssetsPage() {
   const [typeF, setTypeF] = useState('')
   const [search, setSearch] = useState('')     // committed semantic query
   const [searchBox, setSearchBox] = useState('')
+  const [uploaderF, setUploaderF] = useState('')   // filter by uploader name
+  const [sortBy, setSortBy] = useState('recent')   // recent | oldest | name | size
   const [msg, setMsg] = useState('')
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -70,6 +72,15 @@ export default function AssetsPage() {
 
   const pct = limitGb == null ? 0 : Math.min(100, (usedBytes / (limitGb * 1e9)) * 100)
   const near = pct >= 85
+  const uploaders = Array.from(new Set(assets.map(a => a.uploader_name).filter(Boolean))) as string[]
+  // Apply uploader filter + sort client-side. When searching, keep the semantic ranking (don't re-sort).
+  let shown = assets.filter(a => !uploaderF || a.uploader_name === uploaderF)
+  if (!search) shown = [...shown].sort((a, b) =>
+    sortBy === 'name' ? (a.file_name || '').localeCompare(b.file_name || '') :
+    sortBy === 'size' ? (b.size_bytes || 0) - (a.size_bytes || 0) :
+    sortBy === 'oldest' ? +new Date(a.created_at || 0) - +new Date(b.created_at || 0) :
+    +new Date(b.created_at || 0) - +new Date(a.created_at || 0))
+  const selStyle: React.CSSProperties = { fontSize: 12.5, fontWeight: 700, color: '#374151', padding: '7px 11px', borderRadius: 100, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }
 
   return (
     <div style={{ fontFamily: "'Inter',sans-serif", maxWidth: 1100, margin: '0 auto', padding: '28px 24px', color: INK }}>
@@ -107,12 +118,24 @@ export default function AssetsPage() {
           placeholder="Search by meaning — e.g. “UGC unboxing clips”, “green product shot”…"
           style={{ flex: 1, minWidth: 220, padding: '9px 13px', border: '1px solid #d1d5db', borderRadius: 100, fontSize: 13.5, outline: 'none', fontFamily: 'inherit' }} />
         {search && <button onClick={() => { setSearch(''); setSearchBox('') }} style={{ fontSize: 12.5, fontWeight: 700, color: '#6b7280', background: '#f1f5f9', border: 'none', padding: '7px 13px', borderRadius: 100, cursor: 'pointer' }}>Clear search</button>}
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {[['', 'All'], ['image', 'Images'], ['video', 'Videos'], ['audio', 'Audio']].map(([v, label]) => (
             <button key={v} onClick={() => setTypeF(v)}
               style={{ fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 100, cursor: 'pointer',
                 border: `1px solid ${typeF === v ? INK : '#e5e7eb'}`, background: typeF === v ? INK : '#fff', color: typeF === v ? '#fff' : '#374151' }}>{label}</button>
           ))}
+          {uploaders.length > 1 && (
+            <select value={uploaderF} onChange={e => setUploaderF(e.target.value)} style={selStyle}>
+              <option value="">Uploader: All</option>
+              {uploaders.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          )}
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)} disabled={!!search} style={{ ...selStyle, opacity: search ? 0.5 : 1 }} title={search ? 'Sorted by relevance while searching' : ''}>
+            <option value="recent">Sort: Recently added</option>
+            <option value="oldest">Sort: Oldest</option>
+            <option value="name">Sort: Name A–Z</option>
+            <option value="size">Sort: Largest</option>
+          </select>
         </div>
       </div>
       {search && <div style={{ fontSize: 12.5, color: '#6b7280', margin: '-4px 0 10px' }}>Semantic results for “{search}” — ranked by visual/meaning similarity.</div>}
@@ -127,7 +150,7 @@ export default function AssetsPage() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 14 }}>
-            {assets.map(a => (
+            {shown.map(a => (
               <div key={a.id} style={{ background: '#fff', border: '1px solid #eef0ee', borderRadius: 12, overflow: 'hidden' }}>
                 <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: '#0f172a' }}>
                   {a.file_type === 'image' ? (
