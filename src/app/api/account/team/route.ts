@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { getUserOrg, getSeatInfo, canManage, type Role } from '@/lib/org'
+import { getUserOrg, getSeatInfo, canManage, orgAdAccounts, type Role } from '@/lib/org'
 import { sendEmail, emailEnabled } from '@/lib/email'
 import { randomBytes } from 'crypto'
 
@@ -33,12 +33,26 @@ export async function GET() {
   }))
   const { data: invites } = await admin.from('org_invites').select('id, email, role, token, created_at').eq('org_id', org.orgId).eq('status', 'pending').order('created_at', { ascending: false })
   const seats = await getSeatInfo(admin, org.orgId, org.ownerId)
+
+  // Ad-account scoping: the org's shared account pool + each member's assignment (empty = all).
+  const accountPool = await orgAdAccounts(admin, org.orgId)
+  const { data: assignRows } = await admin.from('org_member_ad_accounts').select('user_id, account_id').eq('org_id', org.orgId)
+  const byUser = new Map<string, string[]>()
+  for (const r of (assignRows || []) as any[]) { const a = byUser.get(r.user_id) || []; a.push(r.account_id); byUser.set(r.user_id, a) }
+  const membersWithAccounts = withEmail.map((m: any) => {
+    const assigned = byUser.get(m.user_id) || []
+    // owner/admin always see all; a member with no rows = all (default-all)
+    const all = m.role === 'owner' || m.role === 'admin' || assigned.length === 0
+    return { ...m, accounts: all ? null : assigned, allAccounts: all }
+  })
+
   const site = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
   return NextResponse.json({
     org: { id: org.orgId, name: org.name, role: org.role },
-    members: withEmail,
+    members: membersWithAccounts,
     invites: (invites || []).map((i: any) => ({ ...i, link: `${site}/join?token=${i.token}` })),
     seats,
+    accountPool,   // [{ account_id, account_name }] — the org's connected Meta accounts
   })
 }
 
@@ -67,6 +81,31 @@ export async function POST(request: NextRequest) {
   </div>`
   const emailed = await sendEmail(em, `You're invited to ${org.name} on Selfmade`, html).catch(() => false)
   return NextResponse.json({ invite: data, link, emailed, emailEnabled })
+}
+
+// Set a member's ad-account assignment. Body: { userId, accountIds: string[] }.
+// Empty accountIds → clear all rows → member reverts to seeing ALL org accounts (default-all).
+export async function PATCH(request: NextRequest) {
+  const c = await ctx(); if (!c) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { admin, org } = c
+  if (!canManage(org.role)) return NextResponse.json({ error: 'Only an owner or admin can manage access.' }, { status: 403 })
+  const { userId, accountIds } = await request.json().catch(() => ({}))
+  if (!userId || !Array.isArray(accountIds)) return NextResponse.json({ error: 'userId + accountIds[] required' }, { status: 400 })
+
+  // Member must belong to this org; never scope the owner (they always see all).
+  const { data: mem } = await admin.from('org_members').select('role').eq('org_id', org.orgId).eq('user_id', userId).maybeSingle()
+  if (!mem) return NextResponse.json({ error: 'Not a member of this org.' }, { status: 400 })
+  if (mem.role === 'owner') return NextResponse.json({ error: 'The owner always has access to all accounts.' }, { status: 400 })
+
+  // Only accept account_ids that are actually in the org pool.
+  const pool = new Set((await orgAdAccounts(admin, org.orgId)).map(a => a.account_id))
+  const clean = Array.from(new Set((accountIds as string[]).filter(a => pool.has(a))))
+
+  await admin.from('org_member_ad_accounts').delete().eq('org_id', org.orgId).eq('user_id', userId)
+  if (clean.length) {
+    await admin.from('org_member_ad_accounts').insert(clean.map(account_id => ({ org_id: org.orgId, user_id: userId, account_id })))
+  }
+  return NextResponse.json({ ok: true, accounts: clean.length ? clean : null, allAccounts: clean.length === 0 })
 }
 
 export async function DELETE(request: NextRequest) {
