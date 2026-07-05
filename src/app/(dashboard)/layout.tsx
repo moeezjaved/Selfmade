@@ -25,7 +25,7 @@ const AREAS = [
       { href: '/discovery/brand-spy',  icon: Radar,     label: 'Brand Spy',     badge: 'NEW' },
       { href: '/trending',             icon: Flame,     label: 'Trending',      badge: 'NEW' },
       { href: '/discovery/top-picks',  icon: Star,      label: 'Top Picks',     badge: null },
-      { href: '/discovery/saved',      icon: Bookmark,  label: 'Saved Ads',     badge: null },
+      { href: '/discovery/saved',      icon: Bookmark,  label: 'Boards',        badge: null },
       { href: '/discovery/following',  icon: Heart,     label: 'Following',      badge: null },
     ],
   },
