@@ -9,6 +9,7 @@
 import { listAdAccounts, getAccountInfo, getAdPerformance, searchAdLibrary } from './meta-data'
 import { getCompetitorAds, analyzeNichePatterns, findWinningAds } from './library-data'
 import { addMemory } from './memory'
+import { getTrending, listBoards, createBoard, saveAdToBoard, searchMyAssets } from './actions'
 
 export const TOOLS = [
   {
@@ -134,6 +135,46 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'get_trending',
+      description: 'Get the currently TRENDING winning ads (ranked by live performance score), optionally filtered by niche. Use when the user asks "what\'s trending", "what\'s working right now", or wants fresh winners to model.',
+      parameters: { type: 'object', properties: { niche: { type: 'string' }, limit: { type: 'integer', description: 'default 10, max 20' } } },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'list_boards',
+      description: "List the user's saved-ad boards (team + personal). Call this before saving an ad so you know which boards exist.",
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'create_board',
+      description: 'Create a new board to organize saved ads.',
+      parameters: { type: 'object', required: ['name'], properties: { name: { type: 'string' }, emoji: { type: 'string' } } },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'save_ad_to_board',
+      description: "Save an ad (by its ad_id, e.g. one you found via search/trending/find_winning_ads) into a board. If the board name doesn't exist it's created. Use when the user says 'save this', 'add these to a board', etc.",
+      parameters: { type: 'object', required: ['ad_id', 'board_name'], properties: { ad_id: { type: 'string' }, board_name: { type: 'string' } } },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'search_my_assets',
+      description: "Semantic search of the user's OWN uploaded Assets library (their creatives, b-roll, product shots) by meaning — e.g. 'my UGC unboxing clips', 'green product shots'.",
+      parameters: { type: 'object', required: ['query'], properties: { query: { type: 'string' }, limit: { type: 'integer' } } },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'remember',
       description: "Persist a DURABLE fact about this user so you recall it in future chats — their niche/vertical, target CPA/ROAS goals, brand voice, main competitors, offers, or preferences. Only for things worth carrying forward, not one-off requests.",
       parameters: {
@@ -187,6 +228,11 @@ export const TOOL_LABELS: Record<string, string> = {
   get_competitor_ads: 'Analyzing competitor ads…',
   analyze_niche_patterns: 'Analyzing niche patterns…',
   find_winning_ads: 'Finding proven winners…',
+  get_trending: 'Pulling trending winners…',
+  list_boards: 'Checking your boards…',
+  create_board: 'Creating a board…',
+  save_ad_to_board: 'Saving to a board…',
+  search_my_assets: 'Searching your assets…',
   remember: 'Remembering that…',
   request_clarification: 'Asking for clarification…',
 }
@@ -218,6 +264,16 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       return await analyzeNichePatterns(args)
     case 'find_winning_ads':
       return await findWinningAds(args)
+    case 'get_trending':
+      return await getTrending(args)
+    case 'list_boards':
+      return await listBoards(ctx.userId)
+    case 'create_board':
+      return await createBoard(ctx.userId, String(args.name || ''), args.emoji || '📋')
+    case 'save_ad_to_board':
+      return await saveAdToBoard(ctx.userId, String(args.ad_id || ''), String(args.board_name || ''))
+    case 'search_my_assets':
+      return await searchMyAssets(ctx.userId, String(args.query || ''), args.limit)
     case 'remember':
       await addMemory(ctx.userId, String(args.content || ''), args.kind || 'fact')
       return { remembered: String(args.content || '').slice(0, 400) }
