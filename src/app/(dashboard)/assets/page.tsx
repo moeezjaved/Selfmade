@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { UploadCloud, Trash2, Image as ImageIcon, Film, Music, X } from 'lucide-react'
 
 const INK = '#0e1b12'
-type Asset = { id: string; file_url: string; file_type: string; file_name: string; size_bytes: number; width?: number; height?: number; status: string; uploader_name?: string; uploaded_by?: string; created_at?: string }
+type Asset = { id: string; file_url: string; file_type: string; file_name: string; size_bytes: number; width?: number; height?: number; status: string; uploader_name?: string; uploaded_by?: string; created_at?: string; tags?: string[] }
 
 const fmtSize = (b: number) => b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`
 
@@ -21,6 +21,19 @@ export default function AssetsPage() {
   const [searchBox, setSearchBox] = useState('')
   const [uploaderF, setUploaderF] = useState('')   // filter by uploader name
   const [sortBy, setSortBy] = useState('recent')   // recent | oldest | name | size
+  const [tagFilter, setTagFilter] = useState('')
+  const [tagInput, setTagInput] = useState<string | null>(null)   // asset id whose add-tag box is open
+
+  const addTag = async (id: string, tag: string) => {
+    const t = tag.trim().slice(0, 40); if (!t) return
+    setAssets(prev => prev.map(a => a.id === id ? { ...a, tags: Array.from(new Set([...(a.tags || []), t])) } : a))
+    setTagInput(null)
+    await fetch('/api/assets/tags', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, tag: t }) })
+  }
+  const removeTag = async (id: string, tag: string) => {
+    setAssets(prev => prev.map(a => a.id === id ? { ...a, tags: (a.tags || []).filter(x => x !== tag) } : a))
+    await fetch(`/api/assets/tags?id=${id}&tag=${encodeURIComponent(tag)}`, { method: 'DELETE' })
+  }
   const [msg, setMsg] = useState('')
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -70,11 +83,26 @@ export default function AssetsPage() {
     await fetch(`/api/assets?id=${id}`, { method: 'DELETE' }); load()
   }
 
+  // Video Clone → Assets: animate an image asset into a video (lands in My Creatives).
+  const [busyAnimate, setBusyAnimate] = useState<string | null>(null)
+  const animate = async (a: Asset) => {
+    if (a.file_type !== 'image') return
+    setBusyAnimate(a.id); setMsg('')
+    const r = await fetch('/api/discovery/animate', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ image: a.file_url, style: 'zoom', resolution: '1080p' }) }).then(r => r.json()).catch(() => ({ error: 'failed' }))
+    setBusyAnimate(null)
+    if (r.jobId) setMsg('✓ Animating this asset into a video (40 credits) — it will appear in My Creatives shortly.')
+    else setMsg(r.error === 'insufficient_credits' ? 'Not enough credits to animate (video = 40 credits).' : (r.error || 'Could not start the animation.'))
+  }
+
   const pct = limitGb == null ? 0 : Math.min(100, (usedBytes / (limitGb * 1e9)) * 100)
   const near = pct >= 85
   const uploaders = Array.from(new Set(assets.map(a => a.uploader_name).filter(Boolean))) as string[]
-  // Apply uploader filter + sort client-side. When searching, keep the semantic ranking (don't re-sort).
-  let shown = assets.filter(a => !uploaderF || a.uploader_name === uploaderF)
+  const allTags = Array.from(new Set(assets.flatMap(a => a.tags || []))).sort()
+  // Apply uploader + tag filters + sort client-side. When searching, keep the semantic ranking.
+  let shown = assets
+    .filter(a => !uploaderF || a.uploader_name === uploaderF)
+    .filter(a => !tagFilter || (a.tags || []).includes(tagFilter))
   if (!search) shown = [...shown].sort((a, b) =>
     sortBy === 'name' ? (a.file_name || '').localeCompare(b.file_name || '') :
     sortBy === 'size' ? (b.size_bytes || 0) - (a.size_bytes || 0) :
@@ -109,7 +137,7 @@ export default function AssetsPage() {
         )}
       </div>
 
-      {msg && <div style={{ fontSize: 13, fontWeight: 600, color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 12px', margin: '8px 0', display: 'flex', alignItems: 'center', gap: 8 }}>{msg}<X size={13} style={{ cursor: 'pointer', marginLeft: 'auto' }} onClick={() => setMsg('')} /></div>}
+      {msg && (() => { const ok = msg.startsWith('✓'); return <div style={{ fontSize: 13, fontWeight: 600, color: ok ? '#166534' : '#b91c1c', background: ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${ok ? '#bbf7d0' : '#fecaca'}`, borderRadius: 8, padding: '8px 12px', margin: '8px 0', display: 'flex', alignItems: 'center', gap: 8 }}>{msg}<X size={13} style={{ cursor: 'pointer', marginLeft: 'auto' }} onClick={() => setMsg('')} /></div> })()}
 
       {/* search + filter */}
       <div style={{ display: 'flex', gap: 10, margin: '14px 0', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -128,6 +156,12 @@ export default function AssetsPage() {
             <select value={uploaderF} onChange={e => setUploaderF(e.target.value)} style={selStyle}>
               <option value="">Uploader: All</option>
               {uploaders.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          )}
+          {allTags.length > 0 && (
+            <select value={tagFilter} onChange={e => setTagFilter(e.target.value)} style={selStyle}>
+              <option value="">🏷 Tag: All</option>
+              {allTags.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           )}
           <select value={sortBy} onChange={e => setSortBy(e.target.value)} disabled={!!search} style={{ ...selStyle, opacity: search ? 0.5 : 1 }} title={search ? 'Sorted by relevance while searching' : ''}>
@@ -170,10 +204,32 @@ export default function AssetsPage() {
                     style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: 6, padding: 4, cursor: 'pointer', color: '#fecaca', display: 'flex' }}>
                     <Trash2 size={13} />
                   </button>
+                  {a.file_type === 'image' && (
+                    <button onClick={() => animate(a)} disabled={busyAnimate === a.id} title="Animate into a video (40 credits)"
+                      style={{ position: 'absolute', top: 6, right: 34, background: 'rgba(14,27,18,0.85)', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', color: '#dffe95', display: 'flex', alignItems: 'center', gap: 3, fontSize: 9.5, fontWeight: 800 }}>
+                      <Film size={12} /> {busyAnimate === a.id ? '…' : 'Animate'}
+                    </button>
+                  )}
                 </div>
                 <div style={{ padding: '8px 10px' }}>
                   <div style={{ fontSize: 12.5, fontWeight: 600, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.file_name || 'Untitled'}</div>
                   <div style={{ fontSize: 11, color: '#9ca3af' }}>{a.file_type} · {fmtSize(a.size_bytes)}</div>
+                  {/* tags */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, alignItems: 'center' }}>
+                    {(a.tags || []).map(t => (
+                      <span key={t} onClick={() => setTagFilter(t)} title="Filter by this tag"
+                        style={{ fontSize: 10, fontWeight: 700, color: '#1e40af', background: '#dbeafe', padding: '1px 5px 1px 7px', borderRadius: 100, display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                        {t}<span onClick={e => { e.stopPropagation(); removeTag(a.id, t) }} style={{ cursor: 'pointer', color: '#93a3c4', fontWeight: 800 }}>×</span>
+                      </span>
+                    ))}
+                    {tagInput === a.id ? (
+                      <input autoFocus onBlur={() => setTagInput(null)}
+                        onKeyDown={e => { if (e.key === 'Enter') addTag(a.id, (e.target as HTMLInputElement).value); if (e.key === 'Escape') setTagInput(null) }}
+                        placeholder="tag…" style={{ fontSize: 10, padding: '1px 6px', border: '1px solid #c7d2fe', borderRadius: 100, outline: 'none', width: 60, fontFamily: 'inherit' }} />
+                    ) : (
+                      <button onClick={() => setTagInput(a.id)} style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', background: '#f1f5f9', border: 'none', padding: '1px 7px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit' }}>+ tag</button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
