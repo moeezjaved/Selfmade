@@ -4,7 +4,8 @@
  * storage-capped by plan.assetsGb (the cap is enforced server-side; the meter here mirrors it).
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { UploadCloud, Trash2, Image as ImageIcon, Film, Music, X, MoreHorizontal, Share2, Download, FolderPlus } from 'lucide-react'
+import { UploadCloud, Trash2, Image as ImageIcon, Film, Music, X, MoreHorizontal, Share2, Download, FolderPlus, Sparkles } from 'lucide-react'
+import CloneModal from '../discovery/CloneModal'
 
 const INK = '#0e1b12'
 type Asset = { id: string; file_url: string; file_type: string; file_name: string; size_bytes: number; width?: number; height?: number; status: string; uploader_name?: string; uploaded_by?: string; created_at?: string; tags?: string[] }
@@ -103,6 +104,8 @@ export default function AssetsPage() {
       body: JSON.stringify({ board_id: boardId, ad_id: 'asset:' + a.id, page_name: a.file_name || 'Asset', snapshot_url: a.file_url, ad_data: { thumbnailUrl: a.file_url, isAsset: true, mediaType: a.file_type } }) }).then(r => r.json()).catch(() => ({ error: 'failed' }))
     setMsg(r.error ? `Could not add to board: ${r.error}` : '✓ Added to board.')
   }
+
+  const [cloneAsset, setCloneAsset] = useState<Asset | null>(null)   // asset being cloned via CloneModal
 
   // Video Clone → Assets: animate an image asset into a video (lands in My Creatives).
   const [busyAnimate, setBusyAnimate] = useState<string | null>(null)
@@ -227,10 +230,16 @@ export default function AssetsPage() {
                     <Trash2 size={13} />
                   </button>
                   {a.file_type === 'image' && (
-                    <button onClick={() => animate(a)} disabled={busyAnimate === a.id} title="Animate into a video (40 credits)"
-                      style={{ position: 'absolute', top: 6, right: 34, background: 'rgba(14,27,18,0.85)', border: 'none', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', color: '#dffe95', display: 'flex', alignItems: 'center', gap: 3, fontSize: 9.5, fontWeight: 800 }}>
-                      <Film size={12} /> {busyAnimate === a.id ? '…' : 'Animate'}
-                    </button>
+                    <div style={{ position: 'absolute', bottom: 7, right: 7, display: 'flex', gap: 5 }}>
+                      <button onClick={() => setCloneAsset(a)} title="Clone this creative with your product"
+                        style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Sparkles size={11} /> Clone
+                      </button>
+                      <button onClick={() => animate(a)} disabled={busyAnimate === a.id} title="Animate into a video (40 credits)"
+                        style={{ background: 'rgba(14,27,18,0.85)', color: '#dffe95', border: 'none', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Film size={11} /> {busyAnimate === a.id ? '…' : 'Animate'}
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div style={{ padding: '8px 10px' }}>
@@ -282,6 +291,12 @@ export default function AssetsPage() {
             ))}
           </div>
         )}
+      {cloneAsset && (
+        <CloneModal
+          ad={{ id: 'asset:' + cloneAsset.id, pageId: '', pageName: cloneAsset.file_name || 'Asset', assetImageUrl: cloneAsset.file_url }}
+          onClose={() => setCloneAsset(null)}
+        />
+      )}
     </div>
   )
 }

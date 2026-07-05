@@ -29,7 +29,7 @@ async function fileToDataUrl(f: File): Promise<string> {
   })
 }
 
-export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: string; pageName: string }; onClose: () => void }) {
+export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: string; pageName: string; assetImageUrl?: string }; onClose: () => void }) {
   const [brands, setBrands] = useState<Brand[]>([])
   const [quota, setQuota] = useState<{ used: number; limit: number } | null>(null)
   const [mode, setMode] = useState<'pick' | 'new'>('pick')
@@ -170,7 +170,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       }
 
       // Opt into daily "new winning ads like this" emails (follows the ad's brand + email alerts on).
-      if (emailDaily) {
+      if (emailDaily && !ad.assetImageUrl) {
         fetch('/api/follows', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ pageId: ad.pageId, brandName: ad.pageName, action: 'set_email', email_alerts: true }),
@@ -180,7 +180,9 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       // Fire `count` clones in parallel — each reserves+charges+saves its own generation, so partial
       // success is fine (Gemini's inherent randomness makes the variations differ).
       const body = {
-        adId: ad.id, productImages: chosen, tier, brandId: useBrandId || undefined,
+        // Clone from an uploaded ASSET (refImageUrl) or a discovery ad (adId).
+        ...(ad.assetImageUrl ? { refImageUrl: ad.assetImageUrl } : { adId: ad.id }),
+        productImages: chosen, tier, brandId: useBrandId || undefined,
         brandName: bName.trim() || undefined, colors, newHeadline: headline.trim() || undefined,
         aspectRatio: aspect, logo: logo || undefined, imageSize, palette: palette || undefined,
       }
