@@ -8,6 +8,7 @@
  *                                              ↘ on any failure → refund.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { resolveBillingOwner } from '@/lib/org'
 
 export class InsufficientCreditsError extends Error {
   constructor(public need: number, public have: number) {
@@ -30,8 +31,10 @@ export interface ReservedTx {
 export async function reserveCredits(
   admin: SupabaseClient, userId: string, action: string, refId?: string,
 ): Promise<ReservedTx> {
+  // Charge the ORG's shared wallet (owner), not the individual member — one team, one credit pool.
+  const owner = await resolveBillingOwner(admin, userId)
   const { data, error } = await admin.rpc('reserve_credits', {
-    p_user: userId, p_action: action, p_ref: refId ?? null,
+    p_user: owner, p_action: action, p_ref: refId ?? null,
   })
   if (error) {
     const msg = error.message || ''
@@ -63,16 +66,20 @@ export async function refundCredits(admin: SupabaseClient, txId: string): Promis
 export async function grantCredits(
   admin: SupabaseClient, userId: string, credits: number, refId?: string,
 ): Promise<void> {
-  const { error } = await admin.rpc('grant_credits', { p_user: userId, p_credits: credits, p_ref: refId ?? null })
+  // Top-ups land in the org's shared wallet (owner) so the whole team can spend them.
+  const owner = await resolveBillingOwner(admin, userId)
+  const { error } = await admin.rpc('grant_credits', { p_user: owner, p_credits: credits, p_ref: refId ?? null })
   if (error) throw new Error(error.message)
 }
 
 /** Current balance + plan + reset date (also lazily applies a due monthly reset). */
 export async function getBalance(admin: SupabaseClient, userId: string) {
-  await admin.rpc('ensure_monthly_reset', { p_user: userId })
+  // Members see the ORG's shared balance (owner's wallet + plan), not their own empty one.
+  const owner = await resolveBillingOwner(admin, userId)
+  await admin.rpc('ensure_monthly_reset', { p_user: owner })
   const [{ data: prof }, { data: wallet }] = await Promise.all([
-    admin.from('user_profiles').select('credits_balance, plan_id, credits_reset_at').eq('user_id', userId).maybeSingle(),
-    admin.from('credit_wallets').select('plan_credits_balance, topup_credits_balance, plan_credits_reset_at').eq('owner_id', userId).maybeSingle(),
+    admin.from('user_profiles').select('credits_balance, plan_id, credits_reset_at').eq('user_id', owner).maybeSingle(),
+    admin.from('credit_wallets').select('plan_credits_balance, topup_credits_balance, plan_credits_reset_at').eq('owner_id', owner).maybeSingle(),
   ])
   const plan_credits = (wallet as any)?.plan_credits_balance ?? 0
   const topup_credits = (wallet as any)?.topup_credits_balance ?? 0
