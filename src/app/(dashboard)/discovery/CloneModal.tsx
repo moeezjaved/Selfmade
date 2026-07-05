@@ -10,7 +10,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Upload, Link2, Loader2, Download, Sparkles, Check } from 'lucide-react'
+import { X, Upload, Link2, Loader2, Download, Sparkles, Check, Library } from 'lucide-react'
 import { flyToCreatives } from '@/lib/flyToCreatives'
 import { creativeFilename } from '@/lib/filename'
 
@@ -93,6 +93,15 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       setSelected((s) => Array.from(new Set([...s, ...fresh.map((f) => f.id)])).slice(0, 4))
       return merged
     })
+  }
+
+  // Pull the org's uploaded image Assets into the product-photo picker (spec §10, step 6).
+  const [assetsPulled, setAssetsPulled] = useState(false)
+  const pullAssets = async () => {
+    const r = await fetch('/api/assets?type=image').then((r) => r.json()).catch(() => ({}))
+    const list: Photo[] = (r.assets || []).filter((a: any) => a.file_url).map((a: any) => ({ id: 'asset:' + a.id, src: a.file_url, label: a.file_name || 'Asset' }))
+    if (!list.length) { setErr('No image assets yet — upload some on the Assets page first.'); return }
+    addPhotos(list); setAssetsPulled(true)
   }
 
   const pickBrand = (b: Brand) => {
@@ -321,6 +330,11 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                 <button onClick={() => fileRef.current?.click()} style={{ width: 74, height: 74, borderRadius: 10, border: '2px dashed #365', background: 'transparent', color: '#9fb0a4', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11 }}>
                   <Upload size={16} /> Upload
                 </button>
+                {!assetsPulled && (
+                  <button onClick={pullAssets} title="Use a file from your Assets library" style={{ width: 74, height: 74, borderRadius: 10, border: '2px dashed #365', background: 'transparent', color: '#9fb0a4', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11 }}>
+                    <Library size={16} /> Assets
+                  </button>
+                )}
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => onUpload(e.target.files)} />
               </div>
             </section>
