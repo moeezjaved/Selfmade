@@ -17,14 +17,19 @@ export default function AssetsPage() {
   const [limitGb, setLimitGb] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [typeF, setTypeF] = useState('')
+  const [search, setSearch] = useState('')     // committed semantic query
+  const [searchBox, setSearchBox] = useState('')
   const [msg, setMsg] = useState('')
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
-    const r = await fetch(`/api/assets${typeF ? `?type=${typeF}` : ''}`).then(r => r.json()).catch(() => ({}))
+    const params = new URLSearchParams()
+    if (typeF) params.set('type', typeF)
+    if (search.trim()) params.set('q', search.trim())
+    const r = await fetch(`/api/assets?${params}`).then(r => r.json()).catch(() => ({}))
     setAssets(r.assets || []); setUsedBytes(r.usedBytes || 0); setLimitGb(r.limitGb ?? null); setLoading(false)
-  }, [typeF])
+  }, [typeF, search])
   useEffect(() => { load() }, [load])
 
   const uploadOne = async (file: File): Promise<boolean> => {
@@ -43,7 +48,10 @@ export default function AssetsPage() {
     // 3) confirm → records the row after verifying the object
     const conf = await fetch('/api/assets', { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ assetId: signed.assetId, key: signed.key, fileType: file.type, fileName: file.name }) }).then(r => r.json()).catch(() => ({ error: 'failed' }))
-    return !conf.error
+    if (conf.error) return false
+    // 4) fire AI enrichment (caption + embedding) — non-blocking; the card shows 'processing' until done
+    if (conf.asset?.id) fetch('/api/assets/enrich', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: conf.asset.id }) }).then(() => load()).catch(() => {})
+    return true
   }
 
   const onFiles = async (files: FileList | null) => {
@@ -92,14 +100,22 @@ export default function AssetsPage() {
 
       {msg && <div style={{ fontSize: 13, fontWeight: 600, color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 12px', margin: '8px 0', display: 'flex', alignItems: 'center', gap: 8 }}>{msg}<X size={13} style={{ cursor: 'pointer', marginLeft: 'auto' }} onClick={() => setMsg('')} /></div>}
 
-      {/* filter */}
-      <div style={{ display: 'flex', gap: 8, margin: '14px 0' }}>
-        {[['', 'All'], ['image', 'Images'], ['video', 'Videos'], ['audio', 'Audio']].map(([v, label]) => (
-          <button key={v} onClick={() => setTypeF(v)}
-            style={{ fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 100, cursor: 'pointer',
-              border: `1px solid ${typeF === v ? INK : '#e5e7eb'}`, background: typeF === v ? INK : '#fff', color: typeF === v ? '#fff' : '#374151' }}>{label}</button>
-        ))}
+      {/* search + filter */}
+      <div style={{ display: 'flex', gap: 10, margin: '14px 0', alignItems: 'center', flexWrap: 'wrap' }}>
+        <input value={searchBox} onChange={e => setSearchBox(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') setSearch(searchBox); if (e.key === 'Escape') { setSearch(''); setSearchBox('') } }}
+          placeholder="Search by meaning — e.g. “UGC unboxing clips”, “green product shot”…"
+          style={{ flex: 1, minWidth: 220, padding: '9px 13px', border: '1px solid #d1d5db', borderRadius: 100, fontSize: 13.5, outline: 'none', fontFamily: 'inherit' }} />
+        {search && <button onClick={() => { setSearch(''); setSearchBox('') }} style={{ fontSize: 12.5, fontWeight: 700, color: '#6b7280', background: '#f1f5f9', border: 'none', padding: '7px 13px', borderRadius: 100, cursor: 'pointer' }}>Clear search</button>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[['', 'All'], ['image', 'Images'], ['video', 'Videos'], ['audio', 'Audio']].map(([v, label]) => (
+            <button key={v} onClick={() => setTypeF(v)}
+              style={{ fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 100, cursor: 'pointer',
+                border: `1px solid ${typeF === v ? INK : '#e5e7eb'}`, background: typeF === v ? INK : '#fff', color: typeF === v ? '#fff' : '#374151' }}>{label}</button>
+          ))}
+        </div>
       </div>
+      {search && <div style={{ fontSize: 12.5, color: '#6b7280', margin: '-4px 0 10px' }}>Semantic results for “{search}” — ranked by visual/meaning similarity.</div>}
 
       {loading ? <div style={{ color: '#9ca3af', padding: 40 }}>Loading…</div>
         : assets.length === 0 ? (
@@ -124,6 +140,9 @@ export default function AssetsPage() {
                   <span style={{ position: 'absolute', top: 7, left: 7, background: 'rgba(0,0,0,0.6)', color: '#fff', borderRadius: 6, padding: '2px 5px', display: 'flex' }}>
                     {a.file_type === 'video' ? <Film size={12} /> : a.file_type === 'audio' ? <Music size={12} /> : <ImageIcon size={12} />}
                   </span>
+                  {a.status === 'processing' && (
+                    <span style={{ position: 'absolute', bottom: 7, left: 7, background: 'rgba(14,27,18,0.85)', color: '#dffe95', borderRadius: 6, padding: '2px 7px', fontSize: 9.5, fontWeight: 800 }}>✨ AI tagging…</span>
+                  )}
                   <button onClick={() => del(a.id)} title="Delete"
                     style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: 6, padding: 4, cursor: 'pointer', color: '#fecaca', display: 'flex' }}>
                     <Trash2 size={13} />
