@@ -8,6 +8,7 @@
  */
 import { listAdAccounts, getAccountInfo, getAdPerformance, searchAdLibrary } from './meta-data'
 import { getCompetitorAds, analyzeNichePatterns, findWinningAds } from './library-data'
+import { addMemory } from './memory'
 
 export const TOOLS = [
   {
@@ -133,6 +134,21 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'remember',
+      description: "Persist a DURABLE fact about this user so you recall it in future chats — their niche/vertical, target CPA/ROAS goals, brand voice, main competitors, offers, or preferences. Only for things worth carrying forward, not one-off requests.",
+      parameters: {
+        type: 'object',
+        required: ['content'],
+        properties: {
+          content: { type: 'string', description: 'The fact to remember, phrased concisely in third person (e.g. "Sells collagen supplements, target CPA $25, main competitor Vital Proteins").' },
+          kind: { type: 'string', enum: ['fact', 'preference', 'goal', 'brand'], description: 'default fact' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'request_clarification',
       description: 'Ask the user to choose from options before continuing — e.g. which ad account to analyze, or which date range. Renders an inline picker. Use when you genuinely need the user to decide.',
       parameters: {
@@ -171,6 +187,7 @@ export const TOOL_LABELS: Record<string, string> = {
   get_competitor_ads: 'Analyzing competitor ads…',
   analyze_niche_patterns: 'Analyzing niche patterns…',
   find_winning_ads: 'Finding proven winners…',
+  remember: 'Remembering that…',
   request_clarification: 'Asking for clarification…',
 }
 
@@ -201,6 +218,9 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       return await analyzeNichePatterns(args)
     case 'find_winning_ads':
       return await findWinningAds(args)
+    case 'remember':
+      await addMemory(ctx.userId, String(args.content || ''), args.kind || 'fact')
+      return { remembered: String(args.content || '').slice(0, 400) }
     default:
       throw new Error(`Unknown tool: ${name}`)
   }
