@@ -126,9 +126,14 @@ export async function propagateClassification(copySig: string, c: any): Promise<
     topics: normalizeTopics(c.topics),
     ai_classified: true,
   }
-  // One UPDATE fans the tags out to every ad sharing this copy. No count round-trip
-  // (logging-only) — at 1M scale the extra SELECT per sig doubles DB load for nothing.
-  await (supabase as any).from('discovery_ads_index').update(update).eq('copy_sig', copySig)
+  // One UPDATE fans the tags out to every ad sharing this copy. MUST include is_classifiable=true:
+  // idx_ads_copy_sig is a PARTIAL index (WHERE is_classifiable), so without this predicate the planner
+  // can't use it and falls back to a SEQ SCAN over the whole table → statement timeout → 0 rows written
+  // (which silently froze E for a whole session). Every target ad is is_classifiable anyway (the gate
+  // selects on it), so this only makes the index usable — no semantic change.
+  const { error } = await (supabase as any).from('discovery_ads_index')
+    .update(update).eq('copy_sig', copySig).eq('is_classifiable', true)
+  if (error) { console.warn(`  ⚠️ propagate ${copySig.slice(0, 12)} failed: ${error.message}`); return 0 }
   return 1
 }
 
