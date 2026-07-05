@@ -13,7 +13,7 @@ import { parseClassification, HOOKS, ANGLES, TONES, EMOTIONS } from './classify-
 
 export interface SubmitRequest { customId: string; prompt: string }
 export interface BatchResult { items: any[]; inTok: number; outTok: number }
-export interface BatchListing { id: string; done: boolean }
+export interface BatchListing { id: string; done: boolean; created?: number }
 
 // fetch with retry on 429 (rate limit) + 5xx — honors Retry-After, else exponential backoff. Used by
 // the SYNC path (classify-batch --sync), which fires many concurrent /chat/completions and WILL hit
@@ -198,7 +198,7 @@ class OpenAIProvider implements ClassifyProvider {
   async list(limit = 20): Promise<BatchListing[]> {
     const d = await (await fetch(`${this.base}/batches?limit=${limit}`, { headers: this.auth(), signal: AbortSignal.timeout(30000) })).json()
     const terminal = ['completed', 'failed', 'expired', 'cancelled']
-    return (d.data || []).map((b: any) => ({ id: b.id, done: terminal.includes(b.status) }))
+    return (d.data || []).map((b: any) => ({ id: b.id, done: terminal.includes(b.status), created: b.created_at }))
   }
   async complete(req: SubmitRequest): Promise<BatchResult> {
     const res = await fetchRetry(`${this.base}/chat/completions`, {
