@@ -18,6 +18,7 @@ export interface UserProfile {
   stripe_customer_id?: string
   stripe_subscription_id?: string
   subscription_status: 'trialing' | 'active' | 'canceled' | 'past_due'
+  plan_id?: 'free' | 'starter' | 'pro' | 'business' | 'enterprise'
   trial_ends_at?: string
   created_at: string
   updated_at: string
