@@ -156,11 +156,11 @@ Define plans as a config map the whole app reads from. Example shape:
 
 ```ts
 export const PLANS = {
-  free:       { brandSpy: 1,   monthlyCredits: 20,   welcomeCredits: 60, seats: 1,  aiInsights: false, launch: false, campaigns: false, api: false, discoveryPages: 3,   canBuyCredits: false },
-  starter:    { brandSpy: 15,  monthlyCredits: 150,  seats: 1,  aiInsights: false, launch: false, campaigns: false, api: false, discoveryPages: null, canBuyCredits: true },
-  pro:        { brandSpy: 50,  monthlyCredits: 500,  seats: 3,  aiInsights: true,  launch: true,  campaigns: false, api: true,  discoveryPages: null, canBuyCredits: true },
-  business:   { brandSpy: 150, monthlyCredits: 2000, seats: 10, aiInsights: true,  launch: true,  campaigns: true,  api: true,  discoveryPages: null, canBuyCredits: true },
-  enterprise: { brandSpy: Infinity, monthlyCredits: null /*custom*/, seats: 15, aiInsights: true, launch: true, campaigns: true, api: true, discoveryPages: null, canBuyCredits: true },
+  free:       { brandSpy: 1,   monthlyCredits: 20,   welcomeCredits: 60, seats: 1,  aiInsights: false, launch: false, campaigns: false, api: false, discoveryPages: 3,   canBuyCredits: false, teamBoards: false, assetsGb: 0.5 },
+  starter:    { brandSpy: 15,  monthlyCredits: 150,  seats: 1,  aiInsights: false, launch: false, campaigns: false, api: false, discoveryPages: null, canBuyCredits: true,  teamBoards: false, assetsGb: 5 },
+  pro:        { brandSpy: 50,  monthlyCredits: 500,  seats: 3,  aiInsights: true,  launch: true,  campaigns: false, api: true,  discoveryPages: null, canBuyCredits: true,  teamBoards: true,  assetsGb: 50 },
+  business:   { brandSpy: 150, monthlyCredits: 2000, seats: 10, aiInsights: true,  launch: true,  campaigns: true,  api: true,  discoveryPages: null, canBuyCredits: true,  teamBoards: true,  assetsGb: 250 },
+  enterprise: { brandSpy: Infinity, monthlyCredits: null /*custom*/, seats: 25, aiInsights: true, launch: true, campaigns: true, api: true, discoveryPages: null, canBuyCredits: true, teamBoards: true, assetsGb: null /*custom*/ },
 } as const
 // Creation tools (Mello, Scripts, Transcribe, Image Clone, Video Clone) are available on EVERY tier —
 // gated by CREDIT BALANCE, not a feature flag. No canClone/canMello flags. `welcomeCredits` = one-time
@@ -330,6 +330,87 @@ Real per-action API costs (verified July 2026):
 **Monitoring to add:** per-account monthly AI-cost gauge (sum of real API $ spent vs plan price). Alert if any
 account's fulfillment cost exceeds ~40% of its plan price — that's the early signal of an abuse pattern or a
 mispriced action. No account should ever be underwater given the caps above, but monitor to be sure.
+
+---
+
+## 10. Team Boards + Assets (build ticket)
+
+Modeled on Atria's depth. Two related surfaces: **Boards** (collections of *ads* — saved/spied creatives) and
+**Assets** (a media library of *your own uploaded files*). Both become **org-shared** at Pro+.
+
+### 10.1 Current state (what exists today)
+- ✅ **Personal boards built** — `discovery_boards` table + `/api/discovery/boards` (create/list/delete); `discovery_saved_ads.board_id` links ads to boards. Pinterest-style (name + emoji + description + counts).
+- ❌ Everything is **user-scoped** (`.eq('user_id', user.id)`) — boards are private per user. No org sharing, no sub-boards, no tags.
+- ❌ **No Assets surface** — users cannot upload their own files (only save library ads).
+
+### 10.2 Team Boards — the build
+**Schema changes (`discovery_boards`):**
+```sql
+ALTER TABLE discovery_boards ADD COLUMN org_id uuid REFERENCES orgs(id);
+ALTER TABLE discovery_boards ADD COLUMN visibility text NOT NULL DEFAULT 'personal'
+  CHECK (visibility IN ('personal','team'));          -- 'team' = visible to whole org
+ALTER TABLE discovery_boards ADD COLUMN parent_board_id uuid REFERENCES discovery_boards(id); -- sub-boards (Atria depth)
+ALTER TABLE discovery_boards ADD COLUMN created_by uuid REFERENCES auth.users(id); -- keep author for attribution
+-- backfill: org_id = the owner's org; created_by = user_id; visibility='personal'
+CREATE INDEX idx_boards_org ON discovery_boards(org_id, visibility);
+```
+**Tags (Atria depth) — cross-cutting labels on individual saved ads:**
+```sql
+CREATE TABLE saved_ad_tags (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid REFERENCES orgs(id), saved_ad_id uuid REFERENCES discovery_saved_ads(id) ON DELETE CASCADE,
+  tag text NOT NULL, created_by uuid, created_at timestamptz DEFAULT now(),
+  UNIQUE(saved_ad_id, tag)
+);
+```
+**Query edits in `/api/discovery/boards/route.ts`:**
+- GET: replace `.eq('user_id', user.id)` with **`.or('visibility.eq.team,and(visibility.eq.personal,created_by.eq.'+user.id+')').eq('org_id', orgId)`** — i.e. show all TEAM boards in my org + my own personal boards. Same change to the saved-ads count query (count by `org_id` for team boards, by `created_by` for personal).
+- POST: set `org_id`, `created_by`, and accept `visibility` (default 'personal'); creating a **team** board requires `plan.teamBoards === true` → else 402 upsell. Accept optional `parent_board_id` for sub-boards.
+- DELETE: allow if `created_by = user` OR requester is Admin/Owner (team boards are org assets).
+**Entitlement:** gate team `visibility` + sub-boards on **`plan.teamBoards`** (Pro/Business/Enterprise). Starter/Free = personal boards only.
+**UI:** sidebar shows two groups — "Team boards" (shared, with author avatar) and "My boards" (personal). A per-board "Share with team" toggle (Pro+). Sub-boards render nested. Tag chips filter the saved-ad grid.
+
+### 10.3 Assets — manual file upload (new surface, mirrors Atria's "Assets")
+Atria's Assets = a **per-brand media library of files the user uploads themselves** (own creatives, b-roll,
+logos, footage) with AI search and clip filtering. Build it as:
+**Schema:**
+```sql
+CREATE TABLE assets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid REFERENCES orgs(id) NOT NULL,
+  brand_id uuid REFERENCES brands(id),            -- optional: scope to a brand (Atria groups per-brand)
+  uploaded_by uuid REFERENCES auth.users(id),
+  file_url text NOT NULL,                          -- R2 object URL
+  file_type text,                                  -- image | video | audio
+  file_name text, size_bytes bigint, duration_sec numeric,
+  width int, height int,
+  tags text[] DEFAULT '{}',
+  ai_caption text,                                 -- Gemini/vision auto-caption for semantic search
+  embedding vector(1536),                          -- pgvector for visual/semantic search
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX idx_assets_org_brand ON assets(org_id, brand_id);
+CREATE INDEX idx_assets_embedding ON assets USING ivfflat (embedding vector_cosine_ops);
+```
+**Upload flow:**
+1. Client requests a **presigned R2 upload URL** (`POST /api/assets/upload-url` → returns signed PUT URL + key). Direct-to-R2 upload (never proxy large files through the app server).
+2. On success, `POST /api/assets` records the row; a background job (reuse the Studio auto-tag pipeline) generates `ai_caption` + `embedding` + a poster/thumbnail for video.
+3. **Limits:** enforce `plan.assetsGb` storage cap per org (Free 0.5 / Starter 5 / Pro 50 / Business 250 GB) — check `sum(size_bytes)` before issuing the presigned URL, else 402.
+**Features (Atria parity):**
+- **Per-brand grouping** (filter Assets by brand).
+- **Semantic/visual search** — embed the query, cosine-search `embedding` ("find my UGC unboxing clips").
+- **Clip filters** — by type (image/video/audio), duration, tags.
+- **Org-shared** — all teammates in the org see the org's Assets (same shared-workspace rule as boards).
+- Uploaded assets are usable as **inputs to Image/Video Clone** (upload own product shot → clone).
+**Enforcement:** Assets is available on all tiers but **storage-capped by `plan.assetsGb`**; the upload-URL endpoint is the single gate.
+
+### 10.4 Build order for this ticket
+1. Team Boards schema + query edits + entitlement (ship first — smallest lift, uses existing tables).
+2. Tags on saved ads.
+3. Sub-boards (parent_board_id + nested UI).
+4. Assets: R2 presigned upload + `assets` table + storage cap.
+5. Assets AI layer: auto-caption + embeddings + semantic search + clip filters.
+6. Wire Assets → Clone as an input source.
 
 ---
 
