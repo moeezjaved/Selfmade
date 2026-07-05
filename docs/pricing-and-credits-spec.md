@@ -175,6 +175,8 @@ export const PLANS = {
 | Launch Ads / create campaign | `plan.launch` / `plan.campaigns` |
 | Any credit action (Mello, script, transcribe, image/video clone) | balance ≥ cost (reserve/commit/refund). **Available on ALL tiers** — no feature flag, credit-gated only |
 | Invite a teammate | `count(members) < plan.seats` |
+| Create a **team** board (shared) | `plan.teamBoards === true` else 402 (personal boards always allowed) |
+| Upload an asset | `sum(assets.size_bytes) + file ≤ plan.assetsGb × 1e9` else 402 `storage_limit` (checked at `/api/assets/upload-url`) |
 | API / MCP request | `plan.api === true` (check on the API key's org) |
 | Buy top-up | `plan.canBuyCredits === true` |
 | Discovery search (Free) | cap results to `plan.discoveryPages` |
@@ -303,7 +305,7 @@ create index on topup_purchases (owner_id, expires_at) where credits_remaining >
 2. DB: subscriptions, credit_wallets, credit_ledger, topup_purchases
 3. Credit engine: reserve/commit/refund, plan-first consumption, atomic wallet update
 4. Feature-gate middleware: check limit → structured upsell response (used by every guarded route)
-5. Wire gates into: Brand Spy (add-brand), Patterns, Launch, Campaigns, Clone, Mello, API, seats
+5. Wire gates into: Brand Spy (add-brand), Patterns, Launch, Campaigns, Clone, Mello, API, seats, team boards, asset uploads
 6. Stripe: plan subscriptions (monthly/annual, 25% off), 7-day trial, upgrade proration, downgrade-at-period-end
 7. Monthly reset cron/webhook: plan credits → allotment (no rollover); expire top-ups > 12mo
 8. Top-ups: Stripe one-time charge → topup bucket (12mo expiry) + auto-refill rule + low-credit nudge
@@ -404,11 +406,55 @@ CREATE INDEX idx_assets_embedding ON assets USING ivfflat (embedding vector_cosi
 - Uploaded assets are usable as **inputs to Image/Video Clone** (upload own product shot → clone).
 **Enforcement:** Assets is available on all tiers but **storage-capped by `plan.assetsGb`**; the upload-URL endpoint is the single gate.
 
-### 10.4 Build order for this ticket
+### 10.4 Presigned R2 upload — endpoint spec
+
+Two-step flow: **(1)** app issues a short-lived signed PUT URL after validating quota → **(2)** client uploads
+straight to R2 → **(3)** client confirms, app records the row + kicks off AI tagging. The app server never
+streams the file bytes (keeps Vercel functions fast and cheap).
+
+**Step 1 — `POST /api/assets/upload-url`**
+```jsonc
+// request
+{ "fileName": "unboxing_hero.mp4", "fileType": "video/mp4", "sizeBytes": 48250000, "brandId": "uuid|null" }
+// response 200
+{ "uploadUrl": "https://<bucket>.r2.cloudflarestorage.com/...&X-Amz-Signature=...",
+  "key": "orgs/<orgId>/assets/<uuid>.mp4", "assetId": "<uuid>", "expiresIn": 300 }
+// response 402 (over quota)
+{ "error": "storage_limit", "usedGb": 49.8, "limitGb": 50, "upgradeTo": "business" }
+```
+Server logic (in order — all server-side, never trust the client):
+1. **Auth + org** — resolve `user` → `orgId` (their active org). Reject if not a member.
+2. **MIME allowlist** — `image/(png|jpe?g|webp|gif)`, `video/(mp4|quicktime|webm)`, `audio/(mpeg|wav|mp4)`. Reject anything else (block SVG/HTML/exe — XSS/malware vectors).
+3. **Per-file size cap** — reject > 500 MB (video) / 25 MB (image) to stop abuse.
+4. **Quota check** — `SELECT coalesce(sum(size_bytes),0) FROM assets WHERE org_id=$1`; if `used + sizeBytes > plan.assetsGb * 1e9` → **402** `storage_limit`. (Enterprise `assetsGb=null` = skip check.)
+5. **Sign** — generate `assetId=uuid`, `key=orgs/{orgId}/assets/{assetId}.{ext}`, presign a **PUT** with `@aws-sdk/client-s3` `getSignedUrl` against the R2 S3 endpoint, `expiresIn: 300`, content-type + content-length pinned to the request so the client can't swap the file.
+6. Return the URL + key + assetId. **Do NOT insert the DB row yet** (upload may fail).
+
+**Step 2 — client PUTs the file** directly to `uploadUrl` (with the exact `Content-Type`/`Content-Length`). On failure, nothing to clean up (no row, orphan object reaped by the lifecycle rule below).
+
+**Step 3 — `POST /api/assets` (confirm)**
+```jsonc
+{ "assetId": "<uuid>", "key": "orgs/.../<uuid>.mp4", "brandId": "uuid|null",
+  "fileName": "unboxing_hero.mp4", "fileType": "video/mp4", "sizeBytes": 48250000 }
+```
+1. **Verify the object exists** in R2 (`HeadObject` on `key`) and that its size matches `sizeBytes` (defends against a client lying about size to dodge the quota) — mismatch → delete object + 400.
+2. Re-check `key` starts with `orgs/{orgId}/` (a member of org A can't claim an object under org B).
+3. Insert the `assets` row (`org_id`, `uploaded_by`, `file_url`, `brand_id`, dimensions from HeadObject metadata).
+4. Enqueue the **auto-tag job** (reuse the Studio Gemini pipeline): generate `ai_caption`, `embedding`, and for video a poster/thumbnail (Cloudflare Media Transformations frame extraction). Job writes back async; the asset shows a "processing" state until done.
+5. Return the created asset.
+
+**Delete — `DELETE /api/assets?id=`** removes the row **and** the R2 object (author or Admin/Owner only).
+
+**Safety nets:**
+- **R2 lifecycle rule:** auto-delete objects under `orgs/*/assets/` that have **no matching DB row after 24h** (reaps failed/abandoned uploads so they don't count against real storage or leak cost).
+- **Signed reads:** serve assets via short-lived signed GET URLs (or a Cloudflare Worker) — the bucket is private; never public-read.
+- **Quota is checked twice** (issue-time estimate + confirm-time real size) so the sum can't be gamed.
+
+### 10.5 Build order for this ticket
 1. Team Boards schema + query edits + entitlement (ship first — smallest lift, uses existing tables).
 2. Tags on saved ads.
 3. Sub-boards (parent_board_id + nested UI).
-4. Assets: R2 presigned upload + `assets` table + storage cap.
+4. Assets: presigned R2 upload (§10.4) + `assets` table + storage-cap enforcement.
 5. Assets AI layer: auto-caption + embeddings + semantic search + clip filters.
 6. Wire Assets → Clone as an input source.
 
