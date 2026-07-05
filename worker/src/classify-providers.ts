@@ -170,14 +170,17 @@ class OpenAIProvider implements ClassifyProvider {
     return b.id
   }
   async isDone(id: string) {
-    const b = await (await fetch(`${this.base}/batches/${id}`, { headers: this.auth() })).json()
+    // 30s timeout — a stalled poll fetch used to HANG the whole batch drain indefinitely (E froze for
+    // hours at a fixed %). On timeout this throws → the process exits → the container restarts →
+    // adoptExistingBatches re-picks the in-flight batch. Self-healing instead of frozen.
+    const b = await (await fetch(`${this.base}/batches/${id}`, { headers: this.auth(), signal: AbortSignal.timeout(30000) })).json()
     const terminal = ['completed', 'failed', 'expired', 'cancelled']
     return { done: terminal.includes(b.status), status: b.status || '?', counts: b.request_counts }
   }
   async results(id: string): Promise<BatchResult[]> {
-    const b = await (await fetch(`${this.base}/batches/${id}`, { headers: this.auth() })).json()
+    const b = await (await fetch(`${this.base}/batches/${id}`, { headers: this.auth(), signal: AbortSignal.timeout(30000) })).json()
     if (!b.output_file_id) return []
-    const jsonl = await (await fetch(`${this.base}/files/${b.output_file_id}/content`, { headers: this.auth() })).text()
+    const jsonl = await (await fetch(`${this.base}/files/${b.output_file_id}/content`, { headers: this.auth(), signal: AbortSignal.timeout(60000) })).text()
     const out: BatchResult[] = []
     for (const line of jsonl.split('\n')) {
       if (!line.trim()) continue
@@ -193,7 +196,7 @@ class OpenAIProvider implements ClassifyProvider {
     return out
   }
   async list(limit = 20): Promise<BatchListing[]> {
-    const d = await (await fetch(`${this.base}/batches?limit=${limit}`, { headers: this.auth() })).json()
+    const d = await (await fetch(`${this.base}/batches?limit=${limit}`, { headers: this.auth(), signal: AbortSignal.timeout(30000) })).json()
     const terminal = ['completed', 'failed', 'expired', 'cancelled']
     return (d.data || []).map((b: any) => ({ id: b.id, done: terminal.includes(b.status) }))
   }
