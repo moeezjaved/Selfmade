@@ -1,73 +1,71 @@
+/**
+ * Saved ads. Org-aware (spec §10.2): saves carry org_id so TEAM boards aggregate the whole team's
+ * saves, while personal boards (and the "all saves" library) stay scoped to the individual. Uses the
+ * admin client + manual scoping since discovery_saved_ads/boards have RLS.
+ */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getUserOrg } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/discovery/saved?board_id=xxx — list saved ads
-export async function GET(request: NextRequest) {
+async function ctx() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return null
+  const admin = createAdminClient() as any
+  const org = await getUserOrg(admin, user.id)
+  return { user, admin, org }
+}
 
+// GET /api/discovery/saved?board_id=xxx — list saved ads (team board → org-wide; else the user's own).
+export async function GET(request: NextRequest) {
+  const c = await ctx(); if (!c) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { user, admin, org } = c
   const boardId = request.nextUrl.searchParams.get('board_id')
 
-  let query = supabase
-    .from('discovery_saved_ads')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('saved_at', { ascending: false })
+  let isTeam = false
+  if (boardId) {
+    const { data: b } = await admin.from('discovery_boards').select('visibility, org_id').eq('id', boardId).maybeSingle()
+    isTeam = !!b && b.org_id === org.orgId && b.visibility === 'team'
+  }
 
+  let query = admin.from('discovery_saved_ads').select('*').order('saved_at', { ascending: false })
   if (boardId) query = query.eq('board_id', boardId)
+  // Team board → everyone's saves in the org; personal board / library → just mine.
+  query = isTeam ? query.eq('org_id', org.orgId) : query.eq('user_id', user.id)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ads: data || [] })
 }
 
-// POST /api/discovery/saved — save an ad to a board
+// POST /api/discovery/saved — save an ad to a board (stamps org_id so team boards can aggregate).
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+  const c = await ctx(); if (!c) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { user, admin, org } = c
   const { board_id, ad_id, page_id, page_name, snapshot_url, ad_data } = await request.json()
   if (!board_id || !ad_id) return NextResponse.json({ error: 'board_id and ad_id required' }, { status: 400 })
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('discovery_saved_ads')
-    .upsert({
-      user_id: user.id,
-      board_id,
-      ad_id,
-      page_id,
-      page_name,
-      snapshot_url,
-      ad_data,
-    }, { onConflict: 'user_id,board_id,ad_id' })
-    .select()
-    .single()
-
+    .upsert({ user_id: user.id, org_id: org.orgId, board_id, ad_id, page_id, page_name, snapshot_url, ad_data },
+      { onConflict: 'user_id,board_id,ad_id' })
+    .select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ saved: data })
 }
 
-// DELETE /api/discovery/saved?ad_id=xxx&board_id=xxx — unsave an ad
+// DELETE /api/discovery/saved?ad_id=&board_id= — remove YOUR save (team boards: you unsave your own).
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+  const c = await ctx(); if (!c) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { user, admin } = c
   const adId = request.nextUrl.searchParams.get('ad_id')
   const boardId = request.nextUrl.searchParams.get('board_id')
+  if (!adId) return NextResponse.json({ error: 'ad_id required' }, { status: 400 })
 
-  let query = supabase
-    .from('discovery_saved_ads')
-    .delete()
-    .eq('user_id', user.id)
-    .eq('ad_id', adId!)
-
+  let query = admin.from('discovery_saved_ads').delete().eq('user_id', user.id).eq('ad_id', adId)
   if (boardId) query = query.eq('board_id', boardId)
-
   const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })

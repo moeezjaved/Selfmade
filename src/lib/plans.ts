@@ -22,6 +22,8 @@ export interface PlanEntitlements {
   api: boolean                 // API / MCP access
   exports: boolean             // CSV / creative downloads
   canBuyCredits: boolean       // top-ups allowed
+  teamBoards: boolean          // shared/org-visible boards (Pro+); personal boards always allowed
+  assetsGb: number | null      // uploaded-asset storage cap in GB (null = uncapped/custom)
   mostPopular?: boolean
 }
 
@@ -30,27 +32,31 @@ export const PLANS: Record<PlanId, PlanEntitlements> = {
     label: 'Free', priceMonthly: 0, priceAnnualMonthly: 0,
     monthlyCredits: 20, welcomeCredits: 60, seats: 1, brandSpy: 1, discoveryPages: 3,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: false,
+    teamBoards: false, assetsGb: 0.5,
   },
   starter: {
     label: 'Starter', priceMonthly: 39, priceAnnualMonthly: 29,
     monthlyCredits: 150, seats: 1, brandSpy: 15, discoveryPages: null,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: true, canBuyCredits: true,
+    teamBoards: false, assetsGb: 5,
   },
   pro: {
     label: 'Pro', priceMonthly: 99, priceAnnualMonthly: 74,
     monthlyCredits: 500, seats: 3, brandSpy: 50, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: false, api: true, exports: true, canBuyCredits: true,
-    mostPopular: true,
+    teamBoards: true, assetsGb: 50, mostPopular: true,
   },
   business: {
     label: 'Business', priceMonthly: 249, priceAnnualMonthly: 186,
     monthlyCredits: 2000, seats: 10, brandSpy: 150, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
+    teamBoards: true, assetsGb: 250,
   },
   enterprise: {
     label: 'Enterprise', priceMonthly: 0, priceAnnualMonthly: 0,
-    monthlyCredits: null, seats: 15, brandSpy: Infinity, discoveryPages: null,
+    monthlyCredits: null, seats: 25, brandSpy: Infinity, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
+    teamBoards: true, assetsGb: null,
   },
 }
 
