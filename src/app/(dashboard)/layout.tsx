@@ -210,7 +210,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   {user?.user_metadata?.full_name || user?.email || 'User'}
                 </div>
                 <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {profile?.subscription_status === 'trialing' ? 'Trial' : 'Pro'} · Active
+                  {profile?.subscription_status === 'trialing'
+                    ? 'Trial'
+                    : (profile?.plan_id ? profile.plan_id.charAt(0).toUpperCase() + profile.plan_id.slice(1) : 'Free')} · {profile?.subscription_status === 'canceled' || profile?.subscription_status === 'past_due' ? 'Inactive' : 'Active'}
                 </div>
               </div>
               <button
