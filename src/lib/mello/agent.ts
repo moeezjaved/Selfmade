@@ -32,7 +32,8 @@ export interface AgentResult {
 }
 
 const MODEL = process.env.MELLO_MODEL || 'gpt-4o'
-const MAX_ROUNDS = 8
+// Deeper multi-step reasoning: allow longer tool chains (resolve → pull → compare → reflect → answer).
+const MAX_ROUNDS = parseInt(process.env.MELLO_MAX_ROUNDS || '12', 10)
 
 export async function runAgent(opts: {
   userId: string
