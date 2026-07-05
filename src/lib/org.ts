@@ -50,6 +50,43 @@ export async function resolveBillingOwner(admin: SupabaseClient, userId: string)
   return userId
 }
 
+/** All user_ids in an org (members). Used to gather the org's shared Meta ad-account pool. */
+export async function orgMemberIds(admin: SupabaseClient, orgId: string): Promise<string[]> {
+  const { data } = await (admin as any).from('org_members').select('user_id').eq('org_id', orgId)
+  return (data || []).map((m: any) => m.user_id as string)
+}
+
+/**
+ * The org's shared Meta ad-account POOL: every active account connected by any member. One shared
+ * workspace ⇒ the team draws from the same set of connected accounts (not just each person's own).
+ */
+export async function orgAdAccounts(admin: SupabaseClient, orgId: string): Promise<Array<{ account_id: string; account_name: string | null }>> {
+  const ids = await orgMemberIds(admin, orgId)
+  if (!ids.length) return []
+  const { data } = await (admin as any).from('meta_accounts')
+    .select('account_id, account_name, user_id, status').in('user_id', ids).eq('status', 'active')
+  // de-dupe by account_id (same account could be connected twice)
+  const seen = new Map<string, { account_id: string; account_name: string | null }>()
+  for (const a of (data || []) as any[]) if (a.account_id && !seen.has(a.account_id)) seen.set(a.account_id, { account_id: a.account_id, account_name: a.account_name ?? null })
+  return Array.from(seen.values())
+}
+
+/**
+ * The set of account_ids a user MAY see. Default-all: owner/admin (or a member with no explicit
+ * assignment) → the whole org pool. A member WITH assignment rows → exactly those (∩ pool).
+ * Returns { all: true } when unrestricted so callers can skip filtering entirely.
+ */
+export async function allowedAdAccountIds(admin: SupabaseClient, userId: string): Promise<{ all: boolean; ids: string[] }> {
+  const db = admin as any
+  const { data: m } = await db.from('org_members')
+    .select('org_id, role').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (!m?.org_id || m.role === 'owner' || m.role === 'admin') return { all: true, ids: [] }
+  const { data: rows } = await db.from('org_member_ad_accounts').select('account_id').eq('org_id', m.org_id).eq('user_id', userId)
+  const assigned = (rows || []).map((r: any) => r.account_id as string)
+  if (!assigned.length) return { all: true, ids: [] }   // no explicit assignment → sees all (default-all)
+  return { all: false, ids: assigned }
+}
+
 /** Seat usage for an org: members + pending invites vs the owner's plan limit. */
 export async function getSeatInfo(admin: SupabaseClient, orgId: string, ownerId: string): Promise<{ used: number; limit: number; planId: string }> {
   const db = admin as any

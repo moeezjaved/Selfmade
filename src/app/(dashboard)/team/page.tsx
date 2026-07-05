@@ -6,9 +6,10 @@
 import { useEffect, useState, useCallback } from 'react'
 
 const INK = '#0e1b12', LIME = '#dffe95'
-type Member = { id: string; email: string; role: string; isYou: boolean }
+type Member = { id: string; user_id: string; email: string; role: string; isYou: boolean; accounts: string[] | null; allAccounts: boolean }
 type Invite = { id: string; email: string; role: string; link: string }
-type Data = { org: { name: string; role: string }; members: Member[]; invites: Invite[]; seats: { used: number; limit: number; planId: string } }
+type Account = { account_id: string; account_name: string | null }
+type Data = { org: { name: string; role: string }; members: Member[]; invites: Invite[]; seats: { used: number; limit: number; planId: string }; accountPool: Account[] }
 
 export default function TeamPage() {
   const [d, setD] = useState<Data | null>(null)
@@ -35,6 +36,14 @@ export default function TeamPage() {
       : !j.emailEnabled ? '✓ Invite created. Email isn’t configured (set RESEND_API_KEY) — copy the link below to share.'
       : '✓ Invite created, but the email didn’t send (Resend rejected — likely the from-domain isn’t verified). Copy the link below.')
     load()
+  }
+  const [acctFor, setAcctFor] = useState<string | null>(null)   // user_id whose account editor is open
+  const [acctSel, setAcctSel] = useState<string[]>([])          // working selection (empty = all)
+  const openAccts = (m: Member) => { setAcctFor(m.user_id); setAcctSel(m.allAccounts ? [] : (m.accounts || [])) }
+  const toggleAcct = (id: string) => setAcctSel(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
+  const saveAccts = async (userId: string) => {
+    await fetch('/api/account/team', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId, accountIds: acctSel }) })
+    setAcctFor(null); load()
   }
   const revoke = async (id: string) => { await fetch(`/api/account/team?invite=${id}`, { method: 'DELETE' }); load() }
   const remove = async (id: string) => { if (confirm('Remove this member?')) { await fetch(`/api/account/team?member=${id}`, { method: 'DELETE' }); load() } }
@@ -69,13 +78,38 @@ export default function TeamPage() {
       )}
 
       <div style={{ fontSize: 12, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 10 }}>Members</div>
-      {d.members.map(m => (
-        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', border: '1px solid #eef0ee', borderRadius: 10, marginBottom: 8 }}>
-          <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{m.email}{m.isYou ? ' (you)' : ''}</div>
-          <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 9px', borderRadius: 20, background: m.role === 'owner' ? '#dcfce7' : m.role === 'admin' ? '#dbeafe' : '#f3f4f6', color: m.role === 'owner' ? '#166534' : m.role === 'admin' ? '#1e40af' : '#374151', textTransform: 'capitalize' }}>{m.role}</span>
-          {canManage && m.role !== 'owner' && !m.isYou && <button onClick={() => remove(m.id)} style={{ background: 'none', border: '1px solid #fecaca', color: '#dc2626', padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Remove</button>}
+      {d.members.map(m => {
+        // Account scoping applies only to plain members (owner/admin always see all), and only when
+        // the org actually has connected accounts to divvy up.
+        const scopable = m.role === 'member' && d.accountPool.length > 0
+        const acctLabel = m.allAccounts ? 'All accounts' : `${m.accounts?.length || 0} of ${d.accountPool.length}`
+        const editing = acctFor === m.user_id
+        return (
+        <div key={m.id} style={{ border: '1px solid #eef0ee', borderRadius: 10, marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px' }}>
+            <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{m.email}{m.isYou ? ' (you)' : ''}</div>
+            {scopable && <span title="Ad accounts this member can see" style={{ fontSize: 11.5, fontWeight: 700, color: m.allAccounts ? '#6b7280' : '#1e40af', background: m.allAccounts ? '#f3f4f6' : '#dbeafe', padding: '2px 9px', borderRadius: 20 }}>📊 {acctLabel}</span>}
+            <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 9px', borderRadius: 20, background: m.role === 'owner' ? '#dcfce7' : m.role === 'admin' ? '#dbeafe' : '#f3f4f6', color: m.role === 'owner' ? '#166534' : m.role === 'admin' ? '#1e40af' : '#374151', textTransform: 'capitalize' }}>{m.role}</span>
+            {canManage && scopable && <button onClick={() => editing ? setAcctFor(null) : openAccts(m)} style={{ background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{editing ? 'Close' : 'Accounts'}</button>}
+            {canManage && m.role !== 'owner' && !m.isYou && <button onClick={() => remove(m.id)} style={{ background: 'none', border: '1px solid #fecaca', color: '#dc2626', padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Remove</button>}
+          </div>
+          {editing && (
+            <div style={{ borderTop: '1px solid #eef0ee', padding: '12px 14px', background: '#fbfdfa' }}>
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>Pick the Meta ad accounts this member can see in Insights, Reports & Campaigns. <b>Leave all unchecked = access to every account.</b></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                {d.accountPool.map(a => (
+                  <label key={a.account_id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={acctSel.includes(a.account_id)} onChange={() => toggleAcct(a.account_id)} />
+                    {a.account_name || a.account_id} <span style={{ color: '#9ca3af', fontSize: 12 }}>({a.account_id})</span>
+                  </label>
+                ))}
+              </div>
+              <button onClick={() => saveAccts(m.user_id)} style={{ background: INK, color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>Save access</button>
+              <span style={{ marginLeft: 10, fontSize: 12, color: '#9ca3af' }}>{acctSel.length === 0 ? 'All accounts' : `${acctSel.length} selected`}</span>
+            </div>
+          )}
         </div>
-      ))}
+      )})}
 
       {d.invites.length > 0 && (
         <>
