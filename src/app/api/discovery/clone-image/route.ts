@@ -41,13 +41,13 @@ async function handle(req: NextRequest) {
   if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
 
   const body = await req.json().catch(() => ({}))
-  const { adId, productImageB64, productImages, productMimeType, tier, newHeadline, brandName, colors, brandId, aspectRatio } = body || {}
+  const { adId, refImageUrl, productImageB64, productImages, productMimeType, tier, newHeadline, brandName, colors, brandId, aspectRatio } = body || {}
   // Accept one legacy base64 photo OR an array of product photos (data: URLs and/or http URLs).
   // Multiple angles help Nano Banana hold the product's exact shape/label across the clone.
   const rawProducts: string[] = Array.isArray(productImages) && productImages.length
     ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
     : (productImageB64 ? [String(productImageB64)] : [])
-  if (!adId || rawProducts.length === 0) return NextResponse.json({ error: 'adId and at least one product image required' }, { status: 400 })
+  if ((!adId && !refImageUrl) || rawProducts.length === 0) return NextResponse.json({ error: 'adId (or refImageUrl) and at least one product image required' }, { status: 400 })
   // Clone is Pro-only now; resolution picks the price: 2K → image_clone_pro (15), 4K → image_clone_4k (25).
   const useTier: 'default' | 'pro' = 'pro'
   const imageSize = body.imageSize === '4K' ? '4K' : '2K'
@@ -65,18 +65,25 @@ async function handle(req: NextRequest) {
   const refund = async () => { if (txId) await admin.rpc('refund_credits', { p_tx: txId }).then(() => {}, () => {}) }
 
   try {
-    // Reference ad: creative image + classified DNA.
-    const { data: ad } = await admin
-      .from('discovery_ads_index')
-      .select('hook_type, format_style, angle, emotion, cta, page_name, discovery_creatives(asset_type, r2_url, poster_url, position, width, height)')
-      .eq('ad_id', String(adId))
-      .maybeSingle()
-    if (!ad) { await refund(); return NextResponse.json({ error: 'ad not found' }, { status: 404 }) }
-
-    const cres = ((ad as any).discovery_creatives || []).slice().sort((a: any, b: any) => (a.position || 0) - (b.position || 0))
-    const refCre = cres.find((c: any) => (c.asset_type === 'video' ? c.poster_url : c.r2_url))
-    const refUrl = refCre ? (refCre.asset_type === 'video' ? refCre.poster_url : refCre.r2_url) : null
-    if (!refUrl) { await refund(); return NextResponse.json({ error: 'reference ad has no image' }, { status: 422 }) }
+    // Reference = a discovery ad (creative + classified DNA by adId) OR an uploaded ASSET image URL.
+    let ad: any = { hook_type: null, format_style: null, angle: null, emotion: null, cta: null, page_name: brandName || 'your creative' }
+    let refCre: any = null
+    let refUrl: string | null = null
+    if (refImageUrl && !adId) {
+      refUrl = String(refImageUrl)   // clone from an uploaded asset — no DNA; the image itself is the layout
+    } else {
+      const { data } = await admin
+        .from('discovery_ads_index')
+        .select('hook_type, format_style, angle, emotion, cta, page_name, discovery_creatives(asset_type, r2_url, poster_url, position, width, height)')
+        .eq('ad_id', String(adId))
+        .maybeSingle()
+      if (!data) { await refund(); return NextResponse.json({ error: 'ad not found' }, { status: 404 }) }
+      ad = data
+      const cres = ((data as any).discovery_creatives || []).slice().sort((a: any, b: any) => (a.position || 0) - (b.position || 0))
+      refCre = cres.find((c: any) => (c.asset_type === 'video' ? c.poster_url : c.r2_url))
+      refUrl = refCre ? (refCre.asset_type === 'video' ? refCre.poster_url : refCre.r2_url) : null
+      if (!refUrl) { await refund(); return NextResponse.json({ error: 'reference ad has no image' }, { status: 422 }) }
+    }
     const refImg = await fetchImageB64(refUrl)
     if (!refImg) { await refund(); return NextResponse.json({ error: 'could not load reference image' }, { status: 502 }) }
     // "Original" → match the reference ad's real shape (nearest supported ratio); else use the picked ratio.
@@ -129,7 +136,7 @@ async function handle(req: NextRequest) {
     // Persist to "My Creatives" (best-effort — the user still gets the inline image if R2 is off).
     const saved = await saveGeneration({
       userId: user.id, dataB64: gen.dataB64, mimeType: gen.mimeType, type: 'clone', tier: useTier,
-      brandId: brandId || null, sourceAdId: String(adId), prompt: newHeadline || null,
+      brandId: brandId || null, sourceAdId: adId ? String(adId) : null, prompt: newHeadline || null,
     })
 
     // First-ad lifecycle email (once; claim-once guard inside). Best-effort — never fail the clone.
