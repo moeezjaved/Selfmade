@@ -26,6 +26,7 @@ const AREAS = [
       { href: '/trending',             icon: Flame,     label: 'Trending',      badge: 'NEW' },
       { href: '/discovery/top-picks',  icon: Star,      label: 'Top Picks',     badge: null },
       { href: '/discovery/saved',      icon: Bookmark,  label: 'Boards',        badge: null },
+      { href: '/assets',               icon: Library,   label: 'Assets',        badge: 'NEW' },
       { href: '/discovery/following',  icon: Heart,     label: 'Following',      badge: null },
     ],
   },
@@ -43,7 +44,6 @@ const AREAS = [
     items: [
       { href: '/creative-studio?studio=1', icon: Wand2, label: 'Create Ad',  badge: 'NEW' },
       { href: '/creative-studio', icon: Sparkles, label: 'My Creatives', badge: null },
-      { href: '/assets',          icon: Library,  label: 'Assets',       badge: 'NEW' },
       { href: '/brands',          icon: Store,    label: 'Brands',       badge: null },
     ],
   },
