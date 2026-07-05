@@ -12,7 +12,7 @@ import type { UserProfile } from '@/types'
 import {
   LayoutDashboard, Megaphone, Sparkles, TrendingUp,
   ClipboardList, Settings, CreditCard, BarChart2,
-  Rocket, LogOut, Compass, Bookmark, Heart, Star, Store, Radar, Wand2, Flame, Users,
+  Rocket, LogOut, Compass, Bookmark, Heart, Star, Store, Radar, Wand2, Flame, Users, Library,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -43,6 +43,7 @@ const AREAS = [
     items: [
       { href: '/creative-studio?studio=1', icon: Wand2, label: 'Create Ad',  badge: 'NEW' },
       { href: '/creative-studio', icon: Sparkles, label: 'My Creatives', badge: null },
+      { href: '/assets',          icon: Library,  label: 'Assets',       badge: 'NEW' },
       { href: '/brands',          icon: Store,    label: 'Brands',       badge: null },
     ],
   },

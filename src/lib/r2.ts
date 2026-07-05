@@ -10,7 +10,8 @@
  *
  * If env vars are missing, uploads are skipped and the function returns null.
  */
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 let _client: S3Client | null = null
 
@@ -81,6 +82,40 @@ export async function uploadToR2(
   } catch {
     return null
   }
+}
+
+/** Public URL for a key. */
+export function r2PublicUrl(key: string): string | null {
+  const p = process.env.R2_PUBLIC_URL?.replace(/\/$/, '')
+  return p ? `${p}/${key}` : null
+}
+
+/**
+ * Presign a PUT so the client can upload the file straight to R2 (never proxied through the app —
+ * keeps functions fast for 500 MB videos). Content-type + length are pinned into the signature so the
+ * client can't swap the file for a different one. Returns null if R2 isn't configured.
+ */
+export async function presignPut(key: string, contentType: string, contentLength: number, expiresIn = 300): Promise<string | null> {
+  const client = getClient(); const bucket = process.env.R2_BUCKET_NAME
+  if (!client || !bucket) return null
+  const cmd = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType, ContentLength: contentLength })
+  // Cast around @smithy type skew between client-s3 and s3-request-presigner (runtime is identical).
+  return getSignedUrl(client as any, cmd as any, { expiresIn })
+}
+
+/** Real object size (bytes) from R2, or null if it doesn't exist. Used to verify the client didn't lie. */
+export async function headObjectSize(key: string): Promise<number | null> {
+  const client = getClient(); const bucket = process.env.R2_BUCKET_NAME
+  if (!client || !bucket) return null
+  try { const r = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key })); return r.ContentLength ?? null }
+  catch { return null }
+}
+
+/** Delete an object from R2 (best-effort). */
+export async function deleteFromR2(key: string): Promise<void> {
+  const client = getClient(); const bucket = process.env.R2_BUCKET_NAME
+  if (!client || !bucket) return
+  try { await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })) } catch { /* best-effort */ }
 }
 
 /**
