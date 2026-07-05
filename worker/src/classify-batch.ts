@@ -51,6 +51,16 @@ const POLL_MS = 30_000
 const SYNC = process.argv.includes('--sync') || process.env.CLASSIFY_SYNC === '1'
 const CONCURRENCY = Math.max(1, parseInt(process.env.CLASSIFY_CONCURRENCY || '40', 10))
 
+// ── BATCH concurrency (cheap + fast) ─────────────────────────────────────────
+// Batches finish in ~10–40 min (not 24h), so we keep several in flight at once. This multiplies
+// throughput at the SAME 50%-off batch price — concurrency is free wall-clock, not extra spend (total
+// cost is fixed by unique-copy count). Each sub-batch stays ≤ SIGS_PER_BATCH (~1.1M enqueued tokens,
+// under OpenAI's 2M per-batch cap); N in flight ⇒ ~N× enqueued tokens, so the real ceiling is your
+// org's enqueued-token tier. A submit that trips the limit is skipped + retried next super-wave (never
+// charged). Set CLASSIFY_BATCH_CONCURRENCY=5 for ~16h on a ~2M-ad backlog.
+const BATCH_CONCURRENCY = Math.max(1, parseInt(process.env.CLASSIFY_BATCH_CONCURRENCY || '1', 10))
+const SIGS_PER_BATCH = 7_000   // ~1.1M input tokens/batch — safely under the 2M per-batch enqueued cap
+
 let tIn = 0, tOut = 0, cacheHits = 0
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 // Batch API = 50% off; sync = full price.
@@ -72,10 +82,10 @@ async function pool<T, R>(items: T[], n: number, fn: (item: T, i: number) => Pro
  * gets re-picked, so a partial failure never leaves permanent holes. `is_classifiable`
  * (Postgres-generated) drops blank/template-only bodies.
  */
-async function fetchUniqueSignatures(): Promise<CreativeItem[]> {
+async function fetchUniqueSignatures(scanCap = WAVE): Promise<CreativeItem[]> {
   const bySig = new Map<string, CreativeItem & { _len: number }>()
   let scanned = 0
-  for (let off = 0; off < WAVE; off += 1000) {
+  for (let off = 0; off < scanCap; off += 1000) {
     let q = (supabase as any)
       .from('discovery_ads_index')
       .select('ad_id, page_name, body, title, copy_sig, on_screen_text')
@@ -119,6 +129,13 @@ async function submitBatch(items: CreativeItem[]): Promise<string> {
   const id = await provider.submit(requests)
   console.log(`  📤 [${provider.name}/${provider.model}] submitted ${id} — ${requests.length} requests (${items.length} copy sigs)`)
   return id
+}
+
+/** submitBatch that never throws — a token-limit / rate rejection returns null so that sub-batch's ads
+ *  just stay in the gate and get retried on the next super-wave (never double-charged). */
+async function submitBatchSafe(items: CreativeItem[]): Promise<string | null> {
+  try { return await submitBatch(items) }
+  catch (e: any) { console.warn(`  ⚠️ batch submit skipped (${e?.message || e}) — ${items.length} sigs retry next wave`); return null }
 }
 
 /** SYNC path: fire all requests through a concurrency pool of real-time completions, applying each
@@ -195,7 +212,11 @@ async function main() {
 
   let totalApplied = 0
   while (true) {
-    const sigs = await fetchUniqueSignatures()
+    // In concurrent batch mode scan a bigger SUPER-WAVE from ONE fetch so all BATCH_CONCURRENCY
+    // sub-batches partition cleanly. (Concurrent fetches would each return the SAME unclassified
+    // rows — the gate only advances after a drain applies results — causing duplicate submits/charges.)
+    const scanCap = (!SYNC && BATCH_CONCURRENCY > 1) ? WAVE * BATCH_CONCURRENCY : WAVE
+    const sigs = await fetchUniqueSignatures(scanCap)
     if (!sigs.length) { console.log('  no more unclassified copy.'); break }
 
     // Set-based cache: reuse tags for any copy already classified (steady-state
@@ -213,8 +234,16 @@ async function main() {
       if (SYNC) {
         totalApplied += await classifySync(misses)
       } else {
-        const id = await submitBatch(misses)
-        totalApplied += await drainBatch(id)
+        // CHEAP + PARALLEL: split the super-wave's misses into sub-batches (each ≤ SIGS_PER_BATCH),
+        // keep BATCH_CONCURRENCY of them in flight (submit→drain as a unit). Same 50% batch price;
+        // BATCH_CONCURRENCY=1 reproduces the original one-at-a-time behaviour.
+        const groups = chunk(misses, SIGS_PER_BATCH)
+        console.log(`  🚚 ${groups.length} sub-batch(es), ${BATCH_CONCURRENCY} in flight (batch-priced)`)
+        const counts = await pool(groups, BATCH_CONCURRENCY, async (g) => {
+          const id = await submitBatchSafe(g)
+          return id ? await drainBatch(id) : 0
+        })
+        totalApplied += counts.reduce((a, b) => a + b, 0)
       }
     }
     if (ONCE) break
