@@ -162,12 +162,17 @@ async function classifySync(items: CreativeItem[]): Promise<number> {
 /** Poll until the batch ends, then apply every result. Returns sigs applied. */
 async function drainBatch(id: string): Promise<number> {
   let st = await provider.isDone(id)
-  while (!st.done) {
+  // Poll cap: a stalled/eventual-consistency poll must never hang forever (that froze a completed
+  // batch mid-drain). After the cap we BAIL (return 0); adoptExistingBatches re-drains it next cycle
+  // once it's genuinely terminal. ~90 min at 30s.
+  let polls = 0
+  while (!st.done && polls++ < 180) {
     const c = st.counts || {}
     console.log(`  ⏳ ${id} ${st.status} — done=${c.succeeded ?? c.completed ?? 0} err=${c.errored ?? c.failed ?? 0}`)
     await sleep(POLL_MS)
     st = await provider.isDone(id)
   }
+  if (!st.done) { console.warn(`  ⏸ ${id}: still '${st.status}' after ${polls} polls — bailing; adopt re-drains next cycle`); return 0 }
   // LOUD on non-success — a batch that ends 'failed'/'expired' yields 0 results and would otherwise
   // apply 0 SILENTLY (this masked a token_limit_exceeded that froze E for a whole session). The most
   // common cause is the org's 2M enqueued-token batch cap — lower CLASSIFY_BATCH_CONCURRENCY or raise
@@ -196,17 +201,17 @@ async function drainBatch(id: string): Promise<number> {
 async function adoptExistingBatches(): Promise<void> {
   try {
     const batches = await provider.list(20)
+    const nowS = Date.now() / 1000
     const live = batches.filter(b => !b.done)
-    // Adopt ONLY in-flight batches (restart recovery — a prior run submitted then died
-    // before applying). We deliberately do NOT re-apply ENDED batches: on a clean exit
-    // they were already applied, and re-applying them every run would re-stamp thousands
-    // of already-tagged ads (a steady-state cron tick would needlessly rewrite the whole
-    // last corpus drain). The rare crash-between-end-and-apply case self-heals — those
-    // ads stay topics-null and get re-classified next run by the gate, with no double-
-    // spend on everything else.
-    if (live.length) {
-      console.log(`  adopting ${live.length} in-flight ${provider.name} batch(es) from a prior run`)
-      for (const b of live) await drainBatch(b.id)
+    // Backstop: also drain COMPLETED batches from the last ~3h. These are the orphan risk — a poll that
+    // stalled/crashed between complete-and-apply would otherwise abandon paid results forever (this was
+    // exactly the freeze). Propagation is idempotent (re-stamping already-tagged ads is a no-op on the
+    // tags), and the 3h window bounds any re-stamp to the current drain — never the whole corpus.
+    const recentDone = batches.filter(b => b.done && b.created && (nowS - b.created) < 3 * 3600)
+    const toDrain = [...live, ...recentDone]
+    if (toDrain.length) {
+      console.log(`  adopting ${live.length} in-flight + ${recentDone.length} recent-completed ${provider.name} batch(es)`)
+      for (const b of toDrain) await drainBatch(b.id)
     }
   } catch (e: any) {
     console.warn(`  (could not list prior batches: ${e?.message || e})`)
