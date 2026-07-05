@@ -8,13 +8,16 @@
  *  2. Lifecycle emails — "Brand saved", "Your first ad is ready 🎉" — sent exactly once via a
  *     claim-once column so parallel requests can't double-send.
  *
- * Env: RESEND_API_KEY, EMAIL_FROM (e.g. "Selfmade <alerts@tryselfmade.ai>"), APP_URL.
+ * Env: RESEND_API_KEY, EMAIL_FROM (e.g. "Selfmade <alerts@send.tryselfmade.ai>"), APP_URL.
  */
 import { randomUUID } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/server'
 
 const KEY = process.env.RESEND_API_KEY
-const FROM = process.env.EMAIL_FROM || 'Selfmade <alerts@tryselfmade.ai>'
+// Must send from a Resend-VERIFIED domain. The verified domain is the send.tryselfmade.ai
+// subdomain (Resend › Domains), NOT the bare tryselfmade.ai — sending from an unverified
+// domain makes Resend reject every send. Override via EMAIL_FROM (keep it on send.*).
+const FROM = process.env.EMAIL_FROM || 'Selfmade <alerts@send.tryselfmade.ai>'
 const APP_URL = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
 
 export const emailEnabled = !!KEY

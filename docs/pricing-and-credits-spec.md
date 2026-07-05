@@ -22,7 +22,7 @@ Launch + Campaigns + ROAS analytics** — so we undercut Atria ($129–959) 4–
 | **Brand Spy** (tracked brands) | **1** | **15** | **50** | **150** | **Unlimited** |
 | **Patterns / AI Insights** | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Top Picks** (curated packs) | Preview | ✅ | ✅ | ✅ | ✅ |
-| **Saved Ads / Following / Boards** | 1 board, 25 saves | ✅ | ✅ | ✅ (team boards) | ✅ |
+| **Saved Ads / Following / Boards** | 1 board, 25 saves | ✅ personal boards | ✅ **team boards** | ✅ team boards | ✅ team boards |
 | **Ask Mello** (AI agent) | ✅ *credits* | ✅ *credits* | ✅ | ✅ | ✅ |
 | **Scripts / Transcribe** | ✅ *credits* | ✅ | ✅ | ✅ | ✅ |
 | **Image Clone** (Nano Banana Pro) | ✅ *credits* | ✅ | ✅ | ✅ | ✅ |
