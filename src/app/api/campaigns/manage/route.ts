@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import { resolveScopedAccount } from '@/lib/meta/scope'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 
@@ -12,14 +13,8 @@ export async function GET(request: NextRequest) {
 
     const admin = createAdminClient()
     const accountId = request.nextUrl.searchParams.get('account_id')
-
-    let accountQuery = admin.from('meta_accounts').select('*').eq('user_id', user.id)
-    if (accountId) {
-      accountQuery = accountQuery.eq('account_id', accountId)
-    } else {
-      accountQuery = accountQuery.eq('is_primary', true)
-    }
-    const { data: metaAccount } = await accountQuery.single()
+    // Org-scoped: the requested account (if allowed) or the primary of the user's allowed pool.
+    const metaAccount = await resolveScopedAccount(admin, user.id, accountId)
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)
@@ -150,9 +145,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()
-    const { data: metaAccount } = await admin
-      .from('meta_accounts').select('*')
-      .eq('user_id', user.id).eq('is_primary', true).single()
+    const metaAccount = await resolveScopedAccount(admin, user.id)   // org-scoped primary account
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)

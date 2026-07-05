@@ -10,6 +10,7 @@
  * user has a connected Meta account — useful for brands we haven't crawled yet.
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveScopedAccount } from '@/lib/meta/scope'
 import { createClient, createReadClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
@@ -98,9 +99,7 @@ export async function GET(request: NextRequest) {
 
     // ── 2. Fallback: Meta pages/search ────────────────────────────
     // Only used if our DB returned nothing. Requires a connected Meta account.
-    const { data: metaAccount } = await admin
-      .from('meta_accounts').select('*')
-      .eq('user_id', user.id).eq('is_primary', true).single()
+    const metaAccount = await resolveScopedAccount(admin, user.id)
     if (!metaAccount) return NextResponse.json({ pages: [] })
 
     const userToken = decryptToken(metaAccount.access_token)

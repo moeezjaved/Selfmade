@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import { resolveScopedAccount } from '@/lib/meta/scope'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 
@@ -14,9 +15,7 @@ export async function GET(request: NextRequest) {
     const days = parseInt(dateRange.replace('last_','').replace('d','')) || 7
 
     const admin = createAdminClient()
-    const { data: metaAccount } = await admin
-      .from('meta_accounts').select('*')
-      .eq('user_id', user.id).eq('is_primary', true).single()
+    const metaAccount = await resolveScopedAccount(admin, user.id)   // org-scoped primary account
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)

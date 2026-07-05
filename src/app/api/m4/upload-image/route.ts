@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveScopedAccount } from '@/lib/meta/scope'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
@@ -13,9 +14,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()
-    const { data: metaAccount } = await admin
-      .from('meta_accounts').select('*')
-      .eq('user_id', user.id).eq('is_primary', true).single()
+    const metaAccount = await resolveScopedAccount(admin, user.id)
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)
@@ -91,9 +90,7 @@ export async function PUT(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()
-    const { data: metaAccount } = await admin
-      .from('meta_accounts').select('*')
-      .eq('user_id', user.id).eq('is_primary', true).single()
+    const metaAccount = await resolveScopedAccount(admin, user.id)
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)
