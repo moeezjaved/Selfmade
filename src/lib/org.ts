@@ -88,12 +88,15 @@ export async function allowedAdAccountIds(admin: SupabaseClient, userId: string)
 }
 
 /** Seat usage for an org: members + pending invites vs the owner's plan limit. */
-export async function getSeatInfo(admin: SupabaseClient, orgId: string, ownerId: string): Promise<{ used: number; limit: number; planId: string }> {
+export async function getSeatInfo(admin: SupabaseClient, orgId: string, ownerId: string): Promise<{ used: number; limit: number; planId: string; included: number; extra: number }> {
   const db = admin as any
   const planId = await getPlanId(admin, ownerId)
-  const [{ count: members }, { count: pending }] = await Promise.all([
+  const [{ count: members }, { count: pending }, { data: sub }] = await Promise.all([
     db.from('org_members').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
     db.from('org_invites').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'pending'),
+    db.from('subscriptions').select('extra_seats').eq('owner_id', ownerId).maybeSingle(),
   ])
-  return { used: (members || 0) + (pending || 0), limit: includedSeats(planId), planId }
+  const included = includedSeats(planId)
+  const extra = Math.max(0, (sub as any)?.extra_seats ?? 0)   // paid overage
+  return { used: (members || 0) + (pending || 0), limit: included + extra, planId, included, extra }
 }

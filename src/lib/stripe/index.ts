@@ -115,6 +115,17 @@ export async function handleStripeWebhook(payload: string, signature: string) {
         break
       }
 
+      // ── Paid seat overage (a separate seat subscription) → record extra_seats ──
+      if (session.mode === 'subscription' && session.metadata?.type === 'seats' && ownerId) {
+        const seats = parseInt(session.metadata.seats || '0', 10)
+        await supabase.from('subscriptions').update({
+          extra_seats: Math.max(0, seats),
+          seats_subscription_id: session.subscription as string,
+          updated_at: new Date().toISOString(),
+        }).eq('owner_id', ownerId)
+        break
+      }
+
       // ── Subscription plan upgrade ──
       const userId = ownerId
       if (!userId) break
@@ -147,6 +158,13 @@ export async function handleStripeWebhook(payload: string, signature: string) {
       const sub = event.data.object as Stripe.Subscription
       const userId = sub.metadata?.owner_id || sub.metadata?.user_id
       if (!userId) break
+      // Seat add-on subscription → sync extra_seats from the item quantity; DON'T touch the base plan.
+      if (sub.metadata?.type === 'seats') {
+        const active = sub.status === 'active' || sub.status === 'trialing'
+        const qty = (sub as any).items?.data?.[0]?.quantity ?? 0
+        await supabase.from('subscriptions').update({ extra_seats: active ? Math.max(0, qty) : 0, updated_at: new Date().toISOString() }).eq('owner_id', userId)
+        break
+      }
       const periodEnd = new Date((sub as any).current_period_end * 1000).toISOString()
 
       await supabase.from('subscriptions').update({
@@ -166,6 +184,11 @@ export async function handleStripeWebhook(payload: string, signature: string) {
       const sub = event.data.object as Stripe.Subscription
       const userId = sub.metadata?.owner_id || sub.metadata?.user_id
       if (!userId) break
+      // Seat add-on cancelled → just drop the extra seats; DON'T suspend the base plan to Free.
+      if (sub.metadata?.type === 'seats') {
+        await supabase.from('subscriptions').update({ extra_seats: 0, seats_subscription_id: null, updated_at: new Date().toISOString() }).eq('owner_id', userId)
+        break
+      }
       // Suspend to Free (spec §5 dunning / cancel): drop entitlements, keep data + top-up credits.
       await supabase.from('subscriptions').update({ status: 'canceled', plan: 'free', scheduled_plan: null, updated_at: new Date().toISOString() }).eq('owner_id', userId)
       await supabase.from('user_profiles').update({ subscription_status: 'canceled' }).eq('user_id', userId)
