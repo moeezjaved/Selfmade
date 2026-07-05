@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import { resolveScopedAccount } from '@/lib/meta/scope'
 import { llm } from '@/lib/llm'
 
 export const maxDuration = 60
@@ -15,9 +16,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
-  const { data: ma } = await admin
-    .from('meta_accounts').select('*')
-    .eq('user_id', user.id).eq('is_primary', true).single()
+  const ma = await resolveScopedAccount(admin, user.id)   // org-scoped primary account
   if (!ma) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
   const token = decryptToken(ma.access_token)

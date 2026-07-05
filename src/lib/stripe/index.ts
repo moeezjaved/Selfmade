@@ -19,6 +19,23 @@ export const PLANS = {
   },
 } as const
 
+/**
+ * Reverse map a Stripe price id → our plan tier, from the same env vars checkout uses
+ * (STRIPE_PRICE_<PLAN>_<CYCLE>, plus the legacy STRIPE_PRICE_ID_MONTHLY/ANNUAL = Pro). Lets the
+ * webhook sync the `plan` column when a subscription changes via the Stripe customer PORTAL
+ * (upgrade/downgrade), which carries no plan metadata — the fix for the plan-drift bug.
+ */
+export function planFromPriceId(priceId: string | null | undefined): string | null {
+  if (!priceId) return null
+  for (const plan of ['starter', 'pro', 'business']) {
+    for (const cycle of ['monthly', 'annual']) {
+      if (process.env[`STRIPE_PRICE_${plan.toUpperCase()}_${cycle.toUpperCase()}`] === priceId) return plan
+    }
+  }
+  if (priceId === process.env.STRIPE_PRICE_ID_MONTHLY || priceId === process.env.STRIPE_PRICE_ID_ANNUAL) return 'pro'
+  return null
+}
+
 // Create or retrieve Stripe customer
 export async function getOrCreateCustomer(userId: string, email: string, name?: string) {
   // Check if customer exists in Supabase
@@ -167,8 +184,15 @@ export async function handleStripeWebhook(payload: string, signature: string) {
       }
       const periodEnd = new Date((sub as any).current_period_end * 1000).toISOString()
 
+      // Sync the PLAN column on portal upgrades/downgrades (they carry no plan metadata) — the fix
+      // for plan-drift where a paying user's `plan` went stale and mis-gated them. Map the current
+      // price → tier; only flip on an active/trialing sub, and only if we recognise the price.
+      const mappedPlan = planFromPriceId((sub as any).items?.data?.[0]?.price?.id)
+      const activeNow = sub.status === 'active' || sub.status === 'trialing'
+
       await supabase.from('subscriptions').update({
         status: sub.status, current_period_end: periodEnd,
+        ...(mappedPlan && activeNow ? { plan: mappedPlan } : {}),
         trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
         updated_at: new Date().toISOString(),
       }).eq('owner_id', userId)
@@ -177,6 +201,9 @@ export async function handleStripeWebhook(payload: string, signature: string) {
         subscription_status: sub.status,
         trial_ends_at: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
       }).eq('user_id', userId)
+
+      // Refill entitlements/credits to the new tier's allotment when the plan actually changed.
+      if (mappedPlan && activeNow) await supabase.rpc('apply_plan', { p_user: userId, p_plan: mappedPlan, p_reset: periodEnd })
       break
     }
 

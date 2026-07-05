@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveScopedAccount } from '@/lib/meta/scope'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
@@ -13,12 +14,7 @@ export async function GET(request: NextRequest) {
   if (!q) return NextResponse.json({ interests: [] })
 
   const admin = createAdminClient()
-  const { data: account } = await admin
-    .from('meta_accounts')
-    .select('access_token')
-    .eq('user_id', user.id)
-    .eq('is_primary', true)
-    .single()
+  const account = await resolveScopedAccount(admin, user.id)
 
   if (!account) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 

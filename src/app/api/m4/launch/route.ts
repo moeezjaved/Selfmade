@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveScopedAccount } from '@/lib/meta/scope'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 import { logError } from '@/lib/admin/logError'
@@ -63,9 +64,7 @@ export async function POST(request: NextRequest) {
 
 
     const admin = createAdminClient()
-    const { data: metaAccount } = await admin
-      .from('meta_accounts').select('*')
-      .eq('user_id', user.id).eq('is_primary', true).single()
+    const metaAccount = await resolveScopedAccount(admin, user.id)
 
     if (!metaAccount) return NextResponse.json({ error: 'No primary Meta account' }, { status: 400 })
 
