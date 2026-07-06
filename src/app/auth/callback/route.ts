@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isFreeEmail } from '@/lib/email-domains'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,10 +19,17 @@ export async function GET(request: NextRequest) {
   if (!code) return NextResponse.redirect(`${origin}/login?error=missing_code`)
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.exchangeCodeForSession(code)
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code)
   if (error) return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`)
 
-  // Safe same-origin redirect only.
+  // Business-email gate — block personal Gmail/Yahoo/etc. Google sign-ins (same rule as email signup).
+  // Tear the just-created session back down and bounce to signup with the friendly-popup flag.
+  const email = data?.user?.email || ''
+  if (isFreeEmail(email)) {
+    await supabase.auth.signOut()
+    return NextResponse.redirect(`${origin}/signup?error=business_email&email=${encodeURIComponent(email)}`)
+  }
+
   const dest = next.startsWith('/') ? next : '/dashboard'
   return NextResponse.redirect(`${origin}${dest}`)
 }
