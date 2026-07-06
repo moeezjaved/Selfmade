@@ -77,25 +77,49 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ brands: filtered, scope: 'mine' })
   }
 
-  // scope=all (directory). When SEARCHING, try the full 611K brand_directory first so uncrawled
-  // brands (e.g. "MOTION") are findable+spyable — crawl_state only holds brands we've already
-  // crawled. Falls back to crawl_state if the directory is empty (not yet imported) or errors.
+  // scope=all (directory). When SEARCHING, MERGE two sources so the modal shows everything
+  // spyable: (1) brands we've ALREADY crawled (discovery_brand_crawl_state — real counts, and
+  // re-opening them is instant), and (2) the full 611K brand_directory (uncrawled brands like
+  // "MOTION" that a first spy will crawl). Crawled brands rank first (richer data); directory
+  // brands fill in the rest. Deduped by page_id. Plus the modal's "Add Manually" tab always
+  // covers anything neither source knows (paste the Ad Library URL → POST extracts the page_id).
   if (q) {
-    const { data: dir, error: dirErr } = await admin
-      .from('brand_directory')
-      .select('page_id, name, source_ad_count')
-      .ilike('name', `%${q}%`)
-      .order('source_ad_count', { ascending: false, nullsFirst: false })
-      .limit(limit)
-    if (!dirErr && dir && dir.length) {
-      return NextResponse.json({
-        brands: dir.map((b: any) => ({
-          pageId: b.page_id, name: b.name || b.page_id, adCount: b.source_ad_count || 0,
-          active: null, inactive: null, video: null, image: null, carousel: null,
-        })),
+    const [crawledRes, dirRes] = await Promise.all([
+      admin.from('discovery_brand_crawl_state')
+        .select('page_id, brand_name, ads_indexed, active_count, video_count, image_count, carousel_count')
+        .ilike('brand_name', `%${q}%`)
+        .order('ads_indexed', { ascending: false, nullsFirst: false })
+        .limit(limit),
+      admin.from('brand_directory')
+        .select('page_id, name, source_ad_count')
+        .ilike('name', `%${q}%`)
+        .order('source_ad_count', { ascending: false, nullsFirst: false })
+        .limit(limit),
+    ])
+
+    const seen = new Set<string>()
+    const merged: any[] = []
+    for (const b of (crawledRes.data || []) as any[]) {
+      if (!b.page_id || seen.has(b.page_id)) continue
+      seen.add(b.page_id)
+      const total = b.ads_indexed || 0
+      const active = b.active_count ?? null
+      merged.push({
+        pageId: b.page_id, name: b.brand_name || b.page_id, adCount: total, crawled: true,
+        active, inactive: active != null ? Math.max(0, total - active) : null,
+        video: b.video_count ?? null, image: b.image_count ?? null, carousel: b.carousel_count ?? null,
       })
     }
-    // else fall through to the crawl_state search below
+    for (const b of (dirRes.data || []) as any[]) {
+      if (!b.page_id || seen.has(b.page_id)) continue
+      seen.add(b.page_id)
+      merged.push({
+        pageId: b.page_id, name: b.name || b.page_id, adCount: b.source_ad_count || 0, crawled: false,
+        active: null, inactive: null, video: null, image: null, carousel: null,
+      })
+    }
+    if (merged.length) return NextResponse.json({ brands: merged.slice(0, limit) })
+    // else fall through (both empty) — the generic crawl_state browse below still returns []
   }
 
   // fast crawl_state read (approximate counts; used by the add-modal + as directory fallback).
