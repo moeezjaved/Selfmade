@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
+// Chrome Web Store listing — update to the real URL once the extension is published & reviewed.
+const CHROME_STORE_URL = 'https://chromewebstore.google.com/search/selfmade'
+
 export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -133,6 +136,38 @@ export default function SettingsPage() {
               <option value="daily">Daily</option>
               <option value="off">Off</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Save Ads Anywhere — Chrome extension + (coming soon) mobile Instagram save */}
+      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
+        <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>
+          <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Save ads anywhere</div>
+          <div style={{fontSize:12.5,color:'#7a9a7a',marginTop:3}}>Grab winning ads while you browse — they land in your boards.</div>
+        </div>
+        <div style={{padding:22,display:'flex',flexDirection:'column',gap:16}}>
+          {/* Browser extension */}
+          <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+            <div style={{width:42,height:42,borderRadius:12,background:'#f0fdf4',border:'1px solid #bbf7d0',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>🧩</div>
+            <div style={{flex:1,minWidth:180}}>
+              <div style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>Browser extension</div>
+              <div style={{fontSize:12.5,color:'#7a9a7a',marginTop:2}}>One-click save on Instagram, the Facebook Ad Library & TikTok. Sign in once with your Selfmade account.</div>
+            </div>
+            <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer"
+              style={{background:'#dffe95',color:'#1a3a1a',padding:'9px 18px',borderRadius:100,fontSize:13,fontWeight:800,textDecoration:'none',whiteSpace:'nowrap'}}>
+              Get the extension →
+            </a>
+          </div>
+          <div style={{height:1,background:'#f1f5f9'}} />
+          {/* Mobile Instagram save — coming soon */}
+          <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',opacity:0.85}}>
+            <div style={{width:42,height:42,borderRadius:12,background:'#faf5ff',border:'1px solid #e9d5ff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>📱</div>
+            <div style={{flex:1,minWidth:180}}>
+              <div style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>Save from Instagram on mobile</div>
+              <div style={{fontSize:12.5,color:'#7a9a7a',marginTop:2}}>Forward any ad or reel to our Instagram bot and it saves to your boards — no extension needed.</div>
+            </div>
+            <span style={{background:'#f3f4f6',color:'#6b7280',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:800,whiteSpace:'nowrap'}}>Coming soon</span>
           </div>
         </div>
       </div>

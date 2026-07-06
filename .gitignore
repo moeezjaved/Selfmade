@@ -16,3 +16,4 @@ worker/.env
 # Vercel env pulls (may contain secrets — never commit)
 .env.probe
 .env*.local
+selfmade-extension.zip
