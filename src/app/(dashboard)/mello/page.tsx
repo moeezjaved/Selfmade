@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Sparkles, MessageSquare, Trash2, Zap } from 'lucide-react'
+import { Plus, Sparkles, MessageSquare, Trash2, Zap, PanelLeft, X } from 'lucide-react'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useChatStream, type MelloMessage } from '@/components/mello/useChatStream'
 import { ChatMessage } from '@/components/mello/ChatMessage'
 import { ChatInput } from '@/components/mello/ChatInput'
@@ -17,6 +18,8 @@ export default function MelloPage() {
   const [input, setInput] = useState('')
   const [showLibrary, setShowLibrary] = useState(false)
   const [cat, setCat] = useState<PromptCategory>('diagnostics')
+  const isMobile = useIsMobile()
+  const [tasksOpen, setTasksOpen] = useState(false)   // mobile: task-list drawer
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const onTitle = useCallback((title: string) => {
@@ -42,10 +45,11 @@ export default function MelloPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
-  const newTask = () => { setActiveId(null); reset(); setInput('') }
+  const newTask = () => { setActiveId(null); reset(); setInput(''); setTasksOpen(false) }
 
   const selectConversation = async (id: string) => {
     setActiveId(id)
+    setTasksOpen(false)
     reset()
     try {
       const r = await fetch(`/api/mello/conversations/${id}`)
@@ -110,9 +114,14 @@ export default function MelloPage() {
   const catPrompts = PROMPT_LIBRARY.filter(p => p.category === cat).slice(0, 5)
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#eef5eb' }}>
-      {/* ── Inner rail ── */}
-      <div style={{ width: 250, borderRight: '1px solid #dde6d8', background: '#f6faf3', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+    <div style={{ display: 'flex', height: isMobile ? 'calc(100dvh - 52px)' : '100vh', background: '#eef5eb', position: 'relative' }}>
+      {/* Backdrop behind the task drawer on mobile */}
+      {isMobile && tasksOpen && (
+        <div onClick={() => setTasksOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(14,27,18,0.4)', zIndex: 30 }} />
+      )}
+      {/* ── Inner rail (task list) — off-canvas drawer on mobile ── */}
+      <div style={{ width: 250, borderRight: '1px solid #dde6d8', background: '#f6faf3', display: 'flex', flexDirection: 'column', flexShrink: 0,
+        ...(isMobile ? { position: 'absolute' as const, top: 0, bottom: 0, left: 0, zIndex: 31, transform: tasksOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease', boxShadow: tasksOpen ? '0 0 30px rgba(0,0,0,0.25)' : 'none' } : {}) }}>
         <div style={{ padding: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 8, background: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -142,7 +151,15 @@ export default function MelloPage() {
 
       {/* ── Chat column ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
+        {/* Mobile-only bar to open the task drawer */}
+        {isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #e2eadd', background: '#f6faf3' }}>
+            <button onClick={() => setTasksOpen(true)} aria-label="Open tasks" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 9, border: '1px solid #d3e0cb', background: '#fff', color: '#2d5a27', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+              <PanelLeft size={15} /> Tasks
+            </button>
+          </div>
+        )}
+        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0 14px' : '0 24px' }}>
           <div style={{ maxWidth: 760, margin: '0 auto', paddingBottom: 20 }}>
             {isEmpty ? (
               <div style={{ paddingTop: 64, textAlign: 'center' }}>
