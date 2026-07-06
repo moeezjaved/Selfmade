@@ -13,7 +13,7 @@ import {
   LayoutDashboard, Megaphone, Sparkles, TrendingUp,
   ClipboardList, Settings, CreditCard, BarChart2,
   Rocket, LogOut, Compass, Bookmark, Heart, Star, Store, Radar, Wand2, Flame, Users, Library,
-  Menu, X,
+  Menu, X, Check, LifeBuoy, ChevronsUpDown, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -74,6 +74,17 @@ function RailIcon({ href, active, title, accent, children }: {
   )
 }
 
+// Shared row style + item for the account dropdown.
+const ACCT_ITEM: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, textDecoration: 'none' }
+function AcctItem({ href, icon: Icon, label, accent }: { href: string; icon: React.ElementType; label: string; accent?: boolean }) {
+  return (
+    <Link href={href} className="sm-acct-item" style={{ ...ACCT_ITEM, color: accent ? '#dffe95' : 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: accent ? 700 : 500 }}>
+      <Icon size={16} style={{ flexShrink: 0 }} />
+      <span>{label}</span>
+    </Link>
+  )
+}
+
 interface DashboardLayoutProps {
   children: React.ReactNode
 }
@@ -94,8 +105,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const isMobile = useIsMobile()
   const [navOpen, setNavOpen] = useState(false)
-  // Close the mobile drawer whenever the route changes (tapping a nav item navigates → dismiss).
-  useEffect(() => { setNavOpen(false) }, [pathname])
+  const [acctOpen, setAcctOpen] = useState(false)
+  // Close the mobile drawer + account menu whenever the route changes.
+  useEffect(() => { setNavOpen(false); setAcctOpen(false) }, [pathname])
   // NOTE: this layout used to be gated behind a whole-layout `mounted` flag (returned a blank
   // placeholder until a post-mount effect flipped it). That was meant to dodge hydration #418/#423/
   // #425 — but those turned out to be browser EXTENSIONS injecting into <html>/<body>, not our code,
@@ -134,6 +146,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const initials = user?.user_metadata?.full_name
     ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.[0].toUpperCase() || 'A'
+  const displayName = user?.user_metadata?.full_name || user?.email || 'User'
+  const planLabel = profile?.subscription_status === 'trialing'
+    ? 'Trial'
+    : (profile?.plan_id ? profile.plan_id.charAt(0).toUpperCase() + profile.plan_id.slice(1) : 'Free')
+  const statusLabel = (profile?.subscription_status === 'canceled' || profile?.subscription_status === 'past_due') ? 'Inactive' : 'Active'
 
   return (
     <div className="flex min-h-screen bg-dark">
@@ -242,30 +259,63 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
           </div>
 
-          {/* Credits + User */}
-          <div style={{padding:14,borderTop:"1px solid rgba(223,254,149,0.08)"}}>
+          {/* Credits + Account menu */}
+          <div style={{padding:14,borderTop:"1px solid rgba(223,254,149,0.08)",position:"relative"}}>
             <div style={{marginBottom:12}}><CreditCounter /></div>
-            <div className="flex items-center gap-3 cursor-pointer group">
-              <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">
-                {initials}
+
+            {/* Account button → opens the dropdown */}
+            <button onClick={() => setAcctOpen(o => !o)}
+              style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:acctOpen?"rgba(255,255,255,0.06)":"transparent",border:"none",borderRadius:10,padding:6,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
+              <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">{initials}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.9)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayName}</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{planLabel} · {statusLabel}</div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.9)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {user?.user_metadata?.full_name || user?.email || 'User'}
+              <ChevronsUpDown size={15} color="rgba(255,255,255,0.4)" style={{flexShrink:0}}/>
+            </button>
+
+            {/* Dropdown (pops up above the button) */}
+            {acctOpen && (
+              <>
+                <div onClick={() => setAcctOpen(false)} style={{position:"fixed",inset:0,zIndex:59}}/>
+                <div style={{position:"absolute",bottom:"100%",left:8,right:8,marginBottom:8,minWidth:236,background:"#1c2f19",border:"1px solid rgba(223,254,149,0.14)",borderRadius:14,boxShadow:"0 14px 44px rgba(0,0,0,0.5)",zIndex:60,overflow:"hidden"}}>
+                  {/* header */}
+                  <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 14px 12px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                    <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">{initials}</div>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayName}</div>
+                      <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user?.email}</div>
+                    </div>
+                  </div>
+                  {/* workspace */}
+                  <div style={{padding:"8px 8px 2px"}}>
+                    <div style={{fontSize:9.5,fontWeight:800,letterSpacing:".07em",textTransform:"uppercase",color:"rgba(255,255,255,0.3)",padding:"2px 8px 6px"}}>Workspace</div>
+                    <Link href="/team" className="sm-acct-item" style={ACCT_ITEM}>
+                      <div style={{width:26,height:26,borderRadius:7,background:"#dffe95",color:"#243d20",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:12,flexShrink:0}}>{initials}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12.5,fontWeight:700,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayName.split(' ')[0]}’s Workspace</div>
+                        <div style={{fontSize:10.5,color:"rgba(255,255,255,0.45)"}}>{planLabel} plan</div>
+                      </div>
+                      <Check size={16} color="#dffe95" style={{flexShrink:0}}/>
+                    </Link>
+                  </div>
+                  <div style={{height:1,background:"rgba(255,255,255,0.06)",margin:"4px 0"}}/>
+                  {/* items */}
+                  <div style={{padding:"4px 8px 8px"}}>
+                    <AcctItem href="/settings" icon={Settings} label="Settings" />
+                    <AcctItem href="/team" icon={Users} label="Team & members" />
+                    <AcctItem href="/billing" icon={CreditCard} label="Billing & plan" />
+                    <AcctItem href="/billing" icon={Zap} label="Upgrade plan" accent />
+                    <AcctItem href="/contact" icon={LifeBuoy} label="Support & feedback" />
+                    <div style={{height:1,background:"rgba(255,255,255,0.06)",margin:"6px 0"}}/>
+                    <button onClick={handleSignOut} className="sm-acct-item" style={{...ACCT_ITEM,width:"100%",border:"none",background:"transparent",cursor:"pointer",color:"#ff9d9d",fontFamily:"inherit"}}>
+                      <LogOut size={16} style={{flexShrink:0}}/>
+                      <span style={{fontSize:13,fontWeight:600}}>Log out</span>
+                    </button>
+                  </div>
                 </div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {profile?.subscription_status === 'trialing'
-                    ? 'Trial'
-                    : (profile?.plan_id ? profile.plan_id.charAt(0).toUpperCase() + profile.plan_id.slice(1) : 'Free')} · {profile?.subscription_status === 'canceled' || profile?.subscription_status === 'past_due' ? 'Inactive' : 'Active'}
-                </div>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-white/30 hover:text-white/70"
-              >
-                <LogOut size={14}/>
-              </button>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </aside>

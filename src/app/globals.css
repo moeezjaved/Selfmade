@@ -215,6 +215,9 @@
     color: rgba(255,255,255,0.85);
     background: rgba(255,255,255,0.06);
   }
+  /* Account dropdown rows */
+  .sm-acct-item { transition: background 0.12s ease; }
+  .sm-acct-item:hover { background: rgba(255,255,255,0.07); }
   .sidebar-link.active {
     color: var(--lime);
     background: rgba(223,254,149,0.1);
