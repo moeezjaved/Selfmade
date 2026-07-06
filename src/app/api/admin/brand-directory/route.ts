@@ -60,10 +60,18 @@ export async function POST(req: NextRequest) {
 
   if (!clean.length) return NextResponse.json({ inserted: 0, skipped: rows.length })
 
+  // De-dupe by page_id WITHIN the batch (last row wins). Postgres' ON CONFLICT DO UPDATE
+  // aborts the whole statement — "cannot affect row a second time" — if one upsert touches
+  // the same conflict target twice. The Foreplay export has repeated page_ids (e.g. the same
+  // brand scraped twice), so collapse them here before the upsert.
+  const byId = new Map<string, any>()
+  for (const r of clean as any[]) byId.set(r.page_id, r)
+  const deduped = Array.from(byId.values())
+
   const { error } = await createAdminClient()
-    .from('brand_directory').upsert(clean, { onConflict: 'page_id' })
+    .from('brand_directory').upsert(deduped, { onConflict: 'page_id' })
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json({ inserted: clean.length, skipped: rows.length - clean.length })
+  return NextResponse.json({ inserted: deduped.length, skipped: rows.length - deduped.length })
 }
 
 export async function DELETE(req: NextRequest) {
