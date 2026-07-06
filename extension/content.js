@@ -1,21 +1,23 @@
 /**
  * Selfmade extension — content script (runs on every page except our own site).
  *
- * Two save surfaces, Atria-style:
- *  1. PER-CARD button — on the Facebook Ad Library we inject a prominent full-width
- *     "＋ Save to Selfmade" button into every ad card (discoverable, no hover needed).
- *  2. HOVER button — on Instagram / TikTok / anywhere else, hovering any image or video shows a
- *     ＋Save button. Plus a floating button that grabs the biggest media on the page.
+ * Save surfaces, Atria-style:
+ *  • PER-CARD / PER-POST buttons injected in-place on Facebook Ad Library, Instagram, TikTok Ad
+ *    Library, and the TikTok feed — a prominent "＋ Save to Selfmade" button, no hover needed.
+ *  • HOVER button on any other image/video, plus a floating button for the biggest media on a page.
  *
- * Brand/caption metadata is extracted per-host to enrich the save; a save always works without it.
+ * Brand/caption metadata is extracted per-surface to enrich the save; a save always works without it.
  */
 (function () {
   if (window.__selfmadeInjected) return
   window.__selfmadeInjected = true
   const HOST = location.hostname
   if (HOST.includes('tryselfmade.ai')) return
-  const IS_ADLIB = HOST.includes('facebook.com') && location.pathname.includes('/ads/library')
 
+  const IS_FB_ADLIB = HOST.includes('facebook.com') && location.pathname.includes('/ads/library')
+  const IS_TT_ADLIB = HOST.includes('library.tiktok.com')
+  const IS_TT_FEED = HOST.includes('tiktok.com') && !IS_TT_ADLIB
+  const IS_IG = HOST.includes('instagram.com')
   const MIN = 140
 
   // ── Toast ─────────────────────────────────────────────────────────────────
@@ -47,13 +49,11 @@
     for (const s of sels) { const e = scope.querySelector(s); const t = (e?.textContent || '').trim(); if (t) return t.slice(0, max) }
     return ''
   }
-  // The real ad caption is the longest text block in the card, ignoring UI chrome/labels.
-  const LABEL_RE = /^(Sponsored|Active|Inactive|See ad details|See summary details|Library ID|Started running|Platforms|Open Drop-?down|This ad has multiple versions|\d+ ads?\b)/i
+  const LABEL_RE = /^(Sponsored|Active|Inactive|See ad details|See summary details|Library ID|Started running|Platforms|Open Drop-?down|This ad has multiple versions|First shown|Last shown|Unique users seen|\d+ ads?\b|Ad\b|Follow|Like|Comment|Share|Save)/i
   function longestText(scope, max = 900) {
-    // FB's ad-caption markup shifts (sometimes dir="auto", sometimes a bare span), so key off the
-    // element with the longest OWN text (direct text nodes only) rather than a fixed selector.
+    // Key off the element with the longest OWN text (direct text nodes) — robust to markup shifts.
     let best = ''
-    for (const el of scope.querySelectorAll('span, div')) {
+    for (const el of scope.querySelectorAll('span, div, p')) {
       let own = ''
       for (const n of el.childNodes) if (n.nodeType === 3) own += n.textContent
       own = own.trim()
@@ -64,19 +64,25 @@
   function meta(scope) {
     let brand = '', ad_copy = '', platform = 'web'
     try {
-      if (IS_ADLIB) {
+      if (IS_FB_ADLIB) {
         platform = 'facebook'
         brand = textFrom(scope, ['a[href*="facebook.com/"] span', 'a[href*="/"] strong', 'strong span', 'span[dir="auto"] strong'], 120)
         ad_copy = longestText(scope)
-      } else if (HOST.includes('instagram.com')) {
+      } else if (IS_TT_ADLIB) {
+        platform = 'tiktok'
+        brand = textFrom(scope, ['a[href*="/ads/detail"]', 'h1', 'h2', 'strong', 'a[href*="advertiser"]'], 120)
+        if (!brand) { const t = (scope.textContent || '').replace(/^\s*Ad\s*/i, '').trim(); brand = t.split('\n')[0].slice(0, 120) }
+      } else if (IS_IG) {
         platform = 'instagram'
         const art = scope.closest?.('article') || scope
-        brand = textFrom(art, ['header a[href^="/"]'], 120)
-        ad_copy = textFrom(art, ['h1', 'ul li span'], 500)
-      } else if (HOST.includes('tiktok.com')) {
+        // Username = first "/handle/" permalink with text (IG dropped the <header> wrapper).
+        const u = [...art.querySelectorAll('a[href^="/"]')].find(a => /^\/[A-Za-z0-9._]+\/$/.test(a.getAttribute('href') || '') && (a.textContent || '').trim())
+        brand = u ? (u.textContent || '').trim().replace(/Verified$/, '') : ''
+        ad_copy = longestText(art)
+      } else if (IS_TT_FEED) {
         platform = 'tiktok'
-        brand = textFrom(document, ['[data-e2e="browse-username"]', '[data-e2e="video-author-uniqueid"]'], 120)
-        ad_copy = textFrom(document, ['[data-e2e="browse-video-desc"]', '[data-e2e="video-desc"]'], 500)
+        brand = textFrom(scope, ['[data-e2e="browse-username"]', '[data-e2e="video-author-uniqueid"]', 'a[href^="/@"]'], 120)
+        ad_copy = textFrom(scope, ['[data-e2e="browse-video-desc"]', '[data-e2e="video-desc"]'], 500)
       } else {
         brand = (document.querySelector('meta[property="og:site_name"]')?.getAttribute('content') || document.title || '').trim().slice(0, 120)
       }
@@ -104,7 +110,6 @@
     const restore = btn.innerHTML
     btn.innerHTML = labels.saving
     btn.classList.add('sm-busy')
-
     const m = meta(scope || document)
     const image_data = type === 'image' ? await toDataURL(url) : null
     const payload = {
@@ -122,42 +127,61 @@
     })
   }
 
-  // ── 1. PER-CARD button (Facebook Ad Library) ───────────────────────────────
-  function findCard(label) {
+  // ── Generic card-button injector ────────────────────────────────────────────
+  function addCardButton(card, place) {
+    if (!card || card.dataset.smCard) return
+    card.dataset.smCard = '1'
+    const btn = document.createElement('button')
+    btn.className = 'sm-card-btn'
+    btn.innerHTML = '<span class="sm-ico">＋</span> Save to Selfmade'
+    btn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation()
+      const media = biggestMediaIn(card)
+      if (media) doSave(media, card, btn, { saving: 'Saving…', done: '✓ Saved' })
+      else toast('No media found here', false)
+    })
+    if (getComputedStyle(card).position === 'static') card.style.position = 'relative'
+    if (place === 'append') card.appendChild(btn); else card.insertBefore(btn, card.firstChild)
+  }
+  function cardFromLabel(label, minSize = 240) {
     let el = label
     for (let i = 0; i < 12 && el; i++) {
       el = el.parentElement
       if (el && (el.querySelector('img') || el.querySelector('video'))) {
         const r = el.getBoundingClientRect()
-        if (r.width > 240 && r.height > 240) return el
+        if (r.width > minSize && r.height > minSize) return el
       }
     }
     return null
   }
-  function injectCardButtons() {
-    // Each ad card carries a "Library ID" label near its top — anchor on it, walk up to the card.
-    const labels = document.querySelectorAll('span, div')
-    for (const label of labels) {
-      const txt = label.textContent || ''
-      if (txt.length > 40 || !/Library ID/i.test(txt) || label.children.length > 1) continue
-      const card = findCard(label)
-      if (!card || card.dataset.smCard) continue
-      card.dataset.smCard = '1'
-      const btn = document.createElement('button')
-      btn.className = 'sm-card-btn'
-      btn.innerHTML = '<span class="sm-ico">＋</span> Save to Selfmade'
-      btn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation()
-        const media = biggestMediaIn(card)
-        if (media) doSave(media, card, btn, { saving: 'Saving…', done: '✓ Saved' })
-        else toast('No media found in this ad', false)
-      })
-      if (getComputedStyle(card).position === 'static') card.style.position = 'relative'
-      card.insertBefore(btn, card.firstChild)
+
+  function scan() {
+    if (IS_FB_ADLIB) {
+      for (const label of document.querySelectorAll('span, div')) {
+        const txt = label.textContent || ''
+        if (txt.length > 40 || !/Library ID/i.test(txt) || label.children.length > 1) continue
+        addCardButton(cardFromLabel(label), 'prepend')
+      }
+    } else if (IS_TT_ADLIB) {
+      for (const label of document.querySelectorAll('span, div')) {
+        const txt = label.textContent || ''
+        if (txt.length > 24 || !/First shown|Last shown/i.test(txt) || label.children.length > 1) continue
+        addCardButton(cardFromLabel(label, 180), 'prepend')
+      }
+    } else if (IS_IG) {
+      for (const art of document.querySelectorAll('article')) {
+        const r = art.getBoundingClientRect()
+        if (r.width > 260 && (art.querySelector('img') || art.querySelector('video'))) addCardButton(art, 'append')
+      }
+    } else if (IS_TT_FEED) {
+      for (const v of document.querySelectorAll('video')) {
+        const container = v.closest('[class*="DivItemContainer"], [class*="DivContainer"], article, div[data-e2e]') || v.parentElement
+        if (container) { const r = container.getBoundingClientRect(); if (r.width > 200 && r.height > 200) addCardButton(container, 'prepend') }
+      }
     }
   }
 
-  // ── 2. HOVER button + floating button (everywhere else) ─────────────────────
+  // ── Hover button + floating button ──────────────────────────────────────────
   function setupHover() {
     const btn = document.createElement('button')
     btn.className = 'sm-save-btn'
@@ -200,9 +224,9 @@
 
   // ── Boot ────────────────────────────────────────────────────────────────────
   setupHover()
-  if (IS_ADLIB) {
-    injectCardButtons()
-    const obs = new MutationObserver(() => { clearTimeout(window.__smT); window.__smT = setTimeout(injectCardButtons, 300) })
+  if (IS_FB_ADLIB || IS_TT_ADLIB || IS_IG || IS_TT_FEED) {
+    scan()
+    const obs = new MutationObserver(() => { clearTimeout(window.__smT); window.__smT = setTimeout(scan, 350) })
     obs.observe(document.body, { childList: true, subtree: true })
   }
 })()
