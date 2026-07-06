@@ -44,7 +44,7 @@ export default function BrandSearch() {
         </div>
       )}
       {results.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12, marginTop: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px,100%), 1fr))', gap: 12, marginTop: 8 }}>
           {results.map((b) => (
             <Link key={b.slug} href={`/brands/${b.slug}`}
               style={{ display: 'flex', alignItems: 'center', gap: 12, border: '0.5px solid #e6e6e6', borderRadius: 12, padding: 14, textDecoration: 'none' }}>

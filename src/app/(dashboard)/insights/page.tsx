@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 interface AdsetInsight {
   id: string; name: string; status: string
@@ -27,6 +28,9 @@ export default function InsightsPage() {
   const [scaleFactor, setScaleFactor] = useState('2')
   const [isBudgetIncrease, setIsBudgetIncrease] = useState(false)
   const [expanded, setExpanded] = useState<Record<string,boolean>>({})
+  const isMobile = useIsMobile()
+  // Collapse fixed N-column grids on phones: 1 col for wide (4/6-col) blocks, 2 for the 3-col.
+  const grid = (n: number) => isMobile ? (n >= 4 ? 'repeat(2,1fr)' : '1fr') : `repeat(${n},1fr)`
 
   useEffect(() => { loadInsights() }, [dateRange])
 
@@ -117,7 +121,7 @@ export default function InsightsPage() {
         </div>
       </div>
 
-      <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:28}}>
+      <div style={{display:'grid', gridTemplateColumns:grid(4), gap:14, marginBottom:28}}>
         {[
           {label:'Total Spend', value:fmt(totals.spend, campaigns[0]?.currency), color:'#c0392b'},
           {label:'Total Revenue', value:fmt(totals.revenue, campaigns[0]?.currency), color:'#2d7a2d'},
@@ -210,7 +214,7 @@ export default function InsightsPage() {
                         )}
                       </div>
                     </div>
-                    <div style={{padding:'0 24px 14px',display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:10}}>
+                    <div style={{padding:isMobile?'0 14px 14px':'0 24px 14px',display:'grid',gridTemplateColumns:grid(6),gap:10}}>
                       {[
                         {label:'Spend', value:fmt(adset.spend,adset.currency)},
                         {label:'Revenue', value:fmt(adset.revenue,adset.currency)},
@@ -282,7 +286,7 @@ export default function InsightsPage() {
               {!isBudgetIncrease ? (
                 <div style={{marginBottom:16}}>
                   <div style={{fontSize:11,fontWeight:700,color:'#6b8f6b',marginBottom:8,textTransform:'uppercase',letterSpacing:'.06em'}}>Budget Multiplier for Duplicate</div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:8}}>
+                  <div style={{display:'grid',gridTemplateColumns:grid(4),gap:8,marginBottom:8}}>
                     {['1.5','2','3','5'].map(x=>(
                       <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#1a3a1a':'#e2e8f0'),background:scaleFactor===x?'#1a3a1a':'#f8fafc',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#dffe95':'#374151'}}>
                         {x}x
@@ -299,7 +303,7 @@ export default function InsightsPage() {
                     <div style={{fontSize:12,fontWeight:700,color:'#b8860b',marginBottom:4}}>Max 15% — Protects Learning Phase</div>
                     <div style={{fontSize:11,color:'#6b8f6b'}}>Increasing by more than 20% resets Meta learning. Stay under 15%.</div>
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+                  <div style={{display:'grid',gridTemplateColumns:grid(3),gap:8}}>
                     {['5','10','15'].map(x=>(
                       <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#b8860b':'rgba(255,255,255,0.1)'),background:scaleFactor===x?'rgba(251,191,36,0.1)':'rgba(255,255,255,0.02)',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#b8860b':'rgba(255,255,255,0.5)'}}>
                         +{x}%

@@ -113,7 +113,7 @@ export default function TopPicksPage() {
 
           {/* Packs grid */}
           <h2 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Packs</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px,100%), 1fr))', gap: 18 }}>
             {packs.map(p => (
               <Link key={p.id} href={`/discovery/top-picks/${p.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, overflow: 'hidden', transition: 'box-shadow .15s, transform .15s', height: '100%', display: 'flex', flexDirection: 'column' }}

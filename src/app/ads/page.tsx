@@ -40,7 +40,7 @@ function Grid({ title, items }: { title: string; items: { label: string; url: st
   return (
     <section style={{ maxWidth: 1120, margin: '0 auto', padding: '10px 24px 26px' }}>
       <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-.02em', margin: '18px 0 14px' }}>{title}</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(220px,100%), 1fr))', gap: 10 }}>
         {items.map((it) => (
           <Link key={it.url} href={it.url} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #eef0ee', borderRadius: 12, padding: '14px 16px', textDecoration: 'none', color: INK, fontWeight: 700, fontSize: 15, background: '#fff' }}>
             {it.label} <span style={{ color: GREEN }}>→</span>

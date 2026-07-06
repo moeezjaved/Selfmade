@@ -116,7 +116,7 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
         <section style={{ margin: '4px 0 28px', padding: '20px 22px', background: '#f8fcf6', border: '1px solid #e6ede2', borderRadius: 14 }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: '#1a3a1a', marginBottom: 2 }}>What we found in {name}'s ads</div>
           <div style={{ fontSize: 13, color: '#5a7a5a', marginBottom: 16 }}>Creative DNA from their top-performing ads — analyzed by AI.</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(210px,100%), 1fr))', gap: 18 }}>
             <InsightBlock title="Top hooks" items={page.insights.topHooks} />
             <InsightBlock title="Emotions they trigger" items={page.insights.topEmotions} />
             <InsightBlock title="Angles" items={page.insights.topAngles} />
@@ -142,7 +142,7 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
       {freeAds.length === 0 ? (
         <p style={{ color: '#6b7280' }}>Ads for this brand are being processed — check back soon.</p>
       ) : (
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 16 }}>
           {freeAds.map((a) => {
             const img = cdn(thumbOf(a))
             return (

@@ -13,8 +13,10 @@ import {
   LayoutDashboard, Megaphone, Sparkles, TrendingUp,
   ClipboardList, Settings, CreditCard, BarChart2,
   Rocket, LogOut, Compass, Bookmark, Heart, Star, Store, Radar, Wand2, Flame, Users, Library,
+  Menu, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 // Two-rail nav: each AREA is one icon in the thin rail; its `items` fill the panel.
 const AREAS = [
@@ -90,6 +92,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const isMobile = useIsMobile()
+  const [navOpen, setNavOpen] = useState(false)
+  // Close the mobile drawer whenever the route changes (tapping a nav item navigates → dismiss).
+  useEffect(() => { setNavOpen(false) }, [pathname])
   // NOTE: this layout used to be gated behind a whole-layout `mounted` flag (returned a blank
   // placeholder until a post-mount effect flipped it). That was meant to dodge hydration #418/#423/
   // #425 — but those turned out to be browser EXTENSIONS injecting into <html>/<body>, not our code,
@@ -132,8 +138,36 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="flex min-h-screen bg-dark">
 
+      {/* ── MOBILE TOP BAR (hamburger) — only < 768px ── */}
+      {isMobile && (
+        <div style={{position:"fixed",top:0,left:0,right:0,height:52,zIndex:45,background:"#1c2f19",borderBottom:"1px solid rgba(223,254,149,0.1)",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 12px"}}>
+          <button onClick={() => setNavOpen(true)} aria-label="Open menu" style={{width:38,height:38,display:"flex",alignItems:"center",justifyContent:"center",color:"#dffe95",background:"transparent",border:"none",borderRadius:9}}>
+            <Menu size={22}/>
+          </button>
+          <Link href="/dashboard" style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:28,height:28,borderRadius:8,background:"#dffe95",color:"#243d20",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:16,fontStyle:"italic",fontFamily:"Georgia,serif"}}>S</div>
+          </Link>
+          <div style={{display:"flex",alignItems:"center"}}><NotificationBell /></div>
+        </div>
+      )}
+
+      {/* Backdrop behind the open drawer on mobile */}
+      {isMobile && navOpen && (
+        <div onClick={() => setNavOpen(false)} style={{position:"fixed",inset:0,background:"rgba(14,27,18,0.5)",backdropFilter:"blur(2px)",zIndex:49}}/>
+      )}
+
       {/* ── SIDEBAR (two-rail: thin icon rail + contextual panel) ── */}
-      <aside style={{width:256,flexShrink:0,display:"flex",position:"fixed",top:0,left:0,bottom:0,zIndex:50}}>
+      <aside style={{width:256,flexShrink:0,display:"flex",position:"fixed",top:0,left:0,bottom:0,zIndex:50,
+        transform: isMobile && !navOpen ? "translateX(-100%)" : "translateX(0)",
+        transition:"transform 0.25s ease",
+        boxShadow: isMobile && navOpen ? "0 0 40px rgba(0,0,0,0.4)" : "none"}}>
+
+        {/* Close button inside the drawer — only when open, else it peeks past the off-screen edge */}
+        {isMobile && navOpen && (
+          <button onClick={() => setNavOpen(false)} aria-label="Close menu" style={{position:"absolute",top:10,right:-1,transform:"translateX(100%)",width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",background:"#1c2f19",border:"1px solid rgba(223,254,149,0.1)",borderLeft:"none",borderRadius:"0 9px 9px 0"}}>
+            <X size={18}/>
+          </button>
+        )}
 
         {/* Rail 1 — thin icon rail */}
         <div style={{width:56,flexShrink:0,background:"#1c2f19",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 0",gap:5}}>
@@ -228,7 +262,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </aside>
 
       {/* ── MAIN ── */}
-      <div style={{flex:1,marginLeft:256,display:"flex",flexDirection:"column",minHeight:"100vh",background:"#eef5eb",minWidth:0,maxWidth:"calc(100vw - 256px)",overflowX:"hidden"}}>
+      <div style={{flex:1,
+        marginLeft: isMobile ? 0 : 256,
+        marginTop: isMobile ? 52 : 0,
+        display:"flex",flexDirection:"column",minHeight:"100vh",background:"#eef5eb",minWidth:0,
+        maxWidth: isMobile ? "100vw" : "calc(100vw - 256px)",
+        overflowX:"hidden"}}>
         <div id="topbar-portal"/>
         <main className="flex-1" style={{minWidth:0,overflowX:"hidden"}}>
           {children}

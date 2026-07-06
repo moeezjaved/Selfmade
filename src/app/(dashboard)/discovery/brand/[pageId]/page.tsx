@@ -308,7 +308,7 @@ export default function BrandPage() {
 
         {/* Loading */}
         {loading && !error && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(240px,100%), 1fr))', gap: 14 }}>
             {[...Array(8)].map((_, i) => (
               <div key={i} style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
                 <div style={{ padding: '10px 12px', display: 'flex', gap: 8, borderBottom: '1px solid #f1f5f9' }}>
@@ -327,7 +327,7 @@ export default function BrandPage() {
             {activeTab === 'Overview' && (
               <div>
                 {/* Media mix */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(180px,100%), 1fr))', gap: 14, marginBottom: 28 }}>
                   {[
                     { label: 'Total Ads', value: stats.total, icon: '📊', color: '#f0fdf4' },
                     { label: 'Active Now', value: stats.active, icon: '🟢', color: '#f0fdf4' },
@@ -384,7 +384,7 @@ export default function BrandPage() {
             {activeTab === 'Creatives' && (
               <div>
                 <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>{ads.length} ads loaded</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(240px,100%), 1fr))', gap: 14 }}>
                   {ads.map(ad => <MiniAdCard key={ad.id} ad={ad} />)}
                 </div>
                 {hasMore && (
@@ -429,7 +429,7 @@ export default function BrandPage() {
                 {themes.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#9ca3af', padding: 40 }}>No clear themes detected in this ad set</div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 12 }}>
                     {themes.map(([name, count]) => (
                       <div key={name} style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 22px' }}>
                         <div style={{ fontSize: 28, fontWeight: 900, color: '#1a3a1a', marginBottom: 4 }}>{count}</div>

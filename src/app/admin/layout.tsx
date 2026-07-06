@@ -1,6 +1,8 @@
 'use client'
 import { useRouter, usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: '◈' },
@@ -31,6 +33,9 @@ const NAV = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
+  const isMobile = useIsMobile()
+  const [navOpen, setNavOpen] = useState(false)
+  useEffect(() => { setNavOpen(false) }, [pathname])
 
   if (pathname === '/admin/login') return <>{children}</>
 
@@ -41,8 +46,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif', background: '#f5f5f5' }}>
+      {/* Mobile top bar */}
+      {isMobile && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 48, zIndex: 45, background: '#0f0f0f', borderBottom: '1px solid #1e1e1e', display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px' }}>
+          <button onClick={() => setNavOpen(true)} aria-label="Open menu" style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 22, lineHeight: 1, cursor: 'pointer' }}>☰</button>
+          <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Selfmade Admin</span>
+        </div>
+      )}
+      {/* Backdrop */}
+      {isMobile && navOpen && (
+        <div onClick={() => setNavOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 49 }}/>
+      )}
       {/* Sidebar */}
-      <aside style={{ width: '220px', background: '#0f0f0f', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, bottom: 0 }}>
+      <aside style={{ width: '220px', background: '#0f0f0f', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50,
+        transform: isMobile && !navOpen ? 'translateX(-100%)' : 'translateX(0)', transition: 'transform 0.25s ease' }}>
         <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid #1e1e1e' }}>
           <div style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.12em', color: '#555', textTransform: 'uppercase', marginBottom: '4px' }}>Selfmade</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#fff' }}>Admin</div>
@@ -81,7 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Content */}
-      <main style={{ flex: 1, marginLeft: '220px', padding: '32px 36px', minHeight: '100vh' }}>
+      <main style={{ flex: 1, marginLeft: isMobile ? 0 : '220px', marginTop: isMobile ? 48 : 0, padding: isMobile ? '20px 16px' : '32px 36px', minHeight: '100vh', minWidth: 0, overflowX: 'hidden' }}>
         {children}
       </main>
     </div>

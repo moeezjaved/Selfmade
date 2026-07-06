@@ -362,7 +362,7 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
       case 'overview':  return <OverviewTab data={data} />
       case 'creatives': return (
         data.creatives.length
-          ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+          ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(160px,100%), 1fr))', gap: 12 }}>
               {data.creatives.map(ad => <MiniCreativeCard key={ad.ad_id} ad={ad} />)}
             </div>
           : <EmptyState text="No creatives yet. Run the crawler with Bright Data to get real ad images." />

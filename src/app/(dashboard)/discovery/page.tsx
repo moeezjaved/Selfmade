@@ -19,7 +19,7 @@ function GridSkeleton() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', padding: '14px 24px' }}>
       <div style={{ height: 38, width: 360, maxWidth: '60%', background: '#e9edf2', borderRadius: 10, marginBottom: 16 }} className="shimmer" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 14, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(230px,100%), 1fr))', gap: 14, alignItems: 'start' }}>
         {Array.from({ length: 15 }).map((_, i) => (
           <div key={i} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e9edf2', overflow: 'hidden' }}>
             <div style={{ aspectRatio: i % 3 === 0 ? '3 / 4' : i % 3 === 1 ? '1 / 1' : '4 / 5', background: '#e9edf2' }} className="shimmer" />

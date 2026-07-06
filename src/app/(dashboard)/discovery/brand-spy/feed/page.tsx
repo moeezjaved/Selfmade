@@ -47,7 +47,7 @@ export default function BrandSpyFeed() {
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 18 }}>Newest ads launched across every brand we track — your daily “what are competitors testing today” monitor.</div>
 
       {loading && <div style={{ color: '#9ca3af', fontSize: 14 }}>Loading feed…</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 14 }}>
         {ads.map((a) => {
           const d = daysAgo(a.startDate)
           return (

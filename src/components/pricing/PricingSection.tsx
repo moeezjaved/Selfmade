@@ -88,7 +88,7 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
       </div>
 
       {/* tier cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(195px, 1fr))', gap: 14, alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(195px,100%), 1fr))', gap: 14, alignItems: 'stretch' }}>
         {PLAN_ORDER.map((p) => {
           const plan = PLANS[p]
           const isCurrent = variant === 'dashboard' && current === p
