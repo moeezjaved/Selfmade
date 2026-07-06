@@ -350,7 +350,7 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
               />
             </div>
           )}
-          <div style={{ overflowY: 'auto', padding: '4px 0' }}>
+          <div style={{ overflowY: 'auto', padding: '4px 0', flex: 1, minHeight: 0 }}>
             {selected.length > 0 && (
               <button onClick={() => { onClear(); setOpen(false) }}
                 style={{ width: '100%', textAlign: 'left', padding: '7px 14px', fontSize: 12, color: '#dc2626', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -442,7 +442,7 @@ function CountryDropdown({ value, onChange }: { value: string; onChange: (v: str
               placeholder="Search country…"
               style={{ width: '100%', padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
           </div>
-          <div style={{ overflowY: 'auto' }}>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
             {visible.map(c => (
               <button key={c.code} onClick={() => { onChange(c.code); setOpen(false); setSearch('') }}
                 style={{
@@ -1519,18 +1519,20 @@ export default function DiscoveryPage() {
             })
             return [...prev, ...newOnes]
           })
-          setHasMore(dbData.hasMore)
-          setDbPage(page)
           setDbTotal(dbData.total || 0)
           setTotalInDB(dbData.totalInDB || 0)
           setSearchSource('indexed')
           setNextCursor(null)
         }
+        // The page CURSOR and hasMore must advance SYNCHRONOUSLY — never inside the startTransition
+        // below. If they're deferred, the next loadMore fires with a stale `dbPage`, re-requests the
+        // same page, and the cross-page dedup drops every row → infinite scroll silently stalls.
+        setDbPage(page)
+        setHasMore(dbData.hasMore)
         // A fresh search (reset) is urgent → render immediately. A loadMore APPEND is non-urgent:
-        // wrap it in startTransition so React renders the ~15 new overscan cards at LOW priority and
-        // can interrupt that render to keep the scroll at 60fps — the cards just appear a beat later
-        // instead of the render blocking the main thread and hitching the scroll. This is the fix for
-        // the jank when a page loads in mid-scroll (confirmed app-side: still janky in incognito).
+        // wrap the heavy list append in startTransition so React renders the ~15 new overscan cards
+        // at LOW priority and can interrupt to keep scroll at 60fps — cards appear a beat later
+        // instead of blocking the main thread.
         if (reset) applyResults()
         else startTransition(applyResults)
         return

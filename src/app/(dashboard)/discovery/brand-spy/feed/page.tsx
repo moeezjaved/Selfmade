@@ -26,7 +26,9 @@ export default function BrandSpyFeed() {
       // the route returns ads:[] (the "No recent ads" you saw). last_seen DESC = most-recently-active
       // ads, exactly right for a "what are competitors running now" monitor; each card still shows the
       // real launch-age badge from start_date.
-      const res = await fetch('/api/discovery/db-search?sort=recent&limit=60&country=ALL')
+      // A "competitor feed" is about BREADTH across brands, so widen the window and cap each brand
+      // to 2 (the default 3-per-brand cap + a thin drained pool collapsed this to ~3 brands).
+      const res = await fetch('/api/discovery/db-search?sort=recent&limit=120&ads_per_brand=2&country=ALL')
       const j = await res.json()
       setAds((j.ads || j.results || []).filter((a: Ad) => thumbOf(a)))
     } catch { setAds([]) } finally { setLoading(false) }

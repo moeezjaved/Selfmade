@@ -118,6 +118,24 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       brand,
+      // The brand page reads `data.ads` (camelCase Ad[]); the non-empty branch previously returned
+      // only `creatives:` (snake_case) → page rendered empty and every ad showed "0 duration"
+      // (daysRunning was undefined). Map to the shape the client's Ad interface + cards expect.
+      ads: allAds.map((a: any) => ({
+        id: a.ad_id,
+        pageId: a.page_id ?? pageId,
+        pageName: a.page_name || '',
+        body: a.body || '',
+        title: a.title || '',
+        snapshotUrl: a.snapshot_url || a.thumbnail_url || '',
+        startDate: a.start_date || null,
+        stopDate: a.stop_date || null,
+        mediaType: a.format || '',
+        isActive: !!a.is_active,
+        daysRunning: a.days_running ?? 0,
+      })),
+      hasMore: false,
+      nextCursor: null,
       creatives: allAds.slice(0, 80),
       adCopies: allAds
         .filter((a: any) => a.body)
