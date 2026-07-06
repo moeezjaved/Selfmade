@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    :root { --lime: #dffe95; --ink: #14261a; }
+    * { box-sizing: border-box; }
+    body { width: 320px; margin: 0; font-family: 'Inter', -apple-system, system-ui, sans-serif; background: #f6f7f5; color: #14261a; }
+    .head { display: flex; align-items: center; gap: 9px; padding: 16px 16px 12px; }
+    .head img { width: 26px; height: 26px; border-radius: 7px; }
+    .head b { font-size: 15px; }
+    .body { padding: 4px 16px 18px; }
+    .muted { color: #6b7280; font-size: 12.5px; line-height: 1.5; }
+    button { font-family: inherit; cursor: pointer; }
+    .btn { width: 100%; border: none; border-radius: 11px; padding: 12px; font-size: 14px; font-weight: 800; background: var(--lime); color: var(--ink); }
+    .btn.sec { background: #fff; border: 1px solid #dcdfdc; font-weight: 700; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+    .email { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; flex: 0 0 auto; }
+    label { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #9aa593; display: block; margin: 16px 0 6px; }
+    select { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #d7dbd7; font-family: inherit; font-size: 13.5px; background: #fff; }
+    .tip { margin-top: 14px; font-size: 12px; color: #6b7280; line-height: 1.5; }
+    a { color: #2d6a00; font-weight: 700; text-decoration: none; }
+    .hide { display: none; }
+  </style>
+</head>
+<body>
+  <div class="head"><img id="logo" alt="" /><b>Selfmade</b></div>
+  <div class="body">
+    <!-- signed out -->
+    <div id="signedOut" class="hide">
+      <p class="muted">Save ads from Instagram, the Facebook Ad Library, TikTok and anywhere else — straight into your Selfmade boards.</p>
+      <button id="signIn" class="btn" style="margin-top:12px">Sign in with Selfmade</button>
+    </div>
+    <!-- signed in -->
+    <div id="signedIn" class="hide">
+      <div class="row">
+        <span class="dot"></span>
+        <span class="email" id="email"></span>
+        <button id="signOut" class="btn sec" style="width:auto;padding:6px 10px;font-size:12px">Sign out</button>
+      </div>
+      <label>Default board</label>
+      <select id="board"><option>Saved from Web</option></select>
+      <p class="tip">Hover any image or video and hit <b>＋ Save</b>, or use the round button in the corner. Saves land in <a id="openApp" href="#" target="_blank">your boards →</a></p>
+    </div>
+    <div id="loading" class="muted">Loading…</div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
