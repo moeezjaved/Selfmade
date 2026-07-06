@@ -314,7 +314,7 @@ export default function SavedAdsPage() {
             {visibleAds.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: '#9ca3af', fontSize: 14 }}>No ads match your filters.</div>
             ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(248px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(248px,100%), 1fr))', gap: 16 }}>
               {visibleAds.map(saved => {
                 const ad = saved.ad_data || {}
                 const initials = (saved.page_name || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)

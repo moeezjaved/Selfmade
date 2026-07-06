@@ -102,7 +102,7 @@ function PatternsInner() {
             <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.5 }}>{formula}</div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px,100%), 1fr))', gap: 14 }}>
             {ORDER.map(k => <Card key={k} title={LABELS[k] || k} buckets={data.patterns[k]} />)}
           </div>
 

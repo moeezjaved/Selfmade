@@ -96,7 +96,7 @@ export default function AutomationsPage() {
       {automations.length === 0 && !loading && (
         <div style={{ marginBottom: 22 }}>
           <div style={{ fontSize: 12.5, fontWeight: 800, color: '#9aa593', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>Starter templates</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(240px,100%), 1fr))', gap: 12 }}>
             {templates.map((t, i) => (
               <div key={i} style={{ background: '#fff', border: '1px solid #e6ece2', borderRadius: 12, padding: 14 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: '#2c3a26' }}>{t.name}</div>

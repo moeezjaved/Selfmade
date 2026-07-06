@@ -132,7 +132,7 @@ export default function TrendingPage() {
         <div style={{ color: '#9ca3af', padding: 40, textAlign: 'center', fontSize: 14 }}>No trending ads {niche ? `in ${niche} ` : ''}yet — the more the crawler + classifier process, the richer this gets.</div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 14 }}>
             {shown.map((ad, i) => (
               <article key={ad.adId} style={{ borderRadius: 16, position: 'relative', background: '#fff', border: '1px solid #eef0ee', overflow: 'hidden' }}>
                 <div style={{ position: 'relative', aspectRatio: '3/4', background: '#0d120e', overflow: 'hidden' }}>

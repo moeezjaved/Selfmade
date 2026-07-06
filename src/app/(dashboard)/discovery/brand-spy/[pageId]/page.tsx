@@ -424,7 +424,7 @@ function AdLibrary({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: 
 
       {ads.length === 0 && loading && <div style={{ color: '#9ca3af', fontSize: 14, padding: 20 }}>Loading ads…</div>}
       {ads.length === 0 && !loading && <div style={{ color: '#9ca3af', fontSize: 14, padding: 20 }}>No ads match these filters.</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 12 }}>
         {ads.map((a) => <AdCard key={a.id} a={a} onOpen={onOpen} />)}
       </div>
       {hasMore && (
@@ -514,7 +514,7 @@ function CreativeTests({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: 
                 <div style={{ padding: 12, background: '#fafafa', borderTop: '1px solid #f0f0f0' }}>
                   {loadingDay === t.date && <div style={{ color: '#9ca3af', fontSize: 13 }}>Loading ads…</div>}
                   {adsByDay[t.date] && adsByDay[t.date].length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No previews for this day.</div>}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(160px,100%), 1fr))', gap: 10 }}>
                     {(adsByDay[t.date] || []).map((a) => <AdCard key={a.id} a={a} onOpen={onOpen} />)}
                   </div>
                 </div>
@@ -538,7 +538,7 @@ function TimelineTab({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a
       <div style={{ ...card, marginBottom: 12 }}>
         <div style={label}>Top Ads by Performance <span style={{ textTransform: 'none', fontWeight: 500 }}>— highest performance score (rollup)</span></div>
         {d.topAds.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No performance scores computed yet — these fill in after the nightly rollup.</div>}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(150px,100%), 1fr))', gap: 10 }}>
           {d.topAds.map((a, i) => (
             <a key={a.adId} href={a.snapshot_url || '#'} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'inherit', border: '1px solid #e6e6e6', borderRadius: 10, overflow: 'hidden', position: 'relative', display: 'block' }}>
               <span style={{ position: 'absolute', top: 6, left: 6, zIndex: 1, fontSize: 10, fontWeight: 800, color: '#111', background: ACCENT, padding: '2px 7px', borderRadius: 6 }}>#{i + 1}</span>

@@ -8,6 +8,7 @@
  */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2 } from 'lucide-react'
 import { creativeFilename } from '@/lib/filename'
 import StudioModal from '../discovery/StudioModal'
@@ -116,7 +117,7 @@ function Generations() {
             No creatives yet. Open <b style={{ color: DARK }}>Discovery</b>, hover any ad and hit <b style={{ color: DARK }}>Clone ad</b> — it’ll show up here.
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px,100%), 1fr))', gap: 14 }}>
             {shown.map((g) => (
               <div key={g.id} style={card}>
                 <button onClick={() => g.status !== 'processing' && setOpen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: g.status === 'processing' ? 'default' : 'pointer', background: '#0d120e', aspectRatio: '1', overflow: 'hidden', position: 'relative' }}>
@@ -158,6 +159,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const editCost = 10   // Pro edit — matches image_edit_pro
+  const isMobile = useIsMobile()
 
   const applyEdit = async () => {
     if (!instr.trim()) return
@@ -182,7 +184,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
 
   return (
     <Overlay onClose={onClose}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', maxWidth: 900 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', maxWidth: 900 }}>
         <div style={{ background: '#0d120e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'relative' }}>
           {isVideo
             ? <video src={img || ''} controls autoPlay loop style={{ maxWidth: '100%', maxHeight: '78vh', borderRadius: 8 }} />
@@ -242,7 +244,7 @@ function Brands() {
       {brands === null ? <div style={{ color: '#9ca3af' }}>Loading…</div>
         : brands.length === 0 ? <div style={{ ...card, padding: 40, textAlign: 'center', color: '#9ca3af' }}>No brands yet. Add one to start cloning ads with your product.</div>
           : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(260px,100%), 1fr))', gap: 14 }}>
               {brands.map((b) => {
                 const imgs = (b.products || []).flatMap((p) => p.image_urls || []).slice(0, 4)
                 return (
@@ -534,7 +536,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', maxHeight: '92vh', position: 'relative', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', overflowY: 'auto', maxHeight: '92vh', maxWidth: '100%', position: 'relative', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
         <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, zIndex: 3, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={18} /></button>
         {children}
       </div>

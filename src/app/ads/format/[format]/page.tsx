@@ -91,7 +91,7 @@ export default async function AdsFormatPage({ params }: { params: { format: stri
       )}
 
       <section style={{ maxWidth: 1120, margin: '0 auto', padding: '12px 24px 20px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(200px,100%), 1fr))', gap: 14 }}>
           {ads.map((a: any, i: number) => (
             <div key={a.adId} style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid #eef0ee', background: '#fff' }}>
               <div style={{ position: 'relative', aspectRatio: '3/4', background: '#0d120e' }}>

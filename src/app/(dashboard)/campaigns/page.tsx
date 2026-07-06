@@ -307,12 +307,13 @@ function CampaignsInner() {
     alignItems: 'center',
     minHeight: 48,
     gap: 0,
+    minWidth: 900,   // keep column alignment; the card scrolls horizontally on narrow screens
   }
 
   return (
-    <div style={{ padding: '24px 28px', maxWidth: 1300, margin: '0 auto' }}>
+    <div style={{ padding: 'clamp(16px,3vw,24px) clamp(14px,3vw,28px)', maxWidth: 1300, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 900, color: '#1a3a1a' }}>Campaigns</div>
           <div style={{ fontSize: 13, color: '#7a9a7a', marginTop: 2 }}>Manage your Meta campaigns, ad sets and ads</div>
@@ -344,7 +345,7 @@ function CampaignsInner() {
           <button onClick={() => window.location.href = '/m4'} style={{ background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '10px 24px', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch First Campaign</button>
         </div>
       ) : (
-        <div style={{ background: '#fff', border: '1px solid #e8f0e8', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid #e8f0e8', borderRadius: 16, overflow: 'hidden', overflowX: 'auto' }}>
           {/* Sticky table header */}
           <div style={{ ...rowBase, padding: '0 16px', borderBottom: '2px solid #e8f0e8', background: '#f8fbf7', position: 'sticky', top: 0, zIndex: 10 }}>
             <div />

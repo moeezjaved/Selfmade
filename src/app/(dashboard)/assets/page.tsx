@@ -237,7 +237,7 @@ export default function AssetsPage() {
             <div style={{ fontSize: 13.5 }}>Images, videos & audio. Drag files here or click to browse.</div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(190px,100%), 1fr))', gap: 14 }}>
             {shown.map(a => (
               <div key={a.id} style={{ background: '#fff', border: '1px solid #eef0ee', borderRadius: 12, position: 'relative', overflow: menuFor === a.id ? 'visible' : 'hidden', zIndex: menuFor === a.id ? 5 : 'auto' }}>
                 <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: '#0f172a', overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
