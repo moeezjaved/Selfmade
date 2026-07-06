@@ -208,8 +208,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           <div style={{flex:1}}/>
 
-          {/* Account pinned bottom */}
-          <RailIcon href="/dashboard" title="Account" active={!melloActive && activeArea.key === 'account'}>
+          {/* Settings pinned bottom — a gear should go to Settings (not the Account/Dashboard area) */}
+          <RailIcon href="/settings" title="Settings" active={!melloActive && pathname === '/settings'}>
             <Settings size={18}/>
           </RailIcon>
         </div>
