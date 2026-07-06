@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation'
 import { useCredits, refreshCredits } from '@/components/credits/CreditCounter'
 import { showUpsell } from '@/components/UpsellModal'
 
-type Brand = { pageId: string; name: string; adCount: number; active: number | null; inactive: number | null; video: number | null; image: number | null; carousel: number | null }
+type Brand = { pageId: string; name: string; adCount: number; active: number | null; inactive: number | null; video: number | null; image: number | null; carousel: number | null; crawled?: boolean }
 
 function tab(active: boolean): React.CSSProperties {
   return { padding: '7px 16px', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none', color: active ? '#111' : '#6b7280', background: active ? 'rgba(223,254,149,0.5)' : '#f3f4f6', border: 'none', cursor: 'pointer' }
@@ -137,11 +137,16 @@ export default function BrandSpyList() {
                   {mResults.map((b) => (
                     <div key={b.pageId} className="bs-mrow" onClick={() => spy({ pageId: b.pageId, name: b.name }, b.pageId)}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize' }}>{b.name || b.pageId}</span>
-                      <span style={{ fontSize: 13, color: '#6b7280' }}>{b.adCount.toLocaleString()} ads</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</span>
+                        {b.crawled
+                          ? <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#16a34a', background: 'rgba(22,163,74,0.1)', padding: '2px 7px', borderRadius: 999 }}>CRAWLED · instant</span>
+                          : <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#6b7280', background: '#f3f4f6', padding: '2px 7px', borderRadius: 999 }}>NEW · will crawl</span>}
+                      </span>
+                      <span style={{ flexShrink: 0, fontSize: 13, color: '#6b7280', marginLeft: 8 }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : ''}</span>
                     </div>
                   ))}
-                  {mQ && mResults.length === 0 && <div style={{ padding: 12, fontSize: 13, color: '#9ca3af' }}>No tracked brand matches — use “Add Manually” to start one.</div>}
+                  {mQ && mResults.length === 0 && <div style={{ padding: 12, fontSize: 13, color: '#9ca3af' }}>No brand matches — use “Add Manually” to spy any Facebook page by URL.</div>}
                 </div>
               </div>
             ) : (
