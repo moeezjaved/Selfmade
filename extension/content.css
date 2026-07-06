@@ -13,6 +13,22 @@
 .sm-save-btn.sm-done { background: #16a34a; color: #fff; }
 .sm-save-btn .sm-ico { font-size: 15px; font-weight: 800; line-height: 1; }
 
+/* Per-card button injected into Facebook Ad Library cards (Atria-style, full-width) */
+.sm-card-btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; box-sizing: border-box; margin: 0 0 8px;
+  padding: 10px 14px; border: none; border-radius: 10px;
+  background: #dffe95; color: #14261a;
+  font: 800 14px/1 'Inter', -apple-system, system-ui, sans-serif;
+  cursor: pointer; box-shadow: 0 2px 8px rgba(20,38,26,.12);
+  transition: background .12s ease, transform .1s ease;
+  z-index: 10; position: relative;
+}
+.sm-card-btn:hover { background: #d2f77e; }
+.sm-card-btn.sm-busy { opacity: .7; cursor: default; }
+.sm-card-btn.sm-done { background: #16a34a; color: #fff; }
+.sm-card-btn .sm-ico { font-size: 16px; font-weight: 900; }
+
 .sm-fab {
   position: fixed; right: 18px; bottom: 18px; z-index: 2147483645;
   width: 46px; height: 46px; border-radius: 50%; border: none;
