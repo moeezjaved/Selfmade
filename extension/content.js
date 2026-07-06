@@ -47,13 +47,27 @@
     for (const s of sels) { const e = scope.querySelector(s); const t = (e?.textContent || '').trim(); if (t) return t.slice(0, max) }
     return ''
   }
+  // The real ad caption is the longest text block in the card, ignoring UI chrome/labels.
+  const LABEL_RE = /^(Sponsored|Active|Inactive|See ad details|See summary details|Library ID|Started running|Platforms|Open Drop-?down|This ad has multiple versions|\d+ ads?\b)/i
+  function longestText(scope, max = 900) {
+    // FB's ad-caption markup shifts (sometimes dir="auto", sometimes a bare span), so key off the
+    // element with the longest OWN text (direct text nodes only) rather than a fixed selector.
+    let best = ''
+    for (const el of scope.querySelectorAll('span, div')) {
+      let own = ''
+      for (const n of el.childNodes) if (n.nodeType === 3) own += n.textContent
+      own = own.trim()
+      if (own.length > best.length && own.length > 25 && !LABEL_RE.test(own)) best = own
+    }
+    return best.slice(0, max)
+  }
   function meta(scope) {
     let brand = '', ad_copy = '', platform = 'web'
     try {
       if (IS_ADLIB) {
         platform = 'facebook'
         brand = textFrom(scope, ['a[href*="facebook.com/"] span', 'a[href*="/"] strong', 'strong span', 'span[dir="auto"] strong'], 120)
-        ad_copy = textFrom(scope, ['div[style*="line-clamp"]', '[data-ad-preview="message"]', 'span[dir="auto"]'], 900)
+        ad_copy = longestText(scope)
       } else if (HOST.includes('instagram.com')) {
         platform = 'instagram'
         const art = scope.closest?.('article') || scope
