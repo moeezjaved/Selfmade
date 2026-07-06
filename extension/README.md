@@ -4,10 +4,15 @@ Save ads from **Instagram, the Facebook Ad Library, TikTok, and any page** strai
 Selfmade boards — the Atria-style "save while you browse" workflow.
 
 ## How it works
-- **Hover** any image or video → a **＋ Save** button appears → click it.
-- Or use the round **Selfmade button** in the bottom-right to grab the main media on the page.
+- **Facebook Ad Library** — a full-width **＋ Save to Selfmade** button is injected into every ad
+  card (Atria-style), so saving is one click, no hover needed.
+- **Instagram / TikTok / anywhere** — **hover** any image or video → a **＋ Save** button appears.
+- Or use the round **Selfmade button** (bottom-right) to grab the main media on the page.
 - Saves land in your **boards** (default: a "🌐 Saved from Web" board; pick another in the popup).
 - Media is copied to Selfmade storage (R2) so it survives Instagram/TikTok CDN expiry.
+
+> ⚠️ Turn off ad blockers on the Facebook Ad Library — they hide/alter the ad DOM and break saving
+> (Atria's extension warns about the same thing).
 
 ## Auth
 One-click SSO: click the toolbar icon → **Sign in with Selfmade**. This opens `tryselfmade.ai`,
