@@ -24,11 +24,18 @@ function Inner() {
   const [err, setErr] = useState('')
 
   useEffect(() => {
+    // getSession() can stall on Supabase's cross-tab navigator lock (multiple app tabs open), which
+    // would freeze this page on "Checking…". Don't block on it: race a short timeout and fall back to
+    // an optimistic "ready" — the actual auth is enforced server-side by /api/extension/token (a real
+    // 401 there flips us to the sign-in view).
+    let done = false
+    const finish = (s: typeof state, e?: string) => { if (done) return; done = true; if (e !== undefined) setEmail(e); setState(s) }
+    const t = setTimeout(() => finish('ready'), 2000)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session?.user) { setState('anon'); return }
-      setEmail(session.user.email || '')
-      setState('ready')
-    })
+      clearTimeout(t)
+      if (session?.user) finish('ready', session.user.email || '')
+      else finish('anon')
+    }).catch(() => { clearTimeout(t); finish('ready') })
   }, [])
 
   const signIn = () => {
@@ -40,6 +47,7 @@ function Inner() {
     setState('connecting'); setErr('')
     try {
       const r = await fetch('/api/extension/token', { method: 'POST' })
+      if (r.status === 401) { setState('anon'); return }   // not actually signed in → show sign-in
       const j = await r.json()
       if (!r.ok || !j.token) throw new Error(j.error || 'Could not create a token')
       if (redirectUri) {
