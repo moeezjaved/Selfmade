@@ -55,7 +55,7 @@ export default async function BlogIndex() {
         <>
           {/* hero */}
           <section style={{ maxWidth: 1160, margin: '0 auto', padding: '4px 24px 8px' }}>
-            <Link href={`/blog/${hero.slug}`} style={{ textDecoration: 'none', color: 'inherit', display: 'grid', gridTemplateColumns: 'minmax(0,1.25fr) minmax(0,1fr)', gap: 30, alignItems: 'center', border: '1px solid rgba(255,255,255,.08)', borderRadius: 22, overflow: 'hidden', background: CARD }}>
+            <Link href={`/blog/${hero.slug}`} style={{ textDecoration: 'none', color: 'inherit', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px,100%),1fr))', gap: 30, alignItems: 'center', border: '1px solid rgba(255,255,255,.08)', borderRadius: 22, overflow: 'hidden', background: CARD }}>
               <div style={{ position: 'relative', aspectRatio: '16/10', ...coverStyle(hero) }}>{!hero.cover_image_url && <CoverText title={hero.title} />}</div>
               <div style={{ padding: '10px 30px 12px 4px' }}>
                 <span style={catStyle(hero)}>{categoryOf(hero)}</span>
@@ -68,7 +68,7 @@ export default async function BlogIndex() {
 
           {/* grid */}
           <section style={{ maxWidth: 1160, margin: '0 auto', padding: '30px 24px 90px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(310px,1fr))', gap: 26 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(310px,100%),1fr))', gap: 26 }}>
               {rest.map((p) => (
                 <Link key={p.slug} href={`/blog/${p.slug}`} style={{ textDecoration: 'none', color: 'inherit', border: '1px solid rgba(255,255,255,.08)', borderRadius: 18, overflow: 'hidden', background: CARD, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ position: 'relative', aspectRatio: '16/9', ...coverStyle(p) }}>{!p.cover_image_url && <CoverText title={p.title} small />}</div>
