@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Selfmade — Save Winning Ads",
+  "version": "1.0.0",
+  "description": "Save ads from Instagram, the Facebook Ad Library, TikTok and any page straight into your Selfmade boards.",
+  "permissions": ["storage", "identity"],
+  "host_permissions": [
+    "https://www.tryselfmade.ai/*",
+    "https://tryselfmade.ai/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  },
+  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["icons/icon48.png"], "matches": ["<all_urls>"] }
+  ]
+}

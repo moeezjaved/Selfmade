@@ -1,0 +1,37 @@
+/* Selfmade extension — injected UI. High z-index + scoped class names to avoid clashing with hosts. */
+.sm-save-btn {
+  position: fixed; z-index: 2147483646;
+  display: none; align-items: center; gap: 6px;
+  padding: 7px 12px; border: none; border-radius: 999px;
+  background: #dffe95; color: #14261a;
+  font: 700 13px/1 'Inter', -apple-system, system-ui, sans-serif;
+  cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.28);
+  transition: transform .12s ease, background .12s ease;
+}
+.sm-save-btn:hover { transform: translateY(-1px); background: #d2f77e; }
+.sm-save-btn.sm-busy { opacity: .7; cursor: default; }
+.sm-save-btn.sm-done { background: #16a34a; color: #fff; }
+.sm-save-btn .sm-ico { font-size: 15px; font-weight: 800; line-height: 1; }
+
+.sm-fab {
+  position: fixed; right: 18px; bottom: 18px; z-index: 2147483645;
+  width: 46px; height: 46px; border-radius: 50%; border: none;
+  background: #14261a; cursor: pointer; padding: 0;
+  box-shadow: 0 6px 20px rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .12s ease;
+}
+.sm-fab:hover { transform: scale(1.06); }
+.sm-fab img { width: 26px; height: 26px; border-radius: 7px; pointer-events: none; }
+
+.sm-toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 20px);
+  z-index: 2147483647; opacity: 0;
+  padding: 11px 18px; border-radius: 12px;
+  font: 600 14px/1.3 'Inter', -apple-system, system-ui, sans-serif;
+  color: #fff; background: #14261a; box-shadow: 0 8px 30px rgba(0,0,0,.35);
+  transition: opacity .25s ease, transform .25s ease; max-width: 80vw;
+}
+.sm-toast.sm-show { opacity: 1; transform: translate(-50%, 0); }
+.sm-toast.sm-err { background: #b3261e; }
+.sm-toast.sm-ok { background: #14261a; }
