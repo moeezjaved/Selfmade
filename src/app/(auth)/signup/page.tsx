@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { isFreeEmail, emailDomain } from '@/lib/email-domains'
+import BusinessEmailModal from '@/components/BusinessEmailModal'
 import toast from 'react-hot-toast'
 
 const LIME = '#dffe95', INK = '#0e1b12'
@@ -15,6 +16,13 @@ export default function SignupPage() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '' })
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [bizModal, setBizModal] = useState<string | null>(null)   // email → show business-email popup
+
+  // A blocked Google sign-in (personal email) bounces here with ?error=business_email — pop the modal.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    if (p.get('error') === 'business_email') setBizModal(p.get('email') || '')
+  }, [])
 
   const emailErr = form.email && !emailDomain(form.email) ? 'Enter a valid email'
     : form.email && isFreeEmail(form.email) ? 'Please use your business (work) email — personal addresses like Gmail aren’t accepted.'
@@ -23,7 +31,7 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!emailDomain(form.email)) { toast.error('Enter a valid email'); return }
-    if (isFreeEmail(form.email)) { toast.error('Please sign up with your business email.'); return }
+    if (isFreeEmail(form.email)) { setBizModal(form.email); return }
     if (form.password.length < 8) { toast.error('Password must be at least 8 characters'); return }
     setLoading(true)
     const { error } = await supabase.auth.signUp({
@@ -79,6 +87,7 @@ export default function SignupPage() {
       </div>
       <p style={S.legal}>Already have an account? <Link href="/login" style={S.link}>Log in</Link></p>
       <p style={{ ...S.legal, marginTop: 6 }}>By signing up, you agree to our <Link href="/terms" style={S.link}>Terms</Link> &amp; <Link href="/privacy" style={S.link}>Privacy Policy</Link></p>
+      {bizModal !== null && <BusinessEmailModal email={bizModal} onClose={() => setBizModal(null)} />}
     </div>
   )
 }
