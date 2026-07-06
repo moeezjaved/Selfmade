@@ -135,7 +135,7 @@ function Overview({ d }: { d: Spy }) {
       </div>
 
       {/* Count tiles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(140px,100%), 1fr))', gap: 12 }}>
         {[['Hooks', c.hooks], ['Ad copy', c.adCopy], ['Headlines', c.headlines], ['Landing pages', c.landingPages]].map(([k, v]) => (
           <div key={k as string} style={{ ...card, padding: 16, textAlign: 'center' }}>
             <div style={{ fontSize: 26, fontWeight: 800, color: '#111' }}>{(v as number).toLocaleString()}</div>
@@ -667,7 +667,7 @@ export default function BrandSpyDetail() {
       </div>
 
       {/* Persistent summary panel */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(140px,100%), 1fr))', gap: 12, marginBottom: 16 }}>
         <Stat k="Total ads" v={s.total.toLocaleString()} sub={s.affiliateCount ? `${(s.ownCount ?? 0).toLocaleString()} own + ${s.affiliateCount.toLocaleString()} affiliate` : undefined} />
         <Stat k="Active" v={s.active.toLocaleString()} sub={`${s.activePct}% live`} />
         <Stat k="Inactive" v={s.inactive.toLocaleString()} sub="taken down" />
