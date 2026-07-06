@@ -103,7 +103,7 @@ export default function ReportsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Overview KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px,100%), 1fr))', gap: 12 }}>
             {[
               { label: 'Total Spend', value: fmt(data.overview?.spend || 0, data.currency), color: '#c0392b' },
               { label: 'Total Revenue', value: fmt(data.overview?.revenue || 0, data.currency), color: '#2d7a2d' },

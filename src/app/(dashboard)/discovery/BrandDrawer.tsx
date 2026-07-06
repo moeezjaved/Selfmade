@@ -180,7 +180,7 @@ function OverviewTab({ data }: { data: BrandData }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px,100%), 1fr))', gap: 12 }}>
         {[
           { icon: '📦', label: 'Total Ads', value: brand.total_ads.toLocaleString(), color: '#1a3a1a' },
           { icon: '🟢', label: 'Active Now', value: brand.active_ads.toLocaleString(), color: '#16a34a' },
