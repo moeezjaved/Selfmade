@@ -77,7 +77,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ brands: filtered, scope: 'mine' })
   }
 
-  // scope=all (directory) → fast crawl_state read (approximate counts; used by the add-modal).
+  // scope=all (directory). When SEARCHING, try the full 611K brand_directory first so uncrawled
+  // brands (e.g. "MOTION") are findable+spyable — crawl_state only holds brands we've already
+  // crawled. Falls back to crawl_state if the directory is empty (not yet imported) or errors.
+  if (q) {
+    const { data: dir, error: dirErr } = await admin
+      .from('brand_directory')
+      .select('page_id, name, source_ad_count')
+      .ilike('name', `%${q}%`)
+      .order('source_ad_count', { ascending: false, nullsFirst: false })
+      .limit(limit)
+    if (!dirErr && dir && dir.length) {
+      return NextResponse.json({
+        brands: dir.map((b: any) => ({
+          pageId: b.page_id, name: b.name || b.page_id, adCount: b.source_ad_count || 0,
+          active: null, inactive: null, video: null, image: null, carousel: null,
+        })),
+      })
+    }
+    // else fall through to the crawl_state search below
+  }
+
+  // fast crawl_state read (approximate counts; used by the add-modal + as directory fallback).
   const build = (cols: string) => {
     let qq = admin.from('discovery_brand_crawl_state').select(cols).order('ads_indexed', { ascending: false, nullsFirst: false }).limit(limit)
     // When SEARCHING a specific brand, show name matches even if ads_indexed is 0/stale (e.g. "hims"

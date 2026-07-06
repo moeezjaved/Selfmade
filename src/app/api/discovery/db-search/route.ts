@@ -334,7 +334,10 @@ export async function GET(request: NextRequest) {
     // Time filter: only ads started within the last N days
     if (days > 0) {
       const sinceDate = new Date(Date.now() - days * 86400000).toISOString()
-      baseQuery = baseQuery.gte('start_date', sinceDate)
+      // Filter by ACTIVITY, not launch date: "ads seen in the last N days" (last_seen is the
+      // default-sort column, so it's indexed). Filtering start_date returned almost nothing since
+      // most winning ads launched months ago.
+      baseQuery = baseQuery.gte('last_seen', sinceDate)
     }
     // GetHookd-parity filters (performance tier, niche, brand volume, run-time,
     // CTA, creative reuse, hide-brands) — rollup-backed, all additive.
@@ -411,10 +414,18 @@ export async function GET(request: NextRequest) {
                                                    // so loadMore fires more often (smoother)
     const fetchOffset = page * fetchLimit           // window-aligned — no overlap, no skip
     baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
-    const { data: keywordData, error: kwErr, count: kwCount } = await baseQuery
+    // Retry once on a statement_timeout (57014) — these are transient under the rollup/drain write
+    // load and were surfacing as the "index was busy" banner after a couple of searches.
+    let keywordData: any = null, kwErr: any = null, kwCount: number | null = null
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = await baseQuery
+      keywordData = r.data; kwErr = r.error; kwCount = r.count
+      if (!kwErr || kwErr.code !== '57014') break
+      await new Promise(res => setTimeout(res, 180))
+    }
 
     if (kwErr) {
-      return NextResponse.json({ ads: [], total: 0, totalInDB, source: 'indexed', searchMethod: 'error' })
+      return NextResponse.json({ ads: [], total: 0, totalInDB, source: 'indexed', searchMethod: 'error', timedOut: true })
     }
 
     // 'recommended' sort = MATCH-TIER first, then quality WITHIN a tier. Once concept

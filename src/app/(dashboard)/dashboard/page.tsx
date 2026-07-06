@@ -474,7 +474,7 @@ export default function DashboardPage() {
                     <tr>
                       <td colSpan={6} className="px-6 py-10 text-center text-sm text-white/30">
                         No campaigns yet.{' '}
-                        <Link href="/ad-engine" className="text-lime font-semibold hover:underline">
+                        <Link href="/m4" className="text-lime font-semibold hover:underline">
                           Launch your first →
                         </Link>
                       </td>
