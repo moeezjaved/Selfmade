@@ -64,7 +64,7 @@ export async function GET() {
     // AND fast; fall back to estimated only if exact errors (e.g. transient load).
     let cc: number | null | undefined
     try {
-      const { count, error } = await admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).eq('has_creative', true)
+      const { count, error } = await racedCount(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }).eq('has_creative', true))
       if (!error) cc = count
     } catch { /* fall through to estimate */ }
     if (cc == null) {
@@ -75,7 +75,7 @@ export async function GET() {
   } catch { /* fall back to legacy estimate below */ }
   let qPending = 0
   try {
-    const { count } = await admin.from('creative_queue').select('*', { count: 'exact', head: true })
+    const { count } = await racedCount(admin.from('creative_queue').select('*', { count: 'exact', head: true }))
     qPending = count ?? 0
   } catch { /* creative_queue absent → 0 */ }
 
@@ -91,8 +91,8 @@ export async function GET() {
   // (asset_type='image', poster_url null, r2_url present). Best-effort — null if unreachable.
   let qThumbBacklog: number | null = null
   try {
-    const { count } = await admin.from('discovery_creatives').select('*', { count: 'exact', head: true })
-      .eq('asset_type', 'image').is('poster_url', null).not('r2_url', 'is', null)
+    const { count } = await racedCount(admin.from('discovery_creatives').select('*', { count: 'exact', head: true })
+      .eq('asset_type', 'image').is('poster_url', null).not('r2_url', 'is', null))
     qThumbBacklog = count ?? null
   } catch { /* discovery_creatives unreachable → null */ }
 
@@ -102,8 +102,8 @@ export async function GET() {
   // from the image thumb backlog above — different worker, different remaining count.
   let qPosterBacklog: number | null = null
   try {
-    const { count } = await admin.from('discovery_creatives').select('*', { count: 'exact', head: true })
-      .eq('asset_type', 'video').is('poster_url', null).not('r2_url', 'is', null)
+    const { count } = await racedCount(admin.from('discovery_creatives').select('*', { count: 'exact', head: true })
+      .eq('asset_type', 'video').is('poster_url', null).not('r2_url', 'is', null))
     qPosterBacklog = count ?? null
   } catch { /* discovery_creatives unreachable → null */ }
 
@@ -118,7 +118,7 @@ export async function GET() {
   // it read "—" instead of failing silently.
   const eCount = async (build: (q: any) => any): Promise<number | null> => {
     try {
-      const { count, error } = await build(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true }))
+      const { count, error } = await racedCount(build(admin.from('discovery_ads_index').select('*', { count: 'exact', head: true })))
       if (!error) return count ?? null
       eErr = eErr || (error.message || String(error))
     } catch (e: any) { eErr = eErr || (e?.message || String(e)) }
@@ -490,15 +490,29 @@ export async function GET() {
   })
 }
 
+// Race a (possibly slow) count query against a short client-side timeout. We raised service_role's
+// statement_timeout to 120s (to let E's writebacks finish) — a side effect is that the exact counts
+// below no longer fail-fast at the old 8s cap, so under heavy crawl-write load they hang this 30s
+// route past its budget and the dashboard spins on "Loading…" forever. Capping each exact count and
+// falling back to the estimate keeps the page rendering. Returns {count:null,error} on timeout so
+// callers take their estimated fallback path. (The abandoned query keeps running server-side up to
+// 120s, but it's one probe per 30s poll — negligible next to the crawl.)
+async function racedCount(p: PromiseLike<any>, ms = 5000): Promise<{ count: number | null; error: any }> {
+  return Promise.race([
+    Promise.resolve(p).then((r: any) => ({ count: r?.count ?? null, error: r?.error ?? null })),
+    new Promise<{ count: null; error: any }>((res) => setTimeout(() => res({ count: null, error: new Error('count timeout') }), ms)),
+  ])
+}
+
 // TOTAL is the headline number, so it must be truthful — NOT the reltuples estimate, which drifts
 // high after brand-culling deletes (it read 3.06M when the exact count was 2.59M). An unfiltered
 // count(*) is a single index/heap scan (~1-2s); if it times out under heavy crawl-write load we fall
 // back to the estimate so the dashboard still renders rather than 504-ing.
 async function exactTotal(admin: any): Promise<number> {
   try {
-    const { count, error } = await admin
+    const { count, error } = await racedCount(admin
       .from('discovery_ads_index')
-      .select('*', { count: 'exact', head: true })
+      .select('*', { count: 'exact', head: true }))
     if (!error && typeof count === 'number' && count > 0) return count
   } catch { /* fall through to the estimate */ }
   return countWhere(admin)
