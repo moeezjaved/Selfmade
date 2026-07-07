@@ -160,6 +160,16 @@ const COUNTRIES = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', '
 // Add the brand to the crawl queue if missing, reactivate if deactivated, and (when
 // forceFresh) reset last_crawled_at so it re-crawls as top priority — a paid spy should
 // pull current, complete data, not whatever stale snapshot we happen to have.
+// Spying a brand also FOLLOWS it → the alert-worker (runs every ~30 min) sends "new ads"
+// notifications for it, and the 6h spy re-crawl keeps its ad set fresh so those alerts fire.
+// Idempotent: one follow per (user, brand). Non-fatal — a follow failure never blocks the spy.
+async function ensureFollowed(admin: ReturnType<typeof createAdminClient>, userId: string, pageId: string, name: string) {
+  try {
+    const { data: ex } = await admin.from('followed_brands').select('id').eq('user_id', userId).eq('page_id', pageId).maybeSingle()
+    if (!ex) await admin.from('followed_brands').insert({ user_id: userId, page_id: pageId, brand_name: name })
+  } catch { /* non-fatal */ }
+}
+
 async function ensureTracked(admin: ReturnType<typeof createAdminClient>, pageId: string, name: string, forceFresh: boolean) {
   const { data: ex } = await admin.from('discovery_crawl_terms').select('page_id, is_active').eq('page_id', pageId).maybeSingle()
   if (ex) {
@@ -192,6 +202,7 @@ export async function POST(req: NextRequest) {
     .limit(1).maybeSingle()
   if (prior) {
     await ensureTracked(admin, pageId, name, false)
+    await ensureFollowed(admin, user.id, pageId, name)
     return NextResponse.json({ pageId, charged: false, alreadySpied: true })
   }
 
@@ -210,6 +221,7 @@ export async function POST(req: NextRequest) {
   try {
     if (cost && cost > 0) { const tx = await reserveCredits(admin, user.id, ACTION, pageId); txId = tx.id }
     await ensureTracked(admin, pageId, name, true)
+    await ensureFollowed(admin, user.id, pageId, name)
     if (txId) await commitCredits(admin, txId, { page_id: pageId })
     return NextResponse.json({ pageId, charged: !!txId, cost: cost || 0 })
   } catch (e) {
