@@ -19,12 +19,12 @@ import os from 'node:os'
 import { config } from './config.js'
 import {
   claimAds,
-  dequeue,
+  dequeueMany,
   getQueueDepth,
   writeHeartbeat,
   findExistingByHash,
   saveCreatives,
-  markExtractionFailed,
+  markExtractionFailedMany,
   supabase,
   AdRow,
   CreativeInsert,
@@ -55,6 +55,7 @@ interface ProcessResult {
   bytes_droplet?: number   // bytes consumed via droplet direct (videos only)
   error?: string
   terminal?: boolean       // give-up (marked failed) → dequeue, don't retry. transient (timeout/exception) leaves it queued for the 3-min stale reclaim.
+  creatives?: CreativeInsert[]  // (success only) rows to persist — buffered + bulk-upserted by the batched writer, not written inline per-ad.
 }
 
 /**
@@ -130,7 +131,7 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
   const videoUrls = ad.raw_video_urls || []
 
   if (imageUrls.length === 0 && videoUrls.length === 0) {
-    await markExtractionFailed(ad.ad_id)
+    // terminal fail → marked failed in a batched UPDATE by the writer, not inline here
     return { ad_id: ad.ad_id, ok: false, terminal: true, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: empty raw URL arrays' }
   }
 
@@ -144,8 +145,7 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
   if (images.length === 0 && videos.length === 0) {
     // All raw URLs returned placeholders — could be: ad expired between
     // indexing and download, IPRoyal session blocked by Meta, or the ad
-    // is in a state where Meta now gates everything. Mark failed.
-    await markExtractionFailed(ad.ad_id)
+    // is in a state where Meta now gates everything. Mark failed (batched).
     return { ad_id: ad.ad_id, ok: false, terminal: true, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: all placeholders → marked failed' }
   }
 
@@ -170,7 +170,7 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
   })
 
   if (creatives.length === 0) {
-    await markExtractionFailed(ad.ad_id)
+    // terminal fail → batched markExtractionFailed by the writer
     return { ad_id: ad.ad_id, ok: false, terminal: true, imageCount: 0, videoCount: 0, dedupedCount: 0, error: 'fast_path: r2 upload failed' }
   }
 
@@ -212,8 +212,9 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
   // STOP here. We no longer UPDATE discovery_ads_index (thumbnail_url/video_url/
   // image_hash/video_hash) per ad — that ~50K/hr UPDATE on a 23-index table was the
   // dead-tuple churn that bloated the DB and capped crawl+drain. Serving now reads
-  // creatives from discovery_creatives. The consumer dequeues this ad on success.
-  await saveCreatives(creatives)
+  // creatives from discovery_creatives. We return the creatives here; the batched
+  // writer (runStream) bulk-upserts them + dequeues this ad in one round-trip — no
+  // per-ad COMMIT, to collapse the drain's fsync storm.
 
   const imageCount = imageResults.filter((r) => r.url).length
   const videoCount = videoResults.filter((r) => r.url).length
@@ -229,6 +230,7 @@ async function processAdFastPath(ad: AdRow): Promise<ProcessResult> {
     dedupedCount,
     bytes_proxy: bytes_proxy_total,
     bytes_droplet: bytes_droplet_total,
+    creatives,
   }
 }
 
@@ -272,6 +274,49 @@ async function runStream(isStopping: () => boolean): Promise<void> {
   // rolling-window counters, flushed to telemetry every 30s
   let wImg = 0, wVid = 0, wDed = 0, wProxy = 0, wDroplet = 0, wOk = 0, wCount = 0
 
+  // ── BATCHED WRITE-BACK ─────────────────────────────────────────────────────
+  // Consumers no longer COMMIT per ad. They append to these buffers; the writer
+  // loop flushes them in bulk (one upsert + one delete + one update per flush)
+  // every FLUSH_MS or when the buffer fills. Collapses ~2 fsync'd commits/ad into
+  // ~3 round-trips per ~FLUSH_AT ads → the commit-bound drain speeds up with ZERO
+  // durability loss (unlike synchronous_commit=off). Re-processing a not-yet-flushed
+  // ad is impossible within the window: claim_creative_queue has a 3-min stale reclaim.
+  const FLUSH_AT = Number(process.env.WORKER_FLUSH_AT || 100)   // flush when this many ads are pending
+  const FLUSH_MS = Number(process.env.WORKER_FLUSH_MS || 1500)  // …or at least this often
+  let pendingCreatives: CreativeInsert[] = []
+  let pendingDequeue: string[] = []   // ad_ids to DELETE from creative_queue (terminal: ok or give-up)
+  let pendingFailed: string[] = []    // ad_ids to mark creative_extraction_failed_at (give-up only)
+
+  async function flushWrites(): Promise<void> {
+    // Snapshot + clear synchronously so concurrent consumer pushes land in fresh buffers.
+    const creatives = pendingCreatives; pendingCreatives = []
+    const dequeueIds = pendingDequeue; pendingDequeue = []
+    const failedIds = pendingFailed;   pendingFailed = []
+    if (creatives.length === 0 && dequeueIds.length === 0 && failedIds.length === 0) return
+    try {
+      // Order matters: persist creatives BEFORE dequeuing, so a crash mid-flush leaves
+      // the ad in the queue (re-processed idempotently) rather than lost.
+      if (creatives.length) await saveCreatives(creatives)
+      if (failedIds.length) await markExtractionFailedMany(failedIds)
+      if (dequeueIds.length) await dequeueMany(dequeueIds)
+    } catch (e: any) {
+      // Flush failed → leave ads in the queue (not dequeued) for the 3-min stale reclaim.
+      console.warn(`[writer] flush failed (${dequeueIds.length} ads): ${e?.message ?? e}`)
+    }
+  }
+
+  async function writer() {
+    while (!isStopping()) {
+      // fast path: flush early if the buffer is filling, else tick on FLUSH_MS
+      const start = Date.now()
+      while (Date.now() - start < FLUSH_MS && pendingDequeue.length < FLUSH_AT && !isStopping()) {
+        await sleep(100)
+      }
+      await flushWrites()
+    }
+    await flushWrites()  // final drain on shutdown
+  }
+
   async function producer() {
     while (!isStopping()) {
       await waitIfPaused()
@@ -311,10 +356,17 @@ async function runStream(isStopping: () => boolean): Promise<void> {
       } finally {
         claimed.delete(ad.ad_id)
       }
-      // Dequeue on a TERMINAL result (success or give-up). Transient failures
-      // (timeout / unexpected exception) are left in the queue → re-claimed after the
-      // 3-min stale window, so a blip never loses an ad.
-      if (result.ok || result.terminal) await dequeue(ad.ad_id).catch(() => {})
+      // Buffer the write-back on a TERMINAL result (success or give-up); the writer
+      // loop flushes in bulk. Transient failures (timeout / unexpected exception) are
+      // left un-buffered → the row stays in the queue → re-claimed after the 3-min stale
+      // window, so a blip never loses an ad.
+      if (result.ok) {
+        if (result.creatives?.length) pendingCreatives.push(...result.creatives)
+        pendingDequeue.push(ad.ad_id)
+      } else if (result.terminal) {
+        pendingFailed.push(ad.ad_id)
+        pendingDequeue.push(ad.ad_id)
+      }
       const dt = ((Date.now() - t0) / 1000).toFixed(1)
       const dedupTag = result.dedupedCount > 0 ? ` ♻️${result.dedupedCount}` : ''
       console.log(`  ${result.ok ? '✅' : '❌'} ${ad.ad_id} (${dt}s) ${result.ok ? `${result.imageCount}img+${result.videoCount}vid${dedupTag}` : (result.error || 'unknown')}`)
@@ -349,7 +401,7 @@ async function runStream(isStopping: () => boolean): Promise<void> {
     }
   }
 
-  await Promise.all([producer(), flusher(), ...Array.from({ length: config.concurrency }, () => consumer())])
+  await Promise.all([producer(), flusher(), writer(), ...Array.from({ length: config.concurrency }, () => consumer())])
 }
 
 // Cooperative write-pause: back off while the nightly rollup holds `crawl_paused`,

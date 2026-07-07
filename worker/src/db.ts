@@ -89,6 +89,34 @@ export async function dequeue(adId: string): Promise<void> {
   }
 }
 
+/**
+ * Batched dequeue — DELETE many creative_queue rows in ONE round-trip (one COMMIT)
+ * instead of one-DELETE-per-ad. Collapses the drain's fsync storm: with N consumers
+ * each doing a per-ad DELETE, we were paying ~1 fsync per ad; batching a flush window
+ * of ~100 ads turns that into ~1 fsync per 100. Safe because claim_creative_queue uses
+ * a 3-min stale-reclaim window, so a not-yet-deleted claimed row is never re-handed out
+ * inside the sub-second flush interval. No durability trade-off (unlike synchronous_commit=off).
+ */
+export async function dequeueMany(adIds: string[]): Promise<void> {
+  if (adIds.length === 0) return
+  const { error } = await (supabase as any).from('creative_queue').delete().in('ad_id', adIds)
+  if (error && !/relation .*creative_queue.* does not exist|PGRST205|404/i.test(error.message || '')) {
+    console.warn(`  ⚠️  dequeueMany failed (${adIds.length} ads):`, error.message)
+  }
+}
+
+/**
+ * Batched terminal-failure mark — one UPDATE for many ads instead of one-per-ad.
+ */
+export async function markExtractionFailedMany(adIds: string[]): Promise<void> {
+  if (adIds.length === 0) return
+  const { error } = await (supabase as any)
+    .from('discovery_ads_index')
+    .update({ creative_extraction_failed_at: new Date().toISOString() })
+    .in('ad_id', adIds)
+  if (error) console.warn(`  ⚠️  markExtractionFailedMany (${adIds.length} ads):`, error.message)
+}
+
 export async function updateAdCreative(
   adId: string,
   thumbnailUrl: string | null,

@@ -126,15 +126,34 @@ export async function propagateClassification(copySig: string, c: any): Promise<
     topics: normalizeTopics(c.topics),
     ai_classified: true,
   }
-  // One UPDATE fans the tags out to every ad sharing this copy. MUST include is_classifiable=true:
-  // idx_ads_copy_sig is a PARTIAL index (WHERE is_classifiable), so without this predicate the planner
-  // can't use it and falls back to a SEQ SCAN over the whole table → statement timeout → 0 rows written
-  // (which silently froze E for a whole session). Every target ad is is_classifiable anyway (the gate
-  // selects on it), so this only makes the index usable — no semantic change.
-  const { error } = await (supabase as any).from('discovery_ads_index')
-    .update(update).eq('copy_sig', copySig).eq('is_classifiable', true)
-  if (error) { console.warn(`  ⚠️ propagate ${copySig.slice(0, 12)} failed: ${error.message}`); return 0 }
-  return 1
+  // CHUNKED fan-out. A single `UPDATE … WHERE copy_sig=$1` rewrites EVERY ad sharing this
+  // copy in one statement — for the biggest buckets (one popular copy shared by tens of
+  // thousands of ads) that touches 10s of thousands of rows × ~23 indexes and blows past
+  // statement_timeout → 0 rows written → E silently freezes. Instead we keyset-page the
+  // bucket by ad_id and UPDATE in bounded chunks, so every statement finishes fast
+  // regardless of bucket size or concurrent DB load. Idempotent; re-running is safe.
+  //
+  // MUST keep the is_classifiable=true predicate: idx_ads_copy_sig is a PARTIAL index
+  // (WHERE is_classifiable), so dropping it forces a SEQ SCAN. Every target ad is
+  // is_classifiable anyway (the gate selects on it) — this only keeps the index usable.
+  const CHUNK = 1500
+  let cursor = '0'            // ad_id keyset cursor (works for text or bigint: all ids sort > '0')
+  let total = 0
+  for (;;) {
+    const { data, error: selErr } = await (supabase as any).from('discovery_ads_index')
+      .select('ad_id')
+      .eq('copy_sig', copySig).eq('is_classifiable', true)
+      .gt('ad_id', cursor).order('ad_id', { ascending: true }).limit(CHUNK)
+    if (selErr) { console.warn(`  ⚠️ propagate ${copySig.slice(0, 12)} select failed: ${selErr.message}`); break }
+    if (!data || data.length === 0) break
+    const ids = data.map((r: any) => r.ad_id)
+    const { error: updErr } = await (supabase as any).from('discovery_ads_index').update(update).in('ad_id', ids)
+    if (updErr) { console.warn(`  ⚠️ propagate ${copySig.slice(0, 12)} chunk failed: ${updErr.message}`); break }
+    total += ids.length
+    cursor = ids[ids.length - 1]
+    if (data.length < CHUNK) break
+  }
+  return total > 0 ? 1 : 0
 }
 
 /**
