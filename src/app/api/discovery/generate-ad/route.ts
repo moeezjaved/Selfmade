@@ -8,7 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { generateImage, buildStudioPrompt, geminiEnabled } from '@/lib/gemini/image'
+import { generateImage, buildStudioPrompt, geminiEnabled, geminiImageMime } from '@/lib/gemini/image'
 import { saveGeneration } from '@/lib/creatives'
 import { resolveBrandNiche, getNicheInsights } from '@/lib/studio/insights'
 import { pickInspirations } from '@/lib/studio/inspiration'
@@ -23,7 +23,11 @@ async function fetchImageB64(url: string): Promise<{ mimeType: string; dataB64: 
     const r = await fetch(url)
     if (!r.ok) return null
     const buf = Buffer.from(await r.arrayBuffer())
-    return { mimeType: r.headers.get('content-type') || 'image/jpeg', dataB64: buf.toString('base64') }
+    // Drop images Gemini can't ingest (e.g. an SVG logo) BEFORE they're counted, so the prompt's
+    // image indices (inspirations/products/logo) stay aligned with what's actually sent.
+    const mimeType = geminiImageMime(r.headers.get('content-type'), buf)
+    if (!mimeType) return null
+    return { mimeType, dataB64: buf.toString('base64') }
   } catch { return null }
 }
 
@@ -87,9 +91,10 @@ async function handle(req: NextRequest) {
     // we can auto-detect the niche from the product when the brand has no industry set.
     const products = (await Promise.all(rawProducts.slice(0, 3).map(async (src) => {
       const m = /^data:([^;]+);base64,([\s\S]*)$/i.exec(src)
-      if (m) return { mimeType: m[1] || productMimeType || 'image/png', dataB64: m[2] }
+      if (m) { const mime = geminiImageMime(m[1] || productMimeType, Buffer.from(m[2], 'base64')); return mime ? { mimeType: mime, dataB64: m[2] } : null }
       if (/^https?:\/\//i.test(src)) return await fetchImageB64(src)
-      return { mimeType: productMimeType || 'image/png', dataB64: src.replace(/^data:[^;]+;base64,/, '') }
+      const raw = src.replace(/^data:[^;]+;base64,/, ''); const mime = geminiImageMime(productMimeType, Buffer.from(raw, 'base64'))
+      return mime ? { mimeType: mime, dataB64: raw } : null
     }))).filter(Boolean) as { mimeType: string; dataB64: string }[]
     if (products.length === 0) { await refund(); return NextResponse.json({ error: 'could not load product image(s)' }, { status: 502 }) }
 
