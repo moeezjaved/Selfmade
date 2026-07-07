@@ -1,6 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000 }
+    { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000 },
+    { "name": "bugshield", "runtimeExecutable": "node", "runtimeArgs": ["/Users/hamzaharron/Downloads/bugshield-pk/server.js"], "port": 4321 }
   ]
 }

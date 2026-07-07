@@ -25,8 +25,9 @@ class MasonryBoundary extends Component<{ children: ReactNode }, { k: number; er
     return <Fragment key={this.state.k}>{this.props.children}</Fragment>
   }
 }
-import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download, Copy } from 'lucide-react'
+import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download, Copy, Film } from 'lucide-react'
 import CloneModal from './CloneModal'
+import CloneVideoModal from './CloneVideoModal'
 import { useRouter } from 'next/navigation'
 import BrandDrawer from './BrandDrawer'
 
@@ -819,6 +820,7 @@ const cdnSrcSet = (url: string) =>
 function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: string; iframeVisible: boolean }) {
   const router = useRouter()
   const [cloneOpen, setCloneOpen] = useState(false)
+  const [videoCloneOpen, setVideoCloneOpen] = useState(false)
   // Build slide list: prefer creatives[] (full carousel), fall back to legacy single image/video
   type Slide = { type: 'image' | 'video'; url: string; width?: number | null; height?: number | null; poster?: string | null }
   const slides: Slide[] = useMemo(() => {
@@ -881,6 +883,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   return (
     <>
     {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName }} onClose={() => setCloneOpen(false)} />}
+    {videoCloneOpen && <CloneVideoModal sourceAdId={ad.id} sourcePoster={slide?.poster || undefined} onClose={() => setVideoCloneOpen(false)} />}
     <div
       className="ad-card-visual"
       onClick={() => router.push(`/discovery/${ad.id}`)}
@@ -1024,9 +1027,8 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         className="hover-overlay"
         style={{
           position: 'absolute', inset: 0,
-          // Gradient only on images (it's the backdrop for the Clone-ad pill); video has no clone
-          // button, so keep its hover clean — just the Scripts menu, no shadow.
-          background: slide.type === 'video' ? 'transparent' : 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.30) 26%, rgba(0,0,0,0) 52%)',
+          // Bottom gradient backs the Clone pill on both images (Clone ad) and videos (Clone video).
+          background: 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.30) 26%, rgba(0,0,0,0) 52%)',
           display: playing ? 'none' : 'flex',
           alignItems: 'flex-end',
           justifyContent: 'flex-start',
@@ -1038,9 +1040,24 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         }}
       >
         {slide.type === 'video' && (
+          <>
           <div style={{ position: 'absolute', top: 10, left: 10, pointerEvents: 'auto' }}>
             <ScriptsMenu />
           </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); setVideoCloneOpen(true) }}
+            style={{
+              pointerEvents: 'auto', background: '#dffe95', color: '#14281a', border: 'none',
+              padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em',
+              cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
+          >
+            <Film size={14} strokeWidth={2.4} /> Clone video
+          </button>
+          </>
         )}
         {slide.type !== 'video' && (
         <button
