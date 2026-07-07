@@ -32,7 +32,7 @@ export default function CloneVideoModal({ sourceAdId, sourcePoster, onClose }: {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
 
-  const cost = tier === 'premium' ? 150 : 90
+  const cost = tier === 'premium' ? 70 : 45
 
   useEffect(() => {
     fetch('/api/brands').then(r => r.json()).then((j) => {
