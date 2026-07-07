@@ -189,6 +189,20 @@ async function pickNextBrand(exclude: Set<string>): Promise<BrandRow | null> {
     .limit(batch)
   for (const b of (never || []) as BrandRow[]) if (!exclude.has(b.page_id)) return b
 
+  // SPIED brands due for a ~6h REFRESH — tracked brands re-crawl every 6h, ahead of the general
+  // population, so their ad set stays current and drives new-ad alerts (mirrors claim_next_brand tier 2).
+  const spyRefresh = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+  const { data: spiedDue } = await (supabase as any)
+    .from('discovery_crawl_terms')
+    .select('page_id, term, last_crawled_at')
+    .eq('is_active', true)
+    .not('page_id', 'is', null)
+    .gte('priority', 9)
+    .lte('last_crawled_at', spyRefresh)
+    .order('last_crawled_at', { ascending: true })
+    .limit(batch)
+  for (const b of (spiedDue || []) as BrandRow[]) if (!exclude.has(b.page_id)) return b
+
   // Otherwise the oldest ones past the gap
   const { data: aged } = await (supabase as any)
     .from('discovery_crawl_terms')
