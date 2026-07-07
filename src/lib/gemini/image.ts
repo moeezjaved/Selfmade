@@ -20,13 +20,33 @@ export function modelFor(tier: 'default' | 'pro') { return tier === 'pro' ? MODE
 export type ImageInput = { mimeType: string; dataB64: string }
 export type GenResult = { ok: true; mimeType: string; dataB64: string } | { ok: false; error: string }
 
+// Gemini's image models only accept these raster input types. SVG (image/svg+xml) — common for
+// brand logos — and other vector/exotic types 400 the whole generateContent call, so callers must
+// filter/normalize to this set. Returns the normalized mime, or null if unusable (→ drop the image).
+const GEMINI_IMG_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif'])
+export function geminiImageMime(raw?: string | null, head?: Buffer): string | null {
+  let m = (raw || '').split(';')[0].trim().toLowerCase()
+  if (m === 'image/jpg') m = 'image/jpeg'
+  if (GEMINI_IMG_MIME.has(m)) return m
+  if (m.startsWith('image/')) return null                 // explicit unsupported (svg/gif/bmp/tiff/avif…)
+  if (head && head.length > 8) {                          // generic/unknown (octet-stream, missing) → sniff
+    const s = head.subarray(0, 64).toString('utf8').toLowerCase()
+    if (head[0] === 0x3c /* '<' */ || s.includes('<svg') || s.includes('<?xml')) return null  // SVG/XML text
+    return 'image/jpeg'                                   // assume a mislabeled raster
+  }
+  return null
+}
+
 /**
  * Generate/edit an image from a text prompt + N reference images (e.g. [winning ad, product photo]).
  * Returns the first image part (base64). The caller uploads it to R2.
  */
 export async function generateImage(prompt: string, images: ImageInput[], tier: 'default' | 'pro' = 'default', opts?: { aspectRatio?: string; imageSize?: string }): Promise<GenResult> {
   if (!KEY) return { ok: false, error: 'GEMINI_API_KEY not set' }
-  const parts: any[] = [{ text: prompt }, ...images.map((i) => ({ inline_data: { mime_type: i.mimeType, data: i.dataB64 } }))]
+  // Safety net: strip any image whose MIME Gemini can't ingest (e.g. an SVG logo) so one bad
+  // input never 400s the whole request. Callers should filter earlier to keep prompt indices aligned.
+  const safeImages = images.filter((i) => geminiImageMime(i.mimeType) !== null)
+  const parts: any[] = [{ text: prompt }, ...safeImages.map((i) => ({ inline_data: { mime_type: geminiImageMime(i.mimeType) || i.mimeType, data: i.dataB64 } }))]
   const generationConfig: any = { responseModalities: ['IMAGE'] }
   // Lower temperature → more faithful to the reference/product (less "creative" drift). Env-tunable.
   const temp = parseFloat(process.env.GEMINI_IMAGE_TEMP || '0.35')
