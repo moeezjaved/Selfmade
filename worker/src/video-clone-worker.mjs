@@ -185,10 +185,20 @@ async function generateJob(job) {
     let refVideo = null
     if (job.source_video_url) { try { refVideo = await trimReference(job.source_video_url, job.id) } catch (e) { console.warn('trim ref:', e.message) } }
 
-    const { videoUrl, requestId } = await falGenerate({
-      prompt, imageUrls: productImages, videoUrl: refVideo,
-      resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier,
-    })
+    // Try WITH the video as a motion reference. fal blocks reference videos that contain real people
+    // (likeness policy) — which is nearly every UGC ad — so on a content_policy_violation we retry
+    // WITHOUT the video: Gemini's beat sheet already grounds the prompt in the ad's structure/hook,
+    // and Seedance generates a fresh (non-real) creator. Product-only/no-people videos keep the motion ref.
+    const genArgs = { prompt, imageUrls: productImages, resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier }
+    let videoUrl, requestId
+    try {
+      ({ videoUrl, requestId } = await falGenerate({ ...genArgs, videoUrl: refVideo }))
+    } catch (e) {
+      if (refVideo && /content_policy_violation|likeness|real people/i.test(e.message)) {
+        console.warn(`ref video blocked (likeness) for ${job.id} — retrying prompt-only`)
+        ;({ videoUrl, requestId } = await falGenerate({ ...genArgs, videoUrl: null }))
+      } else throw e
+    }
 
     const dl = await fetch(videoUrl)
     if (!dl.ok) throw new Error(`download result ${dl.status}`)
