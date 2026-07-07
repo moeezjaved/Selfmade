@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { persistImagesToR2 } from '@/lib/brand-photos'
 import { sendFirstBrandEmail } from '@/lib/email'
+import { getPlanId } from '@/lib/entitlements'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,16 +42,17 @@ export async function GET() {
 // A user's brand slots are capped by their plan (trial 1, core 3, plus 10, business unlimited).
 // Returns { used, limit } so the UI can show "2 / 3 brands". limit -1 = unlimited.
 async function brandQuota(admin: ReturnType<typeof createAdminClient>, userId: string) {
-  const [{ data: prof }, { count }] = await Promise.all([
-    admin.from('user_profiles').select('plan_id').eq('id', userId).maybeSingle(),
+  // Resolve the plan the SAME way the rest of the app does: getPlanId reads an ACTIVE subscription
+  // first, then falls back to user_profiles.plan_id. The old code read user_profiles.plan_id directly
+  // — so a paying user whose subscription hadn't synced to their profile (row missing / stale
+  // plan_id) was silently capped at the default limit of 1, and a 2nd brand save 402'd invisibly.
+  const [planId, { count }] = await Promise.all([
+    getPlanId(admin as any, userId),
     admin.from('brands').select('id', { count: 'exact', head: true }).eq('user_id', userId),
   ])
   let limit = 1
-  const planId = (prof as any)?.plan_id
-  if (planId) {
-    const { data: plan } = await admin.from('plans').select('brand_limit').eq('id', planId).maybeSingle()
-    if (plan && typeof (plan as any).brand_limit === 'number') limit = (plan as any).brand_limit
-  }
+  const { data: plan } = await admin.from('plans').select('brand_limit').eq('id', planId).maybeSingle()
+  if (plan && typeof (plan as any).brand_limit === 'number') limit = (plan as any).brand_limit
   return { used: count || 0, limit }
 }
 
