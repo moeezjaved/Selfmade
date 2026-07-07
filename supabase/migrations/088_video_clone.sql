@@ -25,13 +25,14 @@ CREATE INDEX IF NOT EXISTS idx_cg_video_clone_queue
   WHERE type = 'video_clone' AND status = 'processing';
 
 -- ── Billable action ──────────────────────────────────────────────────────────
--- Video clone is FAR more expensive than the other actions (real fal $ per generation: ~$2.70 for a
--- 15s 720p premium reference-to-video with the video-input discount, vs a near-free ffmpeg animate).
--- Price MUST cover that with margin. 150 is a PLACEHOLDER — tune it to the real credit→$ ratio + the
--- desired markup before launch (see [[project_business_strategy]] pricing).
+-- Priced for a ≥100% profit floor (2× fal cost) even at the CHEAPEST credit rate the user can buy
+-- (large top-up = $119/2000 ≈ $0.06/credit). fal cost @ 720p·10s with the video-input ×0.6 discount:
+-- premium ≈ $1.87, fast ≈ $1.15. 70/45 credits × $0.06 ≈ $4.20/$2.70 revenue → ~123%/135% margin floor;
+-- on PLAN credits ($0.12–0.26 each) the margin is far higher. Re-tune if we ship 1080p or 15s defaults
+-- (those cost materially more). See [[project_business_strategy]] + [[project_video_clone]].
 INSERT INTO credit_pricing (action_type, label, credits, is_active) VALUES
-  ('video_clone',      'Video clone — Seedance premium (competitor ad → your product)', 150, true),
-  ('video_clone_fast', 'Video clone — Seedance fast (cheaper, quicker)',                90,  true)
+  ('video_clone',      'Video clone — Seedance premium (competitor ad → your product)', 70, true),
+  ('video_clone_fast', 'Video clone — Seedance fast (cheaper, quicker)',                45, true)
 ON CONFLICT (action_type) DO UPDATE
   SET label = excluded.label, credits = excluded.credits, is_active = true;
 
