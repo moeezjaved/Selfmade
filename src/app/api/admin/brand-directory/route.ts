@@ -22,8 +22,13 @@ async function authed() {
 
 export async function GET() {
   if (!(await authed())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Use an EXACT count, not 'planned'. The planned estimate comes from pg statistics and lags
+  // reality until ANALYZE runs, so the admin "In directory" number looked frozen right after an
+  // import (the client re-fetches on import-complete, but got the stale estimate). brand_directory
+  // is small (~65K rows) → exact count is sub-100ms; the 'exact'-times-out concern only applies to
+  // the millions-row discovery_* tables.
   const { count, error } = await createAdminClient()
-    .from('brand_directory').select('*', { count: 'planned', head: true })
+    .from('brand_directory').select('*', { count: 'exact', head: true })
   if (error) {
     if (isMissingTable(error)) return NextResponse.json({ count: 0 })   // migration 049 pending
     return NextResponse.json({ error: error.message }, { status: 400 })
