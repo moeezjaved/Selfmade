@@ -15,6 +15,10 @@
  *      R2_* (ACCOUNT_ID/ACCESS_KEY_ID/SECRET_ACCESS_KEY/BUCKET_NAME/PUBLIC_URL).
  */
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { spawn } from 'node:child_process'
+import { readFile, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const U = (process.env.SUPABASE_URL || '').split('\n')[0].replace(/\/$/, '')
 const K = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -89,6 +93,40 @@ Return ONLY minified JSON: {"prompt":"","script":""}  (script = the exact voiceo
   return { prompt: String(out.prompt), script: String(out.script || forcedScript || '') }
 }
 
+// ── Trim the competitor video to fal's reference limits (≤15.1s, 480-720p) ────
+// Seedance rejects reference videos over ~15s or above 720p. Ad videos routinely exceed both, so we
+// take the first 14s (where the hook lives) and cap the longer side at 1280 (→ 720p for 9:16), then
+// re-host the trimmed clip on R2 for fal to fetch. ffmpeg is on the worker image (animate-worker uses it).
+function ff(args) {
+  return new Promise((resolve, reject) => {
+    const p = spawn('ffmpeg', args)
+    let err = ''
+    p.stderr.on('data', (d) => { err += d.toString() })
+    p.on('close', (code) => code === 0 ? resolve() : reject(new Error(`ffmpeg ${code}: ${err.slice(-300)}`)))
+    p.on('error', reject)
+  })
+}
+async function trimReference(url, id) {
+  const base = join(tmpdir(), `ref-${id}`)
+  const inFile = `${base}.in.mp4`, outFile = `${base}.out.mp4`
+  try {
+    const r = await fetch(url)
+    if (!r.ok) throw new Error(`fetch ref ${r.status}`)
+    await writeFile(inFile, Buffer.from(await r.arrayBuffer()))
+    // first 14s; cap longer side at 1280 (shorter → ≤720); yuv420p h264 for compatibility.
+    await ff(['-y', '-i', inFile, '-t', '14',
+      '-vf', "scale='if(gt(iw,ih),1280,-2)':'if(gt(iw,ih),-2,1280)'",
+      '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', outFile])
+    const mp4 = await readFile(outFile)
+    const key = `creatives/tmp/${id}-ref.mp4`
+    await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=86400' }))
+    return `${R2_PUBLIC}/${key}`
+  } finally {
+    await rm(inFile, { force: true }).catch(() => {})
+    await rm(outFile, { force: true }).catch(() => {})
+  }
+}
+
 // ── fal Seedance 2.0 reference-to-video (queue REST) ──────────────────────────
 async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, aspect, tier }) {
   const model = tier === 'fast' ? 'bytedance/seedance-2.0/fast/reference-to-video' : 'bytedance/seedance-2.0/reference-to-video'
@@ -109,7 +147,7 @@ async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, 
     if (st.status === 'FAILED' || st.status === 'ERROR') throw new Error(`fal job ${st.status}`)
   }
   const rr = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
-  if (!rr.ok) throw new Error(`fal result ${rr.status}`)
+  if (!rr.ok) throw new Error(`fal result ${rr.status}: ${(await rr.text()).slice(0, 220)}`)
   const data = await rr.json()
   const url = data?.video?.url || data?.data?.video?.url
   if (!url) throw new Error('fal returned no video url')
@@ -143,8 +181,12 @@ async function generateJob(job) {
     const finalScript = meta.final_script || meta.script || ''
     const { prompt, script } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, finalScript)
 
+    // Trim the competitor clip to fal's ≤15s / ≤720p reference limits (raw ad videos exceed them).
+    let refVideo = null
+    if (job.source_video_url) { try { refVideo = await trimReference(job.source_video_url, job.id) } catch (e) { console.warn('trim ref:', e.message) } }
+
     const { videoUrl, requestId } = await falGenerate({
-      prompt, imageUrls: productImages, videoUrl: job.source_video_url,
+      prompt, imageUrls: productImages, videoUrl: refVideo,
       resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier,
     })
 
