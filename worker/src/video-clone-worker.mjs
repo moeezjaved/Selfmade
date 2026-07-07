@@ -77,7 +77,7 @@ async function buildSeedancePrompt(beat, product, nImages, forcedScript) {
 a real-looking creator talks straight to the phone camera and delivers the script out loud. Rules:
 - ONE dense paragraph: subject (the on-camera creator) → they SPEAK to camera → action/product → camera → lighting → mood, then a short beat-by-beat timeline.
 - The creator must be SPEAKING ALOUD to the viewer, lips moving in sync — NOT a silent scene, NOT b-roll with background music. Describe their mouth moving, natural gestures, eye contact with the lens.
-- Reference the user's product images by their tokens (${refList || 'none'}) — the creator holds/shows the product as they talk.
+- PRODUCT IS THE HERO — the creator physically HOLDS the user's product (${refList || 'the product'}) in their hand for MOST of the clip: brings it up to the lens, turns it, and actively USES/demonstrates it across several beats (e.g. takes a puff / applies it / shows how it works), then a close-up of it in-hand. Do NOT show a single static product shot — it must be handled and in-use throughout, and match ${refList || 'the product'} exactly.
 - Keep the SAME structure/pacing/hook as the reference ad, swap in the user's product.
 - UGC realism: iPhone selfie, arm's length, natural light, authentic handheld, no on-screen captions/subtitles.
 ${forcedScript ? '- CRITICAL — the creator says these EXACT words aloud to camera, lip-synced, word for word: "' + forcedScript.replace(/"/g, "'") + '". Weave "she says to camera: …" into the prompt so the model generates spoken dialogue, not narration.' : '- The creator speaks a natural spoken line to camera; put the exact words in the script field.'}
