@@ -73,13 +73,15 @@ async function analyzeVideo(videoUrl) {
 // APPROVED/edited voiceover) the prompt is built around EXACTLY that script. ──
 async function buildSeedancePrompt(beat, product, nImages, forcedScript) {
   const refList = Array.from({ length: nImages }, (_, i) => `@Image${i + 1}`).join(', ')
-  const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). Rules:
-- ONE dense paragraph: subject → action → camera → lighting → mood, then a short beat-by-beat timeline.
-- Reference the user's product images by their tokens (${refList || 'none'}) where the product appears.
-- Keep the SAME structure/pacing/vibe/hook as the reference ad, swap in the user's product.
-- UGC realism: iPhone quality, natural light, authentic handheld, no on-screen captions/subtitles.
-${forcedScript ? '- The spoken voiceover MUST be EXACTLY this (do not change a word): "' + forcedScript.replace(/"/g, "'") + '"' : ''}
-Return ONLY minified JSON: {"prompt":"","script":""}  (script = the exact voiceover).`
+  const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). This is a TALKING-HEAD UGC ad:
+a real-looking creator talks straight to the phone camera and delivers the script out loud. Rules:
+- ONE dense paragraph: subject (the on-camera creator) → they SPEAK to camera → action/product → camera → lighting → mood, then a short beat-by-beat timeline.
+- The creator must be SPEAKING ALOUD to the viewer, lips moving in sync — NOT a silent scene, NOT b-roll with background music. Describe their mouth moving, natural gestures, eye contact with the lens.
+- Reference the user's product images by their tokens (${refList || 'none'}) — the creator holds/shows the product as they talk.
+- Keep the SAME structure/pacing/hook as the reference ad, swap in the user's product.
+- UGC realism: iPhone selfie, arm's length, natural light, authentic handheld, no on-screen captions/subtitles.
+${forcedScript ? '- CRITICAL — the creator says these EXACT words aloud to camera, lip-synced, word for word: "' + forcedScript.replace(/"/g, "'") + '". Weave "she says to camera: …" into the prompt so the model generates spoken dialogue, not narration.' : '- The creator speaks a natural spoken line to camera; put the exact words in the script field.'}
+Return ONLY minified JSON: {"prompt":"","script":""}  (script = the exact words the creator speaks).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || { note: 'analysis unavailable — infer a natural UGC structure' })}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nProduct image tokens: ${refList || '(none)'}.`
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
