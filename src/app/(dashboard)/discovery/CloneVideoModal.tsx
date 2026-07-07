@@ -32,7 +32,7 @@ export default function CloneVideoModal({ sourceAdId, sourcePoster, onClose }: {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
 
-  const cost = tier === 'premium' ? 70 : 45
+  const cost = tier === 'premium' ? 400 : 250
 
   useEffect(() => {
     fetch('/api/brands').then(r => r.json()).then((j) => {
@@ -135,8 +135,8 @@ export default function CloneVideoModal({ sourceAdId, sourcePoster, onClose }: {
             <section>
               <Label>Quality</Label>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => setTier('premium')} style={tierBtn(tier === 'premium')}>Premium · 150 cr</button>
-                <button onClick={() => setTier('fast')} style={tierBtn(tier === 'fast')}>Fast · 90 cr</button>
+                <button onClick={() => setTier('premium')} style={tierBtn(tier === 'premium')}>Premium · 400 cr</button>
+                <button onClick={() => setTier('fast')} style={tierBtn(tier === 'fast')}>Fast · 250 cr</button>
               </div>
             </section>
 
