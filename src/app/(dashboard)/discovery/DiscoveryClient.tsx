@@ -1072,11 +1072,11 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         )}
       </div>
 
-      {/* Clone-video pill for VIDEO cards — its own hover overlay (top-center, clear of the bottom
-          native controls), NOT gated by `playing`, so it stays visible while the video autoplays on
-          hover (the main hover-overlay above hides on playback). */}
+      {/* Clone-video pill for VIDEO cards — bottom-left (matching the image "Clone ad" pill), in its
+          OWN hover overlay NOT gated by `playing`, so it stays visible while the video autoplays on
+          hover. Sits just above the native controls bar so it doesn't cover the scrubber. */}
       {slide.type === 'video' && (
-        <div className="hover-overlay" style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', opacity: 0, transition: 'opacity .18s', pointerEvents: 'none', zIndex: 8 }}>
+        <div className="hover-overlay" style={{ position: 'absolute', bottom: 44, left: 12, opacity: 0, transition: 'opacity .18s', pointerEvents: 'none', zIndex: 8 }}>
           <button
             onClick={(e) => { e.stopPropagation(); setVideoCloneOpen(true) }}
             style={{ pointerEvents: 'auto', background: '#dffe95', color: '#14281a', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(0,0,0,0.45)' }}
