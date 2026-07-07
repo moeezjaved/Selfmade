@@ -39,8 +39,6 @@ export async function POST(req: NextRequest) {
   if (productImages.length === 0) return NextResponse.json({ error: 'add at least one product image to swap in' }, { status: 400 })
 
   const tier = body.tier === 'fast' ? 'fast' : 'premium'
-  const action = tier === 'fast' ? 'video_clone_fast' : 'video_clone'
-
   const admin = createAdminClient()
 
   // ── Resolve the competitor ad's playable video (the motion/pacing reference) ──
@@ -53,14 +51,8 @@ export async function POST(req: NextRequest) {
   const sourceVideo = creatives.find((c: any) => c.asset_type === 'video' && c.r2_url)?.r2_url || null
   if (!sourceVideo) return NextResponse.json({ error: 'this ad has no video to clone (image-only ad)' }, { status: 400 })
 
-  // ── Reserve credits (refunded by the worker on failure) ──
-  const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: action })
-  if (rErr) {
-    const insufficient = String(rErr.message || '').includes('insufficient_credits')
-    return NextResponse.json({ error: insufficient ? 'insufficient_credits' : 'reserve_failed' }, { status: insufficient ? 402 : 500 })
-  }
-  const txId = Array.isArray(tx) ? tx[0]?.id : (tx as any)?.id
-
+  // NO credits reserved here — analysis (Gemini + gpt) is cheap and free to the user. Credits are
+  // reserved at POST …/approve, once the user has SEEN and approved the script. status='analyzing'.
   const clone_meta = {
     product_image_urls: productImages,
     product_details: body.productDetails || null,
@@ -72,13 +64,10 @@ export async function POST(req: NextRequest) {
 
   const { data: row, error } = await admin.from('creative_generations').insert({
     user_id: user.id, brand_id: body.brandId || null, source_ad_id: sourceAdId,
-    type: 'video_clone', media_type: 'video', status: 'processing', tier: tier === 'fast' ? 'default' : 'pro',
-    source_video_url: sourceVideo, clone_meta, prompt: 'video clone', credit_tx: txId, image_url: null,
+    type: 'video_clone', media_type: 'video', status: 'analyzing', tier: tier === 'fast' ? 'default' : 'pro',
+    source_video_url: sourceVideo, clone_meta, prompt: 'video clone', image_url: null,
   }).select('id').single()
 
-  if (error || !row) {
-    if (txId) await admin.rpc('refund_credits', { p_tx: txId }).then(() => {}, () => {})
-    return NextResponse.json({ error: 'could not queue the clone' }, { status: 500 })
-  }
-  return NextResponse.json({ jobId: (row as any).id, status: 'processing' })
+  if (error || !row) return NextResponse.json({ error: 'could not start the clone' }, { status: 500 })
+  return NextResponse.json({ jobId: (row as any).id, status: 'analyzing' })
 }
