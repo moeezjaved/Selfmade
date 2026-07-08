@@ -160,6 +160,24 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const [err, setErr] = useState<string | null>(null)
   const editCost = 10   // Pro edit — matches image_edit_pro
   const isMobile = useIsMobile()
+  const [copied, setCopied] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+
+  // Force a real download. `<a download>` is ignored for cross-origin R2 URLs (browser just opens
+  // them in a new tab), so fetch the bytes and save via an object URL instead.
+  const downloadCreative = async (filename: string) => {
+    if (!img || downloading) return
+    setDownloading(true)
+    try {
+      const r = await fetch(img)
+      const b = await r.blob()
+      const u = URL.createObjectURL(b)
+      const a = document.createElement('a'); a.href = u; a.download = filename; a.click()
+      URL.revokeObjectURL(u)
+    } catch { window.open(img, '_blank') }   // fallback if the fetch is blocked
+    finally { setDownloading(false) }
+  }
+  const copyUrl = () => { if (img) { navigator.clipboard?.writeText(img); setCopied(true); setTimeout(() => setCopied(false), 1500) } }
 
   const applyEdit = async () => {
     if (!instr.trim()) return
@@ -196,7 +214,8 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
           {isVideo ? (
             <>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Your video</div>
-              <a href={img || ''} download={creativeFilename({ brand: gen.brand_name, ext: 'mp4', kind: gen.type, date: new Date(gen.created_at) })} style={{ ...btn, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download MP4</a>
+              <button onClick={() => downloadCreative(creativeFilename({ brand: gen.brand_name, ext: 'mp4', kind: gen.type, date: new Date(gen.created_at) }))} disabled={downloading} style={{ ...btn, justifyContent: 'center' }}><Download size={15} /> {downloading ? 'Downloading…' : 'Download MP4'}</button>
+              <button onClick={copyUrl} style={{ ...btnGhost, justifyContent: 'center' }}><Link2 size={15} /> {copied ? 'Copied ✓' : 'Copy URL'}</button>
             </>
           ) : (
             <>
@@ -206,7 +225,8 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                 placeholder="Tweak this creative — headline, subhead, colors, scene, background…" style={{ ...input, resize: 'vertical' }} />
               {err && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{err}</div>}
               <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · {editCost} cr</button>
-              <a href={img || ''} download={creativeFilename({ brand: gen.brand_name, ext: (img || '').match(/\.(jpg|jpeg|webp|png)(\?|$)/i)?.[1] || 'png', kind: gen.type, date: new Date(gen.created_at) })} style={{ ...btnGhost, justifyContent: 'center', textDecoration: 'none' }}><Download size={15} /> Download</a>
+              <button onClick={() => downloadCreative(creativeFilename({ brand: gen.brand_name, ext: (img || '').match(/\.(jpg|jpeg|webp|png)(\?|$)/i)?.[1] || 'png', kind: gen.type, date: new Date(gen.created_at) }))} disabled={downloading} style={{ ...btnGhost, justifyContent: 'center' }}><Download size={15} /> {downloading ? 'Downloading…' : 'Download'}</button>
+              <button onClick={copyUrl} style={{ ...btnGhost, justifyContent: 'center' }}><Link2 size={15} /> {copied ? 'Copied ✓' : 'Copy URL'}</button>
             </>
           )}
           <button onClick={del} style={{ ...btnGhost, justifyContent: 'center', color: '#b91c1c', borderColor: '#f0c4c4' }}><Trash2 size={15} /> Delete</button>

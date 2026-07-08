@@ -87,9 +87,20 @@
     }
     return best.slice(0, max)
   }
-  function meta(scope) {
-    let brand = '', ad_copy = '', platform = 'web'
+  // Best-effort post permalink so "Open original" opens the actual ad, not the site's home page.
+  function permalinkIn(scope) {
     try {
+      const art = scope.closest?.('article') || scope
+      const a = [...art.querySelectorAll('a[href]')].map(x => x.getAttribute('href') || '')
+        .find(h => /\/(p|reel|reels|share|watch|stories|permalink\.php|posts)\//.test(h) || /story_fbid=|view_all_page_id=/.test(h))
+      if (!a) return ''
+      return a.startsWith('http') ? a : new URL(a, location.origin).href
+    } catch { return '' }
+  }
+  function meta(scope) {
+    let brand = '', ad_copy = '', platform = 'web', permalink = ''
+    try {
+      permalink = permalinkIn(scope)
       if (IS_FB_ADLIB) {
         platform = 'facebook'
         brand = textFrom(scope, ['a[href*="facebook.com/"] span', 'a[href*="/"] strong', 'strong span', 'span[dir="auto"] strong'], 120)
@@ -113,7 +124,7 @@
         brand = (document.querySelector('meta[property="og:site_name"]')?.getAttribute('content') || document.title || '').trim().slice(0, 120)
       }
     } catch {}
-    return { brand, ad_copy, platform }
+    return { brand, ad_copy, platform, permalink }
   }
 
   async function toDataURL(url) {
@@ -140,7 +151,7 @@
     const image_data = type === 'image' ? await toDataURL(url) : null
     const payload = {
       media_url: url, media_type: type, image_data,
-      source_url: location.href, source_platform: m.platform,
+      source_url: m.permalink || location.href, source_platform: m.platform,
       brand: m.brand || undefined, ad_copy: m.ad_copy || undefined,
     }
     chrome.runtime.sendMessage({ type: 'saveAd', payload }, (resp) => {
