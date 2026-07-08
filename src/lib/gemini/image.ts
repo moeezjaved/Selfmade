@@ -98,7 +98,7 @@ export function cleanFontName(raw?: string | null): string | null {
   const oneToken = !s.includes(' ')
   // still a single run-on slug, has digits, or an obvious 2-letter code prefix → not a real name, drop it
   if (oneToken && (s.length > 11 || /\d/.test(s))) return null
-  if (/^[a-z]{2,3}\s/.test(s) && s.split(' ')[1]?.length > 8) return null   // "bc sklonar…" style
+  if (/^[a-z]{2,3}\s/.test(s) && (s.split(' ')[1]?.length ?? 0) > 5) return null   // "bc sklonar…" slug style
   return s.replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
@@ -141,13 +141,16 @@ export function buildStudioPrompt(opts: {
     : (opts.colors?.length ? `Brand colors: ${opts.colors.join(', ')}.` : '')
   const hFont = cleanFontName(opts.fonts?.heading)
   const bFont = cleanFontName(opts.fonts?.body)
-  const fontLine = (hFont || bFont)
-    ? `Typography (use as the typeface STYLE only — never write the font name on the ad): ${[
-        hFont && `headings "${hFont}"${opts.fonts?.headingWeight ? ` weight ${opts.fonts.headingWeight}` : ''}`,
-        bFont && `body "${bFont}"${opts.fonts?.bodyWeight ? ` weight ${opts.fonts.bodyWeight}` : ''}`,
-      ].filter(Boolean).join(', ')} (or closest match).`
-    : (opts.numInspirations > 0
-        ? `No brand fonts are set — so DERIVE the typography from the reference designs (images 1-${opts.numInspirations}): closely echo their typeface CHARACTER (display/serif/grotesque), weight contrast, letter-spacing, case, and headline-to-body hierarchy. Do NOT default to plain Arial/Helvetica/system fonts.`
+  const brandFontHint = [
+    hFont && `headings toward "${hFont}"${opts.fonts?.headingWeight ? ` (weight ${opts.fonts.headingWeight})` : ''}`,
+    bFont && `body toward "${bFont}"${opts.fonts?.bodyWeight ? ` (weight ${opts.fonts.bodyWeight})` : ''}`,
+  ].filter(Boolean).join(', ')
+  // When reference designs are attached, typography is DERIVED FROM THEM first (a real brand font
+  // is only a nudge). This is the "inspired ad" behavior — a generic default sans is a failure.
+  const fontLine = opts.numInspirations > 0
+    ? `Typography — DERIVE it from the reference designs (images 1-${opts.numInspirations}): study their headlines and closely echo the typeface CHARACTER (display / high-contrast serif / geometric or grotesque sans), the weight contrast, letter-spacing, case, and the headline-to-body size hierarchy. Pick a characterful typeface that matches that energy.${brandFontHint ? ` Nudge ${brandFontHint} only where it fits that character.` : ''} Do NOT default to plain Arial/Helvetica/system fonts. Use the font as STYLE only — never write a font name on the ad.`
+    : (brandFontHint
+        ? `Typography: ${brandFontHint} (as style only — never write the font name). Make it distinctive and premium; never plain Arial/Helvetica/system fonts.`
         : `Typography must be DISTINCTIVE and premium — a characterful display/editorial or bold grotesque with strong weight and size hierarchy. Do NOT default to plain Arial/Helvetica/system fonts.`)
   const ins = opts.insights || {}
   const insightLine = [
