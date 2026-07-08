@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const [prefs, setPrefs] = useState<{ in_app: boolean; instant_email: boolean; digest_frequency: string }>({ in_app: true, instant_email: false, digest_frequency: 'weekly' })
   const [prefsSaved, setPrefsSaved] = useState(false)
   const [prefsSaving, setPrefsSaving] = useState(false)
+  const [metaConnected, setMetaConnected] = useState<boolean | null>(null)  // null = still loading
   const supabase = createClient()
   const router = useRouter()
 
@@ -30,6 +31,9 @@ export default function SettingsPage() {
       const meta = (user.user_metadata || {}) as Record<string, string>
       setFullName(meta.full_name || meta.name || '')
       setLoading(false)
+      // Real Meta-connection status (was hardcoded "Connected ✓" even with nothing linked).
+      supabase.from('meta_accounts').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+        .then(({ count }) => { if (!cancelled) setMetaConnected((count || 0) > 0) })
       // load notification prefs (non-blocking)
       fetch('/api/notifications/prefs').then(r => r.json()).then(j => { if (!cancelled && j.prefs) setPrefs(j.prefs) }).catch(() => {})
     })()
@@ -178,8 +182,10 @@ export default function SettingsPage() {
         </div>
         <div style={{padding:22}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
-            <div style={{fontSize:14,color:'#3a5a3a'}}>Meta / Facebook — Connected ✓</div>
-            <a href="/connect-meta" style={{fontSize:13,color:'#1a3a1a',fontWeight:700,textDecoration:'none'}}>Manage →</a>
+            <div style={{fontSize:14,color: metaConnected ? '#3a5a3a' : '#9ca3af'}}>
+              {metaConnected == null ? 'Meta / Facebook — checking…' : metaConnected ? 'Meta / Facebook — Connected ✓' : 'Meta / Facebook — Not connected'}
+            </div>
+            <a href="/connect-meta" style={{fontSize:13,color:'#1a3a1a',fontWeight:700,textDecoration:'none'}}>{metaConnected ? 'Manage →' : 'Connect →'}</a>
           </div>
         </div>
       </div>

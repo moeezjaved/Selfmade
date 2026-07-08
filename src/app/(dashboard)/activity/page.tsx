@@ -18,7 +18,32 @@ export default function ActivityPage() {
     load()
   }, [])
 
-  const icons: Record<string,string> = { META_CONNECTED:'🔗', SYNC_COMPLETED:'↻', META_OAUTH_STARTED:'🔐', RECOMMENDATION_APPROVED:'✓', RECOMMENDATION_REJECTED:'✕' }
+  const icons: Record<string,string> = { META_CONNECTED:'🔗', SYNC_COMPLETED:'↻', META_OAUTH_STARTED:'🔐', RECOMMENDATION_APPROVED:'✓', RECOMMENDATION_REJECTED:'✕', AD_LAUNCHED:'🚀', CAMPAIGN_CREATED:'📣', CREATIVE_GENERATED:'🎨' }
+  // Human descriptions — the stored `description` is often a raw id (e.g. an OAuth state UUID), which
+  // read as "random data". Prefer a friendly sentence per action; only show the stored text when it's
+  // actually meaningful (not a bare UUID).
+  const ACTION_TEXT: Record<string,string> = {
+    META_OAUTH_STARTED: 'Started connecting your Meta account',
+    META_CONNECTED: 'Connected your Meta account',
+    SYNC_COMPLETED: 'Synced Meta insights',
+    RECOMMENDATION_APPROVED: 'Approved an AI recommendation',
+    RECOMMENDATION_REJECTED: 'Dismissed an AI recommendation',
+    AD_LAUNCHED: 'Launched an ad',
+    CAMPAIGN_CREATED: 'Created a campaign',
+    CREATIVE_GENERATED: 'Generated a creative',
+  }
+  const isUuid = (s:string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test((s||'').trim())
+  const describe = (log:any) => {
+    const d = (log.description || '').trim()
+    if (d && !isUuid(d)) return d
+    return ACTION_TEXT[log.action_type] || (log.action_type ? log.action_type.replace(/_/g,' ').toLowerCase().replace(/^\w/, (c:string)=>c.toUpperCase()) : '—')
+  }
+  // Actor: user actions = "You"; agent actions = "AI"; everything else (OAuth, syncs, webhooks) = "System".
+  const byOf = (log:any): { label:string; color:string; bg:string } => {
+    if (log.performed_by === 'user') return { label:'You', color:'#3a7a3a', bg:'rgba(223,254,149,0.35)' }
+    if (log.performed_by === 'ai' || log.performed_by === 'assistant' || log.performed_by === 'agent') return { label:'AI', color:'#2563eb', bg:'rgba(147,197,253,0.18)' }
+    return { label:'System', color:'#6b7280', bg:'rgba(0,0,0,0.05)' }
+  }
 
   return (
     <div style={{padding:28}}>
@@ -45,8 +70,8 @@ export default function ActivityPage() {
                       <span style={{fontSize:12,fontWeight:700,color:'#6b8f6b',textTransform:'uppercase',letterSpacing:'.05em'}}>{log.action_type?.replace(/_/g,' ')}</span>
                     </div>
                   </td>
-                  <td style={{padding:'12px 16px',fontSize:13,color:'#3a5a3a'}}>{log.description}</td>
-                  <td style={{padding:'12px 16px'}}><span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:100,background:log.performed_by==='user'?'rgba(223,254,149,0.1)':'rgba(147,197,253,0.1)',color:log.performed_by==='user'?'#dffe95':'#93c5fd'}}>{log.performed_by==='user'?'You':'AI'}</span></td>
+                  <td style={{padding:'12px 16px',fontSize:13,color:'#3a5a3a'}}>{describe(log)}</td>
+                  <td style={{padding:'12px 16px'}}>{(() => { const b = byOf(log); return <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:100,background:b.bg,color:b.color}}>{b.label}</span> })()}</td>
                   <td style={{padding:'12px 16px',fontSize:11,color:'#8aaa8a',whiteSpace:'nowrap'}}>{new Date(log.created_at).toLocaleString()}</td>
                 </tr>
               ))}

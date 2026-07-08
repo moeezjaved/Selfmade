@@ -39,22 +39,25 @@ export default function TeamPage() {
   }
   const [acctFor, setAcctFor] = useState<string | null>(null)   // user_id whose account editor is open
   const [acctSel, setAcctSel] = useState<string[]>([])          // working selection (empty = all)
+  const [seatModal, setSeatModal] = useState(false)             // in-app seats modal (replaces window.prompt)
+  const [seatCount, setSeatCount] = useState('1')
+  const [seatBusy, setSeatBusy] = useState(false)
   const openAccts = (m: Member) => { setAcctFor(m.user_id); setAcctSel(m.allAccounts ? [] : (m.accounts || [])) }
   const toggleAcct = (id: string) => setAcctSel(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
   const saveAccts = async (userId: string) => {
     await fetch('/api/account/team', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId, accountIds: acctSel }) })
     setAcctFor(null); load()
   }
-  const buySeats = async () => {
-    const cur = d?.seats.extra ?? 0
-    const ans = prompt(`How many total PAID extra seats do you want? (you currently have ${cur})\n\nEach adds one seat beyond your plan, billed monthly.`, String(cur + 1))
-    if (ans == null) return
-    const extra = Math.max(0, Math.floor(Number(ans)))
-    if (!Number.isFinite(extra)) return
-    setMsg('Setting up seats…')
+  // Open the in-app seats modal (was a browser window.prompt — feels broken + can't style/validate).
+  const buySeats = () => { setSeatCount(String((d?.seats.extra ?? 0) + 1)); setMsg(''); setSeatModal(true) }
+  const confirmSeats = async () => {
+    const extra = Math.max(0, Math.floor(Number(seatCount)))
+    if (!Number.isFinite(extra)) { setMsg('Enter a valid number of seats.'); return }
+    setSeatBusy(true); setMsg('Setting up seats…')
     const j = await fetch('/api/billing/seats', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ extra }) }).then(r => r.json()).catch(() => ({ error: 'failed' }))
     if (j.url) { window.location.href = j.url; return }        // first purchase → Stripe Checkout
-    if (j.error) { setMsg(j.message || j.error); return }
+    setSeatBusy(false); setSeatModal(false)
+    if (j.error) { setMsg(j.message || (j.error === 'not_configured' ? 'Paid seats aren’t available yet — contact support.' : j.error)); return }
     setMsg(`✓ Seats updated — ${j.extra} paid seat${j.extra === 1 ? '' : 's'}.`); load()
   }
   const revoke = async (id: string) => { await fetch(`/api/account/team?invite=${id}`, { method: 'DELETE' }); load() }
@@ -138,6 +141,30 @@ export default function TeamPage() {
             </div>
           ))}
         </>
+      )}
+
+      {/* In-app "Add paid seats" modal (replaces the old window.prompt). */}
+      {seatModal && (
+        <div onClick={() => !seatBusy && setSeatModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(14,27,18,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 'min(420px,96vw)', background: '#fff', borderRadius: 16, padding: 22, boxShadow: '0 24px 70px rgba(0,0,0,0.35)' }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: INK }}>Add paid seats</div>
+            <div style={{ fontSize: 13.5, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+              Your <b style={{ color: INK }}>{d.seats.planId}</b> plan includes {d.seats.included} seat{d.seats.included === 1 ? '' : 's'}
+              {d.seats.extra > 0 ? ` (+${d.seats.extra} paid)` : ''}. Each extra seat is billed monthly beyond your plan.
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#6b7280' }}>Total paid extra seats</label>
+              <input type="number" min={0} value={seatCount} autoFocus
+                onChange={e => setSeatCount(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') confirmSeats() }}
+                style={{ ...inp, width: '100%', marginTop: 6, boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+              <button onClick={() => setSeatModal(false)} disabled={seatBusy} style={{ background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={confirmSeats} disabled={seatBusy} style={{ background: INK, color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: seatBusy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: seatBusy ? 0.7 : 1 }}>{seatBusy ? 'Working…' : 'Continue'}</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
