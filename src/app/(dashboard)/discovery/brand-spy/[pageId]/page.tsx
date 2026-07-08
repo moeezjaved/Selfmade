@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import CloneModal from '../../CloneModal'
+import CloneVideoModal from '../../CloneVideoModal'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area,
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -354,7 +355,9 @@ function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
           <div style={{ padding: 18, borderLeft: '1px solid #f3f4f6' }}>
             <button onClick={() => setCloning(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', background: '#111', color: ACCENT, fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 10, fontFamily: 'inherit' }}>✨ Clone this ad</button>
             <a href={a.snapshotUrl || '#'} target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: ACCENT, color: '#111', fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 10, textDecoration: 'none', marginBottom: 14 }}>Open in Meta Ad Library ↗</a>
-            {cloning && <CloneModal ad={{ id: a.id, pageId, pageName: a.pageName, assetImageUrl: a.thumbnailUrl || undefined }} onClose={() => setCloning(false)} />}
+            {cloning && ((a.format || '').toLowerCase().includes('video') || !!a.videoUrl
+              ? <CloneVideoModal sourceAdId={a.id} sourcePoster={a.thumbnailUrl || undefined} onClose={() => setCloning(false)} />
+              : <CloneModal ad={{ id: a.id, pageId, pageName: a.pageName, assetImageUrl: a.thumbnailUrl || undefined }} onClose={() => setCloning(false)} />)}
             <Row k="Status" v={a.isActive ? <span style={{ color: '#16a34a', fontWeight: 700 }}>● Still Running{a.startDate ? ` from ${fmtDate(a.startDate)}` : ''}</span> : <span style={{ color: '#9ca3af' }}>Inactive{a.stopDate ? ` (ended ${fmtDate(a.stopDate)})` : ''}</span>} />
             <Row k="Time Running" v={`${a.daysRunning || 0} day${(a.daysRunning || 0) === 1 ? '' : 's'}`} />
             <Row k="Format" v={a.format || '—'} />
@@ -399,10 +402,17 @@ function AdLibrary({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: 
   const [status, setStatus] = useState('ALL')
   const [sort, setSort] = useState('newest')
   const { ads, loading, hasMore, total, loadMore } = useBrandAds(pageId, { days, format, status, sort })
-  const [cloneAd, setCloneAd] = useState<Card | null>(null)
+  const [cloneImageAd, setCloneImageAd] = useState<Card | null>(null)
+  const [cloneVideoAd, setCloneVideoAd] = useState<Card | null>(null)
+  // Video ads → the Seedance video-clone; image ads → the Gemini image-clone.
+  const openClone = (a: Card) => {
+    const isVid = (a.format || '').toLowerCase().includes('video') || !!a.videoUrl
+    if (isVid) setCloneVideoAd(a); else setCloneImageAd(a)
+  }
   return (
     <div>
-      {cloneAd && <CloneModal ad={{ id: cloneAd.id, pageId, pageName: cloneAd.pageName, assetImageUrl: cloneAd.thumbnailUrl || undefined }} onClose={() => setCloneAd(null)} />}
+      {cloneImageAd && <CloneModal ad={{ id: cloneImageAd.id, pageId, pageName: cloneImageAd.pageName, assetImageUrl: cloneImageAd.thumbnailUrl || undefined }} onClose={() => setCloneImageAd(null)} />}
+      {cloneVideoAd && <CloneVideoModal sourceAdId={cloneVideoAd.id} sourcePoster={cloneVideoAd.thumbnailUrl || undefined} onClose={() => setCloneVideoAd(null)} />}
       {/* Analytics header — Media Mix · Top Landing Pages · Top Hooks (Foreplay layout) */}
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr 1fr', gap: 12, marginBottom: 16 }}>
         <MediaMix d={d} />
@@ -433,7 +443,7 @@ function AdLibrary({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: 
       {ads.length === 0 && loading && <div style={{ color: '#9ca3af', fontSize: 14, padding: 20 }}>Loading ads…</div>}
       {ads.length === 0 && !loading && <div style={{ color: '#9ca3af', fontSize: 14, padding: 20 }}>No ads match these filters.</div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 12 }}>
-        {ads.map((a) => <AdCard key={a.id} a={a} onOpen={onOpen} onClone={setCloneAd} />)}
+        {ads.map((a) => <AdCard key={a.id} a={a} onOpen={onOpen} onClone={openClone} />)}
       </div>
       {hasMore && (
         <div style={{ textAlign: 'center', marginTop: 18 }}>
