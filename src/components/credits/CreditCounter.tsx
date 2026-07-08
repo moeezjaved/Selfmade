@@ -10,6 +10,7 @@
  * spend credits call refreshCredits() after a successful action.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { openCredits } from './CreditModal'
 
 const REFRESH_EVENT = 'credits:refresh'
 export function refreshCredits() {
@@ -55,11 +56,14 @@ export function useCredits(): CreditState & { refetch: () => void } {
   return { ...s, refetch }
 }
 
-/** Pre-action confirm. Returns true if the user proceeds (and can afford it). */
+/** Pre-action confirm. Returns true if the user proceeds (and can afford it).
+ * On insufficient balance we no longer window.confirm — we pop the Buy-credits modal so the
+ * user can top up in place, and block the action (returns false). */
 export function confirmCredits(action: string, credits: number, balance: number): boolean {
   if (typeof window === 'undefined') return false
   if (balance < credits) {
-    return window.confirm(`Not enough credits — ${action} needs ${credits}, you have ${balance}.\n\nGo to Billing to top up?`)
+    openCredits('buy', `Not enough credits — ${action} needs ${credits}, you have ${balance.toLocaleString()}. Top up to continue.`)
+    return false
   }
   return window.confirm(`This ${action} uses ${credits} credits. You have ${balance}.\n\nProceed?`)
 }
@@ -68,19 +72,20 @@ export function CreditCounter({ compact = false }: { compact?: boolean }) {
   const { balance, loading, plan } = useCredits()
   const low = balance < 15  // below the priciest action (image_clone)
   return (
-    <a href="/billing"
+    <button type="button"
+       onClick={() => openCredits(low ? 'buy' : 'plan')}
        title={`Plan: ${plan} · ${balance} credits`}
        style={{
-         display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none',
+         display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit',
          padding: compact ? '4px 10px' : '6px 12px', borderRadius: 999,
          background: low ? '#fef2f2' : 'rgba(223,254,149,0.14)',
          border: `1px solid ${low ? '#fecaca' : 'rgba(223,254,149,0.35)'}`,
-         color: low ? '#b91c1c' : '#dffe95', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+         color: low ? '#b91c1c' : '#dffe95', fontSize: 12, fontWeight: 700,
        }}>
       <span style={{ fontSize: 13 }}>◆</span>
       <span>{loading ? '…' : balance.toLocaleString()}</span>
       <span style={{ opacity: 0.7, fontWeight: 600 }}>credits</span>
       {low && !loading && <span style={{ marginLeft: 4, fontWeight: 800 }}>· Top&nbsp;up</span>}
-    </a>
+    </button>
   )
 }
