@@ -129,7 +129,10 @@ export async function GET() {
   }
   // Run independently (not one shared try) so a failure on one still yields the other.
   eClassifiable = await eCount(q => q.eq('is_classifiable', true))
-  eBacklog = await eCount(q => q.eq('is_classifiable', true).or('ai_classified.is.null,ai_classified.eq.false,topics.is.null'))
+  // "Classified" = ai_classified is true. The old backlog ALSO counted ai_classified rows whose
+  // `topics` were null (≈1.2M) as not-done, so E read ~4.9% when it's really ~49%. topics being
+  // empty is a data-quality nuance, not "unclassified" — the progress metric tracks ai_classified.
+  eBacklog = await eCount(q => q.eq('is_classifiable', true).or('ai_classified.is.null,ai_classified.eq.false'))
   const eDone = (eClassifiable != null && eBacklog != null) ? Math.max(0, eClassifiable - eBacklog) : null
   const ePctLeft = (eClassifiable && eBacklog != null) ? Math.round((eBacklog / eClassifiable) * 1000) / 10 : null
   const ePctDone = (eClassifiable && eDone != null) ? Math.round((eDone / eClassifiable) * 1000) / 10 : null
