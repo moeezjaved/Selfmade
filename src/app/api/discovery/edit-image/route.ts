@@ -12,7 +12,7 @@ import { generateImage, geminiEnabled } from '@/lib/gemini/image'
 import { saveGeneration } from '@/lib/creatives'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300  // gemini-3-pro-image at 2K can exceed 60s → 504; Pro plan allows up to 300s
 export const runtime = 'nodejs'
 
 async function toB64(src: string, fallbackMime = 'image/png'): Promise<{ mimeType: string; dataB64: string } | null> {

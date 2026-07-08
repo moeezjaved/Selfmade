@@ -15,7 +15,7 @@ import { pickInspirations } from '@/lib/studio/inspiration'
 import { inferNiche } from '@/lib/gemini/vision'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300  // gemini-3-pro-image at 2K can exceed 60s → 504; Pro plan allows up to 300s
 export const runtime = 'nodejs'
 
 async function fetchImageB64(url: string): Promise<{ mimeType: string; dataB64: string } | null> {
