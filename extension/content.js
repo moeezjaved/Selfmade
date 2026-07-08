@@ -31,10 +31,27 @@
   }
 
   // ── Media + metadata helpers ─────────────────────────────────────────────
+  // Extract an http(s) image URL from a CSS background-image (FB paints many creatives this way).
+  function bgUrl(el) {
+    try {
+      const bg = getComputedStyle(el).backgroundImage || ''
+      const m = bg.match(/url\(["']?(https?:\/\/[^"')]+)["']?\)/)
+      return m ? m[1] : ''
+    } catch { return '' }
+  }
   function mediaUrl(el) {
     if (!el) return { url: '', type: 'image' }
-    if (el instanceof HTMLVideoElement) return { url: el.currentSrc || el.src || el.querySelector('source')?.src || '', type: 'video' }
-    return { url: el.currentSrc || el.src || '', type: 'image' }
+    if (el instanceof HTMLVideoElement) {
+      const src = el.currentSrc || el.src || el.querySelector('source')?.src || ''
+      // FB/IG stream video through blob: (MediaSource) which the server can't fetch — save the
+      // poster frame (an fbcdn image) instead so the save still works.
+      if (!src || src.startsWith('blob:')) { const p = el.poster || ''; if (p) return { url: p, type: 'image' } }
+      return { url: src, type: 'video' }
+    }
+    if (el instanceof HTMLImageElement) return { url: el.currentSrc || el.src || '', type: 'image' }
+    const bg = bgUrl(el)                                  // background-image creative
+    if (bg) return { url: bg, type: 'image' }
+    return { url: '', type: 'image' }
   }
   function biggestMediaIn(scope) {
     let best = null, bestArea = MIN * MIN
@@ -42,6 +59,15 @@
       const r = el.getBoundingClientRect()
       const area = r.width * r.height
       if (area > bestArea) { best = el; bestArea = area }
+    }
+    // FB often has no <img>/<video> for the creative — it's a background-image div. Consider those.
+    if (!best) {
+      for (const el of scope.querySelectorAll('div, a, span')) {
+        if (!bgUrl(el)) continue
+        const r = el.getBoundingClientRect()
+        const area = r.width * r.height
+        if (area > bestArea) { best = el; bestArea = area }
+      }
     }
     return best
   }
@@ -199,8 +225,16 @@
     }
     const scheduleHide = () => { clearTimeout(hideT); hideT = setTimeout(() => { btn.style.display = 'none'; target = null }, 400) }
     document.addEventListener('mouseover', (e) => {
-      const el = e.target
-      if (el instanceof HTMLImageElement || el instanceof HTMLVideoElement) { clearTimeout(hideT); showFor(el) }
+      let el = e.target
+      // Direct media hover (IG/TikTok/most sites).
+      if (el instanceof HTMLImageElement || el instanceof HTMLVideoElement) { clearTimeout(hideT); showFor(el); return }
+      // FB puts a click overlay ON TOP of the creative, so the hover target is a div/anchor — look for
+      // the media inside a nearby container so the Save button still appears over FB feed ads.
+      if (el instanceof Element) {
+        const box = el.closest('[role="article"], article, [data-ad-preview], [aria-label]') || el.parentElement
+        const media = box && biggestMediaIn(box)
+        if (media) { clearTimeout(hideT); showFor(media) }
+      }
     }, true)
     document.addEventListener('mouseout', (e) => {
       if (e.target === btn || (e.target instanceof Element && e.target.closest('.sm-save-btn'))) return

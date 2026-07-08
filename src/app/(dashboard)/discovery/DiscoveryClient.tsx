@@ -1323,6 +1323,12 @@ export default function DiscoveryPage() {
   const [searchMode, setSearchMode] = useState<'adcopy' | 'brand' | 'category'>('adcopy')
   const [chipTip, setChipTip] = useState<{ label: string; top: number; left: number } | null>(null)  // preset-chip explainer popup
   const [rawAds, setRawAds] = useState<Ad[]>([])
+  // Mirror of rawAds + a bounded "empty page" counter for infinite-scroll stall recovery (Bug 11):
+  // a loadMore window that returns only already-seen creatives appends 0 rows, so the scroll sentinel
+  // never re-fires and the feed stalls. When that happens we auto-advance to the next window.
+  const rawAdsRef = useRef<Ad[]>([])
+  const emptyStreakRef = useRef(0)
+  useEffect(() => { rawAdsRef.current = rawAds }, [rawAds])
   const [loading, setLoading] = useState(true)  // start in loading → grid shows the skeleton from
   // the first render (not the empty state) until the initial fetch lands, so the load reads as a
   // smooth skeleton→cards instead of blank/empty→sudden-burst.
@@ -1556,6 +1562,18 @@ export default function DiscoveryPage() {
           setTotalInDB(dbData.totalInDB || 0)
           setSearchSource('indexed')
           setNextCursor(null)
+          // Stall recovery: if THIS loadMore window contributed no new creative (all dupes) but the
+          // server says there's more, keep advancing so the feed doesn't freeze. Bounded so a genuinely
+          // exhausted feed (or a bad hash run) can't loop forever; falls back to the sentinel otherwise.
+          if (!reset && dbData.hasMore) {
+            const dedupKey2 = (a: Ad) => (a as any).image_hash || (a as any).video_hash || `id:${a.id}`
+            const seen2 = new Set(rawAdsRef.current.map(dedupKey2))
+            const anyNew = classified.some((a: Ad) => !seen2.has(dedupKey2(a)))
+            if (!anyNew) {
+              emptyStreakRef.current += 1
+              if (emptyStreakRef.current <= 6) setTimeout(() => loadMoreRef.current(), 160)
+            } else { emptyStreakRef.current = 0 }
+          } else { emptyStreakRef.current = 0 }
         }
         // The page CURSOR and hasMore must advance SYNCHRONOUSLY — never inside the startTransition
         // below. If they're deferred, the next loadMore fires with a stale `dbPage`, re-requests the
