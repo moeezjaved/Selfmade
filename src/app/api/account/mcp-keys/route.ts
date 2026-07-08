@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireFeature } from '@/lib/entitlements'
+import { resolveBillingOwner } from '@/lib/org'
 import { randomBytes } from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +21,9 @@ async function ctx() {
 export async function GET() {
   const { user, admin } = await ctx()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const gate = await requireFeature(admin, user.id, 'api')
+  // Gate on the ORG billing owner's plan, not the member's own — so every seat on an API-enabled
+  // org (Pro/Business) gets access, and the owner isn't wrongly locked by a stale personal plan_id.
+  const gate = await requireFeature(admin, await resolveBillingOwner(admin, user.id), 'api')
   const { data } = await admin.from('mcp_keys').select('id, label, token, created_at, last_used_at, revoked')
     .eq('user_id', user.id).eq('revoked', false).order('created_at', { ascending: false })
   return NextResponse.json({ keys: data || [], locked: !!gate, upsell: gate || null })
@@ -29,7 +32,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const { user, admin } = await ctx()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const gate = await requireFeature(admin, user.id, 'api')
+  const gate = await requireFeature(admin, await resolveBillingOwner(admin, user.id), 'api')
   if (gate) return NextResponse.json(gate, { status: 403 })
   const { label } = await request.json().catch(() => ({}))
   const token = 'sk_mcp_' + randomBytes(24).toString('hex')
