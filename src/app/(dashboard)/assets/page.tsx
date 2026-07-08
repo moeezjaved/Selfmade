@@ -244,7 +244,11 @@ export default function AssetsPage() {
                   {a.file_type === 'image' ? (
                     <img src={a.file_url} alt={a.file_name} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : a.file_type === 'video' ? (
-                    <video src={a.file_url} muted style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    // preload metadata → shows the first frame as a preview; plays on hover.
+                    <video src={a.file_url} muted playsInline loop preload="metadata"
+                      onMouseEnter={e => { e.currentTarget.play().catch(() => {}) }}
+                      onMouseLeave={e => { const v = e.currentTarget; v.pause(); try { v.currentTime = 0 } catch {} }}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}><Music size={34} /></div>
                   )}
