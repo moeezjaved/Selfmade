@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
-// Chrome Web Store listing — update to the real URL once the extension is published & reviewed.
-const CHROME_STORE_URL = 'https://chromewebstore.google.com/search/selfmade'
+// Chrome Web Store listing (approved 2026-07-08).
+const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi'
 
 export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
