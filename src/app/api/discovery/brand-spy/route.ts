@@ -32,11 +32,18 @@ export async function GET(req: NextRequest) {
 
   let myPageIds: string[] | null = null
   if (scope === 'mine') {
-    const { data: txs } = await admin
-      .from('credit_transactions')
-      .select('reference_id')
-      .eq('user_id', user.id).eq('action_type', ACTION).eq('status', 'committed')
-    myPageIds = Array.from(new Set((txs || []).map((t: any) => t.reference_id).filter(Boolean)))
+    // "Spied" = paid (credit_transactions ledger) AND still actively followed. Un-spying deletes the
+    // followed_brands row, so intersecting with it lets a user remove a brand from their list while
+    // the (immutable) credit ledger keeps re-spying free. Without this intersection, "Stop spying"
+    // couldn't drop a brand from the list — the exact bug this fixes.
+    const [{ data: txs }, { data: follows }] = await Promise.all([
+      admin.from('credit_transactions').select('reference_id')
+        .eq('user_id', user.id).eq('action_type', ACTION).eq('status', 'committed'),
+      admin.from('followed_brands').select('page_id').eq('user_id', user.id),
+    ])
+    const paidIds: string[] = (txs || []).map((t: any) => String(t.reference_id)).filter((x: string) => x && x !== 'null')
+    const followed = new Set<string>(((follows || []) as any[]).map((f: any) => String(f.page_id)))
+    myPageIds = Array.from(new Set<string>(paidIds)).filter((pid: string) => followed.has(pid))
     if (myPageIds.length === 0) return NextResponse.json({ brands: [], scope: 'mine' })
   }
 
@@ -229,4 +236,20 @@ export async function POST(req: NextRequest) {
     if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: `Not enough credits — Brand Spy costs ${e.need}, you have ${e.have}.` }, { status: 402 })
     return NextResponse.json({ error: e instanceof Error ? e.message : 'failed to start spying' }, { status: 400 })
   }
+}
+
+// Stop spying a brand → remove it from the user's tracked list + stop its new-ad alerts by deleting
+// the followed_brands row (the spied list intersects with followed_brands, so this drops it). The
+// paid credit_transactions ledger is intentionally left intact so re-spying stays free. We do NOT
+// touch discovery_crawl_terms here: it's a GLOBAL crawl row that other users (or the base crawl) may
+// still rely on — deactivating it per-user could stop crawling a brand others are tracking.
+export async function DELETE(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const pageId = extractPageId(req.nextUrl.searchParams.get('pageId') || req.nextUrl.searchParams.get('page_id') || '')
+  if (!pageId) return NextResponse.json({ error: 'pageId required' }, { status: 400 })
+  const admin = createAdminClient()
+  await admin.from('followed_brands').delete().eq('user_id', user.id).eq('page_id', pageId)
+  return NextResponse.json({ ok: true, pageId })
 }

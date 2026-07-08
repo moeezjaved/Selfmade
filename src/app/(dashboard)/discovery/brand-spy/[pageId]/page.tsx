@@ -9,6 +9,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import CloneModal from '../../CloneModal'
 import CloneVideoModal from '../../CloneVideoModal'
+import { openCredits } from '@/components/credits/CreditModal'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area,
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -622,12 +623,26 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
 
   const toggleSpy = async () => {
     if (spied == null || busy) return
-    const next = !spied
-    if (!next && !confirm(`Stop spying on ${brandName || 'this brand'}? You'll no longer get its new-ad updates.`)) return
-    setBusy(true); setSpied(next); if (!next) setEmailOn(false)
-    try {
-      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: next ? 'follow' : 'unfollow', pageId, brandName }) })
-    } catch { setSpied(!next) } finally { setBusy(false) }
+    if (spied) {
+      // ── Stop spying → removes it from the tracked list + stops alerts (DELETE /brand-spy). ──
+      if (!confirm(`Stop spying on ${brandName || 'this brand'}? You'll no longer get its new-ad updates and it leaves your spied list.`)) return
+      setBusy(true); setSpied(false); setEmailOn(false)
+      try { await fetch(`/api/discovery/brand-spy?pageId=${pageId}`, { method: 'DELETE' }) }
+      catch { setSpied(true) } finally { setBusy(false) }
+    } else {
+      // ── Spy this brand → the real paid action (charges once per brand, tracks + follows). ──
+      setBusy(true)
+      try {
+        const r = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId, name: brandName }) })
+        const j = await r.json().catch(() => ({}))
+        if (r.ok) { setSpied(true) }
+        else if (r.status === 402) {
+          const msg = String(j.error || j.message || '')
+          if (/credit/i.test(msg)) openCredits('buy', msg)                     // insufficient credits → top-up
+          else alert(msg || 'You’ve reached your plan’s Brand Spy limit — upgrade to track more brands.')
+        } else alert(j.error || 'Could not start spying — try again.')
+      } catch { alert('Network error — try again.') } finally { setBusy(false) }
+    }
   }
   const toggleEmail = async () => {
     if (busy) return
