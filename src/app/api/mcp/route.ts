@@ -32,6 +32,13 @@ const TOOLS = [
       format_style: { type: 'string', description: 'visual format filter, e.g. "UGC", "Before & After"' },
       limit: { type: 'number', description: 'max results (default 12, max 40)' },
     } } },
+  { name: 'semantic_search', description: 'Search the ad library by MEANING, not keywords (pgvector embeddings). Finds conceptually-relevant ads even when they share no words with the query — e.g. "weight loss" also matches "slim down", "melt fat", "back into your jeans". Use this for vague/idea-level queries; use search_ads for exact brand/phrase lookups. Optional niche/format filters. Ranked by semantic similarity.',
+    inputSchema: { type: 'object', required: ['query'], properties: {
+      query: { type: 'string', description: 'natural-language description of the ad concept, angle, or theme' },
+      niche: { type: 'string', description: 'industry/niche filter, e.g. "Supplements"' },
+      format_style: { type: 'string', description: 'visual format filter, e.g. "UGC"' },
+      limit: { type: 'number', description: 'max results (default 12, max 40)' },
+    } } },
   { name: 'get_trending', description: 'Top-performing Meta ads right now, optionally scoped to an industry. Ranked by Selfmade performance score.',
     inputSchema: { type: 'object', properties: { niche: { type: 'string' }, limit: { type: 'number' } } } },
   { name: 'get_ad', description: 'Full detail for one ad by ad_id: copy, brand, AI tags (hook/emotion/angle/persona/topics), creative image URL.',
@@ -73,6 +80,37 @@ async function runTool(name: string, args: any) {
     if (args.query) q = q.or(`body.ilike.%${String(args.query).replace(/[%,]/g, '')}%,title.ilike.%${String(args.query).replace(/[%,]/g, '')}%`)
     const { data } = await q.order('performance_score', { ascending: false }).limit(clamp(args.limit, 12, 40))
     return { count: (data || []).length, ads: (data || []).map(shapeAd) }
+  }
+  if (name === 'semantic_search') {
+    if (!args.query) throw new Error('query required')
+    if (!process.env.OPENAI_API_KEY) throw new Error('semantic search not configured (OPENAI_API_KEY missing)')
+    // Embed the query with the SAME model the corpus is embedded with, then nearest-neighbour match.
+    const er = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({ model: 'text-embedding-3-small', input: String(args.query).slice(0, 8000) }),
+    })
+    if (!er.ok) throw new Error(`embedding failed: HTTP ${er.status}`)
+    const vec = (await er.json())?.data?.[0]?.embedding
+    if (!Array.isArray(vec)) throw new Error('no embedding returned')
+    const wanted = clamp(args.limit, 12, 40)
+    const { data: hits } = await db.rpc('search_ads_semantic', {
+      query_embedding: vec, match_threshold: 0.30, match_count: Math.max(wanted * 4, 60),
+      filter_country: null, filter_active: null, filter_format: null, filter_industry: null,
+    })
+    const rows = (hits || []) as any[]
+    if (!rows.length) return { count: 0, ads: [], note: 'No semantic matches yet — embedding coverage of the corpus is still filling in. Try search_ads for a keyword lookup.' }
+    // The RPC returns ad_id + similarity but no creatives; re-fetch full rows and keep similarity order.
+    const simById = new Map(rows.map((r: any) => [String(r.ad_id), r.similarity ?? null]))
+    const ids = rows.map((r: any) => String(r.ad_id))
+    const { data: full } = await db.from('discovery_ads_index').select(ADCOLS).in('ad_id', ids)
+    const byId = new Map((full || []).map((r: any) => [String(r.ad_id), r]))
+    const nf = args.niche ? String(args.niche).toLowerCase() : null
+    const ff = args.format_style ? String(args.format_style).toLowerCase() : null
+    const ads = ids.map((id) => byId.get(id)).filter(Boolean)
+      .filter((r: any) => (!nf || String(r.niche || '').toLowerCase() === nf) && (!ff || String(r.format_style || '').toLowerCase() === ff))
+      .slice(0, wanted)
+      .map((r: any) => { const s = simById.get(String(r.ad_id)); return { ...shapeAd(r), similarity: s != null ? Math.round(Number(s) * 100) : null } })
+    return { count: ads.length, ads }
   }
   if (name === 'get_trending') {
     let q = db.from('discovery_ads_index').select(ADCOLS).eq('has_creative', true).gt('performance_score', 0)
@@ -134,7 +172,7 @@ export async function POST(request: NextRequest) {
       protocolVersion: '2024-11-05',
       capabilities: { tools: {} },
       serverInfo: { name: 'selfmade', version: '1.0.0' },
-      instructions: 'Read-only access to the Selfmade library of 3M+ real Meta ads with AI tags. Use search_ads/get_trending to find winning ads, get_ad for detail, top_formats/list_taxonomy for trends and filters.',
+      instructions: 'Read-only access to the Selfmade library of 3M+ real Meta ads with AI tags. Use semantic_search for idea/concept queries (matches by meaning), search_ads for exact keyword/brand lookups, get_trending for top performers, get_ad for detail, get_brand_ads to spy a competitor, top_formats/list_taxonomy for trends and filters.',
     } })
   }
   if (method === 'tools/list') return NextResponse.json({ jsonrpc: '2.0', id, result: { tools: TOOLS } })
