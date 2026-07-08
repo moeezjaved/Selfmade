@@ -11,12 +11,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { reserveCredits, commitCredits, refundCredits, getActionCost, InsufficientCreditsError } from '@/lib/credits'
 import { requireUnder } from '@/lib/entitlements'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 20
-const ACTION = 'brand_spy'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -32,18 +30,11 @@ export async function GET(req: NextRequest) {
 
   let myPageIds: string[] | null = null
   if (scope === 'mine') {
-    // "Spied" = paid (credit_transactions ledger) AND still actively followed. Un-spying deletes the
-    // followed_brands row, so intersecting with it lets a user remove a brand from their list while
-    // the (immutable) credit ledger keeps re-spying free. Without this intersection, "Stop spying"
-    // couldn't drop a brand from the list — the exact bug this fixes.
-    const [{ data: txs }, { data: follows }] = await Promise.all([
-      admin.from('credit_transactions').select('reference_id')
-        .eq('user_id', user.id).eq('action_type', ACTION).eq('status', 'committed'),
-      admin.from('followed_brands').select('page_id').eq('user_id', user.id),
-    ])
-    const paidIds: string[] = (txs || []).map((t: any) => String(t.reference_id)).filter((x: string) => x && x !== 'null')
-    const followed = new Set<string>(((follows || []) as any[]).map((f: any) => String(f.page_id)))
-    myPageIds = Array.from(new Set<string>(paidIds)).filter((pid: string) => followed.has(pid))
+    // "Spied" = the brands the user follows (followed_brands). This is the single source of truth:
+    // spying inserts the row, un-spying deletes it, and the plan's brandSpy cap counts these. Tracked
+    // brands are an INCLUDED plan feature (a cap), NOT a credit purchase — so there's no ledger to read.
+    const { data: follows } = await admin.from('followed_brands').select('page_id').eq('user_id', user.id)
+    myPageIds = Array.from(new Set<string>(((follows || []) as any[]).map((f: any) => String(f.page_id)).filter((x: string) => x && x !== 'null')))
     if (myPageIds.length === 0) return NextResponse.json({ brands: [], scope: 'mine' })
   }
 
@@ -200,40 +191,30 @@ export async function POST(req: NextRequest) {
   if (!pageId) return NextResponse.json({ error: 'Paste a Meta Ad Library page URL (…view_all_page_id=123…) or a numeric page ID — not a keyword search.' }, { status: 400 })
   const name = (body.name || '').trim().toLowerCase() || pageId
 
-  // Has THIS user already paid to spy THIS brand? (credit_transactions ledger, ref = pageId).
-  // If so it's free to re-open — we charge once per user per brand, not per click.
+  // Tracked brands are an INCLUDED plan feature (capped), NOT a credit purchase — the plan cards
+  // advertise "N tracked brands", so spying must be FREE within the cap. Source of truth = followed_brands.
+
+  // Already spying this brand? Re-open is a no-op (refresh the crawl, keep the follow).
   const { data: prior } = await admin
-    .from('credit_transactions')
-    .select('id')
-    .eq('user_id', user.id).eq('action_type', ACTION).eq('reference_id', pageId).eq('status', 'committed')
-    .limit(1).maybeSingle()
+    .from('followed_brands').select('id')
+    .eq('user_id', user.id).eq('page_id', pageId).limit(1).maybeSingle()
   if (prior) {
     await ensureTracked(admin, pageId, name, false)
-    await ensureFollowed(admin, user.id, pageId, name)
     return NextResponse.json({ pageId, charged: false, alreadySpied: true })
   }
 
-  // Plan gate (spec §4.2): cap the number of tracked brands by the plan's brandSpy entitlement.
-  const { data: tracked } = await admin
-    .from('credit_transactions').select('reference_id')
-    .eq('user_id', user.id).eq('action_type', ACTION).eq('status', 'committed')
-  const trackedCount = new Set((tracked || []).map((t: any) => t.reference_id).filter(Boolean)).size
-  const gate = await requireUnder(admin, user.id, 'brandSpy', trackedCount)
+  // Plan gate: cap the number of tracked brands by the plan's brandSpy entitlement (count follows).
+  const { count: trackedCount } = await admin
+    .from('followed_brands').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+  const gate = await requireUnder(admin, user.id, 'brandSpy', trackedCount || 0)
   if (gate) return NextResponse.json(gate, { status: 402 })
 
-  // First time this user spies this brand (directory OR manual) → charge, queue a fresh
-  // thorough re-crawl, commit. Reserve→commit→refund on failure.
-  const cost = await getActionCost(admin, ACTION)
-  let txId: string | null = null
+  // Within the cap → track it (fresh thorough re-crawl) + follow for new-ad alerts. No credits.
   try {
-    if (cost && cost > 0) { const tx = await reserveCredits(admin, user.id, ACTION, pageId); txId = tx.id }
     await ensureTracked(admin, pageId, name, true)
     await ensureFollowed(admin, user.id, pageId, name)
-    if (txId) await commitCredits(admin, txId, { page_id: pageId })
-    return NextResponse.json({ pageId, charged: !!txId, cost: cost || 0 })
+    return NextResponse.json({ pageId, charged: false })
   } catch (e) {
-    if (txId) await refundCredits(admin, txId).catch(() => {})
-    if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: `Not enough credits — Brand Spy costs ${e.need}, you have ${e.have}.` }, { status: 402 })
     return NextResponse.json({ error: e instanceof Error ? e.message : 'failed to start spying' }, { status: 400 })
   }
 }

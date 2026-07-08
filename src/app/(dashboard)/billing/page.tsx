@@ -162,55 +162,9 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Pricing selector (shown when not active) */}
-      {!isActive && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 20, padding: 28 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 18 }}>
-            {isLocked ? 'Choose your plan to restore access' : 'Upgrade before your trial ends'}
-          </div>
-
-          {/* Plan toggle */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-            {(['monthly', 'annual'] as const).map(p => (
-              <div
-                key={p}
-                onClick={() => setPlan(p)}
-                style={{ border: `2px solid ${plan === p ? '#152928' : '#e5e7eb'}`, borderRadius: 14, padding: '16px 18px', cursor: 'pointer', position: 'relative', background: plan === p ? '#f0fdf4' : '#fff', transition: 'all .15s' }}
-              >
-                {p === 'annual' && (
-                  <div style={{ position: 'absolute', top: -10, right: 12, background: '#dffe95', color: '#10211f', fontSize: 10, fontWeight: 800, padding: '2px 10px', borderRadius: 100 }}>Save 20%</div>
-                )}
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{p === 'monthly' ? 'Monthly' : 'Annual'}</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                  <span style={{ fontSize: 30, fontWeight: 900, color: '#111' }}>{p === 'monthly' ? '$49' : '$39'}</span>
-                  <span style={{ fontSize: 13, color: '#888' }}>/mo</span>
-                </div>
-                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{p === 'monthly' ? 'Billed monthly' : '$470 billed yearly'}</div>
-                {plan === p && <div style={{ position: 'absolute', top: 12, right: 12, width: 18, height: 18, borderRadius: '50%', background: '#152928', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#dffe95', fontWeight: 900 }}>✓</div>}
-              </div>
-            ))}
-          </div>
-
-          {/* Features */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', marginBottom: 20 }}>
-            {FEATURES.map(f => (
-              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555' }}>
-                <span style={{ background: '#dffe95', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#10211f', flexShrink: 0 }}>✓</span>
-                {f}
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={() => checkout('checkout')}
-            disabled={loading}
-            style={{ width: '100%', padding: '14px', background: '#152928', color: '#dffe95', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
-          >
-            {loading ? 'Redirecting to Stripe…' : isLocked ? `Restore access — $${plan === 'monthly' ? '49' : '39'}/mo` : `Start paying — $${plan === 'monthly' ? '49' : '39'}/mo`}
-          </button>
-          <p style={{ fontSize: 11, color: '#aaa', textAlign: 'center', marginTop: 10 }}>Secure payment via Stripe · Cancel anytime</p>
-        </div>
-      )}
+      {/* NOTE: the plan grid above (PricingSection) is the single source of pricing. A legacy
+          hardcoded "$49/mo (no name)" selector used to render here too — it contradicted the real
+          plan cards (Starter $39 / Pro $99 / …), so it was removed. */}
 
       {/* Invite code */}
       {!isActive && (
