@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { CreditCounter } from '@/components/credits/CreditCounter'
+import { CreditModal } from '@/components/credits/CreditModal'
 import { NotificationBell } from '@/components/NotificationBell'
 import UpsellModalHost from '@/components/UpsellModal'
 import { usePathname, useRouter } from 'next/navigation'
@@ -332,6 +333,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </main>
         <UpsellModalHost />
+        <CreditModal />
       </div>
     </div>
   )
