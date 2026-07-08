@@ -43,17 +43,21 @@ export async function GET(request: NextRequest) {
     // ("mars men") still finds a shorter term ("mars") and vice-versa. (Full
     // page_name substring search returns once a pg_trgm GIN index is built via a
     // direct connection — deferred; not worth a per-keystroke seq-scan.)
-    const { data: trackedAll } = await (admin as any)
-      .from('discovery_crawl_terms')
-      .select('page_id, term')
-      .not('page_id', 'is', null)
-      .limit(8000)
-    const trackedHits: string[] = ((trackedAll || []) as any[])
-      .filter((t) => {
-        const nt = norm(t.term)
-        return nt && (nt.includes(nq) || nq.includes(nt))
-      })
-      .map((t) => t.page_id)
+    // DB-side match (crawl_terms is ~57K rows — the old `.limit(8000)` fetch-then-JS-filter only
+    // saw the first 8K, so most brands were invisible to search). Use a SPACE-INSENSITIVE regex
+    // (imatch): de-space the query and put `\s*` between each char, so "bugmd" and "bug md" both
+    // match the term "bug md". Regex on 57K rows is a fast seq-scan (~tens of ms).
+    const rxBody = nq.split('').map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*')
+    let trackedHits: string[] = []
+    if (nq.length >= 2) {
+      const { data: trackedAll } = await (admin as any)
+        .from('discovery_crawl_terms')
+        .select('page_id, term')
+        .not('page_id', 'is', null)
+        .filter('term', 'imatch', rxBody)
+        .limit(60)
+      trackedHits = ((trackedAll || []) as any[]).map((t) => t.page_id)
+    }
 
     const candidatePageIds = Array.from(new Set<string>(trackedHits)).slice(0, 12)
 
