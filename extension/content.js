@@ -212,10 +212,46 @@
 
     const fab = document.createElement('button')
     fab.className = 'sm-fab'
-    fab.title = 'Save the main media on this page to Selfmade'
+    fab.title = 'Save the main media on this page to Selfmade · drag to move'
     fab.innerHTML = '<img src="' + chrome.runtime.getURL('icons/icon48.png') + '" alt=""/>'
     document.documentElement.appendChild(fab)
-    fab.addEventListener('click', () => {
+
+    // Restore a user-chosen position (persisted), so it stays clear of a site's chat widget.
+    try {
+      const saved = JSON.parse(localStorage.getItem('sm_fab_pos') || 'null')
+      if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
+        fab.style.left = saved.left + 'px'; fab.style.top = saved.top + 'px'
+        fab.style.right = 'auto'; fab.style.bottom = 'auto'
+      }
+    } catch { /* ignore */ }
+
+    // Draggable, with a click/drag threshold so a normal click still saves.
+    let down = null, moved = false
+    const onMove = (e) => {
+      if (!down) return
+      const dx = e.clientX - down.x, dy = e.clientY - down.y
+      if (!moved && Math.hypot(dx, dy) < 5) return          // below threshold → still a click
+      moved = true; fab.classList.add('sm-dragging')
+      const w = fab.offsetWidth, h = fab.offsetHeight
+      const left = Math.min(Math.max(0, down.left + dx), window.innerWidth - w)
+      const top = Math.min(Math.max(0, down.top + dy), window.innerHeight - h)
+      fab.style.left = left + 'px'; fab.style.top = top + 'px'; fab.style.right = 'auto'; fab.style.bottom = 'auto'
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp)
+      if (moved) {
+        fab.classList.remove('sm-dragging')
+        try { localStorage.setItem('sm_fab_pos', JSON.stringify({ left: fab.offsetLeft, top: fab.offsetTop })) } catch { /* ignore */ }
+      }
+      down = null
+    }
+    fab.addEventListener('mousedown', (e) => {
+      const r = fab.getBoundingClientRect()
+      down = { x: e.clientX, y: e.clientY, left: r.left, top: r.top }; moved = false
+      document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp)
+    })
+    fab.addEventListener('click', (e) => {
+      if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; return }   // was a drag, not a click
       const el = biggestMediaIn(document)
       if (el) doSave(el, document, fab, { saving: '…', done: '✓' })
       else toast('No image or video found here', false)
