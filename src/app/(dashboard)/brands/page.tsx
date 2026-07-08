@@ -22,6 +22,8 @@ export default function BrandsPage() {
   const [brands, setBrands] = useState<Brand[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [form, setForm] = useState<any>({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '' })
 
   const load = async () => {
@@ -32,13 +34,26 @@ export default function BrandsPage() {
   useEffect(() => { load() }, [])
 
   const createBrand = async () => {
-    if (!form.name.trim()) return
-    await fetch('/api/brands', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...form, industry: csv(form.industry), usps: csv(form.usps) }),
-    })
-    setForm({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '' })
-    setCreating(false); load()
+    if (!form.name.trim() || saving) return
+    setSaving(true); setMsg(null)
+    try {
+      const r = await fetch('/api/brands', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...form, industry: csv(form.industry), usps: csv(form.usps) }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        // Most common: the plan's brand slots are used up (was failing silently → "nothing happens").
+        setMsg({ ok: false, text: d.message || (d.error === 'brand_limit_reached'
+          ? `You’ve used all ${d.limit ?? ''} brand slots on your plan — upgrade to add more.`
+          : d.error || 'Could not save the brand. Please try again.') })
+        return
+      }
+      setForm({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '' })
+      setCreating(false); setMsg({ ok: true, text: `✓ “${(d.brand?.name || form.name)}” saved.` })
+      await load()
+    } catch { setMsg({ ok: false, text: 'Network error — please try again.' }) }
+    finally { setSaving(false) }
   }
   const delBrand = async (id: string) => { if (confirm('Delete this brand and its products?')) { await fetch(`/api/brands/${id}`, { method: 'DELETE' }); load() } }
   const addProduct = async (brandId: string, name: string, price: string, imageUrl: string) => {
@@ -68,7 +83,14 @@ export default function BrandsPage() {
             <input style={input} placeholder="Tone (e.g. confident, scientific)" value={form.tone} onChange={e => setForm({ ...form, tone: e.target.value })} />
             <input style={input} placeholder="Target audience" value={form.target_audience} onChange={e => setForm({ ...form, target_audience: e.target.value })} />
           </div>
-          <button style={btn} onClick={createBrand}>Create brand</button>
+          <button style={{ ...btn, opacity: saving ? 0.7 : 1, cursor: saving ? 'default' : 'pointer' }} onClick={createBrand} disabled={saving}>{saving ? 'Saving…' : 'Create brand'}</button>
+        </div>
+      )}
+
+      {msg && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+          background: msg.ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${msg.ok ? '#bbf7d0' : '#fecaca'}`, color: msg.ok ? '#15803d' : '#dc2626' }}>
+          {msg.text}
         </div>
       )}
 

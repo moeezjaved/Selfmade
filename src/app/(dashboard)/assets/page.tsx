@@ -268,6 +268,10 @@ export default function AssetsPage() {
                         style={{ background: 'rgba(14,27,18,0.85)', color: '#dffe95', border: 'none', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Film size={11} /> {busyAnimate === a.id ? '…' : 'Animate'}
                       </button>
+                      <button onClick={() => downloadAsset(a)} title="Download this asset"
+                        style={{ background: 'rgba(255,255,255,0.9)', color: '#14281a', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Download size={11} />
+                      </button>
                     </div>
                   )}
                 </div>
