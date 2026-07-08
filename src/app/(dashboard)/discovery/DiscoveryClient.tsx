@@ -1891,15 +1891,11 @@ export default function DiscoveryPage() {
                     <button key={brand.pageId}
                       onMouseDown={e => {
                         e.preventDefault()
-                        // Atria-style: filter main feed to this brand's ads AND open the drawer.
-                        // setSearchMode('brand') ensures the search runs as page_name match,
-                        // so the main grid shows only Gymshark's creatives instead of any ad
-                        // mentioning "gym" in the body.
-                        setSearchInput(brand.name)
-                        setQuery(brand.name)
-                        setSearchMode('brand')
-                        setSelectedBrand({ pageId: brand.pageId, name: brand.name })
+                        // Atria-style: clicking a brand suggestion opens that brand's COMPLETE
+                        // page (Brand Spy dashboard — every ad, timeline, hooks), not just a
+                        // filtered feed. That's what the user expects from the brand result.
                         setShowDropdown(false)
+                        router.push(`/discovery/brand-spy/${brand.pageId}`)
                       }}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}

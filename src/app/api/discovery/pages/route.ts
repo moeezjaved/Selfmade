@@ -29,8 +29,9 @@ export async function GET(request: NextRequest) {
 
     const admin = createReadClient()
     const term = q.trim()
-    // Accent/diacritic-insensitive normalize: "gruns" ⇄ "Grüns", "cafe" ⇄ "café".
-    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+    // Accent- AND space/punctuation-insensitive normalize so "bugmd" ⇄ "Bug MD",
+    // "gruns" ⇄ "Grüns", "well-being" ⇄ "wellbeing". Strip everything but a-z0-9.
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
     const nq = norm(term)
 
     // ── 1. Search the tracked-brand list (small, fast) ────────────────
