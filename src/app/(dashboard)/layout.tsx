@@ -303,6 +303,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <div style={{height:1,background:"rgba(255,255,255,0.06)",margin:"4px 0"}}/>
                   {/* items */}
                   <div style={{padding:"4px 8px 8px"}}>
+                    <AcctItem href="/mcp" icon={Sparkles} label="API & MCP" />
                     <AcctItem href="/settings" icon={Settings} label="Settings" />
                     <AcctItem href="/team" icon={Users} label="Team & members" />
                     <AcctItem href="/billing" icon={CreditCard} label="Billing & plan" />
