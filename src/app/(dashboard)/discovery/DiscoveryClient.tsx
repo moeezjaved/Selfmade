@@ -295,7 +295,9 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
   useEffect(() => {
     if (!open) return
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    const onScroll = () => setOpen(false)
+    // Close on PAGE scroll (the menu is position:fixed and would detach) — but NOT when the user is
+    // scrolling inside the menu's own option list, which was snapping it shut ("scroll not working").
+    const onScroll = (e: Event) => { if (ref.current && ref.current.contains(e.target as Node)) return; setOpen(false) }
     document.addEventListener('mousedown', h)
     window.addEventListener('scroll', onScroll, { passive: true, capture: true })
     return () => { document.removeEventListener('mousedown', h); window.removeEventListener('scroll', onScroll, { capture: true } as any) }
