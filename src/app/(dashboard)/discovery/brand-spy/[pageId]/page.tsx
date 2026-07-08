@@ -296,11 +296,11 @@ function useBrandAds(pageId: string, opts: { days: number; format: string; statu
 const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' }) : '—')
 const FMT_BADGE: Record<string, string> = { Video: '#2075ff', Image: '#10b981', 'Carousel/DCO': '#f59e0b' }
 
-function AdCard({ a, onOpen }: { a: Card; onOpen: (a: Card) => void }) {
+function AdCard({ a, onOpen, onClone }: { a: Card; onOpen: (a: Card) => void; onClone?: (a: Card) => void }) {
   const isVideo = (a.format || '').toLowerCase().includes('video') || !!a.videoUrl
   const img = a.thumbnailUrl
   return (
-    <button onClick={() => onOpen(a)} style={{ textAlign: 'left', background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column' }}>
+    <div onClick={() => onOpen(a)} style={{ textAlign: 'left', background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
         <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#2075ff' }}>{(a.pageName || '?')[0]?.toUpperCase()}</div>
         <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.pageName}</div>
@@ -313,8 +313,9 @@ function AdCard({ a, onOpen }: { a: Card; onOpen: (a: Card) => void }) {
         {isVideo && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>▶</div></div>}
         <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[a.format || ''] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{a.format || 'Ad'}</span>
         {(a.daysRunning || 0) > 0 && <span style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{a.daysRunning}d</span>}
+        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(a) }} style={{ position: 'absolute', bottom: 8, left: 8, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: '#111', border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Clone</button>}
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -398,8 +399,10 @@ function AdLibrary({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: 
   const [status, setStatus] = useState('ALL')
   const [sort, setSort] = useState('newest')
   const { ads, loading, hasMore, total, loadMore } = useBrandAds(pageId, { days, format, status, sort })
+  const [cloneAd, setCloneAd] = useState<Card | null>(null)
   return (
     <div>
+      {cloneAd && <CloneModal ad={{ id: cloneAd.id, pageId, pageName: cloneAd.pageName, assetImageUrl: cloneAd.thumbnailUrl || undefined }} onClose={() => setCloneAd(null)} />}
       {/* Analytics header — Media Mix · Top Landing Pages · Top Hooks (Foreplay layout) */}
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr 1fr', gap: 12, marginBottom: 16 }}>
         <MediaMix d={d} />
@@ -430,7 +433,7 @@ function AdLibrary({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: 
       {ads.length === 0 && loading && <div style={{ color: '#9ca3af', fontSize: 14, padding: 20 }}>Loading ads…</div>}
       {ads.length === 0 && !loading && <div style={{ color: '#9ca3af', fontSize: 14, padding: 20 }}>No ads match these filters.</div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 12 }}>
-        {ads.map((a) => <AdCard key={a.id} a={a} onOpen={onOpen} />)}
+        {ads.map((a) => <AdCard key={a.id} a={a} onOpen={onOpen} onClone={setCloneAd} />)}
       </div>
       {hasMore && (
         <div style={{ textAlign: 'center', marginTop: 18 }}>
