@@ -51,6 +51,7 @@ export async function GET(req: NextRequest) {
     const cre = cres.find((c: any) => (c.asset_type === 'video' ? c.poster_url : c.r2_url)) || cres[0]
     const isVideo = cre?.asset_type === 'video'
     const image = cre ? (isVideo ? cre.poster_url : cre.r2_url) : null
+    const videoUrl = isVideo ? (cre?.r2_url || null) : null  // the mp4 → hover-to-play in the grid
     const lastSeen = r.last_seen ? Date.parse(r.last_seen) : NaN
     const ageDays = Number.isNaN(lastSeen) ? 999 : (now - lastSeen) / DAY
     const recency = ageDays <= 7 ? 0.05 : ageDays <= 30 ? 0.02 : 0
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
     const perf = Number(r.performance_score) || 0
     return {
       adId: r.ad_id, pageId: r.page_id, pageName: r.page_name || 'Brand',
-      image, isVideo, score: perf, format: r.format_style || null, hook: r.hook_type || null,
+      image, isVideo, videoUrl, score: perf, format: r.format_style || null, hook: r.hook_type || null,
       saves: saves7d, isActive: !!r.is_active, daysRunning: r.days_running || null,
       trendScore: perf + recency + saveBoost,
     }
