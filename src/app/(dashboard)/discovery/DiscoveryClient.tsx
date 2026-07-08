@@ -2033,7 +2033,8 @@ export default function DiscoveryPage() {
           <FilterDropdown label="Angle" options={ANGLE_OPTS} selected={angles} onToggle={toggle(setAngles)} onClear={() => setAngles([])} />
           <FilterDropdown label="UGC / Studio" options={FORMATSTYLE_OPTS} selected={formatStyles} onToggle={toggle(setFormatStyles)} onClear={() => setFormatStyles([])} />
           <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable />
-          <FilterDropdown label="CTA style" options={CTASTYLE_OPTS} selected={ctaStyles} onToggle={toggle(setCtaStyles)} onClear={() => setCtaStyles([])} />
+          {/* CTA style filter hidden — the cta_style column is 0% populated (classifier hasn't
+              emitted it yet), so it only ever returned "No ads match". Re-enable once populated. */}
           <FilterDropdown
             label="Format"
             options={FORMAT_OPTS.map(f => ({ value: f, label: f, icon: f === 'Video' ? '🎬' : f === 'Carousel' ? '🔁' : '🖼' }))}
@@ -2057,15 +2058,9 @@ export default function DiscoveryPage() {
             onToggle={v => setStatus(prev => prev === v ? 'ALL' : v)}
             onClear={() => setStatus('ALL')}
           />
-          <FilterDropdown
-            label="Language"
-            options={availableLanguages.length
-              ? availableLanguages.map(l => ({ value: l, label: l }))
-              : Object.values(LANG_NAMES).sort().map(l => ({ value: l, label: l }))
-            }
-            selected={language} onToggle={toggle(setLanguage)} onClear={() => setLanguage([])}
-            searchable
-          />
+          {/* Language filter hidden — the `languages` column is ~0.1% populated (Meta sends no
+              language field; needs text detection), so it returned "No ads match". Re-enable
+              once a language-detection backfill fills the column. */}
           <FilterDropdown
             label="Theme"
             options={THEME_LIST.map(t => ({ value: t, label: t }))}
