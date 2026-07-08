@@ -606,29 +606,58 @@ function TimelineTab({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a
 
 const TABS = [['overview', 'Overview'], ['library', 'Ad Library'], ['hooks', 'Hooks'], ['personas', 'Personas'], ['angles', 'Ad angles'], ['usps', 'USPs'], ['desires', 'Desires'], ['emotions', 'Emotions'], ['themes', 'Themes'], ['tests', 'Creative Tests'], ['timeline', 'Timeline'], ['landing', 'Landing Pages']] as const
 
-// Per-brand email alerts — opt in right from the brand you're spying. Costs 2 credits per email.
-function EmailAlertToggle({ pageId, brandName }: { pageId: string; brandName?: string }) {
-  const [on, setOn] = useState<boolean | null>(null)
+// Viewing-vs-Spying controls. Landing here from search is VIEW-ONLY — nothing is tracked until the
+// user explicitly clicks "Spy this brand" (adds a followed_brands row → 6h re-crawl + new-ad alerts).
+// Email alerts are only offered once spying (turning them on auto-spies too).
+function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string }) {
+  const [spied, setSpied] = useState<boolean | null>(null)   // null = still loading
+  const [emailOn, setEmailOn] = useState(false)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     fetch('/api/follows').then(r => r.json()).then(j => {
       const b = (j.brands || []).find((x: any) => String(x.page_id) === String(pageId))
-      setOn(!!b?.email_alerts)
-    }).catch(() => setOn(false))
+      setSpied(!!b); setEmailOn(!!b?.email_alerts)
+    }).catch(() => setSpied(false))
   }, [pageId])
-  const toggle = async () => {
-    if (on == null || busy) return
-    const next = !on
-    setBusy(true); setOn(next)
+
+  const toggleSpy = async () => {
+    if (spied == null || busy) return
+    const next = !spied
+    if (!next && !confirm(`Stop spying on ${brandName || 'this brand'}? You'll no longer get its new-ad updates.`)) return
+    setBusy(true); setSpied(next); if (!next) setEmailOn(false)
+    try {
+      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: next ? 'follow' : 'unfollow', pageId, brandName }) })
+    } catch { setSpied(!next) } finally { setBusy(false) }
+  }
+  const toggleEmail = async () => {
+    if (busy) return
+    const next = !emailOn
+    setBusy(true); setEmailOn(next); if (next) setSpied(true)
     try {
       await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'set_email', pageId, brandName, email_alerts: next }) })
-    } catch { setOn(!next) } finally { setBusy(false) }
+    } catch { setEmailOn(!next) } finally { setBusy(false) }
   }
+
+  if (spied == null) return null
+  const badge: React.CSSProperties = { fontSize: 11.5, fontWeight: 800, letterSpacing: '.02em', padding: '4px 10px', borderRadius: 100 }
   return (
-    <button onClick={toggle} title="Get emailed when this brand launches new ads (2 credits per email)"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 100, cursor: on == null ? 'default' : 'pointer', border: '1px solid', borderColor: on ? '#1a3a1a' : '#d1d5db', background: on ? '#1a3a1a' : '#fff', color: on ? '#dffe95' : '#374151', opacity: on == null ? 0.5 : 1 }}>
-      🔔 {on ? 'Email alerts on' : 'Email me new ads'} <span style={{ opacity: 0.7, fontWeight: 600 }}>· 2 cr</span>
-    </button>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <span style={{ ...badge, background: spied ? '#dcfce7' : '#eef2f7', color: spied ? '#166534' : '#64748b', border: `1px solid ${spied ? '#bbf7d0' : '#e2e8f0'}` }}>
+        {spied ? '✓ Spying' : '👁 Viewing'}
+      </span>
+      <button onClick={toggleSpy} disabled={busy}
+        title={spied ? 'Stop tracking this brand' : 'Track this brand — re-crawls every 6h and alerts you to new ads'}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 800, padding: '6px 14px', borderRadius: 100, cursor: busy ? 'default' : 'pointer',
+          border: '1px solid', borderColor: spied ? '#d1d5db' : '#1a3a1a', background: spied ? '#fff' : '#1a3a1a', color: spied ? '#6b7280' : '#dffe95', opacity: busy ? 0.6 : 1 }}>
+        {spied ? 'Stop spying' : '＋ Spy this brand'}
+      </button>
+      {spied && (
+        <button onClick={toggleEmail} disabled={busy} title="Get emailed when this brand launches new ads (2 credits per email)"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 100, cursor: busy ? 'default' : 'pointer', border: '1px solid', borderColor: emailOn ? '#1a3a1a' : '#d1d5db', background: emailOn ? '#1a3a1a' : '#fff', color: emailOn ? '#dffe95' : '#374151' }}>
+          🔔 {emailOn ? 'Email alerts on' : 'Email me new ads'} <span style={{ opacity: 0.7, fontWeight: 600 }}>· 2 cr</span>
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -677,10 +706,10 @@ export default function BrandSpyDetail() {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', margin: '4px 0 2px' }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, color: '#111', margin: 0 }}>{d.brand.name}</h1>
-        <EmailAlertToggle pageId={pageId} brandName={d.brand.name} />
+        <SpyControls pageId={pageId} brandName={d.brand.name} />
       </div>
       <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 18 }}>
-        {s.firstSeen ? `Earliest ad ${new Date(s.firstSeen).toLocaleDateString()}` : 'Spying since first crawl'}
+        {s.firstSeen ? `Earliest ad ${new Date(s.firstSeen).toLocaleDateString()}` : 'Brand analytics'}
         {s.dataAsOf ? <span> · <span style={{ color: '#16a34a', fontWeight: 600 }}>data as of {new Date(s.dataAsOf).toLocaleString()}</span></span> : null}
       </div>
 
