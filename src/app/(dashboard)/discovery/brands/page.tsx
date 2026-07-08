@@ -66,16 +66,20 @@ export default function BrandsPage() {
   // Spy = enqueue an on-demand crawl of this brand's ads (+ charge once per user), THEN open the
   // spy view. Most directory brands aren't crawled yet, so this POST is what makes them useful.
   const [spying, setSpying] = useState<string | null>(null)
-  const spy = async (b: Brand) => {
+  const [confirmSpy, setConfirmSpy] = useState<Brand | null>(null)   // in-app dialog (replaces window.confirm)
+  const spy = (b: Brand) => {
     if (b.isSpied) { window.location.assign(`/discovery/brand-spy/${b.pageId}`); return }
-    if (!confirm(`Spy "${b.name}"?\n\nWe'll crawl their full ad archive from the Meta Ad Library. This spends Brand Spy credits the first time (free to re-open after).`)) return
-    setSpying(b.pageId); setError(null)
+    setConfirmSpy(b)
+  }
+  const doSpy = async (b: Brand) => {
+    setConfirmSpy(null); setSpying(b.pageId); setError(null)
     try {
       const r = await fetch('/api/discovery/brand-spy', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pageId: b.pageId, name: b.name }),
       })
-      const d = await r.json()
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 402) throw new Error(d.message || 'You’ve hit your plan’s tracked-brand limit — upgrade to track more.')
       if (!r.ok) throw new Error(d.error || 'failed to start spying')
       window.location.assign(`/discovery/brand-spy/${b.pageId}`)
     } catch (e) { setError(e instanceof Error ? e.message : 'failed to start spying'); setSpying(null) }
@@ -160,6 +164,22 @@ export default function BrandsPage() {
         )}
         <div ref={sentinel} style={{ height: 1 }} />
       </div>
+
+      {/* In-app spy confirmation (replaces window.confirm) */}
+      {confirmSpy && (
+        <div onClick={() => setConfirmSpy(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(14,27,18,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 'min(440px,96vw)', background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 24px 70px rgba(0,0,0,0.35)' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#111' }}>Spy “{confirmSpy.name}”?</div>
+            <div style={{ fontSize: 13.5, color: '#6b7280', marginTop: 8, lineHeight: 1.55 }}>
+              We’ll crawl their full ad archive from the Meta Ad Library and track it over time. This uses one of your plan’s tracked-brand slots — it’s free within your plan.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button onClick={() => setConfirmSpy(null)} style={{ background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={() => doSpy(confirmSpy)} style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '9px 22px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Spy this brand</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

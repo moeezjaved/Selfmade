@@ -12,6 +12,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireUnder } from '@/lib/entitlements'
+import { getUserOrg } from '@/lib/org'
+
+// All user_ids in the requester's org — spied brands are shared across the org's one workspace.
+async function orgMemberIds(admin: any, userId: string): Promise<string[]> {
+  try {
+    const org = await getUserOrg(admin, userId)
+    const { data } = await admin.from('org_members').select('user_id').eq('org_id', org.orgId)
+    const ids = new Set<string>([userId, ...((data || []) as any[]).map((m: any) => String(m.user_id))])
+    return Array.from(ids)
+  } catch { return [userId] }
+}
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 20
@@ -30,10 +41,10 @@ export async function GET(req: NextRequest) {
 
   let myPageIds: string[] | null = null
   if (scope === 'mine') {
-    // "Spied" = the brands the user follows (followed_brands). This is the single source of truth:
-    // spying inserts the row, un-spying deletes it, and the plan's brandSpy cap counts these. Tracked
-    // brands are an INCLUDED plan feature (a cap), NOT a credit purchase — so there's no ledger to read.
-    const { data: follows } = await admin.from('followed_brands').select('page_id').eq('user_id', user.id)
+    // "Spied" = the brands the ORG follows (followed_brands across all org members — one shared
+    // workspace, so a team member sees every brand the owner/teammates spied, not just their own).
+    const ids = await orgMemberIds(admin, user.id)
+    const { data: follows } = await admin.from('followed_brands').select('page_id').in('user_id', ids)
     myPageIds = Array.from(new Set<string>(((follows || []) as any[]).map((f: any) => String(f.page_id)).filter((x: string) => x && x !== 'null')))
     if (myPageIds.length === 0) return NextResponse.json({ brands: [], scope: 'mine' })
   }
