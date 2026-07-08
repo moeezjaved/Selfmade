@@ -421,6 +421,15 @@ export default function SavedAdsPage() {
                         <button onClick={() => setTagInput(saved.id)} style={{ fontSize: 10.5, fontWeight: 700, color: '#6b7280', background: '#f1f5f9', border: 'none', padding: '2px 8px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit' }}>+ tag</button>
                       )}
                     </div>
+                    {/* Clone CTA — prominent footer so it's unmissable */}
+                    <div style={{ marginTop: 'auto', padding: '0 12px 12px' }}>
+                      <button onClick={() => (isVid ? setCloneVid(saved) : setCloneImg(saved))}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 12px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 10, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#12290f')}
+                        onMouseLeave={e => (e.currentTarget.style.background = '#1a3a1a')}>
+                        <Sparkles size={14} /> Clone{isVid ? ' video' : ''} with my product
+                      </button>
+                    </div>
                   </div>
                 )
               })}
