@@ -21,6 +21,8 @@ export interface CreditState {
   balance: number
   plan: string
   reset_at: string | null
+  trialing: boolean
+  trial_ends_at: string | null
   pricing: Record<string, { label: string; credits: number }>
   loading: boolean
 }
@@ -32,7 +34,7 @@ export function useCredits(): CreditState & { refetch: () => void } {
   // client rendered the cached '90' → React hydration #425/#418/#423 → the whole dashboard tree got
   // discarded ("feed vanishes"). We seed from cache in the post-mount effect below instead, so the
   // server HTML and first client render match. (Trades a 1-tick '…' on the pill for not breaking the page.)
-  const [s, setS] = useState<CreditState>({ balance: 0, plan: 'trial', reset_at: null, pricing: {}, loading: true })
+  const [s, setS] = useState<CreditState>({ balance: 0, plan: 'trial', reset_at: null, trialing: false, trial_ends_at: null, pricing: {}, loading: true })
   const refetch = useCallback(async () => {
     try {
       const r = await fetch('/api/credits/balance')
@@ -40,7 +42,7 @@ export function useCredits(): CreditState & { refetch: () => void } {
       const d = await r.json()
       const balance = d.balance ?? 0
       if (typeof window !== 'undefined') localStorage.setItem(BAL_CACHE, String(balance))
-      setS({ balance, plan: d.plan ?? 'trial', reset_at: d.reset_at ?? null, pricing: d.pricing ?? {}, loading: false })
+      setS({ balance, plan: d.plan ?? 'trial', reset_at: d.reset_at ?? null, trialing: !!d.trialing, trial_ends_at: d.trial_ends_at ?? null, pricing: d.pricing ?? {}, loading: false })
     } catch { setS(p => ({ ...p, loading: false })) }
   }, [])
   useEffect(() => {
@@ -69,12 +71,15 @@ export function confirmCredits(action: string, credits: number, balance: number)
 }
 
 export function CreditCounter({ compact = false }: { compact?: boolean }) {
-  const { balance, loading, plan } = useCredits()
+  const { balance, loading, plan, trialing } = useCredits()
   const low = balance < 15  // below the priciest action (image_clone)
+  const title = trialing
+    ? `Trial · ${balance} credits — your full plan credits unlock when the trial ends, or click to pay now & unlock`
+    : `Plan: ${plan} · ${balance} credits`
   return (
     <button type="button"
        onClick={() => openCredits(low ? 'buy' : 'plan')}
-       title={`Plan: ${plan} · ${balance} credits`}
+       title={title}
        style={{
          display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit',
          padding: compact ? '4px 10px' : '6px 12px', borderRadius: 999,

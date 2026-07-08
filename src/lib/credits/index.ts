@@ -78,7 +78,7 @@ export async function getBalance(admin: SupabaseClient, userId: string) {
   const owner = await resolveBillingOwner(admin, userId)
   await admin.rpc('ensure_monthly_reset', { p_user: owner })
   const [{ data: prof }, { data: wallet }] = await Promise.all([
-    admin.from('user_profiles').select('credits_balance, plan_id, credits_reset_at').eq('user_id', owner).maybeSingle(),
+    admin.from('user_profiles').select('credits_balance, plan_id, credits_reset_at, subscription_status, trial_ends_at').eq('user_id', owner).maybeSingle(),
     admin.from('credit_wallets').select('plan_credits_balance, topup_credits_balance, plan_credits_reset_at').eq('owner_id', owner).maybeSingle(),
   ])
   const plan_credits = (wallet as any)?.plan_credits_balance ?? 0
@@ -88,6 +88,9 @@ export async function getBalance(admin: SupabaseClient, userId: string) {
     plan_credits, topup_credits,
     plan: prof?.plan_id ?? 'free',
     reset_at: (wallet as any)?.plan_credits_reset_at ?? prof?.credits_reset_at ?? null,
+    // Trial state — powers the "full credits unlock at trial end / pay now" messaging.
+    trialing: (prof as any)?.subscription_status === 'trialing',
+    trial_ends_at: (prof as any)?.trial_ends_at ?? null,
   }
 }
 

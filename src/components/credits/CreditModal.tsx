@@ -25,7 +25,7 @@ export function openCredits(view: 'plan' | 'buy' = 'plan', reason?: string) {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { view, reason } }))
 }
 
-interface Balance { balance: number; plan_credits: number; topup_credits: number; plan: string; reset_at: string | null }
+interface Balance { balance: number; plan_credits: number; topup_credits: number; plan: string; reset_at: string | null; trialing?: boolean; trial_ends_at?: string | null }
 
 export function CreditModal() {
   const [open, setOpen] = useState(false)
@@ -33,6 +33,7 @@ export function CreditModal() {
   const [reason, setReason] = useState<string | null>(null)
   const [bal, setBal] = useState<Balance | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [unlocking, setUnlocking] = useState(false)
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
 
@@ -70,7 +71,9 @@ export function CreditModal() {
   const topupCredits = bal?.topup_credits ?? 0
   const total = bal?.balance ?? planCredits + topupCredits
   const canBuy = ent.canBuyCredits
-  const resetDate = bal?.reset_at ? new Date(bal.reset_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null
+  const fmtDate = (s?: string | null) => s ? new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null
+  const resetDate = fmtDate(bal?.reset_at)
+  const trialEndDate = fmtDate(bal?.trial_ends_at)
 
   const buy = async (packId: string) => {
     setBusy(packId)
@@ -85,6 +88,23 @@ export function CreditModal() {
     } catch { setReason('Network error — try again.'); setBusy(null) }
   }
 
+  // End the trial now → charge the saved card → unlock the full plan credit pool.
+  const unlockNow = async () => {
+    setUnlocking(true); setReason(null)
+    try {
+      const r = await fetch('/api/billing/end-trial', { method: 'POST' })
+      const j = await r.json()
+      if (r.ok && j.ok) {
+        window.dispatchEvent(new Event('credits:refresh'))  // update the sidebar pill
+        await load()                                          // refresh the modal figures
+        setReason('✓ Your full plan credits are now unlocked.')
+      } else {
+        setReason(j.message || j.error || 'Could not process payment — please check your card in Billing.')
+      }
+    } catch { setReason('Network error — try again.') }
+    finally { setUnlocking(false) }
+  }
+
   return createPortal(
     <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,20,15,0.55)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(560px, 96vw)', maxHeight: '90vh', overflow: 'auto', background: '#fff', borderRadius: 18, boxShadow: '0 24px 80px rgba(0,0,0,0.4)', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -96,6 +116,22 @@ export function CreditModal() {
 
         {reason && (
           <div style={{ margin: '14px 22px 0', background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', borderRadius: 10, padding: '10px 12px', fontSize: 13 }}>{reason}</div>
+        )}
+
+        {/* Trial banner — full plan credits are held back until the trial converts (anti-abuse). */}
+        {bal?.trialing && (
+          <div style={{ margin: '14px 22px 0', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: INK }}>🎁 You're on a free trial</div>
+            <div style={{ fontSize: 12.5, color: '#3f6b4a', marginTop: 4, lineHeight: 1.5 }}>
+              Your full {ent.label} credits{monthlyLimit != null ? ` (${monthlyLimit.toLocaleString()}/mo)` : ''} unlock when your trial ends
+              {trialEndDate ? <> on <b>{trialEndDate}</b></> : ''}. Want them now?
+            </div>
+            <button onClick={unlockNow} disabled={unlocking}
+              style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 7, background: INK, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: unlocking ? 'default' : 'pointer', fontFamily: 'inherit', opacity: unlocking ? 0.7 : 1 }}>
+              {unlocking ? <><Loader2 size={14} className="spin" /> Unlocking…</> : <><Zap size={14} /> Pay now &amp; unlock credits</>}
+            </button>
+            <div style={{ fontSize: 11, color: '#6b8f6b', marginTop: 7 }}>Ends your trial early and charges your saved card today. Cancel anytime.</div>
+          </div>
         )}
 
         {view === 'plan' ? (

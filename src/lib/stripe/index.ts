@@ -117,6 +117,12 @@ export async function handleStripeWebhook(payload: string, signature: string) {
   const { createAdminClient } = await import('@/lib/supabase/server')
   const supabase = createAdminClient()
 
+  // During the free trial we grant only a small credit allowance (not the full plan pool) so a
+  // user can't sign up, burn thousands of credits of compute, and cancel before the first charge.
+  // The cap is written to subscriptions.monthly_credits_override, which apply_plan reads; it's
+  // cleared to null the moment the trial converts to a paid subscription → full pool unlocks.
+  const TRIAL_CREDIT_CAP = parseInt(process.env.TRIAL_CREDIT_CAP || '150', 10)
+
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
@@ -152,11 +158,14 @@ export async function handleStripeWebhook(payload: string, signature: string) {
       const cycle = session.metadata?.cycle || 'monthly'
       const periodEnd = new Date((sub as any).current_period_end * 1000).toISOString()
 
+      const startingTrial = sub.status === 'trialing'
       await supabase.from('subscriptions').upsert({
         owner_id: userId, plan: plan || undefined, billing_cycle: cycle, status: sub.status,
         stripe_customer_id: session.customer as string, stripe_subscription_id: subscriptionId,
         current_period_start: new Date((sub as any).current_period_start * 1000).toISOString(),
         current_period_end: periodEnd, trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+        // Cap credits during the trial; full pool unlocks when it converts (see subscription.updated).
+        monthly_credits_override: startingTrial ? TRIAL_CREDIT_CAP : null,
         scheduled_plan: null, updated_at: new Date().toISOString(),
       }, { onConflict: 'owner_id' })
 
@@ -190,9 +199,15 @@ export async function handleStripeWebhook(payload: string, signature: string) {
       const mappedPlan = planFromPriceId((sub as any).items?.data?.[0]?.price?.id)
       const activeNow = sub.status === 'active' || sub.status === 'trialing'
 
+      // Trial just converted to a paid subscription? (Stripe sends the prior status in previous_attributes.)
+      const prevStatus = (event.data as any).previous_attributes?.status
+      const justConverted = prevStatus === 'trialing' && sub.status === 'active'
+
       await supabase.from('subscriptions').update({
         status: sub.status, current_period_end: periodEnd,
         ...(mappedPlan && activeNow ? { plan: mappedPlan } : {}),
+        // Keep the credit cap while trialing; drop it the moment the sub is active (full pool unlocks).
+        ...(sub.status === 'trialing' ? { monthly_credits_override: TRIAL_CREDIT_CAP } : sub.status === 'active' ? { monthly_credits_override: null } : {}),
         trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
         updated_at: new Date().toISOString(),
       }).eq('owner_id', userId)
@@ -202,8 +217,15 @@ export async function handleStripeWebhook(payload: string, signature: string) {
         trial_ends_at: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
       }).eq('user_id', userId)
 
-      // Refill entitlements/credits to the new tier's allotment when the plan actually changed.
-      if (mappedPlan && activeNow) await supabase.rpc('apply_plan', { p_user: userId, p_plan: mappedPlan, p_reset: periodEnd })
+      // Grant credits (apply_plan reads the override we just set → capped while trialing, full once active).
+      // On a trial→paid conversion the price map can miss, so fall back to the stored plan so the full
+      // pool always unlocks on the first real payment.
+      let creditPlan = mappedPlan
+      if (!creditPlan && justConverted) {
+        const { data: row } = await supabase.from('subscriptions').select('plan').eq('owner_id', userId).maybeSingle()
+        creditPlan = (row as any)?.plan || null
+      }
+      if (creditPlan && activeNow) await supabase.rpc('apply_plan', { p_user: userId, p_plan: creditPlan, p_reset: periodEnd })
       break
     }
 
