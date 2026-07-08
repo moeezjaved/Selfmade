@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Flame, Search, Sparkles, Play, ChevronDown, Loader2, ArrowUpRight } from 'lucide-react'
 import CloneModal from '../discovery/CloneModal'
 
-type Ad = { adId: string; pageId: string; pageName: string; image: string | null; isVideo: boolean; score: number; format: string | null; hook: string | null; saves: number; isActive: boolean; daysRunning: number | null }
+type Ad = { adId: string; pageId: string; pageName: string; image: string | null; isVideo: boolean; videoUrl?: string | null; score: number; format: string | null; hook: string | null; saves: number; isActive: boolean; daysRunning: number | null }
 type BrandW = { pageId: string; pageName: string; adCount: number; activeCount: number; avgScore: number; image: string | null }
 type FormatW = { format: string; count: number; samples: string[] }
 
@@ -30,6 +30,7 @@ export default function TrendingPage() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [nicheQuery, setNicheQuery] = useState('')
   const [cloneAd, setCloneAd] = useState<Ad | null>(null)
+  const [hoverId, setHoverId] = useState<string | null>(null)   // hover-to-play video in the grid
   const [visible, setVisible] = useState(12)
   const [brands, setBrands] = useState<BrandW[]>([])
   const [formats, setFormats] = useState<FormatW[]>([])
@@ -135,12 +136,18 @@ export default function TrendingPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 14 }}>
             {shown.map((ad, i) => (
               <article key={ad.adId} style={{ borderRadius: 16, position: 'relative', background: '#fff', border: '1px solid #eef0ee', overflow: 'hidden' }}>
-                <div style={{ position: 'relative', aspectRatio: '3/4', background: '#0d120e', overflow: 'hidden' }}>
-                  {ad.image
+                <div
+                  onMouseEnter={() => ad.isVideo && ad.videoUrl && setHoverId(ad.adId)}
+                  onMouseLeave={() => setHoverId(h => (h === ad.adId ? null : h))}
+                  style={{ position: 'relative', aspectRatio: '3/4', background: '#0d120e', overflow: 'hidden' }}
+                >
+                  {ad.isVideo && ad.videoUrl && hoverId === ad.adId
+                    ? <video src={ad.videoUrl} poster={ad.image ? img(ad.image) : undefined} autoPlay muted loop playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : ad.image
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={img(ad.image)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <div style={{ width: '100%', height: '100%' }} />}
-                  {ad.isVideo && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Play size={18} color="#fff" fill="#fff" /></div></div>}
+                  {ad.isVideo && hoverId !== ad.adId && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}><div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Play size={18} color="#fff" fill="#fff" /></div></div>}
                   {/* rank + performance badge */}
                   <span style={{ position: 'absolute', top: 8, left: 8, background: i < 3 ? '#e8590c' : 'rgba(0,0,0,.62)', color: '#fff', borderRadius: 20, fontSize: 11, fontWeight: 700, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <Flame size={11} /> {Math.round(ad.score * 100)}

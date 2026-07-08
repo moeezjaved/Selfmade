@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import CloneModal from '../../CloneModal'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area,
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -318,6 +319,8 @@ function AdCard({ a, onOpen }: { a: Card; onOpen: (a: Card) => void }) {
 }
 
 function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
+  const { pageId } = useParams() as { pageId: string }
+  const [cloning, setCloning] = useState(false)
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h)
@@ -348,7 +351,9 @@ function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
             </div>
           </div>
           <div style={{ padding: 18, borderLeft: '1px solid #f3f4f6' }}>
+            <button onClick={() => setCloning(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', background: '#111', color: ACCENT, fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 10, fontFamily: 'inherit' }}>✨ Clone this ad</button>
             <a href={a.snapshotUrl || '#'} target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: ACCENT, color: '#111', fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 10, textDecoration: 'none', marginBottom: 14 }}>Open in Meta Ad Library ↗</a>
+            {cloning && <CloneModal ad={{ id: a.id, pageId, pageName: a.pageName, assetImageUrl: a.thumbnailUrl || undefined }} onClose={() => setCloning(false)} />}
             <Row k="Status" v={a.isActive ? <span style={{ color: '#16a34a', fontWeight: 700 }}>● Still Running{a.startDate ? ` from ${fmtDate(a.startDate)}` : ''}</span> : <span style={{ color: '#9ca3af' }}>Inactive{a.stopDate ? ` (ended ${fmtDate(a.stopDate)})` : ''}</span>} />
             <Row k="Time Running" v={`${a.daysRunning || 0} day${(a.daysRunning || 0) === 1 ? '' : 's'}`} />
             <Row k="Format" v={a.format || '—'} />
