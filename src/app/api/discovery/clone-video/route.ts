@@ -12,6 +12,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { uploadBufferToR2 } from '@/lib/r2'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120   // may fetch the source mp4 from fbcdn on-demand if it isn't drained yet
 
 // Seedance fetches image_urls by URL, so any uploaded data-URL product image must land in R2 first.
 async function toPublicUrl(userId: string, src: string, i: number): Promise<string | null> {
@@ -44,12 +45,38 @@ export async function POST(req: NextRequest) {
   // ── Resolve the competitor ad's playable video (the motion/pacing reference) ──
   const { data: ad } = await admin
     .from('discovery_ads_index')
-    .select('ad_id, discovery_creatives(asset_type, r2_url, position)')
+    .select('ad_id, format, raw_video_urls, discovery_creatives(asset_type, r2_url, position)')
     .eq('ad_id', sourceAdId)
     .maybeSingle()
   const creatives = (((ad as any)?.discovery_creatives) || []).slice().sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
-  const sourceVideo = creatives.find((c: any) => c.asset_type === 'video' && c.r2_url)?.r2_url || null
-  if (!sourceVideo) return NextResponse.json({ error: 'this ad has no video to clone (image-only ad)' }, { status: 400 })
+  let sourceVideo = creatives.find((c: any) => c.asset_type === 'video' && c.r2_url)?.r2_url || null
+
+  // If the video isn't drained to R2 yet, fetch it ON-DEMAND from fbcdn (Meta's video CDN serves
+  // to any IP), so a freshly-spied competitor can be cloned immediately instead of waiting on the
+  // background drain. Only genuinely image-only ads (no video at all) get the hard error.
+  if (!sourceVideo) {
+    const rawVids: string[] = ((ad as any)?.raw_video_urls || []).filter((u: any) => typeof u === 'string')
+    const isVideoAd = /video/i.test((ad as any)?.format || '') || rawVids.length > 0
+    if (!isVideoAd) return NextResponse.json({ error: 'This is an image-only ad — use "Clone as image ad" instead.' }, { status: 400 })
+    if (rawVids.length === 0) return NextResponse.json({ error: 'This video hasn\'t finished downloading yet. It\'s queued — please try again in a few minutes.' }, { status: 409 })
+    try {
+      const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 60_000)
+      const vr = await fetch(rawVids[0], { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.facebook.com/' } })
+      clearTimeout(timer)
+      if (!vr.ok) throw new Error(`fbcdn ${vr.status}`)
+      const buf = Buffer.from(await vr.arrayBuffer())
+      if (buf.byteLength < 10_000) throw new Error('placeholder/empty')
+      sourceVideo = await uploadBufferToR2(buf, `videos/${sourceAdId}.mp4`, 'video/mp4')
+      // Persist so future clones/serving find it without re-fetching.
+      if (sourceVideo) await admin.from('discovery_creatives').upsert(
+        { ad_id: sourceAdId, position: 0, asset_type: 'video', r2_url: sourceVideo, hash: null },
+        { onConflict: 'ad_id,position,asset_type' },
+      ).then(() => {}, () => {})
+    } catch {
+      return NextResponse.json({ error: 'Couldn\'t fetch this video just now — the source link may have expired. Re-spy the brand to refresh it, then try again.' }, { status: 409 })
+    }
+    if (!sourceVideo) return NextResponse.json({ error: 'Couldn\'t stage the source video — please try again shortly.' }, { status: 502 })
+  }
 
   // NO credits reserved here — analysis (Gemini + gpt) is cheap and free to the user. Credits are
   // reserved at POST …/approve, once the user has SEEN and approved the script. status='analyzing'.
