@@ -4,11 +4,13 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import PricingSection from '@/components/pricing/PricingSection'
+import { PLANS, normalizePlan } from '@/lib/plans'
 
 interface Profile {
   subscription_status: string
   trial_ends_at: string | null
   stripe_customer_id: string | null
+  plan_id?: string | null
 }
 
 const FEATURES = [
@@ -38,7 +40,7 @@ export default function BillingPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       supabase.from('user_profiles')
-        .select('subscription_status, trial_ends_at, stripe_customer_id')
+        .select('subscription_status, trial_ends_at, stripe_customer_id, plan_id')
         .eq('user_id', user.id).single()
         .then(({ data }) => setProfile(data))
     })
@@ -122,11 +124,8 @@ export default function BillingPage() {
           <div style={{ position: 'absolute', top: 0, left: '20%', right: '20%', height: '1.5px', background: 'linear-gradient(90deg,transparent,#dffe95,transparent)' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(223,254,149,0.6)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>Selfmade Pro — Active</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <span style={{ fontSize: 42, fontWeight: 900, color: '#dffe95' }}>$49</span>
-                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/month</span>
-              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(223,254,149,0.6)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>Your subscription</div>
+              <div style={{ fontSize: 34, fontWeight: 900, color: '#dffe95', lineHeight: 1 }}>Selfmade {PLANS[normalizePlan(profile?.plan_id)].label}</div>
             </div>
             <span style={{ background: '#dffe9520', border: '1px solid #dffe9540', color: '#dffe95', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 100 }}>✓ Active</span>
           </div>

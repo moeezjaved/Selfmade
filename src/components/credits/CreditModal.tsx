@@ -185,21 +185,43 @@ export function CreditModal() {
             <a href="/billing" style={{ textAlign: 'center', fontSize: 12.5, color: '#6b8f6b', fontWeight: 600, textDecoration: 'none' }}>Billing &amp; invoices →</a>
           </div>
         ) : (
-          <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 14, color: '#374151' }}>How many credits would you like to add? <span style={{ color: '#9ca3af' }}>Top-up credits never expire.</span></div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-              {TOPUP_PACKS.map((p) => (
-                <button key={p.id} onClick={() => buy(p.id)} disabled={!!busy}
-                  style={{ border: '2px solid #e5e9e5', borderRadius: 14, padding: '18px 12px', background: '#fff', cursor: busy ? 'default' : 'pointer', textAlign: 'center', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, opacity: busy && busy !== p.id ? 0.5 : 1 }}
-                  onMouseEnter={(e) => { if (!busy) e.currentTarget.style.borderColor = INK }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e9e5' }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: INK }}>◆ {p.credits.toLocaleString()}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#6b8f6b' }}>${p.priceUsd}</div>
-                  {busy === p.id && <Loader2 size={15} className="spin" style={{ color: INK }} />}
-                </button>
-              ))}
+          <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: 14, color: '#374151' }}>Choose a credit pack. <span style={{ color: '#6b8f6b', fontWeight: 600 }}>Top-ups never expire.</span></div>
+            {(() => {
+              // Best value = most credits per dollar (usually the largest pack).
+              const perDollar = (p: typeof TOPUP_PACKS[number]) => p.credits / p.priceUsd
+              const bestId = [...TOPUP_PACKS].sort((a, b) => perDollar(b) - perDollar(a))[0]?.id
+              const midId = TOPUP_PACKS.length >= 3 ? TOPUP_PACKS[1].id : undefined
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+                  {TOPUP_PACKS.map((p) => {
+                    const best = p.id === bestId
+                    const popular = p.id === midId && !best
+                    const badge = best ? 'Best value' : popular ? 'Popular' : null
+                    const loading = busy === p.id
+                    return (
+                      <button key={p.id} onClick={() => buy(p.id)} disabled={!!busy}
+                        style={{ position: 'relative', border: `2px solid ${best ? INK : '#e5e9e5'}`, borderRadius: 16, padding: '22px 12px 16px', background: best ? 'linear-gradient(180deg,#f4fbe8,#ffffff)' : '#fff', cursor: busy ? 'default' : 'pointer', textAlign: 'center', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, boxShadow: best ? '0 8px 24px rgba(26,58,26,0.12)' : 'none', transition: 'transform .12s, box-shadow .12s, border-color .12s', opacity: busy && !loading ? 0.5 : 1 }}
+                        onMouseEnter={(e) => { if (!busy) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 30px rgba(26,58,26,0.16)'; e.currentTarget.style.borderColor = INK } }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = best ? '0 8px 24px rgba(26,58,26,0.12)' : 'none'; e.currentTarget.style.borderColor = best ? INK : '#e5e9e5' }}>
+                        {badge && (
+                          <span style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: 10, fontWeight: 800, letterSpacing: '.03em', textTransform: 'uppercase', color: best ? INK : '#6b8f6b', background: best ? LIME : '#eef7dc', border: `1px solid ${best ? '#cde87a' : '#dcecc0'}`, padding: '3px 10px', borderRadius: 100 }}>{badge}</span>
+                        )}
+                        <span style={{ fontSize: 20, color: best ? '#5a7d16' : '#9cbf5a', lineHeight: 1 }}>◆</span>
+                        <div style={{ fontSize: 26, fontWeight: 900, color: INK, lineHeight: 1.1 }}>{p.credits.toLocaleString()}</div>
+                        <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>credits</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: '#3f6b4a', marginTop: 6 }}>${p.priceUsd}</div>
+                        <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>{Math.round(perDollar(p))} credits / $1</div>
+                        {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.7)', borderRadius: 14 }}><Loader2 size={20} className="spin" style={{ color: INK }} /></div>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#9ca3af' }}>
+              <Check size={13} style={{ color: '#6b8f6b' }} /> Secure Stripe checkout · credits added instantly after payment
             </div>
-            <div style={{ fontSize: 12, color: '#9ca3af' }}>You'll be taken to secure Stripe checkout. Credits are added instantly after payment.</div>
             <button onClick={() => { setView('plan'); setReason(null) }} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#6b8f6b', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>← Back to plan</button>
           </div>
         )}
