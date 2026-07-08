@@ -1,7 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ExternalLink, Bookmark } from 'lucide-react'
+import { Plus, Trash2, ExternalLink, Bookmark, Sparkles } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
+import CloneModal from '../CloneModal'
+import CloneVideoModal from '../CloneVideoModal'
 
 interface Board { id: string; name: string; emoji: string; visibility?: string; isMine?: boolean; parent_board_id?: string | null; discovery_saved_ads?: { count: number }[] }
 interface SavedAd { id: string; ad_id: string; page_name: string; snapshot_url: string; ad_data: any; saved_at: string; tags?: string[] }
@@ -25,6 +27,8 @@ export default function SavedAdsPage() {
   const [sortBy, setSortBy] = useState('recent')  // recent | oldest | brand
   const [tagFilter, setTagFilter] = useState('')  // '' = all; else a single tag
   const [tagInput, setTagInput] = useState<string | null>(null)  // saved_ad_id whose add-tag box is open
+  const [cloneImg, setCloneImg] = useState<SavedAd | null>(null)   // open image-clone modal for this saved ad
+  const [cloneVid, setCloneVid] = useState<SavedAd | null>(null)   // open video-clone modal for this saved ad
 
   const addTag = async (savedId: string, tag: string) => {
     const t = tag.trim().slice(0, 40); if (!t) return
@@ -117,7 +121,10 @@ export default function SavedAdsPage() {
   const currentBoard = boards.find(b => b.id === selectedBoard)
   const adCount = (b: Board) => b.discovery_saved_ads?.[0]?.count ?? 0
 
-  const fmtOf = (s: SavedAd) => (s.ad_data?.mediaType === 'video' || s.ad_data?.videoUrl || s.ad_data?.format === 'video') ? 'video' : 'image'
+  // Extension-saved ads write `media_type` (snake); internal saves use `mediaType`/`format`/`videoUrl`.
+  const fmtOf = (s: SavedAd) => (s.ad_data?.media_type === 'video' || s.ad_data?.mediaType === 'video' || s.ad_data?.videoUrl || s.ad_data?.format === 'video') ? 'video' : 'image'
+  // True for ads captured by the Chrome extension — their playable media IS the R2 snapshot_url.
+  const isExternal = (s: SavedAd) => !!(s.ad_data?.external || s.ad_data?.source)
   const visibleAds = savedAds
     .filter(s => !q || `${s.page_name || ''} ${s.ad_data?.title || ''} ${s.ad_data?.body || ''}`.toLowerCase().includes(q.toLowerCase()))
     .filter(s => !fmt || fmtOf(s) === fmt)
@@ -275,7 +282,17 @@ export default function SavedAdsPage() {
           <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6b7280' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>{currentBoard.emoji}</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#111', marginBottom: 8 }}>{currentBoard.name} is empty</div>
-            <div style={{ fontSize: 14 }}>Save ads from the Discovery page to this board.</div>
+            {currentBoard.name === 'Saved from Web' ? (
+              <>
+                <div style={{ fontSize: 14 }}>Install the browser extension, then save any ad you find on<br />Instagram, the Facebook Ad Library or TikTok — it lands here.</div>
+                <a href="https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi" target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 20, padding: '10px 22px', background: '#1a3a1a', color: '#dffe95', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>
+                  🧩 Get the Chrome extension
+                </a>
+              </>
+            ) : (
+              <div style={{ fontSize: 14 }}>Save ads from the Discovery page to this board.</div>
+            )}
           </div>
         ) : (
           <>
@@ -317,9 +334,15 @@ export default function SavedAdsPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(248px,100%), 1fr))', gap: 16 }}>
               {visibleAds.map(saved => {
                 const ad = saved.ad_data || {}
+                const ext = isExternal(saved)
                 const initials = (saved.page_name || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
                 const isVid = fmtOf(saved) === 'video'
-                const media = ad.thumbnailUrl || ad.creatives?.[0]?.url || null
+                // Extension ads: the R2 snapshot_url IS the creative (image jpg or video mp4). Internal
+                // ads keep a Meta Ad Library page as snapshot_url, so use the stored thumbnail instead.
+                const media = ad.thumbnailUrl || ad.creatives?.[0]?.url || (ext && !isVid ? saved.snapshot_url : null)
+                const videoSrc = ext && isVid ? saved.snapshot_url : null
+                // Where the external "open" link should go — the page it was saved from, not the raw R2 file.
+                const openUrl = (ext && ad.source_url) ? ad.source_url : saved.snapshot_url
                 const tier = ad.performanceTier
                 const title = cleanCopy(ad.title)
                 const body = cleanCopy(ad.body)
@@ -344,7 +367,13 @@ export default function SavedAdsPage() {
                           {tier === 'winning' ? '🏆 Winning' : '⚡ Optimized'}
                         </span>
                       )}
-                      <a href={saved.snapshot_url} target="_blank" rel="noopener noreferrer" title="Open in Meta Ad Library" style={{ color: '#9ca3af', flexShrink: 0, display: 'flex' }}><ExternalLink size={13} /></a>
+                      <button onClick={() => (isVid ? setCloneVid(saved) : setCloneImg(saved))} title={isVid ? 'Clone this video ad with your product' : 'Clone this ad with your product'}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1a3a1a', padding: 0, flexShrink: 0, display: 'flex' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#65a30d')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#1a3a1a')}>
+                        <Sparkles size={13} />
+                      </button>
+                      <a href={openUrl} target="_blank" rel="noopener noreferrer" title={ext ? 'Open original' : 'Open in Meta Ad Library'} style={{ color: '#9ca3af', flexShrink: 0, display: 'flex' }}><ExternalLink size={13} /></a>
                       <button onClick={() => unsaveAd(saved.ad_id)} title="Remove from board"
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 0, flexShrink: 0, display: 'flex' }}
                         onMouseEnter={e => (e.currentTarget.style.color = '#dc2626')}
@@ -353,9 +382,12 @@ export default function SavedAdsPage() {
                       </button>
                     </div>
                     {/* media — REAL creative (no more Meta iframe) */}
-                    <a href={saved.snapshot_url} target="_blank" rel="noopener noreferrer"
+                    <a href={openUrl} target="_blank" rel="noopener noreferrer"
                       style={{ position: 'relative', display: 'block', width: '100%', paddingBottom: '118%', background: '#0f172a', overflow: 'hidden' }}>
-                      {media ? (
+                      {videoSrc ? (
+                        <video src={videoSrc} poster={media || undefined} muted playsInline preload="metadata"
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : media ? (
                         <img src={media} alt={saved.page_name} loading="lazy" decoding="async"
                           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
@@ -398,6 +430,29 @@ export default function SavedAdsPage() {
         )}
       </div>
       </div> {/* end body flex */}
+
+      {/* Clone modals — reference is the saved creative (external R2 image/mp4 or an internal ad). */}
+      {cloneImg && (
+        <CloneModal
+          ad={{
+            id: cloneImg.ad_id,
+            pageId: cloneImg.ad_data?.page_id || '',
+            pageName: cloneImg.page_name || 'this brand',
+            // External (extension) ads have no discovery_ads_index row → clone from the R2 image.
+            // Internal saves keep their ad_id so the route can pull the ad's DNA.
+            assetImageUrl: isExternal(cloneImg) ? (cloneImg.snapshot_url || undefined) : undefined,
+          }}
+          onClose={() => setCloneImg(null)}
+        />
+      )}
+      {cloneVid && (
+        <CloneVideoModal
+          sourceAdId={isExternal(cloneVid) ? '' : cloneVid.ad_id}
+          sourceVideoUrl={isExternal(cloneVid) ? cloneVid.snapshot_url : undefined}
+          sourcePoster={cloneVid.ad_data?.thumbnailUrl || undefined}
+          onClose={() => setCloneVid(null)}
+        />
+      )}
     </div>
   )
 }

@@ -254,7 +254,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <div style={{padding:"10px 14px",borderTop:"1px solid rgba(223,254,149,0.08)"}}>
             <div style={{fontSize:9.5,fontWeight:800,letterSpacing:".07em",textTransform:"uppercase",color:"rgba(255,255,255,0.32)",marginBottom:7}}>Save ads from</div>
             <div style={{display:"flex",gap:6}}>
-              <Link href="/settings" title="Get the browser extension" style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"6px 8px",borderRadius:8,background:"rgba(223,254,149,0.1)",border:"1px solid rgba(223,254,149,0.14)",color:"#dffe95",fontSize:11.5,fontWeight:700,textDecoration:"none"}}>🧩 Extension</Link>
+              <a href="https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi" target="_blank" rel="noopener noreferrer" title="Install the Chrome extension" style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"6px 8px",borderRadius:8,background:"rgba(223,254,149,0.1)",border:"1px solid rgba(223,254,149,0.14)",color:"#dffe95",fontSize:11.5,fontWeight:700,textDecoration:"none"}}>🧩 Extension</a>
               <Link href="/settings" title="Save from Instagram on mobile" style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"6px 8px",borderRadius:8,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.7)",fontSize:11.5,fontWeight:700,textDecoration:"none"}}>📱 IG</Link>
             </div>
           </div>
