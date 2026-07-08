@@ -79,6 +79,29 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
  */
 export type BrandPalette = { background?: string; accent?: string; heading?: string; body?: string; icon?: string; cta?: string; ctaText?: string }
 
+/**
+ * Humanize an auto-extracted font-family slug so it's usable in a prompt — and drop it entirely
+ * if it's just a machine slug. Brand-kit font detection yields names like "foldgrotesqueregularpro"
+ * or "bc_sklonarmedium"; passed raw, Gemini prints the NAME as text on the ad. Strip separators +
+ * weight/style suffixes; if the result is still a run-on gibberish token, return null so the caller
+ * falls back to "derive typography from the references" instead of stamping a slug on the image.
+ */
+export function cleanFontName(raw?: string | null): string | null {
+  if (!raw) return null
+  const junk = ['thin','extralight','ultralight','light','regular','normal','book','medium','semibold','demibold','bold','extrabold','ultrabold','black','heavy','italic','oblique','pro','std','mt','ot','web','var','variable','display','text']
+  let s = raw.trim().toLowerCase().replace(/\.(ttf|otf|woff2?|eot)$/i, '').replace(/[_\-]+/g, ' ')
+  s = s.split(/\s+/).filter((w) => !junk.includes(w)).join(' ')
+  let changed = true
+  while (changed) { changed = false; for (const j of junk) { if (s.endsWith(j) && s.length > j.length + 2) { s = s.slice(0, -j.length).trim(); changed = true } } }
+  s = s.replace(/\s+/g, ' ').trim()
+  if (!s) return null
+  const oneToken = !s.includes(' ')
+  // still a single run-on slug, has digits, or an obvious 2-letter code prefix → not a real name, drop it
+  if (oneToken && (s.length > 11 || /\d/.test(s))) return null
+  if (/^[a-z]{2,3}\s/.test(s) && s.split(' ')[1]?.length > 8) return null   // "bc sklonar…" style
+  return s.replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 /** Map real pixel dimensions to the nearest Gemini-supported aspect ratio (so "Original" matches the ad). */
 export function nearestAspect(w?: number | null, h?: number | null): string | undefined {
   if (!w || !h) return undefined
@@ -116,10 +139,12 @@ export function buildStudioPrompt(opts: {
         pal.cta && `CTA button ${pal.cta}${pal.ctaText ? ` / ${pal.ctaText} label` : ''}`, pal.icon && `icons ${pal.icon}`,
       ].filter(Boolean).join(', ')}.`
     : (opts.colors?.length ? `Brand colors: ${opts.colors.join(', ')}.` : '')
-  const fontLine = (opts.fonts?.heading || opts.fonts?.body)
-    ? `Typography: ${[
-        opts.fonts?.heading && `headings "${opts.fonts.heading}"${opts.fonts?.headingWeight ? ` weight ${opts.fonts.headingWeight}` : ''}`,
-        opts.fonts?.body && `body "${opts.fonts.body}"${opts.fonts?.bodyWeight ? ` weight ${opts.fonts.bodyWeight}` : ''}`,
+  const hFont = cleanFontName(opts.fonts?.heading)
+  const bFont = cleanFontName(opts.fonts?.body)
+  const fontLine = (hFont || bFont)
+    ? `Typography (use as the typeface STYLE only — never write the font name on the ad): ${[
+        hFont && `headings "${hFont}"${opts.fonts?.headingWeight ? ` weight ${opts.fonts.headingWeight}` : ''}`,
+        bFont && `body "${bFont}"${opts.fonts?.bodyWeight ? ` weight ${opts.fonts.bodyWeight}` : ''}`,
       ].filter(Boolean).join(', ')} (or closest match).`
     : (opts.numInspirations > 0
         ? `No brand fonts are set — so DERIVE the typography from the reference designs (images 1-${opts.numInspirations}): closely echo their typeface CHARACTER (display/serif/grotesque), weight contrast, letter-spacing, case, and headline-to-body hierarchy. Do NOT default to plain Arial/Helvetica/system fonts.`
@@ -155,6 +180,7 @@ export function buildStudioPrompt(opts: {
     cta ? `Include a clear call-to-action button ("${cta}").` : `Include a clear call-to-action button.`,
     logoLine,
     `CRITICAL: render every piece of text ONCE — never repeat the headline, subhead, or any text block in two places. No gibberish text, no watermarks, no other brands' logos, no duplicate products.`,
+    `CRITICAL: fonts, colors, and hex codes are DESIGN DIRECTIONS, not ad copy — NEVER render a font name, font-family slug, style/class token, or hex color code as visible text anywhere in the image. The only text shown is the headline, supporting copy, and CTA.`,
     opts.aspectRatio && opts.aspectRatio !== 'original' ? `Compose at a ${opts.aspectRatio} aspect ratio.` : `Compose at a 4:5 aspect ratio.`,
     `Output ONE photorealistic, polished, ready-to-publish ad image.`,
   ].filter(Boolean).join(' ')
@@ -174,10 +200,12 @@ export function buildClonePrompt(opts: {
         pal.cta && `CTA button ${pal.cta}${pal.ctaText ? ` with ${pal.ctaText} label` : ''}`, pal.icon && `icons ${pal.icon}`,
       ].filter(Boolean).join(', ')}. Apply them consistently and on-brand.`
     : ''
-  const fontLine = (opts.fonts?.heading || opts.fonts?.body)
-    ? `Use on-brand typography: ${[
-        opts.fonts?.heading && `headings in "${opts.fonts.heading}"${opts.fonts?.headingWeight ? ` weight ${opts.fonts.headingWeight}` : ''}`,
-        opts.fonts?.body && `body text in "${opts.fonts.body}"${opts.fonts?.bodyWeight ? ` weight ${opts.fonts.bodyWeight}` : ''}`,
+  const hFontC = cleanFontName(opts.fonts?.heading)
+  const bFontC = cleanFontName(opts.fonts?.body)
+  const fontLine = (hFontC || bFontC)
+    ? `Use on-brand typography (as the typeface STYLE only — never write the font name on the ad): ${[
+        hFontC && `headings in "${hFontC}"${opts.fonts?.headingWeight ? ` weight ${opts.fonts.headingWeight}` : ''}`,
+        bFontC && `body text in "${bFontC}"${opts.fonts?.bodyWeight ? ` weight ${opts.fonts.bodyWeight}` : ''}`,
       ].filter(Boolean).join(', ')} (or the closest available match).`
     : ''
   const logoLine = opts.hasLogo
