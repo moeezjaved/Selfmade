@@ -1784,7 +1784,7 @@ export default function DiscoveryPage() {
             </button>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={viewAds} style={{ flex: 1, padding: '9px', borderRadius: 9, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>View ads</button>
-              <button onClick={() => { window.open(`/discovery/brand-spy/${hoverBrand}`, '_blank', 'noopener'); setHoverBrand(null) }} style={{ flex: 1, padding: '9px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Details</button>
+              <button onClick={() => { window.open(`/discovery/brand/${hoverBrand}`, '_blank', 'noopener'); setHoverBrand(null) }} style={{ flex: 1, padding: '9px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Details</button>
             </div>
           </div>
         )
@@ -1891,11 +1891,12 @@ export default function DiscoveryPage() {
                     <button key={brand.pageId}
                       onMouseDown={e => {
                         e.preventDefault()
-                        // Atria-style: clicking a brand suggestion opens that brand's COMPLETE
-                        // page (Brand Spy dashboard — every ad, timeline, hooks), not just a
-                        // filtered feed. That's what the user expects from the brand result.
+                        // Clicking a brand suggestion opens that brand's full analytics VIEW
+                        // (/discovery/brand — overview, hooks, personas, angles…). NOT the Brand Spy
+                        // tracked-brand page: viewing from search must not imply spying or light up
+                        // the Brand Spy menu. Tracking a brand is an explicit "Spy this brand" action.
                         setShowDropdown(false)
-                        router.push(`/discovery/brand-spy/${brand.pageId}`)
+                        router.push(`/discovery/brand/${brand.pageId}`)
                       }}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
