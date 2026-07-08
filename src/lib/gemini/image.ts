@@ -57,19 +57,41 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
   if (opts?.aspectRatio && opts.aspectRatio !== 'original') imageConfig.aspectRatio = opts.aspectRatio
   if (tier === 'pro') imageConfig.imageSize = opts?.imageSize || process.env.GEMINI_IMAGE_SIZE || '2K'
   if (Object.keys(imageConfig).length) generationConfig.imageConfig = imageConfig
-  try {
-    const r = await fetch(`${BASE}/${modelFor(tier)}:generateContent?key=${KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig }),
-    })
-    if (!r.ok) return { ok: false, error: `gemini ${r.status} [${modelFor(tier)}]: ${(await r.text().catch(() => '')).slice(0, 240)}` }
-    const j = await r.json()
-    const out = (j?.candidates?.[0]?.content?.parts || []).find((p: any) => p.inline_data || p.inlineData)
-    const inline = out?.inline_data || out?.inlineData
-    if (!inline?.data) return { ok: false, error: 'no image in response' }
-    return { ok: true, mimeType: inline.mime_type || inline.mimeType || 'image/png', dataB64: inline.data }
-  } catch (e: any) { return { ok: false, error: String(e?.message || e) } }
+  // Gemini image models routinely return transient 503 (UNAVAILABLE / "high demand"), 429, or
+  // 500 under load — and occasionally a 200 with no image part. Retry with exponential backoff so a
+  // temporary spike doesn't fail the user's clone (credits are refunded by the caller on final fail).
+  const RETRYABLE = new Set([429, 500, 502, 503, 504])
+  const MAX_TRIES = 4
+  const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
+  let lastErr = 'gemini failed'
+  for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+    try {
+      const r = await fetch(`${BASE}/${modelFor(tier)}:generateContent?key=${KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts }], generationConfig }),
+      })
+      if (!r.ok) {
+        lastErr = `gemini ${r.status} [${modelFor(tier)}]: ${(await r.text().catch(() => '')).slice(0, 240)}`
+        if (RETRYABLE.has(r.status) && attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }
+        return { ok: false, error: lastErr }
+      }
+      const j = await r.json()
+      const out = (j?.candidates?.[0]?.content?.parts || []).find((p: any) => p.inline_data || p.inlineData)
+      const inline = out?.inline_data || out?.inlineData
+      if (!inline?.data) {
+        lastErr = 'no image in response'   // often a transient under-load empty response → retry
+        if (attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }
+        return { ok: false, error: lastErr }
+      }
+      return { ok: true, mimeType: inline.mime_type || inline.mimeType || 'image/png', dataB64: inline.data }
+    } catch (e: any) {
+      lastErr = String(e?.message || e)
+      if (attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }
+      return { ok: false, error: lastErr }
+    }
+  }
+  return { ok: false, error: lastErr }
 }
 
 /**
