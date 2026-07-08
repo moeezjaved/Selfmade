@@ -31,7 +31,10 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const sourceAdId = String(body.sourceAdId || '').trim()
-  if (!sourceAdId) return NextResponse.json({ error: 'sourceAdId required' }, { status: 400 })
+  // Extension-saved ("Saved from Web") videos have no discovery_ads_index row — the caller passes the
+  // stored R2 mp4 directly as sourceVideoUrl so those can be cloned too.
+  const sourceVideoUrl = (typeof body.sourceVideoUrl === 'string' && /^https?:\/\//i.test(body.sourceVideoUrl)) ? body.sourceVideoUrl : null
+  if (!sourceAdId && !sourceVideoUrl) return NextResponse.json({ error: 'sourceAdId or sourceVideoUrl required' }, { status: 400 })
 
   const rawImages: string[] = Array.isArray(body.productImages)
     ? body.productImages.filter((u: any) => typeof u === 'string').slice(0, 9)
@@ -43,13 +46,16 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
 
   // ── Resolve the competitor ad's playable video (the motion/pacing reference) ──
-  const { data: ad } = await admin
-    .from('discovery_ads_index')
-    .select('ad_id, format, raw_video_urls, discovery_creatives(asset_type, r2_url, position)')
-    .eq('ad_id', sourceAdId)
-    .maybeSingle()
+  // An explicit sourceVideoUrl (Saved-from-Web mp4 already on R2) wins — no index lookup needed.
+  const { data: ad } = sourceAdId
+    ? await admin
+        .from('discovery_ads_index')
+        .select('ad_id, format, raw_video_urls, discovery_creatives(asset_type, r2_url, position)')
+        .eq('ad_id', sourceAdId)
+        .maybeSingle()
+    : { data: null }
   const creatives = (((ad as any)?.discovery_creatives) || []).slice().sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
-  let sourceVideo = creatives.find((c: any) => c.asset_type === 'video' && c.r2_url)?.r2_url || null
+  let sourceVideo = sourceVideoUrl || creatives.find((c: any) => c.asset_type === 'video' && c.r2_url)?.r2_url || null
 
   // If the video isn't drained to R2 yet, fetch it ON-DEMAND from fbcdn (Meta's video CDN serves
   // to any IP), so a freshly-spied competitor can be cloned immediately instead of waiting on the
@@ -90,7 +96,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: row, error } = await admin.from('creative_generations').insert({
-    user_id: user.id, brand_id: body.brandId || null, source_ad_id: sourceAdId,
+    user_id: user.id, brand_id: body.brandId || null, source_ad_id: sourceAdId || null,
     type: 'video_clone', media_type: 'video', status: 'analyzing', tier: tier === 'fast' ? 'default' : 'pro',
     source_video_url: sourceVideo, clone_meta, prompt: 'video clone', image_url: null,
   }).select('id').single()

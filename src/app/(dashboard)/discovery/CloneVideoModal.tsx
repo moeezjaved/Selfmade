@@ -17,7 +17,7 @@ const uid = () => Math.random().toString(36).slice(2)
 const fileToDataUrl = (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) })
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-export default function CloneVideoModal({ sourceAdId, sourcePoster, onClose }: { sourceAdId: string; sourcePoster?: string | null; onClose: () => void }) {
+export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePoster, onClose }: { sourceAdId: string; sourceVideoUrl?: string | null; sourcePoster?: string | null; onClose: () => void }) {
   const [brands, setBrands] = useState<Brand[]>([])
   const [brandId, setBrandId] = useState<string | null>(null)
   const [photos, setPhotos] = useState<Photo[]>([])
@@ -78,7 +78,7 @@ export default function CloneVideoModal({ sourceAdId, sourcePoster, onClose }: {
     try {
       const start = await fetch('/api/discovery/clone-video', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sourceAdId, brandId: brandId || undefined, productImages: chosen, tier,
+        body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages: chosen, tier,
           productDetails: { name: productName.trim() || undefined, benefit: benefit.trim() || undefined } }),
       }).then(r => r.json())
       if (!start.jobId) { setErr(start.error || 'Could not start.'); setPhase('form'); return }

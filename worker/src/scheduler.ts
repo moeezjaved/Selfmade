@@ -39,6 +39,10 @@ import { supabase } from './db.js'
 // Gated brands set a shorter backoff themselves (see indexer GATE_RETRY_MIN).
 const MIN_BRAND_GAP_MIN = parseInt(process.env.SCHEDULER_MIN_BRAND_GAP_MIN ?? '360', 10)
 const MAX_PAGES_PER_BRAND = parseInt(process.env.SCHEDULER_MAX_PAGES ?? '40', 10)
+// Spied/priority brands (priority≥9) crawl DEEP — a paying user wants that competitor's full ad
+// set, not the 40-page bulk cap (~10 ads/page → ~10k ads). Pagination still stops the moment the
+// brand's ads run out, so this only deepens genuinely large spied brands; cost stays bounded.
+const SPY_MAX_PAGES = parseInt(process.env.SCHEDULER_SPY_MAX_PAGES ?? '1000', 10)
 
 // ── Concurrency ──────────────────────────────────────────────────────────────
 // Each crawl is an independent subprocess with its OWN random IPRoyal session id
@@ -221,9 +225,16 @@ async function pickNextBrand(exclude: Set<string>): Promise<BrandRow | null> {
  * Run the indexer as a subprocess. Streams stdout/stderr to our log.
  * Returns true on success (exit 0), false otherwise.
  */
-function runIndexer(pageId: string): Promise<boolean> {
+async function runIndexer(pageId: string): Promise<boolean> {
+  // Spied/priority brands get the deep page cap; the general population stays at the bulk cap.
+  let maxPages = MAX_PAGES_PER_BRAND
+  try {
+    const { data: b } = await (supabase as any)
+      .from('discovery_crawl_terms').select('priority').eq('page_id', pageId).maybeSingle()
+    if ((b?.priority ?? 0) >= 9) { maxPages = SPY_MAX_PAGES; console.log(`   🔎 spied brand → deep crawl (max_pages=${maxPages})`) }
+  } catch { /* fall back to the default cap */ }
   return new Promise((resolve) => {
-    const child = spawn('npx', ['tsx', 'src/playwright-indexer.ts', pageId, `--max-pages=${MAX_PAGES_PER_BRAND}`], {
+    const child = spawn('npx', ['tsx', 'src/playwright-indexer.ts', pageId, `--max-pages=${maxPages}`], {
       stdio: 'inherit',
       env: process.env,
     })
