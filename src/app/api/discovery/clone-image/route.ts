@@ -87,8 +87,12 @@ async function handle(req: NextRequest) {
     const refImg = await fetchImageB64(refUrl)
     if (!refImg) { await refund(); return NextResponse.json({ error: 'could not load reference image' }, { status: 502 }) }
     // "Original" → match the reference ad's real shape (nearest supported ratio); else use the picked ratio.
+    // Video creatives have null width/height (dims aren't captured), so nearestAspect returns nothing —
+    // fall back to 9:16 (reels/stories are vertical, the common video-clone case) so "Original" isn't a
+    // wrong default square. A concrete ratio is required: Gemini ignores "keep aspect of image 1".
+    const isVideoSrc = refCre?.asset_type === 'video'
     const resolvedAspect = (!aspectRatio || aspectRatio === 'original')
-      ? (nearestAspect(refCre?.width, refCre?.height) || 'original')
+      ? (nearestAspect(refCre?.width, refCre?.height) || (isVideoSrc ? '9:16' : 'original'))
       : aspectRatio
 
     // Pull the saved brand's kit (colors + fonts) so every ad stays on-brand, even if the caller
