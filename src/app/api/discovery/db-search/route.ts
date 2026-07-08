@@ -355,13 +355,14 @@ export async function GET(request: NextRequest) {
       if (langs.length) baseQuery = baseQuery.overlaps('languages', langs)
     }
     if (platforms) baseQuery = baseQuery.overlaps('platforms', platforms.split(','))
-    // Time filter: only ads started within the last N days
+    // Time filter: ads LAUNCHED within the last N days (start_date).
     if (days > 0) {
       const sinceDate = new Date(Date.now() - days * 86400000).toISOString()
-      // Filter by ACTIVITY, not launch date: "ads seen in the last N days" (last_seen is the
-      // default-sort column, so it's indexed). Filtering start_date returned almost nothing since
-      // most winning ads launched months ago.
-      baseQuery = baseQuery.gte('last_seen', sinceDate)
+      // Filter by LAUNCH date, not last_seen. last_seen is bumped on every crawl, so nearly every
+      // active ad falls inside any recent window → the filter appeared to do nothing. start_date now
+      // has ~100% coverage (epoch extraction), and "last N days" = ads that started in that window,
+      // which is what users expect and genuinely narrows (e.g. ~406K launched in the last 30 days).
+      baseQuery = baseQuery.gte('start_date', sinceDate)
     }
     // GetHookd-parity filters (performance tier, niche, brand volume, run-time,
     // CTA, creative reuse, hide-brands) — rollup-backed, all additive.
