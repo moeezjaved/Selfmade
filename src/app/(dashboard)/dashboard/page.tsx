@@ -141,8 +141,13 @@ export default function DashboardPage() {
         toast.success('Sync complete!', { id: toastId })
         loadData()
       } else {
-        toast.error('Sync failed', { id: toastId })
+        // Surface the real reason (no Meta account connected, token expired, Meta API error…)
+        const j = await res.json().catch(() => ({} as any))
+        const reason = j?.error || j?.message || (res.status === 400 ? 'Connect a Meta ad account first.' : `Sync failed (HTTP ${res.status})`)
+        toast.error(reason, { id: toastId })
       }
+    } catch (e: any) {
+      toast.error(`Sync failed: ${String(e?.message || e)}`, { id: toastId })
     } finally {
       setSyncing(false)
     }
@@ -209,38 +214,14 @@ export default function DashboardPage() {
   const healthLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs work'
   const healthColor = healthScore >= 80 ? '#2d7a2d' : healthScore >= 60 ? '#b8860b' : healthScore >= 40 ? '#d97706' : '#c0392b'
 
-  const kpis = [
-    {
-      label: 'Total Spend',
-      value: formatCurrency(data.accountInsights?.spend || 0, currency),
-      change: '+12%',
-      up: true,
-      featured: false,
-    },
-    {
-      label: 'ROAS',
-      value: formatROAS(data.accountInsights?.roas || 0),
-      change: '+0.8×',
-      up: true,
-    },
-    {
-      label: 'CPA',
-      value: formatCurrency(data.accountInsights?.cpa || 0, currency),
-      change: '-$2.10',
-      up: true,
-    },
-    {
-      label: 'CTR',
-      value: formatPercent(data.accountInsights?.ctr || 0),
-      change: '-0.2%',
-      up: false,
-    },
-    {
-      label: 'Conversions',
-      value: formatNumber(data.accountInsights?.conversions || 0),
-      change: '+34',
-      up: true,
-    },
+  // Deltas require a prior-period comparison we don't compute yet — show the KPI value only, never a
+  // fabricated change. (Previously these were hardcoded +12% / +0.8× / -$2.10 / -0.2% / +34 fakes.)
+  const kpis: { label: string; value: string; change: string | null; up: boolean; featured?: boolean }[] = [
+    { label: 'Total Spend', value: formatCurrency(data.accountInsights?.spend || 0, currency), change: null, up: true, featured: false },
+    { label: 'ROAS', value: formatROAS(data.accountInsights?.roas || 0), change: null, up: true },
+    { label: 'CPA', value: formatCurrency(data.accountInsights?.cpa || 0, currency), change: null, up: true },
+    { label: 'CTR', value: formatPercent(data.accountInsights?.ctr || 0), change: null, up: false },
+    { label: 'Conversions', value: formatNumber(data.accountInsights?.conversions || 0), change: null, up: true },
   ]
 
   if (loading) {
@@ -340,13 +321,15 @@ export default function DashboardPage() {
             )}>
               {kpi.value}
             </div>
-            <div className={cn(
-              'flex items-center gap-1 mt-2 text-xs font-semibold',
-              kpi.up ? 'text-status-green' : 'text-status-red'
-            )}>
-              {kpi.up ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}
-              {kpi.change}
-            </div>
+            {kpi.change && (
+              <div className={cn(
+                'flex items-center gap-1 mt-2 text-xs font-semibold',
+                kpi.up ? 'text-status-green' : 'text-status-red'
+              )}>
+                {kpi.up ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}
+                {kpi.change}
+              </div>
+            )}
           </div>
         ))}
       </div>
