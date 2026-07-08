@@ -85,7 +85,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const q = (searchParams.get('q') || '').trim()
+    let q = (searchParams.get('q') || '').trim()
+    let corrected: string | null = null   // set when a typo is auto-corrected (e.g. "supplemnet" → "Supplements")
     const mode = searchParams.get('mode') || 'adcopy'
     // When a brand is selected we filter on its exact page_id (a single Meta page
     // can run ads under several display names — partnership/branded-content ads).
@@ -250,6 +251,29 @@ export async function GET(request: NextRequest) {
         if (pageId) baseQuery = baseQuery.eq('page_id', pageId)
         else baseQuery = baseQuery.ilike('page_name', `%${q}%`)
       } else {
+        // ── TYPO TOLERANCE ─────────────────────────────────────────────────────────
+        // A single-word query is fuzzy-matched (trigram) against the niche vocabulary
+        // (~200 rows, tiny). If it's a strong, same-prefix match to a niche it isn't
+        // spelled as — e.g. "supplemnet" → "Supplements" — search the corrected term so
+        // results still surface. Guarded (len≥5, sim≥0.4, shared 4-char prefix) so real
+        // queries aren't rewritten. Best-effort; failure just leaves q untouched.
+        if (!/\s/.test(q) && q.length >= 5) {
+          try {
+            const { data: nc } = await admin.from('niche_counts').select('niche')
+            const tri = (s: string) => { const p = ` ${s.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim()} `; const g = new Set<string>(); for (let i = 0; i < p.length - 2; i++) g.add(p.slice(i, i + 3)); return g }
+            const qg = tri(q); const ql = q.toLowerCase()
+            let best: { niche: string; sim: number } | null = null
+            for (const r of (nc || []) as any[]) {
+              const n = r.niche as string; if (!n) continue
+              const ng = tri(n); let inter = 0; qg.forEach(x => { if (ng.has(x)) inter++ })
+              const sim = inter / (qg.size + ng.size - inter || 1)
+              if (!best || sim > best.sim) best = { niche: n, sim }
+            }
+            if (best && best.sim >= 0.4 && best.niche.toLowerCase() !== ql && best.niche.slice(0, 4).toLowerCase() === ql.slice(0, 4)) {
+              corrected = q; q = best.niche
+            }
+          } catch { /* correction is best-effort */ }
+        }
         // Topic/keyword search across 3 dimensions: ad copy, brand name, category.
         // Match the FULL PHRASE in text (so "hair loss" finds hair-loss ads, not
         // every ad with "hair" OR "loss"), plus the phrase/words as category tags
@@ -670,6 +694,8 @@ export async function GET(request: NextRequest) {
     const payload = {
       ads: transformed,
       total,
+      corrected,   // original query if it was typo-corrected (UI shows "Showing results for …")
+      correctedTo: corrected ? q : null,
       page,
       // Robust pagination: there's more iff the RAW fetch filled its window — i.e.
       // discovery_creatives!inner still had `fetchLimit` rows at this offset. This is
