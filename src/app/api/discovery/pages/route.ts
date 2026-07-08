@@ -93,7 +93,10 @@ export async function GET(request: NextRequest) {
             }
             name = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || ''
           } catch { /* keep defaults */ }
-          return { pageId: pid, name, picture: pictureByPage.get(pid) || null, category: '', adCount }
+          // Fall back to Facebook's public page avatar (works for any page_id, no token/storage)
+          // so every brand shows a real logo in search, not a blank placeholder.
+          const picture = pictureByPage.get(pid) || `https://graph.facebook.com/${pid}/picture?type=square&width=96&height=96`
+          return { pageId: pid, name, picture, category: '', adCount }
         })
       )
 
