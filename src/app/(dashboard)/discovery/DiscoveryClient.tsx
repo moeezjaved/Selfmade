@@ -1489,18 +1489,31 @@ export default function DiscoveryPage() {
         ...(visualStyles.length ? { visual_style: visualStyles.join(',') } : {}),
         ...(ctaStyles.length ? { cta_style: ctaStyles.join(',') } : {}),
       })
-      const dbRes = await fetch(`/api/discovery/db-search?${dbParams}`)
-      const dbData = await dbRes.json()
-
-      // BUG-2: the API returns searchMethod:'error' (or a non-200) when the query TIMED OUT under
-      // load — that is NOT a legitimate empty result. Surface a retry banner instead of the
-      // misleading "No ads found" empty state, which is indistinguishable from a real zero-result.
-      if (!dbRes.ok || dbData.searchMethod === 'error') {
-        setError('Search hit a snag — the index was busy. Try that term again in a moment.')
+      // Robust fetch+parse. A timed-out query can 500 with a NON-JSON body ("An error occurred"),
+      // which threw "Unexpected token 'A'… is not valid JSON" on .json(). Parse defensively, and
+      // treat any transient error as retryable — retry ONCE silently before showing a banner, so a
+      // brief index-busy blip (e.g. right after toggling filters) self-heals instead of flashing an error.
+      const runSearch = async (): Promise<{ ok: boolean; data: any }> => {
+        try {
+          const r = await fetch(`/api/discovery/db-search?${dbParams}`)
+          let d: any = null
+          try { d = await r.json() } catch { d = null }   // non-JSON error page → null
+          const transient = !r.ok || d == null || d?.searchMethod === 'error'
+          return { ok: !transient, data: d }
+        } catch { return { ok: false, data: null } }      // network error → retryable
+      }
+      let { ok: searchOk, data: dbData } = await runSearch()
+      if (!searchOk) {
+        await new Promise(res => setTimeout(res, 900))     // brief backoff, then one silent retry
+        ;({ ok: searchOk, data: dbData } = await runSearch())
+      }
+      if (!searchOk) {
+        setError('Search hit a snag — the index was busy. Try again in a moment.')
         setHasMore(false)
         if (reset) setDbTotal(0)
         return
       }
+      dbData = dbData || {}
 
       if (!dbData.error && dbData.ads?.length > 0) {
         // We have indexed results — use them
