@@ -24,8 +24,11 @@ export async function GET() {
   // Gate on the ORG billing owner's plan, not the member's own — so every seat on an API-enabled
   // org (Pro/Business) gets access, and the owner isn't wrongly locked by a stale personal plan_id.
   const gate = await requireFeature(admin, await resolveBillingOwner(admin, user.id), 'api')
+  // Exclude the Chrome extension's auth token — it lives in mcp_keys too ("one auth story") but it's
+  // managed by the extension, not a user-created API key. Showing it here confuses users and revoking
+  // it would silently break their extension.
   const { data } = await admin.from('mcp_keys').select('id, label, token, created_at, last_used_at, revoked')
-    .eq('user_id', user.id).eq('revoked', false).order('created_at', { ascending: false })
+    .eq('user_id', user.id).eq('revoked', false).neq('label', 'Chrome Extension').order('created_at', { ascending: false })
   return NextResponse.json({ keys: data || [], locked: !!gate, upsell: gate || null })
 }
 
