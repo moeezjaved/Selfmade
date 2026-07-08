@@ -47,48 +47,56 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
   // input never 400s the whole request. Callers should filter earlier to keep prompt indices aligned.
   const safeImages = images.filter((i) => geminiImageMime(i.mimeType) !== null)
   const parts: any[] = [{ text: prompt }, ...safeImages.map((i) => ({ inline_data: { mime_type: geminiImageMime(i.mimeType) || i.mimeType, data: i.dataB64 } }))]
-  const generationConfig: any = { responseModalities: ['IMAGE'] }
   // Lower temperature → more faithful to the reference/product (less "creative" drift). Env-tunable.
   const temp = parseFloat(process.env.GEMINI_IMAGE_TEMP || '0.35')
-  if (!Number.isNaN(temp)) generationConfig.temperature = temp
-  // gemini-3-pro-image accepts imageConfig { aspectRatio, imageSize }. imageSize (1K/2K/4K) controls
-  // resolution → cost; default 2K. Only sent for the Pro model (standard model rejects it).
-  const imageConfig: any = {}
-  if (opts?.aspectRatio && opts.aspectRatio !== 'original') imageConfig.aspectRatio = opts.aspectRatio
-  if (tier === 'pro') imageConfig.imageSize = opts?.imageSize || process.env.GEMINI_IMAGE_SIZE || '2K'
-  if (Object.keys(imageConfig).length) generationConfig.imageConfig = imageConfig
-  // Gemini image models routinely return transient 503 (UNAVAILABLE / "high demand"), 429, or
-  // 500 under load — and occasionally a 200 with no image part. Retry with exponential backoff so a
-  // temporary spike doesn't fail the user's clone (credits are refunded by the caller on final fail).
+  const wantAspect = opts?.aspectRatio && opts.aspectRatio !== 'original' ? opts.aspectRatio : null
+  const proImageSize = opts?.imageSize || process.env.GEMINI_IMAGE_SIZE || '2K'
+
+  // MODEL CANDIDATES. The Pro image model (gemini-3-pro-image) frequently 503s ("high demand") on
+  // Google's side — a capacity outage, NOT our quota (the standard model works with the same key).
+  // So when Pro is requested, fall back to the standard model after retries: the user still gets an
+  // image instead of an error. imageSize (1K/2K/4K) is Pro-only — the standard model rejects it.
+  const candidates = (tier === 'pro' && MODEL_PRO !== MODEL_DEFAULT) ? [MODEL_PRO, MODEL_DEFAULT] : [modelFor(tier)]
   const RETRYABLE = new Set([429, 500, 502, 503, 504])
   const MAX_TRIES = 4
   const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
   let lastErr = 'gemini failed'
-  for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
-    try {
-      const r = await fetch(`${BASE}/${modelFor(tier)}:generateContent?key=${KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts }], generationConfig }),
-      })
-      if (!r.ok) {
-        lastErr = `gemini ${r.status} [${modelFor(tier)}]: ${(await r.text().catch(() => '')).slice(0, 240)}`
-        if (RETRYABLE.has(r.status) && attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }
-        return { ok: false, error: lastErr }
-      }
-      const j = await r.json()
-      const out = (j?.candidates?.[0]?.content?.parts || []).find((p: any) => p.inline_data || p.inlineData)
-      const inline = out?.inline_data || out?.inlineData
-      if (!inline?.data) {
-        lastErr = 'no image in response'   // often a transient under-load empty response → retry
+
+  for (const model of candidates) {
+    const isPro = model === MODEL_PRO
+    const cfg: any = { responseModalities: ['IMAGE'] }
+    if (!Number.isNaN(temp)) cfg.temperature = temp
+    const ic: any = {}
+    if (wantAspect) ic.aspectRatio = wantAspect
+    if (isPro) ic.imageSize = proImageSize
+    if (Object.keys(ic).length) cfg.imageConfig = ic
+
+    for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+      try {
+        const r = await fetch(`${BASE}/${model}:generateContent?key=${KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts }], generationConfig: cfg }),
+        })
+        if (!r.ok) {
+          lastErr = `gemini ${r.status} [${model}]: ${(await r.text().catch(() => '')).slice(0, 240)}`
+          if (RETRYABLE.has(r.status) && attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }
+          break   // exhausted this model → fall through to the next candidate (standard)
+        }
+        const j = await r.json()
+        const out = (j?.candidates?.[0]?.content?.parts || []).find((p: any) => p.inline_data || p.inlineData)
+        const inline = out?.inline_data || out?.inlineData
+        if (!inline?.data) {
+          lastErr = 'no image in response'
+          if (attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }
+          break
+        }
+        return { ok: true, mimeType: inline.mime_type || inline.mimeType || 'image/png', dataB64: inline.data }
+      } catch (e: any) {
+        lastErr = String(e?.message || e)
         if (attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }
-        return { ok: false, error: lastErr }
+        break
       }
-      return { ok: true, mimeType: inline.mime_type || inline.mimeType || 'image/png', dataB64: inline.data }
-    } catch (e: any) {
-      lastErr = String(e?.message || e)
-      if (attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }
-      return { ok: false, error: lastErr }
     }
   }
   return { ok: false, error: lastErr }
