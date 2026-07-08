@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { generateImage, buildClonePrompt, geminiEnabled, nearestAspect } from '@/lib/gemini/image'
+import { generateImage, buildClonePrompt, geminiEnabled, nearestAspect, describeProduct, verifyClonedAd } from '@/lib/gemini/image'
 import { saveGeneration } from '@/lib/creatives'
 import { sendFirstAdEmail } from '@/lib/email'
 
@@ -114,12 +114,6 @@ async function handle(req: NextRequest) {
     if (!logoUrl && typeof body.logo === 'string' && body.logo.trim()) logoUrl = body.logo.trim()
     const logoImg = logoUrl ? await fetchImageB64(logoUrl) : null
 
-    const prompt = buildClonePrompt({
-      brandName, colors: kitColors, newHeadline, aspectRatio: resolvedAspect, fonts: kitFonts, palette: kitPalette, hasLogo: !!logoImg,
-      dna: { hook_type: (ad as any).hook_type, format_style: (ad as any).format_style, angle: (ad as any).angle, emotion: (ad as any).emotion, cta: (ad as any).cta },
-    })
-    console.log(`clone-image [${useTier}] prompt:`, prompt)   // proof the prompt is sent each generation
-
     // Normalize each product photo to base64. data: URLs are decoded inline; http(s) URLs are fetched.
     // Cap at 4 so the payload stays within Gemini's part limit alongside the reference ad.
     const products = (await Promise.all(rawProducts.slice(0, 4).map(async (src) => {
@@ -130,10 +124,46 @@ async function handle(req: NextRequest) {
     }))).filter(Boolean) as { mimeType: string; dataB64: string }[]
     if (products.length === 0) { await refund(); return NextResponse.json({ error: 'could not load product image(s)' }, { status: 502 }) }
 
+    // Ground the prompt in WHAT the product is ("pesto sauce in a glass jar") — a cheap Flash
+    // vision call. This is the detail the proven-good human prompt had; it drives correct scene,
+    // copy, and shape adaptation. Best-effort: null just means the prompt omits it.
+    const productDesc = await describeProduct(products[0]).catch(() => null)
+
+    const prompt = buildClonePrompt({
+      brandName, colors: kitColors, newHeadline, aspectRatio: resolvedAspect, fonts: kitFonts, palette: kitPalette, hasLogo: !!logoImg,
+      productDesc: productDesc || undefined,
+      dna: { hook_type: (ad as any).hook_type, format_style: (ad as any).format_style, angle: (ad as any).angle, emotion: (ad as any).emotion, cta: (ad as any).cta },
+    })
+    console.log(`clone-image [${useTier}] prompt:`, prompt)   // proof the prompt is sent each generation
+
     // Order matters: [reference ad, ...product photos, logo?] — the prompt references the FINAL image as the logo.
     const genImages = logoImg ? [refImg, ...products, logoImg] : [refImg, ...products]
-    const gen = await generateImage(prompt, genImages, useTier, { aspectRatio: resolvedAspect, imageSize })
-    if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
+
+    // Generate → verify → retry. The verifier (cheap Flash text call) checks product identity,
+    // branding, and text; a failed check regenerates with ONE targeted correction appended (never
+    // a new standing prompt rule). Up to 2 retries, then the best attempt ships — QA never turns
+    // a paid generation into an error. Verifier fails OPEN on API errors.
+    const MAX_GENS = 3
+    let gen: Awaited<ReturnType<typeof generateImage>> | null = null
+    let best: { mimeType: string; dataB64: string } | null = null
+    let verdictLog: string[] = []
+    for (let i = 0; i < MAX_GENS; i++) {
+      const attemptPrompt = i === 0 ? prompt : `${prompt} IMPORTANT CORRECTION: ${verdictLog[verdictLog.length - 1]}`
+      gen = await generateImage(attemptPrompt, genImages, useTier, { aspectRatio: resolvedAspect, imageSize })
+      if (!gen.ok) break                       // API failure → surfaced below (refund if no earlier good attempt)
+      best = { mimeType: gen.mimeType, dataB64: gen.dataB64 }
+      const v = await verifyClonedAd(best, products[0], brandName)
+      if (v.pass) { verdictLog.push('pass'); break }
+      const fix = v.fix || [
+        !v.productMatches && 'Render the product exactly as shown in its photo — same shape, container type, label and colors.',
+        !v.brandingClean && `Every logo and brand name shown must belong to ${brandName ? `"${brandName}"` : "the user's brand"} only.`,
+        !v.textClean && 'Fix all text: correct spelling, no repeated words or duplicated text blocks.',
+      ].filter(Boolean).join(' ')
+      verdictLog.push(fix)
+      console.log(`clone-image verify attempt ${i + 1} failed:`, JSON.stringify(v))
+    }
+    if (!best) { await refund(); return NextResponse.json({ error: (gen && !gen.ok && gen.error) || 'generation failed' }, { status: 502 }) }
+    gen = { ok: true, ...best }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 

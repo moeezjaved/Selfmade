@@ -222,6 +222,7 @@ export function buildStudioPrompt(opts: {
 
 export function buildClonePrompt(opts: {
   brandName?: string; colors?: string[]; newHeadline?: string; aspectRatio?: string; hasLogo?: boolean
+  productDesc?: string   // short "what the product is" (e.g. "pesto sauce jar") — grounds scene/copy adaptation
   palette?: BrandPalette
   fonts?: { heading?: string | null; body?: string | null; headingWeight?: string | null; bodyWeight?: string | null }
   dna?: { hook_type?: string | null; format_style?: string | null; angle?: string | null; emotion?: string[] | null; cta?: string | null }
@@ -257,23 +258,108 @@ export function buildClonePrompt(opts: {
     d.angle && `angle (${d.angle})`,
     d.emotion?.length && `emotional tone (${d.emotion.slice(0, 2).join(', ')})`,
   ].filter(Boolean).join(', ')
+  // Keep this SHORT and POSITIVELY PHRASED. Two lessons learned the hard way:
+  // (1) a bloated prompt (dozens of CRITICAL rules) confuses the model into copying the reference —
+  //     a concise brief, like a person's one-line ask, reproduces the layout AND does the swaps;
+  // (2) image models weight every concept the prompt MENTIONS and handle negation poorly — each
+  //     "remove the competitor's logo/product" line conditions the output ON those things. So state
+  //     only the desired end state (whose product/brand appears), never what must be absent.
+  const brand = opts.brandName ? `"${opts.brandName}"` : "the user's brand"
   return [
-    `TASK: PRODUCT REPLACEMENT. Image 1 is a competitor's winning ad. REUSE its layout, composition, background scene, camera angle, lighting, subjects, and text placement${keep ? ` (${keep})` : ''} — BUT the product shown in image 1 must NOT appear anywhere in your output. It is being replaced.`,
-    `The ONLY product in the final ad is the USER'S PRODUCT, shown in the image(s) AFTER image 1${opts.hasLogo ? ' (the very last image is the brand logo)' : ''}. Render it 1:1 from that photo — EXACT silhouette, proportions, cap/lid shape, materials, textures, on-label text, and colors; treat the photo as ground truth (do not restyle or "improve" it). Place it in the SAME position and SAME relative size/footprint as the product it replaces.`,
-    `SHAPE MISMATCH IS EXPECTED: the user's product is often a COMPLETELY DIFFERENT shape than image 1's product (e.g. a squat jar replacing a tall dropper bottle, a pouch replacing a box). Render the USER'S product's OWN true shape from its photo — do NOT keep the reference product's silhouette, do NOT force the user's product to look like a bottle/dropper/whatever the original was. The reference product's form must be gone; only the user's product's real form remains.`,
-    `CRITICAL — the competitor's original product, its jar/bottle/box, and its packaging/label must be ENTIRELY GONE. Do NOT show two products, do NOT keep or blend the original product, do NOT swap it for a person/hand/fruit/other object. Exactly ONE product in the image: the user's. If you begin drawing the reference product, stop and draw the user's product instead.`,
-    `ADAPT THE SETTING to the user's product. The background, surroundings, spilled ingredients, and props must MATCH the user's product — read its photo to infer what it is. Replace ANYTHING tied to the original product, including its scene: coffee beans behind a coffee bag, pills behind a supplement, an orchard/fruit garden/farm/field behind a different food (e.g. a mango grove behind a pesto). For a pesto/Italian food, use a fitting scene — Italian/Mediterranean countryside, an olive grove, a rustic kitchen or wood table with tomatoes, basil and herbs — NOT the original ad's location. Only a plain, neutral, product-agnostic background (studio seamless, soft gradient) may stay as-is. Keep the same composition, framing, lighting, and premium mood; change only WHAT the scene is made of so it suits the user's product.`,
-    `CRITICAL — STRIP ALL REFERENCE BRANDING: image 1 belongs to a DIFFERENT, competing brand. You MUST completely REMOVE every trace of it — its logo, wordmark, brand name, tagline, and any on-pack/on-screen brand text${opts.brandName ? `, and replace them with "${opts.brandName}" only` : ''}. The finished ad must show ZERO branding from the reference ad (no logos, no brand names, nowhere) — only ${opts.brandName || "the user's"} brand.`,
-    opts.newHeadline
-      ? `On-screen headline — render EXACTLY, letter for letter: "${opts.newHeadline}".`
-      : `WRITE A BRAND-NEW headline for the USER'S product — look at the user's product photo, understand what it is, and write a short, punchy, benefit-driven headline that fits THAT product, correctly spelled in real English. Do NOT reuse the reference ad's headline words (they were for a different product); keep only the headline's on-screen POSITION and typographic style, and replace the WORDS with copy about the user's product. Likewise rewrite any sub-headline/supporting copy to fit the user's product — no leftover text about the original product.`,
-    d.cta ? `Keep a clear call-to-action button ("${d.cta}").` : '',
-    brandStyle ? `Secondary styling, only where it does not fight the layout above — ${brandStyle}.` : '',
+    `Clone the winning ad in image 1 into an ad for the USER'S product${opts.productDesc ? ` (${opts.productDesc})` : ''}${opts.brandName ? ` by brand ${brand}` : ''}, shown in the image(s) after it. Keep image 1's layout, composition, structure${keep ? `, and ${keep}` : ''}, and premium quality — with these swaps:`,
+    `• Product: exactly ONE product appears — the user's, rendered precisely from its photo: its own real shape, proportions, label text and colors, even when that shape differs completely from image 1's product (e.g. a jar in place of a dropper bottle).`,
+    `• Branding: every visible logo, brand name, tagline and label in the final ad belongs to ${brand} only.`,
+    `• Scene & copy: the background, props and all supporting text fit the user's product and what it is.`,
+    opts.newHeadline ? `Headline, rendered exactly: "${opts.newHeadline}".` : `Write one short, punchy headline that fits the user's product.`,
+    d.cta ? `Include a clear CTA button ("${d.cta}").` : '',
+    brandStyle ? `Use on-brand styling where it fits: ${brandStyle}.` : '',
     logoLine,
-    `Spell all text correctly in real English (no gibberish). No watermarks, no other brands' logos, no extra or duplicate products.`,
-    opts.aspectRatio && opts.aspectRatio !== 'original'
-      ? `Compose at a ${opts.aspectRatio} aspect ratio.`
-      : `Keep the same aspect ratio as image 1.`,
-    `Output ONE photorealistic, ad-ready image.`,
+    `Spell every word correctly, never repeat a word, keep on-image text minimal. No gibberish, no watermarks.`,
+    opts.aspectRatio && opts.aspectRatio !== 'original' ? `Compose at a ${opts.aspectRatio} aspect ratio.` : `Keep the same aspect ratio as image 1.`,
+    `Output one photorealistic, ready-to-publish ad image.`,
   ].filter(Boolean).join(' ')
+}
+
+// ── Verify-and-retry QA (post-generation) ─────────────────────────────────────
+// A cheap Gemini Flash TEXT call that inspects the generated ad against the user's product photo.
+// This is the durable reliability lever: instead of hardening the generation prompt every time a
+// failure mode appears (which bloats it and CAUSES the next failure), the checker catches bad
+// outputs before the user sees them and the route regenerates. New failure mode → new CHECK here,
+// never a new paragraph in buildClonePrompt.
+const MODEL_VERIFY = process.env.GEMINI_VERIFY_MODEL || 'gemini-2.5-flash'
+
+export type CloneVerdict = {
+  pass: boolean
+  productMatches: boolean      // generated ad shows the user's product (shape/label from its photo)
+  brandingClean: boolean       // no branding other than the user's brand
+  textClean: boolean           // no misspelled/duplicated/gibberish text
+  fix?: string                 // ONE short corrective sentence for the retry prompt
+}
+
+/**
+ * Inspect a generated clone. images = [generated ad, user's product photo].
+ * Fails OPEN (pass:true) on any API error — QA must never block a paying user's result.
+ */
+export async function verifyClonedAd(generated: ImageInput, product: ImageInput, brandName?: string): Promise<CloneVerdict> {
+  const OPEN: CloneVerdict = { pass: true, productMatches: true, brandingClean: true, textClean: true }
+  if (!KEY) return OPEN
+  const prompt = [
+    `Image 1 is an AI-generated ad. Image 2 is the real product it must feature${brandName ? ` (brand "${brandName}")` : ''}. Inspect image 1 strictly and answer with ONLY this JSON:`,
+    `{"productMatches":bool,  // image 1's product has the same shape, packaging type, label and colors as image 2 (not a different product or the wrong container type)`,
+    ` "brandingClean":bool,   // every logo/brand name/label in image 1 belongs to ${brandName ? `"${brandName}"` : "the product's own brand as seen in image 2"} — no other company's branding anywhere`,
+    ` "textClean":bool,       // all visible text is correctly spelled real English with no duplicated words or repeated text blocks`,
+    ` "fix":string}           // if anything is false: ONE short imperative sentence telling an image model what to correct; else ""`,
+  ].join('\n')
+  try {
+    const r = await fetch(`${BASE}/${MODEL_VERIFY}:generateContent?key=${KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { text: prompt },
+          { inline_data: { mime_type: geminiImageMime(generated.mimeType) || 'image/png', data: generated.dataB64 } },
+          { inline_data: { mime_type: geminiImageMime(product.mimeType) || 'image/jpeg', data: product.dataB64 } },
+        ] }],
+        generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+      }),
+    })
+    if (!r.ok) return OPEN
+    const j = await r.json()
+    const raw = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('')
+    const v = JSON.parse(raw.replace(/^```(?:json)?/m, '').replace(/```\s*$/m, '').trim())
+    const productMatches = v.productMatches !== false
+    const brandingClean = v.brandingClean !== false
+    const textClean = v.textClean !== false
+    return {
+      pass: productMatches && brandingClean && textClean,
+      productMatches, brandingClean, textClean,
+      fix: typeof v.fix === 'string' && v.fix.trim() ? v.fix.trim().slice(0, 200) : undefined,
+    }
+  } catch { return OPEN }
+}
+
+/**
+ * Describe the user's product in a few words ("pesto sauce jar") for prompt grounding — the detail
+ * the proven-good human prompt ("clone first ad into my pesto sauce ad") had and ours lacked.
+ * Best-effort: returns null on any failure and the clone proceeds without it.
+ */
+export async function describeProduct(product: ImageInput): Promise<string | null> {
+  if (!KEY) return null
+  try {
+    const r = await fetch(`${BASE}/${MODEL_VERIFY}:generateContent?key=${KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { text: 'Describe this product in 3-6 plain words (what it is + container type, e.g. "pesto sauce in a glass jar"). Reply with ONLY the phrase — no punctuation, no brand commentary.' },
+          { inline_data: { mime_type: geminiImageMime(product.mimeType) || 'image/jpeg', data: product.dataB64 } },
+        ] }],
+        generationConfig: { temperature: 0 },
+      }),
+    })
+    if (!r.ok) return null
+    const j = await r.json()
+    const t = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('').trim()
+    return t && t.length <= 80 ? t.replace(/^["']|["'.]$/g, '') : null
+  } catch { return null }
 }
