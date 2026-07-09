@@ -7,7 +7,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCredits, refreshCredits } from '@/components/credits/CreditCounter'
+import { refreshCredits } from '@/components/credits/CreditCounter'
 import { showUpsell } from '@/components/UpsellModal'
 
 type Brand = { pageId: string; name: string; adCount: number; active: number | null; inactive: number | null; video: number | null; image: number | null; carousel: number | null; crawled?: boolean }
@@ -18,8 +18,6 @@ function tab(active: boolean): React.CSSProperties {
 
 export default function BrandSpyList() {
   const router = useRouter()
-  const { pricing } = useCredits()
-  const cost = pricing?.brand_spy?.credits ?? null
   const [brands, setBrands] = useState<Brand[]>([])
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
@@ -32,6 +30,7 @@ export default function BrandSpyList() {
   const [mResults, setMResults] = useState<Brand[]>([])
   const [manualUrl, setManualUrl] = useState('')
   const [msg, setMsg] = useState('')
+  const [confirmSpy, setConfirmSpy] = useState<{ payload: { url?: string; pageId?: string; name?: string }; busyKey: string; name: string } | null>(null)  // in-app dialog
 
   const fetchBrands = useCallback(async (query: string, scope: 'mine' | 'all'): Promise<Brand[]> => {
     const p = new URLSearchParams({ scope }); if (query) p.set('q', query)
@@ -45,14 +44,19 @@ export default function BrandSpyList() {
   // Modal search
   useEffect(() => { if (!open) return; const t = setTimeout(async () => setMResults(await fetchBrands(mQ.trim(), 'all')), 250); return () => clearTimeout(t) }, [mQ, open, fetchBrands])
 
-  const spy = async (payload: { url?: string; pageId?: string; name?: string }, busyKey: string) => {
+  // Open the in-app confirmation (was a browser window.confirm).
+  const spy = (payload: { url?: string; pageId?: string; name?: string }, busyKey: string) => {
     setMsg('')
-    if (cost && !confirm(`Spy this brand? Uses ${cost} credits the first time (free to re-open) and pulls a fresh, complete snapshot.`)) return
-    setBusy(busyKey)
+    setConfirmSpy({ payload, busyKey, name: payload.name || 'this brand' })
+  }
+  const doSpy = async () => {
+    if (!confirmSpy) return
+    const { payload, busyKey } = confirmSpy
+    setConfirmSpy(null); setBusy(busyKey)
     try {
       const res = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
       const j = await res.json()
-      if (!res.ok) { if (showUpsell(j)) { setBusy(null); return } setMsg(j.error || 'Failed'); setBusy(null); return }
+      if (!res.ok) { if (showUpsell(j)) { setBusy(null); return } setMsg(j.message || j.error || 'Failed'); setBusy(null); return }
       refreshCredits()
       router.push(`/discovery/brand-spy/${j.pageId}`)
     } catch (e) { setMsg(String(e)); setBusy(null) }
@@ -69,7 +73,7 @@ export default function BrandSpyList() {
         </div>
         <button onClick={() => { setOpen(true); setModalTab('search'); setMQ(''); setManualUrl(''); setMsg('') }}
           style={{ padding: '9px 16px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-          + Spy new brand{cost ? ` · ${cost} cr` : ''}
+          + Spy new brand
         </button>
       </div>
 
@@ -89,7 +93,7 @@ export default function BrandSpyList() {
             <div style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>{q ? `No spied brand matches “${q}”` : 'You’re not spying on any brands yet'}</div>
             <div style={{ fontSize: 13, marginBottom: 14 }}>Add a competitor to start tracking its Meta ads — format mix, creative tests, hooks, and a full active/inactive history.</div>
             <button onClick={() => { setOpen(true); setModalTab('search'); setMQ(''); setManualUrl(''); setMsg('') }}
-              style={{ padding: '9px 18px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>+ Spy your first brand{cost ? ` · ${cost} cr` : ''}</button>
+              style={{ padding: '9px 18px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>+ Spy your first brand</button>
           </div>
         )}
         {brands.map((b) => (
@@ -162,13 +166,29 @@ export default function BrandSpyList() {
                 </div>
                 <button onClick={() => manualUrl.trim() && spy({ url: manualUrl.trim() }, 'manual')} disabled={busy === 'manual' || !manualUrl.trim()}
                   style={{ marginTop: 14, width: '100%', padding: '11px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: busy ? 'wait' : 'pointer', opacity: busy === 'manual' || !manualUrl.trim() ? 0.6 : 1 }}>
-                  {busy === 'manual' ? 'Spying…' : `Add Brand${cost ? ` · ${cost} credits` : ''}`}
+                  {busy === 'manual' ? 'Spying…' : 'Add Brand'}
                 </button>
               </div>
             )}
 
             {msg && <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 10 }}>{msg}</div>}
-            <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>◆ {cost ? `${cost} credits` : 'Free'} per new brand · continuous tracking until removed</div>
+            <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>◆ Included in your plan’s tracked-brand cap · continuous tracking until removed</div>
+          </div>
+        </div>
+      )}
+
+      {/* In-app spy confirmation (replaces the browser window.confirm) */}
+      {confirmSpy && (
+        <div onClick={() => setConfirmSpy(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(14,27,18,0.5)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 'min(440px,96vw)', background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 24px 70px rgba(0,0,0,0.35)' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#111' }}>Spy “{confirmSpy.name}”?</div>
+            <div style={{ fontSize: 13.5, color: '#6b7280', marginTop: 8, lineHeight: 1.55 }}>
+              We’ll crawl their full ad archive from the Meta Ad Library and track it over time. This uses one of your plan’s tracked-brand slots — it’s free within your plan.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button onClick={() => setConfirmSpy(null)} style={{ background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={doSpy} style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '9px 22px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Spy this brand</button>
+            </div>
           </div>
         </div>
       )}
