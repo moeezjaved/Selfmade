@@ -29,6 +29,7 @@ export default function SavedAdsPage() {
   const [tagInput, setTagInput] = useState<string | null>(null)  // saved_ad_id whose add-tag box is open
   const [cloneImg, setCloneImg] = useState<SavedAd | null>(null)   // open image-clone modal for this saved ad
   const [cloneVid, setCloneVid] = useState<SavedAd | null>(null)   // open video-clone modal for this saved ad
+  const [vidFailed, setVidFailed] = useState<Set<string>>(new Set())   // saved videos whose src can't load
 
   const addTag = async (savedId: string, tag: string) => {
     const t = tag.trim().slice(0, 40); if (!t) return
@@ -381,22 +382,31 @@ export default function SavedAdsPage() {
                         <Trash2 size={13} />
                       </button>
                     </div>
-                    {/* media — REAL creative (no more Meta iframe) */}
-                    <a href={openUrl} target="_blank" rel="noopener noreferrer"
-                      style={{ position: 'relative', display: 'block', width: '100%', paddingBottom: '118%', background: '#0f172a', overflow: 'hidden' }}>
-                      {videoSrc ? (
-                        <video src={videoSrc} poster={media || undefined} muted playsInline preload="metadata"
-                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {/* media — playable video (controls) with graceful fallback; image = link to original */}
+                    <div style={{ position: 'relative', width: '100%', paddingBottom: '118%', background: '#0f172a', overflow: 'hidden' }}>
+                      {videoSrc && !vidFailed.has(saved.id) ? (
+                        // A real R2 mp4 plays inline. A dead src (blob/YouTube that couldn't be fetched at
+                        // save time) fires onError → we fall through to the poster / "open original" state.
+                        <video src={videoSrc} poster={media || undefined} muted playsInline loop controls preload="metadata"
+                          onError={() => setVidFailed(s => { const n = new Set(s); n.add(saved.id); return n })}
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#0f172a' }} />
                       ) : media ? (
-                        <img src={media} alt={saved.page_name} loading="lazy" decoding="async"
-                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <a href={openUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', position: 'absolute', inset: 0 }}>
+                          <img src={media} alt={saved.page_name} loading="lazy" decoding="async"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </a>
                       ) : (
-                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 12 }}>No preview</div>
+                        <a href={openUrl} target="_blank" rel="noopener noreferrer"
+                          style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12, textDecoration: 'none' }}>
+                          <span style={{ fontSize: 22 }}>{isVid ? '▶' : '🖼'}</span>
+                          {isVid ? 'Video preview unavailable' : 'No preview'}
+                          <span style={{ fontSize: 10.5, color: '#64748b' }}>Open original ↗</span>
+                        </a>
                       )}
-                      {isVid && (
+                      {isVid && (!videoSrc || vidFailed.has(saved.id)) && (
                         <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,0.55)', padding: '2px 7px', borderRadius: 100 }}>▶ Video</span>
                       )}
-                    </a>
+                    </div>
                     {/* copy */}
                     {(title || body) && (
                       <div style={{ padding: '9px 12px 12px' }}>
