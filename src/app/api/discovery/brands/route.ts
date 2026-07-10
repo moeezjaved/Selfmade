@@ -59,10 +59,11 @@ export async function GET(req: NextRequest) {
     const { data: states } = await admin
       .from('discovery_brand_crawl_state').select('page_id, ads_indexed').in('page_id', ids)
     for (const r of (states || []) as any[]) if ((r.ads_indexed || 0) > 0) { inIndex.add(r.page_id); indexedCount.set(r.page_id, r.ads_indexed) }
-    const { data: txs } = await admin
-      .from('credit_transactions').select('reference_id')
-      .eq('user_id', user.id).eq('action_type', 'brand_spy').eq('status', 'committed').in('reference_id', ids)
-    for (const t of (txs || []) as any[]) if (t.reference_id) spied.add(t.reference_id)
+    // "Spying" badge = an explicit spy in followed_brands (spied=true). Spying is free now, so the old
+    // credit_transactions ledger is empty and can't be the source of truth.
+    const { data: fb } = await admin
+      .from('followed_brands').select('page_id').eq('user_id', user.id).eq('spied', true).in('page_id', ids)
+    for (const t of (fb || []) as any[]) if (t.page_id) spied.add(String(t.page_id))
   }
 
   // Industries for the filter dropdown (cached 10 min). Sample the most-populated brands first
