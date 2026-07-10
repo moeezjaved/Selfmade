@@ -13,7 +13,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  const { data } = await admin.from('followed_brands').select('page_id, brand_name, email_alerts').eq('user_id', user.id)
+  const { data } = await admin.from('followed_brands').select('page_id, brand_name, email_alerts, spied').eq('user_id', user.id)
   const brands = (data || []) as any[]
   return NextResponse.json({ pageIds: brands.map(b => b.page_id), brands })
 }
@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
   // Set per-brand email alerts (opt-in, 2 credits per email). Follows the brand if not already, so the
   // toggle can be flipped straight from the Brand Spy view.
   if (action === 'set_email') {
-    if (!isFollowing) await admin.from('followed_brands').insert({ user_id: user.id, page_id: String(pageId), brand_name: brandName || null, email_alerts: !!email_alerts })
+    // Enabling alerts from the Brand Spy view implies a spy (spied=true), per the "turning them on auto-spies too" rule.
+    if (!isFollowing) await admin.from('followed_brands').insert({ user_id: user.id, page_id: String(pageId), brand_name: brandName || null, email_alerts: !!email_alerts, spied: true })
     else await admin.from('followed_brands').update({ email_alerts: !!email_alerts }).eq('user_id', user.id).eq('page_id', String(pageId))
     return NextResponse.json({ following: true, email_alerts: !!email_alerts })
   }

@@ -45,7 +45,8 @@ export async function GET(req: NextRequest) {
     // "Spied" = the brands the ORG follows (followed_brands across all org members — one shared
     // workspace, so a team member sees every brand the owner/teammates spied, not just their own).
     const ids = await orgMemberIds(admin, user.id)
-    const { data: follows } = await admin.from('followed_brands').select('page_id').in('user_id', ids)
+    // Only SPIED brands belong in Brand Spy (spied=true) — plain ❤️ follows live under Following.
+    const { data: follows } = await admin.from('followed_brands').select('page_id').in('user_id', ids).eq('spied', true)
     myPageIds = Array.from(new Set<string>(((follows || []) as any[]).map((f: any) => String(f.page_id)).filter((x: string) => x && x !== 'null')))
     if (myPageIds.length === 0) return NextResponse.json({ brands: [], scope: 'mine' })
   }
@@ -92,7 +93,7 @@ export async function GET(req: NextRequest) {
     // Brands the org already tracks shouldn't appear in the "spy a NEW brand" modal (and clicking
     // one must never re-charge/re-add). Exclude them from the results.
     const orgIds = await orgMemberIds(admin, user.id)
-    const { data: follows } = await admin.from('followed_brands').select('page_id').in('user_id', orgIds)
+    const { data: follows } = await admin.from('followed_brands').select('page_id').in('user_id', orgIds).eq('spied', true)
     const already = new Set<string>(((follows || []) as any[]).map((f: any) => String(f.page_id)))
 
     const [crawledRes, dirRes] = await Promise.all([
@@ -177,7 +178,10 @@ const COUNTRIES = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', '
 async function ensureFollowed(admin: ReturnType<typeof createAdminClient>, userId: string, pageId: string, name: string) {
   try {
     const { data: ex } = await admin.from('followed_brands').select('id').eq('user_id', userId).eq('page_id', pageId).maybeSingle()
-    if (!ex) await admin.from('followed_brands').insert({ user_id: userId, page_id: pageId, brand_name: name })
+    // spied=true marks this as an explicit Brand Spy (vs a plain ❤️ Follow). If a ❤️ follow row
+    // already exists, upgrade it to a spy so it appears in the Brand Spy list.
+    if (!ex) await admin.from('followed_brands').insert({ user_id: userId, page_id: pageId, brand_name: name, spied: true })
+    else await admin.from('followed_brands').update({ spied: true }).eq('id', (ex as any).id)
   } catch { /* non-fatal */ }
 }
 
@@ -207,10 +211,11 @@ export async function POST(req: NextRequest) {
   // Tracked brands are an INCLUDED plan feature (capped), NOT a credit purchase — the plan cards
   // advertise "N tracked brands", so spying must be FREE within the cap. Source of truth = followed_brands.
 
-  // Already spying this brand? Re-open is a no-op (refresh the crawl, keep the follow).
+  // Already SPYING this brand? Re-open is a no-op (refresh the crawl, keep the follow). A plain
+  // ❤️ follow (spied=false) is NOT "already spying" — it falls through so the spy upgrades it.
   const { data: prior } = await admin
     .from('followed_brands').select('id')
-    .eq('user_id', user.id).eq('page_id', pageId).limit(1).maybeSingle()
+    .eq('user_id', user.id).eq('page_id', pageId).eq('spied', true).limit(1).maybeSingle()
   if (prior) {
     await ensureTracked(admin, pageId, name, false)
     return NextResponse.json({ pageId, charged: false, alreadySpied: true })
@@ -221,8 +226,9 @@ export async function POST(req: NextRequest) {
   // member's own (possibly Free) plan. Count follows across the whole org (shared workspace).
   const billingOwner = await resolveBillingOwner(admin, user.id)
   const orgIds = await orgMemberIds(admin, user.id)
+  // Cap counts SPIED brands only — plain ❤️ follows don't eat into the tracked-brand limit.
   const { count: trackedCount } = await admin
-    .from('followed_brands').select('id', { count: 'exact', head: true }).in('user_id', orgIds)
+    .from('followed_brands').select('id', { count: 'exact', head: true }).in('user_id', orgIds).eq('spied', true)
   const gate = await requireUnder(admin, billingOwner, 'brandSpy', trackedCount || 0)
   if (gate) return NextResponse.json(gate, { status: 402 })
 

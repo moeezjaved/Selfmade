@@ -617,7 +617,8 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
   useEffect(() => {
     fetch('/api/follows').then(r => r.json()).then(j => {
       const b = (j.brands || []).find((x: any) => String(x.page_id) === String(pageId))
-      setSpied(!!b); setEmailOn(!!b?.email_alerts)
+      // "Spied" = explicitly tracked (spied=true), not merely ❤️ followed.
+      setSpied(!!b?.spied); setEmailOn(!!b?.email_alerts)
     }).catch(() => setSpied(false))
   }, [pageId])
 
