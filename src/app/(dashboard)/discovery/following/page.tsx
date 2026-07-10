@@ -33,6 +33,16 @@ export default function FollowingPage() {
 
   const thumb = (a: Ad) => a.thumbnailUrl || a.creatives?.[0]?.r2_url || null
 
+  const [unfollowing, setUnfollowing] = useState<string | null>(null)
+  const unfollow = async (pageId: string) => {
+    setUnfollowing(pageId)
+    try {
+      await fetch(`/api/discovery/follow?page_id=${encodeURIComponent(pageId)}`, { method: 'DELETE' })
+      setBrands(prev => prev.filter((b: any) => String(b.page_id) !== String(pageId)))
+      setAds(prev => prev.filter(a => String(a.pageId) !== String(pageId)))
+    } finally { setUnfollowing(null) }
+  }
+
   if (loading) return <div style={{ padding: 28, color: '#9ca3af' }}>Loading your follows…</div>
 
   if (brands.length === 0) return (
@@ -53,7 +63,15 @@ export default function FollowingPage() {
         <span style={{ fontSize: 13, color: '#6b7280' }}>{brands.length} brand{brands.length > 1 ? 's' : ''} · {ads.length} recent ads</span>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
-        {brands.map((b: any) => <span key={b.page_id} style={{ fontSize: 12, fontWeight: 600, color: '#374151', background: '#f1f5f9', padding: '3px 10px', borderRadius: 100 }}>{b.brand_name || b.page_id}</span>)}
+        {brands.map((b: any) => (
+          <span key={b.page_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#374151', background: '#f1f5f9', padding: '3px 6px 3px 10px', borderRadius: 100, textTransform: 'capitalize' }}>
+            {b.brand_name || b.page_id}
+            <button onClick={() => unfollow(b.page_id)} disabled={unfollowing === b.page_id} title="Unfollow"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: '50%', border: 'none', background: '#e2e8f0', color: '#64748b', fontSize: 12, lineHeight: 1, cursor: unfollowing === b.page_id ? 'wait' : 'pointer', padding: 0 }}>
+              {unfollowing === b.page_id ? '·' : '×'}
+            </button>
+          </span>
+        ))}
       </div>
 
       {ads.length === 0 ? <div style={{ color: '#9ca3af' }}>No ads from your followed brands yet.</div> : (

@@ -242,7 +242,11 @@ export async function GET(request: NextRequest) {
 
     // Keyword search — OR across body, title, page_name, brand_categories
     if (q) {
-      if (mode === 'brand') {
+      if (/^\d{8,}$/.test(q)) {
+        // The query IS a Meta page_id (e.g. pasted from Following/a chip whose name hadn't resolved).
+        // Match it directly so it returns that brand's ads instead of "No ads found".
+        baseQuery = baseQuery.eq('page_id', q)
+      } else if (mode === 'brand') {
         // Exact page_id (captures every display name on that page). NOTE: the
         // seed_terms affiliate OR is intentionally dropped here — an array-contains on
         // the unindexed seed_terms forces a seq-scan that makes the inner-join embed
