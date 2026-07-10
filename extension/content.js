@@ -53,6 +53,24 @@
     if (bg) return { url: bg, type: 'image' }
     return { url: '', type: 'image' }
   }
+  // Blob-streamed videos (FB/IG/TikTok feed) can't be fetched by the server. Grab a POSTER image so
+  // the save still works + the saved card shows the creative (not a black box). "Open original" (the
+  // permalink) is what lets the user actually watch the video on the platform.
+  function findPoster(el) {
+    if (el instanceof HTMLVideoElement && el.poster && /^https?:/.test(el.poster)) return el.poster
+    const box = (el.closest && el.closest('[role="article"], article, [data-ad-preview], [aria-label]')) || el.parentElement || document
+    let best = '', bestArea = 120 * 120                 // ignore avatars/icons
+    for (const img of box.querySelectorAll('img')) {
+      const src = img.currentSrc || img.src || ''
+      if (!/^https?:/.test(src)) continue
+      const r = img.getBoundingClientRect(); const a = r.width * r.height
+      if (a > bestArea) { best = src; bestArea = a }
+    }
+    if (best) return best
+    // Last resort: a background-image creative in the same box.
+    for (const d of box.querySelectorAll('div, a, span')) { const u = bgUrl(d); if (u) return u }
+    return ''
+  }
   function biggestMediaIn(scope) {
     let best = null, bestArea = MIN * MIN
     for (const el of scope.querySelectorAll('img, video')) {
@@ -87,14 +105,19 @@
     }
     return best.slice(0, max)
   }
-  // Best-effort post permalink so "Open original" opens the actual ad, not the site's home page.
+  // Best-effort post permalink so "Open original" opens the actual ad/post, not the site's home page.
   function permalinkIn(scope) {
     try {
       const art = scope.closest?.('article') || scope
-      const a = [...art.querySelectorAll('a[href]')].map(x => x.getAttribute('href') || '')
-        .find(h => /\/(p|reel|reels|share|watch|stories|permalink\.php|posts)\//.test(h) || /story_fbid=|view_all_page_id=/.test(h))
-      if (!a) return ''
-      return a.startsWith('http') ? a : new URL(a, location.origin).href
+      // Prefer the post's timestamp link (the canonical permalink on IG/FB) or an explicit /p/ /reel/ href.
+      let href = ''
+      try { href = (art.querySelector('a:has(time)') || art.querySelector('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"]'))?.getAttribute('href') || '' } catch {}
+      if (!href) {
+        href = [...art.querySelectorAll('a[href]')].map(x => x.getAttribute('href') || '')
+          .find(h => /\/(p|reel|reels|share|watch|stories|posts)\//.test(h) || /story_fbid=|permalink\.php|\/videos\//.test(h) || /view_all_page_id=/.test(h)) || ''
+      }
+      if (!href) return ''
+      return href.startsWith('http') ? href : new URL(href, location.origin).href
     } catch { return '' }
   }
   function meta(scope) {
@@ -139,10 +162,16 @@
 
   // ── Shared save ───────────────────────────────────────────────────────────
   let busy = false
-  async function doSave(mediaEl, scope, btn, labels) {
+  async function doSave(mediaEl, scope, btn, labels, opts = {}) {
     if (busy) return
-    const { url, type } = mediaUrl(mediaEl)
-    if (!url) { toast('Could not read that media', false); return }
+    let { url, type } = mediaUrl(mediaEl)
+    // Blob/again video with no direct src → save its poster frame (image) so the save works and the
+    // card shows the creative. The permalink (below) is how the user watches the real video.
+    if (!url || (type === 'video' && url.startsWith('blob:'))) {
+      const poster = findPoster(mediaEl)
+      if (poster) { url = poster; type = 'image' }
+    }
+    if (!url) { toast('Could not read that media — try the ＋Save on the ad itself', false); return }
     busy = true
     const restore = btn.innerHTML
     btn.innerHTML = labels.saving
@@ -158,7 +187,12 @@
       busy = false
       btn.classList.remove('sm-busy')
       if (chrome.runtime.lastError) { btn.innerHTML = restore; toast('Extension reloaded — refresh the page', false); return }
-      if (resp?.ok) { btn.innerHTML = labels.done; btn.classList.add('sm-done'); toast('✓ Saved to Selfmade') }
+      if (resp?.ok) {
+        btn.innerHTML = labels.done; btn.classList.add('sm-done'); toast('✓ Saved to Selfmade')
+        // Reusable buttons (the floating FAB + the hover button) must NOT stay stuck green — revert
+        // them so the next ad can be saved. Per-card buttons keep the "✓ Saved" state.
+        if (opts.revert) setTimeout(() => { btn.innerHTML = restore; btn.classList.remove('sm-done') }, 1800)
+      }
       else if (resp?.status === 401) { btn.innerHTML = restore; toast('Open the Selfmade icon to sign in first', false) }
       else { btn.innerHTML = restore; toast(resp?.error || 'Save failed', false) }
     })
@@ -167,6 +201,10 @@
   // ── Generic card-button injector ────────────────────────────────────────────
   function addCardButton(card, place) {
     if (!card || card.dataset.smCard) return
+    // De-dupe nested containers (TikTok wraps a video in several matching divs → multiple buttons for
+    // ONE ad). Skip if this card already contains a button, or sits inside an already-tagged card.
+    if (card.querySelector('.sm-card-btn')) return
+    if (card.closest('[data-sm-card]')) return
     card.dataset.smCard = '1'
     const btn = document.createElement('button')
     btn.className = 'sm-card-btn'
@@ -253,7 +291,7 @@
     }, true)
     btn.addEventListener('mouseover', () => clearTimeout(hideT))
     btn.addEventListener('mouseout', scheduleHide)
-    btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (target) doSave(target, document, btn, { saving: '<span class="sm-ico">…</span> Saving', done: '✓ Saved' }) })
+    btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (target) doSave(target, document, btn, { saving: '<span class="sm-ico">…</span> Saving', done: '✓ Saved' }, { revert: true }) })
 
     const fab = document.createElement('button')
     fab.className = 'sm-fab'
@@ -298,7 +336,7 @@
     fab.addEventListener('click', (e) => {
       if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; return }   // was a drag, not a click
       const el = biggestMediaIn(document)
-      if (el) doSave(el, document, fab, { saving: '…', done: '✓' })
+      if (el) doSave(el, document, fab, { saving: '…', done: '✓' }, { revert: true })
       else toast('No image or video found here', false)
     })
   }
