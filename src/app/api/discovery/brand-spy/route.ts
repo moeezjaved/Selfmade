@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireUnder } from '@/lib/entitlements'
-import { getUserOrg } from '@/lib/org'
+import { getUserOrg, resolveBillingOwner } from '@/lib/org'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
 
 // All user_ids in the requester's org — spied brands are shared across the org's one workspace.
@@ -89,6 +89,12 @@ export async function GET(req: NextRequest) {
   // brands fill in the rest. Deduped by page_id. Plus the modal's "Add Manually" tab always
   // covers anything neither source knows (paste the Ad Library URL → POST extracts the page_id).
   if (q) {
+    // Brands the org already tracks shouldn't appear in the "spy a NEW brand" modal (and clicking
+    // one must never re-charge/re-add). Exclude them from the results.
+    const orgIds = await orgMemberIds(admin, user.id)
+    const { data: follows } = await admin.from('followed_brands').select('page_id').in('user_id', orgIds)
+    const already = new Set<string>(((follows || []) as any[]).map((f: any) => String(f.page_id)))
+
     const [crawledRes, dirRes] = await Promise.all([
       admin.from('discovery_brand_crawl_state')
         .select('page_id, brand_name, ads_indexed, active_count, video_count, image_count, carousel_count')
@@ -102,7 +108,7 @@ export async function GET(req: NextRequest) {
         .limit(limit),
     ])
 
-    const seen = new Set<string>()
+    const seen = new Set<string>(already)   // treat already-tracked as "seen" → excluded
     const merged: any[] = []
     for (const b of (crawledRes.data || []) as any[]) {
       if (!b.page_id || seen.has(b.page_id)) continue
@@ -210,10 +216,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ pageId, charged: false, alreadySpied: true })
   }
 
-  // Plan gate: cap the number of tracked brands by the plan's brandSpy entitlement (count follows).
+  // Plan gate: cap tracked brands by the plan's brandSpy entitlement. Resolve the ORG's BILLING
+  // OWNER so the owner's plan (e.g. Business = 150) applies to every team member — not each
+  // member's own (possibly Free) plan. Count follows across the whole org (shared workspace).
+  const billingOwner = await resolveBillingOwner(admin, user.id)
+  const orgIds = await orgMemberIds(admin, user.id)
   const { count: trackedCount } = await admin
-    .from('followed_brands').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
-  const gate = await requireUnder(admin, user.id, 'brandSpy', trackedCount || 0)
+    .from('followed_brands').select('id', { count: 'exact', head: true }).in('user_id', orgIds)
+  const gate = await requireUnder(admin, billingOwner, 'brandSpy', trackedCount || 0)
   if (gate) return NextResponse.json(gate, { status: 402 })
 
   // Within the cap → track it (fresh thorough re-crawl) + follow for new-ad alerts. No credits.

@@ -4,16 +4,22 @@
  * from subscriptions (if present + active) else user_profiles.plan_id, normalized to a PlanId.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { planEntitlements, normalizePlan, nextPlan, firstPlanWith, type PlanEntitlements, type PlanId, type UpsellResponse } from '@/lib/plans'
+import { planEntitlements, normalizePlan, nextPlan, firstPlanWith, PLAN_ORDER, type PlanEntitlements, type PlanId, type UpsellResponse } from '@/lib/plans'
 
 export async function getPlanId(admin: SupabaseClient, ownerId: string): Promise<PlanId> {
-  // Prefer an active subscription row; fall back to the profile's plan_id.
-  const { data: sub } = await admin
-    .from('subscriptions').select('plan, status')
-    .eq('owner_id', ownerId).in('status', ['active', 'trialing']).maybeSingle()
-  if ((sub as any)?.plan) return normalizePlan((sub as any).plan)
-  const { data: prof } = await admin.from('user_profiles').select('plan_id').eq('user_id', ownerId).maybeSingle()
-  return normalizePlan((prof as any)?.plan_id)
+  // Two sources can disagree: the Stripe-synced `subscriptions.plan` and the profile's `plan_id`
+  // (what the Billing page shows + what admin grants set). If they mismatch (e.g. a mis-synced or
+  // stale subscription still says "starter" while the profile is "business"), grant the MORE
+  // generous of the two — never under-serve a paying/granted user. Was: subscription-wins, which
+  // showed a Business user "Your Free plan includes 1 tracked brand".
+  const [{ data: sub }, { data: prof }] = await Promise.all([
+    admin.from('subscriptions').select('plan, status').eq('owner_id', ownerId).in('status', ['active', 'trialing']).maybeSingle(),
+    admin.from('user_profiles').select('plan_id').eq('user_id', ownerId).maybeSingle(),
+  ])
+  const subPlan = (sub as any)?.plan ? normalizePlan((sub as any).plan) : null
+  const profPlan = (prof as any)?.plan_id ? normalizePlan((prof as any).plan_id) : null
+  if (subPlan && profPlan) return PLAN_ORDER.indexOf(subPlan) >= PLAN_ORDER.indexOf(profPlan) ? subPlan : profPlan
+  return subPlan || profPlan || 'free'
 }
 
 export async function getEntitlements(admin: SupabaseClient, ownerId: string): Promise<PlanEntitlements & { planId: PlanId }> {
