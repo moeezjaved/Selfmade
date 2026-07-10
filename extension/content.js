@@ -218,6 +218,20 @@
     if (getComputedStyle(card).position === 'static') card.style.position = 'relative'
     if (place === 'append') card.appendChild(btn); else card.insertBefore(btn, card.firstChild)
   }
+  // Is this feed card an AD (sponsored), vs organic content? The Ad Library surfaces are all-ads, so
+  // this only gates the IG / TikTok / FB FEED. Meta obfuscates the "Sponsored" label, so we also treat
+  // a classic ad CTA or an outbound-ad link as an ad signal. Errs toward NOT injecting on organic posts.
+  const CTA_RE = /\b(Shop now|Learn more|Sign up|Download|Get offer|Order now|Book now|Buy now|Install now|Contact us|Send message|Apply now|Get quote|Subscribe|Get tickets|Play game|Watch more|See menu|Donate now)\b/i
+  function looksLikeAd(scope) {
+    try {
+      const art = scope.closest?.('article') || scope
+      const txt = (art.innerText || '').slice(0, 4000)
+      if (/\bSponsored\b/i.test(txt)) return true
+      if (art.querySelector('[aria-label*="Sponsored" i], a[href*="l.facebook.com"], a[href*="l.instagram.com"], a[href*="/ads/"]')) return true
+      if (CTA_RE.test(txt)) return true
+      return false
+    } catch { return false }
+  }
   function cardFromLabel(label, minSize = 240) {
     let el = label
     for (let i = 0; i < 12 && el; i++) {
@@ -246,12 +260,14 @@
     } else if (IS_IG) {
       for (const art of document.querySelectorAll('article')) {
         const r = art.getBoundingClientRect()
-        if (r.width > 260 && (art.querySelector('img') || art.querySelector('video'))) addCardButton(art, 'append')
+        // Only inject on SPONSORED posts — organic posts/reels get no button (they're not ads and
+        // their blob video can't be saved anyway).
+        if (r.width > 260 && (art.querySelector('img') || art.querySelector('video')) && looksLikeAd(art)) addCardButton(art, 'append')
       }
     } else if (IS_TT_FEED) {
       for (const v of document.querySelectorAll('video')) {
         const container = v.closest('[class*="DivItemContainer"], [class*="DivContainer"], article, div[data-e2e]') || v.parentElement
-        if (container) { const r = container.getBoundingClientRect(); if (r.width > 200 && r.height > 200) addCardButton(container, 'prepend') }
+        if (container) { const r = container.getBoundingClientRect(); if (r.width > 200 && r.height > 200 && looksLikeAd(container)) addCardButton(container, 'prepend') }
       }
     }
   }
