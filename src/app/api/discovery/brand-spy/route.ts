@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireUnder } from '@/lib/entitlements'
 import { getUserOrg } from '@/lib/org'
+import { resolveBrandNames } from '@/lib/discovery/brandNames'
 
 // All user_ids in the requester's org — spied brands are shared across the org's one workspace.
 async function orgMemberIds(admin: any, userId: string): Promise<string[]> {
@@ -53,9 +54,9 @@ export async function GET(req: NextRequest) {
   // (total / active / video / image), so the list never shows a stale crawl_state value like the
   // crawler's per-run count (the "27 ads" bug). Cheap: a handful of HEAD count queries per brand.
   if (myPageIds) {
-    const names = new Map<string, string>()
-    const { data: st } = await admin.from('discovery_brand_crawl_state').select('page_id, brand_name').in('page_id', myPageIds)
-    for (const r of (st || []) as any[]) if (r.brand_name) names.set(r.page_id, r.brand_name)
+    // Resolve real names across every source (crawl_state → directory → followed_brands → first ad),
+    // so the list never shows a bare Meta page_id like "1544270769212882".
+    const names = await resolveBrandNames(admin, myPageIds)
 
     const cnt = (pid: string, extra?: (q: any) => any) => {
       let qq = admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', pid)
@@ -69,12 +70,7 @@ export async function GET(req: NextRequest) {
         cnt(pid, (q) => q.ilike('format', '%video%')),
         cnt(pid, (q) => q.ilike('format', '%image%')),
       ])
-      // Fall back to an ad's page_name if crawl_state has no brand_name yet.
-      let name = names.get(pid)
-      if (!name) {
-        const { data: one } = await admin.from('discovery_ads_index').select('page_name').eq('page_id', pid).not('page_name', 'is', null).limit(1).maybeSingle()
-        name = (one as any)?.page_name || pid
-      }
+      const name = names.get(pid) || pid
       return {
         pageId: pid, name: name || pid, adCount: total,
         active, inactive: Math.max(0, total - active),

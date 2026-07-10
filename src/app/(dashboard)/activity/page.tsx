@@ -32,11 +32,22 @@ export default function ActivityPage() {
     CAMPAIGN_CREATED: 'Created a campaign',
     CREATIVE_GENERATED: 'Generated a creative',
   }
-  const isUuid = (s:string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test((s||'').trim())
+  // Treat bare UUIDs AND other opaque internal ids (long dashless hex/base tokens, no spaces) as
+  // "not human-readable" so we never print them as a description.
+  const looksLikeId = (s:string) => {
+    const t = (s||'').trim()
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)) return true   // UUID
+    if (!/\s/.test(t) && t.length >= 16 && /^[a-z0-9_:-]+$/i.test(t) && /\d/.test(t)) return true // opaque token/id
+    return false
+  }
   const describe = (log:any) => {
+    // For known action types, always prefer the friendly sentence — the stored `description` is
+    // usually an internal id (OAuth state, resource id) that reads as "random data".
+    const mapped = ACTION_TEXT[log.action_type]
+    if (mapped) return mapped
     const d = (log.description || '').trim()
-    if (d && !isUuid(d)) return d
-    return ACTION_TEXT[log.action_type] || (log.action_type ? log.action_type.replace(/_/g,' ').toLowerCase().replace(/^\w/, (c:string)=>c.toUpperCase()) : '—')
+    if (d && !looksLikeId(d)) return d
+    return log.action_type ? log.action_type.replace(/_/g,' ').toLowerCase().replace(/^\w/, (c:string)=>c.toUpperCase()) : '—'
   }
   // Actor: user actions = "You"; agent actions = "AI"; everything else (OAuth, syncs, webhooks) = "System".
   const byOf = (log:any): { label:string; color:string; bg:string } => {
