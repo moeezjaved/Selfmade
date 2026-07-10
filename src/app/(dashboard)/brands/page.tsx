@@ -25,11 +25,12 @@ export default function BrandsPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [form, setForm] = useState<any>({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '' })
+  const [quota, setQuota] = useState<{ used: number; limit: number } | null>(null)
 
   const load = async () => {
     setLoading(true)
     const r = await fetch('/api/brands'); const d = await r.json()
-    setBrands(d.brands || []); setLoading(false)
+    setBrands(d.brands || []); if (d.quota) setQuota(d.quota); setLoading(false)
   }
   useEffect(() => { load() }, [])
 
@@ -67,7 +68,10 @@ export default function BrandsPage() {
   return (
     <div style={{ padding: 28, maxWidth: 900 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111' }}>Brands</h1>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111' }}>Brands</h1>
+          {quota && <span style={{ fontSize: 13, fontWeight: 600, color: '#6b7280' }}>{quota.limit < 0 ? `${quota.used} · unlimited on your plan` : `${quota.used} / ${quota.limit} used`}</span>}
+        </div>
         <button style={btn} onClick={() => setCreating(v => !v)}>{creating ? 'Cancel' : '+ New brand'}</button>
       </div>
       <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 20 }}>Your brands feed Clone and Script Duplicate — voice, USPs, and real product photos.</p>

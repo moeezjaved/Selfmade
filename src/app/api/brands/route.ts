@@ -36,7 +36,10 @@ export async function GET() {
     products: byBrand(products || [], b.id),
     assets: byBrand(assets || [], b.id),
   }))
-  return NextResponse.json({ brands: enriched })
+  // Include the plan's brand-slot quota so the UI can show "used / limit" (limit -1 = unlimited)
+  // instead of only surfacing it as an error when you hit the cap.
+  const quota = await brandQuota(admin, user.id)
+  return NextResponse.json({ brands: enriched, quota })
 }
 
 // A user's brand slots are capped by their plan (trial 1, core 3, plus 10, business unlimited).

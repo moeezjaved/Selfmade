@@ -4,9 +4,12 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createReadClient } from '@/lib/supabase/server'
+import { resolveBrandNames } from '@/lib/discovery/brandNames'
 
 export const dynamic = 'force-dynamic'
 const LIMIT = 40
+
+const isBlankName = (b: unknown) => { const t = String(b ?? '').trim(); return !t || /^\d+$/.test(t) }
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -18,6 +21,13 @@ export async function GET(req: NextRequest) {
   const { data: follows } = await admin.from('followed_brands').select('page_id, brand_name').eq('user_id', user.id)
   const pageIds = (follows || []).map((f: any) => f.page_id)
   if (!pageIds.length) return NextResponse.json({ ads: [], total: 0, hasMore: false, brands: [] })
+
+  // Resolve real names for the brand chips so we never show a bare Meta page_id like "1544270769212882".
+  const needIds = (follows || []).filter((f: any) => isBlankName(f.brand_name)).map((f: any) => f.page_id)
+  if (needIds.length) {
+    const names = await resolveBrandNames(admin, needIds)
+    for (const f of follows as any[]) if (isBlankName(f.brand_name)) f.brand_name = names.get(String(f.page_id)) || f.brand_name
+  }
 
   // Over-fetch for hash dedup, newest first. INNER-JOIN discovery_creatives so we
   // (a) filter to has-creative ads — covers append-only ads whose index row no longer

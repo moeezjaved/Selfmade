@@ -103,8 +103,6 @@ export default function BrandPage() {
   const { pageId } = useParams<{ pageId: string }>()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const pageName = searchParams.get('name') || 'Brand'
-
   const [ads, setAds] = useState<Ad[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -115,6 +113,10 @@ export default function BrandPage() {
   const [followLoading, setFollowLoading] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
+
+  // Prefer an explicit ?name=, else the real page name from the loaded ads — so a direct visit to
+  // /discovery/brand/<id> (e.g. from Following) shows the brand, not the placeholder "Brand".
+  const pageName: string = searchParams.get('name') || (ads.find(a => (a as any).pageName && (a as any).pageName !== pageId) as any)?.pageName || 'Brand'
 
   // Load ads
   const fetchAds = useCallback(async (reset = true, cursor?: string) => {
