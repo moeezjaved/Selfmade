@@ -65,11 +65,16 @@ export async function GET(req: NextRequest) {
     for (const t of (txs || []) as any[]) if (t.reference_id) spied.add(t.reference_id)
   }
 
-  // Industries for the filter dropdown (cached).
+  // Industries for the filter dropdown (cached 10 min). Sample the most-populated brands first
+  // (order by ad count) and take a wide slice so we capture the full taxonomy, not just whatever
+  // 2000 rows happened to sort first — that was dropping industries from the picker.
   let industries: string[] = []
   if (!_industries || Date.now() - _industries.at > IND_TTL) {
-    const { data: inds } = await admin.from('brand_directory').select('industry').not('industry', 'is', null).limit(2000)
-    const names: string[] = (inds || []).map((r: any) => String(r.industry)).filter((s: string) => s && s !== 'null')
+    const { data: inds } = await admin.from('brand_directory')
+      .select('industry').not('industry', 'is', null)
+      .order('source_ad_count', { ascending: false, nullsFirst: false })
+      .limit(20000)
+    const names: string[] = (inds || []).map((r: any) => String(r.industry).trim()).filter((s: string) => s && s !== 'null' && s !== '—')
     industries = Array.from(new Set<string>(names)).sort()
     _industries = { at: Date.now(), list: industries }
   } else industries = _industries.list

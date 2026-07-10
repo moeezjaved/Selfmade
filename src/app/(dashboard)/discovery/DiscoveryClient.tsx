@@ -1514,9 +1514,11 @@ export default function DiscoveryPage() {
         ;({ ok: searchOk, data: dbData } = await runSearch())
       }
       if (!searchOk) {
-        setError('Search hit a snag — the index was busy. Try again in a moment.')
+        // Only surface the banner on a FRESH search (reset). A scroll-append blip must NOT blow away
+        // the grid the user is already looking at or flash an error — just stop paginating quietly
+        // (it retries on the next scroll). This was the "scroll down then up → error + 0 ads" bug.
         setHasMore(false)
-        if (reset) setDbTotal(0)
+        if (reset) { setError('Search hit a snag — the index was busy. Try again in a moment.'); setDbTotal(0) }
         return
       }
       dbData = dbData || {}
