@@ -31,6 +31,7 @@ export default function BrandSpyList() {
   const [manualUrl, setManualUrl] = useState('')
   const [msg, setMsg] = useState('')
   const [confirmSpy, setConfirmSpy] = useState<{ payload: { url?: string; pageId?: string; name?: string }; busyKey: string; name: string } | null>(null)  // in-app dialog
+  const [confirmUnspy, setConfirmUnspy] = useState<Brand | null>(null)  // un-spy confirmation
 
   const fetchBrands = useCallback(async (query: string, scope: 'mine' | 'all'): Promise<Brand[]> => {
     const p = new URLSearchParams({ scope }); if (query) p.set('q', query)
@@ -62,6 +63,16 @@ export default function BrandSpyList() {
     } catch (e) { setMsg(String(e)); setBusy(null) }
   }
 
+  // Stop spying → DELETE the follow, drop the row from the tracked list.
+  const doUnspy = async () => {
+    if (!confirmUnspy) return
+    const b = confirmUnspy; setConfirmUnspy(null); setBusy(b.pageId)
+    try {
+      await fetch(`/api/discovery/brand-spy?pageId=${encodeURIComponent(b.pageId)}`, { method: 'DELETE' })
+      setBrands((prev) => prev.filter((x) => x.pageId !== b.pageId))
+    } catch (e) { setMsg(String(e)) } finally { setBusy(null) }
+  }
+
   return (
     <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
       <style>{`.bs-row:hover{background:#fafafa}.bs-mrow:hover{background:#f6f8ff}`}</style>
@@ -84,8 +95,8 @@ export default function BrandSpyList() {
         style={{ width: 360, padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, marginBottom: 14, outline: 'none' }} />
 
       <div style={{ background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 90px', padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          <div>Brand</div><div>Ads (active · inactive)</div><div>Type</div><div style={{ textAlign: 'right' }}>Spy</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 150px', padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <div>Brand</div><div>Ads (active · inactive)</div><div>Type</div><div style={{ textAlign: 'right' }}>Tracking</div>
         </div>
         {loading && <div style={{ padding: 24, color: '#9ca3af', fontSize: 14 }}>Loading your brands…</div>}
         {!loading && brands.length === 0 && (
@@ -97,8 +108,8 @@ export default function BrandSpyList() {
           </div>
         )}
         {brands.map((b) => (
-          <div key={b.pageId} className="bs-row" onClick={() => busy ? null : spy({ pageId: b.pageId, name: b.name }, b.pageId)}
-            style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 90px', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>
+          <div key={b.pageId} className="bs-row" onClick={() => busy ? null : router.push(`/discovery/brand-spy/${b.pageId}`)}
+            style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 150px', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</div>
             <div style={{ fontSize: 13, color: '#374151' }}>
               {b.active != null
@@ -111,7 +122,14 @@ export default function BrandSpyList() {
               {b.carousel != null && b.carousel > 0 && <span title="Carousel/DCO">▦ {b.carousel}</span>}
               {b.active == null && <span>—</span>}
             </div>
-            <div style={{ textAlign: 'right' }}><span style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', background: 'rgba(32,117,255,0.08)', padding: '5px 12px', borderRadius: 999 }}>{busy === b.pageId ? '…' : 'Spy →'}</span></div>
+            <div style={{ textAlign: 'right', display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', background: 'rgba(32,117,255,0.08)', padding: '5px 12px', borderRadius: 999 }}>Open →</span>
+              <button onClick={(e) => { e.stopPropagation(); if (!busy) setConfirmUnspy(b) }} disabled={!!busy}
+                title="Stop spying — remove from your tracked brands"
+                style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', background: 'rgba(185,28,28,0.07)', border: 'none', padding: '5px 12px', borderRadius: 999, cursor: busy ? 'wait' : 'pointer' }}>
+                {busy === b.pageId ? '…' : 'Stop'}
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -188,6 +206,22 @@ export default function BrandSpyList() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
               <button onClick={() => setConfirmSpy(null)} style={{ background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
               <button onClick={doSpy} style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '9px 22px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Spy this brand</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Un-spy confirmation */}
+      {confirmUnspy && (
+        <div onClick={() => setConfirmUnspy(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(14,27,18,0.5)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 'min(440px,96vw)', background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 24px 70px rgba(0,0,0,0.35)' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#111', textTransform: 'capitalize' }}>Stop spying “{confirmUnspy.name || confirmUnspy.pageId}”?</div>
+            <div style={{ fontSize: 13.5, color: '#6b7280', marginTop: 8, lineHeight: 1.55 }}>
+              It’ll be removed from your tracked brands and you’ll stop getting new-ad alerts for it. You can re-add it any time — it stays free within your plan.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button onClick={() => setConfirmUnspy(null)} style={{ background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={doUnspy} style={{ background: '#b91c1c', color: '#fff', border: 'none', padding: '9px 22px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Stop spying</button>
             </div>
           </div>
         </div>

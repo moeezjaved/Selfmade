@@ -57,7 +57,8 @@ export default function TeamPage() {
     const j = await fetch('/api/billing/seats', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ extra }) }).then(r => r.json()).catch(() => ({ error: 'failed' }))
     if (j.url) { window.location.href = j.url; return }        // first purchase → Stripe Checkout
     setSeatBusy(false); setSeatModal(false)
-    if (j.error) { setMsg(j.message || (j.error === 'not_configured' ? 'Paid seats aren’t available yet — contact support.' : j.error)); return }
+    // Never surface internal error strings (e.g. the "Set STRIPE_PRICE_SEAT…" env hint) to users.
+    if (j.error) { setMsg(j.error === 'not_configured' ? 'Extra paid seats aren’t available yet — email hello@tryselfmade.ai and we’ll add them for you.' : (j.message || 'Couldn’t update seats. Please try again.')); return }
     setMsg(`✓ Seats updated — ${j.extra} paid seat${j.extra === 1 ? '' : 's'}.`); load()
   }
   const revoke = async (id: string) => { await fetch(`/api/account/team?invite=${id}`, { method: 'DELETE' }); load() }

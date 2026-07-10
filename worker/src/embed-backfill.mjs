@@ -34,22 +34,40 @@ const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: fal
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // Exact match to the indexer's enrichment — copy + concept tags + brand categories.
+// BUG FIX: the `.slice(0, N)` used to bind only to the LAST template string (operator precedence:
+// `a + b + c.slice()`), so the (often huge) `body` was never truncated → OpenAI 400s on the 8192-
+// TOKEN cap and the whole batch fails. Wrap the full concat in parens and cap at 6000 CHARS — safe
+// for CJK/emoji copy (≈1 token/char) and plenty of signal for English.
 const embText = (a) =>
-  `${a.page_name || ''} ${a.title || ''} ${a.body || ''} ${a.description || ''} ` +
+  (`${a.page_name || ''} ${a.title || ''} ${a.body || ''} ${a.description || ''} ` +
   `${(a.industries || []).join(' ')} ${(a.themes || []).join(' ')} ` +
-  `${(a.topics || []).join(' ')} ${(a.brand_categories || []).join(' ')}`.slice(0, 8000)
+  `${(a.topics || []).join(' ')} ${(a.brand_categories || []).join(' ')}`).slice(0, 6000)
 
-async function embed(inputs) {
-  // OpenAI rejects empty strings → pad to a single space so indices stay aligned with rows.
-  const safe = inputs.map((t) => (t && t.trim()) ? t : ' ')
+async function embedRaw(inputs) {
   const r = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_KEY}` },
-    body: JSON.stringify({ model: MODEL, input: safe }),
+    body: JSON.stringify({ model: MODEL, input: inputs }),
   })
-  if (!r.ok) throw new Error(`OpenAI ${r.status}: ${(await r.text()).slice(0, 300)}`)
+  if (!r.ok) { const t = await r.text(); const e = new Error(`OpenAI ${r.status}: ${t.slice(0, 300)}`); e.status = r.status; e.body = t; throw e }
   const d = await r.json()
   return d.data.map((x) => x.embedding)
+}
+
+async function embed(inputs) {
+  // OpenAI rejects empty strings → pad to a single space so indices stay aligned with rows.
+  let safe = inputs.map((t) => (t && t.trim()) ? t : ' ')
+  try {
+    return await embedRaw(safe)
+  } catch (e) {
+    // A stray CJK/emoji-dense row can still blow the token cap — retry ONCE with a hard 2500-char cut
+    // on every input (bulletproof under 8192 tokens for any script) instead of failing the whole batch.
+    if (e && e.status === 400 && /maximum input length/i.test(e.body || '')) {
+      safe = safe.map((t) => t.slice(0, 2500) || ' ')
+      return await embedRaw(safe)
+    }
+    throw e
+  }
 }
 
 // Bounded-concurrency map so 200 row-updates don't open 200 simultaneous connections.

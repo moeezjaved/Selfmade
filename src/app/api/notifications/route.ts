@@ -5,8 +5,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { resolveBrandNames } from '@/lib/discovery/brandNames'
 
 export const dynamic = 'force-dynamic'
+
+const isBlankName = (b: unknown) => { const t = String(b ?? '').trim(); return !t || /^\d+$/.test(t) }
 
 export async function GET() {
   const supabase = await createClient()
@@ -21,13 +24,25 @@ export async function GET() {
     .order('created_at', { ascending: false })
     .limit(50)
 
+  // The alert-worker sometimes stores a page_id (or nothing) as brand_name. Resolve a real name
+  // at read time so the bell shows "Country Delight" instead of "1544270769212882". Blank if unknown
+  // (the UI falls back to "A brand you follow" rather than showing the raw id).
+  const notifs = (data || []) as any[]
+  const needIds = notifs.filter((n) => isBlankName(n.brand_name)).map((n) => n.page_id).filter(Boolean)
+  if (needIds.length) {
+    const names = await resolveBrandNames(admin, needIds)
+    for (const n of notifs) {
+      if (isBlankName(n.brand_name)) n.brand_name = names.get(String(n.page_id)) || null
+    }
+  }
+
   const { count: unread } = await admin
     .from('notifications')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)
     .is('read_at', null)
 
-  return NextResponse.json({ notifications: data || [], unread: unread ?? 0 })
+  return NextResponse.json({ notifications: notifs, unread: unread ?? 0 })
 }
 
 export async function POST(req: NextRequest) {
