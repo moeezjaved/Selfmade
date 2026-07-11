@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
 import BootMotion from '@/components/motion/BootMotion'
+import SavedReportsNav from '@/components/reports/SavedReportsNav'
 
 // Two-rail nav: each AREA is one icon in the thin rail; its `items` fill the panel. Outline icons.
 const AREAS = [
@@ -263,6 +264,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               )
             })}
+            {/* Saved reports live under the Reports item in the Analytics area. */}
+            {!melloActive && activeArea.key === 'analytics' && <SavedReportsNav />}
           </nav>
 
           {/* Save ads from — extension / IG-mobile entry points (Atria-style) */}
