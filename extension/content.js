@@ -309,9 +309,11 @@
 
   // ── Hover button + floating button ──────────────────────────────────────────
   function setupHover() {
-    // Hover Save button — only on supported ad surfaces. On YouTube/other sites it was popping up over
-    // every thumbnail as you moused around while scrolling. The static FAB below stays for manual saves.
-    if (SUPPORTED) {
+    // Hover Save button — ONLY on supported surfaces that don't already have per-card buttons (the FB
+    // feed). On the Ad Library / IG / TikTok it trailed the mouse everywhere. The static FAB below is
+    // created on ALL supported surfaces as a reliable fallback (esp. IG, where per-card detection
+    // misses some ads) — it's one fixed, movable button, not a trailing one.
+    if (SUPPORTED && !HAS_CARDS) {
     const btn = document.createElement('button')
     btn.className = 'sm-save-btn'
     btn.innerHTML = '<span class="sm-ico">＋</span> Save'
@@ -400,7 +402,7 @@
   // Hover button + FAB only on supported surfaces that DON'T already get per-card buttons (i.e. the
   // plain Facebook feed). On the Ad Library / IG / TikTok the per-card buttons are the UX, so the
   // trailing hover button is suppressed. Nothing at all runs on YouTube/arbitrary sites.
-  if (SUPPORTED && !HAS_CARDS) setupHover()
+  if (SUPPORTED) setupHover()
   if (IS_FB_ADLIB || IS_TT_ADLIB || IS_IG || IS_TT_FEED) {
     scan()
     const obs = new MutationObserver(() => { clearTimeout(window.__smT); window.__smT = setTimeout(scan, 350) })
