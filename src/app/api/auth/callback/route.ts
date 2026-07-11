@@ -103,7 +103,9 @@ export async function GET(request: NextRequest) {
     const meAcctData = await meAcctRes.json()
     console.log('ME/ADACCOUNTS:', JSON.stringify(meAcctData).slice(0, 300))
     addAccounts(meAcctData.data)
+    const meCount = (meAcctData.data || []).length
 
+    let bizCount = 0
     try {
       const bizRes = await fetch(
         `https://graph.facebook.com/${META_API_VERSION}/me/businesses?` +
@@ -111,6 +113,7 @@ export async function GET(request: NextRequest) {
       )
       const bizData = await bizRes.json()
       console.log('ME/BUSINESSES:', JSON.stringify(bizData).slice(0, 300))
+      bizCount = (bizData.data || []).length
       for (const biz of (bizData.data || [])) {
         for (const edge of ['owned_ad_accounts', 'client_ad_accounts']) {
           try {
@@ -129,7 +132,21 @@ export async function GET(request: NextRequest) {
     const accounts = Array.from(byId.values())
     console.log('MERGED ACCOUNTS:', accounts.length, accounts.map(a => a.account_id).join(','))
 
-    if (!accounts.length) return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_ad_accounts_found`)
+    if (!accounts.length) {
+      // One-shot diagnostic surfaced in the error message (no server-log access):
+      // shows granted permissions + how many businesses/direct accounts Meta returned.
+      let perms = ''
+      try {
+        const pRes = await fetch(
+          `https://graph.facebook.com/${META_API_VERSION}/me/permissions?` +
+          new URLSearchParams({ access_token: longLivedToken })
+        )
+        const pData = await pRes.json()
+        perms = (pData.data || []).filter((p: any) => p.status === 'granted').map((p: any) => p.permission).join('|')
+      } catch {}
+      const msg = `no_ad_accounts_found · me:${meCount} biz:${bizCount} perms:[${perms}]`
+      return NextResponse.redirect(`${APP_URL}/connect-meta?error=${encodeURIComponent(msg)}`)
+    }
 
     const encryptedToken = encryptToken(longLivedToken)
     const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
