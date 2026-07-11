@@ -1,6 +1,7 @@
 'use client'
 import React, { useState } from 'react'
 import UpgradeGate from '@/components/UpgradeGate'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 type Step = 'welcome' | 'pixel' | 'creatives' | 'retargeting' | 'interests' | 'budget' | 'review' | 'grades'
 interface Creative { id: string; name: string; pack: number; type?: string; hash?: string; uploading?: boolean; uploaded?: boolean; mimeType?: string }
@@ -158,6 +159,7 @@ export default function M4Page() {
   return <UpgradeGate feature="launch" name="Launch Ads"><M4Inner /></UpgradeGate>
 }
 function M4Inner() {
+  const isMobile = useIsMobile()
   const [step, setStep] = useState<Step>('welcome')
   const [loading, setLoading] = useState(false)
   const [grades, setGrades] = useState<Grade[]>([])
@@ -489,7 +491,7 @@ function M4Inner() {
           <div style={{position:'absolute',top:0,left:'20%',right:'20%',height:'1.5px',background:'linear-gradient(90deg,transparent,#dffe95,transparent)'}}/>
           <h2 style={{fontSize:24,fontWeight:900,color:'#1a3a1a',marginBottom:8}}>The complete M4 ad system.</h2>
           <p style={{fontSize:14,color:'#5a7a5a',lineHeight:1.8,marginBottom:24}}>4 campaigns. Every customer lifecycle stage. Zero guesswork.</p>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:28}}>
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:12,marginBottom:28}}>
             {[{color:'#2d7a2d',label:'Campaign 1 — Broad',title:'Find winning creative',desc:'Advantage+ audience. One creative per ad set.'},{color:'#1a5c1a',label:'Campaign 2 — Interest',title:'Find winning audience',desc:'Manual interests from competitor data. One per ad set.'},{color:'#fbbf24',label:'Campaign 3 — Retargeting',title:'Convert warm visitors',desc:'Website visitors last 60 days. Different message.'},{color:'#f9a8d4',label:'Campaign 4 — Retainer',title:'Reward your buyers',desc:'Past purchasers. Loyalty offers. Maximize LTV.'}].map(c=>(
               <div key={c.label} style={{background:`${c.color}08`,border:`1px solid ${c.color}25`,borderRadius:16,padding:18}}>
                 <div style={{fontSize:11,fontWeight:800,color:c.color,textTransform:'uppercase',letterSpacing:'.1em',marginBottom:6}}>{c.label}</div>

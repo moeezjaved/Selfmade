@@ -10,6 +10,7 @@ import { X, Bookmark, Link as LinkIcon, Download, Sparkles, ExternalLink } from 
 import { cleanCopy } from '@/lib/cleanCopy'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 import toast from 'react-hot-toast'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 interface Creative {
   position: number
@@ -61,6 +62,7 @@ export default function AdDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [tags, setTags] = useState('')
   const [copied, setCopied] = useState(false)
+  const isMobile = useIsMobile()
   const [boards, setBoards] = useState<{ id: string; name: string; emoji?: string }[]>([])
   const [selectedBoard, setSelectedBoard] = useState('')
   const [saving, setSaving] = useState(false)
@@ -159,7 +161,7 @@ export default function AdDetailPage() {
       </div>
 
       {/* 3-column layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px 360px', gap: 18, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px 360px', gap: 18, alignItems: 'start' }}>
         {/* ── LEFT: ad preview ── */}
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
