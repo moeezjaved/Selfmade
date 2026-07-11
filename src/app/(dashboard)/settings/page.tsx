@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 
 // Chrome Web Store listing (approved 2026-07-08).
 const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi'
@@ -17,6 +18,7 @@ export default function SettingsPage() {
   const [prefsSaved, setPrefsSaved] = useState(false)
   const [prefsSaving, setPrefsSaving] = useState(false)
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)  // null = still loading
+  const [disconnecting, setDisconnecting] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -32,7 +34,7 @@ export default function SettingsPage() {
       setFullName(meta.full_name || meta.name || '')
       setLoading(false)
       // Real Meta-connection status (was hardcoded "Connected ✓" even with nothing linked).
-      supabase.from('meta_accounts').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+      supabase.from('meta_accounts').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'active')
         .then(({ count }) => { if (!cancelled) setMetaConnected((count || 0) > 0) })
       // load notification prefs (non-blocking)
       fetch('/api/notifications/prefs').then(r => r.json()).then(j => { if (!cancelled && j.prefs) setPrefs(j.prefs) }).catch(() => {})
@@ -65,6 +67,17 @@ export default function SettingsPage() {
   const signOut = async () => {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  const disconnectMeta = async () => {
+    if (!confirm('Disconnect your Meta / Facebook account? Your ad accounts will be removed from Selfmade until you reconnect.')) return
+    setDisconnecting(true)
+    try {
+      const res = await fetch('/api/meta/accounts', { method: 'DELETE' })
+      if (res.ok) { setMetaConnected(false); toast.success('Meta account disconnected') }
+      else { const j = await res.json().catch(() => ({})); toast.error(j?.error || 'Failed to disconnect') }
+    } catch { toast.error('Failed to disconnect') }
+    finally { setDisconnecting(false) }
   }
 
   return (
@@ -185,7 +198,14 @@ export default function SettingsPage() {
             <div style={{fontSize:14,color: metaConnected ? '#3a5a3a' : '#9ca3af'}}>
               {metaConnected == null ? 'Meta / Facebook — checking…' : metaConnected ? 'Meta / Facebook — Connected ✓' : 'Meta / Facebook — Not connected'}
             </div>
-            <a href="/connect-meta" style={{fontSize:13,color:'#1a3a1a',fontWeight:700,textDecoration:'none'}}>{metaConnected ? 'Manage →' : 'Connect →'}</a>
+            <div style={{display:'flex',alignItems:'center',gap:16}}>
+              <a href="/connect-meta" style={{fontSize:13,color:'#1a3a1a',fontWeight:700,textDecoration:'none'}}>{metaConnected ? 'Reconnect →' : 'Connect →'}</a>
+              {metaConnected && (
+                <button onClick={disconnectMeta} disabled={disconnecting} style={{fontSize:13,color:'#c0392b',fontWeight:700,background:'none',border:'none',fontFamily:'inherit',cursor:disconnecting?'default':'pointer',opacity:disconnecting?0.5:1,padding:0}}>
+                  {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

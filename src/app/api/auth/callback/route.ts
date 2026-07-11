@@ -82,24 +82,66 @@ export async function GET(request: NextRequest) {
     const llData = await llRes.json()
     const longLivedToken = llData.access_token || tokenData.access_token
 
-    const accountsRes = await fetch(
+    // Collect ad accounts from EVERY source, not just /me/adaccounts:
+    //  - /me/adaccounts            → personal + directly-assigned accounts
+    //  - /me/businesses → owned_ad_accounts / client_ad_accounts
+    // Business-owned accounts (e.g. under a Business Manager) do NOT reliably
+    // appear in /me/adaccounts, so a perfectly valid account came back empty.
+    const acctFields = 'account_id,name,currency,timezone_name'
+    const byId = new Map<string, any>()
+    const addAccounts = (arr: any[]) => {
+      for (const a of (arr || [])) {
+        const accId = a.account_id || (a.id ? String(a.id).replace('act_', '') : null)
+        if (accId && !byId.has(accId)) byId.set(accId, a)
+      }
+    }
+
+    const meAcctRes = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts?` +
-      new URLSearchParams({ fields: 'id,account_id,name,currency,timezone_name', access_token: longLivedToken })
+      new URLSearchParams({ fields: acctFields, limit: '200', access_token: longLivedToken })
     )
-    const accountsData = await accountsRes.json()
-    console.log('ACCOUNTS:', JSON.stringify(accountsData).slice(0, 300))
-    const accounts = accountsData.data || []
+    const meAcctData = await meAcctRes.json()
+    console.log('ME/ADACCOUNTS:', JSON.stringify(meAcctData).slice(0, 300))
+    addAccounts(meAcctData.data)
+
+    try {
+      const bizRes = await fetch(
+        `https://graph.facebook.com/${META_API_VERSION}/me/businesses?` +
+        new URLSearchParams({ fields: 'id,name', limit: '100', access_token: longLivedToken })
+      )
+      const bizData = await bizRes.json()
+      console.log('ME/BUSINESSES:', JSON.stringify(bizData).slice(0, 300))
+      for (const biz of (bizData.data || [])) {
+        for (const edge of ['owned_ad_accounts', 'client_ad_accounts']) {
+          try {
+            const r = await fetch(
+              `https://graph.facebook.com/${META_API_VERSION}/${biz.id}/${edge}?` +
+              new URLSearchParams({ fields: acctFields, limit: '200', access_token: longLivedToken })
+            )
+            addAccounts((await r.json()).data)
+          } catch (e) { console.log(`biz ${biz.id} ${edge} err:`, e) }
+        }
+      }
+    } catch (e) {
+      console.log('businesses fetch error:', e)
+    }
+
+    const accounts = Array.from(byId.values())
+    console.log('MERGED ACCOUNTS:', accounts.length, accounts.map(a => a.account_id).join(','))
 
     if (!accounts.length) return NextResponse.redirect(`${APP_URL}/connect-meta?error=no_ad_accounts_found`)
 
     const encryptedToken = encryptToken(longLivedToken)
     const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
 
+    const activeIds: string[] = []
     for (let i = 0; i < accounts.length; i++) {
       const account = accounts[i]
+      const accId = account.account_id || String(account.id).replace('act_', '')
+      activeIds.push(accId)
       const { error: upsertError } = await admin.from('meta_accounts').upsert({
         user_id: userId,
-        account_id: account.account_id || account.id.replace('act_', ''),
+        account_id: accId,
         account_name: account.name,
         access_token: encryptedToken,
         token_expires_at: expiresAt.toISOString(),
@@ -109,6 +151,17 @@ export async function GET(request: NextRequest) {
         is_primary: i === 0,
       }, { onConflict: 'user_id,account_id' })
       console.log('UPSERT:', upsertError ? JSON.stringify(upsertError) : 'SUCCESS')
+    }
+
+    // Prune accounts this user can no longer access on Meta (e.g. removed after
+    // an account change/hack) so the picker only shows currently-valid accounts.
+    if (activeIds.length) {
+      const inList = `(${activeIds.map(id => `"${id}"`).join(',')})`
+      const { error: pruneErr } = await admin.from('meta_accounts')
+        .update({ status: 'inactive', is_primary: false })
+        .eq('user_id', userId)
+        .not('account_id', 'in', inList)
+      console.log('PRUNE:', pruneErr ? JSON.stringify(pruneErr) : 'OK')
     }
 
     return NextResponse.redirect(`${APP_URL}/connect-meta?success=true`)

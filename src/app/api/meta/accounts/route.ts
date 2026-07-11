@@ -44,3 +44,19 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
+
+// Disconnect Meta: soft-deactivate all of this user's ad accounts (reversible —
+// keeps history). They disappear from the picker + dashboard, which only read
+// status='active'. Reconnecting re-activates whatever Meta still grants.
+export async function DELETE() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = createAdminClient()
+  const { error } = await admin.from('meta_accounts')
+    .update({ status: 'inactive', is_primary: false })
+    .eq('user_id', user.id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}
