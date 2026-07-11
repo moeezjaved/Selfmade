@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
-import { ExternalLink, ArrowLeft, Bookmark } from 'lucide-react'
+import { ExternalLink, ArrowLeft } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
 import CloneModal from '../../CloneModal'
 import CloneVideoModal from '../../CloneVideoModal'
@@ -119,23 +119,40 @@ export default function BrandPage() {
   // /discovery/brand/<id> (e.g. from Following) shows the brand, not the placeholder "Brand".
   const pageName: string = searchParams.get('name') || (ads.find(a => (a as any).pageName && (a as any).pageName !== pageId) as any)?.pageName || 'Brand'
 
-  // Creatives-tab (ad library) filters — applied client-side over the loaded ads.
+  // Creatives-tab (ad library) filters — server-side over the FULL archive via the shared brand-ads
+  // endpoint (paginated, R2 thumbnails), so filters aren't limited to the first batch of loaded ads.
   const [fDays, setFDays] = useState(0)
   const [fFormat, setFFormat] = useState('')
   const [fStatus, setFStatus] = useState('ALL')
   const [fSort, setFSort] = useState('newest')
   const [cloneImg, setCloneImg] = useState<Ad | null>(null)
   const [cloneVid, setCloneVid] = useState<Ad | null>(null)
-  const filteredAds = useMemo(() => {
-    let arr = ads.slice()
-    if (fDays > 0) { const since = Date.now() - fDays * 86_400_000; arr = arr.filter(a => a.isActive || (a.startDate && new Date(a.startDate).getTime() >= since)) }
-    if (fFormat) arr = arr.filter(a => getFormat(a.mediaType).toLowerCase() === fFormat.toLowerCase())
-    if (fStatus === 'ACTIVE') arr = arr.filter(a => a.isActive)
-    else if (fStatus === 'INACTIVE') arr = arr.filter(a => !a.isActive)
-    if (fSort === 'longest') arr.sort((a, b) => (b.daysRunning || 0) - (a.daysRunning || 0))
-    else arr.sort((a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime()) // newest
-    return arr
-  }, [ads, fDays, fFormat, fStatus, fSort])
+  const [libAds, setLibAds] = useState<Ad[]>([])
+  const [libLoading, setLibLoading] = useState(true)
+  const [libPage, setLibPage] = useState(0)
+  const [libHasMore, setLibHasMore] = useState(false)
+  const [libTotal, setLibTotal] = useState<number | null>(null)
+  const loadLib = useCallback(async (page: number, reset: boolean) => {
+    setLibLoading(true)
+    try {
+      const p = new URLSearchParams({ page: String(page), status: fStatus, sort: fSort })
+      if (fFormat) p.set('format', fFormat)
+      if (fDays > 0) p.set('days', String(fDays))
+      const r = await fetch(`/api/discovery/brand-spy/${pageId}/ads?${p.toString()}`)
+      const d = await r.json().catch(() => ({}))
+      const incoming: Ad[] = (Array.isArray(d.ads) ? d.ads : []).map((a: any) => ({
+        id: a.id, pageId, pageName: a.pageName || '', body: a.body || '', title: '', caption: a.caption || '',
+        snapshotUrl: a.snapshotUrl || '', thumbnailUrl: a.thumbnailUrl || null, videoUrl: a.videoUrl || null,
+        startDate: a.startDate || null, stopDate: a.stopDate || null, platforms: a.platforms || [],
+        mediaType: a.format || '', isActive: !!a.isActive, daysRunning: a.daysRunning ?? 0,
+      }))
+      setLibAds(prev => reset ? incoming : [...prev, ...incoming])
+      setLibPage(page); setLibHasMore(!!d.hasMore)
+      if (reset && d.total != null) setLibTotal(d.total)
+    } catch { /* keep prior list */ } finally { setLibLoading(false) }
+  }, [pageId, fDays, fFormat, fStatus, fSort])
+  // Refetch page 0 on mount + whenever a filter changes (filters only change on the Creatives tab).
+  useEffect(() => { loadLib(0, true) }, [loadLib])
   const openClone = (ad: Ad) => { if (getFormat(ad.mediaType) === 'Video' || ad.videoUrl) setCloneVid(ad); else setCloneImg(ad) }
 
   // Load ads
@@ -421,16 +438,18 @@ export default function BrandPage() {
                   <select value={fSort} onChange={e => setFSort(e.target.value)} style={{ ...FILTER_BTN(false), appearance: 'auto' }}>
                     {[['newest', 'Newest'], ['longest', 'Longest running']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
-                  <div style={{ marginLeft: 'auto', fontSize: 13, color: '#6b7280' }}>{filteredAds.length.toLocaleString()} ads</div>
+                  <div style={{ marginLeft: 'auto', fontSize: 13, color: '#6b7280' }}>{libTotal != null ? `${libTotal.toLocaleString()} ads` : ''}</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 12 }}>
-                  {filteredAds.map(ad => <MiniAdCard key={ad.id} ad={ad} onClone={openClone} />)}
+                  {libAds.map(ad => <MiniAdCard key={ad.id} ad={ad} onClone={openClone} />)}
                 </div>
-                {hasMore && (
+                {libLoading && libAds.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>Loading ads…</div>}
+                {!libLoading && libAds.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>No ads match these filters.</div>}
+                {libHasMore && (
                   <div style={{ textAlign: 'center', marginTop: 24 }}>
-                    <button onClick={() => fetchAds(false, nextCursor || undefined)}
-                      style={{ padding: '10px 28px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      Load more
+                    <button onClick={() => loadLib(libPage + 1, false)} disabled={libLoading}
+                      style={{ padding: '10px 28px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: libLoading ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: libLoading ? 0.7 : 1 }}>
+                      {libLoading ? 'Loading…' : 'Load more'}
                     </button>
                   </div>
                 )}
