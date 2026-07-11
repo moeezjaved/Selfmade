@@ -10,8 +10,10 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveScopedAccount } from '@/lib/meta/scope'
 import { decryptToken } from '@/lib/meta/client'
 import { TEMPLATE_BY_KEY, GROUP_BY, METRICS, type GroupByKey, type MetricKey, type ReportTemplate } from '@/lib/reports/templates'
+import { ensureTags, isTagDimension, type TagInput, type CreativeTags } from '@/lib/reports/tagging'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60   // first-time AI tagging (vision over top ads) can take ~10-15s
 const V = process.env.META_API_VERSION || 'v20.0'
 
 function timeRange(dateRange: string): { since: string; until: string } {
@@ -123,17 +125,42 @@ export async function GET(req: NextRequest) {
     const adMeta = new Map<string, any>()
     for (const a of (adJson.data || [])) {
       const spec = a.creative?.object_story_spec
+      const afs = a.creative?.asset_feed_spec
       adMeta.set(a.id, {
         thumbnail: a.creative?.thumbnail_url || null,
         format: inferFormat(a.creative),
-        landingPage: spec?.link_data?.link || spec?.video_data?.call_to_action?.value?.link || a.creative?.asset_feed_spec?.link_urls?.[0]?.website_url || null,
+        landingPage: spec?.link_data?.link || spec?.video_data?.call_to_action?.value?.link || afs?.link_urls?.[0]?.website_url || null,
         launchDate: a.created_time ? String(a.created_time).slice(0, 10) : null,
+        primaryText: spec?.link_data?.message || spec?.video_data?.message || afs?.bodies?.[0]?.text || null,
+        headline: spec?.link_data?.name || spec?.video_data?.title || afs?.titles?.[0]?.text || null,
       })
+    }
+
+    // 2b) AI creative tagging — only when grouping by an AI dimension. Tags the highest-spend ads in
+    // this report (cached in R2, so it runs once per creative), then groups rows by the tag value.
+    let tagMap: Record<string, CreativeTags> = {}
+    let tagRemaining = 0
+    if (isTagDimension(groupBy)) {
+      const spendById = new Map<string, number>()
+      for (const ins of insights) spendById.set(ins.ad_id, (spendById.get(ins.ad_id) || 0) + num(ins.spend))
+      const tagInputs: TagInput[] = Array.from(spendById.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([id]) => {
+          const m = adMeta.get(id) || {}
+          const ins = insights.find(x => x.ad_id === id)
+          return { id, name: ins?.ad_name, primaryText: m.primaryText, headline: m.headline, thumbnail: m.thumbnail, format: m.format }
+        })
+      const r = await ensureTags(metaAccount.account_id, tagInputs, 30)
+      tagMap = r.tags; tagRemaining = r.remaining
     }
 
     // 3) Build + group rows.
     const groups = new Map<string, Row>()
     const keyOf = (ins: any, meta: any): { key: string; name: string } => {
+      if (isTagDimension(groupBy)) {
+        const t = tagMap[ins.ad_id]?.[groupBy] || 'Untagged'
+        return { key: t, name: t }
+      }
       switch (groupBy) {
         case 'ad': return { key: ins.ad_id, name: ins.ad_name || ins.ad_id }
         case 'adset': return { key: ins.adset_id, name: ins.adset_name || ins.adset_id }
@@ -211,6 +238,7 @@ export async function GET(req: NextRequest) {
       template: { key: tpl.key, title: tpl.title, emoji: tpl.emoji, description: tpl.description },
       groupBy, groupByOptions: GROUP_BY, sort, dir, dateRange, currency,
       metrics: tpl.metrics, rows: shaped, netResults: net, count: shaped.length,
+      tagRemaining, aiGrouped: isTagDimension(groupBy),
     })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to build report', rows: [] }, { status: 200 })

@@ -166,7 +166,12 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap', background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 14, padding: '10px 14px' }}>
         <Ctl label="Group by">
           <select value={groupBy} onChange={e => setGroupBy(e.target.value as GroupByKey)} style={selStyle}>
-            {GROUP_BY.map(g => <option key={g.key} value={g.key}>{g.label}</option>)}
+            <optgroup label="Standard">
+              {GROUP_BY.filter(g => !g.ai).map(g => <option key={g.key} value={g.key}>{g.label}</option>)}
+            </optgroup>
+            <optgroup label="✨ AI tags">
+              {GROUP_BY.filter(g => g.ai).map(g => <option key={g.key} value={g.key}>✨ {g.label}</option>)}
+            </optgroup>
           </select>
         </Ctl>
         <Ctl label="Period">
@@ -199,6 +204,14 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           ))}
         </div>
       </div>
+
+      {/* AI tagging progress — grouping by an AI dimension tags the top ads first (cached), then more on demand. */}
+      {data?.aiGrouped && !loading && data?.tagRemaining > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, background: 'linear-gradient(135deg,#faf5ff,#f3e8ff)', border: '1px solid #e9d5ff', borderRadius: 12, padding: '10px 16px' }}>
+          <div style={{ fontSize: 12.5, color: '#6b21a8' }}>✨ AI tagged your top creatives. <b>{data.tagRemaining}</b> more not yet tagged — tag them to complete this report.</div>
+          <button onClick={load} style={{ padding: '6px 13px', borderRadius: 100, border: 'none', background: '#7c3aed', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Tag {Math.min(30, data.tagRemaining)} more</button>
+        </div>
+      )}
 
       {/* Body */}
       {loading ? (
