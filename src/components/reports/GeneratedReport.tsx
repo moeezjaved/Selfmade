@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, type MetricKey, type GroupByKey } from '@/lib/reports/templates'
+import ShareMenu from './ShareMenu'
 
 const ALL_METRICS = Object.keys(METRICS) as MetricKey[]
 
@@ -55,7 +56,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [name, setName] = useState(initialName || tpl?.title || 'Untitled report')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [shareMsg, setShareMsg] = useState('')
+  const [shareOpen, setShareOpen] = useState(false)
 
   // AI
   const [aiOpen, setAiOpen] = useState(false)
@@ -109,13 +110,11 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) }
   }
 
-  const doShare = async () => {
-    const p = new URLSearchParams({ template: templateKey, dateRange, groupBy, sort, dir, metrics: metrics.join(',') })
-    const url = `${window.location.origin}/reports?${p}`
-    try { await navigator.clipboard.writeText(url); setShareMsg('Link copied ✓') }
-    catch { setShareMsg(url) }
-    setTimeout(() => setShareMsg(''), 3000)
-  }
+  // Snapshot payload for the Share menu — the CURRENT data, frozen.
+  const sharePayload = () => ({
+    name, templateKey, emoji: tpl?.emoji, description: tpl?.description,
+    groupBy, dateRange, metrics, currency, rows, netResults: net,
+  })
 
   const availableToAdd = ALL_METRICS.filter(m => !metrics.includes(m))
 
@@ -137,7 +136,15 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <button onClick={runAI} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 15px', borderRadius: 100, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#a855f7)', color: '#fff', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>✨ Analyze</button>
           {onSave && <button onClick={doSave} disabled={saving} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: saved ? '#2d7a2d' : '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>{saving ? 'Saving…' : saved ? 'Saved ✓' : savedId ? 'Update' : 'Save'}</button>}
-          <button onClick={doShare} style={{ padding: '8px 14px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', color: '#3a5a3a', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>{shareMsg || 'Share'}</button>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShareOpen(o => !o)} disabled={!rows.length} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: '#0e1b12', color: '#fff', fontWeight: 800, fontSize: 12.5, cursor: rows.length ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: rows.length ? 1 : 0.5 }}>Share report</button>
+            {shareOpen && rows.length > 0 && (
+              <>
+                <div onClick={() => setShareOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} />
+                <ShareMenu payload={sharePayload} onClose={() => setShareOpen(false)} />
+              </>
+            )}
+          </div>
         </div>
       </div>
 
