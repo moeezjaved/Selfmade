@@ -88,8 +88,8 @@ export async function GET(req: NextRequest) {
   let dirTotal = _dirTotal && Date.now() - _dirTotal.at < DIR_TTL ? _dirTotal.n : null
   if (dirTotal == null) {
     const { count: dc } = await admin.from('brand_directory').select('page_id', { count: 'estimated', head: true })
-    dirTotal = dc || 0
-    _dirTotal = { at: Date.now(), n: dirTotal }
+    dirTotal = dc ?? 0
+    _dirTotal = { at: Date.now(), n: dirTotal ?? 0 }
   }
 
   return NextResponse.json({
