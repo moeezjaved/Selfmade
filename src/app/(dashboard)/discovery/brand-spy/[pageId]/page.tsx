@@ -615,10 +615,19 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
   const [emailOn, setEmailOn] = useState(false)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
-    fetch('/api/follows').then(r => r.json()).then(j => {
-      const b = (j.brands || []).find((x: any) => String(x.page_id) === String(pageId))
-      // "Spied" = explicitly tracked (spied=true), not merely ❤️ followed.
-      setSpied(!!b?.spied); setEmailOn(!!b?.email_alerts)
+    // "Spied" must match the Brand Spy LIST that routes here, which is ORG-scoped
+    // (a brand spied by any teammate is spied for the whole workspace). /api/follows
+    // alone is user-scoped, so it wrongly showed "＋ Spy this brand" for a brand a
+    // teammate already spied. Check the org-wide list, keep /api/follows for the
+    // per-user email-alerts toggle.
+    Promise.all([
+      fetch('/api/discovery/brand-spy?scope=mine').then(r => r.json()).catch(() => ({})),
+      fetch('/api/follows').then(r => r.json()).catch(() => ({})),
+    ]).then(([spy, fol]) => {
+      const orgSpied = (spy.brands || []).some((x: any) => String(x.pageId) === String(pageId))
+      const mine = (fol.brands || []).find((x: any) => String(x.page_id) === String(pageId))
+      setSpied(orgSpied || !!mine?.spied)
+      setEmailOn(!!mine?.email_alerts)
     }).catch(() => setSpied(false))
   }, [pageId])
 

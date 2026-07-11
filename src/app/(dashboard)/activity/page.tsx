@@ -18,7 +18,7 @@ export default function ActivityPage() {
     load()
   }, [])
 
-  const icons: Record<string,string> = { META_CONNECTED:'🔗', SYNC_COMPLETED:'↻', META_OAUTH_STARTED:'🔐', RECOMMENDATION_APPROVED:'✓', RECOMMENDATION_REJECTED:'✕', AD_LAUNCHED:'🚀', CAMPAIGN_CREATED:'📣', CREATIVE_GENERATED:'🎨' }
+  const icons: Record<string,string> = { META_CONNECTED:'🔗', SYNC_COMPLETED:'↻', META_OAUTH_STARTED:'🔐', RECOMMENDATION_APPROVED:'✓', RECOMMENDATION_REJECTED:'✕', AD_LAUNCHED:'🚀', CAMPAIGN_CREATED:'📣', CREATIVE_GENERATED:'🎨', BRAND_FOLLOWED:'❤️', BRAND_UNFOLLOWED:'💔', BRAND_SPIED:'🎯', BRAND_UNSPIED:'🚫' }
   // Human descriptions — the stored `description` is often a raw id (e.g. an OAuth state UUID), which
   // read as "random data". Prefer a friendly sentence per action; only show the stored text when it's
   // actually meaningful (not a bare UUID).

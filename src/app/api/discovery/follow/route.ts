@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logActivity } from '@/lib/activity'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -31,7 +32,10 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient()
 
   const { data: ex } = await admin.from('followed_brands').select('id').eq('user_id', user.id).eq('page_id', String(page_id)).maybeSingle()
-  if (!ex) await admin.from('followed_brands').insert({ user_id: user.id, page_id: String(page_id), brand_name: page_name || null, spied: false })
+  if (!ex) {
+    await admin.from('followed_brands').insert({ user_id: user.id, page_id: String(page_id), brand_name: page_name || null, spied: false })
+    await logActivity(admin, user.id, 'BRAND_FOLLOWED', `Followed ${page_name || String(page_id)}`)
+  }
   return NextResponse.json({ followed: true })
 }
 
@@ -45,5 +49,6 @@ export async function DELETE(request: NextRequest) {
   const admin = createAdminClient()
   const { error } = await admin.from('followed_brands').delete().eq('user_id', user.id).eq('page_id', String(pageId))
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await logActivity(admin, user.id, 'BRAND_UNFOLLOWED', `Unfollowed ${String(pageId)}`)
   return NextResponse.json({ success: true })
 }

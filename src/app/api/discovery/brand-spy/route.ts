@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireUnder } from '@/lib/entitlements'
 import { getUserOrg, resolveBillingOwner } from '@/lib/org'
+import { logActivity } from '@/lib/activity'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
 
 // All user_ids in the requester's org — spied brands are shared across the org's one workspace.
@@ -236,6 +237,7 @@ export async function POST(req: NextRequest) {
   try {
     await ensureTracked(admin, pageId, name, true)
     await ensureFollowed(admin, user.id, pageId, name)
+    await logActivity(admin, user.id, 'BRAND_SPIED', `Started spying ${name}`)
     return NextResponse.json({ pageId, charged: false })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'failed to start spying' }, { status: 400 })
@@ -255,5 +257,6 @@ export async function DELETE(req: NextRequest) {
   if (!pageId) return NextResponse.json({ error: 'pageId required' }, { status: 400 })
   const admin = createAdminClient()
   await admin.from('followed_brands').delete().eq('user_id', user.id).eq('page_id', pageId)
+  await logActivity(admin, user.id, 'BRAND_UNSPIED', `Stopped spying ${pageId}`)
   return NextResponse.json({ ok: true, pageId })
 }

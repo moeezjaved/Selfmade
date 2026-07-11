@@ -29,16 +29,26 @@ export async function GET(req: NextRequest) {
     for (const f of follows as any[]) if (isBlankName(f.brand_name)) f.brand_name = names.get(String(f.page_id)) || f.brand_name
   }
 
-  // Over-fetch for hash dedup, newest first. INNER-JOIN discovery_creatives so we
-  // (a) filter to has-creative ads — covers append-only ads whose index row no longer
-  // carries thumbnail_url/hash — and (b) carry the creatives for stable dedup + thumbnails.
-  const over = LIMIT * 5
-  const { data: rows } = await admin
-    .from('discovery_ads_index')
-    .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash,width,height)')
-    .in('page_id', pageIds)
-    .order('last_seen', { ascending: false })
-    .range(page * over, page * over + over - 1)
+  // Fetch recent ads PER brand and round-robin interleave — NOT one global last_seen
+  // window. A single freshly re-crawled brand (all its rows get the newest last_seen)
+  // would otherwise monopolize the whole window and the feed would show only that one
+  // brand's ads even though the user follows many. INNER-JOIN discovery_creatives so we
+  // (a) filter to has-creative ads and (b) carry creatives for stable dedup + thumbnails.
+  const perBrand = Math.max(6, Math.ceil((LIMIT * 2) / pageIds.length))
+  const perBrandRows = await Promise.all(pageIds.map((pid: any) =>
+    admin
+      .from('discovery_ads_index')
+      .select('*, discovery_creatives!inner(asset_type,position,r2_url,hash,width,height)')
+      .eq('page_id', pid)
+      .order('last_seen', { ascending: false })
+      .range(page * perBrand, page * perBrand + perBrand - 1)
+      .then((r: any) => (r.data || []) as any[])
+  ))
+  // Round-robin across brands so the 40 shown are a fair mix (brand1[0], brand2[0], … then [1]…).
+  const maxLen = perBrandRows.reduce((m, a) => Math.max(m, a.length), 0)
+  const rows: any[] = []
+  for (let i = 0; i < maxLen; i++) for (const arr of perBrandRows) if (arr[i]) rows.push(arr[i])
+  const brandHasMore = perBrandRows.some((a) => a.length >= perBrand)
 
   // Sort each ad's creatives images-first / position-asc so the FIRST is a STABLE dedup
   // key (the index row's "primary" hash is whichever creative was written last, so two
@@ -72,5 +82,5 @@ export async function GET(req: NextRequest) {
       industries: ad.industries || [], topics: ad.topics || [], cta: ad.cta,
     }
   })
-  return NextResponse.json({ ads, hasMore: (rows || []).length >= over, brands: follows || [] })
+  return NextResponse.json({ ads, hasMore: brandHasMore, brands: follows || [] })
 }
