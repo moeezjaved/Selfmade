@@ -21,6 +21,7 @@ import {
 } from 'react-icons/ri'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
+import BootMotion from '@/components/motion/BootMotion'
 
 // Two-rail nav: each AREA is one icon in the thin rail; its `items` fill the panel.
 const AREAS = [
@@ -159,6 +160,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="flex min-h-screen bg-dark">
+      <BootMotion />
 
       {/* ── MOBILE TOP BAR (hamburger) — only < 768px ── */}
       {isMobile && (
