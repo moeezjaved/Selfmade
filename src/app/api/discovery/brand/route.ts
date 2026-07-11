@@ -128,6 +128,8 @@ export async function GET(request: NextRequest) {
         body: a.body || '',
         title: a.title || '',
         snapshotUrl: a.snapshot_url || a.thumbnail_url || '',
+        thumbnailUrl: a.thumbnail_url || null,
+        videoUrl: a.video_url || null,
         startDate: a.start_date || null,
         stopDate: a.stop_date || null,
         mediaType: a.format || '',

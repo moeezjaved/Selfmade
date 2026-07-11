@@ -2,12 +2,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { ExternalLink, ArrowLeft, Bookmark } from 'lucide-react'
+import { cleanCopy } from '@/lib/cleanCopy'
 
 // ── Types ────────────────────────────────────────────────────
 interface Ad {
   id: string; pageId: string; pageName: string; body: string; title: string
   caption: string; snapshotUrl: string; startDate: string; stopDate: string | null
   platforms: string[]; mediaType: string; isActive: boolean; daysRunning: number
+  thumbnailUrl?: string | null; videoUrl?: string | null
 }
 
 interface Analysis {
@@ -15,7 +17,8 @@ interface Analysis {
   desires: string[]; emotions: string[]; hooks: string[]; themes: string[]
 }
 
-const TABS = ['Overview', 'Creatives', 'Hooks', 'Ad Copy', 'Headlines', 'Personas', 'Ad Angles', 'USPs', 'Desires', 'Emotions', 'Themes']
+// Ads grid ("Creatives") leads — it's the ad library people come to see. Overview/analysis follow.
+const TABS = ['Creatives', 'Overview', 'Hooks', 'Ad Copy', 'Headlines', 'Personas', 'Ad Angles', 'USPs', 'Desires', 'Emotions', 'Themes']
 
 // ── Helpers ──────────────────────────────────────────────────
 function extractHook(body: string): string {
@@ -51,6 +54,11 @@ function Shimmer({ width = '100%', height = 16 }: { width?: string | number; hei
 // ── Ad Mini Card ─────────────────────────────────────────────
 function MiniAdCard({ ad }: { ad: Ad }) {
   const initials = ad.pageName?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'
+  const [imgFailed, setImgFailed] = useState(false)
+  const thumb = ad.thumbnailUrl || null
+  const isVideo = getFormat(ad.mediaType) === 'Video'
+  const title = cleanCopy(ad.title)
+  const body = cleanCopy(ad.body, ad.title)
   return (
     <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.08)')}
@@ -68,18 +76,28 @@ function MiniAdCard({ ad }: { ad: Ad }) {
           <ExternalLink size={12} />
         </a>
       </div>
-      <div style={{ position: 'relative', height: 220, background: '#f8fafc', overflow: 'hidden' }}>
-        {ad.snapshotUrl ? (
-          <iframe src={ad.snapshotUrl} style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} scrolling="no" loading="lazy" title="ad" />
+      {/* Media = the real creative thumbnail (R2 image). Meta blocks iframing its Ad Library, so we
+          never iframe snapshotUrl — that was the broken-image box. Click still opens the original. */}
+      <div style={{ position: 'relative', height: 220, background: '#f1f5f9', overflow: 'hidden' }}>
+        {thumb && !imgFailed ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumb} alt="" loading="lazy" onError={() => setImgFailed(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 12 }}>No preview</div>
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12 }}>
+            <span style={{ fontSize: 22 }}>{isVideo ? '🎬' : '🖼'}</span>
+            {getFormat(ad.mediaType)} · open original
+          </div>
         )}
-        <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', inset: 0, zIndex: 2 }} />
+        {isVideo && thumb && !imgFailed && (
+          <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>▶</span>
+        )}
+        {ad.snapshotUrl && <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', inset: 0, zIndex: 2 }} />}
       </div>
-      {(ad.body || ad.title) && (
+      {(body || title) && (
         <div style={{ padding: '8px 12px 10px' }}>
-          {ad.title && <div style={{ fontSize: 11, fontWeight: 700, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{ad.title}</div>}
-          {ad.body && <div style={{ fontSize: 11, color: '#4b5563', lineHeight: 1.5, marginTop: 2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{ad.body}</div>}
+          {title && <div style={{ fontSize: 11, fontWeight: 700, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{title}</div>}
+          {body && <div style={{ fontSize: 11, color: '#4b5563', lineHeight: 1.5, marginTop: 2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{body}</div>}
         </div>
       )}
     </div>
@@ -106,7 +124,7 @@ export default function BrandPage() {
   const [ads, setAds] = useState<Ad[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState('Overview')
+  const [activeTab, setActiveTab] = useState('Creatives')
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
@@ -196,9 +214,10 @@ export default function BrandPage() {
     maxDays: ads.length ? Math.max(...ads.map(a => a.daysRunning)) : 0,
   }
 
-  const hooks = Array.from(new Set(ads.map(a => extractHook(a.body)).filter(Boolean))).slice(0, 20)
-  const copies = Array.from(new Set(ads.map(a => a.body).filter(Boolean))).slice(0, 30)
-  const headlines = Array.from(new Set(ads.map(a => a.title).filter(Boolean))).slice(0, 30)
+  // Clean {{mustache}} template tokens out of all ad copy before deriving hooks/copies/headlines.
+  const hooks = Array.from(new Set(ads.map(a => extractHook(cleanCopy(a.body))).filter(Boolean))).slice(0, 20)
+  const copies = Array.from(new Set(ads.map(a => cleanCopy(a.body)).filter(Boolean))).slice(0, 30)
+  const headlines = Array.from(new Set(ads.map(a => cleanCopy(a.title)).filter(Boolean))).slice(0, 30)
 
   // ── Themes from regex ────────────────────────────────────
   const THEME_PATTERNS: [string, RegExp][] = [
