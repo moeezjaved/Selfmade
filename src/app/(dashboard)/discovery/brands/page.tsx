@@ -4,6 +4,7 @@
  * jump to its Meta Ad Library, or open Brand Spy. Sits next to Explore in the Discovery sub-nav.
  */
 import { useEffect, useState, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { Search, Target, ExternalLink, Eye } from 'lucide-react'
 
 const DARK = '#1a3a1a'
@@ -158,8 +159,8 @@ export default function BrandsPage() {
         {loading && <div style={{ padding: 20, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>Loading…</div>}
         {!loading && brands.length === 0 && (
           <div style={{ padding: 50, textAlign: 'center', color: '#9ca3af' }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#6b7280' }}>No brands found.</div>
-            <div style={{ fontSize: 13, marginTop: 4 }}>Import the catalog in admin → Brand Directory, or adjust your search.</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#6b7280' }}>No brands match your search.</div>
+            <div style={{ fontSize: 13, marginTop: 4 }}>Try a different name — or spy any competitor directly from <Link href="/discovery/brand-spy" style={{ color: '#1a3a1a', fontWeight: 700 }}>Brand Spy → + Spy new brand</Link> by pasting its Meta Ad Library link.</div>
           </div>
         )}
         <div ref={sentinel} style={{ height: 1 }} />

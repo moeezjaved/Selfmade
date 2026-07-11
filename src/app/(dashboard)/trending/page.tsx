@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Flame, Search, Sparkles, Play, ChevronDown, Loader2, ArrowUpRight } from 'lucide-react'
 import CloneModal from '../discovery/CloneModal'
+import CloneVideoModal from '../discovery/CloneVideoModal'
 
 type Ad = { adId: string; pageId: string; pageName: string; image: string | null; isVideo: boolean; videoUrl?: string | null; score: number; format: string | null; hook: string | null; saves: number; isActive: boolean; daysRunning: number | null }
 type BrandW = { pageId: string; pageName: string; adCount: number; activeCount: number; avgScore: number; image: string | null }
@@ -202,7 +203,9 @@ export default function TrendingPage() {
         </section>
       )}
 
-      {cloneAd && <CloneModal ad={{ id: cloneAd.adId, pageId: cloneAd.pageId, pageName: cloneAd.pageName }} onClose={() => setCloneAd(null)} />}
+      {cloneAd && (cloneAd.isVideo
+        ? <CloneVideoModal sourceAdId={cloneAd.adId} sourcePoster={cloneAd.image ? img(cloneAd.image) : undefined} onClose={() => setCloneAd(null)} />
+        : <CloneModal ad={{ id: cloneAd.adId, pageId: cloneAd.pageId, pageName: cloneAd.pageName }} onClose={() => setCloneAd(null)} />)}
     </div>
   )
 }
