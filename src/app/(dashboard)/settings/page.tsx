@@ -19,6 +19,7 @@ export default function SettingsPage() {
   const [prefsSaving, setPrefsSaving] = useState(false)
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)  // null = still loading
   const [disconnecting, setDisconnecting] = useState(false)
+  const [newPw, setNewPw] = useState(''); const [confirmPw, setConfirmPw] = useState(''); const [pwSaving, setPwSaving] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -62,6 +63,16 @@ export default function SettingsPage() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     }
+  }
+
+  const changePassword = async () => {
+    if (newPw.length < 8) { toast.error('Password must be at least 8 characters.'); return }
+    if (newPw !== confirmPw) { toast.error('Passwords don’t match.'); return }
+    setPwSaving(true)
+    const { error } = await supabase.auth.updateUser({ password: newPw })
+    setPwSaving(false)
+    if (error) { toast.error(error.message || 'Could not update password.'); return }
+    setNewPw(''); setConfirmPw(''); toast.success('Password updated.')
   }
 
   const signOut = async () => {
@@ -114,6 +125,40 @@ export default function SettingsPage() {
             style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'10px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:saving||loading?'not-allowed':'pointer',alignSelf:'flex-start',opacity:saving||loading?0.6:1}}
           >
             {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+
+      {/* Change password — Supabase updateUser({password}); works for email users and lets Google
+          sign-in users SET a password too. No current-password field (the session already proves identity). */}
+      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
+        <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>
+          <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Change Password</div>
+        </div>
+        <div style={{padding:22,display:'flex',flexDirection:'column',gap:14}}>
+          <div>
+            <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6b8f6b',marginBottom:6}}>New Password</label>
+            <input
+              type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)}
+              placeholder="At least 8 characters" autoComplete="new-password"
+              style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'#f8fcf6',color:'#1a3a1a',fontSize:14,fontFamily:'inherit',outline:'none'}}
+            />
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6b8f6b',marginBottom:6}}>Confirm New Password</label>
+            <input
+              type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)}
+              placeholder="Re-enter new password" autoComplete="new-password"
+              onKeyDown={(e) => { if (e.key === 'Enter') changePassword() }}
+              style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(255,255,255,0.1)',background:'#f8fcf6',color:'#1a3a1a',fontSize:14,fontFamily:'inherit',outline:'none'}}
+            />
+          </div>
+          <button
+            onClick={changePassword}
+            disabled={pwSaving || !newPw || !confirmPw}
+            style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'10px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:(pwSaving||!newPw||!confirmPw)?'not-allowed':'pointer',alignSelf:'flex-start',opacity:(pwSaving||!newPw||!confirmPw)?0.6:1}}
+          >
+            {pwSaving ? 'Updating…' : 'Update Password'}
           </button>
         </div>
       </div>
