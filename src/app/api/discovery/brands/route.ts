@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
       isCrawled: inIndex.has(b.page_id),
       isSpied: spied.has(b.page_id),
     })),
-    total: dirTotal,
+    total: dirTotal ?? 0,
     page,
     pageSize: PAGE_SIZE,
     hasMore: brands.length === PAGE_SIZE,
