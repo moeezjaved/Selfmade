@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import AccountSelector from '@/components/AccountSelector'
 
 const fmt = (n: number, currency = 'PKR') =>
   new Intl.NumberFormat('en-PK', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
@@ -71,12 +72,16 @@ export default function ReportsPage() {
           <div style={{ fontSize: 22, fontWeight: 900, color: '#1a3a1a' }}>Reports</div>
           <div style={{ fontSize: 13, color: '#7a9a7a', marginTop: 2 }}>Deep insights from your Meta Ads</div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {['last_3d', 'last_7d', 'last_14d', 'last_30d'].map(r => (
-            <button key={r} onClick={() => setDateRange(r)} style={{ padding: '7px 14px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.1)', fontFamily: 'inherit', fontWeight: 700, fontSize: 12, cursor: 'pointer', background: dateRange === r ? '#1a3a1a' : '#f0f7ee', color: dateRange === r ? '#dffe95' : '#5a7a5a' }}>
-              {r.replace('last_', '').replace('d', 'd')}
-            </button>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {/* Which ad account this report is for — switch to re-scope (sets the org primary account). */}
+          <AccountSelector onAccountChange={() => setTimeout(() => { loadReports(); loadCreativeAudience() }, 600)} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            {['last_3d', 'last_7d', 'last_14d', 'last_30d'].map(r => (
+              <button key={r} onClick={() => setDateRange(r)} style={{ padding: '7px 14px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.1)', fontFamily: 'inherit', fontWeight: 700, fontSize: 12, cursor: 'pointer', background: dateRange === r ? '#1a3a1a' : '#f0f7ee', color: dateRange === r ? '#dffe95' : '#5a7a5a' }}>
+                {r.replace('last_', '').replace('d', 'd')}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
