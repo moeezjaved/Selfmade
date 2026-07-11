@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Upload, Loader2, Check, Film, Sparkles, Pencil } from 'lucide-react'
 import CloneGeneration from '@/components/motion/CloneGeneration'
+import { refreshCredits } from '@/components/credits/CreditCounter'
 
 const LIME = '#dffe95'
 type Photo = { id: string; src: string }
@@ -101,8 +102,9 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
         body: JSON.stringify({ jobId, script: draftScript }),
       }).then(r => r.json())
       if (ap.error) { setErr(ap.error === 'insufficient_credits' ? 'Not enough credits.' : ap.error); setPhase('review'); return }
+      refreshCredits()   // credits reserved on approve → drop the sidebar counter now
       const st = await pollUntil(jobId, 'processing')   // wait for 'done'
-      if (st.error || !st.url) { setErr((st.error || 'generation failed') + ' — credits refunded.'); setPhase('review'); return }
+      if (st.error || !st.url) { setErr((st.error || 'generation failed') + ' — credits refunded.'); setPhase('review'); refreshCredits(); return }
       setResult({ url: st.url, script: st.script }); setPhase('done')
     } catch (e: any) { setErr(String(e?.message || e)); setPhase('review') }
   }
