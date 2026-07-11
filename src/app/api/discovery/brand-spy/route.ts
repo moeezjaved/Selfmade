@@ -204,43 +204,42 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
 
-  const body = await req.json().catch(() => ({}))
-  const pageId = extractPageId(body.url || body.pageId || '')
-  if (!pageId) return NextResponse.json({ error: 'Paste a Meta Ad Library page URL (…view_all_page_id=123…) or a numeric page ID — not a keyword search.' }, { status: 400 })
-  const name = (body.name || '').trim().toLowerCase() || pageId
-
-  // Tracked brands are an INCLUDED plan feature (capped), NOT a credit purchase — the plan cards
-  // advertise "N tracked brands", so spying must be FREE within the cap. Source of truth = followed_brands.
-
-  // Already SPYING this brand? Re-open is a no-op (refresh the crawl, keep the follow). A plain
-  // ❤️ follow (spied=false) is NOT "already spying" — it falls through so the spy upgrades it.
-  const { data: prior } = await admin
-    .from('followed_brands').select('id')
-    .eq('user_id', user.id).eq('page_id', pageId).eq('spied', true).limit(1).maybeSingle()
-  if (prior) {
-    await ensureTracked(admin, pageId, name, false)
-    return NextResponse.json({ pageId, charged: false, alreadySpied: true })
-  }
-
-  // Plan gate: cap tracked brands by the plan's brandSpy entitlement. Resolve the ORG's BILLING
-  // OWNER so the owner's plan (e.g. Business = 150) applies to every team member — not each
-  // member's own (possibly Free) plan. Count follows across the whole org (shared workspace).
-  const billingOwner = await resolveBillingOwner(admin, user.id)
-  const orgIds = await orgMemberIds(admin, user.id)
-  // Cap counts SPIED brands only — plain ❤️ follows don't eat into the tracked-brand limit.
-  const { count: trackedCount } = await admin
-    .from('followed_brands').select('id', { count: 'exact', head: true }).in('user_id', orgIds).eq('spied', true)
-  const gate = await requireUnder(admin, billingOwner, 'brandSpy', trackedCount || 0)
-  if (gate) return NextResponse.json(gate, { status: 402 })
-
-  // Within the cap → track it (fresh thorough re-crawl) + follow for new-ad alerts. No credits.
+  // Wrap EVERYTHING so a thrown DB error (e.g. a statement timeout under crawl/rollup load) returns
+  // JSON, not a Next 500 HTML page — the latter made the modal throw
+  // "SyntaxError: Unexpected token 'A', 'A server e'… is not valid JSON" instead of showing the
+  // plan-limit / upgrade message.
   try {
+    const body = await req.json().catch(() => ({}))
+    const pageId = extractPageId(body.url || body.pageId || '')
+    if (!pageId) return NextResponse.json({ error: 'Paste a Meta Ad Library page URL (…view_all_page_id=123…) or a numeric page ID — not a keyword search.' }, { status: 400 })
+    const name = (body.name || '').trim().toLowerCase() || pageId
+
+    // Already SPYING this brand? Re-open is a no-op (refresh the crawl, keep the follow). A plain
+    // ❤️ follow (spied=false) is NOT "already spying" — it falls through so the spy upgrades it.
+    const { data: prior } = await admin
+      .from('followed_brands').select('id')
+      .eq('user_id', user.id).eq('page_id', pageId).eq('spied', true).limit(1).maybeSingle()
+    if (prior) {
+      await ensureTracked(admin, pageId, name, false)
+      return NextResponse.json({ pageId, charged: false, alreadySpied: true })
+    }
+
+    // Plan gate: cap tracked brands by the plan's brandSpy entitlement. Resolve the ORG's BILLING
+    // OWNER so the owner's plan (e.g. Business = 150) applies to every team member. Count org-wide.
+    const billingOwner = await resolveBillingOwner(admin, user.id)
+    const orgIds = await orgMemberIds(admin, user.id)
+    const { count: trackedCount } = await admin
+      .from('followed_brands').select('id', { count: 'exact', head: true }).in('user_id', orgIds).eq('spied', true)
+    const gate = await requireUnder(admin, billingOwner, 'brandSpy', trackedCount || 0)
+    if (gate) return NextResponse.json(gate, { status: 402 })
+
+    // Within the cap → track it (fresh thorough re-crawl) + follow for new-ad alerts. No credits.
     await ensureTracked(admin, pageId, name, true)
     await ensureFollowed(admin, user.id, pageId, name)
     await logActivity(admin, user.id, 'BRAND_SPIED', `Started spying ${name}`)
     return NextResponse.json({ pageId, charged: false })
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'failed to start spying' }, { status: 400 })
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Something went wrong — please try again.' }, { status: 500 })
   }
 }
 
