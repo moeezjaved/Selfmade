@@ -21,6 +21,10 @@
   // Ad surfaces we actually support. The hover Save button only runs here — otherwise it popped up on
   // EVERY thumbnail on media sites like YouTube ("Save button everywhere when I scroll").
   const SUPPORTED = HOST.includes('facebook.com') || IS_IG || IS_TT_ADLIB || IS_TT_FEED
+  // Surfaces where we inject a per-CARD Save button (Atria-style). There, the floating hover button
+  // is redundant + annoying (it trails the mouse "everywhere"). Hover/FAB are only for the plain
+  // Facebook FEED, which has no per-card buttons.
+  const HAS_CARDS = IS_FB_ADLIB || IS_TT_ADLIB || IS_IG || IS_TT_FEED
   const MIN = 140
 
   // ── Toast ─────────────────────────────────────────────────────────────────
@@ -393,8 +397,10 @@
   }
 
   // ── Boot ────────────────────────────────────────────────────────────────────
-  // Only run Selfmade's save UI on supported ad surfaces — nothing on YouTube/arbitrary sites.
-  if (SUPPORTED) setupHover()
+  // Hover button + FAB only on supported surfaces that DON'T already get per-card buttons (i.e. the
+  // plain Facebook feed). On the Ad Library / IG / TikTok the per-card buttons are the UX, so the
+  // trailing hover button is suppressed. Nothing at all runs on YouTube/arbitrary sites.
+  if (SUPPORTED && !HAS_CARDS) setupHover()
   if (IS_FB_ADLIB || IS_TT_ADLIB || IS_IG || IS_TT_FEED) {
     scan()
     const obs = new MutationObserver(() => { clearTimeout(window.__smT); window.__smT = setTimeout(scan, 350) })
