@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, useMemo, Component, Fragment, startTransition } from 'react'
 import type { ReactNode } from 'react'
+import { showSavedToast } from '@/components/motion/SavedToast'
 import { Masonry } from 'masonic'
 import { cleanCopy } from '@/lib/cleanCopy'
 
@@ -531,6 +532,7 @@ function SaveModal({ ad, onClose }: { ad: Ad; onClose: () => void }) {
     })
     setSaved(prev => [...prev, boardId])
     setSaving(null)
+    showSavedToast('Saved to Board')
   }
 
   const createAndSave = async () => {
