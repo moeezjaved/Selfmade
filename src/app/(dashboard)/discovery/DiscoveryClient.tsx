@@ -31,6 +31,7 @@ import CloneModal from './CloneModal'
 import CloneVideoModal from './CloneVideoModal'
 import { useRouter } from 'next/navigation'
 import BrandDrawer from './BrandDrawer'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 // ── Types ────────────────────────────────────────────────────
 interface Creative {
@@ -1320,6 +1321,7 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
 // ── Page ─────────────────────────────────────────────────────
 export default function DiscoveryPage() {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [searchInput, setSearchInput] = useState('')
   const [query, setQuery] = useState('')
   const [searchMode, setSearchMode] = useState<'adcopy' | 'brand' | 'category'>('adcopy')
@@ -1831,7 +1833,7 @@ export default function DiscoveryPage() {
       <div style={{ borderBottom: '1px solid #e2e8f0', background: '#fff', padding: '14px 24px', position: 'sticky', top: 0, zIndex: 40 }}>
 
         {/* Row 1: title + nav + search + refresh */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+        <div style={{ display: 'flex', flexWrap: isMobile ? 'wrap' : 'nowrap', alignItems: 'center', gap: 12, marginBottom: 10 }}>
           <div style={{ marginRight: 4, flexShrink: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>Ad Discovery</div>
             <div style={{ fontSize: 11, color: '#6b7280' }}>Live creative intelligence from Meta</div>
@@ -1856,7 +1858,7 @@ export default function DiscoveryPage() {
             ))}
           </div>
           {/* Search with dropdown */}
-          <div ref={searchContainerRef} style={{ flex: 1, maxWidth: 520, position: 'relative' }}>
+          <div ref={searchContainerRef} style={{ flex: isMobile ? '1 1 100%' : 1, order: isMobile ? 3 : 0, maxWidth: isMobile ? '100%' : 520, minWidth: isMobile ? '100%' : 0, position: 'relative' }}>
             <form onSubmit={e => { e.preventDefault(); if (searchInput.trim()) { setQuery(searchInput); setShowDropdown(false) } }}>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <Search size={15} style={{ position: 'absolute', left: 12, color: '#9ca3af', pointerEvents: 'none' }} />

@@ -10,6 +10,7 @@ import Link from 'next/link'
 import CloneModal from '../../CloneModal'
 import CloneVideoModal from '../../CloneVideoModal'
 import { openCredits } from '@/components/credits/CreditModal'
+import { useIsMobile } from '@/lib/useIsMobile'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area,
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -47,13 +48,14 @@ type Spy = {
 
 // ── Overview tab (Atria-style): media mix + the brand's creative-DNA chip rows + count tiles ──
 function ChipRow({ icon, label, items }: { icon: string; label: string; items?: { label: string; count: number }[] }) {
+  const isMobile = useIsMobile()
   if (!items || !items.length) return null
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
-      <div style={{ width: 150, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}><span>{icon}</span>{label}</div>
-      <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'flex-start', gap: isMobile ? 6 : 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ width: isMobile ? 'auto' : 150, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}><span>{icon}</span>{label}</div>
+      <div style={{ flex: 1, minWidth: 0, maxWidth: '100%', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {items.slice(0, 8).map((it) => (
-          <span key={it.label} title={`${it.count} ads`} style={{ fontSize: 12, fontWeight: 600, color: '#1a3a1a', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 100, padding: '3px 10px', whiteSpace: 'nowrap' }}>
+          <span key={it.label} title={`${it.count} ads`} style={{ fontSize: 12, fontWeight: 600, color: '#1a3a1a', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 100, padding: '3px 10px', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
             {it.label} <span style={{ opacity: 0.55, fontWeight: 700 }}>{it.count}</span>
           </span>
         ))}
@@ -212,6 +214,7 @@ function Hooks({ d }: { d: Spy }) {
 
 // Landing Pages tab — Foreplay-style: ranked destination list (active/inactive) + live preview.
 function LandingPages({ d }: { d: Spy }) {
+  const isMobile = useIsMobile()
   const [sel, setSel] = useState(d.landingPages[0] || null)
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
   const [copied, setCopied] = useState(false)
@@ -224,7 +227,7 @@ function LandingPages({ d }: { d: Spy }) {
   const shotW = device === 'desktop' ? 1280 : 390
   const shot = sel ? `https://s.wordpress.com/mshots/v1/${encodeURIComponent(sel.fullUrl)}?w=${shotW}` : ''
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '380px 1fr', gap: 12 }}>
       <div style={{ ...card, padding: 8, maxHeight: 620, overflowY: 'auto' }}>
         {d.landingPages.map((p) => {
           const on = sel?.url === p.url
@@ -398,6 +401,7 @@ function FilterBar({ days, setDays, format, setFormat, status, setStatus, sort, 
 }
 
 function AdLibrary({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: Card) => void }) {
+  const isMobile = useIsMobile()
   const [days, setDays] = useState(0)
   const [format, setFormat] = useState('')
   const [status, setStatus] = useState('ALL')
@@ -415,7 +419,7 @@ function AdLibrary({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: 
       {cloneImageAd && <CloneModal ad={{ id: cloneImageAd.id, pageId, pageName: cloneImageAd.pageName, assetImageUrl: cloneImageAd.thumbnailUrl || undefined }} onClose={() => setCloneImageAd(null)} />}
       {cloneVideoAd && <CloneVideoModal sourceAdId={cloneVideoAd.id} sourcePoster={cloneVideoAd.thumbnailUrl || undefined} onClose={() => setCloneVideoAd(null)} />}
       {/* Analytics header — Media Mix · Top Landing Pages · Top Hooks (Foreplay layout) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr 1fr', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '320px 1fr 1fr', gap: 12, marginBottom: 16 }}>
         <MediaMix d={d} />
         <div style={card}>
           <div style={label}>Top Landing Pages</div>
@@ -721,7 +725,7 @@ export default function BrandSpyDetail() {
   const s = d.summary
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto', overflowX: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <Link href="/discovery/brand-spy" style={{ fontSize: 13, color: '#2075ff', textDecoration: 'none' }}>← All spied brands</Link>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>

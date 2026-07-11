@@ -121,15 +121,15 @@ export default function BrandsPage() {
       {error && <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 16 }}>{error}</div>}
 
       {/* List */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid #f1f5f9', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflowX: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 640, padding: '10px 16px', borderBottom: '1px solid #f1f5f9', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           <span style={{ flex: 1 }}>Brand</span>
-          <span style={{ width: 160 }}>Industry</span>
-          <span style={{ width: 90, textAlign: 'right' }}># Ads</span>
-          <span style={{ width: 230 }} />
+          <span style={{ width: 160, flexShrink: 0 }}>Industry</span>
+          <span style={{ width: 90, flexShrink: 0, textAlign: 'right' }}># Ads</span>
+          <span style={{ width: 230, flexShrink: 0 }} />
         </div>
         {brands.map(b => (
-          <div key={b.pageId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: '1px solid #f8fafc' }}>
+          <div key={b.pageId} style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 640, padding: '11px 16px', borderBottom: '1px solid #f8fafc' }}>
             {/* Brand → opens this brand's Meta Ad Library (avatar + name both clickable). */}
             <a href={b.adLibraryUrl} target="_blank" rel="noopener noreferrer" title="Open in Meta Ad Library"
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, textDecoration: 'none', color: 'inherit' }}>
@@ -142,9 +142,9 @@ export default function BrandsPage() {
                 {b.isCrawled && <span style={{ fontSize: 10, fontWeight: 700, color: '#059669' }}>● in your index</span>}
               </div>
             </a>
-            <span style={{ width: 160, fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.industry || '—'}</span>
-            <span style={{ width: 90, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#374151' }}>{b.adCount.toLocaleString()}</span>
-            <div style={{ width: 230, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <span style={{ width: 160, flexShrink: 0, fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.industry || '—'}</span>
+            <span style={{ width: 90, flexShrink: 0, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#374151' }}>{b.adCount.toLocaleString()}</span>
+            <div style={{ width: 230, flexShrink: 0, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <a href={b.adLibraryUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600, color: '#6b7280', textDecoration: 'none', padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 7 }}>
                 <ExternalLink size={13} /> Ad Library
               </a>
