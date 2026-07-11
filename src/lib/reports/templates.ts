@@ -54,8 +54,11 @@ export const METRICS: Record<MetricKey, Metric> = {
   avg_watch_time:   { key: 'avg_watch_time',   label: 'Avg Watch Time',   format: 'seconds',  goodHigh: true, video: true },
 }
 
-export type GroupByKey = 'creative' | 'ad' | 'adset' | 'campaign' | 'landing_page' | 'format' | 'launch_date'
-export const GROUP_BY: { key: GroupByKey; label: string }[] = [
+export type GroupByKey =
+  | 'creative' | 'ad' | 'adset' | 'campaign' | 'landing_page' | 'format' | 'launch_date'
+  // AI creative-pattern dimensions (require the tagging pass — see lib/reports/tagging.ts):
+  | 'visual_format' | 'messaging_theme' | 'hook_tactic' | 'headline_tactic' | 'intended_audience' | 'offer_type'
+export const GROUP_BY: { key: GroupByKey; label: string; ai?: boolean }[] = [
   { key: 'creative', label: 'Creative' },
   { key: 'ad', label: 'Ad' },
   { key: 'adset', label: 'Ad set' },
@@ -63,7 +66,15 @@ export const GROUP_BY: { key: GroupByKey; label: string }[] = [
   { key: 'landing_page', label: 'Landing page' },
   { key: 'format', label: 'Format' },
   { key: 'launch_date', label: 'Launch date' },
+  // ── AI tags ──
+  { key: 'visual_format', label: 'Visual format', ai: true },
+  { key: 'messaging_theme', label: 'Messaging theme', ai: true },
+  { key: 'hook_tactic', label: 'Hook tactic', ai: true },
+  { key: 'headline_tactic', label: 'Headline tactic', ai: true },
+  { key: 'intended_audience', label: 'Intended audience', ai: true },
+  { key: 'offer_type', label: 'Offer type', ai: true },
 ]
+export const AI_GROUP_BY = GROUP_BY.filter(g => g.ai)
 
 export type ReportCategory = 'Find winners' | 'Find problems' | 'Creative strategy' | 'Understand performance'
 
@@ -139,18 +150,23 @@ export const TEMPLATES: ReportTemplate[] = [
 
   // ── Creative strategy ──
   { key: 'persona', title: 'Persona analysis', emoji: '👥', category: 'Creative strategy',
-    description: 'Which audience personas respond best to your creatives', groupBy: 'creative',
+    description: 'Which audience personas respond best to your creatives', groupBy: 'intended_audience',
     metrics: ['spend', 'roas', 'conversions', 'ctr', 'cpa'], sort: 'roas', sortDir: 'desc' },
   { key: 'hook_analysis', title: 'Hook analysis', emoji: '🎣', category: 'Creative strategy',
-    description: 'Which hook tactics capture the most attention', groupBy: 'creative',
-    metrics: ['spend', 'hook_rate', 'video_3s', 'ctr', 'roas'], sort: 'hook_rate', sortDir: 'desc',
-    onlyFormat: 'video', needsVideo: true },
-  { key: 'visual_analysis', title: 'Visual analysis', emoji: '🎨', category: 'Creative strategy',
-    description: 'Compare performance across different visual styles and formats', groupBy: 'format',
+    description: 'Which hook tactics capture the most attention', groupBy: 'hook_tactic',
+    metrics: ['spend', 'roas', 'ctr', 'conversions', 'cpa'], sort: 'roas', sortDir: 'desc' },
+  { key: 'visual_analysis', title: 'Visual format', emoji: '🎨', category: 'Creative strategy',
+    description: 'Compare visual formats to learn which creative style makes your message stick', groupBy: 'visual_format',
     metrics: ['spend', 'roas', 'conversions', 'ctr', 'cpm'], sort: 'spend', sortDir: 'desc' },
   { key: 'messaging', title: 'Messaging theme analysis', emoji: '💬', category: 'Creative strategy',
-    description: 'Which messaging themes resonate most with your audience', groupBy: 'creative',
+    description: 'Which messaging themes resonate most with your audience', groupBy: 'messaging_theme',
     metrics: ['spend', 'roas', 'conversions', 'ctr'], sort: 'roas', sortDir: 'desc' },
+  { key: 'offer_analysis', title: 'Offer analysis', emoji: '🏷️', category: 'Creative strategy',
+    description: 'Which offer types drive the best return', groupBy: 'offer_type',
+    metrics: ['spend', 'roas', 'conversions', 'cpa', 'ctr'], sort: 'roas', sortDir: 'desc' },
+  { key: 'headline_analysis', title: 'Headline tactic analysis', emoji: '✍️', category: 'Creative strategy',
+    description: 'Which headline tactics win clicks and conversions', groupBy: 'headline_tactic',
+    metrics: ['spend', 'roas', 'ctr', 'conversions'], sort: 'roas', sortDir: 'desc' },
 
   // ── Understand performance ──
   { key: 'customer_journey', title: 'Customer journey', emoji: '🛤️', category: 'Understand performance',
