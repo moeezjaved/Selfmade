@@ -663,12 +663,13 @@ function MoreMenu({ ad }: { ad: Ad }) {
     const firstVideo = ad.creatives?.find(c => c.asset_type === 'video')?.r2_url || ad.videoUrl
     const url = firstVideo || firstImage
     if (!url) return
-    // Open in new tab — browser handles save
+    // Route through /api/download → presigned R2 URL with Content-Disposition: attachment, so it
+    // actually SAVES the file instead of opening it in a new tab (the <a download> attr is ignored
+    // cross-origin).
+    const fname = `${ad.pageName || 'creative'}-${ad.id}.${url.endsWith('.mp4') ? 'mp4' : 'jpg'}`
     const a = document.createElement('a')
-    a.href = url
-    a.download = `${ad.pageName || 'creative'}-${ad.id}.${url.endsWith('.mp4') ? 'mp4' : 'jpg'}`
-    a.target = '_blank'
-    a.rel = 'noopener noreferrer'
+    a.href = `/api/download?url=${encodeURIComponent(url)}&name=${encodeURIComponent(fname)}`
+    a.download = fname
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)

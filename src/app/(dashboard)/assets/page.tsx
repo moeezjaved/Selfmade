@@ -96,16 +96,12 @@ export default function AssetsPage() {
   const shareAsset = (a: Asset) => { navigator.clipboard?.writeText(a.file_url); setMenuFor(null); setMsg('✓ Link copied to clipboard.') }
   const downloadAsset = (a: Asset) => {
     setMenuFor(null)
-    // Synchronous anchor so it stays inside the click gesture (the old code fetched the cross-origin
-    // R2 url as a blob → CORS-failed → its window.open fallback ran after `await`, outside the gesture,
-    // so the popup blocker swallowed it → "nothing happens"). `download` forces a save for same-origin
-    // files; for the cross-origin CDN url the browser opens it in a new tab instead — either way the
-    // user gets the file.
+    // Route through /api/download (same-origin) which redirects to a presigned R2 URL carrying
+    // Content-Disposition: attachment — so the browser actually SAVES the file instead of opening it
+    // in a new tab (the <a download> attribute is ignored for cross-origin R2 URLs).
     const el = document.createElement('a')
-    el.href = a.file_url
+    el.href = `/api/download?url=${encodeURIComponent(a.file_url)}&name=${encodeURIComponent(a.file_name || 'asset')}`
     el.download = a.file_name || 'asset'
-    el.target = '_blank'
-    el.rel = 'noopener'
     document.body.appendChild(el)
     el.click()
     el.remove()
