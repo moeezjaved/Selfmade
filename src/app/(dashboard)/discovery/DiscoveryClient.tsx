@@ -380,16 +380,28 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
 // clean row instead of wrapping into a cluttered 2–3 rows.
 function MoreFilters({ count, children }: { count: number; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!open) return
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [open])
+  const openPanel = () => {
+    const r = btnRef.current?.getBoundingClientRect()
+    if (r) {
+      // Clamp to the viewport so the panel never gets cut off at the right edge (or off-screen on mobile).
+      const width = Math.min(620, window.innerWidth - 16)
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8))
+      setPos({ top: r.bottom + 6, left, width })
+    }
+    setOpen(o => !o)
+  }
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(o => !o)}
+      <button ref={btnRef} onClick={openPanel}
         style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
           background: count ? '#1a3a1a' : '#fff', border: `1px solid ${count ? '#1a3a1a' : '#e2e8f0'}`,
           borderRadius: 8, fontSize: 13, fontWeight: 600, color: count ? '#dffe95' : '#374151',
@@ -398,10 +410,10 @@ function MoreFilters({ count, children }: { count: number; children: React.React
         {count > 0 && <span style={{ background: '#dffe95', color: '#1a3a1a', borderRadius: 100, fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>{count}</span>}
         <span style={{ fontSize: 10, opacity: 0.5 }}>{open ? '▲' : '▼'}</span>
       </button>
-      {open && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 6, background: '#fff',
+      {open && pos && (
+        <div style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, background: '#fff',
           border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 14px 40px rgba(0,0,0,0.16)',
-          zIndex: 1000, padding: 14, width: 'min(620px,92vw)' }}>
+          zIndex: 1000, padding: 14, maxHeight: 'min(70vh, 460px)', overflowY: 'auto', boxSizing: 'border-box' }}>
           <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#9ca3af', marginBottom: 10 }}>More filters</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
             {children}
