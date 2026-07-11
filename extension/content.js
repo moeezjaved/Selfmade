@@ -153,6 +153,27 @@
     return { brand, ad_copy, platform, permalink }
   }
 
+  // Last-resort creative grab: draw the current frame of a <video> to a canvas → data URL. Handles
+  // FB/IG feed video ads that stream via blob: with NO poster and no sibling <img> (the exact case
+  // that used to fail with "Could not read that media"). Same-origin blob frames aren't canvas-tainted;
+  // a cross-origin taint throws and we fall through gracefully.
+  function captureFrame(video) {
+    try {
+      if (!(video instanceof HTMLVideoElement)) return null
+      const w = video.videoWidth, h = video.videoHeight
+      if (!w || !h) return null
+      const c = document.createElement('canvas')
+      c.width = w; c.height = h
+      c.getContext('2d').drawImage(video, 0, 0, w, h)
+      return c.toDataURL('image/jpeg', 0.85)
+    } catch { return null }
+  }
+  function findVideoIn(el, scope) {
+    if (el instanceof HTMLVideoElement) return el
+    const box = (el && el.closest && el.closest('[role="article"], article, [data-ad-preview]')) || scope || document
+    return (box.querySelector && box.querySelector('video')) || null
+  }
+
   async function toDataURL(url) {
     try {
       const res = await fetch(url)
@@ -174,15 +195,22 @@
       const poster = findPoster(mediaEl)
       if (poster) { url = poster; type = 'image' }
     }
-    if (!url) { toast('Could not read that media — try the ＋Save on the ad itself', false); return }
+    // Still no fetchable URL (posterless blob video — the FB/IG feed case) → capture the current
+    // video frame off a canvas so the save works instead of erroring "Could not read that media".
+    let capturedFrame = null
+    if (!url || url.startsWith('blob:')) {
+      const frame = captureFrame(findVideoIn(mediaEl, scope))
+      if (frame) { capturedFrame = frame; type = 'image'; if (url.startsWith('blob:')) url = '' }
+    }
+    if (!url && !capturedFrame) { toast('Could not read that media — try the ＋Save on the ad itself', false); return }
     busy = true
     const restore = btn.innerHTML
     btn.innerHTML = labels.saving
     btn.classList.add('sm-busy')
     const m = meta(scope || document)
-    const image_data = type === 'image' ? await toDataURL(url) : null
+    const image_data = capturedFrame || (type === 'image' ? await toDataURL(url) : null)
     const payload = {
-      media_url: url, media_type: type, image_data,
+      media_url: url || m.permalink || location.href, media_type: capturedFrame ? 'image' : type, image_data,
       source_url: m.permalink || location.href, source_platform: m.platform,
       brand: m.brand || undefined, ad_copy: m.ad_copy || undefined,
     }
