@@ -328,6 +328,8 @@
 
 /* Discovery card hover overlay — show Clone/Scripts button on hover */
 .ad-card-visual:hover .hover-overlay { opacity: 1 !important; }
+/* Touch devices have no hover, so the Clone button never appeared on mobile — always show it there. */
+@media (hover: none) { .ad-card-visual .hover-overlay { opacity: 1 !important; } }
 
 
 /* Discovery thumbnail loading skeleton — soft shimmer while the creative loads,

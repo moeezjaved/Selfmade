@@ -180,7 +180,16 @@ export default function SavedAdsPage() {
           </div>
 
           {showCreate && (
-            <div style={{ background: '#f8fafc', borderRadius: 10, padding: 12, border: '1px solid #e2e8f0' }}>
+            // MOBILE: full-screen dimmed backdrop + centered opaque card (the inline panel bled into
+            // the board list behind it). DESKTOP: unchanged inline panel.
+            <div onClick={isMobile ? () => setShowCreate(false) : undefined}
+              style={isMobile
+                ? { position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }
+                : { background: '#f8fafc', borderRadius: 10, padding: 12, border: '1px solid #e2e8f0' }}>
+            <div onClick={isMobile ? (e) => e.stopPropagation() : undefined}
+              style={isMobile
+                ? { background: '#fff', borderRadius: 14, padding: 16, border: '1px solid #e2e8f0', width: '100%', maxWidth: 360, boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }
+                : { display: 'contents' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8 }}>New Board</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
                 {EMOJIS.map(e => (
@@ -206,6 +215,7 @@ export default function SavedAdsPage() {
                 style={{ width: '100%', padding: '7px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: creating ? 0.7 : 1 }}>
                 {creating ? 'Creating…' : 'Create Board'}
               </button>
+            </div>
             </div>
           )}
         </div>
