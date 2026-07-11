@@ -128,106 +128,76 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
 
   if (!tpl) return <div style={{ padding: 40 }}>Unknown report.</div>
 
+  const groupLabel = GROUP_BY.find(g => g.key === groupBy)?.label || 'Creative'
+
   return (
-    <div style={{ padding: 28, maxWidth: 1280, margin: '0 auto' }}>
-      {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-          <button onClick={onBack} style={{ border: '1px solid rgba(0,0,0,0.1)', background: '#fff', width: 34, height: 34, borderRadius: 10, cursor: 'pointer', fontSize: 16, color: '#3a5a3a', flexShrink: 0 }}>←</button>
-          <div style={{ fontSize: 26, flexShrink: 0 }}>{tpl.emoji}</div>
-          <div style={{ minWidth: 0 }}>
+    <div style={{ minHeight: '100vh', background: '#eef1e8', fontFamily: FONT, padding: '28px 30px 60px' }}>
+     <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 22, flexWrap: 'wrap' }}>
+        <button onClick={onBack} title="Back" style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid rgba(26,58,26,.14)', background: '#fff', color: '#1a3a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
+        </button>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#dffe95,#b6e86a)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>{tpl.emoji}</div>
+        <div style={{ flex: 1, minWidth: 200, paddingTop: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
             <input value={name} onChange={e => setName(e.target.value)}
-              style={{ fontSize: 20, fontWeight: 900, color: '#1a3a1a', border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', width: '100%', padding: 0 }} />
-            <div style={{ fontSize: 12, color: '#8aaa8a' }}>{tpl.description}</div>
+              style={{ fontSize: 23, fontWeight: 800, color: '#0e1b12', letterSpacing: '-.02em', border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', padding: 0, minWidth: 0, width: Math.max(8, name.length + 1) + 'ch', maxWidth: '100%' }} />
+            {savedId && <span style={{ fontSize: 11.5, fontWeight: 600, color: '#7c8577', background: '#fff', border: '1px solid rgba(26,58,26,.12)', padding: '3px 9px', borderRadius: 999 }}>Saved</span>}
           </div>
+          <div style={{ fontSize: 13.5, fontWeight: 500, color: '#6f7a68', marginTop: 3 }}>{tpl.description}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <button onClick={runAI} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 15px', borderRadius: 100, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#a855f7)', color: '#fff', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>✨ Analyze</button>
-          {onSave && <button onClick={doSave} disabled={saving} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: saved ? '#2d7a2d' : '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>{saving ? 'Saving…' : saved ? 'Saved ✓' : savedId ? 'Update' : 'Save'}</button>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
+          <button onClick={runAI} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#dffe95', color: '#0e1b12', border: 'none', fontFamily: FONT, fontSize: 13.5, fontWeight: 700, padding: '10px 16px', borderRadius: 11, cursor: 'pointer', boxShadow: '0 5px 14px -6px rgba(223,254,149,.9)' }}>
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="#0e1b12"><path d="M10 1.5l1.7 4.6 4.8 1.7-4.8 1.7L10 14.1 8.3 9.5 3.5 7.8l4.8-1.7z" /><circle cx="16" cy="15" r="1.5" /></svg>
+            Analyze
+          </button>
+          {onSave && <button onClick={doSave} disabled={saving} style={{ background: saved ? '#2f8f2f' : '#fff', color: saved ? '#fff' : '#1a3a1a', border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 13.5, fontWeight: 600, padding: '10px 16px', borderRadius: 11, cursor: 'pointer' }}>{saving ? 'Saving…' : saved ? 'Saved ✓' : savedId ? 'Update' : 'Save'}</button>}
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setShareOpen(o => !o)} disabled={!rows.length} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: '#0e1b12', color: '#fff', fontWeight: 800, fontSize: 12.5, cursor: rows.length ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: rows.length ? 1 : 0.5 }}>Share report</button>
-            {shareOpen && rows.length > 0 && (
-              <>
-                <div onClick={() => setShareOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} />
-                <ShareMenu payload={sharePayload} onClose={() => setShareOpen(false)} />
-              </>
-            )}
+            <button onClick={() => setShareOpen(o => !o)} disabled={!rows.length} style={{ background: '#0e1b12', color: '#f4f7ef', border: 'none', fontFamily: FONT, fontSize: 13.5, fontWeight: 700, padding: '10px 18px', borderRadius: 11, cursor: rows.length ? 'pointer' : 'not-allowed', opacity: rows.length ? 1 : 0.5 }}>Share report</button>
+            {shareOpen && rows.length > 0 && (<><div onClick={() => setShareOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} /><ShareMenu payload={sharePayload} onClose={() => setShareOpen(false)} /></>)}
           </div>
         </div>
       </div>
 
-      {/* AI panel */}
+      {/* AI analysis panel */}
       {aiOpen && (
         <div style={{ background: 'linear-gradient(135deg,#faf5ff,#f3e8ff)', border: '1px solid #e9d5ff', borderRadius: 16, padding: '16px 20px', marginBottom: 16, position: 'relative' }}>
           <button onClick={() => setAiOpen(false)} style={{ position: 'absolute', top: 12, right: 14, border: 'none', background: 'transparent', cursor: 'pointer', color: '#a855f7', fontSize: 14 }}>✕</button>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>✨ Mello's analysis</div>
-          {aiLoading ? (
-            <div style={{ color: '#9333ea', fontSize: 13 }}>Reading your data…</div>
-          ) : (
-            <div style={{ fontSize: 13.5, color: '#3b0764', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}
-              dangerouslySetInnerHTML={{ __html: mdLite(aiText) }} />
-          )}
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', marginBottom: 8 }}>✨ Mello's analysis</div>
+          {aiLoading ? <div style={{ color: '#9333ea', fontSize: 13 }}>Reading your data…</div>
+            : <div style={{ fontSize: 13.5, color: '#3b0764', lineHeight: 1.65 }} dangerouslySetInnerHTML={{ __html: mdLite(aiText) }} />}
         </div>
       )}
 
-      {/* Controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap', background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 14, padding: '10px 14px' }}>
-        <Ctl label="Group by">
-          <select value={groupBy} onChange={e => setGroupBy(e.target.value as GroupByKey)} style={selStyle}>
-            <optgroup label="Standard">
-              {GROUP_BY.filter(g => !g.ai).map(g => <option key={g.key} value={g.key}>{g.label}</option>)}
-            </optgroup>
-            <optgroup label="✨ AI tags">
-              {GROUP_BY.filter(g => g.ai).map(g => <option key={g.key} value={g.key}>✨ {g.label}</option>)}
-            </optgroup>
+      {/* Controls: Group by · Period · AI tags · Add filter */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        <label style={pill}>
+          Group by <span style={{ color: '#0e1b12', fontWeight: 700 }}>{groupLabel}</span>
+          <select value={groupBy} onChange={e => setGroupBy(e.target.value as GroupByKey)} style={pillSelect}>
+            <optgroup label="Standard">{GROUP_BY.filter(g => !g.ai).map(g => <option key={g.key} value={g.key}>{g.label}</option>)}</optgroup>
+            <optgroup label="✨ AI tags">{GROUP_BY.filter(g => g.ai).map(g => <option key={g.key} value={g.key}>{g.label}</option>)}</optgroup>
           </select>
-        </Ctl>
-        <Ctl label="Period">
-          <div style={{ display: 'flex', gap: 4 }}>
-            {DATE_RANGES.map(d => (
-              <button key={d.key} onClick={() => setDateRange(d.key)} style={{ padding: '5px 11px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 700, fontSize: 11.5, cursor: 'pointer', background: dateRange === d.key ? '#1a3a1a' : '#f0f7ee', color: dateRange === d.key ? '#dffe95' : '#5a7a5a' }}>{d.label}</button>
-            ))}
-          </div>
-        </Ctl>
-        <div style={{ flex: 1 }} />
-        {/* AI tags toggle — runs the vision tagging pass so creative pills populate. */}
+          <Chevron />
+        </label>
+        <label style={pill}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a3a1a" strokeWidth="1.8"><rect x="3" y="4" width="18" height="17" rx="2.5" /><path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" /></svg>
+          Last {dateRange.replace('last_', '').replace('d', ' days')}
+          <select value={dateRange} onChange={e => setDateRange(e.target.value)} style={pillSelect}>
+            {DATE_RANGES.map(d => <option key={d.key} value={d.key}>Last {d.label}</option>)}
+          </select>
+          <Chevron />
+        </label>
         <button onClick={() => setAiTags(v => !v)} title="Tag creatives with AI (Visual format, Hook, Audience…)"
-          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px', borderRadius: 100, border: aiTags ? 'none' : '1px solid rgba(124,58,237,0.35)', background: aiTags ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : '#faf5ff', color: aiTags ? '#fff' : '#7c3aed', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-          ✨ AI tags
-        </button>
-        {/* Add metric */}
-        <div style={{ position: 'relative' }}>
-          <button onClick={() => setAddOpen(o => !o)} style={{ padding: '7px 13px', borderRadius: 100, border: '1px dashed rgba(0,0,0,0.2)', background: '#fff', color: '#3a5a3a', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>＋ Metric</button>
-          {addOpen && (
-            <div style={{ position: 'absolute', right: 0, top: '110%', zIndex: 30, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.15)', padding: 8, width: 220, maxHeight: 320, overflowY: 'auto' }}>
-              {availableToAdd.map(m => (
-                <button key={m} onClick={() => addMetric(m)} style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12.5, color: '#1a3a1a', fontFamily: 'inherit', display: 'flex', justifyContent: 'space-between' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f0f7ee'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  {METRICS[m].label}{METRICS[m].video && <span style={{ fontSize: 9, color: '#8aaa8a' }}>🎬</span>}
-                </button>
-              ))}
-              {!availableToAdd.length && <div style={{ padding: 10, fontSize: 12, color: '#9ab09a' }}>All metrics added.</div>}
-            </div>
-          )}
-        </div>
-        {/* View toggle */}
-        <div style={{ display: 'flex', background: '#f0f7ee', borderRadius: 100, padding: 3 }}>
-          {(['table', 'card'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)} style={{ padding: '5px 12px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 700, fontSize: 11.5, cursor: 'pointer', background: view === v ? '#1a3a1a' : 'transparent', color: view === v ? '#dffe95' : '#5a7a5a' }}>{v === 'table' ? '☰ Table' : '▦ Cards'}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div style={{ marginBottom: 14 }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 11, padding: '9px 13px', fontFamily: FONT, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: aiTags ? 'none' : '1px solid rgba(124,58,237,.3)', background: aiTags ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : '#faf5ff', color: aiTags ? '#fff' : '#7c3aed' }}>✨ AI tags</button>
         <ReportFilters filters={filters} onChange={setFilters} />
       </div>
 
-      {/* AI tagging progress — tags the top ads first (cached), then more on demand. */}
+      {/* AI tagging progress */}
       {!loading && data?.tagRemaining > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, background: 'linear-gradient(135deg,#faf5ff,#f3e8ff)', border: '1px solid #e9d5ff', borderRadius: 12, padding: '10px 16px' }}>
-          <div style={{ fontSize: 12.5, color: '#6b21a8' }}>✨ AI tagged your top creatives. <b>{data.tagRemaining}</b> more not yet tagged — tag them to complete this report.</div>
-          <button onClick={load} style={{ padding: '6px 13px', borderRadius: 100, border: 'none', background: '#7c3aed', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Tag {Math.min(30, data.tagRemaining)} more</button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, background: 'linear-gradient(135deg,#faf5ff,#f3e8ff)', border: '1px solid #e9d5ff', borderRadius: 12, padding: '10px 16px' }}>
+          <div style={{ fontSize: 12.5, color: '#6b21a8' }}>✨ AI tagged your top creatives. <b>{data.tagRemaining}</b> more not yet tagged.</div>
+          <button onClick={load} style={{ padding: '6px 13px', borderRadius: 100, border: 'none', background: '#7c3aed', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: FONT, flexShrink: 0 }}>Tag {Math.min(30, data.tagRemaining)} more</button>
         </div>
       )}
 
@@ -245,43 +215,115 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           <div style={{ fontWeight: 700, color: '#1a3a1a' }}>No matching ads in this period</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>{tpl.onlyFormat === 'video' ? 'This report needs active video ads with spend.' : tpl.onlyFormat === 'image' ? 'This report needs active image ads with spend.' : 'Try a wider date range.'}</div>
         </div>
-      ) : view === 'table' ? (
-        <TableView rows={rows} metrics={metrics} sort={sort} dir={dir} currency={currency} net={net} groupBy={groupBy}
-          onSort={toggleSort} onRemove={removeMetric} count={data?.count} />
       ) : (
-        <CardView rows={rows} metrics={metrics} sort={sort} currency={currency} />
+        <>
+          {/* Visualization panel — metric toolbar + card grid */}
+          <div style={panelStyle}>
+            <div style={{ padding: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: view === 'card' ? 18 : 0, flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative' }}>
+                  <button onClick={() => setAddOpen(o => !o)} style={toolBtn}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 1v10M1 6h10" strokeLinecap="round" /></svg> Add metric
+                  </button>
+                  {addOpen && (
+                    <div style={{ position: 'absolute', left: 0, top: '112%', zIndex: 30, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.15)', padding: 8, width: 220, maxHeight: 320, overflowY: 'auto' }}>
+                      {availableToAdd.map(m => (
+                        <button key={m} onClick={() => addMetric(m)} style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12.5, color: '#1a3a1a', fontFamily: FONT, display: 'flex', justifyContent: 'space-between' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f4f6f0'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          {METRICS[m].label}{METRICS[m].video && <span style={{ fontSize: 9, color: '#8aaa8a' }}>🎬</span>}
+                        </button>
+                      ))}
+                      {!availableToAdd.length && <div style={{ padding: 10, fontSize: 12, color: '#9ab09a' }}>All metrics added.</div>}
+                    </div>
+                  )}
+                </div>
+                {/* numbered metric chips */}
+                {metrics.map((m: MetricKey, i: number) => (
+                  <span key={m} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#eef4dc', border: '1px solid rgba(26,58,26,.1)', borderRadius: 999, padding: '6px 10px 6px 7px', fontSize: 12.5, fontWeight: 700, color: '#243d17' }}>
+                    <span style={{ width: 17, height: 17, borderRadius: '50%', background: '#c8e58a', color: '#243d17', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+                    <span onClick={() => toggleSort(m)} style={{ cursor: 'pointer' }}>{METRICS[m].label}</span>
+                    {metrics.length > 1 && <span onClick={() => removeMetric(m)} title="Remove" style={{ cursor: 'pointer', color: '#6a7a52', marginLeft: -1 }}>✕</span>}
+                  </span>
+                ))}
+                <div style={{ flex: 1 }} />
+                {/* view toggle: cards / table-only */}
+                <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: 3 }}>
+                  {([['card', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'], ['table', 'M4 6h16M4 12h16M4 18h16']] as const).map(([v, d]) => (
+                    <button key={v} onClick={() => setView(v)} title={v === 'card' ? 'Cards' : 'Table only'} style={{ width: 30, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: view === v ? '#0e1b12' : 'transparent' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={view === v ? '#dffe95' : '#7c8577'} strokeWidth="2" strokeLinecap="round"><path d={d} /></svg>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {view === 'card' && <CardsGrid rows={rows} metrics={metrics} sort={sort} currency={currency} />}
+            </div>
+          </div>
+
+          {/* Table panel */}
+          <TablePanel rows={rows} metrics={metrics} sort={sort} dir={dir} currency={currency} net={net} groupLabel={groupLabel}
+            onSort={toggleSort} count={data?.count} />
+        </>
       )}
 
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+      <style>{`
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        .rp-scroll::-webkit-scrollbar{height:9px;width:9px}
+        .rp-scroll::-webkit-scrollbar-thumb{background:rgba(26,58,26,.16);border-radius:8px}
+        .rp-row:hover{background:#fafcf5}
+        .rp-card:hover{box-shadow:0 10px 24px -16px rgba(14,27,18,.5)}
+      `}</style>
+     </div>
     </div>
   )
 }
 
-const selStyle: React.CSSProperties = { padding: '6px 10px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.12)', fontFamily: 'inherit', fontWeight: 700, fontSize: 12, color: '#1a3a1a', background: '#fff', cursor: 'pointer', outline: 'none' }
+const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+const pill: React.CSSProperties = { position: 'relative', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid rgba(26,58,26,.14)', borderRadius: 11, padding: '9px 13px', fontSize: 13, fontWeight: 600, color: '#3a4636', cursor: 'pointer', fontFamily: FONT }
+const pillSelect: React.CSSProperties = { position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', fontFamily: FONT }
+const panelStyle: React.CSSProperties = { background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 20, boxShadow: '0 12px 30px -22px rgba(14,27,18,.4)', marginBottom: 20 }
+const toolBtn: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: '7px 13px', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#3a4636', cursor: 'pointer' }
+const Chevron = () => <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#7c8577" strokeWidth="1.7"><path d="M2 4l4 4 4-4" strokeLinecap="round" /></svg>
 
-function Ctl({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-      <span style={{ fontSize: 10.5, fontWeight: 800, color: '#7a9a7a', textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</span>
-      {children}
-    </div>
-  )
-}
+// Soft lime-green heat fill for a cell, strength 0..1 (matches the design's heatmap).
+const heat = (strength: number) => strength <= 0.001 ? 'transparent' : `rgba(140,200,74,${(0.14 + strength * 0.5).toFixed(2)})`
+// Metrics that get a heatmap fill (higher = better, and not Spend which stays plain).
+const heatable = (m: MetricKey) => METRICS[m].goodHigh && m !== 'spend'
+// Net Results shows an average (not a sum) for rate/cost metrics.
+const isAvg = (m: MetricKey) => ['percent', 'ratio', 'seconds'].includes(METRICS[m].format) || ['cpm', 'cpc', 'cpa'].includes(m)
 
-function TableView({ rows, metrics, sort, dir, currency, net, groupBy, onSort, onRemove, count }: any) {
+function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count }: any) {
+  const colMax: Record<string, number> = {}
+  for (const m of metrics as MetricKey[]) colMax[m] = Math.max(...rows.map((r: any) => r.metrics[m] || 0), 0.0001)
   return (
-    <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+    <div style={panelStyle}>
+      {/* toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px', borderBottom: '1px solid rgba(26,58,26,.08)' }}>
+        <span style={toolBtn}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="2.5" /><path d="M3 9h18M9 21V9" strokeLinecap="round" /></svg>
+          Custom <Chevron />
+        </span>
+        <span style={{ ...toolBtn, background: '#fff', border: '1px solid rgba(26,58,26,.12)' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" /></svg>
+          Table settings
+        </span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#7c8577' }}>{count || rows.length} ad {(count || rows.length) === 1 ? 'group' : 'groups'}</span>
+      </div>
+
+      <div className="rp-scroll" style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
           <thead>
-            <tr style={{ background: '#f6faf4', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
-              <th style={{ ...thStyle, textAlign: 'left', minWidth: 240, position: 'sticky', left: 0, background: '#f6faf4' }}>{GROUP_BY.find((g: any) => g.key === groupBy)?.label || 'Item'}</th>
+            <tr style={{ background: '#fafcf5', borderBottom: '1px solid rgba(26,58,26,.08)' }}>
+              <th style={{ ...thStyle, textAlign: 'left', minWidth: 250, paddingLeft: 18 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 11 }}>
+                  <span style={{ width: 16, height: 16, borderRadius: 5, background: '#0e1b12', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#dffe95" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+                  {(groupLabel || 'Creative').toUpperCase()}
+                </span>
+              </th>
               {metrics.map((m: MetricKey) => (
-                <th key={m} style={thStyle} onClick={() => onSort(m)}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: sort === m ? '#1a3a1a' : '#7a9a7a' }}>
-                    {METRICS[m].label}
-                    {sort === m && <span style={{ fontSize: 9 }}>{dir === 'desc' ? '▼' : '▲'}</span>}
-                    {metrics.length > 1 && <span onClick={(e) => { e.stopPropagation(); onRemove(m) }} title="Remove column" style={{ marginLeft: 2, color: '#c5c5c5', fontSize: 11, fontWeight: 400 }}>✕</span>}
+                <th key={m} style={{ ...thStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14 }} onClick={() => onSort(m)}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: sort === m ? '#0e1b12' : '#8a9182' }}>
+                    {METRICS[m].label.toUpperCase()}{sort === m && <span style={{ fontSize: 9 }}>{dir === 'desc' ? '▼' : '▲'}</span>}
                   </span>
                 </th>
               ))}
@@ -289,32 +331,46 @@ function TableView({ rows, metrics, sort, dir, currency, net, groupBy, onSort, o
           </thead>
           <tbody>
             {rows.map((r: any, i: number) => (
-              <tr key={r.key + i} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#fafcf9'} onMouseLeave={e => e.currentTarget.style.background = ''}>
-                <td style={{ ...tdStyle, textAlign: 'left', position: 'sticky', left: 0, background: 'inherit' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 11, color: '#b5c5b5', width: 18, flexShrink: 0 }}>{i + 1}</span>
+              <tr key={r.key + i} className="rp-row" style={{ borderBottom: '1px solid rgba(26,58,26,.06)', transition: 'background .12s' }}>
+                <td style={{ ...tdStyle, textAlign: 'left', paddingLeft: 18 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+                    <span style={{ width: 16, height: 16, borderRadius: 5, border: '1.6px solid #6fb03a', background: '#dffe95', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#1a3a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
                     <Thumb src={r.thumbnail} format={r.format} />
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>{r.name}</div>
-                      {r.adCount > 1 && <div style={{ fontSize: 10, color: '#9ab09a' }}>{r.adCount} ads</div>}
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0e1b12', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{r.name}</div>
+                      <div style={{ fontSize: 11.5, fontWeight: 500, color: '#9aa196' }}>{r.adCount} {r.adCount === 1 ? 'ad' : 'ads'}</div>
                       <TagPills tags={r.tags} max={3} />
                     </div>
                   </div>
                 </td>
-                {metrics.map((m: MetricKey) => (
-                  <td key={m} style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: sort === m ? 800 : 600, color: metricColor(m, r.metrics[m]) || '#2a3a2a' }}>
-                    {fmtMetric(r.metrics[m], m, currency)}
-                  </td>
-                ))}
+                {metrics.map((m: MetricKey) => {
+                  const val = r.metrics[m] || 0
+                  const showHeat = heatable(m)
+                  return (
+                    <td key={m} style={{ ...tdStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14 }}>
+                      {showHeat ? (
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#243d17', background: heat(val / colMax[m]), padding: '4px 9px', borderRadius: 7, fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(val, m, currency)}</span>
+                      ) : (
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#3a4636', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(val, m, currency)}</span>
+                      )}
+                    </td>
+                  )
+                })}
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr style={{ background: '#1a3a1a', color: '#dffe95' }}>
-              <td style={{ ...tdStyle, textAlign: 'left', fontWeight: 900, position: 'sticky', left: 0, background: '#1a3a1a' }}>Net results{count ? ` · ${count}` : ''}</td>
+            <tr style={{ background: '#0e1b12' }}>
+              <td style={{ ...tdStyle, textAlign: 'left', paddingLeft: 18 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 800, color: '#f4f7ef' }}>
+                  Net Results
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a9182" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" strokeLinecap="round" /></svg>
+                </span>
+              </td>
               {metrics.map((m: MetricKey) => (
-                <td key={m} style={{ ...tdStyle, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: '#dffe95' }}>{fmtMetric(net[m] || 0, m, currency)}</td>
+                <td key={m} style={{ ...tdStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14, fontSize: 13, fontWeight: 700, color: isAvg(m) ? '#dffe95' : '#f4f7ef', fontVariantNumeric: 'tabular-nums' }}>
+                  {isAvg(m) ? 'Avg ' : ''}{fmtMetric(net[m] || 0, m, currency)}
+                </td>
               ))}
             </tr>
           </tfoot>
@@ -324,33 +380,28 @@ function TableView({ rows, metrics, sort, dir, currency, net, groupBy, onSort, o
   )
 }
 
-function CardView({ rows, metrics, sort, currency }: any) {
+function CardsGrid({ rows, metrics, sort, currency }: any) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px,100%),1fr))', gap: 18 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px,100%),1fr))', gap: 16 }}>
       {rows.map((r: any, i: number) => (
-        <div key={r.key + i} style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          {/* Tall creative preview */}
-          <div style={{ aspectRatio: '4 / 5', background: '#0e120e', position: 'relative', overflow: 'hidden' }}>
+        <div key={r.key + i} className="rp-card" style={{ border: '1px solid rgba(26,58,26,.1)', borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
+          {/* creative preview 16:10 */}
+          <div style={{ position: 'relative', aspectRatio: '16 / 10', background: '#0e1b12', overflow: 'hidden' }}>
             {r.thumbnail
               ? <img src={r.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.visibility = 'hidden' }} />
-              : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44 }}>{r.format === 'video' ? '🎬' : r.format === 'carousel' ? '🎠' : '🖼️'}</div>}
-            {/* rank + format + ad-count overlays */}
-            <span style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)', color: '#fff', fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 100 }}>#{i + 1}</span>
-            {r.format === 'video' && (
-              <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 46, height: 46, borderRadius: 100, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 18, paddingLeft: 3 }}>▶</span>
-            )}
-            <span style={{ position: 'absolute', bottom: 10, left: 10, background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 100 }}>{r.adCount} {r.adCount === 1 ? 'ad' : 'ads'}</span>
-            <span style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(255,255,255,0.92)', color: '#3a5a3a', fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 100, textTransform: 'capitalize' }}>{r.format}</span>
+              : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, color: '#c6d2ba' }}>{r.format === 'video' ? '🎬' : r.format === 'carousel' ? '🎠' : '🖼️'}</div>}
+            {r.format === 'video' && <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 44, height: 44, borderRadius: 100, background: 'rgba(14,27,18,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 17, paddingLeft: 3 }}>▶</span>}
+            <span style={{ position: 'absolute', left: 10, bottom: 10, background: 'rgba(14,27,18,.82)', color: '#f4f7ef', fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 8, backdropFilter: 'blur(4px)' }}>{r.adCount} {r.adCount === 1 ? 'ad' : 'ads'}</span>
           </div>
-          {/* Body */}
-          <div style={{ padding: '13px 15px 6px' }}>
-            <div style={{ fontSize: 14.5, fontWeight: 800, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+          {/* body */}
+          <div style={{ padding: '13px 14px 14px' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0e1b12', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
             <TagPills tags={r.tags} max={3} />
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 11 }}>
               {metrics.map((m: MetricKey, idx: number) => (
-                <div key={m} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderTop: idx === 0 ? 'none' : '1px solid rgba(0,0,0,0.05)' }}>
-                  <span style={{ fontSize: 12.5, color: '#7a8a7a', fontWeight: sort === m ? 700 : 500 }}>{METRICS[m].label}</span>
-                  <span style={{ fontSize: 13.5, fontWeight: sort === m ? 900 : 700, color: metricColor(m, r.metrics[m]) || '#1a3a1a', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(r.metrics[m], m, currency)}</span>
+                <div key={m} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: idx === 0 ? '0 0 8px' : '8px 0 0', borderTop: idx === 0 ? 'none' : '1px solid rgba(26,58,26,.07)' }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 500, color: '#7c8577' }}>{METRICS[m].label}</span>
+                  <span style={{ fontSize: 13, fontWeight: idx === 0 ? 700 : 800, color: metricColor(m, r.metrics[m]) || '#243d17', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(r.metrics[m], m, currency)}</span>
                 </div>
               ))}
             </div>
@@ -395,8 +446,8 @@ function Thumb({ src, format }: { src: string | null; format: string }) {
   )
 }
 
-const thStyle: React.CSSProperties = { padding: '11px 14px', textAlign: 'right', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }
-const tdStyle: React.CSSProperties = { padding: '11px 14px', textAlign: 'right', fontSize: 13, whiteSpace: 'nowrap' }
+const thStyle: React.CSSProperties = { padding: '11px 14px', textAlign: 'right', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: '#8a9182', whiteSpace: 'nowrap' }
+const tdStyle: React.CSSProperties = { padding: '11px 14px', textAlign: 'right', whiteSpace: 'nowrap' }
 
 // Minimal markdown → HTML for the AI panel (bold + line breaks + bullets only; no untrusted HTML).
 function mdLite(s: string): string {
