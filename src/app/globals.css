@@ -189,11 +189,35 @@
     text-align: left;
     width: 100%;
     position: relative;
-    color: rgba(255,255,255,0.4);
-    padding: 7px 16px;
+    color: rgba(255,255,255,0.55);
+    padding: 7px 8px;
+    border-radius: 11px;
     font-family: inherit;
     text-decoration: none;
   }
+  /* Nav item: icon well + title/subtitle stack */
+  .nav-well {
+    width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.6);
+    transition: all 0.15s ease;
+  }
+  .nav-well.accent { background: rgba(223,254,149,0.14); color: #dffe95; }
+  .nav-title { display: block; font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.9); line-height: 1.25; letter-spacing: -.005em; }
+  .nav-sub { display: block; font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.4); line-height: 1.2; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-link:hover .nav-well { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.92); }
+  .sidebar-link.active .nav-well { background: #dffe95; color: #1a3a1a; }
+  .sidebar-link.active .nav-title { color: #dffe95; }
+  /* Ask Mello card */
+  .sm-mello-card {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 12px 6px; padding: 9px 10px; border-radius: 12px;
+    background: linear-gradient(135deg, rgba(223,254,149,0.12), rgba(223,254,149,0.04));
+    border: 1px solid rgba(223,254,149,0.16);
+    text-decoration: none; transition: all 0.15s ease;
+  }
+  .sm-mello-card:hover { background: linear-gradient(135deg, rgba(223,254,149,0.2), rgba(223,254,149,0.07)); border-color: rgba(223,254,149,0.3); }
   /* Icon-rail buttons (two-rail sidebar) — icon on top, small label below (Atria-style) */
   .rail-icon {
     width: 56px;
@@ -233,18 +257,8 @@
   .sm-acct-item:hover { background: rgba(255,255,255,0.07); }
   .sidebar-link.active {
     color: var(--lime);
-    background: rgba(223,254,149,0.1);
+    background: rgba(223,254,149,0.12);
     font-weight: 600;
-  }
-  .sidebar-link.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 6px;
-    bottom: 6px;
-    width: 3px;
-    background: var(--lime);
-    border-radius: 0 3px 3px 0;
   }
 
   /* ── DATA TABLE ── */

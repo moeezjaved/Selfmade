@@ -27,41 +27,41 @@ const AREAS = [
   {
     key: 'discover', label: 'Ad Discovery', railLabel: 'Discovery', railIcon: RiCompass3Fill, defaultHref: '/discovery',
     items: [
-      { href: '/discovery',            icon: RiCompass3Fill,  label: 'Discovery',     badge: 'NEW' },
-      { href: '/discovery/brand-spy',  icon: RiFocus3Fill,    label: 'Brand Spy',     badge: 'NEW' },
-      { href: '/trending',             icon: RiFireFill,      label: 'Trending',      badge: 'NEW' },
-      { href: '/discovery/top-picks',  icon: RiStarFill,      label: 'Top Picks',     badge: null },
-      { href: '/discovery/saved',      icon: RiBookmarkFill,  label: 'Boards',        badge: null },
-      { href: '/assets',               icon: RiFilmFill,      label: 'Assets',        badge: 'NEW' },
-      { href: '/discovery/following',  icon: RiHeartFill,     label: 'Following',      badge: null },
+      { href: '/discovery',            icon: RiCompass3Fill,  label: 'Discovery',  sub: 'Find winning ads',   badge: 'NEW' },
+      { href: '/discovery/brand-spy',  icon: RiFocus3Fill,    label: 'Brand Spy',  sub: 'Track competitors',  badge: 'NEW' },
+      { href: '/trending',             icon: RiFireFill,      label: 'Trending',   sub: "What's hot now",     badge: 'NEW' },
+      { href: '/discovery/top-picks',  icon: RiStarFill,      label: 'Top Picks',  sub: 'Expert-curated',     badge: null },
+      { href: '/discovery/saved',      icon: RiBookmarkFill,  label: 'Boards',     sub: 'Your swipe file',    badge: null },
+      { href: '/assets',               icon: RiFilmFill,      label: 'Assets',     sub: 'Your creatives',     badge: 'NEW' },
+      { href: '/discovery/following',  icon: RiHeartFill,     label: 'Following',  sub: 'Tracked brands',     badge: null },
     ],
   },
   {
     key: 'analytics', label: 'Analytics & Launch', railLabel: 'Launch', railIcon: RiRocketFill, defaultHref: '/m4',
     items: [
-      { href: '/m4',         icon: RiRocketFill,      label: 'Launch Ads',       badge: 'AI' },
-      { href: '/campaigns',  icon: RiMegaphoneFill,   label: 'Campaigns',        badge: null },
-      { href: '/insights',   icon: RiLineChartFill,   label: 'Scale & Insights', badge: 'NEW' },
-      { href: '/reports',    icon: RiBarChartBoxFill, label: 'Reports',          badge: 'NEW' },
+      { href: '/m4',         icon: RiRocketFill,      label: 'Launch Ads',       sub: 'Ship campaigns',   badge: 'AI' },
+      { href: '/campaigns',  icon: RiMegaphoneFill,   label: 'Campaigns',        sub: 'Manage live ads',  badge: null },
+      { href: '/insights',   icon: RiLineChartFill,   label: 'Scale & Insights', sub: 'Grow winners',     badge: 'NEW' },
+      { href: '/reports',    icon: RiBarChartBoxFill, label: 'Reports',          sub: 'Performance',      badge: 'NEW' },
     ],
   },
   {
     key: 'create', label: 'AI Gen', railLabel: 'AI Gen', railIcon: RiMagicFill, defaultHref: '/creative-studio',
     items: [
-      { href: '/creative-studio?studio=1', icon: RiMagicFill,      label: 'Create Ad',  badge: 'NEW' },
-      { href: '/creative-studio', icon: RiSparkling2Fill, label: 'My Creatives', badge: null },
-      { href: '/brands',          icon: RiStore2Fill,     label: 'Brands',       badge: null },
+      { href: '/creative-studio?studio=1', icon: RiMagicFill,      label: 'Create Ad',    sub: 'Generate an ad',    badge: 'NEW' },
+      { href: '/creative-studio', icon: RiSparkling2Fill, label: 'My Creatives', sub: 'Your generations',  badge: null },
+      { href: '/brands',          icon: RiStore2Fill,     label: 'Brands',       sub: 'Your brand kits',   badge: null },
     ],
   },
   {
     key: 'account', label: 'Account', railIcon: RiSettings3Fill, defaultHref: '/dashboard',
     items: [
-      { href: '/dashboard',  icon: RiDashboardFill,   label: 'Dashboard',    badge: null },
-      { href: '/mcp',        icon: RiTerminalBoxFill, label: 'API & MCP',    badge: 'NEW' },
-      { href: '/team',       icon: RiTeamFill,        label: 'Team',         badge: 'NEW' },
-      { href: '/activity',   icon: RiFileList3Fill,   label: 'Activity Log', badge: null },
-      { href: '/settings',   icon: RiSettings3Fill,   label: 'Settings',     badge: null },
-      { href: '/billing',    icon: RiBankCardFill,    label: 'Billing & plans', badge: null },
+      { href: '/dashboard',  icon: RiDashboardFill,   label: 'Dashboard',       sub: 'Overview',         badge: null },
+      { href: '/mcp',        icon: RiTerminalBoxFill, label: 'API & MCP',       sub: 'Developer access', badge: 'NEW' },
+      { href: '/team',       icon: RiTeamFill,        label: 'Team',            sub: 'Members & seats',  badge: 'NEW' },
+      { href: '/activity',   icon: RiFileList3Fill,   label: 'Activity Log',    sub: 'Audit trail',      badge: null },
+      { href: '/settings',   icon: RiSettings3Fill,   label: 'Settings',        sub: 'Preferences',      badge: null },
+      { href: '/billing',    icon: RiBankCardFill,    label: 'Billing & plans', sub: 'Plan & credits',   badge: null },
     ],
   },
 ]
@@ -179,7 +179,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       )}
 
       {/* ── SIDEBAR (two-rail: thin icon rail + contextual panel) ── */}
-      <aside style={{width:256,flexShrink:0,display:"flex",position:"fixed",top:0,left:0,bottom:0,zIndex:50,
+      <aside style={{width:304,flexShrink:0,display:"flex",position:"fixed",top:0,left:0,bottom:0,zIndex:50,
         transform: isMobile && !navOpen ? "translateX(-100%)" : "translateX(0)",
         transition:"transform 0.25s ease",
         boxShadow: isMobile && navOpen ? "0 0 40px rgba(0,0,0,0.4)" : "none"}}>
@@ -220,18 +220,29 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
 
         {/* Rail 2 — contextual panel */}
-        <div style={{width:200,flexShrink:0,background:"#243d20",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column"}}>
+        <div style={{width:236,flexShrink:0,background:"#243d20",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column"}}>
 
           {/* Panel header: active area name + bell */}
-          <div style={{padding:"20px 16px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+          <div style={{padding:"18px 16px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
             <span style={{fontSize:13,fontWeight:800,color:"#dffe95",letterSpacing:"-.01em"}}>
               {melloActive ? 'Ask Mello' : activeArea.label}
             </span>
             <NotificationBell />
           </div>
 
-          {/* Items of the active area */}
-          <nav className="flex-1 overflow-y-auto" style={{padding:"2px 0"}}>
+          {/* Ask Mello card */}
+          <Link href="/mello" className="sm-mello-card">
+            <span className="nav-well accent"><RiSparkling2Fill size={16}/></span>
+            <span style={{flex:1,minWidth:0}}>
+              <span className="nav-title" style={{color:"#dffe95"}}>Ask Mello</span>
+              <span className="nav-sub">Analyze any creative</span>
+            </span>
+          </Link>
+
+          <div style={{padding:"8px 18px 4px",fontSize:9.5,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"rgba(255,255,255,0.32)"}}>Workspace</div>
+
+          {/* Items of the active area — icon well + title + subtitle */}
+          <nav className="flex-1 overflow-y-auto" style={{padding:"2px 8px"}}>
             {activeArea.items.map(item => {
               // Active = the LONGEST matching href (see activeHref above).
               const isActive = item.href === activeHref
@@ -242,10 +253,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   data-nav={item.href === '/creative-studio' ? 'creatives' : undefined}
                   className={cn('sidebar-link', isActive && 'active')}
                 >
-                  <item.icon size={17} className="flex-shrink-0"/>
-                  <span className="flex-1">{item.label}</span>
+                  <span className="nav-well"><item.icon size={16}/></span>
+                  <span style={{flex:1,minWidth:0}}>
+                    <span className="nav-title">{item.label}</span>
+                    {(item as any).sub && <span className="nav-sub">{(item as any).sub}</span>}
+                  </span>
                   {item.badge === 'AI' && (
-                    <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 6px",borderRadius:99,background:"#dffe95",color:"#243d20"}}>AI</span>
+                    <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 6px",borderRadius:99,background:"#dffe95",color:"#243d20",flexShrink:0}}>AI</span>
                   )}
                   {(item.badge === 'NEW' || item.badge === 'New') && (
                     <span title="New" style={{width:6,height:6,borderRadius:99,background:"#dffe95",flexShrink:0}}/>
@@ -328,10 +342,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* ── MAIN ── */}
       <div style={{flex:1,
-        marginLeft: isMobile ? 0 : 256,
+        marginLeft: isMobile ? 0 : 304,
         marginTop: isMobile ? 52 : 0,
         display:"flex",flexDirection:"column",minHeight:"100vh",background:"#eef5eb",minWidth:0,
-        maxWidth: isMobile ? "100vw" : "calc(100vw - 256px)",
+        maxWidth: isMobile ? "100vw" : "calc(100vw - 304px)",
         overflowX:"hidden"}}>
         <div id="topbar-portal"/>
         <main className="flex-1" style={{minWidth:0,overflowX:"hidden"}}>
