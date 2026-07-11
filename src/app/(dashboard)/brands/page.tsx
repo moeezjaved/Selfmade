@@ -17,6 +17,10 @@ const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8
 const input: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', marginBottom: 8 }
 const btn: React.CSSProperties = { padding: '8px 14px', borderRadius: 8, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }
 const csv = (s: string) => s.split(',').map(x => x.trim()).filter(Boolean)
+// Pasted product image URLs are often referrer/hotlink-protected → a raw <img> renders broken.
+// Route through the weserv proxy (same as every other image surface). R2 objects pass through.
+const cdn = (u: string, w = 72) => (!u || u.startsWith('data:') || u.includes('.r2.dev') || u.includes('cdn.tryselfmade'))
+  ? u : `https://images.weserv.nl/?url=${encodeURIComponent(u)}&w=${w}&q=72&output=webp`
 
 export default function BrandsPage() {
   const [brands, setBrands] = useState<Brand[]>([])
@@ -57,6 +61,10 @@ export default function BrandsPage() {
     finally { setSaving(false) }
   }
   const delBrand = async (id: string) => { if (confirm('Delete this brand and its products?')) { await fetch(`/api/brands/${id}`, { method: 'DELETE' }); load() } }
+  const editBrand = async (id: string, patch: { name: string; website: string; tone: string }) => {
+    await fetch(`/api/brands/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })
+    load()
+  }
   const addProduct = async (brandId: string, name: string, price: string, imageUrl: string) => {
     await fetch(`/api/brands/${brandId}`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -100,26 +108,50 @@ export default function BrandsPage() {
 
       {loading ? <div style={{ color: '#9ca3af' }}>Loading…</div>
         : brands.length === 0 ? <div style={{ ...card, color: '#9ca3af', textAlign: 'center' }}>No brands yet — create your first to start cloning ads.</div>
-        : brands.map(b => <BrandCard key={b.id} brand={b} onDelete={() => delBrand(b.id)} onAddProduct={addProduct} onDelProduct={delProduct} />)}
+        : brands.map(b => <BrandCard key={b.id} brand={b} onDelete={() => delBrand(b.id)} onEdit={editBrand} onAddProduct={addProduct} onDelProduct={delProduct} />)}
     </div>
   )
 }
 
-function BrandCard({ brand, onDelete, onAddProduct, onDelProduct }: {
+function BrandCard({ brand, onDelete, onEdit, onAddProduct, onDelProduct }: {
   brand: Brand; onDelete: () => void
+  onEdit: (id: string, patch: { name: string; website: string; tone: string }) => void
   onAddProduct: (b: string, n: string, p: string, i: string) => void
   onDelProduct: (b: string, p: string) => void
 }) {
   const [p, setP] = useState({ name: '', price: '', image: '' })
+  const [editing, setEditing] = useState(false)
+  const [ef, setEf] = useState({ name: brand.name, website: brand.website || '', tone: brand.tone || '' })
+  const resetEf = () => setEf({ name: brand.name, website: brand.website || '', tone: brand.tone || '' })
   return (
     <div style={{ ...card, marginBottom: 14 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{brand.name}</div>
-          {brand.website && <div style={{ fontSize: 12, color: '#6b7280' }}>{brand.website}</div>}
-          {brand.tone && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Tone: {brand.tone}</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        {editing ? (
+          <div style={{ flex: 1 }}>
+            <input style={input} placeholder="Brand name" value={ef.name} onChange={e => setEf({ ...ef, name: e.target.value })} />
+            <input style={input} placeholder="Website (https://…)" value={ef.website} onChange={e => setEf({ ...ef, website: e.target.value })} />
+            <input style={{ ...input, marginBottom: 0 }} placeholder="Tone (e.g. bold, playful, warm)" value={ef.tone} onChange={e => setEf({ ...ef, tone: e.target.value })} />
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{brand.name}</div>
+            {brand.website && <div style={{ fontSize: 12, color: '#6b7280' }}>{brand.website}</div>}
+            {brand.tone && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Tone: {brand.tone}</div>}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
+          {editing ? (
+            <>
+              <button onClick={() => { if (ef.name.trim()) { onEdit(brand.id, ef); setEditing(false) } }} style={{ background: 'none', border: 'none', color: '#16a34a', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Save</button>
+              <button onClick={() => { resetEf(); setEditing(false) }} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Cancel</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { resetEf(); setEditing(true) }} style={{ background: 'none', border: 'none', color: '#1a3a1a', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Edit</button>
+              <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Delete</button>
+            </>
+          )}
         </div>
-        <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Delete</button>
       </div>
       {brand.usps?.length > 0 && <div style={{ fontSize: 12, color: '#374151', marginTop: 6 }}>USPs: {brand.usps.join(' · ')}</div>}
 
@@ -127,7 +159,7 @@ function BrandCard({ brand, onDelete, onAddProduct, onDelProduct }: {
         <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8 }}>PRODUCTS ({brand.products?.length || 0})</div>
         {brand.products?.map(pr => (
           <div key={pr.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-            {pr.image_urls?.[0] && <img src={pr.image_urls[0]} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} />}
+            {pr.image_urls?.[0] && <img src={cdn(pr.image_urls[0])} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} />}
             <div style={{ flex: 1, fontSize: 13 }}>{pr.name} {pr.price && <span style={{ color: '#6b7280' }}>· {pr.price}</span>}</div>
             <button onClick={() => onDelProduct(brand.id, pr.id)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 11 }}>remove</button>
           </div>
