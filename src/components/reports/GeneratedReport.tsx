@@ -6,8 +6,9 @@
  * AI analysis (Mello), and Save / Share. onSave persists via the reports page (Stage 3).
  */
 import { useState, useEffect, useCallback } from 'react'
-import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, type MetricKey, type GroupByKey } from '@/lib/reports/templates'
+import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, type MetricKey, type GroupByKey, type ReportFilter } from '@/lib/reports/templates'
 import ShareMenu from './ShareMenu'
+import ReportFilters from './ReportFilters'
 
 const ALL_METRICS = Object.keys(METRICS) as MetricKey[]
 
@@ -49,6 +50,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [sort, setSort] = useState<MetricKey>(ic.sort || tpl?.sort || 'spend')
   const [dir, setDir] = useState<'asc' | 'desc'>(ic.dir || tpl?.sortDir || 'desc')
   const [view, setView] = useState<'card' | 'table'>(ic.view || 'table')
+  const [filters, setFilters] = useState<ReportFilter[]>((ic as any).filters || [])
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -67,6 +69,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
     setLoading(true); setError('')
     try {
       const p = new URLSearchParams({ template: templateKey, dateRange, groupBy, sort, dir, metrics: metrics.join(',') })
+      if (filters.length) p.set('filters', JSON.stringify(filters))
       const res = await fetch(`/api/reports/generate?${p}`)
       const json = await res.json()
       if (json.error && !json.rows?.length) setError(json.error === 'no_account' ? 'Connect a Meta ad account to build this report.' : json.error)
@@ -74,7 +77,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       setAiText('') // stale once controls change
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
-  }, [templateKey, dateRange, groupBy, sort, dir, metrics])
+  }, [templateKey, dateRange, groupBy, sort, dir, metrics, filters])
 
   useEffect(() => { load() }, [load])
 
@@ -105,7 +108,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const doSave = async () => {
     if (!onSave) return
     setSaving(true)
-    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view } })
+    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters } })
     setSaving(false)
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) }
   }
@@ -203,6 +206,11 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             <button key={v} onClick={() => setView(v)} style={{ padding: '5px 12px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 700, fontSize: 11.5, cursor: 'pointer', background: view === v ? '#1a3a1a' : 'transparent', color: view === v ? '#dffe95' : '#5a7a5a' }}>{v === 'table' ? '☰ Table' : '▦ Cards'}</button>
           ))}
         </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ marginBottom: 14 }}>
+        <ReportFilters filters={filters} onChange={setFilters} />
       </div>
 
       {/* AI tagging progress — grouping by an AI dimension tags the top ads first (cached), then more on demand. */}

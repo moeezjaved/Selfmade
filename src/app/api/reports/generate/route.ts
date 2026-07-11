@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveScopedAccount } from '@/lib/meta/scope'
 import { decryptToken } from '@/lib/meta/client'
-import { TEMPLATE_BY_KEY, GROUP_BY, METRICS, type GroupByKey, type MetricKey, type ReportTemplate } from '@/lib/reports/templates'
+import { TEMPLATE_BY_KEY, GROUP_BY, METRICS, type GroupByKey, type MetricKey, type ReportTemplate, type ReportFilter, type FilterOp } from '@/lib/reports/templates'
 import { ensureTags, isTagDimension, type TagInput, type CreativeTags } from '@/lib/reports/tagging'
 
 export const dynamic = 'force-dynamic'
@@ -95,6 +95,12 @@ export async function GET(req: NextRequest) {
   const cols = (reqMetrics.length ? reqMetrics : tpl.metrics).filter(m => !!METRICS[m])
   const sort = (sp.get('sort') as MetricKey) || tpl.sort
   const dir = (sp.get('dir') as 'asc' | 'desc') || tpl.sortDir
+  let filters: ReportFilter[] = []
+  try { const f = JSON.parse(sp.get('filters') || '[]'); if (Array.isArray(f)) filters = f } catch {}
+  const statusFilter = filters.find(f => f.field === 'status')
+  const metricFilters = filters.filter(f => f.field !== 'status' && METRICS[f.field as MetricKey])
+  const passOp = (a: number, op: FilterOp, b: number) =>
+    op === '>' ? a > b : op === '<' ? a < b : op === '>=' ? a >= b : op === '<=' ? a <= b : a === b
 
   let metaAccount: any
   try { metaAccount = await resolveScopedAccount(admin, user.id) } catch { metaAccount = null }
@@ -120,7 +126,7 @@ export async function GET(req: NextRequest) {
     const insights: any[] = insJson.data || []
 
     // 2) Ad objects — creative preview, format, landing page, launch date. Matched by ad id.
-    const adRes = await fetch(`https://graph.facebook.com/${V}/${act}/ads?fields=id,name,created_time,creative{thumbnail_url,object_story_spec,video_id,image_url,image_hash,asset_feed_spec}&limit=500&effective_status=["ACTIVE","PAUSED","ARCHIVED","IN_PROCESS","WITH_ISSUES"]&access_token=${token}`)
+    const adRes = await fetch(`https://graph.facebook.com/${V}/${act}/ads?fields=id,name,created_time,effective_status,creative{thumbnail_url,object_story_spec,video_id,image_url,image_hash,asset_feed_spec}&limit=500&effective_status=["ACTIVE","PAUSED","ARCHIVED","IN_PROCESS","WITH_ISSUES","CAMPAIGN_PAUSED","ADSET_PAUSED"]&access_token=${token}`)
     const adJson = await adRes.json().catch(() => ({}))
     const adMeta = new Map<string, any>()
     for (const a of (adJson.data || [])) {
@@ -133,6 +139,8 @@ export async function GET(req: NextRequest) {
         launchDate: a.created_time ? String(a.created_time).slice(0, 10) : null,
         primaryText: spec?.link_data?.message || spec?.video_data?.message || afs?.bodies?.[0]?.text || null,
         headline: spec?.link_data?.name || spec?.video_data?.title || afs?.titles?.[0]?.text || null,
+        // Normalize Meta's effective_status to active | paused | archived for the status filter.
+        status: /ARCHIV/.test(a.effective_status) ? 'archived' : /ACTIVE/.test(a.effective_status) ? 'active' : 'paused',
       })
     }
 
@@ -177,6 +185,8 @@ export async function GET(req: NextRequest) {
       // Format filter (video-only / image-only templates).
       if (tpl.onlyFormat === 'video' && meta.format !== 'video') continue
       if (tpl.onlyFormat === 'image' && !(meta.format === 'image' || meta.format === 'carousel')) continue
+      // Ad-status filter (per-ad, applied before grouping).
+      if (statusFilter && (meta.status || 'paused') !== statusFilter.value) continue
       const { key, name } = keyOf(ins, meta)
       let row = groups.get(key)
       if (!row) {
@@ -211,6 +221,8 @@ export async function GET(req: NextRequest) {
       const medSpend = spends[Math.floor(spends.length / 2)]
       rows = rows.filter(r => metricValue(r, 'roas') >= 1 && r.spend <= medSpend && r.conversions > 0)
     }
+    // Metric filters (on grouped rows) — Net Results below reflects the filtered set.
+    for (const f of metricFilters) rows = rows.filter(r => passOp(metricValue(r, f.field as MetricKey), f.op, Number(f.value)))
     const shaped = rows.map(r => {
       const m: Record<string, number> = {}
       for (const k of cols) m[k] = metricValue(r, k)

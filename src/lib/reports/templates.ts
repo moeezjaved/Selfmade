@@ -76,6 +76,13 @@ export const GROUP_BY: { key: GroupByKey; label: string; ai?: boolean }[] = [
 ]
 export const AI_GROUP_BY = GROUP_BY.filter(g => g.ai)
 
+// ── Filters ──
+export type FilterOp = '>' | '<' | '>=' | '<=' | '='
+export const FILTER_OPS: FilterOp[] = ['>', '<', '>=', '<=', '=']
+/** A filter on a computed metric (numeric) or the ad `status` (string equality). */
+export type ReportFilter = { field: MetricKey | 'status'; op: FilterOp; value: number | string }
+export const AD_STATUSES = ['active', 'paused', 'archived'] as const
+
 export type ReportCategory = 'Find winners' | 'Find problems' | 'Creative strategy' | 'Understand performance'
 
 export type ReportTemplate = {
