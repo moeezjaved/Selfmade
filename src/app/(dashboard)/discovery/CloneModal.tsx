@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom'
 import { X, Upload, Link2, Loader2, Download, Sparkles, Check, Library } from 'lucide-react'
 import { flyToCreatives } from '@/lib/flyToCreatives'
 import { creativeFilename } from '@/lib/filename'
+import CloneGeneration from '@/components/motion/CloneGeneration'
 
 type Photo = { id: string; src: string; label?: string } // src = data: URL (upload) or http URL (detected/brand)
 type Brand = { id: string; name: string; website?: string | null; products?: { image_urls?: string[] }[] }
@@ -260,6 +261,11 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#8aa', cursor: 'pointer' }}><X size={20} /></button>
         </div>
 
+        {busy && !hasResults ? (
+          <div style={{ background: '#f6f7f5', borderRadius: '0 0 16px 16px' }}>
+            <CloneGeneration helper="Cloning your ad · ~15–40 seconds · keep browsing" />
+          </div>
+        ) : (
         <div style={{ display: 'grid', gridTemplateColumns: hasResults ? '1fr 1fr' : '1fr', gap: 0 }}>
           {/* ── controls ── */}
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -436,6 +442,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
             </div>
           )}
         </div>
+        )}
       </div>
       <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>,
