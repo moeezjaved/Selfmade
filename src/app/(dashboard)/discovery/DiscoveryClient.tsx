@@ -1832,7 +1832,7 @@ export default function DiscoveryPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
           <div style={{ marginRight: 4, flexShrink: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>Ad Discovery</div>
-            <div style={{ fontSize: 11, color: '#6b7280' }}>Browse live ads from Meta Ads Library</div>
+            <div style={{ fontSize: 11, color: '#6b7280' }}>Live creative intelligence from Meta</div>
           </div>
 
           {/* Sub-nav tabs */}
