@@ -35,18 +35,31 @@ export default function DashboardPage() {
   const [winners, setWinners] = useState<any[]>([])
   const [winnersLoading, setWinnersLoading] = useState(true)
   const [liveCampaigns, setLiveCampaigns] = useState<any[]>([])
+  const [noAccount, setNoAccount] = useState(false)
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // Get primary account
-    const { data: primaryAccount } = await supabase
+    // Only ACTIVE accounts count — pruned/removed ones (status != 'active') must
+    // not keep the dashboard alive with stale cached campaigns.
+    const { data: activeAccounts } = await supabase
       .from('meta_accounts')
-      .select('id,account_id,account_name,last_synced_at,currency')
+      .select('id,account_id,account_name,last_synced_at,currency,is_primary')
       .eq('user_id', user.id)
-      .eq('is_primary', true)
-      .single()
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false })
+
+    if (!activeAccounts || activeAccounts.length === 0) {
+      // No ad account connected → clean empty state, never phantom data.
+      setNoAccount(true)
+      setData({ campaigns: [], recommendations: [], accountInsights: null, lastSynced: null })
+      setWinners([]); setLiveCampaigns([]); setWinnersLoading(false)
+      setLoading(false)
+      return
+    }
+    setNoAccount(false)
+    const primaryAccount = activeAccounts.find((a: any) => a.is_primary) || activeAccounts[0]
 
     if (primaryAccount?.currency) setCurrency(primaryAccount.currency)
 
@@ -239,6 +252,31 @@ export default function DashboardPage() {
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-24 bg-dark2 rounded-2xl shimmer"/>
           ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (noAccount) {
+    return (
+      <div className="p-8">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight" style={{color:"#1a3a1a"}}>Dashboard</h1>
+            <p className="text-sm mt-0.5" style={{color:"#8aaa8a"}}>No ad account connected</p>
+          </div>
+        </div>
+        <div style={{background:'#fff',border:'1px solid #e2ecdf',borderRadius:20,padding:'56px 32px',textAlign:'center',maxWidth:540,margin:'32px auto'}}>
+          <div style={{width:56,height:56,borderRadius:16,background:'#f0f7e6',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px'}}>
+            <Zap size={26} style={{color:'#1a3a1a'}}/>
+          </div>
+          <h2 style={{fontSize:20,fontWeight:800,color:'#1a3a1a',marginBottom:8}}>No ad account connected</h2>
+          <p style={{fontSize:14,color:'#6f8a6f',marginBottom:24,lineHeight:1.5,maxWidth:400,marginLeft:'auto',marginRight:'auto'}}>
+            Connect your Meta account to see spend, ROAS, and live campaign performance here.
+          </p>
+          <a href="/connect-meta" style={{display:'inline-flex',alignItems:'center',gap:8,background:'#dffe95',color:'#0e1b12',fontWeight:800,fontSize:14,padding:'12px 22px',borderRadius:12,textDecoration:'none'}}>
+            <Zap size={15}/> Connect Meta account
+          </a>
         </div>
       </div>
     )
