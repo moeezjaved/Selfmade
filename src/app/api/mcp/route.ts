@@ -56,6 +56,8 @@ const ADCOLS = 'ad_id, page_id, page_name, body, title, niche, hook_type, emotio
 function shapeAd(r: any) {
   const c = (r.discovery_creatives || []).slice().sort((a: any, b: any) => (a.position || 0) - (b.position || 0))
     .find((x: any) => (x.asset_type === 'video' ? x.poster_url : x.r2_url))
+  // The video mp4 itself (r2_url of a video creative), so MCP clients can pull/clone the actual video.
+  const vid = (r.discovery_creatives || []).find((x: any) => x.asset_type === 'video' && x.r2_url)
   return {
     ad_id: r.ad_id, brand: r.page_name || 'Brand', niche: r.niche || null,
     hook_type: r.hook_type || null, format_style: r.format_style || null,
@@ -64,6 +66,7 @@ function shapeAd(r: any) {
     performance_score: Math.round((Number(r.performance_score) || 0) * 100),
     days_running: r.days_running ?? null, active: !!r.is_active,
     image: c ? img(c.asset_type === 'video' ? c.poster_url : c.r2_url) : null,
+    video_url: vid?.r2_url || null,
     permalink: `${SITE}/discovery?ad=${r.ad_id}`,
   }
 }
