@@ -374,6 +374,44 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
   )
 }
 
+// ── MoreFilters ──────────────────────────────────────────────
+// Atria-style: keep only the core filters on the toolbar and tuck the advanced/rarely-used ones
+// (creative-DNA + numeric thresholds) behind one "More filters" popover, so the bar stays a single
+// clean row instead of wrapping into a cluttered 2–3 rows.
+function MoreFilters({ count, children }: { count: number; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+          background: count ? '#1a3a1a' : '#fff', border: `1px solid ${count ? '#1a3a1a' : '#e2e8f0'}`,
+          borderRadius: 8, fontSize: 13, fontWeight: 600, color: count ? '#dffe95' : '#374151',
+          cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+        More filters
+        {count > 0 && <span style={{ background: '#dffe95', color: '#1a3a1a', borderRadius: 100, fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>{count}</span>}
+        <span style={{ fontSize: 10, opacity: 0.5 }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 6, background: '#fff',
+          border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 14px 40px rgba(0,0,0,0.16)',
+          zIndex: 1000, padding: 14, width: 'min(620px,92vw)' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#9ca3af', marginBottom: 10 }}>More filters</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            {children}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── SortDropdown ─────────────────────────────────────────────
 function SortDropdown({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -2007,9 +2045,10 @@ export default function DiscoveryPage() {
           ))}
         </div>
 
-        {/* Row 2: filters — time buttons + country + format etc all on one line */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Time filter (inline) */}
+        {/* Filter toolbar — Atria-style: time + a few CORE dropdowns on one clean line, everything
+            else tucked behind "More filters", Sort pinned right. */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Time filter (segmented) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '2px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', flexShrink: 0 }}>
             {[
               { label: 'All time', days: 0 },
@@ -2033,28 +2072,12 @@ export default function DiscoveryPage() {
 
           <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
 
-          {/* Country filter removed — we crawl worldwide (country=ALL); per-country
-              filtering isn't active, so the selector was misleading. `country` stays
-              'ALL' in state so the search query is unchanged. */}
-
+          {/* CORE filters (kept on the bar) */}
           <FilterDropdown
             label="Performance"
             options={TIER_OPTS}
             selected={tiers} onToggle={toggle(setTiers)} onClear={() => setTiers([])}
           />
-          <FilterDropdown
-            label="Niche"
-            options={NICHE_OPTS}
-            selected={niches} onToggle={toggle(setNiches)} onClear={() => setNiches([])}
-            searchable
-          />
-          <FilterDropdown label="Hook" options={HOOK_OPTS} selected={hookTypes} onToggle={toggle(setHookTypes)} onClear={() => setHookTypes([])} searchable />
-          <FilterDropdown label="Emotion" options={EMOTION_OPTS} selected={emotions} onToggle={toggle(setEmotions)} onClear={() => setEmotions([])} />
-          <FilterDropdown label="Angle" options={ANGLE_OPTS} selected={angles} onToggle={toggle(setAngles)} onClear={() => setAngles([])} />
-          <FilterDropdown label="UGC / Studio" options={FORMATSTYLE_OPTS} selected={formatStyles} onToggle={toggle(setFormatStyles)} onClear={() => setFormatStyles([])} />
-          <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable />
-          {/* CTA style filter hidden — the cta_style column is 0% populated (classifier hasn't
-              emitted it yet), so it only ever returned "No ads match". Re-enable once populated. */}
           <FilterDropdown
             label="Format"
             options={FORMAT_OPTS.map(f => ({ value: f, label: f, icon: f === 'Video' ? '🎬' : f === 'Carousel' ? '🔁' : '🖼' }))}
@@ -2078,26 +2101,26 @@ export default function DiscoveryPage() {
             onToggle={v => setStatus(prev => prev === v ? 'ALL' : v)}
             onClear={() => setStatus('ALL')}
           />
-          {/* Language filter hidden — the `languages` column is ~0.1% populated (Meta sends no
-              language field; needs text detection), so it returned "No ads match". Re-enable
-              once a language-detection backfill fills the column. */}
-          <FilterDropdown
-            label="Theme"
-            options={THEME_LIST.map(t => ({ value: t, label: t }))}
-            selected={theme} onToggle={toggle(setTheme)} onClear={() => setTheme([])}
-            searchable
-          />
 
-          <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
-
-          {/* Run-time minimum — days_running ≥ N (server-side) */}
-          <NumberInput label="Run ≥ days" value={minDaysStr} onChange={setMinDaysStr} placeholder="0" />
-          {/* Brand active-ad count — brand_active_ads ≥ N (server-side) */}
-          <NumberInput label="Brand ads ≥" value={minBrandAdsStr} onChange={setMinBrandAdsStr} placeholder="0" />
-          {/* Creative reuse — creative_reuse_count ≥ N (server-side) */}
-          <NumberInput label="Reuse ≥" value={minReuseStr} onChange={setMinReuseStr} placeholder="0" />
-          {/* Limit ads per brand (GetHookd "Limit ads per brand"; default cap 3) */}
-          <NumberInput label="Ads/brand" value={adsPerBrandStr} onChange={setAdsPerBrandStr} placeholder="3" />
+          {/* ADVANCED filters — creative-DNA + numeric thresholds — behind one popover.
+              Country/CTA/Language filters stay retired (columns unpopulated). */}
+          <MoreFilters count={
+            niches.length + hookTypes.length + emotions.length + angles.length + formatStyles.length + visualStyles.length + theme.length
+            + [minDaysStr, minBrandAdsStr, minReuseStr].filter(Boolean).length
+          }>
+            <FilterDropdown label="Niche" options={NICHE_OPTS} selected={niches} onToggle={toggle(setNiches)} onClear={() => setNiches([])} searchable />
+            <FilterDropdown label="Hook" options={HOOK_OPTS} selected={hookTypes} onToggle={toggle(setHookTypes)} onClear={() => setHookTypes([])} searchable />
+            <FilterDropdown label="Emotion" options={EMOTION_OPTS} selected={emotions} onToggle={toggle(setEmotions)} onClear={() => setEmotions([])} />
+            <FilterDropdown label="Angle" options={ANGLE_OPTS} selected={angles} onToggle={toggle(setAngles)} onClear={() => setAngles([])} />
+            <FilterDropdown label="UGC / Studio" options={FORMATSTYLE_OPTS} selected={formatStyles} onToggle={toggle(setFormatStyles)} onClear={() => setFormatStyles([])} />
+            <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable />
+            <FilterDropdown label="Theme" options={THEME_LIST.map(t => ({ value: t, label: t }))} selected={theme} onToggle={toggle(setTheme)} onClear={() => setTheme([])} searchable />
+            <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
+            <NumberInput label="Run ≥ days" value={minDaysStr} onChange={setMinDaysStr} placeholder="0" />
+            <NumberInput label="Brand ads ≥" value={minBrandAdsStr} onChange={setMinBrandAdsStr} placeholder="0" />
+            <NumberInput label="Reuse ≥" value={minReuseStr} onChange={setMinReuseStr} placeholder="0" />
+            <NumberInput label="Ads/brand" value={adsPerBrandStr} onChange={setAdsPerBrandStr} placeholder="3" />
+          </MoreFilters>
 
           {/* Clear all */}
           {activeFilterCount > 0 && (

@@ -13,8 +13,8 @@ import type { UserProfile } from '@/types'
 import {
   LayoutDashboard, Megaphone, Sparkles, TrendingUp,
   ClipboardList, Settings, CreditCard, BarChart2,
-  Rocket, LogOut, Compass, Bookmark, Heart, Star, Store, Radar, Wand2, Flame, Users, Library,
-  Menu, X, Check, LifeBuoy, ChevronsUpDown, Zap,
+  Rocket, LogOut, Compass, Bookmark, Heart, Star, Store, Wand2, Flame, Users,
+  Menu, X, Check, LifeBuoy, ChevronsUpDown, Zap, Target, Film,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -25,11 +25,11 @@ const AREAS = [
     key: 'discover', label: 'Ad Discovery', railIcon: Compass, defaultHref: '/discovery',
     items: [
       { href: '/discovery',            icon: Compass,   label: 'Discovery',     badge: 'NEW' },
-      { href: '/discovery/brand-spy',  icon: Radar,     label: 'Brand Spy',     badge: 'NEW' },
+      { href: '/discovery/brand-spy',  icon: Target,    label: 'Brand Spy',     badge: 'NEW' },
       { href: '/trending',             icon: Flame,     label: 'Trending',      badge: 'NEW' },
       { href: '/discovery/top-picks',  icon: Star,      label: 'Top Picks',     badge: null },
       { href: '/discovery/saved',      icon: Bookmark,  label: 'Boards',        badge: null },
-      { href: '/assets',               icon: Library,   label: 'Assets',        badge: 'NEW' },
+      { href: '/assets',               icon: Film,      label: 'Assets',        badge: 'NEW' },
       { href: '/discovery/following',  icon: Heart,     label: 'Following',      badge: null },
     ],
   },
@@ -195,15 +195,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Mello — the AI, pinned top */}
           <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent>
-            <Sparkles size={18}/>
+            <Sparkles size={19} strokeWidth={1.75}/>
           </RailIcon>
 
           <div style={{width:22,height:1,background:"rgba(255,255,255,0.08)",margin:"5px 0"}}/>
 
-          {/* Top areas */}
+          {/* Top areas — thin, uniform monoline stroke for a cleaner/premium look */}
           {AREAS.filter(a => a.key !== 'account').map(a => (
             <RailIcon key={a.key} href={a.defaultHref} title={a.label} active={!melloActive && activeArea.key === a.key}>
-              <a.railIcon size={18}/>
+              <a.railIcon size={19} strokeWidth={1.75}/>
             </RailIcon>
           ))}
 
@@ -211,7 +211,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Settings pinned bottom — a gear should go to Settings (not the Account/Dashboard area) */}
           <RailIcon href="/settings" title="Settings" active={!melloActive && pathname === '/settings'}>
-            <Settings size={18}/>
+            <Settings size={19} strokeWidth={1.75}/>
           </RailIcon>
         </div>
 
@@ -238,7 +238,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   data-nav={item.href === '/creative-studio' ? 'creatives' : undefined}
                   className={cn('sidebar-link', isActive && 'active')}
                 >
-                  <item.icon size={16} className="flex-shrink-0"/>
+                  <item.icon size={17} strokeWidth={1.75} className="flex-shrink-0"/>
                   <span className="flex-1">{item.label}</span>
                   {item.badge === 'AI' && (
                     <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 6px",borderRadius:99,background:"#dffe95",color:"#243d20"}}>AI</span>
