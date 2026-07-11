@@ -1,8 +1,14 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { ExternalLink, ArrowLeft, Bookmark } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
+import CloneModal from '../../CloneModal'
+import CloneVideoModal from '../../CloneVideoModal'
+
+const FMT_BADGE: Record<string, string> = { Video: '#2075ff', Image: '#10b981', Carousel: '#f59e0b' }
+const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' }) : '—')
+const FILTER_BTN = (on: boolean): React.CSSProperties => ({ fontSize: 13, fontWeight: 700, padding: '7px 12px', borderRadius: 8, border: '1px solid #e6e6e6', background: on ? 'rgba(223,254,149,0.5)' : '#fff', cursor: 'pointer', color: '#111', fontFamily: 'inherit' })
 
 // ── Types ────────────────────────────────────────────────────
 interface Ad {
@@ -51,55 +57,32 @@ function Shimmer({ width = '100%', height = 16 }: { width?: string | number; hei
   return <div style={{ width, height, background: '#e2e8f0', borderRadius: 6 }} className="shimmer" />
 }
 
-// ── Ad Mini Card ─────────────────────────────────────────────
-function MiniAdCard({ ad }: { ad: Ad }) {
-  const initials = ad.pageName?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'
+// ── Ad Card (Brand-Spy-style: header + Live badge + media + format/days badge + Clone) ──
+function MiniAdCard({ ad, onClone }: { ad: Ad; onClone?: (ad: Ad) => void }) {
   const [imgFailed, setImgFailed] = useState(false)
-  const thumb = ad.thumbnailUrl || null
-  const isVideo = getFormat(ad.mediaType) === 'Video'
-  const title = cleanCopy(ad.title)
+  const fmt = getFormat(ad.mediaType)
+  const isVideo = fmt === 'Video' || !!ad.videoUrl
+  const img = ad.thumbnailUrl || null
   const body = cleanCopy(ad.body, ad.title)
   return (
-    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.08)')}
-      onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}>
-      <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #f1f5f9' }}>
-        <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#1a3a1a', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{initials}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.pageName}</div>
-          <div style={{ fontSize: 10, color: '#6b7280', display: 'flex', gap: 4, alignItems: 'center' }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#9ca3af', display: 'inline-block' }} />
-            {ad.daysRunning}d · {getFormat(ad.mediaType)}
-          </div>
-        </div>
-        <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#9ca3af' }}>
-          <ExternalLink size={12} />
-        </a>
+    <div style={{ textAlign: 'left', background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
+        <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#2075ff', flexShrink: 0 }}>{(ad.pageName || '?')[0]?.toUpperCase()}</div>
+        <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.pageName}</div>
+        <span style={{ fontSize: 11, fontWeight: 700, color: ad.isActive ? '#16a34a' : '#9ca3af' }}>{ad.isActive ? '● Live' : 'Off'}</span>
       </div>
-      {/* Media = the real creative thumbnail (R2 image). Meta blocks iframing its Ad Library, so we
-          never iframe snapshotUrl — that was the broken-image box. Click still opens the original. */}
-      <div style={{ position: 'relative', height: 220, background: '#f1f5f9', overflow: 'hidden' }}>
-        {thumb && !imgFailed ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumb} alt="" loading="lazy" onError={() => setImgFailed(true)}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12 }}>
-            <span style={{ fontSize: 22 }}>{isVideo ? '🎬' : '🖼'}</span>
-            {getFormat(ad.mediaType)} · open original
-          </div>
-        )}
-        {isVideo && thumb && !imgFailed && (
-          <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>▶</span>
-        )}
-        {ad.snapshotUrl && <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', inset: 0, zIndex: 2 }} />}
+      <div style={{ fontSize: 11, color: '#9ca3af', padding: '0 12px 8px' }}>{fmtDate(ad.startDate)}{ad.isActive ? ' – Present' : ad.stopDate ? ` – ${fmtDate(ad.stopDate)}` : ''}</div>
+      {body && <div style={{ fontSize: 12, color: '#374151', padding: '0 12px 8px', lineHeight: 1.4, maxHeight: 52, overflow: 'hidden' }}>{body.slice(0, 120)}</div>}
+      <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#f3f4f6' }}>
+        {img && !imgFailed
+          ? <img src={img} alt="" loading="lazy" onError={() => setImgFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c4c4c4', fontSize: 12 }}>no preview</div>}
+        {isVideo && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}><div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>▶</div></div>}
+        <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[fmt] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{fmt}</span>
+        {(ad.daysRunning || 0) > 0 && <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{ad.daysRunning}d</span>}
+        {ad.snapshotUrl && <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" title="Open original" style={{ position: 'absolute', inset: 0, zIndex: 1 }} />}
+        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(ad) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 2, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: '#111', border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Clone</button>}
       </div>
-      {(body || title) && (
-        <div style={{ padding: '8px 12px 10px' }}>
-          {title && <div style={{ fontSize: 11, fontWeight: 700, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{title}</div>}
-          {body && <div style={{ fontSize: 11, color: '#4b5563', lineHeight: 1.5, marginTop: 2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{body}</div>}
-        </div>
-      )}
     </div>
   )
 }
@@ -135,6 +118,25 @@ export default function BrandPage() {
   // Prefer an explicit ?name=, else the real page name from the loaded ads — so a direct visit to
   // /discovery/brand/<id> (e.g. from Following) shows the brand, not the placeholder "Brand".
   const pageName: string = searchParams.get('name') || (ads.find(a => (a as any).pageName && (a as any).pageName !== pageId) as any)?.pageName || 'Brand'
+
+  // Creatives-tab (ad library) filters — applied client-side over the loaded ads.
+  const [fDays, setFDays] = useState(0)
+  const [fFormat, setFFormat] = useState('')
+  const [fStatus, setFStatus] = useState('ALL')
+  const [fSort, setFSort] = useState('newest')
+  const [cloneImg, setCloneImg] = useState<Ad | null>(null)
+  const [cloneVid, setCloneVid] = useState<Ad | null>(null)
+  const filteredAds = useMemo(() => {
+    let arr = ads.slice()
+    if (fDays > 0) { const since = Date.now() - fDays * 86_400_000; arr = arr.filter(a => a.isActive || (a.startDate && new Date(a.startDate).getTime() >= since)) }
+    if (fFormat) arr = arr.filter(a => getFormat(a.mediaType).toLowerCase() === fFormat.toLowerCase())
+    if (fStatus === 'ACTIVE') arr = arr.filter(a => a.isActive)
+    else if (fStatus === 'INACTIVE') arr = arr.filter(a => !a.isActive)
+    if (fSort === 'longest') arr.sort((a, b) => (b.daysRunning || 0) - (a.daysRunning || 0))
+    else arr.sort((a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime()) // newest
+    return arr
+  }, [ads, fDays, fFormat, fStatus, fSort])
+  const openClone = (ad: Ad) => { if (getFormat(ad.mediaType) === 'Video' || ad.videoUrl) setCloneVid(ad); else setCloneImg(ad) }
 
   // Load ads
   const fetchAds = useCallback(async (reset = true, cursor?: string) => {
@@ -404,9 +406,25 @@ export default function BrandPage() {
             {/* ── CREATIVES ── */}
             {activeTab === 'Creatives' && (
               <div>
-                <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>{ads.length} ads loaded</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(240px,100%), 1fr))', gap: 14 }}>
-                  {ads.map(ad => <MiniAdCard key={ad.id} ad={ad} />)}
+                {/* Filter bar — time chips + Format + Status + Sort (Brand-Spy style) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                  {([[0, 'All time'], [7, '7d'], [30, '30d'], [90, '90d'], [180, '180d']] as [number, string][]).map(([d, l]) => (
+                    <button key={d} onClick={() => setFDays(d)} style={FILTER_BTN(fDays === d)}>{l}</button>
+                  ))}
+                  <div style={{ width: 1, height: 22, background: '#e6e6e6', margin: '0 2px' }} />
+                  <select value={fFormat} onChange={e => setFFormat(e.target.value)} style={{ ...FILTER_BTN(!!fFormat), appearance: 'auto' }}>
+                    {[['', 'Format · All'], ['Video', 'Video'], ['Image', 'Image'], ['Carousel', 'Carousel']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                  <select value={fStatus} onChange={e => setFStatus(e.target.value)} style={{ ...FILTER_BTN(fStatus !== 'ALL'), appearance: 'auto' }}>
+                    {[['ALL', 'Status · All'], ['ACTIVE', 'Live'], ['INACTIVE', 'Off']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                  <select value={fSort} onChange={e => setFSort(e.target.value)} style={{ ...FILTER_BTN(false), appearance: 'auto' }}>
+                    {[['newest', 'Newest'], ['longest', 'Longest running']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                  <div style={{ marginLeft: 'auto', fontSize: 13, color: '#6b7280' }}>{filteredAds.length.toLocaleString()} ads</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 12 }}>
+                  {filteredAds.map(ad => <MiniAdCard key={ad.id} ad={ad} onClone={openClone} />)}
                 </div>
                 {hasMore && (
                   <div style={{ textAlign: 'center', marginTop: 24 }}>
@@ -416,6 +434,8 @@ export default function BrandPage() {
                     </button>
                   </div>
                 )}
+                {cloneImg && <CloneModal ad={{ id: cloneImg.id, pageId, pageName: cloneImg.pageName, assetImageUrl: cloneImg.thumbnailUrl || undefined }} onClose={() => setCloneImg(null)} />}
+                {cloneVid && <CloneVideoModal sourceAdId={cloneVid.id} sourcePoster={cloneVid.thumbnailUrl || undefined} onClose={() => setCloneVid(null)} />}
               </div>
             )}
 
