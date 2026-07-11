@@ -374,56 +374,6 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
   )
 }
 
-// ── MoreFilters ──────────────────────────────────────────────
-// Atria-style: keep only the core filters on the toolbar and tuck the advanced/rarely-used ones
-// (creative-DNA + numeric thresholds) behind one "More filters" popover, so the bar stays a single
-// clean row instead of wrapping into a cluttered 2–3 rows.
-function MoreFilters({ count, children }: { count: number; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
-  const ref = useRef<HTMLDivElement>(null)
-  const btnRef = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [open])
-  const openPanel = () => {
-    const r = btnRef.current?.getBoundingClientRect()
-    if (r) {
-      // Clamp to the viewport so the panel never gets cut off at the right edge (or off-screen on mobile).
-      const width = Math.min(620, window.innerWidth - 16)
-      const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8))
-      setPos({ top: r.bottom + 6, left, width })
-    }
-    setOpen(o => !o)
-  }
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button ref={btnRef} onClick={openPanel}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
-          background: count ? '#1a3a1a' : '#fff', border: `1px solid ${count ? '#1a3a1a' : '#e2e8f0'}`,
-          borderRadius: 8, fontSize: 13, fontWeight: 600, color: count ? '#dffe95' : '#374151',
-          cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
-        More filters
-        {count > 0 && <span style={{ background: '#dffe95', color: '#1a3a1a', borderRadius: 100, fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>{count}</span>}
-        <span style={{ fontSize: 10, opacity: 0.5 }}>{open ? '▲' : '▼'}</span>
-      </button>
-      {open && pos && (
-        <div style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, background: '#fff',
-          border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 14px 40px rgba(0,0,0,0.16)',
-          zIndex: 1000, padding: 14, maxHeight: 'min(70vh, 460px)', overflowY: 'auto', boxSizing: 'border-box' }}>
-          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#9ca3af', marginBottom: 10 }}>More filters</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            {children}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── SortDropdown ─────────────────────────────────────────────
 function SortDropdown({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -2057,9 +2007,9 @@ export default function DiscoveryPage() {
           ))}
         </div>
 
-        {/* Filter toolbar — Atria-style: time + a few CORE dropdowns on one clean line, everything
-            else tucked behind "More filters", Sort pinned right. */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Filter toolbar — every filter visible, uniform + evenly spaced. Wraps to tidy rows on
+            narrower widths (rowGap gives each wrapped row breathing space). Sort pinned right. */}
+        <div style={{ display: 'flex', gap: 8, rowGap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Time filter (segmented) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '2px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', flexShrink: 0 }}>
             {[
@@ -2071,7 +2021,7 @@ export default function DiscoveryPage() {
             ].map(f => (
               <button key={f.days} onClick={() => setTimeDays(f.days)}
                 style={{
-                  padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                  padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
                   background: timeDays === f.days ? '#1a3a1a' : 'transparent',
                   color: timeDays === f.days ? '#dffe95' : '#6b7280',
                   border: 'none',
@@ -2082,57 +2032,27 @@ export default function DiscoveryPage() {
             ))}
           </div>
 
-          <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
+          {/* All filters inline — uniform dropdowns */}
+          <FilterDropdown label="Performance" options={TIER_OPTS} selected={tiers} onToggle={toggle(setTiers)} onClear={() => setTiers([])} />
+          <FilterDropdown label="Format" options={FORMAT_OPTS.map(f => ({ value: f, label: f, icon: f === 'Video' ? '🎬' : f === 'Carousel' ? '🔁' : '🖼' }))} selected={format} onToggle={toggle(setFormat)} onClear={() => setFormat([])} />
+          <FilterDropdown label="Platform" options={PLATFORM_OPTS.map(p => ({ value: p, label: PLATFORM_LABELS[p], icon: PLATFORM_ICONS[p] }))} selected={platforms} onToggle={toggle(setPlatforms)} onClear={() => setPlatforms([])} />
+          <FilterDropdown label="Industry" options={INDUSTRY_LIST.map(i => ({ value: i, label: i }))} selected={industry} onToggle={toggle(setIndustry)} onClear={() => setIndustry([])} searchable />
+          <FilterDropdown label="Status" options={STATUS_OPTS} selected={status !== 'ALL' ? [status] : []} onToggle={v => setStatus(prev => prev === v ? 'ALL' : v)} onClear={() => setStatus('ALL')} />
+          <FilterDropdown label="Niche" options={NICHE_OPTS} selected={niches} onToggle={toggle(setNiches)} onClear={() => setNiches([])} searchable />
+          <FilterDropdown label="Hook" options={HOOK_OPTS} selected={hookTypes} onToggle={toggle(setHookTypes)} onClear={() => setHookTypes([])} searchable />
+          <FilterDropdown label="Emotion" options={EMOTION_OPTS} selected={emotions} onToggle={toggle(setEmotions)} onClear={() => setEmotions([])} />
+          <FilterDropdown label="Angle" options={ANGLE_OPTS} selected={angles} onToggle={toggle(setAngles)} onClear={() => setAngles([])} />
+          <FilterDropdown label="UGC / Studio" options={FORMATSTYLE_OPTS} selected={formatStyles} onToggle={toggle(setFormatStyles)} onClear={() => setFormatStyles([])} />
+          <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable />
+          <FilterDropdown label="Theme" options={THEME_LIST.map(t => ({ value: t, label: t }))} selected={theme} onToggle={toggle(setTheme)} onClear={() => setTheme([])} searchable />
 
-          {/* CORE filters (kept on the bar) */}
-          <FilterDropdown
-            label="Performance"
-            options={TIER_OPTS}
-            selected={tiers} onToggle={toggle(setTiers)} onClear={() => setTiers([])}
-          />
-          <FilterDropdown
-            label="Format"
-            options={FORMAT_OPTS.map(f => ({ value: f, label: f, icon: f === 'Video' ? '🎬' : f === 'Carousel' ? '🔁' : '🖼' }))}
-            selected={format} onToggle={toggle(setFormat)} onClear={() => setFormat([])}
-          />
-          <FilterDropdown
-            label="Platform"
-            options={PLATFORM_OPTS.map(p => ({ value: p, label: PLATFORM_LABELS[p], icon: PLATFORM_ICONS[p] }))}
-            selected={platforms} onToggle={toggle(setPlatforms)} onClear={() => setPlatforms([])}
-          />
-          <FilterDropdown
-            label="Industry"
-            options={INDUSTRY_LIST.map(i => ({ value: i, label: i }))}
-            selected={industry} onToggle={toggle(setIndustry)} onClear={() => setIndustry([])}
-            searchable
-          />
-          <FilterDropdown
-            label="Status"
-            options={STATUS_OPTS}
-            selected={status !== 'ALL' ? [status] : []}
-            onToggle={v => setStatus(prev => prev === v ? 'ALL' : v)}
-            onClear={() => setStatus('ALL')}
-          />
-
-          {/* ADVANCED filters — creative-DNA + numeric thresholds — behind one popover.
-              Country/CTA/Language filters stay retired (columns unpopulated). */}
-          <MoreFilters count={
-            niches.length + hookTypes.length + emotions.length + angles.length + formatStyles.length + visualStyles.length + theme.length
-            + [minDaysStr, minBrandAdsStr, minReuseStr].filter(Boolean).length
-          }>
-            <FilterDropdown label="Niche" options={NICHE_OPTS} selected={niches} onToggle={toggle(setNiches)} onClear={() => setNiches([])} searchable />
-            <FilterDropdown label="Hook" options={HOOK_OPTS} selected={hookTypes} onToggle={toggle(setHookTypes)} onClear={() => setHookTypes([])} searchable />
-            <FilterDropdown label="Emotion" options={EMOTION_OPTS} selected={emotions} onToggle={toggle(setEmotions)} onClear={() => setEmotions([])} />
-            <FilterDropdown label="Angle" options={ANGLE_OPTS} selected={angles} onToggle={toggle(setAngles)} onClear={() => setAngles([])} />
-            <FilterDropdown label="UGC / Studio" options={FORMATSTYLE_OPTS} selected={formatStyles} onToggle={toggle(setFormatStyles)} onClear={() => setFormatStyles([])} />
-            <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable />
-            <FilterDropdown label="Theme" options={THEME_LIST.map(t => ({ value: t, label: t }))} selected={theme} onToggle={toggle(setTheme)} onClear={() => setTheme([])} searchable />
-            <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
+          {/* Numeric thresholds — grouped in a subtle container so they read as one set, not scattered */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, flexShrink: 0 }}>
             <NumberInput label="Run ≥ days" value={minDaysStr} onChange={setMinDaysStr} placeholder="0" />
             <NumberInput label="Brand ads ≥" value={minBrandAdsStr} onChange={setMinBrandAdsStr} placeholder="0" />
             <NumberInput label="Reuse ≥" value={minReuseStr} onChange={setMinReuseStr} placeholder="0" />
             <NumberInput label="Ads/brand" value={adsPerBrandStr} onChange={setAdsPerBrandStr} placeholder="3" />
-          </MoreFilters>
+          </div>
 
           {/* Clear all */}
           {activeFilterCount > 0 && (

@@ -25,7 +25,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 // Two-rail nav: each AREA is one icon in the thin rail; its `items` fill the panel.
 const AREAS = [
   {
-    key: 'discover', label: 'Ad Discovery', railIcon: RiCompass3Fill, defaultHref: '/discovery',
+    key: 'discover', label: 'Ad Discovery', railLabel: 'Discovery', railIcon: RiCompass3Fill, defaultHref: '/discovery',
     items: [
       { href: '/discovery',            icon: RiCompass3Fill,  label: 'Discovery',     badge: 'NEW' },
       { href: '/discovery/brand-spy',  icon: RiFocus3Fill,    label: 'Brand Spy',     badge: 'NEW' },
@@ -37,7 +37,7 @@ const AREAS = [
     ],
   },
   {
-    key: 'analytics', label: 'Analytics & Launch', railIcon: RiRocketFill, defaultHref: '/m4',
+    key: 'analytics', label: 'Analytics & Launch', railLabel: 'Launch', railIcon: RiRocketFill, defaultHref: '/m4',
     items: [
       { href: '/m4',         icon: RiRocketFill,      label: 'Launch Ads',       badge: 'AI' },
       { href: '/campaigns',  icon: RiMegaphoneFill,   label: 'Campaigns',        badge: null },
@@ -46,7 +46,7 @@ const AREAS = [
     ],
   },
   {
-    key: 'create', label: 'AI Gen', railIcon: RiMagicFill, defaultHref: '/creative-studio',
+    key: 'create', label: 'AI Gen', railLabel: 'AI Gen', railIcon: RiMagicFill, defaultHref: '/creative-studio',
     items: [
       { href: '/creative-studio?studio=1', icon: RiMagicFill,      label: 'Create Ad',  badge: 'NEW' },
       { href: '/creative-studio', icon: RiSparkling2Fill, label: 'My Creatives', badge: null },
@@ -67,13 +67,14 @@ const AREAS = [
 ]
 
 // Thin-rail icon button (icon-only, tooltip on hover).
-function RailIcon({ href, active, title, accent, children }: {
-  href: string; active: boolean; title: string; accent?: boolean; children: React.ReactNode
+function RailIcon({ href, active, title, accent, label, children }: {
+  href: string; active: boolean; title: string; accent?: boolean; label?: string; children: React.ReactNode
 }) {
   return (
     <Link href={href} title={title} aria-label={title}
       className={cn('rail-icon', accent && 'accent', active && 'active')}>
       {children}
+      {label && <span className="rail-label">{label}</span>}
     </Link>
   )
 }
@@ -190,31 +191,31 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </button>
         )}
 
-        {/* Rail 1 — thin icon rail */}
-        <div style={{width:56,flexShrink:0,background:"#1c2f19",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 0",gap:5}}>
-          <Link href="/dashboard" title="Home" style={{marginBottom:8}}>
+        {/* Rail 1 — icon rail with labels below (Atria-style) */}
+        <div style={{width:68,flexShrink:0,background:"#1c2f19",borderRight:"1px solid rgba(223,254,149,0.08)",display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 0",gap:3}}>
+          <Link href="/dashboard" title="Home" style={{marginBottom:10}}>
             <div style={{width:32,height:32,borderRadius:9,background:"#dffe95",color:"#243d20",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:18,fontStyle:"italic",fontFamily:"Georgia,serif"}}>S</div>
           </Link>
 
           {/* Mello — the AI, pinned top */}
-          <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent>
-            <RiSparkling2Fill size={19}/>
+          <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent label="Mello">
+            <RiSparkling2Fill size={20}/>
           </RailIcon>
 
-          <div style={{width:22,height:1,background:"rgba(255,255,255,0.08)",margin:"5px 0"}}/>
+          <div style={{width:30,height:1,background:"rgba(255,255,255,0.08)",margin:"5px 0"}}/>
 
-          {/* Top areas — thin, uniform monoline stroke for a cleaner/premium look */}
+          {/* Top areas — icon + label below */}
           {AREAS.filter(a => a.key !== 'account').map(a => (
-            <RailIcon key={a.key} href={a.defaultHref} title={a.label} active={!melloActive && activeArea.key === a.key}>
-              <a.railIcon size={19}/>
+            <RailIcon key={a.key} href={a.defaultHref} title={a.label} label={(a as any).railLabel} active={!melloActive && activeArea.key === a.key}>
+              <a.railIcon size={20}/>
             </RailIcon>
           ))}
 
           <div style={{flex:1}}/>
 
           {/* Settings pinned bottom — a gear should go to Settings (not the Account/Dashboard area) */}
-          <RailIcon href="/settings" title="Settings" active={!melloActive && pathname === '/settings'}>
-            <RiSettings3Fill size={19}/>
+          <RailIcon href="/settings" title="Settings" label="Settings" active={!melloActive && pathname === '/settings'}>
+            <RiSettings3Fill size={20}/>
           </RailIcon>
         </div>
 
