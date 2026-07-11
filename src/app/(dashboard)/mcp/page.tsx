@@ -8,6 +8,7 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 
 type Key = { id: string; label: string; token: string; last_used_at: string | null }
 type Agent = 'claude' | 'chatgpt' | 'cursor' | 'cli'
@@ -31,8 +32,21 @@ export default function McpPage() {
 
   const mint = async () => {
     setMinting(true)
-    await fetch('/api/account/mcp-keys', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label }) }).catch(() => {})
-    setLabel(''); await load(); setMinting(false)
+    try {
+      const res = await fetch('/api/account/mcp-keys', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label }) })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j?.error || 'Could not generate key')
+      setLabel('')
+      await load()
+      // Auto-copy the fresh key + confirm — the new key lands at the top of "Your keys" and fills the
+      // config snippets, but without this there was zero feedback ("clicked Generate, nothing happened").
+      if (j?.key?.token) { try { navigator.clipboard.writeText(j.key.token) } catch {} }
+      toast.success('API key created — copied to clipboard')
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to generate key')
+    } finally {
+      setMinting(false)
+    }
   }
   const revoke = async (id: string) => { if (confirm('Revoke this key?')) { await fetch(`/api/account/mcp-keys?id=${id}`, { method: 'DELETE' }); load() } }
   const copy = (t: string, tag: string) => { navigator.clipboard.writeText(t); setCopied(tag); setTimeout(() => setCopied(''), 1500) }
