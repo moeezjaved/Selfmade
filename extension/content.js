@@ -18,6 +18,9 @@
   const IS_TT_ADLIB = HOST.includes('library.tiktok.com')
   const IS_TT_FEED = HOST.includes('tiktok.com') && !IS_TT_ADLIB
   const IS_IG = HOST.includes('instagram.com')
+  // Ad surfaces we actually support. The hover Save button only runs here — otherwise it popped up on
+  // EVERY thumbnail on media sites like YouTube ("Save button everywhere when I scroll").
+  const SUPPORTED = HOST.includes('facebook.com') || IS_IG || IS_TT_ADLIB || IS_TT_FEED
   const MIN = 140
 
   // ── Toast ─────────────────────────────────────────────────────────────────
@@ -274,6 +277,9 @@
 
   // ── Hover button + floating button ──────────────────────────────────────────
   function setupHover() {
+    // Hover Save button — only on supported ad surfaces. On YouTube/other sites it was popping up over
+    // every thumbnail as you moused around while scrolling. The static FAB below stays for manual saves.
+    if (SUPPORTED) {
     const btn = document.createElement('button')
     btn.className = 'sm-save-btn'
     btn.innerHTML = '<span class="sm-ico">＋</span> Save'
@@ -308,6 +314,7 @@
     btn.addEventListener('mouseover', () => clearTimeout(hideT))
     btn.addEventListener('mouseout', scheduleHide)
     btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (target) doSave(target, document, btn, { saving: '<span class="sm-ico">…</span> Saving', done: '✓ Saved' }, { revert: true }) })
+    }
 
     const fab = document.createElement('button')
     fab.className = 'sm-fab'
