@@ -179,87 +179,57 @@
   .sidebar-link {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.15s ease;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.14s ease;
     cursor: pointer;
     border: none;
     background: transparent;
     text-align: left;
     width: 100%;
     position: relative;
-    color: rgba(255,255,255,0.55);
-    padding: 7px 8px;
-    border-radius: 11px;
+    color: rgba(255,255,255,0.72);
+    padding: 10px 14px;
+    border-radius: 12px;
+    margin-bottom: 2px;
     font-family: inherit;
     text-decoration: none;
   }
-  /* Nav item: icon well + title/subtitle stack */
-  .nav-well {
-    width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(255,255,255,0.06);
-    color: rgba(255,255,255,0.6);
-    transition: all 0.15s ease;
-  }
-  .nav-well.accent { background: rgba(223,254,149,0.14); color: #dffe95; }
-  .nav-title { display: block; font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.9); line-height: 1.25; letter-spacing: -.005em; }
-  .nav-sub { display: block; font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.4); line-height: 1.2; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sidebar-link:hover .nav-well { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.92); }
-  .sidebar-link.active .nav-well { background: #dffe95; color: #1a3a1a; }
-  .sidebar-link.active .nav-title { color: #dffe95; }
+  .sidebar-link:hover { color: #f4f7ef; background: rgba(255,255,255,0.05); }
+  .sidebar-link.active { background: #dffe95; color: #0e1b12; font-weight: 700; box-shadow: 0 4px 14px -6px rgba(223,254,149,.5); }
+  .sidebar-link.active:hover { background: #dffe95; color: #0e1b12; }
+
   /* Ask Mello card */
   .sm-mello-card {
-    display: flex; align-items: center; gap: 10px;
-    margin: 0 12px 6px; padding: 9px 10px; border-radius: 12px;
-    background: linear-gradient(135deg, rgba(223,254,149,0.12), rgba(223,254,149,0.04));
-    border: 1px solid rgba(223,254,149,0.16);
+    display: flex; align-items: center; gap: 12px;
+    margin: 0 12px 8px; padding: 11px 12px; border-radius: 14px;
+    background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.06);
     text-decoration: none; transition: all 0.15s ease;
   }
-  .sm-mello-card:hover { background: linear-gradient(135deg, rgba(223,254,149,0.2), rgba(223,254,149,0.07)); border-color: rgba(223,254,149,0.3); }
-  /* Icon-rail buttons (two-rail sidebar) — icon on top, small label below (Atria-style) */
+  .sm-mello-card:hover { background: rgba(255,255,255,0.06); border-color: rgba(223,254,149,0.2); }
+  .sm-mello-mark { width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #dffe95, #8fd66a); }
+
+  /* Icon-rail buttons — outline icon on top, small label below */
   .rail-icon {
-    width: 56px;
-    padding: 7px 0 5px;
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    color: rgba(255,255,255,0.55);
-    transition: all 0.15s ease;
-    flex-shrink: 0;
+    width: 58px; padding: 8px 0 6px; border-radius: 14px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    color: rgba(255,255,255,0.5); transition: all 0.14s ease; flex-shrink: 0;
   }
   .rail-label {
-    font-size: 9.5px;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    line-height: 1;
-    text-align: center;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: 9.5px; font-weight: 600; letter-spacing: 0.01em; line-height: 1;
+    text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .rail-icon:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.95); }
-  .rail-icon.accent { color: #dffe95; background: rgba(223,254,149,0.12); }
-  .rail-icon.accent:hover { background: rgba(223,254,149,0.2); }
-  .rail-icon.active { background: #dffe95; color: #243d20; }
-  .rail-icon.active:hover { background: #dffe95; color: #243d20; }
-  .sidebar-link:hover {
-    color: rgba(255,255,255,0.85);
-    background: rgba(255,255,255,0.06);
-  }
+  .rail-icon:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.9); }
+  .rail-icon.accent { color: #dffe95; }
+  .rail-icon.accent:hover { background: rgba(223,254,149,0.1); }
+  .rail-icon.active { background: rgba(223,254,149,0.12); color: #dffe95; border: 1px solid rgba(223,254,149,0.2); }
+  .rail-icon.active:hover { background: rgba(223,254,149,0.16); }
+
   /* Account dropdown rows */
   .sm-acct-item { transition: background 0.12s ease; }
   .sm-acct-item:hover { background: rgba(255,255,255,0.07); }
-  .sidebar-link.active {
-    color: var(--lime);
-    background: rgba(223,254,149,0.12);
-    font-weight: 600;
-  }
 
   /* ── DATA TABLE ── */
   .data-table { width: 100%; border-collapse: collapse; }
