@@ -365,7 +365,8 @@
   }
 
   // ── Boot ────────────────────────────────────────────────────────────────────
-  setupHover()
+  // Only run Selfmade's save UI on supported ad surfaces — nothing on YouTube/arbitrary sites.
+  if (SUPPORTED) setupHover()
   if (IS_FB_ADLIB || IS_TT_ADLIB || IS_IG || IS_TT_FEED) {
     scan()
     const obs = new MutationObserver(() => { clearTimeout(window.__smT); window.__smT = setTimeout(scan, 350) })
