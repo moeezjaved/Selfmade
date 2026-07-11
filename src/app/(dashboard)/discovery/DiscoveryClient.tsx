@@ -1230,9 +1230,9 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
       </div>
 
       {/* ── Date range (compact) ── */}
-      <div style={{ padding: '0 10px 6px', fontSize: 10, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span style={{ width: 5, height: 5, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db', animation: ad.isActive ? 'livepulse 2s infinite' : 'none' }} />
-        <span>
+      <div style={{ padding: '0 10px 6px', fontSize: 10, color: '#6b7280', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, rowGap: 4 }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', flexShrink: 0, background: ad.isActive ? '#22c55e' : '#d1d5db', animation: ad.isActive ? 'livepulse 2s infinite' : 'none' }} />
+        <span style={{ whiteSpace: 'nowrap' }}>
           {ad.startDate ? new Date(ad.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
           {' - '}
           {ad.stopDate ? new Date(ad.stopDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Present'}
@@ -1388,7 +1388,7 @@ export default function DiscoveryPage() {
   // Responsive masonry column count.
   const [gridCols, setGridCols] = useState(4)
   useEffect(() => {
-    const calc = () => { const w = window.innerWidth; setGridCols(w < 700 ? 2 : w < 1050 ? 3 : w < 1450 ? 4 : 5) }
+    const calc = () => { const w = window.innerWidth; setGridCols(w < 480 ? 1 : w < 700 ? 2 : w < 1050 ? 3 : w < 1450 ? 4 : 5) }
     calc(); window.addEventListener('resize', calc); return () => window.removeEventListener('resize', calc)
   }, [])
   // masonic measures the DOM to position cards — the server can't replicate that, so SSR vs client
