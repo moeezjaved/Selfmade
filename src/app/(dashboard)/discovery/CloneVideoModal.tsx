@@ -13,6 +13,9 @@ import { refreshCredits } from '@/components/credits/CreditCounter'
 
 const LIME = '#dffe95'
 type Photo = { id: string; src: string }
+// Proxy external product URLs (hotlink-protected → raw <img> breaks). data:/R2 pass through.
+const cdn = (u: string) => (!u || u.startsWith('data:') || u.includes('.r2.dev') || u.includes('r2.cloudflarestorage') || u.includes('cdn.tryselfmade'))
+  ? u : `https://images.weserv.nl/?url=${encodeURIComponent(u)}&w=160&q=72&output=webp`
 type Brand = { id: string; name: string; products?: { image_urls?: string[] }[] }
 type Phase = 'form' | 'analyzing' | 'review' | 'generating' | 'done'
 const uid = () => Math.random().toString(36).slice(2)
@@ -166,7 +169,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       return (
                         <button key={p.id} onClick={() => toggleSel(p.id)} style={{ position: 'relative', width: 74, height: 74, borderRadius: 10, overflow: 'hidden', border: on ? `2px solid ${LIME}` : '2px solid #263', background: '#0a0f0c', cursor: 'pointer', padding: 0 }}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={p.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={cdn(p.src)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           {on && <span style={{ position: 'absolute', top: 3, right: 3, background: LIME, color: '#14281a', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={12} strokeWidth={3} /></span>}
                         </button>
                       )
