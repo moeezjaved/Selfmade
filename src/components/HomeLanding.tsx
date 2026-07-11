@@ -9,6 +9,7 @@
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import PricingSection from '@/components/pricing/PricingSection'
+import LandingHero from '@/components/motion/LandingHero'
 
 const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
 
@@ -265,7 +266,8 @@ export default function HomeLanding() {
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center', flexWrap: 'wrap', marginTop: 20, fontSize: 13.5, color: '#6b7280', fontWeight: 600 }}>
           {['No card to start', '50 free credits', 'Cancel anytime'].map(t => <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check /> {t}</span>)}
         </div>
-        <div style={{ maxWidth: 720, margin: '52px auto 0' }}><HeroMock ads={ads} /></div>
+        <div style={{ maxWidth: 720, margin: '48px auto 0', display: 'flex', justifyContent: 'center' }}><LandingHero /></div>
+        <div style={{ maxWidth: 720, margin: '28px auto 0' }}><HeroMock ads={ads} /></div>
       </header>
 
       {/* META-EXPERTS positioning band */}
