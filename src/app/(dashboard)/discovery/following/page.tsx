@@ -1,10 +1,11 @@
 'use client'
 /** Following — ads from brands the user follows. */
 import { useEffect, useState } from 'react'
-import { Heart } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cleanCopy } from '@/lib/cleanCopy'
+import RadarSearch from '@/components/motion/RadarSearch'
+import EmptyState from '@/components/motion/EmptyState'
 
 interface Ad {
   id: string; pageId: string; pageName: string; body: string
@@ -43,16 +44,12 @@ export default function FollowingPage() {
     } finally { setUnfollowing(null) }
   }
 
-  if (loading) return <div style={{ padding: 28, color: '#9ca3af' }}>Loading your follows…</div>
+  if (loading) return <div style={{ padding: '60px 28px' }}><RadarSearch caption="Loading your follows" /></div>
 
   if (brands.length === 0) return (
-    <div style={{ padding: 48, maxWidth: 560, margin: '40px auto', textAlign: 'center' }}>
-      <Heart size={40} style={{ color: '#dffe95', marginBottom: 12 }} />
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111', marginBottom: 8 }}>Following</h1>
-      <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 20 }}>
-        You're not following any brands yet. Hover a brand in Discovery and hit <strong>Follow</strong> to build a feed of just their new ads.
-      </p>
-      <Link href="/discovery" style={{ display: 'inline-block', padding: '10px 18px', background: '#1a3a1a', color: '#dffe95', borderRadius: 10, fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>Find brands to follow →</Link>
+    <div style={{ padding: 48, maxWidth: 560, margin: '30px auto', textAlign: 'center' }}>
+      <EmptyState heading="You're not following any brands yet" sub="Hover a brand in Discovery and hit Follow to build a feed of just their new ads." />
+      <Link href="/discovery" style={{ display: 'inline-block', marginTop: 6, padding: '10px 18px', background: '#1a3a1a', color: '#dffe95', borderRadius: 10, fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>Find brands to follow →</Link>
     </div>
   )
 
