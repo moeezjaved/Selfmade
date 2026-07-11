@@ -4,7 +4,6 @@
  * jump to its Meta Ad Library, or open Brand Spy. Sits next to Explore in the Discovery sub-nav.
  */
 import { useEffect, useState, useCallback, useRef } from 'react'
-import Link from 'next/link'
 import { Search, Target, ExternalLink, Eye } from 'lucide-react'
 
 const DARK = '#1a3a1a'
@@ -86,6 +85,26 @@ export default function BrandsPage() {
     } catch (e) { setError(e instanceof Error ? e.message : 'failed to start spying'); setSpying(null) }
   }
 
+  // Brand not in the directory? Let the user paste a Meta Ad Library link and spy it on the spot —
+  // same path as Brand Spy's "Add Manually" (the POST extracts page_id from the URL, crawls + tracks).
+  const [manualUrl, setManualUrl] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importFromUrl = async () => {
+    const url = manualUrl.trim()
+    if (!url) return
+    setImporting(true); setError(null)
+    try {
+      const r = await fetch('/api/discovery/brand-spy', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 402) throw new Error(d.message || 'You’ve hit your plan’s tracked-brand limit — upgrade to track more.')
+      if (!r.ok || !d.pageId) throw new Error(d.error || 'Paste a valid Meta Ad Library link (it contains …view_all_page_id=123…).')
+      window.location.assign(`/discovery/brand-spy/${d.pageId}`)
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not import that brand.'); setImporting(false) }
+  }
+
   return (
     <div style={{ padding: '20px 28px', maxWidth: 1200, margin: '0 auto' }}>
       {/* Header + sub-nav */}
@@ -159,8 +178,19 @@ export default function BrandsPage() {
         {loading && <div style={{ padding: 20, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>Loading…</div>}
         {!loading && brands.length === 0 && (
           <div style={{ padding: 50, textAlign: 'center', color: '#9ca3af' }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#6b7280' }}>No brands match your search.</div>
-            <div style={{ fontSize: 13, marginTop: 4 }}>Try a different name — or spy any competitor directly from <Link href="/discovery/brand-spy" style={{ color: '#1a3a1a', fontWeight: 700 }}>Brand Spy → + Spy new brand</Link> by pasting its Meta Ad Library link.</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#374151' }}>No brands match {q ? `“${q}”` : 'your search'}.</div>
+            <div style={{ fontSize: 13, marginTop: 4, marginBottom: 16 }}>Spy any competitor instantly — paste its Meta Ad Library link and we’ll import it for you.</div>
+            <div style={{ display: 'flex', gap: 8, maxWidth: 560, margin: '0 auto', flexWrap: 'wrap' }}>
+              <input value={manualUrl} onChange={e => setManualUrl(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') importFromUrl() }}
+                placeholder="https://www.facebook.com/ads/library/?...view_all_page_id=123..."
+                style={{ flex: 1, minWidth: 240, padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13.5, outline: 'none', color: '#111' }} />
+              <button onClick={importFromUrl} disabled={importing || !manualUrl.trim()}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: DARK, color: '#dffe95', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 13.5, fontWeight: 700, cursor: importing || !manualUrl.trim() ? 'default' : 'pointer', opacity: importing || !manualUrl.trim() ? 0.6 : 1, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                <Target size={14} /> {importing ? 'Importing…' : 'Spy this brand'}
+              </button>
+            </div>
+            <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 8 }}>Open the brand on the <a href="https://www.facebook.com/ads/library" target="_blank" rel="noopener noreferrer" style={{ color: '#1a3a1a', fontWeight: 600 }}>Meta Ad Library</a>, copy the page URL, and paste it above.</div>
           </div>
         )}
         <div ref={sentinel} style={{ height: 1 }} />
