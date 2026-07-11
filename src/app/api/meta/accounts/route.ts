@@ -55,7 +55,7 @@ export async function DELETE() {
 
   const admin = createAdminClient()
   const { error } = await admin.from('meta_accounts')
-    .update({ status: 'inactive', is_primary: false })
+    .update({ status: 'disconnected', is_primary: false })
     .eq('user_id', user.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
