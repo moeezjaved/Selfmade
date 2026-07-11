@@ -475,7 +475,7 @@ export default function BrandPage() {
                   <div style={{ textAlign: 'center', padding: '60px 20px' }}>
                     <div style={{ fontSize: 36, marginBottom: 16 }}>🤖</div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 8 }}>Analyzing {ads.length} ads with AI…</div>
-                    <div style={{ fontSize: 13, color: '#6b7280' }}>Claude is reading all ad copy and extracting intelligence</div>
+                    <div style={{ fontSize: 13, color: '#6b7280' }}>Mello is reading all ad copy and extracting intelligence</div>
                     <div style={{ marginTop: 20, display: 'flex', gap: 8, justifyContent: 'center' }}>
                       {[...Array(4)].map((_, i) => (
                         <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: '#1a3a1a', animation: `bounce 1s ease-in-out ${i * 0.15}s infinite` }} />
@@ -494,7 +494,7 @@ export default function BrandPage() {
                 {analysis && (
                   <div>
                     <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>
-                      AI-generated from {ads.length} ads · Powered by Claude
+                      AI-generated from {ads.length} ads · Powered by Mello
                     </div>
                     {activeTab === 'Personas' && analysis.personas?.map((p, i) => <TextItem key={i} text={p} index={i} />)}
                     {activeTab === 'Ad Angles' && analysis.adAngles?.map((a, i) => <TextItem key={i} text={a} index={i} />)}
