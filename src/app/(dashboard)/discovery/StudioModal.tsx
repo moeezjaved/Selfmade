@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom'
 import { X, Upload, Link2, Loader2, Download, Sparkles, Check, Wand2 } from 'lucide-react'
 import { flyToCreatives } from '@/lib/flyToCreatives'
 import { creativeFilename } from '@/lib/filename'
+import CloneGeneration from '@/components/motion/CloneGeneration'
 
 const LIME = '#dffe95'
 type Photo = { id: string; src: string; label?: string }
@@ -150,12 +151,22 @@ export default function StudioModal({ onClose }: { onClose: () => void }) {
   if (!mounted) return null
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(3,6,4,.72)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflow: 'auto', padding: '4vh 16px' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: hasResults ? 1040 : 640, background: '#0d130e', border: '1px solid #22331c', borderRadius: 18, overflow: 'hidden', display: hasResults ? 'grid' : 'block', gridTemplateColumns: hasResults ? '1fr 1fr' : undefined }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', maxWidth: hasResults ? 1040 : 640, background: '#0d130e', border: '1px solid #22331c', borderRadius: 18, overflow: 'hidden', display: hasResults ? 'grid' : 'block', gridTemplateColumns: hasResults ? '1fr 1fr' : undefined }}>
+        {/* Generating → the money-moment wait animation (light takeover over the form) */}
+        {busy && !hasResults && (
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 57, bottom: 0, background: '#f6f7f5', zIndex: 5, overflow: 'auto', borderRadius: '0 0 18px 18px' }}>
+            <CloneGeneration helper="Designing your ad · ~30 seconds · keep browsing" />
+          </div>
+        )}
         {/* Left / form */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 20px', borderBottom: '1px solid #1c2a17' }}>
-            <Wand2 size={17} color={LIME} /> <span style={{ fontSize: 16, fontWeight: 800, color: '#eaf6e6' }}>AI Ad Studio</span>
-            <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#7a8a7e', cursor: 'pointer' }}><X size={18} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 20px', borderBottom: '1px solid #1c2a17' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 14px -4px rgba(223,254,149,.6)' }}><Sparkles size={20} color="#0e1b12" /></div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#eaf6e6' }}>AI Ad Studio</div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: '#8a9182', marginTop: 1 }}>Design a brand-new ad — no source ad needed</div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#7a8a7e', cursor: 'pointer' }}><X size={18} /></button>
           </div>
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18, maxHeight: '80vh', overflow: 'auto' }}>
             <div style={{ fontSize: 12.5, color: '#8aa', lineHeight: 1.5, background: '#101b12', border: '1px solid #22331c', borderRadius: 10, padding: '10px 12px' }}>
@@ -299,8 +310,18 @@ export default function StudioModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function Label({ children }: { children: React.ReactNode }) { return <div style={{ fontSize: 12, fontWeight: 700, color: '#9fb0a4', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.04em' }}>{children}</div> }
-const input: React.CSSProperties = { background: '#0a0f0c', border: '1px solid #24331d', borderRadius: 9, padding: '9px 11px', color: '#e8f0e8', fontSize: 13, fontFamily: 'inherit', outline: 'none' }
+// Section label — a leading "N · " renders as a lime numbered badge (handoff section pattern).
+function Label({ children }: { children: React.ReactNode }) {
+  const m = typeof children === 'string' ? children.match(/^(\d+)\s*·\s*(.*)$/) : null
+  if (m) return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#dffe95', color: '#0e1b12', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{m[1]}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: '#9fb0a4', textTransform: 'uppercase', letterSpacing: '.09em' }}>{m[2]}</span>
+    </div>
+  )
+  return <div style={{ fontSize: 12, fontWeight: 700, color: '#9fb0a4', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.04em' }}>{children}</div>
+}
+const input: React.CSSProperties = { background: '#14251a', border: '1px solid rgba(223,254,149,.12)', borderRadius: 12, padding: '10px 12px', color: '#e8f0e8', fontSize: 13, fontFamily: 'inherit', outline: 'none' }
 const btnGhost: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: '#16241a', border: '1px solid #2c4030', color: '#cfe', borderRadius: 9, padding: '0 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }
 const btnPrimary: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, background: LIME, color: '#14281a', border: 'none', borderRadius: 10, padding: '11px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
 const chip = (on: boolean): React.CSSProperties => ({ background: on ? LIME : '#16241a', color: on ? '#14281a' : '#cfe', border: `1px solid ${on ? LIME : '#2c4030'}`, borderRadius: 20, padding: '6px 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' })
