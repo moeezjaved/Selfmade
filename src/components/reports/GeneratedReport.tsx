@@ -49,7 +49,10 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [metrics, setMetrics] = useState<MetricKey[]>(ic.metrics?.length ? ic.metrics : (tpl?.metrics || ['spend', 'roas']))
   const [sort, setSort] = useState<MetricKey>(ic.sort || tpl?.sort || 'spend')
   const [dir, setDir] = useState<'asc' | 'desc'>(ic.dir || tpl?.sortDir || 'desc')
-  const [view, setView] = useState<'card' | 'table'>(ic.view || 'table')
+  // Creative-level reports (grouped by creative or an AI tag) default to the big Cards view, like Motion.
+  const initGroup = ic.groupBy || tpl?.groupBy || 'creative'
+  const creativeGroup = initGroup === 'creative' || !!GROUP_BY.find(g => g.key === initGroup)?.ai
+  const [view, setView] = useState<'card' | 'table'>(ic.view || (creativeGroup ? 'card' : 'table'))
   const [filters, setFilters] = useState<ReportFilter[]>((ic as any).filters || [])
   const [aiTags, setAiTags] = useState<boolean>(!!(ic as any).aiTags)
   const [data, setData] = useState<any>(null)
@@ -323,24 +326,31 @@ function TableView({ rows, metrics, sort, dir, currency, net, groupBy, onSort, o
 
 function CardView({ rows, metrics, sort, currency }: any) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px,100%),1fr))', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px,100%),1fr))', gap: 18 }}>
       {rows.map((r: any, i: number) => (
-        <div key={r.key + i} style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-          <div style={{ height: 150, background: '#f0f7ee', position: 'relative', overflow: 'hidden' }}>
+        <div key={r.key + i} style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+          {/* Tall creative preview */}
+          <div style={{ aspectRatio: '4 / 5', background: '#0e120e', position: 'relative', overflow: 'hidden' }}>
             {r.thumbnail
-              ? <img src={r.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} />
-              : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34 }}>{r.format === 'video' ? '🎬' : r.format === 'carousel' ? '🎠' : '🖼️'}</div>}
-            <span style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>#{i + 1}</span>
-            <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,0.9)', color: '#3a5a3a', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100, textTransform: 'capitalize' }}>{r.format}</span>
+              ? <img src={r.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.visibility = 'hidden' }} />
+              : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44 }}>{r.format === 'video' ? '🎬' : r.format === 'carousel' ? '🎠' : '🖼️'}</div>}
+            {/* rank + format + ad-count overlays */}
+            <span style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)', color: '#fff', fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 100 }}>#{i + 1}</span>
+            {r.format === 'video' && (
+              <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 46, height: 46, borderRadius: 100, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 18, paddingLeft: 3 }}>▶</span>
+            )}
+            <span style={{ position: 'absolute', bottom: 10, left: 10, background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 100 }}>{r.adCount} {r.adCount === 1 ? 'ad' : 'ads'}</span>
+            <span style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(255,255,255,0.92)', color: '#3a5a3a', fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 100, textTransform: 'capitalize' }}>{r.format}</span>
           </div>
-          <div style={{ padding: '12px 14px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+          {/* Body */}
+          <div style={{ padding: '13px 15px 6px' }}>
+            <div style={{ fontSize: 14.5, fontWeight: 800, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
             <TagPills tags={r.tags} max={3} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-              {metrics.slice(0, 6).map((m: MetricKey) => (
-                <div key={m} style={{ background: sort === m ? '#f0f7ee' : '#fafcf9', borderRadius: 9, padding: '7px 9px' }}>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#8aaa8a', textTransform: 'uppercase', letterSpacing: '.04em' }}>{METRICS[m].label}</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: metricColor(m, r.metrics[m]) || '#1a3a1a', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(r.metrics[m], m, currency)}</div>
+            <div style={{ marginTop: 10 }}>
+              {metrics.map((m: MetricKey, idx: number) => (
+                <div key={m} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderTop: idx === 0 ? 'none' : '1px solid rgba(0,0,0,0.05)' }}>
+                  <span style={{ fontSize: 12.5, color: '#7a8a7a', fontWeight: sort === m ? 700 : 500 }}>{METRICS[m].label}</span>
+                  <span style={{ fontSize: 13.5, fontWeight: sort === m ? 900 : 700, color: metricColor(m, r.metrics[m]) || '#1a3a1a', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(r.metrics[m], m, currency)}</span>
                 </div>
               ))}
             </div>
