@@ -194,19 +194,32 @@
     font-family: inherit;
     text-decoration: none;
   }
-  /* Thin-rail icon buttons (two-rail sidebar) */
+  /* Icon-rail buttons (two-rail sidebar) — icon on top, small label below (Atria-style) */
   .rail-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 11px;
+    width: 56px;
+    padding: 7px 0 5px;
+    border-radius: 12px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: rgba(255,255,255,0.5);
+    gap: 3px;
+    color: rgba(255,255,255,0.55);
     transition: all 0.15s ease;
     flex-shrink: 0;
   }
-  .rail-icon:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.92); }
+  .rail-label {
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    text-align: center;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rail-icon:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.95); }
   .rail-icon.accent { color: #dffe95; background: rgba(223,254,149,0.12); }
   .rail-icon.accent:hover { background: rgba(223,254,149,0.2); }
   .rail-icon.active { background: #dffe95; color: #243d20; }
