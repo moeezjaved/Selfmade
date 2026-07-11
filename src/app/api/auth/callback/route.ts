@@ -175,7 +175,7 @@ export async function GET(request: NextRequest) {
     if (activeIds.length) {
       const inList = `(${activeIds.map(id => `"${id}"`).join(',')})`
       const { error: pruneErr } = await admin.from('meta_accounts')
-        .update({ status: 'inactive', is_primary: false })
+        .update({ status: 'disconnected', is_primary: false })
         .eq('user_id', userId)
         .not('account_id', 'in', inList)
       console.log('PRUNE:', pruneErr ? JSON.stringify(pruneErr) : 'OK')
