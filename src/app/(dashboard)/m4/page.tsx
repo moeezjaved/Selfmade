@@ -736,7 +736,7 @@ function M4Inner() {
           <div style={S.body}>
             {interests.length===0?(
               <div style={{textAlign:'center',padding:32}}>
-                <button onClick={generateInterests} disabled={loading} style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'12px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer',opacity:loading?0.7:1}}>{loading?'Claude is thinking…':'Generate Interest Suggestions'}</button>
+                <button onClick={generateInterests} disabled={loading} style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'12px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer',opacity:loading?0.7:1}}>{loading?'Mello is thinking…':'Generate Interest Suggestions'}</button>
               </div>
             ):(
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
