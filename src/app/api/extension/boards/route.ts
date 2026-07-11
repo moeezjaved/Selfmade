@@ -26,8 +26,18 @@ export async function GET(request: NextRequest) {
     .or(`and(org_id.eq.${org.orgId},visibility.eq.team),created_by.eq.${userId}`)
     .order('created_at', { ascending: false })
 
+  // Collapse accidental same-named duplicate boards (e.g. "test-1" created 3×) so the picker isn't
+  // cluttered with indistinguishable options. Ordered created_at desc → the first (newest) wins.
+  const seenNames = new Set<string>()
+  const deduped = (boards || []).filter((b: any) => {
+    const key = String(b.name || '').trim().toLowerCase()
+    if (seenNames.has(key)) return false
+    seenNames.add(key)
+    return true
+  })
+
   return corsJson({
-    boards: (boards || []).map((b: any) => ({
+    boards: deduped.map((b: any) => ({
       id: b.id, name: b.name, emoji: b.emoji || '📋',
       visibility: b.visibility, isMine: b.created_by === userId,
     })),
