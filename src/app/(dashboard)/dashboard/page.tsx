@@ -239,7 +239,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         {/* Topbar skeleton */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -248,7 +248,7 @@ export default function DashboardPage() {
           </div>
         </div>
         {/* KPI skeleton */}
-        <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-24 bg-dark2 rounded-2xl shimmer"/>
           ))}
@@ -259,7 +259,7 @@ export default function DashboardPage() {
 
   if (noAccount) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-black tracking-tight" style={{color:"#1a3a1a"}}>Dashboard</h1>
@@ -283,7 +283,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
 
       {/* ── TOPBAR ── */}
       <div className="flex items-center justify-between mb-8">
@@ -311,7 +311,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── PROMO CARDS ── */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <Link href="/insights" className="flex items-center gap-4 bg-gradient-to-r from-dark2 to-dark3 border border-lime/30 rounded-2xl px-5 py-4 hover:border-lime/50 transition-all group">
           <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center flex-shrink-0">
             <TrendingUp size={20} className="text-dark"/>
@@ -338,7 +338,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── KPI CARDS ── */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         {kpis.map(kpi => (
           <div
             key={kpi.label}
@@ -373,7 +373,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── MAIN GRID ── */}
-      <div className="grid grid-cols-[1fr_300px] gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5">
 
         {/* Left: Recommendations + Campaigns */}
         <div className="flex flex-col gap-5">

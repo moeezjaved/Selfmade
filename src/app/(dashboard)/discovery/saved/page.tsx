@@ -4,11 +4,13 @@ import { Plus, Trash2, ExternalLink, Bookmark, Sparkles } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
 import CloneModal from '../CloneModal'
 import CloneVideoModal from '../CloneVideoModal'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 interface Board { id: string; name: string; emoji: string; visibility?: string; isMine?: boolean; parent_board_id?: string | null; discovery_saved_ads?: { count: number }[] }
 interface SavedAd { id: string; ad_id: string; page_name: string; snapshot_url: string; ad_data: any; saved_at: string; tags?: string[] }
 
 export default function SavedAdsPage() {
+  const isMobile = useIsMobile()
   const [boards, setBoards] = useState<Board[]>([])
   const [selectedBoard, setSelectedBoard] = useState<string | null>(null)
   const [savedAds, setSavedAds] = useState<SavedAd[]>([])
@@ -164,10 +166,10 @@ export default function SavedAdsPage() {
       </div>
 
       {/* ── Body ── */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, overflow: isMobile ? 'visible' : 'hidden' }}>
 
       {/* ── Sidebar ── */}
-      <div style={{ width: 260, background: '#fff', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div style={{ width: isMobile ? '100%' : 260, background: '#fff', borderRight: isMobile ? 'none' : '1px solid #e2e8f0', borderBottom: isMobile ? '1px solid #e2e8f0' : 'none', maxHeight: isMobile ? 240 : undefined, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <div style={{ padding: '20px 18px', borderBottom: '1px solid #f1f5f9' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>📚 Saved Ads</div>
@@ -264,7 +266,7 @@ export default function SavedAdsPage() {
       </div>
 
       {/* ── Main ── */}
-      <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: isMobile ? 12 : 24, overflowY: 'auto' }}>
         {!currentBoard ? (
           <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6b7280' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}><Bookmark size={48} strokeWidth={1} /></div>
@@ -305,7 +307,7 @@ export default function SavedAdsPage() {
               </div>
               <div style={{ flex: 1 }} />
               <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search saved ads…"
-                style={{ ...selStyle, width: 200, fontWeight: 500 }} />
+                style={{ ...selStyle, width: isMobile ? '100%' : 200, fontWeight: 500 }} />
               <select value={fmt} onChange={e => setFmt(e.target.value)} style={selStyle}>
                 <option value="">Format: All</option>
                 <option value="video">Video</option>
