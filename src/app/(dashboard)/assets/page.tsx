@@ -94,10 +94,21 @@ export default function AssetsPage() {
     if (!boardList.length) { const r = await fetch('/api/discovery/boards').then(r => r.json()).catch(() => ({})); setBoardList(r.boards || []) }
   }
   const shareAsset = (a: Asset) => { navigator.clipboard?.writeText(a.file_url); setMenuFor(null); setMsg('✓ Link copied to clipboard.') }
-  const downloadAsset = async (a: Asset) => {
+  const downloadAsset = (a: Asset) => {
     setMenuFor(null)
-    try { const r = await fetch(a.file_url); const b = await r.blob(); const u = URL.createObjectURL(b); const el = document.createElement('a'); el.href = u; el.download = a.file_name || 'asset'; el.click(); URL.revokeObjectURL(u) }
-    catch { window.open(a.file_url, '_blank') }
+    // Synchronous anchor so it stays inside the click gesture (the old code fetched the cross-origin
+    // R2 url as a blob → CORS-failed → its window.open fallback ran after `await`, outside the gesture,
+    // so the popup blocker swallowed it → "nothing happens"). `download` forces a save for same-origin
+    // files; for the cross-origin CDN url the browser opens it in a new tab instead — either way the
+    // user gets the file.
+    const el = document.createElement('a')
+    el.href = a.file_url
+    el.download = a.file_name || 'asset'
+    el.target = '_blank'
+    el.rel = 'noopener'
+    document.body.appendChild(el)
+    el.click()
+    el.remove()
   }
   const addToBoard = async (a: Asset, boardId: string) => {
     setMenuFor(null); setBoardSub(false)
@@ -262,22 +273,27 @@ export default function AssetsPage() {
                     style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: 6, padding: 4, cursor: 'pointer', color: '#fecaca', display: 'flex' }}>
                     <Trash2 size={13} />
                   </button>
-                  {a.file_type === 'image' && (
-                    <div style={{ position: 'absolute', bottom: 7, right: 7, display: 'flex', gap: 5 }}>
-                      <button onClick={() => setCloneAsset(a)} title="Clone this creative with your product"
-                        style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <Sparkles size={11} /> Clone
-                      </button>
-                      <button onClick={() => animate(a)} disabled={busyAnimate === a.id} title="Animate into a video (40 credits)"
-                        style={{ background: 'rgba(14,27,18,0.85)', color: '#dffe95', border: 'none', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <Film size={11} /> {busyAnimate === a.id ? '…' : 'Animate'}
-                      </button>
-                      <button onClick={() => downloadAsset(a)} title="Download this asset"
-                        style={{ background: 'rgba(255,255,255,0.9)', color: '#14281a', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <Download size={11} />
-                      </button>
-                    </div>
-                  )}
+                  <div style={{ position: 'absolute', bottom: 7, right: 7, display: 'flex', gap: 5 }}>
+                    {/* Clone + Animate are image-only by design (Clone composites onto a still; Animate
+                        turns a still into a video). Download must show for ALL types — it was trapped
+                        inside this image guard, so videos/audio had no hover download at all. */}
+                    {a.file_type === 'image' && (
+                      <>
+                        <button onClick={() => setCloneAsset(a)} title="Clone this creative with your product"
+                          style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <Sparkles size={11} /> Clone
+                        </button>
+                        <button onClick={() => animate(a)} disabled={busyAnimate === a.id} title="Animate into a video (40 credits)"
+                          style={{ background: 'rgba(14,27,18,0.85)', color: '#dffe95', border: 'none', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <Film size={11} /> {busyAnimate === a.id ? '…' : 'Animate'}
+                        </button>
+                      </>
+                    )}
+                    <button onClick={() => downloadAsset(a)} title="Download this asset"
+                      style={{ background: 'rgba(255,255,255,0.9)', color: '#14281a', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <Download size={11} />
+                    </button>
+                  </div>
                 </div>
                 <div style={{ padding: '8px 10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

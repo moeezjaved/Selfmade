@@ -341,7 +341,10 @@ export default function SavedAdsPage() {
                 // Extension ads: the R2 snapshot_url IS the creative (image jpg or video mp4). Internal
                 // ads keep a Meta Ad Library page as snapshot_url, so use the stored thumbnail instead.
                 const media = ad.thumbnailUrl || ad.creatives?.[0]?.url || (ext && !isVid ? saved.snapshot_url : null)
-                const videoSrc = ext && isVid ? saved.snapshot_url : null
+                // Only treat it as a PLAYABLE video when we actually stored an .mp4 in R2. Extension
+                // saves of IG/FB blob videos have no fetchable mp4 (snapshot_url is a dead blob/CDN
+                // url) → don't render a black <video>; fall through to the poster / "open original".
+                const videoSrc = ext && isVid && /\.mp4(\?|$)/i.test(saved.snapshot_url || '') ? saved.snapshot_url : null
                 // Where the external "open" link should go — the page it was saved from, not the raw R2 file.
                 const openUrl = (ext && ad.source_url) ? ad.source_url : saved.snapshot_url
                 const tier = ad.performanceTier
