@@ -94,8 +94,8 @@ export default function BrandSpyList() {
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter your brands…"
         style={{ width: 360, padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, marginBottom: 14, outline: 'none' }} />
 
-      <div style={{ background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 150px', padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+      <div style={{ background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflowX: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 150px', minWidth: 660, padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           <div>Brand</div><div>Ads (active · inactive)</div><div>Type</div><div style={{ textAlign: 'right' }}>Tracking</div>
         </div>
         {loading && <div style={{ padding: 24, color: '#9ca3af', fontSize: 14 }}>Loading your brands…</div>}
@@ -109,7 +109,7 @@ export default function BrandSpyList() {
         )}
         {brands.map((b) => (
           <div key={b.pageId} className="bs-row" onClick={() => busy ? null : router.push(`/discovery/brand-spy/${b.pageId}`)}
-            style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 150px', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>
+            style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 150px', minWidth: 660, alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</div>
             <div style={{ fontSize: 13, color: '#374151' }}>
               {b.active != null
