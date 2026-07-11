@@ -51,6 +51,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [dir, setDir] = useState<'asc' | 'desc'>(ic.dir || tpl?.sortDir || 'desc')
   const [view, setView] = useState<'card' | 'table'>(ic.view || 'table')
   const [filters, setFilters] = useState<ReportFilter[]>((ic as any).filters || [])
+  const [aiTags, setAiTags] = useState<boolean>(!!(ic as any).aiTags)
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -70,6 +71,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
     try {
       const p = new URLSearchParams({ template: templateKey, dateRange, groupBy, sort, dir, metrics: metrics.join(',') })
       if (filters.length) p.set('filters', JSON.stringify(filters))
+      if (aiTags) p.set('aiTags', '1')
       const res = await fetch(`/api/reports/generate?${p}`)
       const json = await res.json()
       if (json.error && !json.rows?.length) setError(json.error === 'no_account' ? 'Connect a Meta ad account to build this report.' : json.error)
@@ -77,7 +79,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       setAiText('') // stale once controls change
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
-  }, [templateKey, dateRange, groupBy, sort, dir, metrics, filters])
+  }, [templateKey, dateRange, groupBy, sort, dir, metrics, filters, aiTags])
 
   useEffect(() => { load() }, [load])
 
@@ -108,7 +110,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const doSave = async () => {
     if (!onSave) return
     setSaving(true)
-    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters } })
+    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters, aiTags } })
     setSaving(false)
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) }
   }
@@ -185,6 +187,11 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           </div>
         </Ctl>
         <div style={{ flex: 1 }} />
+        {/* AI tags toggle — runs the vision tagging pass so creative pills populate. */}
+        <button onClick={() => setAiTags(v => !v)} title="Tag creatives with AI (Visual format, Hook, Audience…)"
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px', borderRadius: 100, border: aiTags ? 'none' : '1px solid rgba(124,58,237,0.35)', background: aiTags ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : '#faf5ff', color: aiTags ? '#fff' : '#7c3aed', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+          ✨ AI tags
+        </button>
         {/* Add metric */}
         <div style={{ position: 'relative' }}>
           <button onClick={() => setAddOpen(o => !o)} style={{ padding: '7px 13px', borderRadius: 100, border: '1px dashed rgba(0,0,0,0.2)', background: '#fff', color: '#3a5a3a', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>＋ Metric</button>
@@ -213,8 +220,8 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
         <ReportFilters filters={filters} onChange={setFilters} />
       </div>
 
-      {/* AI tagging progress — grouping by an AI dimension tags the top ads first (cached), then more on demand. */}
-      {data?.aiGrouped && !loading && data?.tagRemaining > 0 && (
+      {/* AI tagging progress — tags the top ads first (cached), then more on demand. */}
+      {!loading && data?.tagRemaining > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, background: 'linear-gradient(135deg,#faf5ff,#f3e8ff)', border: '1px solid #e9d5ff', borderRadius: 12, padding: '10px 16px' }}>
           <div style={{ fontSize: 12.5, color: '#6b21a8' }}>✨ AI tagged your top creatives. <b>{data.tagRemaining}</b> more not yet tagged — tag them to complete this report.</div>
           <button onClick={load} style={{ padding: '6px 13px', borderRadius: 100, border: 'none', background: '#7c3aed', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Tag {Math.min(30, data.tagRemaining)} more</button>
@@ -286,8 +293,9 @@ function TableView({ rows, metrics, sort, dir, currency, net, groupBy, onSort, o
                     <span style={{ fontSize: 11, color: '#b5c5b5', width: 18, flexShrink: 0 }}>{i + 1}</span>
                     <Thumb src={r.thumbnail} format={r.format} />
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{r.name}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>{r.name}</div>
                       {r.adCount > 1 && <div style={{ fontSize: 10, color: '#9ab09a' }}>{r.adCount} ads</div>}
+                      <TagPills tags={r.tags} max={3} />
                     </div>
                   </div>
                 </td>
@@ -326,8 +334,9 @@ function CardView({ rows, metrics, sort, currency }: any) {
             <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,0.9)', color: '#3a5a3a', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100, textTransform: 'capitalize' }}>{r.format}</span>
           </div>
           <div style={{ padding: '12px 14px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 10 }}>{r.name}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+            <TagPills tags={r.tags} max={3} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
               {metrics.slice(0, 6).map((m: MetricKey) => (
                 <div key={m} style={{ background: sort === m ? '#f0f7ee' : '#fafcf9', borderRadius: 9, padding: '7px 9px' }}>
                   <div style={{ fontSize: 9.5, fontWeight: 700, color: '#8aaa8a', textTransform: 'uppercase', letterSpacing: '.04em' }}>{METRICS[m].label}</div>
@@ -337,6 +346,31 @@ function CardView({ rows, metrics, sort, currency }: any) {
             </div>
           </div>
         </div>
+      ))}
+    </div>
+  )
+}
+
+// AI creative-tag pills, colour-coded by dimension. Skips empty / Unknown / None / Other values.
+const PILL_DIMS: [string, string, string][] = [
+  ['visual_format', '#fff7ed', '#c2410c'],
+  ['hook_tactic', '#eff6ff', '#1d4ed8'],
+  ['messaging_theme', '#f0fdf4', '#15803d'],
+  ['offer_type', '#fdf2f8', '#be185d'],
+  ['intended_audience', '#f0fdfa', '#0f766e'],
+  ['headline_tactic', '#faf5ff', '#7c3aed'],
+]
+function TagPills({ tags, max = 3 }: { tags: any; max?: number }) {
+  if (!tags) return null
+  const shown = PILL_DIMS
+    .map(([k, bg, fg]) => ({ v: tags[k] as string, bg, fg }))
+    .filter(x => x.v && !['Unknown', 'None', 'Other', ''].includes(x.v))
+    .slice(0, max)
+  if (!shown.length) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+      {shown.map((p, i) => (
+        <span key={i} style={{ fontSize: 10, fontWeight: 700, background: p.bg, color: p.fg, padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap' }}>{p.v}</span>
       ))}
     </div>
   )

@@ -10,7 +10,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveScopedAccount } from '@/lib/meta/scope'
 import { decryptToken } from '@/lib/meta/client'
 import { TEMPLATE_BY_KEY, GROUP_BY, METRICS, type GroupByKey, type MetricKey, type ReportTemplate, type ReportFilter, type FilterOp } from '@/lib/reports/templates'
-import { ensureTags, isTagDimension, type TagInput, type CreativeTags } from '@/lib/reports/tagging'
+import { ensureTags, loadTagCache, isTagDimension, type TagInput, type CreativeTags } from '@/lib/reports/tagging'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60   // first-time AI tagging (vision over top ads) can take ~10-15s
@@ -35,7 +35,7 @@ function firstActionVal(arr: any[], types: string[]): number {
 
 type Row = {
   key: string; name: string; thumbnail: string | null; format: 'video' | 'image' | 'carousel' | 'other'
-  landingPage: string | null; launchDate: string | null; adCount: number
+  landingPage: string | null; launchDate: string | null; adCount: number; adId: string
   // raw sums
   spend: number; impressions: number; reach: number; clicks: number
   conversions: number; revenue: number
@@ -43,7 +43,7 @@ type Row = {
   thruplay: number; video_3s: number; video_p25: number; video_p50: number; video_p75: number; video_p100: number; watch_time_weighted: number
 }
 
-const emptyRow = (): Omit<Row, 'key' | 'name' | 'thumbnail' | 'format' | 'landingPage' | 'launchDate' | 'adCount'> => ({
+const emptyRow = (): Omit<Row, 'key' | 'name' | 'thumbnail' | 'format' | 'landingPage' | 'launchDate' | 'adCount' | 'adId'> => ({
   spend: 0, impressions: 0, reach: 0, clicks: 0, conversions: 0, revenue: 0,
   add_to_cart: 0, initiate_checkout: 0, view_content: 0, landing_page_view: 0, link_click: 0, post_engagement: 0,
   thruplay: 0, video_3s: 0, video_p25: 0, video_p50: 0, video_p75: 0, video_p100: 0, watch_time_weighted: 0,
@@ -144,11 +144,13 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 2b) AI creative tagging — only when grouping by an AI dimension. Tags the highest-spend ads in
-    // this report (cached in R2, so it runs once per creative), then groups rows by the tag value.
+    // 2b) AI creative tags. Grouping by an AI dimension, or the "AI tags" toggle (aiTags=1), RUNS the
+    // tagging pass (top-spend ads, cached in R2 → once per creative). Otherwise we still LOAD the cache
+    // for free so already-tagged creatives show their pills without spending anything.
     let tagMap: Record<string, CreativeTags> = {}
     let tagRemaining = 0
-    if (isTagDimension(groupBy)) {
+    const wantTags = isTagDimension(groupBy) || sp.get('aiTags') === '1'
+    if (wantTags) {
       const spendById = new Map<string, number>()
       for (const ins of insights) spendById.set(ins.ad_id, (spendById.get(ins.ad_id) || 0) + num(ins.spend))
       const tagInputs: TagInput[] = Array.from(spendById.entries())
@@ -160,6 +162,8 @@ export async function GET(req: NextRequest) {
         })
       const r = await ensureTags(metaAccount.account_id, tagInputs, 30)
       tagMap = r.tags; tagRemaining = r.remaining
+    } else {
+      tagMap = await loadTagCache(metaAccount.account_id)
     }
 
     // 3) Build + group rows.
@@ -190,7 +194,7 @@ export async function GET(req: NextRequest) {
       const { key, name } = keyOf(ins, meta)
       let row = groups.get(key)
       if (!row) {
-        row = { key, name, thumbnail: meta.thumbnail || null, format: meta.format || 'other', landingPage: meta.landingPage || null, launchDate: meta.launchDate || null, adCount: 0, ...emptyRow() }
+        row = { key, name, thumbnail: meta.thumbnail || null, format: meta.format || 'other', landingPage: meta.landingPage || null, launchDate: meta.launchDate || null, adCount: 0, adId: ins.ad_id, ...emptyRow() }
         groups.set(key, row)
       }
       row.adCount++
@@ -223,6 +227,9 @@ export async function GET(req: NextRequest) {
     }
     // Metric filters (on grouped rows) — Net Results below reflects the filtered set.
     for (const f of metricFilters) rows = rows.filter(r => passOp(metricValue(r, f.field as MetricKey), f.op, Number(f.value)))
+    // Pills make sense on creative-level rows (each row = one creative/ad). For aggregate groupings a
+    // single creative's tags would misrepresent the group, so only attach there.
+    const attachTags = groupBy === 'creative' || groupBy === 'ad'
     const shaped = rows.map(r => {
       const m: Record<string, number> = {}
       for (const k of cols) m[k] = metricValue(r, k)
@@ -230,6 +237,7 @@ export async function GET(req: NextRequest) {
       return {
         key: r.key, name: r.name, thumbnail: r.thumbnail, format: r.format,
         landingPage: r.landingPage, launchDate: r.launchDate, adCount: r.adCount, metrics: m,
+        tags: attachTags ? (tagMap[r.adId] || null) : null,
       }
     }).filter(r => r.metrics.spend > 0)
     shaped.sort((a, b) => dir === 'desc' ? (b.metrics[sort] || 0) - (a.metrics[sort] || 0) : (a.metrics[sort] || 0) - (b.metrics[sort] || 0))
