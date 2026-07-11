@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Upload, Loader2, Check, Film, Sparkles, Pencil } from 'lucide-react'
+import CloneGeneration from '@/components/motion/CloneGeneration'
 
 const LIME = '#dffe95'
 type Photo = { id: string; src: string }
@@ -117,8 +118,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
           </div>
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18, maxHeight: '80vh', overflow: 'auto' }}>
 
-            {/* ── REVIEW: the approval gate ── */}
-            {phase === 'review' ? (
+            {/* ── GENERATING: the money-moment wait animation ── */}
+            {phase === 'generating' ? (
+              <CloneGeneration helper="Rendering your video · this can take a few minutes · keep browsing" />
+            ) : phase === 'review' ? (
               <>
                 <div style={{ fontSize: 12.5, color: '#8aa', background: '#101b12', border: '1px solid #22331c', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Pencil size={14} color={LIME} /> Review the script before we spend credits. Edit anything — the video says exactly this.
