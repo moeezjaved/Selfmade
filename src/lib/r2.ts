@@ -10,7 +10,7 @@
  *
  * If env vars are missing, uploads are skipped and the function returns null.
  */
-import { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 let _client: S3Client | null = null
@@ -88,6 +88,26 @@ export async function uploadToR2(
 export function r2PublicUrl(key: string): string | null {
   const p = process.env.R2_PUBLIC_URL?.replace(/\/$/, '')
   return p ? `${p}/${key}` : null
+}
+
+/** Reverse of r2PublicUrl — the object key from a public R2 URL (null if it isn't one of ours). */
+export function keyFromPublicUrl(url: string): string | null {
+  const p = process.env.R2_PUBLIC_URL?.replace(/\/$/, '')
+  if (!p || !url) return null
+  return url.startsWith(p + '/') ? url.slice(p.length + 1) : null
+}
+
+/**
+ * Presign a GET that forces a browser DOWNLOAD (Content-Disposition: attachment) straight from R2.
+ * Used by /api/download so a click actually saves the file instead of opening it in a new tab (the
+ * cross-origin `download` attribute is ignored by browsers). Pass the object KEY. Null if unconfigured.
+ */
+export async function presignDownloadUrl(key: string, filename: string, expiresIn = 300): Promise<string | null> {
+  const client = getClient(); const bucket = process.env.R2_BUCKET_NAME
+  if (!client || !bucket || !key) return null
+  const safe = (filename || 'download').replace(/[^\w.\-]+/g, '_')
+  const cmd = new GetObjectCommand({ Bucket: bucket, Key: key, ResponseContentDisposition: `attachment; filename="${safe}"` })
+  return getSignedUrl(client as any, cmd as any, { expiresIn })
 }
 
 /**

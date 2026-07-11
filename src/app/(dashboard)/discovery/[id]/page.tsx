@@ -9,6 +9,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { X, Bookmark, Link as LinkIcon, Download, Sparkles, ExternalLink } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
+import toast from 'react-hot-toast'
 
 interface Creative {
   position: number
@@ -60,6 +61,9 @@ export default function AdDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [tags, setTags] = useState('')
   const [copied, setCopied] = useState(false)
+  const [boards, setBoards] = useState<{ id: string; name: string; emoji?: string }[]>([])
+  const [selectedBoard, setSelectedBoard] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!params?.id) return
@@ -76,6 +80,27 @@ export default function AdDetailPage() {
       }
     })()
   }, [params?.id])
+
+  // Load the user's boards for the "Save to board" picker.
+  useEffect(() => {
+    fetch('/api/discovery/boards').then(r => r.json()).then(d => setBoards(d.boards || [])).catch(() => {})
+  }, [])
+
+  const handleSave = async () => {
+    if (!ad) return
+    if (!selectedBoard) { toast.error('Pick a board to save into first.'); return }
+    setSaving(true)
+    try {
+      const tagList = tags.split(',').map(t => t.trim()).filter(Boolean)
+      const res = await fetch('/api/discovery/saved', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ board_id: selectedBoard, ad_id: ad.id, page_id: ad.pageId, page_name: ad.pageName, snapshot_url: ad.snapshotUrl, ad_data: { ...ad, tags: tagList } }),
+      })
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j?.error || 'Could not save') }
+      toast.success('✓ Saved to board')
+    } catch (e: any) { toast.error(e?.message || 'Could not save') }
+    finally { setSaving(false) }
+  }
 
   const copyLink = async () => {
     if (!ad) return
@@ -121,9 +146,10 @@ export default function AdDetailPage() {
           <h1 style={{ fontSize: 18, fontWeight: 800, color: '#111' }}>Ad Detail</h1>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, background: '#dffe95', color: '#1a3a1a', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-            <Bookmark size={14} /> Save
+          <button onClick={handleSave} disabled={saving}
+            title={selectedBoard ? 'Save to the selected board' : 'Pick a board under “Save Details” first'}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, background: '#dffe95', color: '#1a3a1a', border: 'none', fontWeight: 800, fontSize: 13, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>
+            <Bookmark size={14} /> {saving ? 'Saving…' : 'Save'}
           </button>
           <button onClick={copyLink}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, background: '#fff', color: '#111', border: '1px solid #e2e8f0', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -214,11 +240,14 @@ export default function AdDetailPage() {
               style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', marginBottom: 14 }}
             />
             <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>📋 Boards</div>
-            <select style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', marginBottom: 14, background: '#fff' }}>
-              <option>Select boards</option>
+            <select value={selectedBoard} onChange={e => setSelectedBoard(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', marginBottom: 14, background: '#fff' }}>
+              <option value="">Select board…</option>
+              {boards.map(b => <option key={b.id} value={b.id}>{b.emoji ? `${b.emoji} ` : ''}{b.name}</option>)}
             </select>
-            <button style={{ width: '100%', padding: '10px', background: '#dffe95', color: '#1a3a1a', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-              Confirm
+            <button onClick={handleSave} disabled={saving || !selectedBoard}
+              style={{ width: '100%', padding: '10px', background: '#dffe95', color: '#1a3a1a', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: (saving || !selectedBoard) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (saving || !selectedBoard) ? 0.6 : 1 }}>
+              {saving ? 'Saving…' : 'Confirm'}
             </button>
           </div>
 
@@ -226,10 +255,10 @@ export default function AdDetailPage() {
 
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#111' }}>Comments (0)</div>
-              <span style={{ fontSize: 11, color: '#6b7280' }}>Only visible in workspace</span>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#111' }}>Comments</div>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: '#6b7280', background: '#f1f5f9', padding: '2px 8px', borderRadius: 100 }}>Coming soon</span>
             </div>
-            <input placeholder="Add a comment..." style={{ marginTop: 10, width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
+            <input placeholder="Team comments on ads are coming soon…" disabled style={{ marginTop: 10, width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#f8fafc', color: '#9ca3af', cursor: 'not-allowed' }} />
           </div>
         </div>
       </div>
