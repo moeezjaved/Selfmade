@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import AccountSelector from '@/components/AccountSelector'
+import CreateReportModal from '@/components/reports/CreateReportModal'
+import GeneratedReport from '@/components/reports/GeneratedReport'
 
 const fmt = (n: number, currency = 'PKR') =>
   new Intl.NumberFormat('en-PK', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
@@ -21,6 +23,42 @@ export default function ReportsPage() {
   const [caCurrency, setCaCurrency] = useState('USD')
   const [caLoading, setCaLoading] = useState(false)
   const [caExpanded, setCaExpanded] = useState<Record<string, boolean>>({})
+  const [showCreate, setShowCreate] = useState(false)
+  const [activeReport, setActiveReport] = useState<{ templateKey: string; savedId?: string; name?: string; config?: any } | null>(null)
+
+  // Deep-links: ?create=1 opens the picker; ?report=<id> opens a saved report; ?template=<key>&... a shared one.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    if (p.get('create')) { setShowCreate(true); return }
+    const rid = p.get('report')
+    if (rid) {
+      fetch('/api/reports/saved').then(r => r.json()).then(j => {
+        const found = (j.reports || []).find((x: any) => x.id === rid)
+        if (found) setActiveReport({ templateKey: found.template_key, savedId: found.id, name: found.name, config: found.config })
+      }).catch(() => {})
+      return
+    }
+    const t = p.get('template')
+    if (t) {
+      const cfg: any = {}
+      if (p.get('groupBy')) cfg.groupBy = p.get('groupBy')
+      if (p.get('dateRange')) cfg.dateRange = p.get('dateRange')
+      if (p.get('metrics')) cfg.metrics = p.get('metrics')!.split(',')
+      if (p.get('sort')) cfg.sort = p.get('sort')
+      if (p.get('dir')) cfg.dir = p.get('dir')
+      setActiveReport({ templateKey: t, config: cfg })
+    }
+  }, [])
+
+  const saveReport = async (payload: { id?: string; name: string; templateKey: string; config: any }) => {
+    try {
+      const res = await fetch('/api/reports/saved', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      })
+      if (res.ok) window.dispatchEvent(new Event('reports:changed'))
+      return res.ok
+    } catch { return false }
+  }
 
   useEffect(() => { loadReports(); loadCreativeAudience() }, [dateRange])
 
@@ -63,8 +101,23 @@ export default function ReportsPage() {
     { key: 'cpa', label: 'CPA' },
   ]
 
+  // A saved/template report takes over the whole page.
+  if (activeReport) {
+    return (
+      <GeneratedReport
+        templateKey={activeReport.templateKey}
+        savedId={activeReport.savedId}
+        initialName={activeReport.name}
+        initialConfig={activeReport.config}
+        onBack={() => { setActiveReport(null); if (window.location.search) window.history.replaceState({}, '', '/reports') }}
+        onSave={saveReport}
+      />
+    )
+  }
+
   return (
     <div style={{ padding: 28, maxWidth: 1200, margin: '0 auto' }}>
+      {showCreate && <CreateReportModal onClose={() => setShowCreate(false)} onCreate={(k) => { setShowCreate(false); setActiveReport({ templateKey: k }) }} />}
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
@@ -73,6 +126,7 @@ export default function ReportsPage() {
           <div style={{ fontSize: 13, color: '#7a9a7a', marginTop: 2 }}>Deep insights from your Meta Ads</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button onClick={() => setShowCreate(true)} style={{ padding: '9px 18px', borderRadius: 100, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>＋ Create report</button>
           {/* Which ad account this report is for — switch to re-scope (sets the org primary account). */}
           <AccountSelector onAccountChange={() => setTimeout(() => { loadReports(); loadCreativeAudience() }, 600)} />
           <div style={{ display: 'flex', gap: 6 }}>
