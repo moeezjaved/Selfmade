@@ -24,7 +24,24 @@ const getOpenAI = () => (_openai ||= new OpenAI({ apiKey: process.env.OPENAI_API
 // TTL keeps it fresh; per warm serverless instance (cold starts just repopulate); size-bounded.
 type FeedHit = { at: number; body: any }
 const FEED_CACHE = new Map<string, FeedHit>()
-const FEED_TTL = 60_000   // 60s — instant without going meaningfully stale
+const FEED_TTL = 180_000   // 3 min — public ad data; a few min stale is invisible for search UX
+
+// Query-embedding cache: the OpenAI embedding for a given search term is deterministic, so cache it and
+// skip the ~200-400ms network round-trip on repeat searches of the same term (across cache-miss pages
+// and filter combos). Bounded; per warm instance.
+type EmbHit = { at: number; vec: number[] }
+const EMB_CACHE = new Map<string, EmbHit>()
+const EMB_TTL = 30 * 60_000   // 30 min — a term's embedding never changes
+async function embedQuery(openai: OpenAI, q: string): Promise<number[]> {
+  const key = q.slice(0, 8000)
+  const hit = EMB_CACHE.get(key)
+  if (hit && Date.now() - hit.at < EMB_TTL) return hit.vec
+  const res = await openai.embeddings.create({ model: 'text-embedding-3-small', input: key })
+  const vec = res.data[0].embedding as number[]
+  if (EMB_CACHE.size > 500) EMB_CACHE.clear()
+  EMB_CACHE.set(key, { at: Date.now(), vec })
+  return vec
+}
 
 // ── Quality score for the Atria-style "Recommended" sort ──────────────────
 // A flat ORDER BY can't BLEND signals — it just tiers them. This blends the
@@ -541,12 +558,9 @@ export async function GET(request: NextRequest) {
     // below so it can never hang the request even when enabled.
     if (process.env.SEMANTIC_SEARCH_ENABLED === '1' && q && mode !== 'brand' && ads.length < limit && process.env.OPENAI_API_KEY) {
       try {
-        const embRes = await getOpenAI().embeddings.create({
-          model: 'text-embedding-3-small',
-          input: q.slice(0, 8000),
-        })
+        const queryVec = await embedQuery(getOpenAI(), q)
         const { data: vectorResults } = await admin.rpc('search_ads_semantic', {
-          query_embedding: embRes.data[0].embedding,
+          query_embedding: queryVec,
           match_threshold: 0.32,         // raised: concept expansion now catches synonyms
                                          // precisely in the topic tier, so semantic only
                                          // fills genuine gaps — tighter floor cuts over-reach
