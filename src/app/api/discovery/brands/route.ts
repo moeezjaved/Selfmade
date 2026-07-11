@@ -14,6 +14,10 @@ const PAGE_SIZE = 50
 // Distinct industries change rarely — cache the list so the filter dropdown doesn't scan 611K each load.
 let _industries: { at: number; list: string[] } | null = null
 const IND_TTL = 10 * 60_000
+// Full directory size for the "Search N brands" header. Cached — and NEVER the per-query planner
+// estimate: `count:'planned'` can't estimate an ILIKE '%q%' filter, so it returned garbage like "16".
+let _dirTotal: { at: number; n: number } | null = null
+const DIR_TTL = 30 * 60_000
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -30,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   let query = admin
     .from('brand_directory')
-    .select('page_id, name, avatar_url, industry, source_ad_count, country', { count: 'planned' })
+    .select('page_id, name, avatar_url, industry, source_ad_count, country')
   if (q) query = query.ilike('name', `%${q}%`)
   if (industry) query = query.eq('industry', industry)
 
@@ -39,7 +43,7 @@ export async function GET(req: NextRequest) {
   query = query.order('page_id', { ascending: true })                 // stable tiebreaker
   query = query.range(offset, offset + PAGE_SIZE - 1)
 
-  const { data, error, count } = await query
+  const { data, error } = await query
   if (error) {
     // brand_directory not created yet (migration 049 pending) → clean empty state, not a 500.
     if (isMissingTable(error)) return NextResponse.json({ brands: [], total: 0, page, pageSize: PAGE_SIZE, hasMore: false, industries: [] })
@@ -80,6 +84,14 @@ export async function GET(req: NextRequest) {
     _industries = { at: Date.now(), list: industries }
   } else industries = _industries.list
 
+  // True directory size for the header (cached, estimated — fast on 161K+ rows).
+  let dirTotal = _dirTotal && Date.now() - _dirTotal.at < DIR_TTL ? _dirTotal.n : null
+  if (dirTotal == null) {
+    const { count: dc } = await admin.from('brand_directory').select('page_id', { count: 'estimated', head: true })
+    dirTotal = dc || 0
+    _dirTotal = { at: Date.now(), n: dirTotal }
+  }
+
   return NextResponse.json({
     brands: brands.map(b => ({
       pageId: b.page_id,
@@ -95,7 +107,7 @@ export async function GET(req: NextRequest) {
       isCrawled: inIndex.has(b.page_id),
       isSpied: spied.has(b.page_id),
     })),
-    total: count || brands.length,
+    total: dirTotal,
     page,
     pageSize: PAGE_SIZE,
     hasMore: brands.length === PAGE_SIZE,
