@@ -2251,9 +2251,14 @@ export default function DiscoveryPage() {
               />
             </MasonryBoundary>
             )}
-            {/* No "loading more" text — eager prefetch + 2500px sentinel keep the next pages ready
-                before the user reaches them (Atria-style). Just a spacer so the scroll area is stable. */}
-            {loading && hasMore && <div style={{ height: 24 }} />}
+            {/* Loading-more indicator — so the grid never LOOKS finished while the next page fetches
+                (users were assuming "that's all the ads"). */}
+            {loading && hasMore && filteredAds.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '30px 0 40px', color: '#64748b', fontSize: 13.5, fontWeight: 600 }}>
+                <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #e2e8f0', borderTopColor: '#1a3a1a', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                Finding more winning ads…
+              </div>
+            )}
           </>
         )}
       </div>
