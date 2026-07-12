@@ -75,13 +75,15 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000', opacity: ready ? 1 : 0, transition: 'opacity .15s', zIndex: 2 }} />
       )}
 
-      {/* scrub line — sits above the card's hover overlay (zIndex 6/8) so it's always visible */}
+      {/* Vertical scrub playhead at the cursor (Motion-style) — sweeps across as you move; the frame
+          seeks to match. Plus a thin bottom progress bar. zIndex above the card's hover overlay. */}
       {showScrub && (
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, background: 'rgba(255,255,255,.3)', zIndex: 9, pointerEvents: 'none' }}>
-          <div style={{ height: '100%', width: `${progress * 100}%`, background: '#fff', boxShadow: '0 0 8px rgba(255,255,255,.9)' }} />
-          {/* playhead knob at the cursor */}
-          <div style={{ position: 'absolute', top: '50%', left: `${progress * 100}%`, transform: 'translate(-50%,-50%)', width: 9, height: 9, borderRadius: '50%', background: '#fff', boxShadow: '0 0 6px rgba(0,0,0,.4)' }} />
-        </div>
+        <>
+          <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${progress * 100}%`, width: 2, background: '#fff', transform: 'translateX(-1px)', boxShadow: '0 0 8px rgba(0,0,0,.5)', zIndex: 9, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, background: 'rgba(0,0,0,.25)', zIndex: 9, pointerEvents: 'none' }}>
+            <div style={{ height: '100%', width: `${progress * 100}%`, background: '#fff' }} />
+          </div>
+        </>
       )}
 
       {/* Play button (lime) — shown when not playing */}
