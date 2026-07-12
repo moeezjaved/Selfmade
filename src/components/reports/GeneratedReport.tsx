@@ -102,6 +102,11 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [name, setName] = useState(initialName || tpl?.title || 'Untitled report')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [folder, setFolder] = useState<string>((ic as any).folder || '')
+  const [saveDialog, setSaveDialog] = useState(false)
+  const [folderInput, setFolderInput] = useState('')
+  const [nameInput, setNameInput] = useState('')
+  const [knownFolders, setKnownFolders] = useState<string[]>([])
   const [shareOpen, setShareOpen] = useState(false)
 
   // AI
@@ -157,13 +162,29 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
     finally { setAiLoading(false) }
   }
 
-  const doSave = async () => {
+  const doSave = async (overrideName?: string, overrideFolder?: string) => {
     if (!onSave) return
+    const finalName = (overrideName ?? name).trim() || todayName()
+    const finalFolder = (overrideFolder ?? folder).trim()
+    setName(finalName); setFolder(finalFolder)
     setSaving(true)
-    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters, aiTags, tagCols, colorMode, attribution, perPage, showTags, showLaunch, showStatus, cardAspect } })
+    const ok = await onSave({ id: savedId, name: finalName, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters, aiTags, tagCols, colorMode, attribution, perPage, showTags, showLaunch, showStatus, cardAspect, folder: finalFolder || undefined } })
     setSaving(false)
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) }
   }
+  // Save-dialog flow: existing reports update in place; new ones prompt for a name (defaulting to
+  // today's date) + an optional folder, offering the folders already used across saved reports.
+  const openSave = () => {
+    if (savedId) { doSave(); return }
+    setNameInput(name && name !== (tpl?.title || 'Untitled report') ? name : todayName())
+    setFolderInput(folder)
+    fetch('/api/reports/saved').then(r => r.json()).then(j => {
+      const fs = Array.from(new Set([...(j.reports || []), ...(j.shared || [])].map((r: any) => r.config?.folder).filter(Boolean))) as string[]
+      setKnownFolders(fs)
+    }).catch(() => {})
+    setSaveDialog(true)
+  }
+  const confirmSave = async () => { setSaveDialog(false); await doSave(nameInput, folderInput) }
 
   // Snapshot payload for the Share menu — the CURRENT data, frozen.
   const sharePayload = () => ({
@@ -205,7 +226,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             <svg width="15" height="15" viewBox="0 0 20 20" fill="#0e1b12"><path d="M10 1.5l1.7 4.6 4.8 1.7-4.8 1.7L10 14.1 8.3 9.5 3.5 7.8l4.8-1.7z" /><circle cx="16" cy="15" r="1.5" /></svg>
             Analyze
           </button>
-          {onSave && <button onClick={doSave} disabled={saving} style={{ background: saved ? '#2f8f2f' : '#fff', color: saved ? '#fff' : '#1a3a1a', border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 13.5, fontWeight: 600, padding: '10px 16px', borderRadius: 11, cursor: 'pointer' }}>{saving ? 'Saving…' : saved ? 'Saved ✓' : savedId ? 'Update' : 'Save'}</button>}
+          {onSave && <button onClick={openSave} disabled={saving} style={{ background: saved ? '#2f8f2f' : '#fff', color: saved ? '#fff' : '#1a3a1a', border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 13.5, fontWeight: 600, padding: '10px 16px', borderRadius: 11, cursor: 'pointer' }}>{saving ? 'Saving…' : saved ? 'Saved ✓' : savedId ? 'Update' : 'Save'}</button>}
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShareOpen(o => !o)} disabled={!rows.length} style={{ background: '#0e1b12', color: '#f4f7ef', border: 'none', fontFamily: FONT, fontSize: 13.5, fontWeight: 700, padding: '10px 18px', borderRadius: 11, cursor: rows.length ? 'pointer' : 'not-allowed', opacity: rows.length ? 1 : 0.5 }}>Share report</button>
             {shareOpen && rows.length > 0 && (<><div onClick={() => setShareOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} /><ShareMenu payload={sharePayload} savedId={savedId} onClose={() => setShareOpen(false)} /></>)}
@@ -369,6 +390,25 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
 
       {detailAd && <AdDetailDrawer adId={detailAd.id} name={detailAd.name} dateRange={dateRange} onClose={() => setDetailAd(null)} />}
 
+      {saveDialog && (
+        <div onClick={() => setSaveDialog(false)} style={{ position: 'fixed', inset: 0, zIndex: 5000, background: 'rgba(14,27,18,.32)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 380, background: '#fff', borderRadius: 16, padding: 22, boxShadow: '0 24px 60px rgba(0,0,0,.28)', fontFamily: FONT }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: '#0e1b12', marginBottom: 16 }}>Save report</div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#6f6f6f', marginBottom: 6 }}>Report name</label>
+            <input autoFocus value={nameInput} onChange={e => setNameInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmSave()}
+              style={{ width: '100%', height: 38, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,.14)', fontFamily: FONT, fontSize: 14, color: '#171717', outline: 'none', boxSizing: 'border-box', marginBottom: 14 }} />
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#6f6f6f', marginBottom: 6 }}>Folder <span style={{ fontWeight: 400, color: '#9aa196' }}>(optional)</span></label>
+            <input list="rp-folders" value={folderInput} onChange={e => setFolderInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmSave()} placeholder="e.g. Weekly, Q3, Client A"
+              style={{ width: '100%', height: 38, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,.14)', fontFamily: FONT, fontSize: 14, color: '#171717', outline: 'none', boxSizing: 'border-box' }} />
+            <datalist id="rp-folders">{knownFolders.map(f => <option key={f} value={f} />)}</datalist>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <button onClick={() => setSaveDialog(false)} style={{ height: 36, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(0,0,0,.12)', background: '#fff', color: '#3a4636', fontFamily: FONT, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={confirmSave} style={{ height: 36, padding: '0 18px', borderRadius: 10, border: 'none', background: '#0e1b12', color: '#dffe95', fontFamily: FONT, fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
         .rp-scroll::-webkit-scrollbar{height:9px;width:9px}
@@ -383,6 +423,10 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
 }
 
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+// Default saved-report name = today's date, e.g. "Jul 12, 2026".
+function todayName(): string {
+  return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
 // Relative "synced X ago" label.
 function agoLabel(t: number): string {
   const s = Math.floor((Date.now() - t) / 1000)
