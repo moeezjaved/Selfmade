@@ -26,7 +26,6 @@ export default function AdDetailDrawer({ adId, name, dateRange = 'last_14d', onC
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
-  const [notes, setNotes] = useState('')
 
   useEffect(() => {
     setLoading(true)
@@ -91,12 +90,13 @@ export default function AdDetailDrawer({ adId, name, dateRange = 'last_14d', onC
               ))}
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: 22 }}>
-              {loading ? <div style={{ color: '#7c8577', padding: 30 }}>Loading…</div>
-                : data?.error ? <div style={{ color: '#c0392b', padding: 30 }}>{data.error}</div>
-                : tab === 'Overview' ? <Overview data={data} cur={cur} adId={adId} name={c.name || name} />
+              {loading && tab !== 'Notes' && tab !== 'Transcript' && tab !== 'Ad comments' ? <div style={{ color: '#7c8577', padding: 30 }}>Loading…</div>
+                : tab === 'Overview' ? (data?.error ? <div style={{ color: '#c0392b', padding: 30 }}>{data.error}</div> : <Overview data={data} cur={cur} adId={adId} name={c.name || name} />)
                 : tab === 'Performance' ? <Performance data={data} cur={cur} />
-                : tab === 'Notes' ? <Notes notes={notes} setNotes={setNotes} />
-                : <Empty tab={tab} />}
+                : tab === 'Notes' ? <NotesTab adId={adId} />
+                : tab === 'Transcript' ? <TranscriptTab adId={adId} hasVideo={!!c.videoUrl || data?.hasVideo} />
+                : tab === 'Ad comments' ? <CommentsTab adId={adId} />
+                : null}
             </div>
           </div>
         </div>
@@ -228,19 +228,105 @@ function Performance({ data, cur }: any) {
   )
 }
 
-function Notes({ notes, setNotes }: { notes: string; setNotes: (s: string) => void }) {
+const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.round(s % 60)).padStart(2, '0')}`
+
+function NotesTab({ adId }: { adId: string }) {
+  const [notes, setNotes] = useState<any[]>([])
+  const [text, setText] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { fetch(`/api/reports/ad/${adId}/notes`).then(r => r.json()).then(j => setNotes(j.notes || [])).catch(() => {}).finally(() => setLoading(false)) }, [adId])
+  const add = async () => {
+    const t = text.trim(); if (!t) return
+    setBusy(true)
+    try { const r = await fetch(`/api/reports/ad/${adId}/notes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t }) }); const j = await r.json(); if (j.notes) { setNotes(j.notes); setText('') } }
+    finally { setBusy(false) }
+  }
   return (
-    <div>
-      <div style={{ fontSize: 13, color: '#7c8577', marginBottom: 8 }}>Jot notes about this creative (kept in this session).</div>
-      <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="What's working, what to test next…" rows={12}
-        style={{ width: '100%', padding: 14, borderRadius: 12, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 14, color: '#0e1b12', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 400 }}>
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {loading ? <div style={{ color: '#7c8577', padding: 20 }}>Loading…</div>
+          : notes.length === 0 ? (
+            <div style={{ background: '#f4f6f0', borderRadius: 14, padding: '36px 20px', textAlign: 'center' }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>🗒️</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#0e1b12' }}>No saved notes yet</div>
+              <div style={{ fontSize: 12.5, color: '#7c8577', marginTop: 5, lineHeight: 1.5 }}>Save insights, opportunities, and learnings here for easy access later. Start typing to add a note.</div>
+            </div>
+          ) : notes.map(n => (
+            <div key={n.id} style={{ background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
+              <div style={{ fontSize: 13.5, color: '#1a2a1a', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{n.text}</div>
+              <div style={{ fontSize: 11, color: '#9aa196', marginTop: 6 }}>{n.author} · {new Date(n.at).toLocaleDateString()}</div>
+            </div>
+          ))}
+      </div>
+      <div style={{ border: '1px solid rgba(26,58,26,.14)', borderRadius: 14, padding: 12, marginTop: 12 }}>
+        <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Start writing a note…" rows={2}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) add() }}
+          style={{ width: '100%', border: 'none', outline: 'none', resize: 'none', fontFamily: FONT, fontSize: 14, color: '#0e1b12', background: 'transparent', boxSizing: 'border-box' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+          <span title="Slack integration coming soon" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#9aa196', border: '1px solid rgba(26,58,26,.12)', borderRadius: 8, padding: '5px 10px', cursor: 'default' }}>💬 Connect to Slack</span>
+          <button onClick={add} disabled={busy || !text.trim()} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: text.trim() ? '#0e1b12' : '#e2e6dc', color: '#dffe95', cursor: text.trim() ? 'pointer' : 'default', fontSize: 15 }}>↑</button>
+        </div>
+      </div>
     </div>
   )
 }
 
-function Empty({ tab }: { tab: string }) {
-  const msg = tab === 'Ad comments' ? 'Ad comments aren’t pulled in yet — they need Meta post-level permissions.' : 'Transcript generation is coming soon.'
-  return <div style={{ padding: 40, textAlign: 'center', color: '#9aa196' }}><div style={{ fontSize: 34, marginBottom: 10 }}>{tab === 'Ad comments' ? '💬' : '📝'}</div><div style={{ fontSize: 14, fontWeight: 600, color: '#5a6b52' }}>{tab}</div><div style={{ fontSize: 12.5, marginTop: 4 }}>{msg}</div></div>
+function TranscriptTab({ adId, hasVideo }: { adId: string; hasVideo: boolean }) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [copiedAll, setCopiedAll] = useState(false)
+  useEffect(() => { fetch(`/api/reports/ad/${adId}/transcript`).then(r => r.json()).then(setData).catch(() => setData({ error: 'failed' })).finally(() => setLoading(false)) }, [adId])
+  const segs = data?.segments || []
+  if (loading) return <div style={{ padding: 30, textAlign: 'center', color: '#7c8577' }}><div style={{ fontSize: 22, marginBottom: 8 }}>✍️</div>Transcribing the video…<div style={{ fontSize: 12, color: '#9aa196', marginTop: 4 }}>First time takes a few seconds; cached after.</div></div>
+  if (!segs.length) return <div style={{ padding: 40, textAlign: 'center', color: '#9aa196' }}><div style={{ fontSize: 30, marginBottom: 8 }}>📝</div><div style={{ fontSize: 14, fontWeight: 600, color: '#5a6b52' }}>No transcript</div><div style={{ fontSize: 12.5, marginTop: 4 }}>{hasVideo ? 'Couldn’t transcribe this video (no clear speech, or the source is unavailable).' : 'This is an image ad — nothing to transcribe.'}</div></div>
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontSize: 16, fontWeight: 800, color: '#0e1b12' }}>Transcript</span>
+        <span style={{ fontSize: 12, color: '#9aa196' }}>{data.lang || 'EN'} · {mmss(data.duration || 0)}
+          <button onClick={() => { navigator.clipboard.writeText(segs.map((s: any) => s.text).join(' ')); setCopiedAll(true); setTimeout(() => setCopiedAll(false), 1500) }} style={{ marginLeft: 10, border: 'none', background: '#f4f6f0', borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 700, color: '#3a4636', cursor: 'pointer' }}>{copiedAll ? 'Copied' : 'Copy all'}</button>
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {segs.map((s: any, i: number) => (
+          <div key={i} className="tr-seg" style={{ display: 'flex', gap: 14, padding: '10px 12px', borderRadius: 10, alignItems: 'flex-start' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f6faf4'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#9aa196', flexShrink: 0, fontVariantNumeric: 'tabular-nums', width: 42 }}>{mmss(s.start)}</span>
+            <span style={{ fontSize: 13.5, color: '#1a2a1a', lineHeight: 1.55, flex: 1 }}>{s.text}</span>
+            <button onClick={() => navigator.clipboard.writeText(s.text)} title="Copy line" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#c2ccc0', fontSize: 12, flexShrink: 0 }}>⧉</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CommentsTab({ adId }: { adId: string }) {
+  const [comments, setComments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => { fetch(`/api/reports/ad/${adId}/comments`).then(r => r.json()).then(j => setComments(j.comments || [])).catch(() => {}).finally(() => setLoading(false)) }, [adId])
+  if (loading) return <div style={{ padding: 30, color: '#7c8577', textAlign: 'center' }}>Loading comments…</div>
+  if (!comments.length) return (
+    <div style={{ background: '#f4f6f0', borderRadius: 14, padding: '36px 20px', textAlign: 'center' }}>
+      <div style={{ fontSize: 26, marginBottom: 8 }}>💬</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#0e1b12' }}>No comments for this ad</div>
+      <div style={{ fontSize: 12.5, color: '#7c8577', marginTop: 5 }}>Comments left on this ad will appear here automatically.</div>
+    </div>
+  )
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {comments.map(c => (
+        <div key={c.id} style={{ background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 12, padding: '12px 14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0e1b12' }}>{c.author}</span>
+            <span style={{ fontSize: 11, color: '#9aa196' }}>{c.likes ? `♥ ${c.likes}` : ''}</span>
+          </div>
+          <div style={{ fontSize: 13.5, color: '#1a2a1a', lineHeight: 1.5 }}>{c.message}</div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#9aa196', marginBottom: 3 }
