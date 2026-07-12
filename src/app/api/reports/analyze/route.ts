@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { templateKey, metrics, rows, netResults, currency, groupBy } = await req.json()
+  const { templateKey, metrics, rows, netResults, currency, groupBy, mode, question } = await req.json()
   const tpl = TEMPLATE_BY_KEY[templateKey]
   if (!tpl) return NextResponse.json({ error: 'Unknown template' }, { status: 400 })
   if (!Array.isArray(rows) || rows.length === 0) return NextResponse.json({ analysis: 'Not enough data to analyze yet — this report has no ads with spend in the selected period.' })
@@ -33,7 +33,19 @@ export async function POST(req: NextRequest) {
   const top = rows.slice(0, 15).map(line).join('\n')
   const net = (metrics as MetricKey[]).map(m => `${METRICS[m]?.label || m}: ${netResults?.[m] ?? 0}`).join(', ')
 
-  const prompt = `You are Mello, a sharp performance-marketing analyst for a DTC brand. Analyze this "${tpl.title}" report (grouped by ${groupBy}, currency ${currency}).
+  // Per-chip instructions (Mello quick prompts). Default = the 3-section analysis.
+  const TASKS: Record<string, string> = {
+    analyze: `Write a tight analysis in 3 short sections using markdown:\n**What's working** — 1-2 bullets naming specific winners and why.\n**What's wasting budget** — 1-2 bullets naming specific under-performers.\n**Do this next** — ONE concrete, specific action (scale X, kill Y, test Z).\nBe specific with names and numbers. Under 130 words total.`,
+    brief: `Write a creative brief for the next round of ads, based on the top performers above. Use markdown with:\n**What to double down on** — the winning angle/format/hook and why (name specific creatives).\n**3 new ad concepts** — a numbered list; each = a one-line hook + format + angle to test next.\nBe concrete and production-ready. Under 160 words.`,
+    working: `Answer "what's working and what's not" in two markdown sections:\n**Working** — 2-3 bullets, specific winners with the numbers that prove it.\n**Not working** — 2-3 bullets, specific losers with the numbers.\nName creatives/groups explicitly. Under 130 words.`,
+    themes: `Look at the creative names and any tags. In markdown, identify the 2-3 recurring themes/angles/messages that show up in the best performers, and 1 theme that's underperforming. Name examples. Under 120 words.`,
+  }
+  const ask = (question || '').toString().trim().slice(0, 400)
+  const task = ask
+    ? `Answer this question about the report, using only the data above: "${ask}". Be specific with names and numbers, markdown, under 150 words.`
+    : (TASKS[mode as string] || TASKS.analyze)
+
+  const prompt = `You are Mello, a sharp performance-marketing analyst for a DTC brand. This is the "${tpl.title}" report (grouped by ${groupBy}, currency ${currency}).
 
 Columns: ${cols.join(', ')}
 Net results (all rows): ${net}
@@ -41,11 +53,8 @@ Net results (all rows): ${net}
 Rows (top ${Math.min(rows.length, 15)}):
 ${top}
 
-Write a tight analysis in 3 short sections using markdown:
-**What's working** — 1-2 bullets naming specific winners and why.
-**What's wasting budget** — 1-2 bullets naming specific under-performers.
-**Do this next** — ONE concrete, specific action (scale X, kill Y, test Z).
-Be specific with names and numbers. No preamble, no fluff, under 130 words total.`
+${task}
+No preamble, no fluff.`
 
   try {
     const res = await llm.messages.create({ model: 'gpt-4o', max_tokens: 500, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
