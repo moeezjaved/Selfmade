@@ -15,6 +15,10 @@ export type MetricKey =
   | 'aov' | 'cost_per_atc' | 'cost_per_checkout' | 'cost_per_lpv' | 'cost_per_link_click'
   | 'outbound_clicks' | 'outbound_ctr' | 'click_to_purchase' | 'atc_to_purchase'
   | 'comments' | 'reactions' | 'shares' | 'post_saves'
+  | 'leads' | 'cost_per_lead' | 'registrations' | 'cost_per_registration'
+  | 'app_installs' | 'cost_per_app_install' | 'messaging_started' | 'cost_per_messaging'
+  | 'add_payment_info' | 'search' | 'add_to_wishlist' | 'likes' | 'cost_per_view_content'
+  | 'engagement_rate' | 'checkout_to_purchase' | 'vc_to_atc'
 
 export type Metric = {
   key: MetricKey
@@ -70,6 +74,22 @@ export const METRICS: Record<MetricKey, Metric> = {
   reactions:        { key: 'reactions',        label: 'Reactions',        format: 'number',   goodHigh: true },
   shares:           { key: 'shares',           label: 'Shares',           format: 'number',   goodHigh: true },
   post_saves:       { key: 'post_saves',       label: 'Post Saves',       format: 'number',   goodHigh: true },
+  leads:            { key: 'leads',            label: 'Leads',            format: 'number',   goodHigh: true },
+  cost_per_lead:    { key: 'cost_per_lead',    label: 'Cost / Lead',      format: 'currency', goodHigh: false },
+  registrations:    { key: 'registrations',    label: 'Registrations',    format: 'number',   goodHigh: true },
+  cost_per_registration: { key: 'cost_per_registration', label: 'Cost / Registration', format: 'currency', goodHigh: false },
+  app_installs:     { key: 'app_installs',     label: 'App Installs',     format: 'number',   goodHigh: true },
+  cost_per_app_install: { key: 'cost_per_app_install', label: 'Cost / Install', format: 'currency', goodHigh: false },
+  messaging_started:{ key: 'messaging_started',label: 'Conversations',    format: 'number',   goodHigh: true },
+  cost_per_messaging:{ key: 'cost_per_messaging', label: 'Cost / Conversation', format: 'currency', goodHigh: false },
+  add_payment_info: { key: 'add_payment_info', label: 'Payment Info Adds', format: 'number',  goodHigh: true },
+  search:           { key: 'search',           label: 'Searches',         format: 'number',   goodHigh: true },
+  add_to_wishlist:  { key: 'add_to_wishlist',  label: 'Wishlist Adds',    format: 'number',   goodHigh: true },
+  likes:            { key: 'likes',            label: 'Page Likes',       format: 'number',   goodHigh: true },
+  cost_per_view_content: { key: 'cost_per_view_content', label: 'Cost / Content View', format: 'currency', goodHigh: false },
+  engagement_rate:  { key: 'engagement_rate',  label: 'Engagement Rate',  format: 'percent',  goodHigh: true },
+  checkout_to_purchase: { key: 'checkout_to_purchase', label: 'Checkout→Purchase', format: 'percent', goodHigh: true },
+  vc_to_atc:        { key: 'vc_to_atc',        label: 'View→ATC',         format: 'percent',  goodHigh: true },
 }
 
 export type GroupByKey =
