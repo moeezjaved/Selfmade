@@ -52,6 +52,7 @@ export default function ReportsPage() {
       if (p.get('metrics')) cfg.metrics = p.get('metrics')!.split(',')
       if (p.get('sort')) cfg.sort = p.get('sort')
       if (p.get('dir')) cfg.dir = p.get('dir')
+      if (p.get('view')) cfg.view = p.get('view')
       setActiveReport({ templateKey: t, config: cfg })
     } else {
       setActiveReport(null)   // plain /reports → default insights view

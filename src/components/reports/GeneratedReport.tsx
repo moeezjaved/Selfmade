@@ -61,7 +61,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   onDelete?: (id: string) => Promise<void>
   initialName?: string
   savedId?: string
-  initialConfig?: { groupBy?: GroupByKey; dateRange?: string; metrics?: MetricKey[]; sort?: MetricKey; dir?: 'asc' | 'desc'; view?: 'card' | 'bar' | 'line' }
+  initialConfig?: { groupBy?: GroupByKey; dateRange?: string; metrics?: MetricKey[]; sort?: MetricKey; dir?: 'asc' | 'desc'; view?: 'card' | 'bar' | 'line' | 'sprint' }
 }) {
   const tpl = TEMPLATE_BY_KEY[templateKey]
   const ic = initialConfig || {}
@@ -71,7 +71,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [sort, setSort] = useState<MetricKey>(ic.sort || tpl?.sort || 'spend')
   const [dir, setDir] = useState<'asc' | 'desc'>(ic.dir || tpl?.sortDir || 'desc')
   // Top visualization mode (the table always shows below). card | bar | line.
-  const [view, setView] = useState<'card' | 'bar' | 'line'>(((ic.view === 'bar' || ic.view === 'line') ? ic.view : 'card'))
+  const [view, setView] = useState<'card' | 'bar' | 'line' | 'sprint'>((['bar', 'line', 'sprint'].includes(ic.view as string) ? ic.view : 'card') as any)
   const [filters, setFilters] = useState<ReportFilter[]>((ic as any).filters || [])
   // Default AI tags ON for creative/ad reports so the colorful tag pills show like Motion (cheap + cached).
   const [aiTags, setAiTags] = useState<boolean>((ic as any).aiTags ?? (tpl?.groupBy === 'creative' || tpl?.groupBy === 'ad'))
@@ -333,16 +333,17 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
                   ＋ Save
                 </button>
                 <div style={{ flex: 1 }} />
-                {/* view toggle: cards / bar / line (the table always shows below) */}
+                {/* view toggle: cards / bar / line / sprint (time-series). The table always shows below. */}
                 <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: 3 }}>
-                  {([['card', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'], ['bar', 'M4 20V10M10 20V4M16 20v-7M22 20H2'], ['line', 'M3 17l6-6 4 4 8-8']] as const).map(([v, d]) => (
-                    <button key={v} onClick={() => setView(v)} title={v === 'card' ? 'Cards' : v === 'bar' ? 'Bar chart' : 'Line chart'} style={{ width: 30, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: view === v ? '#0e1b12' : 'transparent' }}>
+                  {([['card', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'], ['bar', 'M4 20V10M10 20V4M16 20v-7M22 20H2'], ['line', 'M3 17l6-6 4 4 8-8'], ['sprint', 'M3 12h4l3 8 4-16 3 8h4']] as const).map(([v, d]) => (
+                    <button key={v} onClick={() => setView(v)} title={v === 'card' ? 'Cards' : v === 'bar' ? 'Bar chart' : v === 'line' ? 'Line chart' : 'Sprint (over time)'} style={{ width: 30, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: view === v ? '#0e1b12' : 'transparent' }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={view === v ? '#dffe95' : '#7c8577'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
                     </button>
                   ))}
                 </div>
               </div>
               {view === 'card' ? <CardsGrid rows={rows} metrics={metrics} sort={sort} currency={currency} aspect={cardAspect} onSee={setGroupBy} onOpenAd={(id: string, nm?: string) => setDetailAd({ id, name: nm })} />
+                : view === 'sprint' ? <SprintView templateKey={templateKey} dateRange={dateRange} groupBy={groupBy} sort={sort} metrics={metrics} currency={currency} />
                 : <ChartView rows={rows} metrics={metrics} sort={sort} currency={currency} type={view} />}
             </div>
           </div>
@@ -719,6 +720,112 @@ function ChartView({ rows, metrics, sort, currency, type }: any) {
           </LineChart>
         )}
       </ResponsiveContainer>
+    </div>
+  )
+}
+
+// Sprint (time-series) view — a metric plotted over weekly/daily/monthly buckets, one line per top
+// group, plus a bold "Overall" line, and a trend table classifying each group Scaling / Stable /
+// Fatiguing. Fetches /api/reports/sprints on demand (its own bucketed pass over the connected account).
+const SPRINT_COLORS = ['#2d7a2d', '#1d4ed8', '#c2410c', '#6d28d9', '#be185d', '#0e7490', '#b45309', '#0891b2']
+function SprintView({ templateKey, dateRange, groupBy, sort, metrics, currency }: any) {
+  const [metric, setMetric] = useState<MetricKey>(sort)
+  const [increment, setIncrement] = useState<'weekly' | 'daily' | 'monthly'>('weekly')
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let live = true
+    setLoading(true); setErr('')
+    const p = new URLSearchParams({ template: templateKey, dateRange, groupBy, metric, increment })
+    fetch(`/api/reports/sprints?${p}`).then(r => r.json()).then(j => {
+      if (!live) return
+      if (j.error && !j.series?.length) setErr(j.error === 'no_account' ? 'Connect a Meta ad account.' : j.error)
+      setData(j)
+    }).catch(e => live && setErr(e.message)).finally(() => live && setLoading(false))
+    return () => { live = false }
+  }, [templateKey, dateRange, groupBy, metric, increment])
+
+  const fmt = METRICS[metric]?.format || 'number'
+  const tickFmt = (v: any) => fmt === 'currency' ? (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : String(Math.round(v))) : fmt === 'percent' ? v + '%' : fmt === 'ratio' ? v + 'x' : fmt === 'score' ? String(Math.round(v)) : new Intl.NumberFormat('en-US', { notation: 'compact' }).format(v)
+  const dateLabel = (d: string) => { const [y, m, day] = d.split('-'); const mo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(m) - 1] || m; return increment === 'monthly' ? `${mo} ${String(y).slice(2)}` : `${mo} ${Number(day)}` }
+
+  const series: any[] = data?.series || []
+  const buckets: string[] = data?.buckets || []
+  const lineSeries = series.slice(0, 6)   // keep the chart legible; the table lists all
+  const chartData = buckets.map((d, i) => {
+    const row: any = { date: dateLabel(d) }
+    lineSeries.forEach((s, si) => { row[`s${si}`] = s.points?.[i]?.value ?? 0 })
+    row.__all = data?.overall?.[i]?.value ?? 0
+    return row
+  })
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#7c8577' }}>Metric:</span>
+        <select value={metric} onChange={e => setMetric(e.target.value as MetricKey)} style={{ padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }}>
+          {metrics.map((m: MetricKey) => <option key={m} value={m}>{METRICS[m]?.label || m}</option>)}
+        </select>
+        <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: 3 }}>
+          {(['daily', 'weekly', 'monthly'] as const).map(inc => (
+            <button key={inc} onClick={() => setIncrement(inc)} style={{ padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 11.5, fontWeight: 700, textTransform: 'capitalize', color: increment === inc ? '#dffe95' : '#7c8577', background: increment === inc ? '#0e1b12' : 'transparent' }}>{inc}</button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? <div style={{ padding: 60, textAlign: 'center', color: '#9aa196', fontSize: 13 }}>Building sprint…</div>
+        : err ? <div style={{ padding: 40, textAlign: 'center', color: '#c0392b', fontSize: 13 }}>{err}</div>
+        : !buckets.length ? <div style={{ padding: 40, textAlign: 'center', color: '#9aa196', fontSize: 13 }}>No time-series data in this range. Try a longer date range.</div>
+        : (
+          <>
+            <ResponsiveContainer width="100%" height={340}>
+              <LineChart data={chartData} margin={{ top: 8, right: 16, left: 4, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eef1e8" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10.5, fill: '#7c8577' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tickFormatter={tickFmt} tick={{ fontSize: 11, fill: '#9aa196' }} axisLine={false} tickLine={false} width={48} />
+                <RTooltip formatter={(v: any, k: any) => [fmtMetric(v, metric, currency), k === '__all' ? 'Overall' : (lineSeries[Number(String(k).slice(1))]?.name || k)]} />
+                <Line type="monotone" dataKey="__all" stroke="#0e1b12" strokeWidth={2.5} strokeDasharray="5 4" dot={false} />
+                {lineSeries.map((s, si) => <Line key={si} type="monotone" dataKey={`s${si}`} stroke={SPRINT_COLORS[si % SPRINT_COLORS.length]} strokeWidth={2} dot={{ r: 2 }} />)}
+              </LineChart>
+            </ResponsiveContainer>
+
+            {/* Trend table — every returned group with a momentum classification */}
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 12, padding: '4px 8px', fontSize: 9.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9aa196' }}>
+                <span>{(GROUP_BY.find((g: any) => g.key === groupBy)?.label) || 'Group'}</span>
+                <span style={{ textAlign: 'right' }}>Spend</span>
+                <span style={{ textAlign: 'right' }}>{data?.metricLabel || METRICS[metric]?.label}</span>
+                <span style={{ textAlign: 'right', minWidth: 96 }}>Trend</span>
+              </div>
+              {series.map((s, i) => {
+                const good = s.trendGood
+                const color = good === null ? '#9aa196' : good ? '#2d7a2d' : '#c0392b'
+                const badge = good === null ? 'Stable' : good ? 'Scaling' : 'Fatiguing'
+                const arrow = good === null ? '→' : (s.trendPct >= 0 ? '▲' : '▼')
+                const dot = i < lineSeries.length ? SPRINT_COLORS[i % SPRINT_COLORS.length] : 'transparent'
+                return (
+                  <div key={s.key} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 12, alignItems: 'center', padding: '7px 8px', borderRadius: 8, background: i % 2 ? 'transparent' : '#fafbf7', fontSize: 12.5 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: dot, flexShrink: 0, border: dot === 'transparent' ? '1px solid #dfe4d8' : 'none' }} />
+                      {s.thumbnail && <img src={cdn(s.thumbnail, 60)} alt="" style={{ width: 26, height: 26, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }} />}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#243d17', fontWeight: 600 }}>{s.name}</span>
+                    </div>
+                    <span style={{ textAlign: 'right', color: '#7c8577', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(s.totalSpend, 'spend' as MetricKey, currency)}</span>
+                    <span style={{ textAlign: 'right', color: '#0e1b12', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(s.metricTotal, metric, currency)}</span>
+                    <span style={{ textAlign: 'right', minWidth: 96, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
+                      <span style={{ color, fontWeight: 800, fontSize: 11 }}>{arrow} {good === null ? '' : Math.abs(s.trendPct).toFixed(0) + '%'}</span>
+                      <span style={{ fontSize: 9.5, fontWeight: 800, color, background: good === null ? '#f0f2ec' : good ? '#eaf7e6' : '#fdecea', padding: '2px 7px', borderRadius: 999 }}>{badge}</span>
+                    </span>
+                  </div>
+                )
+              })}
+              {data?.truncated > 0 && <div style={{ padding: '8px', fontSize: 11, color: '#9aa196', textAlign: 'center' }}>+{data.truncated} more groups not shown (top {series.length} by spend)</div>}
+            </div>
+          </>
+        )}
     </div>
   )
 }

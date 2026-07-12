@@ -32,6 +32,14 @@ const FROM_TEMPLATES: { emoji: string; label: string; href: string }[] = [
   { emoji: '🛤️', label: 'Customer journey', href: '/reports?template=customer_journey' },
   { emoji: '🔻', label: 'Funnel comparison', href: '/reports?template=funnel' },
 ]
+// Sprints (time-series) — same templates, opened straight into the over-time view.
+const SPRINTS: { emoji: string; label: string; href: string }[] = [
+  { emoji: '📈', label: 'ROAS over time', href: '/reports?template=top_performers&sort=roas&dateRange=last_90d&view=sprint' },
+  { emoji: '💸', label: 'Spend pacing', href: '/reports?template=top_performers&sort=spend&dateRange=last_90d&view=sprint' },
+  { emoji: '🎯', label: 'CPA trend', href: '/reports?template=top_converters&sort=cpa&dateRange=last_90d&view=sprint' },
+  { emoji: '🪝', label: 'Hook-rate trend', href: '/reports?template=top_hook&sort=hook_rate&dateRange=last_90d&view=sprint' },
+  { emoji: '📊', label: 'Campaign momentum', href: '/reports?template=top_performers&groupBy=campaign&sort=roas&dateRange=last_90d&view=sprint' },
+]
 const CREATIVE_PATTERNS: { emoji: string; label: string; href: string }[] = [
   { emoji: '🎞️', label: 'Asset Type', href: '/reports?template=top_performers&groupBy=format' },
   { emoji: '🎨', label: 'Visual Format', href: '/reports?template=visual_analysis' },
@@ -103,6 +111,9 @@ export default function SavedReportsNav() {
       {/* Quick-report shortcuts — click to generate */}
       <Folder title="Reports" defaultOpen>
         {QUICK_REPORTS.map(s => <Shortcut key={s.label} s={s} />)}
+      </Folder>
+      <Folder title="Sprints">
+        {SPRINTS.map(s => <Shortcut key={s.label} s={s} />)}
       </Folder>
       <Folder title="Creative Patterns">
         {CREATIVE_PATTERNS.map(s => <Shortcut key={s.label} s={s} />)}
