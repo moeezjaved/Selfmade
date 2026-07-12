@@ -57,7 +57,7 @@ export const METRICS: Record<MetricKey, Metric> = {
 export type GroupByKey =
   | 'creative' | 'ad' | 'adset' | 'campaign' | 'landing_page' | 'format' | 'launch_date'
   // AI creative-pattern dimensions (require the tagging pass — see lib/reports/tagging.ts):
-  | 'visual_format' | 'messaging_theme' | 'hook_tactic' | 'headline_tactic' | 'intended_audience' | 'offer_type'
+  | 'visual_format' | 'messaging_theme' | 'hook_tactic' | 'headline_tactic' | 'intended_audience' | 'offer_type' | 'seasonality'
 export const GROUP_BY: { key: GroupByKey; label: string; ai?: boolean }[] = [
   { key: 'creative', label: 'Creative' },
   { key: 'ad', label: 'Ad' },
@@ -73,6 +73,7 @@ export const GROUP_BY: { key: GroupByKey; label: string; ai?: boolean }[] = [
   { key: 'headline_tactic', label: 'Headline tactic', ai: true },
   { key: 'intended_audience', label: 'Intended audience', ai: true },
   { key: 'offer_type', label: 'Offer type', ai: true },
+  { key: 'seasonality', label: 'Seasonality', ai: true },
 ]
 export const AI_GROUP_BY = GROUP_BY.filter(g => g.ai)
 
