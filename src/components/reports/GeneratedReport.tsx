@@ -251,7 +251,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
         </label>
         <button onClick={() => setAiTags(v => !v)} title="Tag creatives with AI (Visual format, Hook, Audience…)"
           style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 11, padding: '9px 13px', fontFamily: FONT, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: aiTags ? 'none' : '1px solid rgba(124,58,237,.3)', background: aiTags ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : '#faf5ff', color: aiTags ? '#fff' : '#7c3aed' }}>✨ AI tags</button>
-        <ReportFilters filters={filters} onChange={setFilters} />
+        <ReportFilters filters={filters} onChange={setFilters} currency={currency} />
       </div>
 
       {/* Mello quick-prompt chips */}

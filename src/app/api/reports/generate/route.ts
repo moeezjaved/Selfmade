@@ -248,7 +248,11 @@ export async function GET(req: NextRequest) {
       rows = rows.filter(r => metricValue(r, 'roas') >= 1 && r.spend <= medSpend && r.conversions > 0)
     }
     // Filters on grouped rows — Net Results below reflects the filtered set.
-    for (const f of metricFilters) rows = rows.filter(r => passOp(metricValue(r, f.field as MetricKey), f.op, Number(f.value)))
+    for (const f of metricFilters) rows = rows.filter(r => {
+      const v = metricValue(r, f.field as MetricKey)
+      if (f.op === 'between') { const [lo, hi] = String(f.value).split(':').map(Number); return v >= Math.min(lo, hi) && v <= Math.max(lo, hi) }
+      return passOp(v, f.op, Number(f.value))
+    })
     for (const f of rowTextFilters) rows = rows.filter(r => passText(r.landingPage || '', f.op, String(f.value)))
     for (const f of formatFilters) rows = rows.filter(r => f.op === 'is_not' ? r.format !== f.value : r.format === f.value)
     for (const f of dateFilters) rows = rows.filter(r => { if (!r.launchDate) return false; return f.op === 'before' ? r.launchDate < String(f.value) : r.launchDate > String(f.value) })

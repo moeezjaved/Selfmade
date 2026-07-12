@@ -7,26 +7,35 @@
 import { useState } from 'react'
 import { FILTER_FIELDS, FILTER_FIELD_BY_KEY, opsForType, AD_STATUSES, type FilterOp, type ReportFilter } from '@/lib/reports/templates'
 
-const OP_LABEL: Record<FilterOp, string> = { '>': '>', '<': '<', '>=': '≥', '<=': '≤', '=': '=', contains: 'contains', is: 'is', is_not: 'is not', after: 'after', before: 'before' }
+const OP_LABEL: Record<FilterOp, string> = { '>': '>', '<': '<', '>=': '≥', '<=': '≤', '=': '=', between: 'is between', contains: 'contains', is: 'is', is_not: 'is not', after: 'after', before: 'before' }
 const GROUPS = ['Dimensions', 'Performance', 'AI Tags']
+// Metric keys whose values are money — used to show a currency suffix on the numeric input.
+const MONEY = new Set(['spend', 'revenue', 'cpa', 'cpc', 'cpm', 'aov'])
+const isMoney = (key: string) => MONEY.has(key) || /^(cost_per_|cpa_|revenue_|cpcc_)/.test(key)
 
 function chipLabel(f: ReportFilter): string {
   const fld = FILTER_FIELD_BY_KEY[f.field]
+  if (f.op === 'between') { const [lo, hi] = String(f.value).split(':'); return `${fld?.label || f.field} is ${lo}–${hi}` }
   return `${fld?.label || f.field} ${OP_LABEL[f.op] || f.op} ${f.value}`
 }
 
-export default function ReportFilters({ filters, onChange }: { filters: ReportFilter[]; onChange: (f: ReportFilter[]) => void }) {
+export default function ReportFilters({ filters, onChange, currency = 'PKR' }: { filters: ReportFilter[]; onChange: (f: ReportFilter[]) => void; currency?: string }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const [field, setField] = useState<string | null>(null)     // chosen field key (step 2)
   const [op, setOp] = useState<FilterOp>('>')
   const [value, setValue] = useState('')
+  const [value2, setValue2] = useState('')                    // upper bound for "is between"
 
   const fld = field ? FILTER_FIELD_BY_KEY[field] : null
-  const reset = () => { setField(null); setQ(''); setValue(''); setOpen(false) }
-  const pick = (key: string) => { const f = FILTER_FIELD_BY_KEY[key]; setField(key); setOp(opsForType(f.type)[0]); setValue(f.type === 'enum' ? (f.options?.[0] || '') : '') }
+  const reset = () => { setField(null); setQ(''); setValue(''); setValue2(''); setOpen(false) }
+  const pick = (key: string) => { const f = FILTER_FIELD_BY_KEY[key]; setField(key); setOp(opsForType(f.type)[0]); setValue(f.type === 'enum' ? (f.options?.[0] || '') : ''); setValue2('') }
   const add = () => {
     if (!fld) return
+    if (op === 'between') {
+      if (value === '' || value2 === '' || isNaN(Number(value)) || isNaN(Number(value2))) return
+      onChange([...filters, { field: fld.key, op, value: `${Number(value)}:${Number(value2)}` }]); reset(); return
+    }
     if (fld.type === 'number' && (value === '' || isNaN(Number(value)))) return
     if (fld.type !== 'enum' && !String(value).trim()) return
     onChange([...filters, { field: fld.key, op, value: fld.type === 'number' ? Number(value) : value }])
@@ -79,7 +88,7 @@ export default function ReportFilters({ filters, onChange }: { filters: ReportFi
                 <div style={{ padding: 12 }}>
                   <button onClick={() => setField(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#7a9a7a', fontSize: 12, fontWeight: 700, padding: 0, marginBottom: 10 }}>← {fld!.label}</button>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <select value={op} onChange={e => setOp(e.target.value as FilterOp)} style={{ ...sel, width: fld!.type === 'number' ? 70 : 110 }}>
+                    <select value={op} onChange={e => setOp(e.target.value as FilterOp)} style={{ ...sel, width: fld!.type === 'number' ? 96 : 110, flexShrink: 0 }}>
                       {opsForType(fld!.type).map(o => <option key={o} value={o}>{OP_LABEL[o]}</option>)}
                     </select>
                     {fld!.type === 'enum' ? (
@@ -88,8 +97,16 @@ export default function ReportFilters({ filters, onChange }: { filters: ReportFi
                       </select>
                     ) : fld!.type === 'date' ? (
                       <input type="date" value={value} onChange={e => setValue(e.target.value)} style={{ ...sel, flex: 1 }} />
+                    ) : op === 'between' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1 }}>
+                        <NumInput value={value} onChange={setValue} onEnter={add} suffix={isMoney(fld!.key) ? currency : undefined} autoFocus />
+                        <span style={{ fontSize: 12, color: '#7a9a7a' }}>–</span>
+                        <NumInput value={value2} onChange={setValue2} onEnter={add} suffix={isMoney(fld!.key) ? currency : undefined} />
+                      </div>
+                    ) : fld!.type === 'number' ? (
+                      <NumInput value={value} onChange={setValue} onEnter={add} suffix={isMoney(fld!.key) ? currency : undefined} autoFocus />
                     ) : (
-                      <input type={fld!.type === 'number' ? 'number' : 'text'} value={value} onChange={e => setValue(e.target.value)} autoFocus
+                      <input type="text" value={value} onChange={e => setValue(e.target.value)} autoFocus
                         onKeyDown={e => e.key === 'Enter' && add()} placeholder={fld!.type === 'tag' ? 'e.g. Testimonial' : 'Value'} style={{ ...sel, flex: 1 }} />
                     )}
                   </div>
@@ -107,3 +124,14 @@ export default function ReportFilters({ filters, onChange }: { filters: ReportFi
 }
 
 const sel: React.CSSProperties = { padding: '8px 10px', borderRadius: 9, border: '1px solid rgba(0,0,0,0.14)', fontFamily: 'inherit', fontSize: 12.5, color: '#1a3a1a', background: '#fff', outline: 'none', boxSizing: 'border-box' }
+
+// Numeric input with an optional trailing currency suffix (PKR for money metrics).
+function NumInput({ value, onChange, onEnter, suffix, autoFocus }: { value: string; onChange: (v: string) => void; onEnter: () => void; suffix?: string; autoFocus?: boolean }) {
+  return (
+    <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+      <input type="number" value={value} onChange={e => onChange(e.target.value)} autoFocus={autoFocus} onKeyDown={e => e.key === 'Enter' && onEnter()}
+        placeholder="0" style={{ ...sel, width: '100%', paddingRight: suffix ? 44 : 10 }} />
+      {suffix && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, fontWeight: 700, color: '#9ab09a', pointerEvents: 'none' }}>{suffix}</span>}
+    </div>
+  )
+}
