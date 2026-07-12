@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts'
 import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, BUILTIN_PRESETS, FILTER_FIELD_BY_KEY, type MetricKey, type GroupByKey, type ReportFilter, type ColumnPreset } from '@/lib/reports/templates'
 import ShareMenu from './ShareMenu'
 import ReportFilters from './ReportFilters'
@@ -52,7 +53,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   onDelete?: (id: string) => Promise<void>
   initialName?: string
   savedId?: string
-  initialConfig?: { groupBy?: GroupByKey; dateRange?: string; metrics?: MetricKey[]; sort?: MetricKey; dir?: 'asc' | 'desc'; view?: 'card' | 'table' }
+  initialConfig?: { groupBy?: GroupByKey; dateRange?: string; metrics?: MetricKey[]; sort?: MetricKey; dir?: 'asc' | 'desc'; view?: 'card' | 'bar' | 'line' }
 }) {
   const tpl = TEMPLATE_BY_KEY[templateKey]
   const ic = initialConfig || {}
@@ -61,10 +62,8 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [metrics, setMetrics] = useState<MetricKey[]>(ic.metrics?.length ? ic.metrics : (tpl?.metrics || ['spend', 'roas']))
   const [sort, setSort] = useState<MetricKey>(ic.sort || tpl?.sort || 'spend')
   const [dir, setDir] = useState<'asc' | 'desc'>(ic.dir || tpl?.sortDir || 'desc')
-  // Creative-level reports (grouped by creative or an AI tag) default to the big Cards view, like Motion.
-  const initGroup = ic.groupBy || tpl?.groupBy || 'creative'
-  const creativeGroup = initGroup === 'creative' || !!GROUP_BY.find(g => g.key === initGroup)?.ai
-  const [view, setView] = useState<'card' | 'table'>(ic.view || (creativeGroup ? 'card' : 'table'))
+  // Top visualization mode (the table always shows below). card | bar | line.
+  const [view, setView] = useState<'card' | 'bar' | 'line'>(((ic.view === 'bar' || ic.view === 'line') ? ic.view : 'card'))
   const [filters, setFilters] = useState<ReportFilter[]>((ic as any).filters || [])
   // Default AI tags ON for creative/ad reports so the colorful tag pills show like Motion (cheap + cached).
   const [aiTags, setAiTags] = useState<boolean>((ic as any).aiTags ?? (tpl?.groupBy === 'creative' || tpl?.groupBy === 'ad'))
@@ -325,16 +324,17 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
                   ＋ Save
                 </button>
                 <div style={{ flex: 1 }} />
-                {/* view toggle: cards / table-only */}
+                {/* view toggle: cards / bar / line (the table always shows below) */}
                 <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: 3 }}>
-                  {([['card', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'], ['table', 'M4 6h16M4 12h16M4 18h16']] as const).map(([v, d]) => (
-                    <button key={v} onClick={() => setView(v)} title={v === 'card' ? 'Cards' : 'Table only'} style={{ width: 30, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: view === v ? '#0e1b12' : 'transparent' }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={view === v ? '#dffe95' : '#7c8577'} strokeWidth="2" strokeLinecap="round"><path d={d} /></svg>
+                  {([['card', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'], ['bar', 'M4 20V10M10 20V4M16 20v-7M22 20H2'], ['line', 'M3 17l6-6 4 4 8-8']] as const).map(([v, d]) => (
+                    <button key={v} onClick={() => setView(v)} title={v === 'card' ? 'Cards' : v === 'bar' ? 'Bar chart' : 'Line chart'} style={{ width: 30, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: view === v ? '#0e1b12' : 'transparent' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={view === v ? '#dffe95' : '#7c8577'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
                     </button>
                   ))}
                 </div>
               </div>
-              {view === 'card' && <CardsGrid rows={rows} metrics={metrics} sort={sort} currency={currency} aspect={cardAspect} onSee={setGroupBy} onOpenAd={(id: string, nm?: string) => setDetailAd({ id, name: nm })} />}
+              {view === 'card' ? <CardsGrid rows={rows} metrics={metrics} sort={sort} currency={currency} aspect={cardAspect} onSee={setGroupBy} onOpenAd={(id: string, nm?: string) => setDetailAd({ id, name: nm })} />
+                : <ChartView rows={rows} metrics={metrics} sort={sort} currency={currency} type={view} />}
             </div>
           </div>
 
@@ -666,6 +666,46 @@ function CardsGrid({ rows, metrics, sort, currency, aspect = '4 / 5', onSee, onO
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// Bar/line chart of the report — a chosen metric across the top groups (recharts).
+function ChartView({ rows, metrics, sort, currency, type }: any) {
+  const [metric, setMetric] = useState<MetricKey>(sort)
+  const short = (s: string) => s.length > 16 ? s.slice(0, 15) + '…' : s
+  const data = [...rows].sort((a, b) => (b.metrics[metric] || 0) - (a.metrics[metric] || 0)).slice(0, 20)
+    .map((r: any) => ({ name: short(r.name), full: r.name, value: r.metrics[metric] || 0 }))
+  const tickFmt = (v: any) => { const f = METRICS[metric].format; return f === 'currency' ? (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : String(v)) : f === 'percent' ? v + '%' : f === 'ratio' ? v + 'x' : new Intl.NumberFormat('en-US', { notation: 'compact' }).format(v) }
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#7c8577' }}>Metric:</span>
+        <select value={metric} onChange={e => setMetric(e.target.value as MetricKey)} style={{ padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }}>
+          {metrics.map((m: MetricKey) => <option key={m} value={m}>{METRICS[m].label}</option>)}
+        </select>
+      </div>
+      <ResponsiveContainer width="100%" height={360}>
+        {type === 'bar' ? (
+          <BarChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 70 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eef1e8" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#7c8577' }} axisLine={false} tickLine={false} angle={-35} textAnchor="end" interval={0} height={70} />
+            <YAxis tickFormatter={tickFmt} tick={{ fontSize: 11, fill: '#9aa196' }} axisLine={false} tickLine={false} width={48} />
+            <RTooltip formatter={(v: any) => fmtMetric(v, metric, currency)} labelFormatter={(l: any, p: any) => p?.[0]?.payload?.full || l} />
+            <Bar dataKey="value" radius={[5, 5, 0, 0]} maxBarSize={44}>
+              {data.map((d: any, i: number) => <Cell key={i} fill={metricColor(metric, d.value) || '#6fb03a'} />)}
+            </Bar>
+          </BarChart>
+        ) : (
+          <LineChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 70 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eef1e8" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#7c8577' }} axisLine={false} tickLine={false} angle={-35} textAnchor="end" interval={0} height={70} />
+            <YAxis tickFormatter={tickFmt} tick={{ fontSize: 11, fill: '#9aa196' }} axisLine={false} tickLine={false} width={48} />
+            <RTooltip formatter={(v: any) => fmtMetric(v, metric, currency)} labelFormatter={(l: any, p: any) => p?.[0]?.payload?.full || l} />
+            <Line type="monotone" dataKey="value" stroke="#2d7a2d" strokeWidth={2.5} dot={{ r: 3, fill: '#2d7a2d' }} />
+          </LineChart>
+        )}
+      </ResponsiveContainer>
     </div>
   )
 }
