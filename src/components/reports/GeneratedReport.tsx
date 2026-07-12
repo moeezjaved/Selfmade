@@ -97,6 +97,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [aiLoading, setAiLoading] = useState(false)
   const [askMode, setAskMode] = useState(false)
   const [askText, setAskText] = useState('')
+  const [syncedAt, setSyncedAt] = useState<number>(() => Date.now())
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -108,6 +109,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       const json = await res.json()
       if (json.error && !json.rows?.length) setError(json.error === 'no_account' ? 'Connect a Meta ad account to build this report.' : json.error)
       setData(json)
+      setSyncedAt(Date.now())
       setAiText('') // stale once controls change
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
@@ -178,6 +180,12 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           <div style={{ fontSize: 13.5, fontWeight: 500, color: '#6f7a68', marginTop: 3 }}>{tpl.description}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
+          {/* Last synced — click to re-sync live from Meta */}
+          <button onClick={() => load()} title="Sync now (fetch the latest from Meta)" disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', cursor: loading ? 'default' : 'pointer', fontFamily: FONT, fontSize: 12, fontWeight: 600, color: '#7c8577' }}>
+            {agoLabel(syncedAt)}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c8577" strokeWidth="2" style={loading ? { animation: 'spin 1s linear infinite' } : undefined}><path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
           <button onClick={() => runAI('analyze')} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#dffe95', color: '#0e1b12', border: 'none', fontFamily: FONT, fontSize: 13.5, fontWeight: 700, padding: '10px 16px', borderRadius: 11, cursor: 'pointer', boxShadow: '0 5px 14px -6px rgba(223,254,149,.9)' }}>
             <svg width="15" height="15" viewBox="0 0 20 20" fill="#0e1b12"><path d="M10 1.5l1.7 4.6 4.8 1.7-4.8 1.7L10 14.1 8.3 9.5 3.5 7.8l4.8-1.7z" /><circle cx="16" cy="15" r="1.5" /></svg>
             Analyze
@@ -349,6 +357,15 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
 }
 
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+// Relative "synced X ago" label.
+function agoLabel(t: number): string {
+  const s = Math.floor((Date.now() - t) / 1000)
+  if (s < 10) return 'Synced just now'
+  if (s < 60) return `Synced ${s}s ago`
+  if (s < 3600) return `Synced ${Math.floor(s / 60)}m ago`
+  if (s < 86400) return `Synced ${Math.floor(s / 3600)}h ago`
+  return `Synced ${Math.floor(s / 86400)}d ago`
+}
 const pill: React.CSSProperties = { position: 'relative', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid rgba(26,58,26,.14)', borderRadius: 11, padding: '9px 13px', fontSize: 13, fontWeight: 600, color: '#3a4636', cursor: 'pointer', fontFamily: FONT }
 const pillSelect: React.CSSProperties = { position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', fontFamily: FONT }
 const panelStyle: React.CSSProperties = { background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 20, boxShadow: '0 12px 30px -22px rgba(14,27,18,.4)', marginBottom: 20 }
