@@ -132,17 +132,21 @@ export type ReportTemplate = {
   needsVideo?: boolean
 }
 
+// Fuller default column set (Motion-style) — used by most templates. Add/remove per report anytime.
+const BASE: MetricKey[] = ['spend', 'impressions', 'cpm', 'link_click', 'cpc', 'ctr', 'conversions', 'cpa', 'revenue', 'roas']
+const VIDEO_BASE: MetricKey[] = ['spend', 'impressions', 'ctr', 'hook_rate', 'hold_rate', 'thruplay', 'conversions', 'cpa', 'revenue', 'roas']
+
 export const TEMPLATES: ReportTemplate[] = [
   // ── Featured ──
   { key: 'top_performers', title: 'Top performers', emoji: '⭐', category: 'Find winners', featured: true,
     description: 'Your best creatives by return on ad spend', groupBy: 'creative',
-    metrics: ['spend', 'roas', 'conversions', 'revenue', 'cpa', 'ctr'], sort: 'roas', sortDir: 'desc' },
+    metrics: BASE, sort: 'roas', sortDir: 'desc' },
   { key: 'comparative', title: 'Comparative analysis', emoji: '📊', category: 'Understand performance', featured: true,
     description: 'Compare this period against the previous one', groupBy: 'creative',
-    metrics: ['spend', 'roas', 'conversions', 'cpa', 'ctr', 'cpm'], sort: 'spend', sortDir: 'desc' },
+    metrics: BASE, sort: 'spend', sortDir: 'desc' },
   { key: 'launch_analysis', title: 'Launch analysis', emoji: '🚀', category: 'Find winners', featured: true,
     description: 'How your newest ads are performing out of the gate', groupBy: 'creative',
-    metrics: ['spend', 'roas', 'conversions', 'ctr', 'cpa'], sort: 'spend', sortDir: 'desc' },
+    metrics: BASE, sort: 'spend', sortDir: 'desc' },
 
   // ── Find winners ──
   { key: 'top_converters', title: 'Top converters', emoji: '💵', category: 'Find winners',
@@ -153,66 +157,66 @@ export const TEMPLATES: ReportTemplate[] = [
     metrics: ['spend', 'impressions', 'ctr', 'clicks', 'link_click', 'cpc', 'post_engagement'], sort: 'ctr', sortDir: 'desc' },
   { key: 'scalers', title: 'Scalers', emoji: '📈', category: 'Find winners',
     description: 'Promising low-spend creatives with strong ROAS that are ready to scale', groupBy: 'creative',
-    metrics: ['spend', 'roas', 'conversions', 'cpa', 'ctr'], sort: 'roas', sortDir: 'desc' },
+    metrics: BASE, sort: 'roas', sortDir: 'desc' },
   { key: 'top_hook', title: 'Top hook', emoji: '🪝', category: 'Find winners',
     description: 'Which video openings grab attention in the first 3 seconds', groupBy: 'creative',
-    metrics: ['spend', 'hook_rate', 'video_3s', 'thruplay', 'ctr'], sort: 'hook_rate', sortDir: 'desc',
+    metrics: ['spend', 'impressions', 'hook_rate', 'video_3s', 'thruplay', 'ctr', 'cpc', 'conversions', 'roas'], sort: 'hook_rate', sortDir: 'desc',
     onlyFormat: 'video', needsVideo: true },
   { key: 'top_hold', title: 'Top hold', emoji: '⏱️', category: 'Find winners',
     description: 'Which videos keep viewers watching the longest', groupBy: 'creative',
-    metrics: ['spend', 'hold_rate', 'thruplay', 'avg_watch_time', 'video_p100'], sort: 'hold_rate', sortDir: 'desc',
+    metrics: ['spend', 'impressions', 'hold_rate', 'thruplay', 'avg_watch_time', 'video_p100', 'ctr', 'conversions', 'roas'], sort: 'hold_rate', sortDir: 'desc',
     onlyFormat: 'video', needsVideo: true },
 
   // ── Find problems ──
   { key: 'bottom_cpm', title: 'Bottom performers (CPM)', emoji: '😴', category: 'Find problems',
     description: 'High-CPM creatives that are eating into your budget', groupBy: 'creative',
-    metrics: ['spend', 'cpm', 'impressions', 'ctr', 'roas'], sort: 'cpm', sortDir: 'desc' },
+    metrics: ['spend', 'impressions', 'cpm', 'cpc', 'ctr', 'conversions', 'cpa', 'roas'], sort: 'cpm', sortDir: 'desc' },
   { key: 'heavies', title: 'Heavies', emoji: '🏋️', category: 'Find problems',
     description: "High-spend creatives that aren't pulling their weight", groupBy: 'creative',
-    metrics: ['spend', 'roas', 'conversions', 'cpa', 'ctr'], sort: 'spend', sortDir: 'desc' },
+    metrics: BASE, sort: 'spend', sortDir: 'desc' },
   { key: 'drop_off', title: 'Drop off rate', emoji: '📉', category: 'Find problems',
     description: 'See exactly where viewers lose interest in your videos', groupBy: 'creative',
-    metrics: ['spend', 'video_p25', 'video_p50', 'video_p75', 'video_p100', 'hold_rate'], sort: 'spend', sortDir: 'desc',
+    metrics: ['spend', 'impressions', 'video_3s', 'video_p25', 'video_p50', 'video_p75', 'video_p100', 'hold_rate', 'thruplay'], sort: 'spend', sortDir: 'desc',
     onlyFormat: 'video', needsVideo: true },
   { key: 'video_analysis', title: 'Video analysis', emoji: '🎬', category: 'Find problems',
     description: 'Deep dive into your video ad performance and retention', groupBy: 'creative',
-    metrics: ['spend', 'roas', 'hook_rate', 'hold_rate', 'thruplay', 'ctr'], sort: 'spend', sortDir: 'desc',
+    metrics: VIDEO_BASE, sort: 'spend', sortDir: 'desc',
     onlyFormat: 'video', needsVideo: true },
   { key: 'static_analysis', title: 'Static analysis', emoji: '🖼️', category: 'Find problems',
     description: 'Analyze your image ad performance across key metrics', groupBy: 'creative',
-    metrics: ['spend', 'roas', 'conversions', 'ctr', 'cpm', 'cpa'], sort: 'spend', sortDir: 'desc',
+    metrics: BASE, sort: 'spend', sortDir: 'desc',
     onlyFormat: 'image' },
 
   // ── Creative strategy ──
   { key: 'persona', title: 'Persona analysis', emoji: '👥', category: 'Creative strategy',
     description: 'Which audience personas respond best to your creatives', groupBy: 'intended_audience',
-    metrics: ['spend', 'roas', 'conversions', 'ctr', 'cpa'], sort: 'roas', sortDir: 'desc' },
+    metrics: BASE, sort: 'roas', sortDir: 'desc' },
   { key: 'hook_analysis', title: 'Hook analysis', emoji: '🎣', category: 'Creative strategy',
     description: 'Which hook tactics capture the most attention', groupBy: 'hook_tactic',
-    metrics: ['spend', 'roas', 'ctr', 'conversions', 'cpa'], sort: 'roas', sortDir: 'desc' },
+    metrics: BASE, sort: 'roas', sortDir: 'desc' },
   { key: 'visual_analysis', title: 'Visual format', emoji: '🎨', category: 'Creative strategy',
     description: 'Compare visual formats to learn which creative style makes your message stick', groupBy: 'visual_format',
-    metrics: ['spend', 'roas', 'conversions', 'ctr', 'cpm'], sort: 'spend', sortDir: 'desc' },
+    metrics: BASE, sort: 'spend', sortDir: 'desc' },
   { key: 'messaging', title: 'Messaging theme analysis', emoji: '💬', category: 'Creative strategy',
     description: 'Which messaging themes resonate most with your audience', groupBy: 'messaging_theme',
-    metrics: ['spend', 'roas', 'conversions', 'ctr'], sort: 'roas', sortDir: 'desc' },
+    metrics: BASE, sort: 'roas', sortDir: 'desc' },
   { key: 'offer_analysis', title: 'Offer analysis', emoji: '🏷️', category: 'Creative strategy',
     description: 'Which offer types drive the best return', groupBy: 'offer_type',
-    metrics: ['spend', 'roas', 'conversions', 'cpa', 'ctr'], sort: 'roas', sortDir: 'desc' },
+    metrics: BASE, sort: 'roas', sortDir: 'desc' },
   { key: 'headline_analysis', title: 'Headline tactic analysis', emoji: '✍️', category: 'Creative strategy',
     description: 'Which headline tactics win clicks and conversions', groupBy: 'headline_tactic',
-    metrics: ['spend', 'roas', 'ctr', 'conversions'], sort: 'roas', sortDir: 'desc' },
+    metrics: BASE, sort: 'roas', sortDir: 'desc' },
 
   // ── Understand performance ──
   { key: 'customer_journey', title: 'Customer journey', emoji: '🛤️', category: 'Understand performance',
     description: 'Track performance from first impression to final purchase', groupBy: 'creative',
-    metrics: ['spend', 'link_click', 'view_content', 'add_to_cart', 'initiate_checkout', 'conversions'], sort: 'spend', sortDir: 'desc' },
+    metrics: ['spend', 'impressions', 'link_click', 'view_content', 'add_to_cart', 'initiate_checkout', 'conversions', 'revenue', 'roas'], sort: 'spend', sortDir: 'desc' },
   { key: 'ad_format', title: 'Ad format comparison', emoji: '🧩', category: 'Understand performance',
     description: 'Compare performance across images, videos, and carousels', groupBy: 'format',
-    metrics: ['spend', 'roas', 'conversions', 'ctr', 'cpm', 'cpa'], sort: 'spend', sortDir: 'desc' },
+    metrics: BASE, sort: 'spend', sortDir: 'desc' },
   { key: 'funnel', title: 'Funnel comparison', emoji: '🔻', category: 'Understand performance',
     description: 'Compare creative performance across TOF, MOF, and BOF', groupBy: 'campaign',
-    metrics: ['spend', 'roas', 'conversions', 'ctr', 'cpa'], sort: 'spend', sortDir: 'desc' },
+    metrics: BASE, sort: 'spend', sortDir: 'desc' },
 ]
 
 // Column presets (Motion's "Custom" dropdown) — named metric/tag-column sets. Built-ins ship with the
