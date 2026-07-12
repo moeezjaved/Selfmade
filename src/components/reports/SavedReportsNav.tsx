@@ -67,17 +67,34 @@ export default function SavedReportsNav() {
     return () => window.removeEventListener('reports:changed', h)
   }, [])
 
+  // Delete a saved report (own reports only — shared-with-me rows are owned by another org).
+  const del = async (r: Saved) => {
+    if (!confirm(`Delete “${r.name}” from your reports? This can't be undone.`)) return
+    setReports(rs => rs.filter(x => x.id !== r.id))
+    await fetch(`/api/reports/saved?id=${r.id}`, { method: 'DELETE' }).catch(() => {})
+    window.dispatchEvent(new Event('reports:changed'))
+  }
+
   const Item = ({ r, badge }: { r: Saved; badge?: string }) => {
     const emoji = TEMPLATE_BY_KEY[r.template_key]?.emoji || '📊'
+    const [hover, setHover] = useState(false)
+    const canDelete = !r.ownerName   // not a shared-with-me report
     return (
-      <button onClick={() => router.push(`/reports?report=${r.id}`)} title={r.ownerName ? `${r.name} — shared by ${r.ownerName}` : r.name}
-        style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%', height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'background-color .075s ease-in-out' }}
-        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-        <span style={{ fontSize: 13, flexShrink: 0 }}>{emoji}</span>
-        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-        {badge && <span style={{ fontSize: 8.5, fontWeight: 800, color: '#8aaa8a', flexShrink: 0 }}>{badge}</span>}
-      </button>
+      <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+        style={{ display: 'flex', alignItems: 'center', width: '100%', height: 32, borderRadius: 10, background: hover ? 'rgba(255,255,255,0.08)' : 'transparent', transition: 'background-color .075s ease-in-out' }}>
+        <button onClick={() => router.push(`/reports?report=${r.id}`)} title={r.ownerName ? `${r.name} — shared by ${r.ownerName}` : r.name}
+          style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, height: '100%', padding: '0 4px 0 10px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+          <span style={{ fontSize: 13, flexShrink: 0 }}>{emoji}</span>
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+          {badge && <span style={{ fontSize: 8.5, fontWeight: 800, color: '#8aaa8a', flexShrink: 0 }}>{badge}</span>}
+        </button>
+        {canDelete && hover && (
+          <button onClick={() => del(r)} title="Delete report"
+            style={{ flexShrink: 0, width: 24, height: 24, marginRight: 5, borderRadius: 6, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, lineHeight: 1 }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,120,110,0.25)'; e.currentTarget.style.color = '#ffd5d0' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}>✕</button>
+        )}
+      </div>
     )
   }
 
