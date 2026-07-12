@@ -221,6 +221,25 @@ export async function GET(req: NextRequest) {
       prevByKey = Object.fromEntries(pg)
     }
 
+    // 3b) Global attribution window. Default = Meta's account-configured window (the `value` sums
+    // accInsight already collected). If the user picks a specific click+view combo, re-derive the core
+    // purchase count + revenue from the per-window keys so ROAS/CPA/AOV recompute against that window.
+    const attribution = sp.get('attribution') || ''   // "<click>:<view>" e.g. "7d_click:1d_view"; "" = default
+    if (attribution && attribution !== 'default') {
+      const [click, viewW] = attribution.split(':')
+      const pField: Record<string, keyof Row> = { '1d_click': 'p_1dc', '7d_click': 'p_7dc', '28d_click': 'p_28dc', '1d_view': 'p_1dv' }
+      const rField: Record<string, keyof Row> = { '1d_click': 'rev_1dc', '7d_click': 'rev_7dc', '28d_click': 'rev_28dc', '1d_view': 'rev_1dv' }
+      const applyAttr = (r: Row) => {
+        const cP = click && click !== 'none' ? (r[pField[click]] as number || 0) : 0
+        const vP = viewW && viewW !== 'none' ? (r[pField[viewW]] as number || 0) : 0
+        const cR = click && click !== 'none' ? (r[rField[click]] as number || 0) : 0
+        const vR = viewW && viewW !== 'none' ? (r[rField[viewW]] as number || 0) : 0
+        r.conversions = cP + vP; r.revenue = cR + vR
+      }
+      for (const r of Array.from(groups.values())) applyAttr(r)
+      if (prevByKey) for (const k of Object.keys(prevByKey)) applyAttr(prevByKey[k])
+    }
+
     // 4) Shape + sort. "Scalers" = above-median ROAS but below-median spend (ready to scale).
     let rows = Array.from(groups.values())
     if (tpl.key === 'scalers' && rows.length > 3) {

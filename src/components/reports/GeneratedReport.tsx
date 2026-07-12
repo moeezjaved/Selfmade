@@ -77,7 +77,8 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [aiTags, setAiTags] = useState<boolean>((ic as any).aiTags ?? (tpl?.groupBy === 'creative' || tpl?.groupBy === 'ad'))
   // Table settings + AI-tag columns (Motion's Table settings / AI tags toolbar).
   const [tagCols, setTagCols] = useState<string[]>((ic as any).tagCols || [])
-  const [heatOn, setHeatOn] = useState<boolean>((ic as any).heatOn !== false)
+  const [colorMode, setColorMode] = useState<'none' | 'green' | 'red' | 'gradient'>((ic as any).colorMode || ((ic as any).heatOn === false ? 'none' : 'green'))
+  const [attribution, setAttribution] = useState<string>((ic as any).attribution || 'default')
   const [perPage, setPerPage] = useState<number>((ic as any).perPage || 20)
   const [showTags, setShowTags] = useState<boolean>((ic as any).showTags !== false)
   const [showLaunch, setShowLaunch] = useState<boolean>(!!(ic as any).showLaunch)
@@ -117,6 +118,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       const p = new URLSearchParams({ template: templateKey, dateRange, groupBy, sort, dir, metrics: metrics.join(',') })
       if (filters.length) p.set('filters', JSON.stringify(filters))
       if (needsTagData) p.set('aiTags', '1')
+      if (attribution && attribution !== 'default') p.set('attribution', attribution)
       const res = await fetch(`/api/reports/generate?${p}`)
       const json = await res.json()
       registerCustomMetrics(json.customMetrics)
@@ -126,7 +128,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       setAiText('') // stale once controls change
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
-  }, [templateKey, dateRange, groupBy, sort, dir, metrics, filters, needsTagData])
+  }, [templateKey, dateRange, groupBy, sort, dir, metrics, filters, needsTagData, attribution])
 
   useEffect(() => { load() }, [load])
 
@@ -158,7 +160,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const doSave = async () => {
     if (!onSave) return
     setSaving(true)
-    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters, aiTags, tagCols, heatOn, perPage, showTags, showLaunch, showStatus, cardAspect } })
+    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters, aiTags, tagCols, colorMode, attribution, perPage, showTags, showLaunch, showStatus, cardAspect } })
     setSaving(false)
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) }
   }
@@ -352,8 +354,8 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           <TablePanel rows={rows} metrics={metrics} sort={sort} dir={dir} currency={currency} net={net} groupLabel={groupLabel}
             onSort={toggleSort} count={data?.count}
             tagCols={tagCols} onToggleTagCol={(c: string) => setTagCols(cols => cols.includes(c) ? cols.filter(x => x !== c) : [...cols, c])}
-            settings={{ heatOn, perPage, showTags, showLaunch, showStatus, cardAspect }}
-            setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus} setCardAspect={setCardAspect}
+            settings={{ colorMode, attribution, perPage, showTags, showLaunch, showStatus, cardAspect }}
+            setColorMode={setColorMode} setAttribution={setAttribution} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus} setCardAspect={setCardAspect}
             presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} onSee={setGroupBy}
             onOpenAd={(id: string, nm?: string) => setDetailAd({ id, name: nm })} />
         </>
@@ -398,6 +400,15 @@ const Chevron = () => <svg width="11" height="11" viewBox="0 0 12 12" fill="none
 
 // Soft lime-green heat fill for a cell, strength 0..1 (matches the design's heatmap).
 const heat = (strength: number) => strength <= 0.001 ? 'transparent' : `rgba(140,200,74,${(0.14 + strength * 0.5).toFixed(2)})`
+// Conditional cell fill by color-formatting mode: green (high=good), red (high=intense red),
+// gradient (red→amber→green across the column range), or none.
+const cellBg = (mode: string, strength: number) => {
+  const s = Math.max(0, Math.min(1, strength))
+  if (mode === 'none' || s <= 0.001) return 'transparent'
+  if (mode === 'red') return `rgba(224,120,110,${(0.12 + s * 0.5).toFixed(2)})`
+  if (mode === 'gradient') { const hue = s * 120; return `hsla(${hue},62%,60%,${(0.18 + s * 0.32).toFixed(2)})` }
+  return `rgba(140,200,74,${(0.14 + s * 0.5).toFixed(2)})`   // green (default)
+}
 // Metrics that get a heatmap fill (higher = better, and not Spend which stays plain).
 const heatable = (m: MetricKey) => METRICS[m].goodHigh && m !== 'spend'
 // Net Results shows an average (not a sum) for rate/cost metrics.
@@ -423,8 +434,9 @@ const AI_TAG_COLOR: Record<string, [string, string]> = {
 const cap1 = (s: string) => (s || '').charAt(0).toUpperCase() + (s || '').slice(1)
 const STATUS_COLOR: Record<string, [string, string]> = { active: ['#f0fdf4', '#15803d'], paused: ['#f4f6f0', '#7c8577'], archived: ['#faf5f0', '#9a7b5a'] }
 
-function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setHeatOn, setPerPage, setShowTags, setShowLaunch, setShowStatus, setCardAspect, presets, onApplyPreset, onCustomize, onSee, onOpenAd }: any) {
+function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setColorMode, setAttribution, setPerPage, setShowTags, setShowLaunch, setShowStatus, setCardAspect, presets, onApplyPreset, onCustomize, onSee, onOpenAd }: any) {
   const [menu, setMenu] = useState<string | null>(null)
+  const [presetQ, setPresetQ] = useState('')
   const colMax: Record<string, number> = {}
   for (const m of metrics as MetricKey[]) colMax[m] = Math.max(...rows.map((r: any) => r.metrics[m] || 0), 0.0001)
 
@@ -472,7 +484,9 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
           </button>
           {menu === 'custom' && (
             <div style={{ ...menuBox, width: 220 }}>
-              {(presets || []).map((p: any) => (
+              <input autoFocus value={presetQ} onChange={e => setPresetQ(e.target.value)} placeholder="Search presets…"
+                style={{ width: '100%', padding: '7px 10px', marginBottom: 6, borderRadius: 8, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, outline: 'none', boxSizing: 'border-box' }} />
+              {(presets || []).filter((p: any) => !presetQ || p.name.toLowerCase().includes(presetQ.toLowerCase())).map((p: any) => (
                 <button key={p.name} onClick={() => { onApplyPreset(p); setMenu(null) }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0e1b12', fontFamily: FONT }}
                   onMouseEnter={e => e.currentTarget.style.background = '#f4f6f0'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <span style={{ flex: 1 }}>{p.name}</span>{p.builtin && <span style={{ fontSize: 9, fontWeight: 700, color: '#9aa196' }}>PRESET</span>}
@@ -493,8 +507,23 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
           </button>
           {menu === 'settings' && (
             <div style={menuBox}>
+              <SettingRow label="Attribution window">
+                <select value={settings.attribution} onChange={e => setAttribution(e.target.value)} style={{ ...miniSelect, minWidth: 128 }}>
+                  <option value="default">Default (account)</option>
+                  <option value="1d_click:none">1-day click</option>
+                  <option value="7d_click:none">7-day click</option>
+                  <option value="28d_click:none">28-day click</option>
+                  <option value="1d_click:1d_view">1d click · 1d view</option>
+                  <option value="7d_click:1d_view">7d click · 1d view</option>
+                  <option value="28d_click:1d_view">28d click · 1d view</option>
+                </select>
+              </SettingRow>
               <SettingRow label="Color formatting">
-                <Toggle on={settings.heatOn} onClick={() => setHeatOn(!settings.heatOn)} />
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {([['none', '#e6e9e0', 'None'], ['green', '#8cc84a', 'Green'], ['red', '#e8837a', 'Red'], ['gradient', 'linear-gradient(90deg,#e8837a,#f0d878,#8cc84a)', 'Gradient']] as const).map(([mode, bg, title]) => (
+                    <button key={mode} title={title} onClick={() => setColorMode(mode)} style={{ width: 26, height: 20, borderRadius: 6, cursor: 'pointer', background: bg, border: settings.colorMode === mode ? '2px solid #0e1b12' : '1px solid rgba(26,58,26,.18)' }} />
+                  ))}
+                </div>
               </SettingRow>
               <SettingRow label="Results per page">
                 <select value={settings.perPage} onChange={e => setPerPage(Number(e.target.value))} style={miniSelect}>
@@ -590,12 +619,12 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
                 {dimCols.map(dc => <td key={dc.key} style={{ ...tdStyle, textAlign: 'left' }}>{dimCell(r, dc.key)}</td>)}
                 {metrics.map((m: MetricKey) => {
                   const val = r.metrics[m] || 0
-                  const showHeat = settings.heatOn && heatable(m)
+                  const showHeat = settings.colorMode !== 'none' && heatable(m)
                   const d = r.delta?.[m]
                   return (
                     <td key={m} style={{ ...tdStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14 }}>
                       {showHeat ? (
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#243d17', background: heat(val / colMax[m]), padding: '4px 9px', borderRadius: 7, fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(val, m, currency)}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#243d17', background: cellBg(settings.colorMode, val / colMax[m]), padding: '4px 9px', borderRadius: 7, fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(val, m, currency)}</span>
                       ) : (
                         <span style={{ fontSize: 13, fontWeight: 600, color: '#3a4636', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(val, m, currency)}</span>
                       )}
