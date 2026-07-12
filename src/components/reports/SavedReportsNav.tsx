@@ -71,8 +71,8 @@ export default function SavedReportsNav() {
     const emoji = TEMPLATE_BY_KEY[r.template_key]?.emoji || '📊'
     return (
       <button onClick={() => router.push(`/reports?report=${r.id}`)} title={r.ownerName ? `${r.name} — shared by ${r.ownerName}` : r.name}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
-        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+        style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%', height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'background-color .075s ease-in-out' }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
         <span style={{ fontSize: 13, flexShrink: 0 }}>{emoji}</span>
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
@@ -83,8 +83,8 @@ export default function SavedReportsNav() {
 
   const Shortcut = ({ s }: { s: { emoji: string; label: string; href: string } }) => (
     <button onClick={() => router.push(s.href)} title={s.label}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
-      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+      style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%', height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'background-color .075s ease-in-out' }}
+      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
       <span style={{ fontSize: 13, flexShrink: 0 }}>{s.emoji}</span>
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
     </button>

@@ -304,28 +304,27 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             <div style={{ padding: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: view === 'card' ? 18 : 0, flexWrap: 'wrap' }}>
                 <div style={{ position: 'relative' }}>
-                  <button onClick={() => setAddOpen(o => !o)} style={toolBtn}>
+                  <button onClick={() => setAddOpen(o => !o)} className="mds-int" style={toolBtn}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 1v10M1 6h10" strokeLinecap="round" /></svg> Add metric
                   </button>
                   {addOpen && (
-                    <div style={{ position: 'absolute', left: 0, top: '112%', zIndex: 30, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.15)', padding: 8, width: 220, maxHeight: 320, overflowY: 'auto' }}>
+                    <div style={{ position: 'absolute', left: 0, top: '112%', zIndex: 30, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, boxShadow: 'var(--mds-popover-shadow)', padding: 8, width: 320, maxHeight: 320, overflowY: 'auto' }}>
                       {availableToAdd.map(m => (
-                        <button key={m} onClick={() => addMetric(m)} style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12.5, color: '#1a3a1a', fontFamily: FONT, display: 'flex', justifyContent: 'space-between' }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#f4f6f0'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          {METRICS[m].label}{METRICS[m].video && <span style={{ fontSize: 9, color: '#8aaa8a' }}>🎬</span>}
+                        <button key={m} onClick={() => addMetric(m)} className="mds-menu-item" style={{ width: '100%', textAlign: 'left', height: 32, padding: '0 8px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#171717', fontFamily: FONT, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          {METRICS[m].label}{METRICS[m].video && <span style={{ fontSize: 9, color: '#8f8f8f' }}>🎬</span>}
                         </button>
                       ))}
-                      {!availableToAdd.length && <div style={{ padding: 10, fontSize: 12, color: '#9ab09a' }}>All metrics added.</div>}
+                      {!availableToAdd.length && <div style={{ padding: 10, fontSize: 12, color: '#6f6f6f' }}>All metrics added.</div>}
                     </div>
                   )}
                 </div>
                 {/* numbered metric chips — Motion geometry: 32px tall / 10px radius / white / 1px border,
                     with a 16×16 4px-radius order badge whose pastel colour cycles per slot position. */}
                 {metrics.map((m: MetricKey, i: number) => (
-                  <span key={m} style={{ display: 'flex', alignItems: 'center', gap: 7, height: 32, background: '#fff', border: '1px solid rgba(0,0,0,0.09)', borderRadius: 10, padding: '0 8px', fontSize: 14, fontWeight: 500, color: '#171717' }}>
+                  <span key={m} className="mds-int" style={{ display: 'flex', alignItems: 'center', gap: 7, height: 32, background: '#fff', border: '1px solid rgba(0,0,0,0.09)', borderRadius: 10, padding: '0 8px', fontSize: 14, fontWeight: 500, color: '#171717' }}>
                     <span style={{ width: 16, height: 16, borderRadius: 4, background: METRIC_BADGES[i % METRIC_BADGES.length], color: '#171717', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
                     <span onClick={() => toggleSort(m)} style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>{METRICS[m]?.label || m}</span>
-                    {metrics.length > 1 && <span onClick={() => removeMetric(m)} title="Remove" style={{ cursor: 'pointer', color: '#8f8f8f', marginLeft: -1 }}>✕</span>}
+                    {metrics.length > 1 && <span className="mds-x" onClick={() => removeMetric(m)} title="Remove" style={{ cursor: 'pointer', color: '#8f8f8f', marginLeft: -1, padding: '0 2px' }}>✕</span>}
                   </span>
                 ))}
                 {/* Save the current metric/tag columns as a reusable preset (Motion's floating ＋ Save). */}
@@ -480,7 +479,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
 
         {/* Custom (presets) */}
         <div style={{ position: 'relative', zIndex: 20 }}>
-          <button style={{ ...toolBtn, background: menu === 'custom' ? '#eaeee2' : '#f4f6f0' }} onClick={() => setMenu(menu === 'custom' ? null : 'custom')}>
+          <button className="mds-int" style={{ ...toolBtn, background: menu === 'custom' ? '#eaeee2' : '#f4f6f0' }} onClick={() => setMenu(menu === 'custom' ? null : 'custom')}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="2.5" /><path d="M3 9h18M9 21V9" strokeLinecap="round" /></svg>
             Custom <Chevron />
           </button>
@@ -503,7 +502,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
 
         {/* Table settings */}
         <div style={{ position: 'relative', zIndex: 20 }}>
-          <button style={{ ...toolBtn, background: menu === 'settings' ? '#eaeee2' : '#f4f6f0' }} onClick={() => setMenu(menu === 'settings' ? null : 'settings')}>
+          <button className="mds-int" style={{ ...toolBtn, background: menu === 'settings' ? '#eaeee2' : '#f4f6f0' }} onClick={() => setMenu(menu === 'settings' ? null : 'settings')}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" /></svg>
             Table settings <Chevron />
           </button>
@@ -538,13 +537,16 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
               <SettingRow label="Show launch date"><Toggle on={settings.showLaunch} onClick={() => setShowLaunch(!settings.showLaunch)} /></SettingRow>
               <div style={{ padding: '8px 10px', borderTop: '1px solid rgba(26,58,26,.06)', marginTop: 4 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#3a4636', marginBottom: 8 }}>Creative aspect ratio</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {([['9 / 16', '9:16'], ['4 / 5', '4:5'], ['1 / 1', '1:1']] as const).map(([val, lbl]) => (
-                    <button key={val} onClick={() => setCardAspect(val)} style={{ flex: 1, padding: '6px 4px', borderRadius: 9, border: settings.cardAspect === val ? '2px solid #6fb03a' : '1px solid rgba(26,58,26,.14)', background: settings.cardAspect === val ? '#f0f7ee' : '#fff', cursor: 'pointer', fontFamily: FONT, fontSize: 11, fontWeight: 700, color: '#0e1b12', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                      <span style={{ width: val === '9 / 16' ? 14 : val === '4 / 5' ? 20 : 22, aspectRatio: val, background: '#c8d6c0', borderRadius: 3 }} />
-                      {lbl}
-                    </button>
-                  ))}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                  {([['9 / 16', '9:16'], ['4 / 5', '4:5'], ['1 / 1', '1:1']] as const).map(([val, lbl]) => {
+                    const on = settings.cardAspect === val
+                    return (
+                      <button key={val} onClick={() => setCardAspect(val)} style={{ width: 53, height: val === '9 / 16' ? 76 : 60, borderRadius: 2, border: on ? '1.5px solid #171717' : '1px solid #8f8f8f', background: on ? '#e8e8e8' : '#f3f3f3', cursor: 'pointer', fontFamily: FONT, fontSize: 11, fontWeight: 600, color: '#171717', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'background-color .075s ease-in-out' }}>
+                        <span style={{ width: val === '9 / 16' ? 14 : val === '4 / 5' ? 20 : 22, aspectRatio: val, background: '#8f8f8f', borderRadius: 2 }} />
+                        {lbl}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -553,7 +555,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
 
         {/* AI tags */}
         <div style={{ position: 'relative', zIndex: 20 }}>
-          <button style={{ ...toolBtn, background: '#fff', border: '1px solid rgba(26,58,26,.12)' }} onClick={() => setMenu(menu === 'aitags' ? null : 'aitags')}>
+          <button className="mds-int" style={{ ...toolBtn, background: '#fff', border: '1px solid rgba(26,58,26,.12)' }} onClick={() => setMenu(menu === 'aitags' ? null : 'aitags')}>
             <svg width="13" height="13" viewBox="0 0 20 20" fill="#7c3aed"><path d="M10 1.5l1.7 4.6 4.8 1.7-4.8 1.7L10 14.1 8.3 9.5 3.5 7.8l4.8-1.7z" /></svg>
             AI tags <Chevron />
           </button>
@@ -664,15 +666,17 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
 const menuBox: React.CSSProperties = { position: 'absolute', left: 0, top: '112%', zIndex: 21, background: '#fff', border: '1px solid rgba(26,58,26,.12)', borderRadius: 12, boxShadow: '0 14px 40px rgba(0,0,0,.16)', padding: 8, width: 260 }
 const miniSelect: React.CSSProperties = { padding: '4px 8px', borderRadius: 7, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
 const chartSel: React.CSSProperties = { padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
-// Metric order-badge palette — Motion cycles a small ordered pastel set by slot position (violet,
-// then teal/green, warm, etc.). Mapped to the metric index, not the metric identity.
-const METRIC_BADGES = ['rgb(184,172,255)', 'rgb(255,209,163)', 'rgb(110,212,176)', 'rgb(150,200,255)', 'rgb(255,178,214)', 'rgb(240,224,140)']
+// Metric order-badge palette — Motion cycles a small ordered pastel set by slot position: violet,
+// salmon, teal, then more. Mapped to the metric INDEX (not identity); these exactly match the
+// metric-selection checkbox fills.
+const METRIC_BADGES = ['rgb(184,172,255)', 'rgb(255,158,148)', 'rgb(110,212,176)', 'rgb(150,200,255)', 'rgb(255,178,214)', 'rgb(240,224,140)']
 function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', fontSize: 13, fontWeight: 600, color: '#3a4636' }}>{label}{children}</div>
 }
+// Dark monochrome switch (Motion's report display toggles): track gray-3 off → gray-12 on, white knob.
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
-  return <button onClick={onClick} style={{ width: 34, height: 20, borderRadius: 999, border: 'none', cursor: 'pointer', background: on ? '#6fb03a' : '#d4d9cd', position: 'relative', transition: 'background .15s', flexShrink: 0 }}>
-    <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .15s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+  return <button onClick={onClick} style={{ width: 34, height: 20, borderRadius: 999, border: 'none', cursor: 'pointer', background: on ? '#171717' : '#f3f3f3', position: 'relative', transition: 'background-color .075s ease-in-out', flexShrink: 0 }}>
+    <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .12s ease-in-out', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
   </button>
 }
 

@@ -305,6 +305,22 @@
     margin-bottom: 12px;
   }
 
+  /* ── Motion mds interaction states — hover/active fills from the gray ramp, fast transitions.
+     Applied to report pills/chips/toolbar buttons, nav items, and menu rows. ── */
+  .mds-int { transition: background-color .075s ease-in-out, color .1s ease-in-out; }
+  .mds-int:hover { background-color: #ededed !important; }              /* gray-4 */
+  .mds-int:active { background-color: #e8e8e8 !important; }             /* gray-5 */
+  .mds-menu-item { transition: background-color .075s ease-in-out; border-radius: 6px; }
+  .mds-menu-item:hover { background-color: #ededed !important; }        /* gray-4 */
+  .mds-nav-item { transition: background-color .075s ease-in-out; }
+  .mds-nav-item:hover { background-color: #ededed !important; }         /* gray-4 */
+  .mds-nav-item[aria-current="page"], .mds-nav-item.active { background-color: #e8e8e8 !important; } /* gray-5 */
+  .mds-x { transition: background-color .075s ease-in-out; border-radius: 4px; }
+  .mds-x:hover { background-color: #e8e8e8; }                           /* gray-5 */
+  /* Loading skeleton: gray-4 block with a left→right white shimmer sweep. */
+  .mds-skel { position: relative; overflow: hidden; background: #ededed; border-radius: 10px; }
+  .mds-skel::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent); animation:shimmer 1.4s infinite; }
+
   /* ── MISC ── */
   .shimmer { position: relative; overflow: hidden; background: #e8f0e4; }
   .shimmer::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent); animation:shimmer 1.5s infinite; }
