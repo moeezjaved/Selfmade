@@ -1,78 +1,103 @@
 'use client'
 /**
- * Report filter bar — Motion-style "+ Add filter" with metric/status conditions rendered as removable
- * chips (Spend < 200, Impressions > 150000, Ad status is Active). Owned by GeneratedReport, which
- * passes the filters to /api/reports/generate.
+ * Motion-style report filters. "+ Add filter" opens a searchable field picker (Dimensions /
+ * Performance / AI Tags); pick a field → operator + value → add. Active filters render as removable
+ * chips. Owned by GeneratedReport, which passes the filters to /api/reports/generate.
  */
 import { useState } from 'react'
-import { METRICS, FILTER_OPS, AD_STATUSES, type MetricKey, type FilterOp, type ReportFilter } from '@/lib/reports/templates'
+import { FILTER_FIELDS, FILTER_FIELD_BY_KEY, opsForType, AD_STATUSES, type FilterOp, type ReportFilter } from '@/lib/reports/templates'
 
-const METRIC_KEYS = Object.keys(METRICS) as MetricKey[]
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+const OP_LABEL: Record<FilterOp, string> = { '>': '>', '<': '<', '>=': '≥', '<=': '≤', '=': '=', contains: 'contains', is: 'is', is_not: 'is not', after: 'after', before: 'before' }
+const GROUPS = ['Dimensions', 'Performance', 'AI Tags']
 
-function label(f: ReportFilter): string {
-  if (f.field === 'status') return `Ad status is ${cap(String(f.value))}`
-  return `${METRICS[f.field as MetricKey]?.label || f.field} ${f.op} ${f.value}`
+function chipLabel(f: ReportFilter): string {
+  const fld = FILTER_FIELD_BY_KEY[f.field]
+  return `${fld?.label || f.field} ${OP_LABEL[f.op] || f.op} ${f.value}`
 }
 
-export default function ReportFilters({ filters, onChange }: {
-  filters: ReportFilter[]
-  onChange: (f: ReportFilter[]) => void
-}) {
+export default function ReportFilters({ filters, onChange }: { filters: ReportFilter[]; onChange: (f: ReportFilter[]) => void }) {
   const [open, setOpen] = useState(false)
-  const [field, setField] = useState<string>('spend')
+  const [q, setQ] = useState('')
+  const [field, setField] = useState<string | null>(null)     // chosen field key (step 2)
   const [op, setOp] = useState<FilterOp>('>')
   const [value, setValue] = useState('')
 
-  const isStatus = field === 'status'
+  const fld = field ? FILTER_FIELD_BY_KEY[field] : null
+  const reset = () => { setField(null); setQ(''); setValue(''); setOpen(false) }
+  const pick = (key: string) => { const f = FILTER_FIELD_BY_KEY[key]; setField(key); setOp(opsForType(f.type)[0]); setValue(f.type === 'enum' ? (f.options?.[0] || '') : '') }
   const add = () => {
-    if (isStatus) { onChange([...filters, { field: 'status', op: '=', value: value || 'active' }]); }
-    else { if (value === '' || isNaN(Number(value))) return; onChange([...filters, { field: field as MetricKey, op, value: Number(value) }]) }
-    setValue(''); setOpen(false)
+    if (!fld) return
+    if (fld.type === 'number' && (value === '' || isNaN(Number(value)))) return
+    if (fld.type !== 'enum' && !String(value).trim()) return
+    onChange([...filters, { field: fld.key, op, value: fld.type === 'number' ? Number(value) : value }])
+    reset()
   }
   const remove = (i: number) => onChange(filters.filter((_, idx) => idx !== i))
+
+  const matches = FILTER_FIELDS.filter(f => !q || f.label.toLowerCase().includes(q.toLowerCase()))
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       {filters.map((f, i) => (
         <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 100, background: '#eef4ec', border: '1px solid rgba(0,0,0,0.06)', fontSize: 12, fontWeight: 700, color: '#2a4a2a' }}>
-          {label(f)}
+          {chipLabel(f)}
           <button onClick={() => remove(i)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#8aaa8a', fontSize: 13, padding: 0, lineHeight: 1 }}>✕</button>
         </span>
       ))}
       <div style={{ position: 'relative' }}>
-        <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.14)', background: '#fff', color: '#3a5a3a', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-          <span style={{ fontSize: 14, lineHeight: 1 }}>⊟</span> Add filter
+        <button onClick={() => { setOpen(o => !o); setField(null) }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.14)', background: '#fff', color: '#3a5a3a', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 5h16M7 12h10M10 19h4" strokeLinecap="round" /></svg> Add filter
         </button>
         {open && (
           <>
-            <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 29 }} />
-            <div style={{ position: 'absolute', left: 0, top: '112%', zIndex: 30, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 12, boxShadow: '0 14px 40px rgba(0,0,0,0.18)', padding: 12, width: 300 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#7a9a7a', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Add a filter</div>
-              <select value={field} onChange={e => setField(e.target.value)} style={sel}>
-                <option value="status">Ad status</option>
-                <optgroup label="Metrics">
-                  {METRIC_KEYS.map(m => <option key={m} value={m}>{METRICS[m].label}</option>)}
-                </optgroup>
-              </select>
-              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                {!isStatus && (
-                  <select value={op} onChange={e => setOp(e.target.value as FilterOp)} style={{ ...sel, width: 80 }}>
-                    {FILTER_OPS.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                )}
-                {isStatus ? (
-                  <select value={value || 'active'} onChange={e => setValue(e.target.value)} style={{ ...sel, flex: 1 }}>
-                    {AD_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
-                  </select>
-                ) : (
-                  <input type="number" value={value} onChange={e => setValue(e.target.value)} placeholder="Value" autoFocus
-                    onKeyDown={e => e.key === 'Enter' && add()} style={{ ...sel, flex: 1 }} />
-                )}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
-                <button onClick={add} style={{ padding: '7px 15px', borderRadius: 100, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Add filter</button>
-              </div>
+            <div onClick={reset} style={{ position: 'fixed', inset: 0, zIndex: 29 }} />
+            <div style={{ position: 'absolute', left: 0, top: '112%', zIndex: 30, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 12, boxShadow: '0 14px 44px rgba(0,0,0,0.18)', width: 300 }}>
+              {!field ? (
+                <>
+                  <div style={{ padding: 10, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                    <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search…" autoFocus
+                      style={{ width: '100%', padding: '8px 11px', borderRadius: 9, border: '1px solid rgba(0,0,0,0.12)', fontFamily: 'inherit', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ maxHeight: 340, overflowY: 'auto', padding: 6 }}>
+                    {GROUPS.map(g => {
+                      const items = matches.filter(f => f.group === g)
+                      if (!items.length) return null
+                      return (
+                        <div key={g}>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: '#9ab09a', textTransform: 'uppercase', letterSpacing: '.05em', padding: '8px 10px 4px' }}>{g}</div>
+                          {items.map(f => (
+                            <button key={f.key} onClick={() => pick(f.key)} style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#1a3a1a', fontFamily: 'inherit' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f0f7ee'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{f.label}</button>
+                          ))}
+                        </div>
+                      )
+                    })}
+                    {!matches.length && <div style={{ padding: 12, fontSize: 12.5, color: '#9ab09a' }}>No fields match.</div>}
+                  </div>
+                </>
+              ) : (
+                <div style={{ padding: 12 }}>
+                  <button onClick={() => setField(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#7a9a7a', fontSize: 12, fontWeight: 700, padding: 0, marginBottom: 10 }}>← {fld!.label}</button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <select value={op} onChange={e => setOp(e.target.value as FilterOp)} style={{ ...sel, width: fld!.type === 'number' ? 70 : 110 }}>
+                      {opsForType(fld!.type).map(o => <option key={o} value={o}>{OP_LABEL[o]}</option>)}
+                    </select>
+                    {fld!.type === 'enum' ? (
+                      <select value={value} onChange={e => setValue(e.target.value)} style={{ ...sel, flex: 1 }}>
+                        {(fld!.options || []).map(o => <option key={o} value={o}>{o.replace(/^\w/, c => c.toUpperCase())}</option>)}
+                      </select>
+                    ) : fld!.type === 'date' ? (
+                      <input type="date" value={value} onChange={e => setValue(e.target.value)} style={{ ...sel, flex: 1 }} />
+                    ) : (
+                      <input type={fld!.type === 'number' ? 'number' : 'text'} value={value} onChange={e => setValue(e.target.value)} autoFocus
+                        onKeyDown={e => e.key === 'Enter' && add()} placeholder={fld!.type === 'tag' ? 'e.g. Testimonial' : 'Value'} style={{ ...sel, flex: 1 }} />
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                    <button onClick={add} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Add filter</button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -81,4 +106,4 @@ export default function ReportFilters({ filters, onChange }: {
   )
 }
 
-const sel: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 9, border: '1px solid rgba(0,0,0,0.14)', fontFamily: 'inherit', fontSize: 12.5, color: '#1a3a1a', background: '#fff', outline: 'none', boxSizing: 'border-box' }
+const sel: React.CSSProperties = { padding: '8px 10px', borderRadius: 9, border: '1px solid rgba(0,0,0,0.14)', fontFamily: 'inherit', fontSize: 12.5, color: '#1a3a1a', background: '#fff', outline: 'none', boxSizing: 'border-box' }

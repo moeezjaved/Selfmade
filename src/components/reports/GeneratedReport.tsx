@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, BUILTIN_PRESETS, type MetricKey, type GroupByKey, type ReportFilter, type ColumnPreset } from '@/lib/reports/templates'
+import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, BUILTIN_PRESETS, FILTER_FIELD_BY_KEY, type MetricKey, type GroupByKey, type ReportFilter, type ColumnPreset } from '@/lib/reports/templates'
 import ShareMenu from './ShareMenu'
 import ReportFilters from './ReportFilters'
 import MetricPicker from './MetricPicker'
@@ -71,7 +71,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [showTags, setShowTags] = useState<boolean>((ic as any).showTags !== false)
   const [showLaunch, setShowLaunch] = useState<boolean>(!!(ic as any).showLaunch)
   const [showStatus, setShowStatus] = useState<boolean>(!!(ic as any).showStatus)
-  const needsTagData = aiTags || tagCols.some(c => c !== 'asset_type')
+  const needsTagData = aiTags || tagCols.some(c => c !== 'asset_type') || filters.some(f => FILTER_FIELD_BY_KEY[f.field]?.type === 'tag')
   // Column presets (Custom dropdown + KPI picker). User presets persist in localStorage.
   const [showPicker, setShowPicker] = useState(false)
   const [detailAd, setDetailAd] = useState<{ id: string; name?: string } | null>(null)
@@ -615,8 +615,8 @@ function CardsGrid({ rows, metrics, sort, currency, onSee, onOpenAd }: any) {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px,100%),1fr))', gap: 16 }}>
       {rows.map((r: any, i: number) => (
         <div key={r.key + i} className="rp-card" onClick={() => r.adId && onOpenAd?.(r.adId, r.name)} style={{ border: '1px solid rgba(26,58,26,.1)', borderRadius: 16, overflow: 'hidden', background: '#fff', cursor: r.adId ? 'pointer' : 'default' }}>
-          {/* creative preview 16:10 */}
-          <div style={{ position: 'relative', aspectRatio: '16 / 10', background: '#0e1b12', overflow: 'hidden' }}>
+          {/* creative preview — portrait 4:5 to match Motion's card size */}
+          <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#0e1b12', overflow: 'hidden' }}>
             {r.thumbnail
               ? <img src={cdn(r.thumbnail, 500)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.visibility = 'hidden' }} />
               : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, color: '#c6d2ba' }}>{r.format === 'video' ? '🎬' : r.format === 'carousel' ? '🎠' : '🖼️'}</div>}

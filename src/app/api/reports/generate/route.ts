@@ -97,10 +97,20 @@ export async function GET(req: NextRequest) {
   const dir = (sp.get('dir') as 'asc' | 'desc') || tpl.sortDir
   let filters: ReportFilter[] = []
   try { const f = JSON.parse(sp.get('filters') || '[]'); if (Array.isArray(f)) filters = f } catch {}
+  const TAG_FIELDS = ['visual_format', 'messaging_theme', 'hook_tactic', 'headline_tactic', 'intended_audience', 'offer_type', 'seasonality']
   const statusFilter = filters.find(f => f.field === 'status')
-  const metricFilters = filters.filter(f => f.field !== 'status' && METRICS[f.field as MetricKey])
+  const nameFilters = filters.filter(f => ['ad_name', 'campaign_name', 'adset_name'].includes(f.field))   // pre-group (on insights)
+  const metricFilters = filters.filter(f => !!METRICS[f.field as MetricKey])
+  const rowTextFilters = filters.filter(f => f.field === 'landing_page')
+  const dateFilters = filters.filter(f => f.field === 'launch_date')
+  const formatFilters = filters.filter(f => f.field === 'format')
+  const tagFilters = filters.filter(f => TAG_FIELDS.includes(f.field))
   const passOp = (a: number, op: FilterOp, b: number) =>
     op === '>' ? a > b : op === '<' ? a < b : op === '>=' ? a >= b : op === '<=' ? a <= b : a === b
+  const passText = (v: string, op: FilterOp, q: string) => {
+    const a = (v || '').toLowerCase(), b = (q || '').toLowerCase()
+    return op === 'is' ? a === b : op === 'is_not' ? a !== b : a.includes(b)   // contains
+  }
 
   let metaAccount: any
   try { metaAccount = await resolveScopedAccount(admin, user.id) } catch { metaAccount = null }
@@ -179,7 +189,7 @@ export async function GET(req: NextRequest) {
     // for free so already-tagged creatives show their pills without spending anything.
     let tagMap: Record<string, CreativeTags> = {}
     let tagRemaining = 0
-    const wantTags = isTagDimension(groupBy) || sp.get('aiTags') === '1'
+    const wantTags = isTagDimension(groupBy) || sp.get('aiTags') === '1' || tagFilters.length > 0
     if (wantTags) {
       const spendById = new Map<string, number>()
       for (const ins of insights) spendById.set(ins.ad_id, (spendById.get(ins.ad_id) || 0) + num(ins.spend))
@@ -220,7 +230,12 @@ export async function GET(req: NextRequest) {
       if (tpl.onlyFormat === 'video' && meta.format !== 'video') continue
       if (tpl.onlyFormat === 'image' && !(meta.format === 'image' || meta.format === 'carousel')) continue
       // Ad-status filter (per-ad, applied before grouping).
-      if (statusFilter && (meta.status || 'paused') !== statusFilter.value) continue
+      if (statusFilter) { const match = (meta.status || 'paused') === statusFilter.value; if (statusFilter.op === 'is_not' ? match : !match) continue }
+      // Name filters (ad/campaign/ad set) — applied per-ad before grouping.
+      if (nameFilters.length) {
+        const val: Record<string, string> = { ad_name: ins.ad_name || '', campaign_name: ins.campaign_name || '', adset_name: ins.adset_name || '' }
+        if (!nameFilters.every(f => passText(val[f.field], f.op, String(f.value)))) continue
+      }
       const { key, name } = keyOf(ins, meta)
       let row = groups.get(key)
       if (!row) {
@@ -255,8 +270,12 @@ export async function GET(req: NextRequest) {
       const medSpend = spends[Math.floor(spends.length / 2)]
       rows = rows.filter(r => metricValue(r, 'roas') >= 1 && r.spend <= medSpend && r.conversions > 0)
     }
-    // Metric filters (on grouped rows) — Net Results below reflects the filtered set.
+    // Filters on grouped rows — Net Results below reflects the filtered set.
     for (const f of metricFilters) rows = rows.filter(r => passOp(metricValue(r, f.field as MetricKey), f.op, Number(f.value)))
+    for (const f of rowTextFilters) rows = rows.filter(r => passText(r.landingPage || '', f.op, String(f.value)))
+    for (const f of formatFilters) rows = rows.filter(r => f.op === 'is_not' ? r.format !== f.value : r.format === f.value)
+    for (const f of dateFilters) rows = rows.filter(r => { if (!r.launchDate) return false; return f.op === 'before' ? r.launchDate < String(f.value) : r.launchDate > String(f.value) })
+    for (const f of tagFilters) rows = rows.filter(r => { const t = tagMap[r.adId]?.[f.field as keyof CreativeTags]; return f.op === 'is_not' ? t !== f.value : t === f.value })
     // Pills make sense on creative-level rows (each row = one creative/ad). For aggregate groupings a
     // single creative's tags would misrepresent the group, so only attach there.
     const attachTags = groupBy === 'creative' || groupBy === 'ad'
