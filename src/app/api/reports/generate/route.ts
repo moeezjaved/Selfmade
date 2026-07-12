@@ -152,18 +152,26 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 2a) Video posters — many video creatives return no thumbnail_url in the bulk edge. Batch-fetch
-    // the video's `picture` (higher-res poster) for those, so cards show a real frame not a placeholder.
-    const needPoster = Array.from(adMeta.values()).filter((m: any) => !m.thumbnail && m.videoId)
-    const vidIds = Array.from(new Set(needPoster.map((m: any) => m.videoId))).slice(0, 100)
-    if (vidIds.length) {
-      const picById: Record<string, string> = {}
-      for (let i = 0; i < vidIds.length; i += 50) {
-        const chunk = vidIds.slice(i, i + 50)
-        const res = await fetch(`https://graph.facebook.com/${V}/?ids=${chunk.join(',')}&fields=picture&access_token=${token}`).then(r => r.json()).catch(() => ({}))
-        for (const id of chunk) if (res?.[id]?.picture) picById[id] = res[id].picture
+    // 2a) Posters — Meta's bulk /ads edge is unreliable about creative images. For any ad missing a
+    // thumbnail, re-fetch its creative per-ad (batched ?ids=) which returns thumbnail_url/image_url/
+    // video_id more reliably; then batch-fetch the video's higher-res `picture`. So cards show a real
+    // frame instead of a placeholder. Bounded to the ads actually in the report.
+    const missIds = Array.from(adMeta.entries()).filter(([, m]: any) => !m.thumbnail).map(([id]) => id as string).slice(0, 120)
+    for (let i = 0; i < missIds.length; i += 50) {
+      const chunk = missIds.slice(i, i + 50)
+      const res = await fetch(`https://graph.facebook.com/${V}/?ids=${chunk.join(',')}&fields=creative{thumbnail_url,image_url,video_id}&access_token=${token}`).then(r => r.json()).catch(() => ({}))
+      for (const id of chunk) {
+        const c = res?.[id]?.creative; if (!c) continue
+        const m = adMeta.get(id); if (!m) continue
+        m.thumbnail = m.thumbnail || c.thumbnail_url || c.image_url || null
+        m.videoId = m.videoId || c.video_id || null
       }
-      for (const m of Array.from(adMeta.values())) if (!m.thumbnail && m.videoId && picById[m.videoId]) m.thumbnail = picById[m.videoId]
+    }
+    const vidIds = Array.from(new Set(Array.from(adMeta.values()).filter((m: any) => !m.thumbnail && m.videoId).map((m: any) => m.videoId))).slice(0, 120)
+    for (let i = 0; i < vidIds.length; i += 50) {
+      const chunk = vidIds.slice(i, i + 50)
+      const res = await fetch(`https://graph.facebook.com/${V}/?ids=${chunk.join(',')}&fields=picture&access_token=${token}`).then(r => r.json()).catch(() => ({}))
+      for (const m of Array.from(adMeta.values())) if (!m.thumbnail && m.videoId && res?.[m.videoId]?.picture) m.thumbnail = res[m.videoId].picture
     }
 
     // 2b) AI creative tags. Grouping by an AI dimension, or the "AI tags" toggle (aiTags=1), RUNS the
