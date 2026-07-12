@@ -11,7 +11,7 @@
 import OpenAI from 'openai'
 import { uploadBufferToR2, r2PublicUrl } from '@/lib/r2'
 
-export type TagDimension = 'visual_format' | 'messaging_theme' | 'hook_tactic' | 'headline_tactic' | 'intended_audience' | 'offer_type'
+export type TagDimension = 'visual_format' | 'messaging_theme' | 'hook_tactic' | 'headline_tactic' | 'intended_audience' | 'offer_type' | 'seasonality'
 
 export const TAG_DIMENSIONS: { key: TagDimension; label: string; hint: string }[] = [
   { key: 'visual_format',    label: 'Visual format',    hint: 'Testimonial, Unboxing, Demo, Montage, Cinematic B-Roll, Greenscreen…' },
@@ -20,6 +20,7 @@ export const TAG_DIMENSIONS: { key: TagDimension; label: string; hint: string }[
   { key: 'headline_tactic',  label: 'Headline tactic',  hint: 'Discount, Urgency, Benefit, Curiosity…' },
   { key: 'intended_audience',label: 'Intended audience',hint: 'The persona the ad speaks to' },
   { key: 'offer_type',       label: 'Offer type',       hint: 'Discount, BOGO, Free Shipping, Bundle, No Offer…' },
+  { key: 'seasonality',      label: 'Seasonality',      hint: 'Evergreen, Holiday, Black Friday, Summer, New Year…' },
 ]
 export const TAG_KEYS = TAG_DIMENSIONS.map(d => d.key)
 export const isTagDimension = (k: string): k is TagDimension => (TAG_KEYS as string[]).includes(k)
@@ -32,6 +33,7 @@ const VOCAB: Record<TagDimension, string[] | null> = {
   headline_tactic: ['Discount', 'Urgency', 'Benefit', 'Social Proof', 'Curiosity', 'Question', 'How-To', 'Announcement', 'None'],
   intended_audience: null, // free-form short label, e.g. "Smokers quitting nicotine"
   offer_type: ['Discount', 'BOGO', 'Free Shipping', 'Bundle', 'Free Gift', 'New Arrival', 'Subscription', 'No Offer'],
+  seasonality: ['Evergreen', 'Holiday', 'Black Friday', 'Christmas', 'New Year', 'Summer', 'Back to School', 'Valentine', 'Ramadan/Eid'],
 }
 
 export type CreativeTags = Record<TagDimension, string>

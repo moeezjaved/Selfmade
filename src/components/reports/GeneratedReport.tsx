@@ -340,6 +340,7 @@ const AI_TAG_COLS: { key: string; label: string; group: string }[] = [
   { key: 'intended_audience', label: 'Intended Audience', group: 'Persona' },
   { key: 'messaging_theme', label: 'Messaging theme', group: 'Messaging' },
   { key: 'offer_type', label: 'Offer Type', group: 'Messaging' },
+  { key: 'seasonality', label: 'Seasonality', group: 'Messaging' },
   { key: 'hook_tactic', label: 'Hook Tactic', group: 'Hook' },
   { key: 'headline_tactic', label: 'Headline Tactic', group: 'Hook' },
 ]
@@ -347,7 +348,7 @@ const AI_TAG_LABEL: Record<string, string> = Object.fromEntries(AI_TAG_COLS.map(
 const AI_TAG_COLOR: Record<string, [string, string]> = {
   asset_type: ['#eef4dc', '#41611b'], visual_format: ['#fff7ed', '#c2410c'], hook_tactic: ['#eff6ff', '#1d4ed8'],
   messaging_theme: ['#f0fdf4', '#15803d'], offer_type: ['#fdf2f8', '#be185d'], intended_audience: ['#f0fdfa', '#0f766e'],
-  headline_tactic: ['#faf5ff', '#7c3aed'],
+  headline_tactic: ['#faf5ff', '#7c3aed'], seasonality: ['#fffbeb', '#b45309'],
 }
 const cap1 = (s: string) => (s || '').charAt(0).toUpperCase() + (s || '').slice(1)
 const STATUS_COLOR: Record<string, [string, string]> = { active: ['#f0fdf4', '#15803d'], paused: ['#f4f6f0', '#7c8577'], archived: ['#faf5f0', '#9a7b5a'] }
@@ -364,6 +365,19 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
   for (const c of tagCols) dimCols.push({ key: c, label: AI_TAG_LABEL[c] || c })
 
   const visibleRows = settings.perPage >= 9999 ? rows : rows.slice(0, settings.perPage)
+
+  // Row selection — Net Results recomputes over the selected groups (default: all selected).
+  const [sel, setSel] = useState<Set<string>>(() => new Set(rows.map((r: any) => r.key)))
+  useEffect(() => { setSel(new Set(rows.map((r: any) => r.key))) }, [rows])
+  const allSel = rows.length > 0 && sel.size === rows.length
+  const toggleAll = () => setSel(allSel ? new Set() : new Set(rows.map((r: any) => r.key)))
+  const toggleRow = (k: string) => setSel(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
+  const selRows = rows.filter((r: any) => sel.has(r.key))
+  const computedNet: Record<string, number> = {}
+  for (const m of metrics as MetricKey[]) {
+    if (isAvg(m)) { const vals = selRows.map((r: any) => r.metrics[m]).filter((v: number) => v > 0); computedNet[m] = vals.length ? vals.reduce((a: number, b: number) => a + b, 0) / vals.length : 0 }
+    else computedNet[m] = selRows.reduce((s: number, r: any) => s + (r.metrics[m] || 0), 0)
+  }
 
   const dimCell = (r: any, key: string) => {
     if (key === '__launch') return <span style={{ fontSize: 12.5, color: r.launchDate ? '#3a4636' : '#b5c5b5' }}>{r.launchDate || '—'}</span>
@@ -432,7 +446,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
         </div>
 
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#7c8577' }}>{count || rows.length} ad {(count || rows.length) === 1 ? 'group' : 'groups'}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#7c8577' }}>{sel.size} ad {sel.size === 1 ? 'group' : 'groups'} selected</span>
       </div>
 
       <div className="rp-scroll" style={{ overflowX: 'auto' }}>
@@ -441,7 +455,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
             <tr style={{ background: '#fafcf5', borderBottom: '1px solid rgba(26,58,26,.08)' }}>
               <th style={{ ...thStyle, textAlign: 'left', minWidth: 240, paddingLeft: 18 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 11 }}>
-                  <span style={{ width: 16, height: 16, borderRadius: 5, background: '#0e1b12', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#dffe95" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+                  <button onClick={toggleAll} title={allSel ? 'Deselect all' : 'Select all'} style={{ width: 16, height: 16, borderRadius: 5, border: allSel ? 'none' : '1.6px solid #9aa196', background: allSel ? '#0e1b12' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}>{allSel && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#dffe95" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
                   {(groupLabel || 'Creative').toUpperCase()}
                 </span>
               </th>
@@ -460,7 +474,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
               <tr key={r.key + i} className="rp-row" style={{ borderBottom: '1px solid rgba(26,58,26,.06)', transition: 'background .12s' }}>
                 <td style={{ ...tdStyle, textAlign: 'left', paddingLeft: 18 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                    <span style={{ width: 16, height: 16, borderRadius: 5, border: '1.6px solid #6fb03a', background: '#dffe95', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#1a3a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+                    <button onClick={() => toggleRow(r.key)} style={{ width: 16, height: 16, borderRadius: 5, border: sel.has(r.key) ? '1.6px solid #6fb03a' : '1.6px solid #c2ccc0', background: sel.has(r.key) ? '#dffe95' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', padding: 0 }}>{sel.has(r.key) && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#1a3a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
                     <Thumb src={r.thumbnail} format={r.format} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0e1b12', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{r.name}</div>
@@ -497,7 +511,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
               {dimCols.map(dc => <td key={dc.key} style={{ ...tdStyle, textAlign: 'left', color: '#5f6b5a' }}>—</td>)}
               {metrics.map((m: MetricKey) => (
                 <td key={m} style={{ ...tdStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14, fontSize: 13, fontWeight: 700, color: isAvg(m) ? '#dffe95' : '#f4f7ef', fontVariantNumeric: 'tabular-nums' }}>
-                  {isAvg(m) ? 'Avg ' : ''}{fmtMetric(net[m] || 0, m, currency)}
+                  {isAvg(m) ? 'Avg ' : ''}{fmtMetric(computedNet[m] || 0, m, currency)}
                 </td>
               ))}
             </tr>
@@ -559,6 +573,7 @@ const PILL_DIMS: [string, string, string][] = [
   ['offer_type', '#fdf2f8', '#be185d'],
   ['intended_audience', '#f0fdfa', '#0f766e'],
   ['headline_tactic', '#faf5ff', '#7c3aed'],
+  ['seasonality', '#fffbeb', '#b45309'],
 ]
 function TagPills({ tags, max = 3 }: { tags: any; max?: number }) {
   if (!tags) return null
