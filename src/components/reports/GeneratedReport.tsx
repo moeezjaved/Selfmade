@@ -319,12 +319,13 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
                     </div>
                   )}
                 </div>
-                {/* numbered metric chips */}
+                {/* numbered metric chips — Motion geometry: 32px tall / 10px radius / white / 1px border,
+                    with a 16×16 4px-radius order badge whose pastel colour cycles per slot position. */}
                 {metrics.map((m: MetricKey, i: number) => (
-                  <span key={m} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#eef4dc', border: '1px solid rgba(26,58,26,.1)', borderRadius: 999, padding: '6px 10px 6px 7px', fontSize: 12.5, fontWeight: 700, color: '#243d17' }}>
-                    <span style={{ width: 17, height: 17, borderRadius: '50%', background: '#c8e58a', color: '#243d17', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
-                    <span onClick={() => toggleSort(m)} style={{ cursor: 'pointer' }}>{METRICS[m].label}</span>
-                    {metrics.length > 1 && <span onClick={() => removeMetric(m)} title="Remove" style={{ cursor: 'pointer', color: '#6a7a52', marginLeft: -1 }}>✕</span>}
+                  <span key={m} style={{ display: 'flex', alignItems: 'center', gap: 7, height: 32, background: '#fff', border: '1px solid rgba(0,0,0,0.09)', borderRadius: 10, padding: '0 8px', fontSize: 14, fontWeight: 500, color: '#171717' }}>
+                    <span style={{ width: 16, height: 16, borderRadius: 4, background: METRIC_BADGES[i % METRIC_BADGES.length], color: '#171717', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
+                    <span onClick={() => toggleSort(m)} style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>{METRICS[m]?.label || m}</span>
+                    {metrics.length > 1 && <span onClick={() => removeMetric(m)} title="Remove" style={{ cursor: 'pointer', color: '#8f8f8f', marginLeft: -1 }}>✕</span>}
                   </span>
                 ))}
                 {/* Save the current metric/tag columns as a reusable preset (Motion's floating ＋ Save). */}
@@ -395,7 +396,7 @@ function agoLabel(t: number): string {
 const pill: React.CSSProperties = { position: 'relative', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid rgba(26,58,26,.14)', borderRadius: 11, padding: '9px 13px', fontSize: 13, fontWeight: 600, color: '#3a4636', cursor: 'pointer', fontFamily: FONT }
 const pillSelect: React.CSSProperties = { position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', fontFamily: FONT }
 const panelStyle: React.CSSProperties = { background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 20, boxShadow: '0 12px 30px -22px rgba(14,27,18,.4)', marginBottom: 20 }
-const toolBtn: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: '7px 13px', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#3a4636', cursor: 'pointer' }
+const toolBtn: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, height: 32, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: '0 12px', fontFamily: FONT, fontSize: 14, fontWeight: 500, color: '#3a4636', cursor: 'pointer' }
 const Chevron = () => <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#7c8577" strokeWidth="1.7"><path d="M2 4l4 4 4-4" strokeLinecap="round" /></svg>
 
 // Soft lime-green heat fill for a cell, strength 0..1 (matches the design's heatmap).
@@ -405,9 +406,10 @@ const heat = (strength: number) => strength <= 0.001 ? 'transparent' : `rgba(140
 const cellBg = (mode: string, strength: number) => {
   const s = Math.max(0, Math.min(1, strength))
   if (mode === 'none' || s <= 0.001) return 'transparent'
-  if (mode === 'red') return `rgba(224,120,110,${(0.12 + s * 0.5).toFixed(2)})`
+  if (mode === 'red') return `rgb(${Math.round(255 - 49 * s)},${Math.round(229 - 71 * s)},${Math.round(229 - 78 * s)})`   // error-4 → error-7 ramp
   if (mode === 'gradient') { const hue = s * 120; return `hsla(${hue},62%,60%,${(0.18 + s * 0.32).toFixed(2)})` }
-  return `rgba(140,200,74,${(0.14 + s * 0.5).toFixed(2)})`   // green (default)
+  // Motion green conditional ramp: mid rgb(206,243,218) → best rgb(173,235,194).
+  return `rgb(${Math.round(206 - 33 * s)},${Math.round(243 - 8 * s)},${Math.round(218 - 24 * s)})`
 }
 // Metrics that get a heatmap fill (higher = better, and not Spend which stays plain).
 const heatable = (m: MetricKey) => METRICS[m].goodHigh && m !== 'spend'
@@ -602,7 +604,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
           </thead>
           <tbody>
             {visibleRows.map((r: any, i: number) => (
-              <tr key={r.key + i} className="rp-row" style={{ borderBottom: '1px solid rgba(26,58,26,.06)', transition: 'background .12s' }}>
+              <tr key={r.key + i} className="rp-row" style={{ height: 56, borderBottom: '1px solid rgba(26,58,26,.06)', transition: 'background .12s' }}>
                 <td style={{ ...tdStyle, textAlign: 'left', paddingLeft: 18 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
                     <button onClick={() => toggleRow(r.key)} style={{ width: 16, height: 16, borderRadius: 5, border: sel.has(r.key) ? '1.6px solid #6fb03a' : '1.6px solid #c2ccc0', background: sel.has(r.key) ? '#dffe95' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', padding: 0 }}>{sel.has(r.key) && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#1a3a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
@@ -662,6 +664,9 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
 const menuBox: React.CSSProperties = { position: 'absolute', left: 0, top: '112%', zIndex: 21, background: '#fff', border: '1px solid rgba(26,58,26,.12)', borderRadius: 12, boxShadow: '0 14px 40px rgba(0,0,0,.16)', padding: 8, width: 260 }
 const miniSelect: React.CSSProperties = { padding: '4px 8px', borderRadius: 7, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
 const chartSel: React.CSSProperties = { padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
+// Metric order-badge palette — Motion cycles a small ordered pastel set by slot position (violet,
+// then teal/green, warm, etc.). Mapped to the metric index, not the metric identity.
+const METRIC_BADGES = ['rgb(184,172,255)', 'rgb(255,209,163)', 'rgb(110,212,176)', 'rgb(150,200,255)', 'rgb(255,178,214)', 'rgb(240,224,140)']
 function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', fontSize: 13, fontWeight: 600, color: '#3a4636' }}>{label}{children}</div>
 }
@@ -675,7 +680,7 @@ function CardsGrid({ rows, metrics, sort, currency, aspect = '4 / 5', onSee, onO
   // Wider tiles for taller aspect ratios so 9:16 doesn't get absurdly narrow.
   const minW = aspect === '9 / 16' ? 220 : aspect === '1 / 1' ? 300 : 280
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${minW}px,100%),1fr))`, gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${minW}px,100%),1fr))`, gap: 12 }}>
       {rows.map((r: any, i: number) => (
         <div key={r.key + i} className="rp-card" onClick={() => r.adId && onOpenAd?.(r.adId, r.name)} style={{ border: '1px solid rgba(26,58,26,.1)', borderRadius: 16, overflow: 'hidden', background: '#fff', cursor: r.adId ? 'pointer' : 'default' }}>
           {/* creative preview — aspect set by the card display setting (9:16 / 4:5 / 1:1) */}
@@ -701,9 +706,9 @@ function CardsGrid({ rows, metrics, sort, currency, aspect = '4 / 5', onSee, onO
             <TagPills tags={r.tags} max={3} rows={rows} onSee={onSee} />
             <div style={{ marginTop: 11 }}>
               {metrics.map((m: MetricKey, idx: number) => (
-                <div key={m} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: idx === 0 ? '0 0 8px' : '8px 0 0', borderTop: idx === 0 ? 'none' : '1px solid rgba(26,58,26,.07)' }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 500, color: '#7c8577' }}>{METRICS[m].label}</span>
-                  <span style={{ fontSize: 13, fontWeight: idx === 0 ? 700 : 800, color: metricColor(m, r.metrics[m]) || '#243d17', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(r.metrics[m], m, currency)}</span>
+                <div key={m} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 28, borderTop: idx === 0 ? 'none' : '1px solid rgba(26,58,26,.07)' }}>
+                  <span style={{ fontSize: 14, fontWeight: 400, color: '#6f6f6f' }}>{METRICS[m]?.label || m}</span>
+                  <span style={{ fontSize: 14, fontWeight: idx === 0 ? 700 : 600, color: metricColor(m, r.metrics[m]) || '#171717', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(r.metrics[m], m, currency)}</span>
                 </div>
               ))}
             </div>
@@ -1010,7 +1015,7 @@ function Thumb({ src, format }: { src: string | null; format: string }) {
   }
   return (
     <div onMouseEnter={enter} onMouseLeave={() => setPreview(null)}
-      style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.06)', position: 'relative' }}>
+      style={{ width: 40, height: 40, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: '#f3f3f3', border: '1px solid rgba(0,0,0,0.06)', position: 'relative' }}>
       {src ? <img src={cdn(src, 96)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} />
         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{format === 'video' ? '🎬' : format === 'carousel' ? '🎠' : '🖼️'}</div>}
       {/* hover preview — a larger creative frame, portalled so it's never clipped */}
@@ -1023,7 +1028,7 @@ function Thumb({ src, format }: { src: string | null; format: string }) {
   )
 }
 
-const thStyle: React.CSSProperties = { padding: '11px 14px', textAlign: 'right', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: '#8a9182', whiteSpace: 'nowrap' }
+const thStyle: React.CSSProperties = { padding: '11px 14px', textAlign: 'right', fontSize: 12, fontWeight: 600, letterSpacing: '.04em', color: '#6f6f6f', whiteSpace: 'nowrap' }
 const tdStyle: React.CSSProperties = { padding: '11px 14px', textAlign: 'right', whiteSpace: 'nowrap' }
 
 // Minimal markdown → HTML for the AI panel (bold + line breaks + bullets only; no untrusted HTML).

@@ -38,6 +38,21 @@
     --dark2: #ffffff;
     --dark3: #eef5eb;
     --dark4: #d8ebd4;
+
+    /* ── Motion Design System (mds) tokens — geometry + neutral ramps for the report suite.
+       We keep Selfmade's green accent above; these provide Motion's exact measurements/neutrals. ── */
+    --mds-radius-2: 2px;  --mds-radius-6: 6px;  --mds-radius-8: 8px;  --mds-radius-10: 10px;
+    --mds-radius-12: 12px; --mds-radius-16: 16px; --mds-radius-20: 20px; --mds-radius-24: 24px; --mds-radius-pill: 9999px;
+    --mds-gray-0: #ffffff; --mds-gray-1: #fcfcfc; --mds-gray-2: #f8f8f8; --mds-gray-3: #f3f3f3;
+    --mds-gray-4: #ededed; --mds-gray-5: #e8e8e8; --mds-gray-6: #e2e2e2; --mds-gray-7: #dbdbdb;
+    --mds-gray-8: #c7c7c7; --mds-gray-9: #8f8f8f; --mds-gray-10: #858585; --mds-gray-11: #6f6f6f; --mds-gray-12: #171717;
+    --mds-success-3: #edf7f1; --mds-success-4: #ddf3e4; --mds-success-7: #5ad19a; --mds-success-9: #30a46c; --mds-success-11: #18794e;
+    --mds-error-3: #ffefef; --mds-error-4: #ffe5e5; --mds-error-7: #f3aeaf; --mds-error-9: #e5484d; --mds-error-11: #cd2b31;
+    --mds-warning-3: #fff1e7; --mds-warning-4: #ffe8d7; --mds-warning-9: #f76808; --mds-warning-11: #bd4b00;
+    --mds-control-h: 32px;
+    --mds-control-border: 1px solid rgba(0,0,0,0.09);
+    --mds-popover-shadow: 0 0 0 1px rgba(0,0,0,.06), 0 1px 2px -1px rgba(0,0,0,.12), 0 4px 12px -2px rgba(0,0,0,.10);
+    /* Conditional-formatting green ramp (best → mid) and metric-badge cycling palette live in JS. */
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
