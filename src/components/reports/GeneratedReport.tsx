@@ -350,6 +350,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
         .rp-scroll::-webkit-scrollbar-thumb{background:rgba(26,58,26,.16);border-radius:8px}
         .rp-row:hover{background:#fafcf5}
         .rp-card:hover{box-shadow:0 10px 24px -16px rgba(14,27,18,.5)}
+        .rp-card:hover .rp-card-open{opacity:1}
       `}</style>
      </div>
     </div>
@@ -614,6 +615,15 @@ function CardsGrid({ rows, metrics, sort, currency, onSee, onOpenAd }: any) {
               : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, color: '#c6d2ba' }}>{r.format === 'video' ? '🎬' : r.format === 'carousel' ? '🎠' : '🖼️'}</div>}
             {r.format === 'video' && <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 44, height: 44, borderRadius: 100, background: 'rgba(14,27,18,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 17, paddingLeft: 3 }}>▶</span>}
             <span style={{ position: 'absolute', left: 10, bottom: 10, background: 'rgba(14,27,18,.82)', color: '#f4f7ef', fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 8, backdropFilter: 'blur(4px)' }}>{r.adCount} {r.adCount === 1 ? 'ad' : 'ads'}</span>
+            {/* click-to-view — revealed on hover */}
+            {r.adId && (
+              <div className="rp-card-open" style={{ position: 'absolute', inset: 0, background: 'rgba(14,27,18,.42)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: 0, transition: 'opacity .15s' }}>
+                <span style={{ width: 46, height: 46, borderRadius: '50%', background: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0e1b12" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>View details</span>
+              </div>
+            )}
           </div>
           {/* body */}
           <div style={{ padding: '13px 14px 14px' }}>
