@@ -11,7 +11,10 @@ export type MetricKey =
   | 'conversions' | 'revenue' | 'roas' | 'cpa'
   | 'add_to_cart' | 'initiate_checkout' | 'view_content' | 'landing_page_view' | 'link_click' | 'post_engagement'
   | 'thruplay' | 'video_3s' | 'hook_rate' | 'hold_rate' | 'video_p25' | 'video_p50' | 'video_p75' | 'video_p100'
-  | 'avg_watch_time'
+  | 'avg_watch_time' | 'sustain_rate' | 'cost_per_thruplay'
+  | 'aov' | 'cost_per_atc' | 'cost_per_checkout' | 'cost_per_lpv' | 'cost_per_link_click'
+  | 'outbound_clicks' | 'outbound_ctr' | 'click_to_purchase' | 'atc_to_purchase'
+  | 'comments' | 'reactions' | 'shares' | 'post_saves'
 
 export type Metric = {
   key: MetricKey
@@ -52,6 +55,21 @@ export const METRICS: Record<MetricKey, Metric> = {
   video_p75:        { key: 'video_p75',        label: '75% Watched',      format: 'number',   goodHigh: true, video: true },
   video_p100:       { key: 'video_p100',       label: '100% Watched',     format: 'number',   goodHigh: true, video: true },
   avg_watch_time:   { key: 'avg_watch_time',   label: 'Avg Watch Time',   format: 'seconds',  goodHigh: true, video: true },
+  sustain_rate:     { key: 'sustain_rate',     label: 'Sustain Rate',     format: 'percent',  goodHigh: true, video: true },
+  cost_per_thruplay:{ key: 'cost_per_thruplay',label: 'Cost / ThruPlay',  format: 'currency', goodHigh: false, video: true },
+  aov:              { key: 'aov',              label: 'AOV',              format: 'currency', goodHigh: true },
+  cost_per_atc:     { key: 'cost_per_atc',     label: 'Cost / Add to Cart', format: 'currency', goodHigh: false },
+  cost_per_checkout:{ key: 'cost_per_checkout',label: 'Cost / Checkout',  format: 'currency', goodHigh: false },
+  cost_per_lpv:     { key: 'cost_per_lpv',     label: 'Cost / Landing View', format: 'currency', goodHigh: false },
+  cost_per_link_click:{ key: 'cost_per_link_click', label: 'Cost / Link Click', format: 'currency', goodHigh: false },
+  outbound_clicks:  { key: 'outbound_clicks',  label: 'Outbound Clicks',  format: 'number',   goodHigh: true },
+  outbound_ctr:     { key: 'outbound_ctr',     label: 'CTR (outbound)',   format: 'percent',  goodHigh: true },
+  click_to_purchase:{ key: 'click_to_purchase',label: 'Click→Purchase',   format: 'percent',  goodHigh: true },
+  atc_to_purchase:  { key: 'atc_to_purchase',  label: 'ATC→Purchase',     format: 'percent',  goodHigh: true },
+  comments:         { key: 'comments',         label: 'Comments',         format: 'number',   goodHigh: true },
+  reactions:        { key: 'reactions',        label: 'Reactions',        format: 'number',   goodHigh: true },
+  shares:           { key: 'shares',           label: 'Shares',           format: 'number',   goodHigh: true },
+  post_saves:       { key: 'post_saves',       label: 'Post Saves',       format: 'number',   goodHigh: true },
 }
 
 export type GroupByKey =

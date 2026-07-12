@@ -52,12 +52,14 @@ type Row = {
   conversions: number; revenue: number
   add_to_cart: number; initiate_checkout: number; view_content: number; landing_page_view: number; link_click: number; post_engagement: number
   thruplay: number; video_3s: number; video_p25: number; video_p50: number; video_p75: number; video_p100: number; watch_time_weighted: number
+  outbound_clicks: number; comments: number; reactions: number; shares: number; post_saves: number
 }
 
 const emptyRow = (): Omit<Row, 'key' | 'name' | 'thumbnail' | 'format' | 'landingPage' | 'launchDate' | 'status' | 'adCount' | 'adId'> => ({
   spend: 0, impressions: 0, reach: 0, clicks: 0, conversions: 0, revenue: 0,
   add_to_cart: 0, initiate_checkout: 0, view_content: 0, landing_page_view: 0, link_click: 0, post_engagement: 0,
   thruplay: 0, video_3s: 0, video_p25: 0, video_p50: 0, video_p75: 0, video_p100: 0, watch_time_weighted: 0,
+  outbound_clicks: 0, comments: 0, reactions: 0, shares: 0, post_saves: 0,
 })
 
 // Derived metric values from a row's raw sums.
@@ -72,6 +74,16 @@ function metricValue(r: Row, m: MetricKey): number {
     case 'hook_rate': return r.impressions ? (r.video_3s / r.impressions) * 100 : 0
     case 'hold_rate': return r.impressions ? (r.thruplay / r.impressions) * 100 : 0
     case 'avg_watch_time': return r.thruplay ? r.watch_time_weighted / r.thruplay : 0
+    case 'sustain_rate': return r.video_3s ? (r.video_p100 / r.video_3s) * 100 : 0
+    case 'cost_per_thruplay': return r.thruplay ? r.spend / r.thruplay : 0
+    case 'aov': return r.conversions ? r.revenue / r.conversions : 0
+    case 'cost_per_atc': return r.add_to_cart ? r.spend / r.add_to_cart : 0
+    case 'cost_per_checkout': return r.initiate_checkout ? r.spend / r.initiate_checkout : 0
+    case 'cost_per_lpv': return r.landing_page_view ? r.spend / r.landing_page_view : 0
+    case 'cost_per_link_click': return r.link_click ? r.spend / r.link_click : 0
+    case 'outbound_ctr': return r.impressions ? (r.outbound_clicks / r.impressions) * 100 : 0
+    case 'click_to_purchase': return r.link_click ? (r.conversions / r.link_click) * 100 : 0
+    case 'atc_to_purchase': return r.add_to_cart ? (r.conversions / r.add_to_cart) * 100 : 0
     default: return num((r as any)[m])
   }
 }
@@ -264,6 +276,11 @@ export async function GET(req: NextRequest) {
       row.landing_page_view += actionVal(actions, 'landing_page_view')
       row.link_click += actionVal(actions, 'link_click')
       row.post_engagement += actionVal(actions, 'post_engagement')
+      row.outbound_clicks += actionVal(actions, 'outbound_click')
+      row.comments += actionVal(actions, 'comment')
+      row.reactions += actionVal(actions, 'post_reaction')
+      row.shares += actionVal(actions, 'post')
+      row.post_saves += actionVal(actions, 'onsite_conversion.post_save')
       row.video_3s += actionVal(ins.video_play_actions || [], 'video_view')
       row.thruplay += actionVal(ins.video_thruplay_watched_actions || [], 'video_view')
       row.video_p25 += actionVal(ins.video_p25_watched_actions || [], 'video_view')
