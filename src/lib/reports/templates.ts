@@ -160,8 +160,8 @@ export const GROUP_BY: { key: GroupByKey; label: string; ai?: boolean }[] = [
 export const AI_GROUP_BY = GROUP_BY.filter(g => g.ai)
 
 // ── Filters (Motion-style) ──
-export type FilterOp = '>' | '<' | '>=' | '<=' | '=' | 'contains' | 'is' | 'is_not' | 'after' | 'before'
-export const NUM_OPS: FilterOp[] = ['>', '<', '>=', '<=', '=']
+export type FilterOp = '>' | '<' | '>=' | '<=' | '=' | 'between' | 'contains' | 'is' | 'is_not' | 'after' | 'before'
+export const NUM_OPS: FilterOp[] = ['>', '<', '>=', '<=', '=', 'between']
 export const FILTER_OPS = NUM_OPS
 export type ReportFilter = { field: string; op: FilterOp; value: number | string }
 export const AD_STATUSES = ['active', 'paused', 'archived'] as const
