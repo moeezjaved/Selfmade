@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation'
 import { Plus, ChevronRight } from 'lucide-react'
 import { TEMPLATE_BY_KEY } from '@/lib/reports/templates'
 
-type Saved = { id: string; name: string; template_key: string; visibility?: string; ownerName?: string }
+type Saved = { id: string; name: string; template_key: string; visibility?: string; ownerName?: string; config?: any }
 
 // Quick-report shortcuts (Motion's sidebar folders). Each opens a generated report on click.
 const QUICK_REPORTS: { emoji: string; label: string; href: string }[] = [
@@ -97,11 +97,26 @@ export default function SavedReportsNav() {
         <Plus size={15} /> Create report
       </button>
 
-      {reports.length > 0 && (
-        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {reports.map(r => <Item key={r.id} r={r} badge={r.visibility === 'team' ? 'TEAM' : undefined} />)}
-        </div>
-      )}
+      {reports.length > 0 && (() => {
+        // Reports with a config.folder group under a collapsible folder; the rest render flat on top.
+        const loose = reports.filter(r => !r.config?.folder)
+        const byFolder = new Map<string, Saved[]>()
+        for (const r of reports) { const f = r.config?.folder; if (f) { const a = byFolder.get(f) || []; a.push(r); byFolder.set(f, a) } }
+        return (
+          <>
+            {loose.length > 0 && (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {loose.map(r => <Item key={r.id} r={r} badge={r.visibility === 'team' ? 'TEAM' : undefined} />)}
+              </div>
+            )}
+            {Array.from(byFolder.entries()).map(([f, rs]) => (
+              <Folder key={f} title={f} defaultOpen>
+                {rs.map(r => <Item key={r.id} r={r} badge={r.visibility === 'team' ? 'TEAM' : undefined} />)}
+              </Folder>
+            ))}
+          </>
+        )
+      })()}
 
       {shared.length > 0 && (
         <Folder title="Shared with me" defaultOpen>
