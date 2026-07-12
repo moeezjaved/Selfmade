@@ -147,10 +147,10 @@ export const TEMPLATES: ReportTemplate[] = [
   // ── Find winners ──
   { key: 'top_converters', title: 'Top converters', emoji: '💵', category: 'Find winners',
     description: 'See which creatives are driving the most purchases and revenue', groupBy: 'creative',
-    metrics: ['spend', 'conversions', 'cpa', 'revenue', 'roas'], sort: 'conversions', sortDir: 'desc' },
+    metrics: ['spend', 'impressions', 'cpm', 'link_click', 'cpc', 'ctr', 'conversions', 'cpa', 'revenue', 'roas'], sort: 'conversions', sortDir: 'desc' },
   { key: 'top_engagers', title: 'Top engagers', emoji: '👀', category: 'Find winners',
     description: 'Which creatives capture the most attention and engagement', groupBy: 'creative',
-    metrics: ['spend', 'ctr', 'clicks', 'link_click', 'post_engagement'], sort: 'ctr', sortDir: 'desc' },
+    metrics: ['spend', 'impressions', 'ctr', 'clicks', 'link_click', 'cpc', 'post_engagement'], sort: 'ctr', sortDir: 'desc' },
   { key: 'scalers', title: 'Scalers', emoji: '📈', category: 'Find winners',
     description: 'Promising low-spend creatives with strong ROAS that are ready to scale', groupBy: 'creative',
     metrics: ['spend', 'roas', 'conversions', 'cpa', 'ctr'], sort: 'roas', sortDir: 'desc' },

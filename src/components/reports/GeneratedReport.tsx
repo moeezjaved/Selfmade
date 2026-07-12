@@ -721,10 +721,23 @@ function TagPills({ tags, max = 3, rows, onSee }: { tags: any; max?: number; row
 }
 
 function Thumb({ src, format }: { src: string | null; format: string }) {
+  const [preview, setPreview] = useState<{ x: number; y: number } | null>(null)
+  const enter = (e: React.MouseEvent) => {
+    if (!src) return
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setPreview({ x: r.right + 10, y: r.top })
+  }
   return (
-    <div style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.06)' }}>
+    <div onMouseEnter={enter} onMouseLeave={() => setPreview(null)}
+      style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.06)', position: 'relative' }}>
       {src ? <img src={cdn(src, 96)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} />
         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{format === 'video' ? '🎬' : format === 'carousel' ? '🎠' : '🖼️'}</div>}
+      {/* hover preview — a larger creative frame, portalled so it's never clipped */}
+      {preview && src && typeof document !== 'undefined' && createPortal(
+        <div style={{ position: 'fixed', left: Math.min(preview.x, window.innerWidth - 230), top: Math.min(preview.y, window.innerHeight - 300), zIndex: 4000, width: 216, borderRadius: 12, overflow: 'hidden', boxShadow: '0 18px 44px rgba(0,0,0,.32)', border: '1px solid rgba(0,0,0,.1)', background: '#0e1b12', pointerEvents: 'none' }}>
+          <img src={cdn(src, 432)} alt="" style={{ width: '100%', display: 'block', maxHeight: 288, objectFit: 'cover' }} />
+          {format === 'video' && <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(14,27,18,.75)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>🎬 Video</div>}
+        </div>, document.body)}
     </div>
   )
 }
