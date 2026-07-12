@@ -6,8 +6,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getUserOrg } from '@/lib/org'
 import { uploadBufferToR2, r2PublicUrl } from '@/lib/r2'
+import { recordSnapshot } from '@/lib/reports/snapshots'
 import { sendEmail, emailShell, emailEnabled } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
@@ -41,6 +43,12 @@ export async function POST(req: NextRequest) {
   const url = await uploadBufferToR2(Buffer.from(JSON.stringify(snapshot)), `shared-reports/${token}.json`, 'application/json')
   if (!url) return NextResponse.json({ error: 'Sharing is not configured (storage unavailable).' }, { status: 503 })
   const shareUrl = `${APP_URL}/r/${token}`
+
+  // File a copy in the org's Snapshots archive (frozen, listable at /snapshots). Best-effort.
+  try {
+    const org = await getUserOrg(createAdminClient() as any, user.id)
+    if (org?.orgId) await recordSnapshot(org.orgId, { token, name: snapshot.name, emoji: snapshot.emoji, templateKey: snapshot.templateKey, note: snapshot.note, createdAt: snapshot.sharedAt, sharedBy: snapshot.sharedBy, mode })
+  } catch { /* archive is best-effort — never block the share */ }
 
   if (mode === 'partner') {
     const email = (b.partnerEmail || '').trim()
