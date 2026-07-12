@@ -77,12 +77,39 @@ export const GROUP_BY: { key: GroupByKey; label: string; ai?: boolean }[] = [
 ]
 export const AI_GROUP_BY = GROUP_BY.filter(g => g.ai)
 
-// ── Filters ──
-export type FilterOp = '>' | '<' | '>=' | '<=' | '='
-export const FILTER_OPS: FilterOp[] = ['>', '<', '>=', '<=', '=']
-/** A filter on a computed metric (numeric) or the ad `status` (string equality). */
-export type ReportFilter = { field: MetricKey | 'status'; op: FilterOp; value: number | string }
+// ── Filters (Motion-style) ──
+export type FilterOp = '>' | '<' | '>=' | '<=' | '=' | 'contains' | 'is' | 'is_not' | 'after' | 'before'
+export const NUM_OPS: FilterOp[] = ['>', '<', '>=', '<=', '=']
+export const FILTER_OPS = NUM_OPS
+export type ReportFilter = { field: string; op: FilterOp; value: number | string }
 export const AD_STATUSES = ['active', 'paused', 'archived'] as const
+
+// Filter-field registry drives the "Add filter" picker + the engine.
+export type FilterFieldType = 'number' | 'text' | 'date' | 'enum' | 'tag'
+export type FilterField = { key: string; label: string; type: FilterFieldType; group: string; options?: readonly string[] }
+export const FILTER_FIELDS: FilterField[] = [
+  // Dimensions
+  { key: 'ad_name', label: 'Ad name', type: 'text', group: 'Dimensions' },
+  { key: 'campaign_name', label: 'Campaign name', type: 'text', group: 'Dimensions' },
+  { key: 'adset_name', label: 'Ad set name', type: 'text', group: 'Dimensions' },
+  { key: 'landing_page', label: 'Landing page', type: 'text', group: 'Dimensions' },
+  { key: 'launch_date', label: 'Launch date', type: 'date', group: 'Dimensions' },
+  { key: 'format', label: 'Asset type', type: 'enum', group: 'Dimensions', options: ['video', 'image', 'carousel'] },
+  { key: 'status', label: 'Ad status', type: 'enum', group: 'Dimensions', options: AD_STATUSES },
+  // Performance metrics
+  ...(Object.keys(METRICS) as MetricKey[]).map(k => ({ key: k, label: METRICS[k].label, type: 'number' as FilterFieldType, group: 'Performance' })),
+  // AI tags
+  { key: 'visual_format', label: 'Visual Format', type: 'tag', group: 'AI Tags' },
+  { key: 'messaging_theme', label: 'Messaging Theme', type: 'tag', group: 'AI Tags' },
+  { key: 'hook_tactic', label: 'Hook Tactic', type: 'tag', group: 'AI Tags' },
+  { key: 'headline_tactic', label: 'Headline Tactic', type: 'tag', group: 'AI Tags' },
+  { key: 'intended_audience', label: 'Intended Audience', type: 'tag', group: 'AI Tags' },
+  { key: 'offer_type', label: 'Offer Type', type: 'tag', group: 'AI Tags' },
+  { key: 'seasonality', label: 'Seasonality', type: 'tag', group: 'AI Tags' },
+]
+export const FILTER_FIELD_BY_KEY: Record<string, FilterField> = Object.fromEntries(FILTER_FIELDS.map(f => [f.key, f]))
+export const opsForType = (t: FilterFieldType): FilterOp[] =>
+  t === 'number' ? NUM_OPS : t === 'text' ? ['contains', 'is', 'is_not'] : t === 'date' ? ['after', 'before'] : ['is', 'is_not']
 
 export type ReportCategory = 'Find winners' | 'Find problems' | 'Creative strategy' | 'Understand performance'
 
