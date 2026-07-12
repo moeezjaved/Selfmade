@@ -581,12 +581,16 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
                 {metrics.map((m: MetricKey) => {
                   const val = r.metrics[m] || 0
                   const showHeat = settings.heatOn && heatable(m)
+                  const d = r.delta?.[m]
                   return (
                     <td key={m} style={{ ...tdStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14 }}>
                       {showHeat ? (
                         <span style={{ fontSize: 13, fontWeight: 700, color: '#243d17', background: heat(val / colMax[m]), padding: '4px 9px', borderRadius: 7, fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(val, m, currency)}</span>
                       ) : (
                         <span style={{ fontSize: 13, fontWeight: 600, color: '#3a4636', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(val, m, currency)}</span>
+                      )}
+                      {d !== undefined && Math.abs(d) >= 0.5 && (
+                        <div style={{ fontSize: 10.5, fontWeight: 700, marginTop: 2, color: (METRICS[m].goodHigh ? d > 0 : d < 0) ? '#2d7a2d' : '#c0392b' }}>{d > 0 ? '▲' : '▼'} {Math.abs(d).toFixed(0)}%</div>
                       )}
                     </td>
                   )

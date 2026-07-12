@@ -62,6 +62,35 @@ const emptyRow = (): Omit<Row, 'key' | 'name' | 'thumbnail' | 'format' | 'landin
   outbound_clicks: 0, comments: 0, reactions: 0, shares: 0, post_saves: 0,
 })
 
+const PURCHASE = ['offsite_conversion.fb_pixel_purchase', 'purchase', 'omni_purchase']
+// Accumulate one insight row's metrics into a Row (shared by the current + previous-period passes).
+function accInsight(row: Row, ins: any) {
+  row.adCount++
+  const actions = ins.actions || [], values = ins.action_values || []
+  row.spend += num(ins.spend); row.impressions += num(ins.impressions); row.reach += num(ins.reach); row.clicks += num(ins.clicks)
+  row.conversions += firstActionVal(actions, PURCHASE)
+  row.revenue += firstActionVal(values, PURCHASE)
+  row.add_to_cart += firstActionVal(actions, ['offsite_conversion.fb_pixel_add_to_cart', 'add_to_cart', 'omni_add_to_cart'])
+  row.initiate_checkout += firstActionVal(actions, ['offsite_conversion.fb_pixel_initiate_checkout', 'initiate_checkout', 'omni_initiated_checkout'])
+  row.view_content += firstActionVal(actions, ['offsite_conversion.fb_pixel_view_content', 'view_content', 'omni_view_content'])
+  row.landing_page_view += actionVal(actions, 'landing_page_view')
+  row.link_click += actionVal(actions, 'link_click')
+  row.post_engagement += actionVal(actions, 'post_engagement')
+  row.outbound_clicks += actionVal(actions, 'outbound_click')
+  row.comments += actionVal(actions, 'comment')
+  row.reactions += actionVal(actions, 'post_reaction')
+  row.shares += actionVal(actions, 'post')
+  row.post_saves += actionVal(actions, 'onsite_conversion.post_save')
+  row.video_3s += actionVal(ins.video_play_actions || [], 'video_view')
+  row.thruplay += actionVal(ins.video_thruplay_watched_actions || [], 'video_view')
+  row.video_p25 += actionVal(ins.video_p25_watched_actions || [], 'video_view')
+  row.video_p50 += actionVal(ins.video_p50_watched_actions || [], 'video_view')
+  row.video_p75 += actionVal(ins.video_p75_watched_actions || [], 'video_view')
+  row.video_p100 += actionVal(ins.video_p100_watched_actions || [], 'video_view')
+  const avgWatch = actionVal(ins.video_avg_time_watched_actions || [], 'video_view')
+  row.watch_time_weighted += avgWatch * actionVal(ins.video_thruplay_watched_actions || [], 'video_view')
+}
+
 // Derived metric values from a row's raw sums.
 function metricValue(r: Row, m: MetricKey): number {
   switch (m) {
@@ -265,30 +294,28 @@ export async function GET(req: NextRequest) {
         row = { key, name, thumbnail: meta.thumbnail || null, format: meta.format || 'other', landingPage: meta.landingPage || null, launchDate: meta.launchDate || null, status: meta.status || 'paused', adCount: 0, adId: ins.ad_id, ...emptyRow() }
         groups.set(key, row)
       }
-      row.adCount++
-      const actions = ins.actions || [], values = ins.action_values || []
-      row.spend += num(ins.spend); row.impressions += num(ins.impressions); row.reach += num(ins.reach); row.clicks += num(ins.clicks)
-      row.conversions += firstActionVal(actions, ['offsite_conversion.fb_pixel_purchase', 'purchase', 'omni_purchase'])
-      row.revenue += firstActionVal(values, ['offsite_conversion.fb_pixel_purchase', 'purchase', 'omni_purchase'])
-      row.add_to_cart += firstActionVal(actions, ['offsite_conversion.fb_pixel_add_to_cart', 'add_to_cart', 'omni_add_to_cart'])
-      row.initiate_checkout += firstActionVal(actions, ['offsite_conversion.fb_pixel_initiate_checkout', 'initiate_checkout', 'omni_initiated_checkout'])
-      row.view_content += firstActionVal(actions, ['offsite_conversion.fb_pixel_view_content', 'view_content', 'omni_view_content'])
-      row.landing_page_view += actionVal(actions, 'landing_page_view')
-      row.link_click += actionVal(actions, 'link_click')
-      row.post_engagement += actionVal(actions, 'post_engagement')
-      row.outbound_clicks += actionVal(actions, 'outbound_click')
-      row.comments += actionVal(actions, 'comment')
-      row.reactions += actionVal(actions, 'post_reaction')
-      row.shares += actionVal(actions, 'post')
-      row.post_saves += actionVal(actions, 'onsite_conversion.post_save')
-      row.video_3s += actionVal(ins.video_play_actions || [], 'video_view')
-      row.thruplay += actionVal(ins.video_thruplay_watched_actions || [], 'video_view')
-      row.video_p25 += actionVal(ins.video_p25_watched_actions || [], 'video_view')
-      row.video_p50 += actionVal(ins.video_p50_watched_actions || [], 'video_view')
-      row.video_p75 += actionVal(ins.video_p75_watched_actions || [], 'video_view')
-      row.video_p100 += actionVal(ins.video_p100_watched_actions || [], 'video_view')
-      const avgWatch = actionVal(ins.video_avg_time_watched_actions || [], 'video_view')
-      row.watch_time_weighted += avgWatch * actionVal(ins.video_thruplay_watched_actions || [], 'video_view')
+      accInsight(row, ins)
+    }
+
+    // Comparative: fetch the previous equal-length period and compute per-group prev metrics for deltas.
+    let prevByKey: Record<string, Row> | null = null
+    if (tpl.key === 'comparative' || sp.get('compare') === '1') {
+      const [sy, sm, sd] = since.split('-').map(Number), [uy, um, ud] = until.split('-').map(Number)
+      const len = Math.max(1, Math.round((Date.UTC(uy, um - 1, ud) - Date.UTC(sy, sm - 1, sd)) / 86400000) + 1)
+      const pUntil = new Date(Date.UTC(sy, sm - 1, sd) - 86400000)
+      const pSince = new Date(pUntil.getTime() - (len - 1) * 86400000)
+      const isoU = (d: Date) => d.toISOString().slice(0, 10)
+      const ptr = encodeURIComponent(JSON.stringify({ since: isoU(pSince), until: isoU(pUntil) }))
+      const prevRes = await fetch(`https://graph.facebook.com/${V}/${act}/insights?level=ad&fields=${insFields}&time_range=${ptr}&limit=500&access_token=${token}`).then(r => r.json()).catch(() => ({}))
+      const pg = new Map<string, Row>()
+      for (const ins of (prevRes?.data || [])) {
+        const meta = adMeta.get(ins.ad_id) || {}
+        const { key, name } = keyOf(ins, meta)
+        let row = pg.get(key)
+        if (!row) { row = { key, name, thumbnail: null, format: 'other', landingPage: null, launchDate: null, status: 'paused', adCount: 0, adId: ins.ad_id, ...emptyRow() }; pg.set(key, row) }
+        accInsight(row, ins)
+      }
+      prevByKey = Object.fromEntries(pg)
     }
 
     // 4) Shape + sort. "Scalers" = above-median ROAS but below-median spend (ready to scale).
@@ -311,9 +338,16 @@ export async function GET(req: NextRequest) {
       const m: Record<string, number> = {}
       for (const k of cols) m[k] = metricValue(r, k)
       m[sort] = metricValue(r, sort)
+      // Comparative: previous-period value + % delta per column.
+      let delta: Record<string, number> | undefined
+      if (prevByKey) {
+        const pr = prevByKey[r.key]
+        delta = {}
+        for (const k of cols) { const cur = m[k], prev = pr ? metricValue(pr, k) : 0; delta[k] = prev ? ((cur - prev) / prev) * 100 : (cur ? 100 : 0) }
+      }
       return {
         key: r.key, name: r.name, thumbnail: r.thumbnail, format: r.format, adId: r.adId,
-        landingPage: r.landingPage, launchDate: r.launchDate, status: r.status, adCount: r.adCount, metrics: m,
+        landingPage: r.landingPage, launchDate: r.launchDate, status: r.status, adCount: r.adCount, metrics: m, delta,
         tags: attachTags ? (tagMap[r.adId] || null) : null,
       }
     }).filter(r => r.metrics.spend > 0)
