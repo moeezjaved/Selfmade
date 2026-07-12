@@ -17,10 +17,21 @@ export const maxDuration = 60   // first-time AI tagging (vision over top ads) c
 const V = process.env.META_API_VERSION || 'v20.0'
 
 function timeRange(dateRange: string): { since: string; until: string } {
-  const days = { last_3d: 3, last_7d: 7, last_14d: 14, last_30d: 30, last_60d: 60, last_90d: 90 }[dateRange] || 14
-  const until = new Date(); const since = new Date(Date.now() - days * 86400000)
   const iso = (d: Date) => d.toISOString().slice(0, 10)
-  return { since: iso(since), until: iso(until) }
+  const now = new Date()
+  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+  // Custom range: "custom:2026-01-01:2026-01-31"
+  if (dateRange.startsWith('custom:')) { const [, s, u] = dateRange.split(':'); if (s && u) return { since: s, until: u } }
+  const days = { last_3d: 3, last_7d: 7, last_14d: 14, last_30d: 30, last_60d: 60, last_90d: 90, last_365d: 365 }[dateRange]
+  if (days) return { since: iso(new Date(Date.now() - days * 86400000)), until: iso(now) }
+  // Calendar presets.
+  if (dateRange === 'today') return { since: iso(now), until: iso(now) }
+  if (dateRange === 'yesterday') { const y = new Date(Date.now() - 86400000); return { since: iso(y), until: iso(y) } }
+  if (dateRange === 'this_week') { const d = startOfDay(now); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return { since: iso(d), until: iso(now) } }
+  if (dateRange === 'last_week') { const end = startOfDay(now); end.setDate(end.getDate() - ((end.getDay() + 6) % 7) - 1); const start = new Date(end); start.setDate(start.getDate() - 6); return { since: iso(start), until: iso(end) } }
+  if (dateRange === 'this_month') return { since: iso(new Date(now.getFullYear(), now.getMonth(), 1)), until: iso(now) }
+  if (dateRange === 'last_month') return { since: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)), until: iso(new Date(now.getFullYear(), now.getMonth(), 0)) }
+  return { since: iso(new Date(Date.now() - 14 * 86400000)), until: iso(now) }
 }
 
 const num = (v: any) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }

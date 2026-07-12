@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
     brief: `Write a creative brief for the next round of ads, based on the top performers above. Use markdown with:\n**What to double down on** — the winning angle/format/hook and why (name specific creatives).\n**3 new ad concepts** — a numbered list; each = a one-line hook + format + angle to test next.\nBe concrete and production-ready. Under 160 words.`,
     working: `Answer "what's working and what's not" in two markdown sections:\n**Working** — 2-3 bullets, specific winners with the numbers that prove it.\n**Not working** — 2-3 bullets, specific losers with the numbers.\nName creatives/groups explicitly. Under 130 words.`,
     themes: `Look at the creative names and any tags. In markdown, identify the 2-3 recurring themes/angles/messages that show up in the best performers, and 1 theme that's underperforming. Name examples. Under 120 words.`,
+    testing: `Propose a concrete A/B testing plan for next week based on this data. Markdown with:\n**Test 1 / Test 2 / Test 3** — each = a hypothesis (what to change and why, referencing a specific winner/loser) + the single metric to judge it on. Be specific and prioritized by expected impact. Under 160 words.`,
+    patterns: `Find the shared patterns among the TOP performers here (format, hook, angle, audience, offer). In markdown: **Winning patterns** — 2-3 bullets naming the common traits with the creatives that prove them; **Do more of** — one concrete recommendation. Name specifics. Under 140 words.`,
   }
   const ask = (question || '').toString().trim().slice(0, 400)
   const task = ask
