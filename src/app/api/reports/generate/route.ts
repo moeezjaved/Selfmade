@@ -130,10 +130,17 @@ export async function GET(req: NextRequest) {
     const adJson = await adRes.json().catch(() => ({}))
     const adMeta = new Map<string, any>()
     for (const a of (adJson.data || [])) {
-      const spec = a.creative?.object_story_spec
-      const afs = a.creative?.asset_feed_spec
+      const cr = a.creative || {}
+      const spec = cr.object_story_spec
+      const afs = cr.asset_feed_spec
+      // thumbnail_url is often null for video/dynamic creatives — fall back through the other image
+      // fields Meta exposes so the report card shows a real frame instead of a placeholder.
+      const thumbnail = cr.thumbnail_url || cr.image_url
+        || spec?.video_data?.image_url || spec?.link_data?.picture
+        || spec?.link_data?.child_attachments?.[0]?.picture
+        || afs?.images?.[0]?.url || afs?.videos?.[0]?.thumbnail_url || null
       adMeta.set(a.id, {
-        thumbnail: a.creative?.thumbnail_url || null,
+        thumbnail,
         format: inferFormat(a.creative),
         landingPage: spec?.link_data?.link || spec?.video_data?.call_to_action?.value?.link || afs?.link_urls?.[0]?.website_url || null,
         launchDate: a.created_time ? String(a.created_time).slice(0, 10) : null,
