@@ -160,6 +160,35 @@ export async function GET(request: NextRequest) {
     const hookTypes = csv('hook_type'), emotions = csv('emotion'), angles = csv('angle')
     const formatStyles = csv('format_style'), visualStyles = csv('visual_style'), ctaStyles = csv('cta_style')
     const VALID_TIERS = new Set(['winning', 'optimized', 'growing', 'scaling', 'testing'])
+    // Hoisted so the semantic gap-fill can honour these too (its RPC has no such params).
+    const themeList = theme ? theme.split(',').map(s => s.trim()).filter(Boolean) : []
+    const langList = language ? language.split(',').map(s => s.trim()).filter(Boolean) : []
+    const platformList = platforms ? platforms.split(',').map(s => s.trim()).filter(Boolean) : []
+    // Filters the semantic RPC (search_ads_semantic) can't express because it doesn't return those
+    // columns (performance tier, niche, brand-volume, reuse count, style-DNA). When any is active we
+    // skip the semantic gap-fill entirely so it can't sneak past them; the rest we filter in-process.
+    const semanticBlind = tiers.length > 0 || niches.length > 0 || activeAdsMin > 0 || minReuse > 0
+      || formatStyles.length > 0 || visualStyles.length > 0 || ctaStyles.length > 0
+    const overlap = (a: any, b: string[]) => Array.isArray(a) && a.some((x: string) => b.includes(x))
+    const inRunTime = (dr: number) => runTimeBuckets.length === 0 || runTimeBuckets.some(b => {
+      if (b.endsWith('+')) { const n = parseInt(b); return Number.isFinite(n) && dr >= n }
+      const [a, c] = b.split('-').map(x => parseInt(x)); return Number.isFinite(a) && Number.isFinite(c) && dr >= a && dr < c
+    })
+    // A semantic-fill row must satisfy every filter whose column the RPC returns (days/cta/hook/
+    // emotion/angle/hide-brands/theme/language/platform/run-time), mirroring the main query.
+    const passesSemantic = (v: any) => {
+      if (sinceDate && (!v.start_date || v.start_date < sinceDate)) return false
+      if (ctaTypes.length && !ctaTypes.includes(v.cta)) return false
+      if (hookTypes.length && !hookTypes.includes(v.hook_type)) return false
+      if (emotions.length && !overlap(v.emotion, emotions)) return false
+      if (angles.length && !angles.includes(v.angle)) return false
+      if (hideBrands.length && hideBrands.includes(String(v.page_id))) return false
+      if (themeList.length && !overlap(v.themes, themeList)) return false
+      if (langList.length && !overlap(v.languages, langList)) return false
+      if (platformList.length && !overlap(v.platforms, platformList)) return false
+      if (runTimeBuckets.length && !inRunTime(Number(v.days_running) || 0)) return false
+      return true
+    }
 
     // ── Persistent feed snapshot (instant cold loads under write load) ──────────
     // The bare default feed (no query / no filters / page 0) is the hottest path and the one that
@@ -558,7 +587,7 @@ export async function GET(request: NextRequest) {
     // can surface as a fake "error/empty". Keep it OFF until the embed-backfill fills the corpus,
     // then set SEMANTIC_SEARCH_ENABLED=1 in the env to turn it on. Also hard-capped by a timeout
     // below so it can never hang the request even when enabled.
-    if (process.env.SEMANTIC_SEARCH_ENABLED === '1' && q && mode !== 'brand' && ads.length < limit && process.env.OPENAI_API_KEY) {
+    if (process.env.SEMANTIC_SEARCH_ENABLED === '1' && q && mode !== 'brand' && ads.length < limit && process.env.OPENAI_API_KEY && !semanticBlind) {
       try {
         const queryVec = await embedQuery(getOpenAI(), q)
         const { data: vectorResults } = await admin.rpc('search_ads_semantic', {
@@ -601,9 +630,9 @@ export async function GET(request: NextRequest) {
           for (const v of rows.slice(offset)) {
             if (ads.length >= limit) break
             if (floor != null && typeof v.similarity === 'number' && v.similarity < floor) continue
-            // Honour the days filter — the semantic RPC has no date param, so drop out-of-window
-            // (or undated) rows here, exactly like the main query's start_date >= sinceDate.
-            if (sinceDate && (!v.start_date || v.start_date < sinceDate)) continue
+            // Honour every active filter the RPC couldn't express (days/cta/hook/emotion/angle/
+            // hide-brands/theme/language/platform/run-time) so gap-fill can't leak past them.
+            if (!passesSemantic(v)) continue
             if (haveIds.has(v.ad_id)) continue
             const h = v.image_hash || v.video_hash
             if (h && haveHashes.has(h)) continue
