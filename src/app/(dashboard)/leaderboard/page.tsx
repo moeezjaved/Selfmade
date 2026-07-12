@@ -14,11 +14,24 @@ const money = (n: number, c: string) => new Intl.NumberFormat('en-US', { style: 
 const cdn = (u?: string | null, w = 300) => (!u || u.startsWith('data:') || u.includes('.r2.dev') || u.includes('r2.cloudflarestorage') || u.includes('cdn.tryselfmade'))
   ? (u || '') : `https://images.weserv.nl/?url=${encodeURIComponent(u)}&w=${w}&q=78&output=webp`
 
-// A colored week-over-week delta. Null baseline → a plain muted "-".
+// A week-over-week delta PILL. Null baseline → a plain muted "-" (no pill).
 function Delta({ v }: { v: number | null }) {
   if (v === null || v === undefined) return <span style={{ fontSize: 12, color: G9 }}>-</span>
   const up = v >= 0
-  return <span style={{ fontSize: 12, fontWeight: 400, color: up ? GREEN : RED }}>{up ? '+' : ''}{Math.round(v)}%</span>
+  return <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 4px', borderRadius: 10, fontSize: 12, fontWeight: 400, background: up ? '#edf7f1' : '#ffefef', color: up ? GREEN : RED }}>{up ? '+' : ''}{Math.round(v)}%</span>
+}
+
+// Rank-movement icon (16px, 24-viewBox, currentColor) — four states with a positions-moved count.
+function RankMove({ movement, moved }: { movement: string; moved: number }) {
+  if (movement === 'new') return <svg width="16" height="16" viewBox="0 0 24 24" fill={G12}><path d="M10.99 2.63c.406-.84 1.614-.84 2.02 0l2.014 4.182c.163.338.488.572.864.62l4.638.606c.933.122 1.306 1.26.624 1.9l-3.393 3.19a1.1 1.1 0 0 0-.33 1.005l.852 4.556c.171.915-.806 1.619-1.633 1.174l-4.113-2.21a1.13 1.13 0 0 0-1.066 0l-4.113 2.21c-.827.445-1.804-.259-1.633-1.174l.852-4.556a1.1 1.1 0 0 0-.33-1.005L2.85 9.938c-.683-.64-.31-1.778.623-1.9l4.64-.605c.375-.05.7-.283.863-.621z" /></svg>
+  if (movement === 'held') return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={G9} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+  const up = movement === 'up', color = up ? '#30a46c' : '#e5484d'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 1, color, fontSize: 11, fontWeight: 600 }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={up ? 'M12 5v15M6 10l6-6 6 6' : 'm18 14-6 6-6-6m6 5V4'} /></svg>
+      {moved > 0 && moved}
+    </span>
+  )
 }
 
 function PlayDot() {
@@ -36,14 +49,36 @@ export default function LeaderboardPage() {
   const [tab, setTab] = useState<'scaling' | 'declining' | 'newly' | 'paused'>('newly')
   const [shiftExpanded, setShiftExpanded] = useState(false)
   const [boardExpanded, setBoardExpanded] = useState(false)
+  const [threshold, setThreshold] = useState(0)          // applied spend threshold
+  const [thresholdInput, setThresholdInput] = useState('0')
+  const [aiText, setAiText] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
 
   useEffect(() => {
-    setLoading(true); setError('')
-    fetch('/api/leaderboard').then(r => r.json()).then(j => {
+    setLoading(true); setError(''); setAiText('')
+    fetch(`/api/leaderboard?spendThreshold=${threshold}`).then(r => r.json()).then(j => {
       if (j.error && !j.leaderboard?.length) setError(j.error === 'no_account' ? 'Connect a Meta ad account to see your leaderboard.' : j.error)
       setData(j)
     }).catch(e => setError(e.message)).finally(() => setLoading(false))
-  }, [])
+  }, [threshold])
+
+  const analyzeShifts = async () => {
+    if (!data?.shifts) return
+    setAiLoading(true); setAiText('')
+    const top = (arr: any[]) => (arr || []).slice(0, 6).map((c: any) => ({ name: c.name, spend: Math.round(c.spend), spendDelta: c.spendDelta, roas: Number((c.roas || 0).toFixed(2)), roasDelta: c.roasDelta }))
+    try {
+      const res = await fetch('/api/reports/analyze', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'leaderboard', currency: data.currency,
+          shifts: { scaling: top(data.shifts.scaling), declining: top(data.shifts.declining), newly: top(data.shifts.newly), paused: top(data.shifts.paused) },
+          leaderboard: top(data.leaderboard) }),
+      })
+      const j = await res.json()
+      setAiText(j.analysis || j.error || 'Could not analyze.')
+    } catch (e: any) { setAiText(e.message) }
+    finally { setAiLoading(false) }
+  }
+  const applyThreshold = () => { const n = Math.max(0, Number(thresholdInput) || 0); setThreshold(n) }
 
   const currency = data?.currency || 'PKR'
   const counts = data?.shifts?.counts || { scaling: 0, declining: 0, newly: 0, paused: 0 }
@@ -65,10 +100,36 @@ export default function LeaderboardPage() {
         <span>Leaderboard</span>
         {ago && <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: G9 }} />{ago}</span>}
       </div>
-      <h1 style={{ fontSize: 24, lineHeight: '29px', fontWeight: 600, letterSpacing: '-0.019em', margin: 0 }}>Leaderboard</h1>
-      <div style={{ fontSize: 14, color: G11, marginTop: 4, marginBottom: 26 }}>Track performance shifts and top creatives</div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: 24, lineHeight: '29px', fontWeight: 600, letterSpacing: '-0.019em', margin: 0 }}>Leaderboard</h1>
+          <div style={{ fontSize: 14, color: G11, marginTop: 4 }}>Track performance shifts and top creatives</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {/* Spend-threshold control — gates what counts as Scaling/Declining. */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 10px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.09)', fontSize: 13, color: G11 }}>
+            Spend threshold
+            <input type="number" value={thresholdInput} onChange={e => setThresholdInput(e.target.value)} onBlur={applyThreshold} onKeyDown={e => e.key === 'Enter' && applyThreshold()}
+              style={{ width: 84, height: 24, border: 'none', outline: 'none', fontFamily: FONT, fontSize: 13, fontWeight: 600, color: G12, textAlign: 'right', background: 'transparent' }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: G9 }}>{currency}</span>
+          </label>
+          <button onClick={analyzeShifts} disabled={aiLoading || !data?.shifts}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, height: 34, padding: '0 13px', borderRadius: 10, border: 'none', background: '#0e1b12', color: '#dffe95', fontSize: 13, fontWeight: 800, cursor: aiLoading ? 'default' : 'pointer', fontFamily: FONT, opacity: aiLoading || !data?.shifts ? 0.6 : 1 }}>
+            ✨ {aiLoading ? 'Reading…' : 'Analyze shifts'}
+          </button>
+        </div>
+      </div>
+      <div style={{ height: 26 }} />
 
       {error ? <div style={{ padding: 24, background: '#ffefef', border: '1px solid #ffe5e5', borderRadius: 12, color: RED }}>{error}</div> : null}
+
+      {(aiText || aiLoading) && (
+        <div style={{ marginBottom: 22, background: 'linear-gradient(180deg,#f6faef,#fff)', border: '1px solid #e3ecd4', borderRadius: 12, padding: '13px 16px' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#5a7a3a', marginBottom: aiText ? 8 : 0 }}>✨ Mello · this week's shifts</div>
+          {aiLoading ? <div style={{ fontSize: 12.5, color: G9 }}>Reading the week…</div>
+            : <div style={{ fontSize: 13.5, lineHeight: 1.6, color: '#243d17' }} dangerouslySetInnerHTML={{ __html: mdLite(aiText) }} />}
+        </div>
+      )}
 
       {/* ── Section 1: Performance shifts ── */}
       <h2 style={{ fontSize: 20, lineHeight: '24px', fontWeight: 600, letterSpacing: '-0.017em', margin: '0 0 14px' }}>Performance shifts</h2>
@@ -89,7 +150,10 @@ export default function LeaderboardPage() {
         : cards.length === 0 ? <ShiftEmpty tab={tab} />
         : (
           <>
-            <div className="lb-carousel" style={{ display: shiftExpanded ? 'grid' : 'flex', gridTemplateColumns: shiftExpanded ? 'repeat(auto-fill, minmax(180px, 1fr))' : undefined, gap: 14, overflowX: shiftExpanded ? undefined : 'auto', paddingBottom: 8 }}>
+            <div className="lb-carousel" style={{ display: 'grid', gap: 16, paddingBottom: 8,
+              ...(shiftExpanded
+                ? { gridTemplateColumns: 'repeat(auto-fill, 197px)' }
+                : { gridAutoFlow: 'column', gridAutoColumns: '197px', overflowX: 'auto' }) }}>
               {shownCards.map(c => <ShiftCard key={c.key} c={c} currency={currency} showMetrics={tab === 'scaling' || tab === 'declining' || tab === 'paused'} />)}
             </div>
             {cards.length > 8 && <button onClick={() => setShiftExpanded(x => !x)} style={showBtn}>{shiftExpanded ? 'Show less' : `Show more (${cards.length})`}</button>}
@@ -117,18 +181,20 @@ export default function LeaderboardPage() {
 
 function ShiftCard({ c, currency, showMetrics }: { c: any; currency: string; showMetrics: boolean }) {
   return (
-    <div style={{ flex: '0 0 auto', width: 180 }}>
-      <div style={{ position: 'relative', width: '100%', aspectRatio: '9 / 16', borderRadius: 12, overflow: 'hidden', background: '#0e1b12' }}>
+    <div style={{ width: 197, border: '1px solid rgba(0,0,0,0.09)', borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
+      <div style={{ position: 'relative', width: '100%', aspectRatio: '9 / 16', overflow: 'hidden', background: '#0e1b12' }}>
         {c.thumbnail ? <img src={cdn(c.thumbnail)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
         {c.format === 'video' && <PlayDot />}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 500, marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
-      {showMetrics && (
-        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: G11 }}>Spend</span><span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{money(c.spend, currency)} <Delta v={c.spendDelta} /></span></div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: G11 }}>ROAS</span><span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{(c.roas || 0).toFixed(2)}x <Delta v={c.roasDelta} /></span></div>
-        </div>
-      )}
+      <div style={{ padding: '10px 12px 12px' }}>
+        <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+        {showMetrics && (
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: G11 }}>Spend</span><span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{money(c.spend, currency)} <Delta v={c.spendDelta} /></span></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: G11 }}>ROAS</span><span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{(c.roas || 0).toFixed(2)}x <Delta v={c.roasDelta} /></span></div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -138,9 +204,7 @@ function BoardRow({ r, currency }: { r: any; currency: string }) {
     <div className="lb-row" style={{ display: 'grid', gridTemplateColumns: '64px 1fr 120px 160px 160px', alignItems: 'center', height: 100, background: G2, borderRadius: 16, overflow: 'hidden', transition: 'background-color .075s ease-in-out' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
         <span style={{ fontSize: 24, fontWeight: 600, color: G12 }}>{r.rank}</span>
-        {r.movement === 'new'
-          ? <svg width="16" height="16" viewBox="0 0 24 24" fill={G12}><path d="M12 2l2.9 6.3 6.9.7-5.1 4.6 1.4 6.8L12 17.8 5.9 20.4l1.4-6.8L2.2 9l6.9-.7z" /></svg>
-          : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={G9} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>}
+        <RankMove movement={r.movement} moved={r.moved} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
         <div style={{ width: 100, height: 100, flexShrink: 0, background: '#eee', overflow: 'hidden' }}>
@@ -194,3 +258,12 @@ function BoardSkeleton() {
 }
 
 const showBtn: React.CSSProperties = { marginTop: 14, height: 34, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.09)', background: '#fff', color: G12, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: FONT }
+
+// Minimal markdown → HTML for Mello's read: bold, bullets, line breaks.
+function mdLite(s: string): string {
+  return (s || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^\s*[-•]\s+(.*)$/gm, '• $1')
+    .replace(/\n/g, '<br/>')
+}

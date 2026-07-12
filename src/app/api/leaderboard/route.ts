@@ -134,7 +134,13 @@ export async function GET(req: NextRequest) {
       .map(([k, r]) => card(k, r))
       .filter(c => c.spend > 0)
       .sort((a, b) => b.spend - a.spend)
-      .map((c, i) => ({ ...c, rank: i + 1, movement: prevRank.has(c.key) ? 'held' : 'new' as 'held' | 'new' }))
+      .map((c, i) => {
+        const rank = i + 1, pr = prevRank.get(c.key)
+        // Movement: new (no prior rank), or up/down/held by the change in rank position.
+        const movement = pr === undefined ? 'new' : rank < pr ? 'up' : rank > pr ? 'down' : 'held'
+        const moved = pr === undefined ? 0 : Math.abs(pr - rank)
+        return { ...c, rank, movement, moved }
+      })
 
     return NextResponse.json({
       currency, spendThreshold, updatedAt: now.toISOString(),
