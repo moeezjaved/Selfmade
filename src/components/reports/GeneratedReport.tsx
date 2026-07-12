@@ -6,6 +6,7 @@
  * AI analysis (Mello), and Save / Share. onSave persists via the reports page (Stage 3).
  */
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, BUILTIN_PRESETS, type MetricKey, type GroupByKey, type ReportFilter, type ColumnPreset } from '@/lib/reports/templates'
 import ShareMenu from './ShareMenu'
 import ReportFilters from './ReportFilters'
@@ -304,7 +305,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
                   ))}
                 </div>
               </div>
-              {view === 'card' && <CardsGrid rows={rows} metrics={metrics} sort={sort} currency={currency} />}
+              {view === 'card' && <CardsGrid rows={rows} metrics={metrics} sort={sort} currency={currency} onSee={setGroupBy} />}
             </div>
           </div>
 
@@ -314,7 +315,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             tagCols={tagCols} onToggleTagCol={(c: string) => setTagCols(cols => cols.includes(c) ? cols.filter(x => x !== c) : [...cols, c])}
             settings={{ heatOn, perPage, showTags, showLaunch, showStatus }}
             setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus}
-            presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} />
+            presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} onSee={setGroupBy} />
         </>
       )}
 
@@ -370,7 +371,7 @@ const AI_TAG_COLOR: Record<string, [string, string]> = {
 const cap1 = (s: string) => (s || '').charAt(0).toUpperCase() + (s || '').slice(1)
 const STATUS_COLOR: Record<string, [string, string]> = { active: ['#f0fdf4', '#15803d'], paused: ['#f4f6f0', '#7c8577'], archived: ['#faf5f0', '#9a7b5a'] }
 
-function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setHeatOn, setPerPage, setShowTags, setShowLaunch, setShowStatus, presets, onApplyPreset, onCustomize }: any) {
+function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setHeatOn, setPerPage, setShowTags, setShowLaunch, setShowStatus, presets, onApplyPreset, onCustomize, onSee }: any) {
   const [menu, setMenu] = useState<string | null>(null)
   const colMax: Record<string, number> = {}
   for (const m of metrics as MetricKey[]) colMax[m] = Math.max(...rows.map((r: any) => r.metrics[m] || 0), 0.0001)
@@ -517,7 +518,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0e1b12', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{r.name}</div>
                       <div style={{ fontSize: 11.5, fontWeight: 500, color: '#9aa196' }}>{r.adCount} {r.adCount === 1 ? 'ad' : 'ads'}</div>
-                      {settings.showTags && <TagPills tags={r.tags} max={3} />}
+                      {settings.showTags && <TagPills tags={r.tags} max={3} rows={rows} onSee={onSee} />}
                     </div>
                   </div>
                 </td>
@@ -571,7 +572,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   </button>
 }
 
-function CardsGrid({ rows, metrics, sort, currency }: any) {
+function CardsGrid({ rows, metrics, sort, currency, onSee }: any) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px,100%),1fr))', gap: 16 }}>
       {rows.map((r: any, i: number) => (
@@ -587,7 +588,7 @@ function CardsGrid({ rows, metrics, sort, currency }: any) {
           {/* body */}
           <div style={{ padding: '13px 14px 14px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#0e1b12', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
-            <TagPills tags={r.tags} max={3} />
+            <TagPills tags={r.tags} max={3} rows={rows} onSee={onSee} />
             <div style={{ marginTop: 11 }}>
               {metrics.map((m: MetricKey, idx: number) => (
                 <div key={m} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: idx === 0 ? '0 0 8px' : '8px 0 0', borderTop: idx === 0 ? 'none' : '1px solid rgba(26,58,26,.07)' }}>
@@ -613,18 +614,58 @@ const PILL_DIMS: [string, string, string][] = [
   ['headline_tactic', '#faf5ff', '#7c3aed'],
   ['seasonality', '#fffbeb', '#b45309'],
 ]
-function TagPills({ tags, max = 3 }: { tags: any; max?: number }) {
+const DIM_LABEL: Record<string, string> = { visual_format: 'Visual Format', hook_tactic: 'Hook Tactic', messaging_theme: 'Messaging Theme', offer_type: 'Offer Type', intended_audience: 'Intended Audience', headline_tactic: 'Headline Tactic', seasonality: 'Seasonality' }
+// Short descriptions for the controlled-vocab tag values (shown in the hover tooltip).
+const TAG_DESC: Record<string, string> = {
+  Testimonial: "Customer's personal story", UGC: 'User-generated, native-feeling content', Unboxing: 'Product reveal / first impressions',
+  Demo: 'Shows the product in use', 'Product Showcase': 'Hero shots of the product', 'Feature Callout': 'Highlights a specific feature',
+  Lifestyle: 'Product woven into daily life', Montage: 'Fast-cut sequence of clips', 'Cinematic B-Roll': 'Polished, film-style footage',
+  Greenscreen: 'Creator over a keyed background', 'Talking Head': 'Person speaking to camera', Comparison: 'Us-vs-them / before-after',
+  'Before & After': 'Transformation reveal', 'Text-Heavy': 'Copy-led, minimal imagery', 'Founder Story': 'Founder speaks to the brand',
+  'Problem/Solution': 'Names a pain, offers the fix', 'Social Proof': 'Reviews, ratings, popularity', 'Benefit-Led': 'Leads with the payoff',
+  Emotional: 'Appeals to feeling', Educational: 'Teaches something useful', 'Offer/Discount': 'Price / promo is the hook',
+  FOMO: 'Scarcity / urgency', Question: 'Opens with a question', 'Bold Claim': 'Big, attention-grabbing claim',
+  'Problem Callout': 'Calls out the viewer’s problem', 'Pattern Interrupt': 'Unexpected opening', POV: 'First-person point of view',
+  Discount: 'Money off', BOGO: 'Buy one get one', 'Free Shipping': 'No delivery cost', Bundle: 'Multi-item deal', 'No Offer': 'No explicit promo',
+  Evergreen: 'Runs year-round', Holiday: 'Holiday-season angle', 'Black Friday': 'BFCM promo', Summer: 'Summer seasonal angle',
+}
+
+function TagPills({ tags, max = 3, rows, onSee }: { tags: any; max?: number; rows?: any[]; onSee?: (dim: string) => void }) {
+  const [hover, setHover] = useState<{ k: string; v: string; x: number; y: number; below: boolean } | null>(null)
   if (!tags) return null
   const shown = PILL_DIMS
-    .map(([k, bg, fg]) => ({ v: tags[k] as string, bg, fg }))
+    .map(([k, bg, fg]) => ({ k, v: tags[k] as string, bg, fg }))
     .filter(x => x.v && !['Unknown', 'None', 'Other', ''].includes(x.v))
     .slice(0, max)
   if (!shown.length) return null
+
+  const enter = (e: React.MouseEvent, k: string, v: string) => {
+    if (!rows) return
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const below = r.top < 260
+    setHover({ k, v, x: r.left, y: below ? r.bottom + 6 : r.top - 6, below })
+  }
+  const sib = hover ? (rows || []).filter(r => r.tags?.[hover.k] === hover.v) : []
+  const thumbs = sib.map(r => r.thumbnail).filter(Boolean).slice(0, 5)
+
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
       {shown.map((p, i) => (
-        <span key={i} style={{ fontSize: 10, fontWeight: 700, background: p.bg, color: p.fg, padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap' }}>{p.v}</span>
+        <span key={i} onMouseEnter={e => enter(e, p.k, p.v)} onMouseLeave={() => setHover(null)}
+          style={{ fontSize: 10, fontWeight: 700, background: p.bg, color: p.fg, padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap', cursor: rows ? 'help' : 'inherit' }}>{p.v}</span>
       ))}
+      {hover && typeof document !== 'undefined' && createPortal(
+        <div style={{ position: 'fixed', left: Math.min(hover.x, window.innerWidth - 280), top: hover.y, transform: hover.below ? 'none' : 'translateY(-100%)', zIndex: 4000, width: 260, background: '#0e1b12', color: '#f4f7ef', borderRadius: 12, padding: 14, boxShadow: '0 16px 40px rgba(0,0,0,.4)', pointerEvents: 'none', fontFamily: FONT }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa196', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>{DIM_LABEL[hover.k] || hover.k}</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#dffe95', marginBottom: 2 }}>{hover.v}</div>
+          {TAG_DESC[hover.v] && <div style={{ fontSize: 12, color: '#c9d2bf', marginBottom: 10 }}>{TAG_DESC[hover.v]}</div>}
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: '#9aa196', marginBottom: thumbs.length ? 8 : 0, borderTop: '1px solid rgba(255,255,255,.1)', paddingTop: 8 }}>{sib.length} {sib.length === 1 ? 'creative' : 'creatives'} with this tag</div>
+          {thumbs.length > 0 && (
+            <div style={{ display: 'flex', gap: 5 }}>
+              {thumbs.map((t, j) => <img key={j} src={t as string} alt="" style={{ width: 44, height: 44, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} />)}
+            </div>
+          )}
+        </div>, document.body)}
     </div>
   )
 }
