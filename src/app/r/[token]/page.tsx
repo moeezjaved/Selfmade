@@ -38,6 +38,9 @@ function fmt(v: number, key: MetricKey, currency: string): string {
   }
 }
 
+const cdn = (u?: string | null, w = 96) => (!u || u.startsWith('data:') || u.includes('.r2.dev') || u.includes('r2.cloudflarestorage') || u.includes('cdn.tryselfmade'))
+  ? (u || '') : `https://images.weserv.nl/?url=${encodeURIComponent(u)}&w=${w}&q=75&output=webp`
+
 export default async function SharedReportPage({ params }: { params: { token: string } }) {
   const snap = await getSnapshot(params.token)
 
@@ -105,7 +108,7 @@ export default async function SharedReportPage({ params }: { params: { token: st
                         <span style={{ fontSize: 11, color: '#b5c5b5', width: 16 }}>{i + 1}</span>
                         <div style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.06)' }}>
                           {r.thumbnail
-                            ? <img src={r.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ? <img src={cdn(r.thumbnail, 96)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{r.format === 'video' ? '🎬' : r.format === 'carousel' ? '🎠' : '🖼️'}</div>}
                         </div>
                         <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{r.name}</div>

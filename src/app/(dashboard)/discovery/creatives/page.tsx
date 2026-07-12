@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cleanCopy } from '@/lib/cleanCopy'
+import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
 interface Creative {
   hash: string
@@ -193,10 +194,9 @@ function CreativeCard({ creative: c, onOpen }: { creative: Creative; onOpen: () 
       <div style={{ position: 'relative', background: '#000', overflow: 'hidden', lineHeight: 0 }}>
         {url ? (
           c.type === 'video' ? (
-            <video src={url} muted loop playsInline preload="metadata"
-              onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play().catch(() => {})}
-              onMouseLeave={(e) => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
-              style={{ width: '100%', height: 'auto', display: 'block', verticalAlign: 'top', background: '#000', maxHeight: 500 }} />
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5' }}>
+              <HoverScrubVideo src={url} brandBg="#000" />
+            </div>
           ) : (
             <img src={url} alt="" loading="lazy" style={{ width: '100%', height: 'auto', display: 'block', verticalAlign: 'top' }} />
           )

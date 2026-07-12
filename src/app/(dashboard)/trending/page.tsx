@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Flame, Search, Sparkles, Play, ChevronDown, Loader2, ArrowUpRight } from 'lucide-react'
 import CloneModal from '../discovery/CloneModal'
 import CloneVideoModal from '../discovery/CloneVideoModal'
+import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
 type Ad = { adId: string; pageId: string; pageName: string; image: string | null; isVideo: boolean; videoUrl?: string | null; score: number; format: string | null; hook: string | null; saves: number; isActive: boolean; daysRunning: number | null }
 type BrandW = { pageId: string; pageName: string; adCount: number; activeCount: number; avgScore: number; image: string | null }
@@ -142,13 +143,12 @@ export default function TrendingPage() {
                   onMouseLeave={() => setHoverId(h => (h === ad.adId ? null : h))}
                   style={{ position: 'relative', aspectRatio: '3/4', background: '#0d120e', overflow: 'hidden' }}
                 >
-                  {ad.isVideo && ad.videoUrl && hoverId === ad.adId
-                    ? <video src={ad.videoUrl} poster={ad.image ? img(ad.image) : undefined} autoPlay muted loop playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {ad.isVideo && ad.videoUrl
+                    ? <HoverScrubVideo src={ad.videoUrl} poster={ad.image ? img(ad.image) : undefined} brandBg="#0d120e" initials={initials(ad.pageName)} />
                     : ad.image
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={img(ad.image)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <div style={{ width: '100%', height: '100%' }} />}
-                  {ad.isVideo && hoverId !== ad.adId && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}><div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Play size={18} color="#fff" fill="#fff" /></div></div>}
                   {/* rank + performance badge */}
                   <span style={{ position: 'absolute', top: 8, left: 8, background: i < 3 ? '#e8590c' : 'rgba(0,0,0,.62)', color: '#fff', borderRadius: 20, fontSize: 11, fontWeight: 700, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <Flame size={11} /> {Math.round(ad.score * 100)}

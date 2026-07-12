@@ -14,6 +14,11 @@ import MetricPicker from './MetricPicker'
 
 const ALL_METRICS = Object.keys(METRICS) as MetricKey[]
 
+// Meta thumbnail_url is hotlink-protected (403 without an fb referer) — proxy through weserv like
+// every other image surface so report creatives actually render. R2/data URLs pass through.
+const cdn = (u?: string | null, w = 400) => (!u || u.startsWith('data:') || u.includes('.r2.dev') || u.includes('r2.cloudflarestorage') || u.includes('cdn.tryselfmade'))
+  ? (u || '') : `https://images.weserv.nl/?url=${encodeURIComponent(u)}&w=${w}&q=75&output=webp`
+
 function fmtMetric(v: number, key: MetricKey, currency: string): string {
   const m = METRICS[key]; const n = Number(v) || 0
   switch (m.format) {
@@ -582,7 +587,7 @@ function CardsGrid({ rows, metrics, sort, currency, onSee }: any) {
           {/* creative preview 16:10 */}
           <div style={{ position: 'relative', aspectRatio: '16 / 10', background: '#0e1b12', overflow: 'hidden' }}>
             {r.thumbnail
-              ? <img src={r.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.visibility = 'hidden' }} />
+              ? <img src={cdn(r.thumbnail, 500)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.visibility = 'hidden' }} />
               : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, color: '#c6d2ba' }}>{r.format === 'video' ? '🎬' : r.format === 'carousel' ? '🎠' : '🖼️'}</div>}
             {r.format === 'video' && <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 44, height: 44, borderRadius: 100, background: 'rgba(14,27,18,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 17, paddingLeft: 3 }}>▶</span>}
             <span style={{ position: 'absolute', left: 10, bottom: 10, background: 'rgba(14,27,18,.82)', color: '#f4f7ef', fontSize: 11, fontWeight: 700, padding: '4px 9px', borderRadius: 8, backdropFilter: 'blur(4px)' }}>{r.adCount} {r.adCount === 1 ? 'ad' : 'ads'}</span>
@@ -664,7 +669,7 @@ function TagPills({ tags, max = 3, rows, onSee }: { tags: any; max?: number; row
           <div style={{ fontSize: 11.5, fontWeight: 600, color: '#9aa196', marginBottom: thumbs.length ? 8 : 0, borderTop: '1px solid rgba(255,255,255,.1)', paddingTop: 8 }}>{sib.length} {sib.length === 1 ? 'creative' : 'creatives'} with this tag</div>
           {thumbs.length > 0 && (
             <div style={{ display: 'flex', gap: 5 }}>
-              {thumbs.map((t, j) => <img key={j} src={t as string} alt="" style={{ width: 44, height: 44, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} />)}
+              {thumbs.map((t, j) => <img key={j} src={cdn(t as string, 96)} alt="" style={{ width: 44, height: 44, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} />)}
             </div>
           )}
         </div>, document.body)}
@@ -675,7 +680,7 @@ function TagPills({ tags, max = 3, rows, onSee }: { tags: any; max?: number; row
 function Thumb({ src, format }: { src: string | null; format: string }) {
   return (
     <div style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.06)' }}>
-      {src ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} />
+      {src ? <img src={cdn(src, 96)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} />
         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{format === 'video' ? '🎬' : format === 'carousel' ? '🎠' : '🖼️'}</div>}
     </div>
   )

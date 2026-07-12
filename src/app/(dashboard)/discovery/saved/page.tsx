@@ -5,6 +5,7 @@ import { cleanCopy } from '@/lib/cleanCopy'
 import CloneModal from '../CloneModal'
 import CloneVideoModal from '../CloneVideoModal'
 import { useIsMobile } from '@/lib/useIsMobile'
+import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
 interface Board { id: string; name: string; emoji: string; visibility?: string; isMine?: boolean; parent_board_id?: string | null; discovery_saved_ads?: { count: number }[] }
 interface SavedAd { id: string; ad_id: string; page_name: string; snapshot_url: string; ad_data: any; saved_at: string; tags?: string[] }
@@ -400,11 +401,10 @@ export default function SavedAdsPage() {
                     {/* media — playable video (controls) with graceful fallback; image = link to original */}
                     <div style={{ position: 'relative', width: '100%', paddingBottom: '118%', background: '#0f172a', overflow: 'hidden' }}>
                       {videoSrc && !vidFailed.has(saved.id) ? (
-                        // A real R2 mp4 plays inline. A dead src (blob/YouTube that couldn't be fetched at
-                        // save time) fires onError → we fall through to the poster / "open original" state.
-                        <video src={videoSrc} poster={media || undefined} muted playsInline loop controls preload="metadata"
-                          onError={() => setVidFailed(s => { const n = new Set(s); n.add(saved.id); return n })}
-                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#0f172a' }} />
+                        // A real R2 mp4 → hover-scrub + play. A dead src (blob/YouTube that couldn't be
+                        // fetched at save time) fires onError → fall through to poster / "open original".
+                        <HoverScrubVideo src={videoSrc} poster={media || undefined} brandBg="#0f172a"
+                          onError={() => setVidFailed(s => { const n = new Set(s); n.add(saved.id); return n })} />
                       ) : media ? (
                         <a href={openUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', position: 'absolute', inset: 0 }}>
                           <img src={media} alt={saved.page_name} loading="lazy" decoding="async"
