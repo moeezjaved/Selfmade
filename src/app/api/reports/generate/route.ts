@@ -43,6 +43,15 @@ function firstActionVal(arr: any[], types: string[]): number {
   for (const t of types) { const v = actionVal(arr, t); if (v) return v }
   return 0
 }
+// Sum a specific attribution-window key (e.g. '7d_click') for a given action_type.
+function actionWin(arr: any[], type: string, win: string): number {
+  return (arr || []).filter((a: any) => a.action_type === type).reduce((s: number, a: any) => s + num(a[win]), 0)
+}
+// Like firstActionVal, but reads one attribution window; picks the first type present.
+function firstActionWin(arr: any[], types: string[], win: string): number {
+  for (const t of types) { if ((arr || []).some((a: any) => a.action_type === t)) return actionWin(arr, t, win) }
+  return 0
+}
 
 type Row = {
   key: string; name: string; thumbnail: string | null; format: 'video' | 'image' | 'carousel' | 'other'
@@ -55,6 +64,9 @@ type Row = {
   outbound_clicks: number; comments: number; reactions: number; shares: number; post_saves: number
   leads: number; registrations: number; app_installs: number; messaging_started: number
   add_payment_info: number; search: number; add_to_wishlist: number; likes: number
+  // attribution-window purchase counts + revenue
+  p_1dc: number; p_7dc: number; p_1dv: number; p_28dc: number
+  rev_1dc: number; rev_7dc: number; rev_1dv: number; rev_28dc: number
 }
 
 const emptyRow = (): Omit<Row, 'key' | 'name' | 'thumbnail' | 'format' | 'landingPage' | 'launchDate' | 'status' | 'adCount' | 'adId'> => ({
@@ -64,6 +76,7 @@ const emptyRow = (): Omit<Row, 'key' | 'name' | 'thumbnail' | 'format' | 'landin
   outbound_clicks: 0, comments: 0, reactions: 0, shares: 0, post_saves: 0,
   leads: 0, registrations: 0, app_installs: 0, messaging_started: 0,
   add_payment_info: 0, search: 0, add_to_wishlist: 0, likes: 0,
+  p_1dc: 0, p_7dc: 0, p_1dv: 0, p_28dc: 0, rev_1dc: 0, rev_7dc: 0, rev_1dv: 0, rev_28dc: 0,
 })
 
 const PURCHASE = ['offsite_conversion.fb_pixel_purchase', 'purchase', 'omni_purchase']
@@ -93,6 +106,11 @@ function accInsight(row: Row, ins: any) {
   row.search += firstActionVal(actions, ['search', 'offsite_conversion.fb_pixel_search'])
   row.add_to_wishlist += firstActionVal(actions, ['add_to_wishlist', 'offsite_conversion.fb_pixel_add_to_wishlist'])
   row.likes += actionVal(actions, 'like')
+  // per-window purchase counts + revenue (only populated when action_attribution_windows requested)
+  row.p_1dc += firstActionWin(actions, PURCHASE, '1d_click');  row.p_7dc += firstActionWin(actions, PURCHASE, '7d_click')
+  row.p_1dv += firstActionWin(actions, PURCHASE, '1d_view');   row.p_28dc += firstActionWin(actions, PURCHASE, '28d_click')
+  row.rev_1dc += firstActionWin(values, PURCHASE, '1d_click'); row.rev_7dc += firstActionWin(values, PURCHASE, '7d_click')
+  row.rev_1dv += firstActionWin(values, PURCHASE, '1d_view');  row.rev_28dc += firstActionWin(values, PURCHASE, '28d_click')
   row.video_3s += actionVal(ins.video_play_actions || [], 'video_view')
   row.thruplay += actionVal(ins.video_thruplay_watched_actions || [], 'video_view')
   row.video_p25 += actionVal(ins.video_p25_watched_actions || [], 'video_view')
@@ -133,6 +151,34 @@ function metricValue(r: Row, m: MetricKey): number {
     case 'engagement_rate': return r.impressions ? (r.post_engagement / r.impressions) * 100 : 0
     case 'checkout_to_purchase': return r.initiate_checkout ? (r.conversions / r.initiate_checkout) * 100 : 0
     case 'vc_to_atc': return r.view_content ? (r.add_to_cart / r.view_content) * 100 : 0
+    // Attribution-window purchase counts + revenue (raw sums under short field names)
+    case 'purchases_1d_click': return r.p_1dc
+    case 'purchases_7d_click': return r.p_7dc
+    case 'purchases_1d_view': return r.p_1dv
+    case 'purchases_28d_click': return r.p_28dc
+    case 'revenue_1d_click': return r.rev_1dc
+    case 'revenue_7d_click': return r.rev_7dc
+    case 'revenue_1d_view': return r.rev_1dv
+    case 'revenue_28d_click': return r.rev_28dc
+    case 'roas_1d_click': return r.spend ? r.rev_1dc / r.spend : 0
+    case 'roas_7d_click': return r.spend ? r.rev_7dc / r.spend : 0
+    case 'roas_1d_view': return r.spend ? r.rev_1dv / r.spend : 0
+    case 'roas_28d_click': return r.spend ? r.rev_28dc / r.spend : 0
+    case 'cpa_1d_click': return r.p_1dc ? r.spend / r.p_1dc : 0
+    case 'cpa_7d_click': return r.p_7dc ? r.spend / r.p_7dc : 0
+    case 'cpa_1d_view': return r.p_1dv ? r.spend / r.p_1dv : 0
+    case 'cpa_28d_click': return r.p_28dc ? r.spend / r.p_28dc : 0
+    // Per-1000-impression density
+    case 'purchases_per_1k': return r.impressions ? (r.conversions / r.impressions) * 1000 : 0
+    case 'revenue_per_1k': return r.impressions ? (r.revenue / r.impressions) * 1000 : 0
+    case 'atc_per_1k': return r.impressions ? (r.add_to_cart / r.impressions) * 1000 : 0
+    case 'checkout_per_1k': return r.impressions ? (r.initiate_checkout / r.impressions) * 1000 : 0
+    case 'lpv_per_1k': return r.impressions ? (r.landing_page_view / r.impressions) * 1000 : 0
+    case 'link_clicks_per_1k': return r.impressions ? (r.link_click / r.impressions) * 1000 : 0
+    case 'leads_per_1k': return r.impressions ? (r.leads / r.impressions) * 1000 : 0
+    case 'registrations_per_1k': return r.impressions ? (r.registrations / r.impressions) * 1000 : 0
+    case 'view_content_per_1k': return r.impressions ? (r.view_content / r.impressions) * 1000 : 0
+    case 'thruplay_per_1k': return r.impressions ? (r.thruplay / r.impressions) * 1000 : 0
     default: return num((r as any)[m])
   }
 }
@@ -202,7 +248,9 @@ export async function GET(req: NextRequest) {
       'video_thruplay_watched_actions', 'video_p25_watched_actions', 'video_p50_watched_actions',
       'video_p75_watched_actions', 'video_p100_watched_actions', 'video_play_actions', 'video_avg_time_watched_actions',
     ].join(',')
-    const insRes = await fetch(`https://graph.facebook.com/${V}/${act}/insights?level=ad&fields=${insFields}&time_range=${tr}&limit=500&access_token=${token}`)
+    // Request all four attribution windows so actions/action_values carry per-window keys (1d_view/1d_click/7d_click/28d_click).
+    const attrWin = `&action_attribution_windows=${encodeURIComponent(JSON.stringify(['1d_view', '1d_click', '7d_click', '28d_click']))}`
+    const insRes = await fetch(`https://graph.facebook.com/${V}/${act}/insights?level=ad&fields=${insFields}&time_range=${tr}${attrWin}&limit=500&access_token=${token}`)
     const insJson = await insRes.json()
     if (insJson.error) throw new Error(insJson.error.message)
     const insights: any[] = insJson.data || []
@@ -326,7 +374,7 @@ export async function GET(req: NextRequest) {
       const pSince = new Date(pUntil.getTime() - (len - 1) * 86400000)
       const isoU = (d: Date) => d.toISOString().slice(0, 10)
       const ptr = encodeURIComponent(JSON.stringify({ since: isoU(pSince), until: isoU(pUntil) }))
-      const prevRes = await fetch(`https://graph.facebook.com/${V}/${act}/insights?level=ad&fields=${insFields}&time_range=${ptr}&limit=500&access_token=${token}`).then(r => r.json()).catch(() => ({}))
+      const prevRes = await fetch(`https://graph.facebook.com/${V}/${act}/insights?level=ad&fields=${insFields}&time_range=${ptr}${attrWin}&limit=500&access_token=${token}`).then(r => r.json()).catch(() => ({}))
       const pg = new Map<string, Row>()
       for (const ins of (prevRes?.data || [])) {
         const meta = adMeta.get(ins.ad_id) || {}
