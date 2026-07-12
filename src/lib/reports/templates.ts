@@ -229,6 +229,9 @@ export const TEMPLATES: ReportTemplate[] = [
   { key: 'launch_analysis', title: 'Launch analysis', emoji: '🚀', category: 'Find winners', featured: true,
     description: 'How your newest ads are performing out of the gate', groupBy: 'creative',
     metrics: BASE, sort: 'spend', sortDir: 'desc' },
+  { key: 'new_launches', title: 'New Launches', emoji: '🚀', category: 'Find winners', featured: true,
+    description: 'Track newly-launched ads against a goal: Launched → Scaled → Winners, by launch week',
+    groupBy: 'creative', metrics: ['spend', 'roas', 'conversions', 'revenue', 'cpa', 'ctr'], sort: 'spend', sortDir: 'desc' },
 
   // ── Find winners ──
   { key: 'top_converters', title: 'Top converters', emoji: '💵', category: 'Find winners',
