@@ -661,6 +661,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
 
 const menuBox: React.CSSProperties = { position: 'absolute', left: 0, top: '112%', zIndex: 21, background: '#fff', border: '1px solid rgba(26,58,26,.12)', borderRadius: 12, boxShadow: '0 14px 40px rgba(0,0,0,.16)', padding: 8, width: 260 }
 const miniSelect: React.CSSProperties = { padding: '4px 8px', borderRadius: 7, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
+const chartSel: React.CSSProperties = { padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
 function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', fontSize: 13, fontWeight: 600, color: '#3a4636' }}>{label}{children}</div>
 }
@@ -713,31 +714,68 @@ function CardsGrid({ rows, metrics, sort, currency, aspect = '4 / 5', onSee, onO
   )
 }
 
-// Bar/line chart of the report — a chosen metric across the top groups (recharts).
+// Compact axis-tick formatter for a given metric's format.
+const axisFmt = (m: MetricKey) => (v: any) => { const f = METRICS[m]?.format; return f === 'currency' ? (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : String(v)) : f === 'percent' ? v + '%' : f === 'ratio' ? v + 'x' : f === 'score' ? String(Math.round(v)) : new Intl.NumberFormat('en-US', { notation: 'compact' }).format(v) }
+
+// Bar/line chart of the report. Bar view is a grouped, DUAL-AXIS comparison (Motion type B): a primary
+// metric on the left axis + an optional secondary metric on the right, one bar each per segment, with a
+// representative creative thumbnail under each column. Line view plots the single primary metric.
 function ChartView({ rows, metrics, sort, currency, type }: any) {
   const [metric, setMetric] = useState<MetricKey>(sort)
-  const short = (s: string) => s.length > 16 ? s.slice(0, 15) + '…' : s
-  const data = [...rows].sort((a, b) => (b.metrics[metric] || 0) - (a.metrics[metric] || 0)).slice(0, 20)
-    .map((r: any) => ({ name: short(r.name), full: r.name, value: r.metrics[metric] || 0 }))
-  const tickFmt = (v: any) => { const f = METRICS[metric].format; return f === 'currency' ? (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : String(v)) : f === 'percent' ? v + '%' : f === 'ratio' ? v + 'x' : new Intl.NumberFormat('en-US', { notation: 'compact' }).format(v) }
+  const [metric2, setMetric2] = useState<MetricKey | ''>(() => (metrics as MetricKey[]).find((m: MetricKey) => m !== sort && METRICS[m]?.format !== METRICS[sort as MetricKey]?.format) || '')
+  const short = (s: string) => s.length > 14 ? s.slice(0, 13) + '…' : s
+  const dual = type === 'bar' && !!metric2 && metric2 !== metric
+  const data = [...rows].sort((a, b) => (b.metrics[metric] || 0) - (a.metrics[metric] || 0)).slice(0, 16)
+    .map((r: any) => ({ name: short(r.name), full: r.name, thumb: r.thumbnail || '', value: r.metrics[metric] || 0, value2: metric2 ? (r.metrics[metric2] || 0) : 0 }))
+  const tickFmt = axisFmt(metric), tickFmt2 = metric2 ? axisFmt(metric2 as MetricKey) : tickFmt
+  const hasThumbs = data.some((d: any) => d.thumb)
+  // X-axis tick that shows the segment name and, when available, its creative thumbnail beneath.
+  const ThumbTick = (props: any) => {
+    const { x, y, payload } = props; const d = data.find((r: any) => r.name === payload.value)
+    return (
+      <g transform={`translate(${x},${y})`}>
+        {d?.thumb && <image href={cdn(d.thumb, 60)} x={-15} y={6} width={30} height={30} preserveAspectRatio="xMidYMid slice" clipPath="inset(0 round 5px)" />}
+        <text x={0} y={d?.thumb ? 48 : 12} textAnchor="middle" fill="#7c8577" fontSize={10}>{payload.value}</text>
+      </g>
+    )
+  }
+  const xTickProps = hasThumbs ? { tick: <ThumbTick />, height: 72 } : { tick: { fontSize: 10, fill: '#7c8577' }, angle: -35, textAnchor: 'end' as const, height: 70 }
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12.5, fontWeight: 600, color: '#7c8577' }}>Metric:</span>
-        <select value={metric} onChange={e => setMetric(e.target.value as MetricKey)} style={{ padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }}>
-          {metrics.map((m: MetricKey) => <option key={m} value={m}>{METRICS[m].label}</option>)}
+        <select value={metric} onChange={e => setMetric(e.target.value as MetricKey)} style={chartSel}>
+          {metrics.map((m: MetricKey) => <option key={m} value={m}>{METRICS[m]?.label || m}</option>)}
         </select>
+        {type === 'bar' && (
+          <>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#7c8577' }}>vs.</span>
+            <select value={metric2} onChange={e => setMetric2(e.target.value as MetricKey)} style={chartSel}>
+              <option value="">— none —</option>
+              {metrics.filter((m: MetricKey) => m !== metric).map((m: MetricKey) => <option key={m} value={m}>{METRICS[m]?.label || m}</option>)}
+            </select>
+          </>
+        )}
       </div>
-      <ResponsiveContainer width="100%" height={360}>
+      {dual && (
+        <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 11.5, fontWeight: 700 }}>
+          <span style={{ color: '#6fb03a' }}>▉ {METRICS[metric]?.label} (left)</span>
+          <span style={{ color: '#3b82f6' }}>▉ {METRICS[metric2 as MetricKey]?.label} (right)</span>
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={hasThumbs ? 380 : 360}>
         {type === 'bar' ? (
-          <BarChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 70 }}>
+          <BarChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: hasThumbs ? 20 : 70 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#eef1e8" vertical={false} />
-            <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#7c8577' }} axisLine={false} tickLine={false} angle={-35} textAnchor="end" interval={0} height={70} />
-            <YAxis tickFormatter={tickFmt} tick={{ fontSize: 11, fill: '#9aa196' }} axisLine={false} tickLine={false} width={48} />
-            <RTooltip formatter={(v: any) => fmtMetric(v, metric, currency)} labelFormatter={(l: any, p: any) => p?.[0]?.payload?.full || l} />
-            <Bar dataKey="value" radius={[5, 5, 0, 0]} maxBarSize={44}>
-              {data.map((d: any, i: number) => <Cell key={i} fill={metricColor(metric, d.value) || '#6fb03a'} />)}
+            <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} {...xTickProps} />
+            <YAxis yAxisId="left" tickFormatter={tickFmt} tick={{ fontSize: 11, fill: '#9aa196' }} axisLine={false} tickLine={false} width={48} />
+            {dual && <YAxis yAxisId="right" orientation="right" tickFormatter={tickFmt2} tick={{ fontSize: 11, fill: '#9aa196' }} axisLine={false} tickLine={false} width={48} />}
+            <RTooltip formatter={(v: any, k: any) => fmtMetric(v, k === 'value2' ? (metric2 as MetricKey) : metric, currency)} labelFormatter={(l: any, p: any) => p?.[0]?.payload?.full || l} />
+            <Bar yAxisId="left" dataKey="value" name={METRICS[metric]?.label} radius={[5, 5, 0, 0]} maxBarSize={dual ? 22 : 44}>
+              {!dual && data.map((d: any, i: number) => <Cell key={i} fill={metricColor(metric, d.value) || '#6fb03a'} />)}
+              {dual && data.map((d: any, i: number) => <Cell key={i} fill="#6fb03a" />)}
             </Bar>
+            {dual && <Bar yAxisId="right" dataKey="value2" name={METRICS[metric2 as MetricKey]?.label} radius={[5, 5, 0, 0]} maxBarSize={22} fill="#3b82f6" />}
           </BarChart>
         ) : (
           <LineChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 70 }}>
