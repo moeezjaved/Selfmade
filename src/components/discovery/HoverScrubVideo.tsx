@@ -29,12 +29,12 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
 
   const onMove = (e: React.MouseEvent) => {
     if (reduce || playing) return
-    const v = vidRef.current, wrap = wrapRef.current
-    if (!v || !wrap || !v.duration || !isFinite(v.duration)) return
+    const wrap = wrapRef.current; if (!wrap) return
     const rect = wrap.getBoundingClientRect()
     const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
-    setProgress(ratio)
-    try { v.currentTime = ratio * v.duration } catch { /* not seekable yet */ }
+    setProgress(ratio)                       // move the line immediately, even before the video loads
+    const v = vidRef.current
+    if (v && v.duration && isFinite(v.duration)) { try { v.currentTime = ratio * v.duration } catch { /* not seekable yet */ } }
   }
 
   const play = (e: React.MouseEvent) => {
@@ -46,7 +46,7 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
   const pause = (e: React.MouseEvent) => { e.stopPropagation(); vidRef.current?.pause(); setPlay(false) }
 
   const mountVideo = hover || playing
-  const showScrub = hover && ready && !playing && !reduce
+  const showScrub = hover && !playing && !reduce
   // Progress ring geometry (r=15, C=2πr≈94.25).
   const C = 94.25, off = C * (1 - progress)
 
@@ -74,16 +74,18 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000', opacity: ready ? 1 : 0, transition: 'opacity .15s', zIndex: 2 }} />
       )}
 
-      {/* scrub line */}
+      {/* scrub line — sits above the card's hover overlay (zIndex 6/8) so it's always visible */}
       {showScrub && (
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, background: 'rgba(255,255,255,.25)', zIndex: 4 }}>
-          <div style={{ height: '100%', width: `${progress * 100}%`, background: '#dffe95', boxShadow: '0 0 6px rgba(223,254,149,.8)' }} />
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, background: 'rgba(255,255,255,.3)', zIndex: 9, pointerEvents: 'none' }}>
+          <div style={{ height: '100%', width: `${progress * 100}%`, background: '#fff', boxShadow: '0 0 8px rgba(255,255,255,.9)' }} />
+          {/* playhead knob at the cursor */}
+          <div style={{ position: 'absolute', top: '50%', left: `${progress * 100}%`, transform: 'translate(-50%,-50%)', width: 9, height: 9, borderRadius: '50%', background: '#fff', boxShadow: '0 0 6px rgba(0,0,0,.4)' }} />
         </div>
       )}
 
       {/* Play button (lime) — shown when not playing */}
       {!playing && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9, pointerEvents: 'none' }}>
           <button onClick={play} aria-label="Play" style={{ pointerEvents: 'auto', width: 48, height: 48, borderRadius: '50%', background: '#dffe95', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 6px 20px rgba(0,0,0,.35)', padding: 0, transition: 'transform .12s' }}
             onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
             <span style={{ fontSize: 17, marginLeft: 3, color: '#0e1b12' }}>▶</span>
@@ -93,7 +95,7 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
 
       {/* Progress + loading ring while playing */}
       {playing && (
-        <div style={{ position: 'absolute', bottom: 10, right: 10, width: 40, height: 40, zIndex: 6 }}>
+        <div style={{ position: 'absolute', bottom: 10, right: 10, width: 40, height: 40, zIndex: 9 }}>
           <button onClick={pause} aria-label="Pause" style={{ position: 'absolute', inset: 0, width: 40, height: 40, borderRadius: '50%', background: 'rgba(14,27,18,.6)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dffe95', fontSize: 13, backdropFilter: 'blur(4px)' }}>
             {loading ? '' : '⏸'}
           </button>
