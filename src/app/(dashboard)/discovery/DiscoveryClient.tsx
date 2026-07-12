@@ -29,6 +29,7 @@ class MasonryBoundary extends Component<{ children: ReactNode }, { k: number; er
 import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download, Copy, Film } from 'lucide-react'
 import CloneModal from './CloneModal'
 import CloneVideoModal from './CloneVideoModal'
+import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 import { useRouter } from 'next/navigation'
 import BrandDrawer from './BrandDrawer'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -893,8 +894,6 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
     <div
       className="ad-card-visual"
       onClick={() => router.push(`/discovery/${ad.id}`)}
-      onMouseEnter={() => { if (slide?.type === 'video') setPlaying(true) }}
-      onMouseLeave={() => { if (slide?.type === 'video') setPlaying(false) }}
       style={{
         position: 'relative', width: '100%', paddingBottom: `${aspectPct}%`,
         background: '#f1f3f5', overflow: 'hidden', lineHeight: 0, cursor: 'pointer',
@@ -929,59 +928,15 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
           )}
         </>
       ) : (
-        <>
-          {/* RESTING STATE (not playing): show the real poster frame if we have one,
-              otherwise the branded gradient+initial placeholder. The <video> is NOT
-              mounted yet — so nothing downloads until the user hits play. */}
-          {!playing && (
-            <div style={{
-              position: 'absolute', inset: 0, zIndex: 1,
-              background: `linear-gradient(140deg, ${avatarBg} 0%, #14181c 130%)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-            }}>
-              {/* brand initial watermark (visible until the poster paints; always visible if no poster) */}
-              {!imgLoaded && (
-                <span style={{ position: 'absolute', fontSize: 72, fontWeight: 900, color: 'rgba(255,255,255,0.10)', letterSpacing: '-0.05em', userSelect: 'none', lineHeight: 1 }}>
-                  {(ad.pageName || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
-                </span>
-              )}
-              {posterSrc && (
-                <img
-                  src={posterSrc}
-                  alt={ad.pageName}
-                  loading="lazy"
-                  decoding="async"
-                  onLoad={() => setImgLoaded(true)}
-                  onError={() => setImgLoaded(true)}
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.12s linear' }}
-                />
-              )}
-            </div>
-          )}
-          {/* VIDEO — only mounted once the user hits play, so it never downloads upfront. */}
-          {playing && (
-            <video
-              ref={videoRef}
-              key={slide.url}
-              src={slide.url}
-              autoPlay
-              controls
-              playsInline
-              preload="auto"
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', outline: 'none', border: 'none', background: '#000', zIndex: 2 }}
-              onEnded={() => setPlaying(false)}
-            />
-          )}
-          {/* Play overlay — the button PLAYS inline (stopPropagation); clicking around it opens detail. */}
-          {!playing && (
-            <div onClick={() => router.push(`/discovery/${ad.id}`)}
-              style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.18)', cursor: 'pointer', zIndex: 3 }}>
-              <button onClick={startPlay} aria-label="Play" style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.93)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.25)', border: 'none', cursor: 'pointer', padding: 0 }}>
-                <span style={{ fontSize: 20, marginLeft: 3, color: '#111' }}>▶</span>
-              </button>
-            </div>
-          )}
-        </>
+        // Hover-scrub preview + lime play/progress ring (Motion-style). Reports playing state up so
+        // the info overlay hides while the video plays.
+        <HoverScrubVideo
+          src={slide.url}
+          poster={posterSrc}
+          brandBg={avatarBg}
+          initials={(ad.pageName || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+          onPlayingChange={setPlaying}
+        />
       )}
 
       {/* Carousel arrows + dots */}
