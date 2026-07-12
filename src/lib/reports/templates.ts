@@ -19,6 +19,14 @@ export type MetricKey =
   | 'app_installs' | 'cost_per_app_install' | 'messaging_started' | 'cost_per_messaging'
   | 'add_payment_info' | 'search' | 'add_to_wishlist' | 'likes' | 'cost_per_view_content'
   | 'engagement_rate' | 'checkout_to_purchase' | 'vc_to_atc'
+  // Attribution-window variants (real, different numbers per window)
+  | 'purchases_1d_click' | 'purchases_7d_click' | 'purchases_1d_view' | 'purchases_28d_click'
+  | 'revenue_1d_click' | 'revenue_7d_click' | 'revenue_1d_view' | 'revenue_28d_click'
+  | 'roas_1d_click' | 'roas_7d_click' | 'roas_1d_view' | 'roas_28d_click'
+  | 'cpa_1d_click' | 'cpa_7d_click' | 'cpa_1d_view' | 'cpa_28d_click'
+  // Per-1000-impression variants (arithmetic on existing counts)
+  | 'purchases_per_1k' | 'revenue_per_1k' | 'atc_per_1k' | 'checkout_per_1k' | 'lpv_per_1k'
+  | 'link_clicks_per_1k' | 'leads_per_1k' | 'registrations_per_1k' | 'view_content_per_1k' | 'thruplay_per_1k'
 
 export type Metric = {
   key: MetricKey
@@ -90,6 +98,34 @@ export const METRICS: Record<MetricKey, Metric> = {
   engagement_rate:  { key: 'engagement_rate',  label: 'Engagement Rate',  format: 'percent',  goodHigh: true },
   checkout_to_purchase: { key: 'checkout_to_purchase', label: 'Checkout→Purchase', format: 'percent', goodHigh: true },
   vc_to_atc:        { key: 'vc_to_atc',        label: 'View→ATC',         format: 'percent',  goodHigh: true },
+  // Attribution-window variants — same event, different attribution window (genuinely different counts)
+  purchases_1d_click:  { key: 'purchases_1d_click',  label: 'Purchases (1d click)',  format: 'number',   goodHigh: true },
+  purchases_7d_click:  { key: 'purchases_7d_click',  label: 'Purchases (7d click)',  format: 'number',   goodHigh: true },
+  purchases_1d_view:   { key: 'purchases_1d_view',   label: 'Purchases (1d view)',   format: 'number',   goodHigh: true },
+  purchases_28d_click: { key: 'purchases_28d_click', label: 'Purchases (28d click)', format: 'number',   goodHigh: true },
+  revenue_1d_click:    { key: 'revenue_1d_click',    label: 'Revenue (1d click)',    format: 'currency', goodHigh: true },
+  revenue_7d_click:    { key: 'revenue_7d_click',    label: 'Revenue (7d click)',    format: 'currency', goodHigh: true },
+  revenue_1d_view:     { key: 'revenue_1d_view',     label: 'Revenue (1d view)',     format: 'currency', goodHigh: true },
+  revenue_28d_click:   { key: 'revenue_28d_click',   label: 'Revenue (28d click)',   format: 'currency', goodHigh: true },
+  roas_1d_click:       { key: 'roas_1d_click',       label: 'ROAS (1d click)',       format: 'ratio',    goodHigh: true },
+  roas_7d_click:       { key: 'roas_7d_click',       label: 'ROAS (7d click)',       format: 'ratio',    goodHigh: true },
+  roas_1d_view:        { key: 'roas_1d_view',        label: 'ROAS (1d view)',        format: 'ratio',    goodHigh: true },
+  roas_28d_click:      { key: 'roas_28d_click',      label: 'ROAS (28d click)',      format: 'ratio',    goodHigh: true },
+  cpa_1d_click:        { key: 'cpa_1d_click',        label: 'CPA (1d click)',        format: 'currency', goodHigh: false },
+  cpa_7d_click:        { key: 'cpa_7d_click',        label: 'CPA (7d click)',        format: 'currency', goodHigh: false },
+  cpa_1d_view:         { key: 'cpa_1d_view',         label: 'CPA (1d view)',         format: 'currency', goodHigh: false },
+  cpa_28d_click:       { key: 'cpa_28d_click',       label: 'CPA (28d click)',       format: 'currency', goodHigh: false },
+  // Per-1000-impression variants — density of an event against reach
+  purchases_per_1k:     { key: 'purchases_per_1k',     label: 'Purchases / 1k impr',   format: 'number',   goodHigh: true },
+  revenue_per_1k:       { key: 'revenue_per_1k',       label: 'Revenue / 1k impr',     format: 'currency', goodHigh: true },
+  atc_per_1k:           { key: 'atc_per_1k',           label: 'ATC / 1k impr',         format: 'number',   goodHigh: true },
+  checkout_per_1k:      { key: 'checkout_per_1k',      label: 'Checkouts / 1k impr',   format: 'number',   goodHigh: true },
+  lpv_per_1k:           { key: 'lpv_per_1k',           label: 'LP Views / 1k impr',    format: 'number',   goodHigh: true },
+  link_clicks_per_1k:   { key: 'link_clicks_per_1k',   label: 'Link Clicks / 1k impr', format: 'number',   goodHigh: true },
+  leads_per_1k:         { key: 'leads_per_1k',         label: 'Leads / 1k impr',       format: 'number',   goodHigh: true },
+  registrations_per_1k: { key: 'registrations_per_1k', label: 'Regs / 1k impr',        format: 'number',   goodHigh: true },
+  view_content_per_1k:  { key: 'view_content_per_1k',  label: 'Content Views / 1k impr', format: 'number', goodHigh: true },
+  thruplay_per_1k:      { key: 'thruplay_per_1k',      label: 'ThruPlays / 1k impr',   format: 'number',   goodHigh: true },
 }
 
 export type GroupByKey =
