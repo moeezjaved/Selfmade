@@ -88,9 +88,10 @@ export default async function SharedReportPage({ params }: { params: { token: st
           </div>
         )}
 
-        {/* Table */}
-        <div style={{ marginTop: 20, background: '#fff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-          <div style={{ overflowX: 'auto' }}>
+        {/* Table — scrolls horizontally when there are many metric columns. The scrollbar is forced
+            visible (macOS hides overlay scrollbars, which made the last column look cut off). */}
+        <div style={{ position: 'relative', marginTop: 20, background: '#fff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+          <div className="snap-scroll" style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
               <thead>
                 <tr style={{ background: '#f6faf4', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
@@ -139,6 +140,14 @@ export default async function SharedReportPage({ params }: { params: { token: st
           Made with <a href="https://tryselfmade.ai" style={{ color: '#2d7a2d', fontWeight: 700, textDecoration: 'none' }}>Selfmade</a> — spy, clone, launch &amp; track winning ads.
         </div>
       </div>
+
+      <style>{`
+        .snap-scroll { scrollbar-width: thin; scrollbar-color: #b9cdb4 transparent; }
+        .snap-scroll::-webkit-scrollbar { height: 10px; }
+        .snap-scroll::-webkit-scrollbar-thumb { background: #b9cdb4; border-radius: 8px; }
+        .snap-scroll::-webkit-scrollbar-thumb:hover { background: #9fbf98; }
+        .snap-scroll::-webkit-scrollbar-track { background: #f2f7f0; }
+      `}</style>
     </div>
   )
 }
