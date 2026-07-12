@@ -61,7 +61,8 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const creativeGroup = initGroup === 'creative' || !!GROUP_BY.find(g => g.key === initGroup)?.ai
   const [view, setView] = useState<'card' | 'table'>(ic.view || (creativeGroup ? 'card' : 'table'))
   const [filters, setFilters] = useState<ReportFilter[]>((ic as any).filters || [])
-  const [aiTags, setAiTags] = useState<boolean>(!!(ic as any).aiTags)
+  // Default AI tags ON for creative/ad reports so the colorful tag pills show like Motion (cheap + cached).
+  const [aiTags, setAiTags] = useState<boolean>((ic as any).aiTags ?? (tpl?.groupBy === 'creative' || tpl?.groupBy === 'ad'))
   // Table settings + AI-tag columns (Motion's Table settings / AI tags toolbar).
   const [tagCols, setTagCols] = useState<string[]>((ic as any).tagCols || [])
   const [heatOn, setHeatOn] = useState<boolean>((ic as any).heatOn !== false)
@@ -314,15 +315,13 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             </div>
           </div>
 
-          {/* Table panel — shown in table view (cards view shows the grid above instead) */}
-          {view === 'table' && (
-            <TablePanel rows={rows} metrics={metrics} sort={sort} dir={dir} currency={currency} net={net} groupLabel={groupLabel}
-              onSort={toggleSort} count={data?.count}
-              tagCols={tagCols} onToggleTagCol={(c: string) => setTagCols(cols => cols.includes(c) ? cols.filter(x => x !== c) : [...cols, c])}
-              settings={{ heatOn, perPage, showTags, showLaunch, showStatus }}
-              setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus}
-              presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} onSee={setGroupBy} />
-          )}
+          {/* Table panel — always shown below the cards (Motion stacks both). */}
+          <TablePanel rows={rows} metrics={metrics} sort={sort} dir={dir} currency={currency} net={net} groupLabel={groupLabel}
+            onSort={toggleSort} count={data?.count}
+            tagCols={tagCols} onToggleTagCol={(c: string) => setTagCols(cols => cols.includes(c) ? cols.filter(x => x !== c) : [...cols, c])}
+            settings={{ heatOn, perPage, showTags, showLaunch, showStatus }}
+            setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus}
+            presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} onSee={setGroupBy} />
         </>
       )}
 
@@ -612,14 +611,15 @@ function CardsGrid({ rows, metrics, sort, currency, onSee }: any) {
 }
 
 // AI creative-tag pills, colour-coded by dimension. Skips empty / Unknown / None / Other values.
-const PILL_DIMS: [string, string, string][] = [
-  ['visual_format', '#fff7ed', '#c2410c'],
-  ['hook_tactic', '#eff6ff', '#1d4ed8'],
-  ['messaging_theme', '#f0fdf4', '#15803d'],
-  ['offer_type', '#fdf2f8', '#be185d'],
-  ['intended_audience', '#f0fdfa', '#0f766e'],
-  ['headline_tactic', '#faf5ff', '#7c3aed'],
-  ['seasonality', '#fffbeb', '#b45309'],
+// [dimension, bg, fg, icon] — icon mirrors Motion's category glyphs on the pills.
+const PILL_DIMS: [string, string, string, string][] = [
+  ['visual_format', '#eff6ff', '#1d4ed8', '▦'],
+  ['messaging_theme', '#f0fdf4', '#15803d', '💬'],
+  ['intended_audience', '#fff7ed', '#c2410c', '👥'],
+  ['hook_tactic', '#f5f3ff', '#6d28d9', '🪝'],
+  ['offer_type', '#fdf2f8', '#be185d', '🏷'],
+  ['headline_tactic', '#ecfeff', '#0e7490', '✍'],
+  ['seasonality', '#fffbeb', '#b45309', '📅'],
 ]
 const DIM_LABEL: Record<string, string> = { visual_format: 'Visual Format', hook_tactic: 'Hook Tactic', messaging_theme: 'Messaging Theme', offer_type: 'Offer Type', intended_audience: 'Intended Audience', headline_tactic: 'Headline Tactic', seasonality: 'Seasonality' }
 // Short descriptions for the controlled-vocab tag values (shown in the hover tooltip).
@@ -641,7 +641,7 @@ function TagPills({ tags, max = 3, rows, onSee }: { tags: any; max?: number; row
   const [hover, setHover] = useState<{ k: string; v: string; x: number; y: number; below: boolean } | null>(null)
   if (!tags) return null
   const shown = PILL_DIMS
-    .map(([k, bg, fg]) => ({ k, v: tags[k] as string, bg, fg }))
+    .map(([k, bg, fg, icon]) => ({ k, v: tags[k] as string, bg, fg, icon }))
     .filter(x => x.v && !['Unknown', 'None', 'Other', ''].includes(x.v))
     .slice(0, max)
   if (!shown.length) return null
@@ -659,7 +659,9 @@ function TagPills({ tags, max = 3, rows, onSee }: { tags: any; max?: number; row
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
       {shown.map((p, i) => (
         <span key={i} onMouseEnter={e => enter(e, p.k, p.v)} onMouseLeave={() => setHover(null)}
-          style={{ fontSize: 10, fontWeight: 700, background: p.bg, color: p.fg, padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap', cursor: rows ? 'help' : 'inherit' }}>{p.v}</span>
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, background: p.bg, color: p.fg, padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap', cursor: rows ? 'help' : 'inherit' }}>
+          <span style={{ fontSize: 9, opacity: .8 }}>{p.icon}</span>{p.v}
+        </span>
       ))}
       {hover && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', left: Math.min(hover.x, window.innerWidth - 280), top: hover.y, transform: hover.below ? 'none' : 'translateY(-100%)', zIndex: 4000, width: 260, background: '#0e1b12', color: '#f4f7ef', borderRadius: 12, padding: 14, boxShadow: '0 16px 40px rgba(0,0,0,.4)', pointerEvents: 'none', fontFamily: FONT }}>
