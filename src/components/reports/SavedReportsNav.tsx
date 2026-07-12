@@ -23,6 +23,7 @@ const QUICK_REPORTS: { emoji: string; label: string; href: string }[] = [
   { emoji: '🖼️', label: 'Static Analysis', href: '/reports?template=static_analysis' },
   { emoji: '🧩', label: 'Ad Format Comparison', href: '/reports?template=ad_format' },
   { emoji: '🚀', label: 'Launch Analysis', href: '/reports?template=launch_analysis' },
+  { emoji: '🎯', label: 'New Launches', href: '/reports?template=new_launches' },
 ]
 const FROM_TEMPLATES: { emoji: string; label: string; href: string }[] = [
   { emoji: '💵', label: 'Top converters', href: '/reports?template=top_converters' },

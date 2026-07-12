@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import AccountSelector from '@/components/AccountSelector'
 import CreateReportModal from '@/components/reports/CreateReportModal'
 import GeneratedReport from '@/components/reports/GeneratedReport'
+import LaunchReport from '@/components/reports/LaunchReport'
 
 export const dynamic = 'force-dynamic'
 
@@ -110,7 +111,20 @@ export default function ReportsPage() {
     { key: 'cpa', label: 'CPA' },
   ]
 
-  // A saved/template report takes over the whole page.
+  // A saved/template report takes over the whole page. New Launches uses the launch-tracking engine.
+  if (activeReport && activeReport.templateKey === 'new_launches') {
+    return (
+      <LaunchReport
+        key={activeReport.savedId || 'new_launches'}
+        templateKey="new_launches"
+        savedId={activeReport.savedId}
+        initialName={activeReport.name}
+        initialConfig={activeReport.config}
+        onBack={() => { if (window.location.search) window.history.replaceState({}, '', '/reports'); setActiveReport(null) }}
+        onSave={saveReport}
+      />
+    )
+  }
   if (activeReport) {
     return (
       <GeneratedReport
