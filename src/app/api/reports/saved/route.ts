@@ -20,7 +20,7 @@ async function ctx() {
 
 const missingTable = (e: any) => e && (e.code === '42P01' || /does not exist/i.test(e.message || ''))
 
-// GET — team reports in my org + my personal ones.
+// GET — team reports in my org + my personal ones, plus reports shared WITH my org (partner collab).
 export async function GET() {
   const c = await ctx(); if (!c) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { user, admin, org } = c
@@ -30,10 +30,25 @@ export async function GET() {
     .or(`visibility.eq.team,created_by.eq.${user.id}`)
     .order('created_at', { ascending: false })
   if (error) {
-    if (missingTable(error)) return NextResponse.json({ reports: [], pending: true })
+    if (missingTable(error)) return NextResponse.json({ reports: [], shared: [], pending: true })
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  return NextResponse.json({ reports: data || [] })
+
+  // "Shared with me": saved reports another org invited this org onto (accepted collaborations).
+  let shared: any[] = []
+  try {
+    const { data: collabs } = await admin.from('report_collaborators')
+      .select('saved_report_id, owner_name').eq('partner_org_id', org.orgId).eq('status', 'accepted')
+    const ids = Array.from(new Set((collabs || []).map((c: any) => c.saved_report_id)))
+    if (ids.length) {
+      const ownerBy: Record<string, string> = {}
+      for (const cb of collabs || []) ownerBy[cb.saved_report_id] = cb.owner_name || 'Shared'
+      const { data: reps } = await admin.from('saved_reports').select('*').in('id', ids)
+      shared = (reps || []).map((r: any) => ({ ...r, shared: true, ownerName: ownerBy[r.id] || 'Shared' }))
+    }
+  } catch { /* 093 not applied yet → no shared reports */ }
+
+  return NextResponse.json({ reports: data || [], shared })
 }
 
 // POST — create (or update when id supplied) a saved report.
