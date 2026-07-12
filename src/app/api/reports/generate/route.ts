@@ -67,6 +67,8 @@ type Row = {
   // attribution-window purchase counts + revenue
   p_1dc: number; p_7dc: number; p_1dv: number; p_28dc: number
   rev_1dc: number; rev_7dc: number; rev_1dv: number; rev_28dc: number
+  // account-specific custom conversions, keyed by conversion id: counts + values
+  cc: Record<string, number>; ccv: Record<string, number>
 }
 
 const emptyRow = (): Omit<Row, 'key' | 'name' | 'thumbnail' | 'format' | 'landingPage' | 'launchDate' | 'status' | 'adCount' | 'adId'> => ({
@@ -77,6 +79,7 @@ const emptyRow = (): Omit<Row, 'key' | 'name' | 'thumbnail' | 'format' | 'landin
   leads: 0, registrations: 0, app_installs: 0, messaging_started: 0,
   add_payment_info: 0, search: 0, add_to_wishlist: 0, likes: 0,
   p_1dc: 0, p_7dc: 0, p_1dv: 0, p_28dc: 0, rev_1dc: 0, rev_7dc: 0, rev_1dv: 0, rev_28dc: 0,
+  cc: {}, ccv: {},
 })
 
 const PURCHASE = ['offsite_conversion.fb_pixel_purchase', 'purchase', 'omni_purchase']
@@ -111,6 +114,10 @@ function accInsight(row: Row, ins: any) {
   row.p_1dv += firstActionWin(actions, PURCHASE, '1d_view');   row.p_28dc += firstActionWin(actions, PURCHASE, '28d_click')
   row.rev_1dc += firstActionWin(values, PURCHASE, '1d_click'); row.rev_7dc += firstActionWin(values, PURCHASE, '7d_click')
   row.rev_1dv += firstActionWin(values, PURCHASE, '1d_view');  row.rev_28dc += firstActionWin(values, PURCHASE, '28d_click')
+  // Account-specific custom conversions surface as action_type "offsite_conversion.custom.<id>".
+  const CC = 'offsite_conversion.custom.'
+  for (const a of actions) if (typeof a.action_type === 'string' && a.action_type.startsWith(CC)) { const id = a.action_type.slice(CC.length); row.cc[id] = (row.cc[id] || 0) + num(a.value) }
+  for (const a of values) if (typeof a.action_type === 'string' && a.action_type.startsWith(CC)) { const id = a.action_type.slice(CC.length); row.ccv[id] = (row.ccv[id] || 0) + num(a.value) }
   row.video_3s += actionVal(ins.video_play_actions || [], 'video_view')
   row.thruplay += actionVal(ins.video_thruplay_watched_actions || [], 'video_view')
   row.video_p25 += actionVal(ins.video_p25_watched_actions || [], 'video_view')
@@ -123,6 +130,11 @@ function accInsight(row: Row, ins: any) {
 
 // Derived metric values from a row's raw sums.
 function metricValue(r: Row, m: MetricKey): number {
+  // Dynamic custom-conversion columns: cc_<id> = count, ccv_<id> = value, cpcc_<id> = cost per.
+  const k = m as string
+  if (k.startsWith('cpcc_')) { const c = r.cc[k.slice(5)] || 0; return c ? r.spend / c : 0 }
+  if (k.startsWith('ccv_')) return r.ccv[k.slice(4)] || 0
+  if (k.startsWith('cc_')) return r.cc[k.slice(3)] || 0
   switch (m) {
     case 'ctr': return r.impressions ? (r.clicks / r.impressions) * 100 : 0
     case 'cpc': return r.clicks ? r.spend / r.clicks : 0
@@ -210,7 +222,8 @@ export async function GET(req: NextRequest) {
   const groupBy = (sp.get('groupBy') as GroupByKey) || tpl.groupBy
   // Columns: client can override the template's metric list (add/remove). Falls back to the template's.
   const reqMetrics = (sp.get('metrics') || '').split(',').map(s => s.trim()).filter(Boolean) as MetricKey[]
-  const cols = (reqMetrics.length ? reqMetrics : tpl.metrics).filter(m => !!METRICS[m])
+  const isCustomCol = (m: string) => /^(cc|ccv|cpcc)_/.test(m)
+  const cols = (reqMetrics.length ? reqMetrics : tpl.metrics).filter(m => !!METRICS[m] || isCustomCol(m as string))
   const sort = (sp.get('sort') as MetricKey) || tpl.sort
   const dir = (sp.get('dir') as 'asc' | 'desc') || tpl.sortDir
   let filters: ReportFilter[] = []
@@ -303,6 +316,20 @@ export async function GET(req: NextRequest) {
       const res = await fetch(`https://graph.facebook.com/${V}/?ids=${chunk.join(',')}&fields=picture&access_token=${token}`).then(r => r.json()).catch(() => ({}))
       for (const m of Array.from(adMeta.values())) if (!m.thumbnail && m.videoId && res?.[m.videoId]?.picture) m.thumbnail = res[m.videoId].picture
     }
+
+    // 2c) Account-specific custom conversions → dynamic columns (count + cost-per). We surface every
+    // non-archived custom conversion so the user can add it as a column; per-row values fall to 0 when
+    // an ad didn't fire it. Keys: cc_<id> (count), cpcc_<id> (cost/conv). Best-effort; never fatal.
+    const customMetrics: { key: string; label: string; format: string; goodHigh: boolean }[] = []
+    try {
+      const ccRes = await fetch(`https://graph.facebook.com/${V}/${act}/customconversions?fields=id,name,is_archived&limit=200&access_token=${token}`).then(r => r.json()).catch(() => ({}))
+      for (const c of (ccRes?.data || [])) {
+        if (c.is_archived) continue
+        const nm = (c.name || `Custom ${c.id}`).slice(0, 40)
+        customMetrics.push({ key: `cc_${c.id}`, label: nm, format: 'number', goodHigh: true })
+        customMetrics.push({ key: `cpcc_${c.id}`, label: `Cost / ${nm}`, format: 'currency', goodHigh: false })
+      }
+    } catch {}
 
     // 2b) AI creative tags. Grouping by an AI dimension, or the "AI tags" toggle (aiTags=1), RUNS the
     // tagging pass (top-spend ads, cached in R2 → once per creative). Otherwise we still LOAD the cache
@@ -399,6 +426,35 @@ export async function GET(req: NextRequest) {
     for (const f of formatFilters) rows = rows.filter(r => f.op === 'is_not' ? r.format !== f.value : r.format === f.value)
     for (const f of dateFilters) rows = rows.filter(r => { if (!r.launchDate) return false; return f.op === 'before' ? r.launchDate < String(f.value) : r.launchDate > String(f.value) })
     for (const f of tagFilters) rows = rows.filter(r => { const t = tagMap[r.adId]?.[f.field as keyof CreativeTags]; return f.op === 'is_not' ? t !== f.value : t === f.value })
+    // Proprietary 0–100 composite scores — percentile-rank each row's funnel-stage rate within THIS
+    // report (transparent, self-contained: no external benchmark). Hook/Watch gauge video attention and
+    // rank among video rows only; Click/Convert rank across all spending rows. Overall = weighted blend.
+    const scored = rows.filter(r => r.spend > 0)
+    const percentiler = (getVal: (r: Row) => number, pool: Row[]) => {
+      const vals = pool.map(getVal).filter(v => v > 0).sort((a, b) => a - b)
+      return (r: Row) => {
+        const v = getVal(r)
+        if (v <= 0 || vals.length === 0) return 0
+        let c = 0; for (const x of vals) { if (x <= v) c++; else break }
+        return Math.round((c / vals.length) * 100)
+      }
+    }
+    const vids = scored.filter(r => r.format === 'video')
+    const hookP = percentiler(r => r.impressions ? r.video_3s / r.impressions : 0, vids)
+    const watchP = percentiler(r => r.impressions ? r.thruplay / r.impressions : 0, vids)
+    const clickP = percentiler(r => r.impressions ? r.link_click / r.impressions : 0, scored)
+    const convP = percentiler(r => r.link_click ? r.conversions / r.link_click : 0, scored)
+    const scoreByKey = new Map<string, Record<string, number>>()
+    for (const r of scored) {
+      const hook = r.format === 'video' ? hookP(r) : 0
+      const watch = r.format === 'video' ? watchP(r) : 0
+      const click = clickP(r), convert = convP(r)
+      const overall = r.format === 'video'
+        ? Math.round(0.25 * hook + 0.20 * watch + 0.25 * click + 0.30 * convert)
+        : Math.round(0.45 * click + 0.55 * convert)
+      scoreByKey.set(r.key, { hook_score: hook, watch_score: watch, click_score: click, convert_score: convert, overall_score: overall })
+    }
+
     // Pills make sense on creative-level rows (each row = one creative/ad). For aggregate groupings a
     // single creative's tags would misrepresent the group, so only attach there.
     const attachTags = groupBy === 'creative' || groupBy === 'ad'
@@ -406,12 +462,16 @@ export async function GET(req: NextRequest) {
       const m: Record<string, number> = {}
       for (const k of cols) m[k] = metricValue(r, k)
       m[sort] = metricValue(r, sort)
-      // Comparative: previous-period value + % delta per column.
+      // Overlay composite scores (percentile ranks can't be computed per-row inside metricValue).
+      const sc = scoreByKey.get(r.key)
+      if (sc) { for (const k of cols) if (k in sc) m[k] = sc[k]; if (sort in sc) m[sort] = sc[sort] }
+      // Comparative: previous-period value + % delta per column. Scores are cohort-relative (no
+      // stable prev-period meaning), so we skip deltas for them.
       let delta: Record<string, number> | undefined
       if (prevByKey) {
         const pr = prevByKey[r.key]
         delta = {}
-        for (const k of cols) { const cur = m[k], prev = pr ? metricValue(pr, k) : 0; delta[k] = prev ? ((cur - prev) / prev) * 100 : (cur ? 100 : 0) }
+        for (const k of cols) { if (sc && k in sc) continue; const cur = m[k], prev = pr ? metricValue(pr, k) : 0; delta[k] = prev ? ((cur - prev) / prev) * 100 : (cur ? 100 : 0) }
       }
       return {
         key: r.key, name: r.name, thumbnail: r.thumbnail, format: r.format, adId: r.adId,
@@ -424,8 +484,8 @@ export async function GET(req: NextRequest) {
     // 5) Net Results — column totals (sums for volume metrics, averages for rate metrics).
     const net: Record<string, number> = {}
     for (const k of cols) {
-      const f = METRICS[k].format
-      if (f === 'percent' || f === 'ratio' || f === 'seconds' || k === 'cpm' || k === 'cpc' || k === 'cpa') {
+      const f = METRICS[k]?.format || (String(k).startsWith('cpcc_') ? 'currency' : 'number')
+      if (f === 'percent' || f === 'ratio' || f === 'seconds' || f === 'score' || k === 'cpm' || k === 'cpc' || k === 'cpa' || String(k).startsWith('cpcc_')) {
         const vals = shaped.map(r => r.metrics[k]).filter(v => v > 0)
         net[k] = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0
       } else {
@@ -437,7 +497,7 @@ export async function GET(req: NextRequest) {
       template: { key: tpl.key, title: tpl.title, emoji: tpl.emoji, description: tpl.description },
       groupBy, groupByOptions: GROUP_BY, sort, dir, dateRange, currency,
       metrics: tpl.metrics, rows: shaped, netResults: net, count: shaped.length,
-      tagRemaining, aiGrouped: isTagDimension(groupBy),
+      tagRemaining, aiGrouped: isTagDimension(groupBy), customMetrics,
     })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to build report', rows: [] }, { status: 200 })

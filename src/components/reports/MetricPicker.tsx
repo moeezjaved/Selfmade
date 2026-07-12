@@ -7,7 +7,6 @@ import { useState } from 'react'
 import { METRICS, type MetricKey } from '@/lib/reports/templates'
 
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-const ALL_METRICS = Object.keys(METRICS) as MetricKey[]
 const AI_TAGS: { key: string; label: string }[] = [
   { key: 'asset_type', label: 'Asset Type' }, { key: 'visual_format', label: 'Visual Format' },
   { key: 'messaging_theme', label: 'Messaging theme' }, { key: 'offer_type', label: 'Offer Type' },
@@ -32,7 +31,7 @@ export default function MetricPicker({ metrics, tagCols, onApply, onSavePreset, 
   const addM = (m: MetricKey) => setSel(s => s.includes(m) ? s : [...s, m])
   const toggleTag = (k: string) => setTags(t => t.includes(k) ? t.filter(x => x !== k) : [...t, k])
 
-  const avail = ALL_METRICS.filter(m => !sel.includes(m) && (!q || METRICS[m].label.toLowerCase().includes(q.toLowerCase())))
+  const avail = (Object.keys(METRICS) as MetricKey[]).filter(m => !sel.includes(m) && (!q || METRICS[m].label.toLowerCase().includes(q.toLowerCase())))
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, background: 'rgba(10,20,13,.55)', backdropFilter: 'blur(3px)', padding: '32px 20px' }}>

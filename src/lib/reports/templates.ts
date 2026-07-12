@@ -27,12 +27,14 @@ export type MetricKey =
   // Per-1000-impression variants (arithmetic on existing counts)
   | 'purchases_per_1k' | 'revenue_per_1k' | 'atc_per_1k' | 'checkout_per_1k' | 'lpv_per_1k'
   | 'link_clicks_per_1k' | 'leads_per_1k' | 'registrations_per_1k' | 'view_content_per_1k' | 'thruplay_per_1k'
+  // Proprietary composite scores (0–100, percentile-ranked within the report)
+  | 'hook_score' | 'watch_score' | 'click_score' | 'convert_score' | 'overall_score'
 
 export type Metric = {
-  key: MetricKey
+  key: string
   label: string
   /** How to format the value in the UI. */
-  format: 'currency' | 'number' | 'percent' | 'ratio' | 'seconds'
+  format: 'currency' | 'number' | 'percent' | 'ratio' | 'seconds' | 'score'
   /** Higher is better (green) vs lower is better (for CPM/CPA/CPC etc.). */
   goodHigh: boolean
   /** Needs the extra video fields on the insights call (Hook/Hold/retention). */
@@ -126,6 +128,12 @@ export const METRICS: Record<MetricKey, Metric> = {
   registrations_per_1k: { key: 'registrations_per_1k', label: 'Regs / 1k impr',        format: 'number',   goodHigh: true },
   view_content_per_1k:  { key: 'view_content_per_1k',  label: 'Content Views / 1k impr', format: 'number', goodHigh: true },
   thruplay_per_1k:      { key: 'thruplay_per_1k',      label: 'ThruPlays / 1k impr',   format: 'number',   goodHigh: true },
+  // Proprietary composite scores — 0–100, percentile-ranked within the report (see engine).
+  hook_score:    { key: 'hook_score',    label: 'Hook Score',    format: 'score', goodHigh: true, video: true },
+  watch_score:   { key: 'watch_score',   label: 'Watch Score',   format: 'score', goodHigh: true, video: true },
+  click_score:   { key: 'click_score',   label: 'Click Score',   format: 'score', goodHigh: true },
+  convert_score: { key: 'convert_score', label: 'Convert Score', format: 'score', goodHigh: true },
+  overall_score: { key: 'overall_score', label: 'Overall Score', format: 'score', goodHigh: true },
 }
 
 export type GroupByKey =

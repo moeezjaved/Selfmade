@@ -14,7 +14,14 @@ import ReportFilters from './ReportFilters'
 import MetricPicker from './MetricPicker'
 import AdDetailDrawer from './AdDetailDrawer'
 
-const ALL_METRICS = Object.keys(METRICS) as MetricKey[]
+// Merge the connected account's custom-conversion columns (cc_<id> count / cpcc_<id> cost) into the
+// shared METRICS registry so every label/format lookup + the Add-metric picker pick them up. Stale
+// keys from a previously-viewed account are cleared first so columns never bleed across accounts.
+function registerCustomMetrics(list?: { key: string; label: string; format: string; goodHigh: boolean }[]) {
+  const M = METRICS as Record<string, any>
+  for (const k of Object.keys(M)) if (/^(cc|ccv|cpcc)_/.test(k)) delete M[k]
+  for (const cm of (list || [])) M[cm.key] = cm
+}
 
 // Meta thumbnail_url is hotlink-protected (403 without an fb referer) — proxy through weserv like
 // every other image surface so report creatives actually render. R2/data URLs pass through.
@@ -28,6 +35,7 @@ function fmtMetric(v: number, key: MetricKey, currency: string): string {
     case 'percent': return n.toFixed(2) + '%'
     case 'ratio': return n.toFixed(2) + 'x'
     case 'seconds': return n.toFixed(1) + 's'
+    case 'score': return String(Math.round(n))
     default: return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)
   }
 }
@@ -111,6 +119,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       if (needsTagData) p.set('aiTags', '1')
       const res = await fetch(`/api/reports/generate?${p}`)
       const json = await res.json()
+      registerCustomMetrics(json.customMetrics)
       if (json.error && !json.rows?.length) setError(json.error === 'no_account' ? 'Connect a Meta ad account to build this report.' : json.error)
       setData(json)
       setSyncedAt(Date.now())
@@ -160,7 +169,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
     groupBy, dateRange, metrics, currency, rows, netResults: net,
   })
 
-  const availableToAdd = ALL_METRICS.filter(m => !metrics.includes(m))
+  const availableToAdd = (Object.keys(METRICS) as MetricKey[]).filter(m => !metrics.includes(m))
 
   if (!tpl) return <div style={{ padding: 40 }}>Unknown report.</div>
 
@@ -391,7 +400,7 @@ const heat = (strength: number) => strength <= 0.001 ? 'transparent' : `rgba(140
 // Metrics that get a heatmap fill (higher = better, and not Spend which stays plain).
 const heatable = (m: MetricKey) => METRICS[m].goodHigh && m !== 'spend'
 // Net Results shows an average (not a sum) for rate/cost metrics.
-const isAvg = (m: MetricKey) => ['percent', 'ratio', 'seconds'].includes(METRICS[m].format) || ['cpm', 'cpc', 'cpa'].includes(m)
+const isAvg = (m: MetricKey) => ['percent', 'ratio', 'seconds', 'score'].includes(METRICS[m].format) || ['cpm', 'cpc', 'cpa'].includes(m)
 
 // AI-tag column definitions (Motion's "AI tags" menu). asset_type maps to the derived format.
 const AI_TAG_COLS: { key: string; label: string; group: string }[] = [
