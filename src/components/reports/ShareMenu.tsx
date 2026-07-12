@@ -74,6 +74,12 @@ export default function ShareMenu({ payload, onClose, savedId }: {
               rows={3} style={taStyle} />
             {link ? (
               <div style={{ marginTop: 10 }}>
+                {/* Confirmation — tell the user the snapshot is filed on the Snapshots page. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#f0f7ee', border: '1px solid #cfe6c4', borderRadius: 10, padding: '8px 11px', marginBottom: 8 }}>
+                  <span style={{ fontSize: 14 }}>📸</span>
+                  <span style={{ fontSize: 12.5, color: '#2d5a2d', fontWeight: 600, flex: 1 }}>Snapshot created</span>
+                  <a href="/snapshots" style={{ fontSize: 12, fontWeight: 700, color: '#2d7a2d', textDecoration: 'none' }}>View in Snapshots →</a>
+                </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input readOnly value={link} style={{ ...inStyle, flex: 1, fontSize: 11.5, color: '#3a5a3a' }} onFocus={e => e.currentTarget.select()} />
                   <button onClick={() => { navigator.clipboard.writeText(link); setCopied(true) }} style={btnPrimary}>{copied ? 'Copied ✓' : 'Copy'}</button>
