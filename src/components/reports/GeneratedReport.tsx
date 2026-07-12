@@ -11,6 +11,7 @@ import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, BUILTIN_PRESETS, type MetricKey, ty
 import ShareMenu from './ShareMenu'
 import ReportFilters from './ReportFilters'
 import MetricPicker from './MetricPicker'
+import AdDetailDrawer from './AdDetailDrawer'
 
 const ALL_METRICS = Object.keys(METRICS) as MetricKey[]
 
@@ -73,6 +74,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const needsTagData = aiTags || tagCols.some(c => c !== 'asset_type')
   // Column presets (Custom dropdown + KPI picker). User presets persist in localStorage.
   const [showPicker, setShowPicker] = useState(false)
+  const [detailAd, setDetailAd] = useState<{ id: string; name?: string } | null>(null)
   const [userPresets, setUserPresets] = useState<ColumnPreset[]>([])
   useEffect(() => { try { const s = localStorage.getItem('selfmade_report_presets'); if (s) setUserPresets(JSON.parse(s)) } catch {} }, [])
   const applyPreset = (p: ColumnPreset) => { setMetrics(p.metrics); setTagCols(p.tagCols || []) }
@@ -311,7 +313,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
                   ))}
                 </div>
               </div>
-              {view === 'card' && <CardsGrid rows={rows} metrics={metrics} sort={sort} currency={currency} onSee={setGroupBy} />}
+              {view === 'card' && <CardsGrid rows={rows} metrics={metrics} sort={sort} currency={currency} onSee={setGroupBy} onOpenAd={(id: string, nm?: string) => setDetailAd({ id, name: nm })} />}
             </div>
           </div>
 
@@ -321,7 +323,8 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             tagCols={tagCols} onToggleTagCol={(c: string) => setTagCols(cols => cols.includes(c) ? cols.filter(x => x !== c) : [...cols, c])}
             settings={{ heatOn, perPage, showTags, showLaunch, showStatus }}
             setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus}
-            presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} onSee={setGroupBy} />
+            presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} onSee={setGroupBy}
+            onOpenAd={(id: string, nm?: string) => setDetailAd({ id, name: nm })} />
         </>
       )}
 
@@ -330,6 +333,8 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           onApply={(m, t) => { setMetrics(m); setTagCols(t) }}
           onSavePreset={savePreset} onClose={() => setShowPicker(false)} />
       )}
+
+      {detailAd && <AdDetailDrawer adId={detailAd.id} name={detailAd.name} dateRange={dateRange} onClose={() => setDetailAd(null)} />}
 
       <style>{`
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
@@ -377,7 +382,7 @@ const AI_TAG_COLOR: Record<string, [string, string]> = {
 const cap1 = (s: string) => (s || '').charAt(0).toUpperCase() + (s || '').slice(1)
 const STATUS_COLOR: Record<string, [string, string]> = { active: ['#f0fdf4', '#15803d'], paused: ['#f4f6f0', '#7c8577'], archived: ['#faf5f0', '#9a7b5a'] }
 
-function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setHeatOn, setPerPage, setShowTags, setShowLaunch, setShowStatus, presets, onApplyPreset, onCustomize, onSee }: any) {
+function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setHeatOn, setPerPage, setShowTags, setShowLaunch, setShowStatus, presets, onApplyPreset, onCustomize, onSee, onOpenAd }: any) {
   const [menu, setMenu] = useState<string | null>(null)
   const colMax: Record<string, number> = {}
   for (const m of metrics as MetricKey[]) colMax[m] = Math.max(...rows.map((r: any) => r.metrics[m] || 0), 0.0001)
@@ -520,12 +525,14 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
                 <td style={{ ...tdStyle, textAlign: 'left', paddingLeft: 18 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
                     <button onClick={() => toggleRow(r.key)} style={{ width: 16, height: 16, borderRadius: 5, border: sel.has(r.key) ? '1.6px solid #6fb03a' : '1.6px solid #c2ccc0', background: sel.has(r.key) ? '#dffe95' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', padding: 0 }}>{sel.has(r.key) && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#1a3a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
+                    <span onClick={() => r.adId && onOpenAd?.(r.adId, r.name)} style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0, cursor: r.adId ? 'pointer' : 'default' }}>
                     <Thumb src={r.thumbnail} format={r.format} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0e1b12', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{r.name}</div>
                       <div style={{ fontSize: 11.5, fontWeight: 500, color: '#9aa196' }}>{r.adCount} {r.adCount === 1 ? 'ad' : 'ads'}</div>
                       {settings.showTags && <TagPills tags={r.tags} max={3} rows={rows} onSee={onSee} />}
                     </div>
+                    </span>
                   </div>
                 </td>
                 {dimCols.map(dc => <td key={dc.key} style={{ ...tdStyle, textAlign: 'left' }}>{dimCell(r, dc.key)}</td>)}
@@ -578,11 +585,11 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   </button>
 }
 
-function CardsGrid({ rows, metrics, sort, currency, onSee }: any) {
+function CardsGrid({ rows, metrics, sort, currency, onSee, onOpenAd }: any) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px,100%),1fr))', gap: 16 }}>
       {rows.map((r: any, i: number) => (
-        <div key={r.key + i} className="rp-card" style={{ border: '1px solid rgba(26,58,26,.1)', borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
+        <div key={r.key + i} className="rp-card" onClick={() => r.adId && onOpenAd?.(r.adId, r.name)} style={{ border: '1px solid rgba(26,58,26,.1)', borderRadius: 16, overflow: 'hidden', background: '#fff', cursor: r.adId ? 'pointer' : 'default' }}>
           {/* creative preview 16:10 */}
           <div style={{ position: 'relative', aspectRatio: '16 / 10', background: '#0e1b12', overflow: 'hidden' }}>
             {r.thumbnail

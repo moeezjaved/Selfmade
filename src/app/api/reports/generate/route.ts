@@ -242,7 +242,7 @@ export async function GET(req: NextRequest) {
       for (const k of cols) m[k] = metricValue(r, k)
       m[sort] = metricValue(r, sort)
       return {
-        key: r.key, name: r.name, thumbnail: r.thumbnail, format: r.format,
+        key: r.key, name: r.name, thumbnail: r.thumbnail, format: r.format, adId: r.adId,
         landingPage: r.landingPage, launchDate: r.launchDate, status: r.status, adCount: r.adCount, metrics: m,
         tags: attachTags ? (tagMap[r.adId] || null) : null,
       }
