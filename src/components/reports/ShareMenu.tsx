@@ -7,9 +7,10 @@
  */
 import { useState } from 'react'
 
-export default function ShareMenu({ payload, onClose }: {
+export default function ShareMenu({ payload, onClose, savedId }: {
   payload: () => any            // returns the current snapshot payload (name, template, metrics, rows, net, …)
   onClose: () => void
+  savedId?: string              // when set, partner-share sends a real collaboration invite (not just a snapshot)
 }) {
   const [tab, setTab] = useState<'once' | 'partner'>('once')
   const [note, setNote] = useState('')
@@ -23,6 +24,18 @@ export default function ShareMenu({ payload, onClose }: {
   const post = async (mode: 'once' | 'partner') => {
     setBusy(true); setErr(''); setSent('')
     try {
+      // Partner + a saved report → real collaboration invite (they accept into their workspace).
+      if (mode === 'partner' && savedId) {
+        const res = await fetch('/api/reports/collab', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ savedReportId: savedId, partnerEmail: email }),
+        })
+        const j = await res.json()
+        if (!res.ok) { setErr(j.error || 'Something went wrong.'); return }
+        if (j.link) setLink(j.link)
+        setSent(j.emailed ? `Invitation sent to ${email} ✓` : 'Invite created — copy the link to share.')
+        return
+      }
       const res = await fetch('/api/reports/share', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...payload(), mode, note, partnerEmail: email }),
@@ -74,10 +87,14 @@ export default function ShareMenu({ payload, onClose }: {
           </>
         ) : (
           <>
-            <div style={{ fontSize: 12.5, color: '#5a7a5a', lineHeight: 1.5, marginBottom: 10 }}>Send this report to a client or partner. They can open it without a Selfmade account.</div>
+            <div style={{ fontSize: 12.5, color: '#5a7a5a', lineHeight: 1.5, marginBottom: 10 }}>
+              {savedId
+                ? 'Invite a client or partner to collaborate. They accept into their own workspace and see this report update live.'
+                : 'A snapshot link will be emailed. Tip: Save this report first to invite a partner who sees live updates.'}
+            </div>
             <label style={lblStyle}>Partner email address</label>
             <input value={email} onChange={e => setEmail(e.target.value)} placeholder="partner@example.com" type="email" style={inStyle} />
-            <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note (optional)" rows={2} style={{ ...taStyle, marginTop: 8 }} />
+            {!savedId && <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note (optional)" rows={2} style={{ ...taStyle, marginTop: 8 }} />}
             {sent && <div style={{ marginTop: 10, fontSize: 12.5, color: '#2d7a2d', fontWeight: 600 }}>{sent}{link && <><br /><a href={link} target="_blank" rel="noopener noreferrer" style={{ color: '#3a5a3a', fontSize: 11.5 }}>{link}</a></>}</div>}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
               <button onClick={onClose} style={btnGhost}>Cancel</button>
