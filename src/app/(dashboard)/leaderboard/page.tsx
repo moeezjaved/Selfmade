@@ -54,6 +54,12 @@ export default function LeaderboardPage() {
   const [aiText, setAiText] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
 
+  // Restore the saved spend threshold on mount (browser-local, per-device). Set after hydration to
+  // avoid an SSR mismatch; the fetch effect below picks up the restored value.
+  useEffect(() => {
+    try { const s = localStorage.getItem('selfmade_lb_threshold'); if (s != null) { const n = Number(s) || 0; setThreshold(n); setThresholdInput(String(n)) } } catch {}
+  }, [])
+
   useEffect(() => {
     setLoading(true); setError(''); setAiText('')
     fetch(`/api/leaderboard?spendThreshold=${threshold}`).then(r => r.json()).then(j => {
@@ -78,7 +84,7 @@ export default function LeaderboardPage() {
     } catch (e: any) { setAiText(e.message) }
     finally { setAiLoading(false) }
   }
-  const applyThreshold = () => { const n = Math.max(0, Number(thresholdInput) || 0); setThreshold(n) }
+  const applyThreshold = () => { const n = Math.max(0, Number(thresholdInput) || 0); setThreshold(n); try { localStorage.setItem('selfmade_lb_threshold', String(n)) } catch {} }
 
   const currency = data?.currency || 'PKR'
   const counts = data?.shifts?.counts || { scaling: 0, declining: 0, newly: 0, paused: 0 }
