@@ -15,9 +15,35 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { templateKey, metrics, rows, netResults, currency, groupBy, mode, question } = await req.json()
+  const body = await req.json()
+  const { templateKey, metrics, rows, netResults, currency, groupBy, mode, question } = body
   const tpl = TEMPLATE_BY_KEY[templateKey]
   if (!tpl) return NextResponse.json({ error: 'Unknown template' }, { status: 400 })
+
+  // Sprint (time-series) analysis — reads the per-creative momentum trend instead of a static snapshot.
+  if (mode === 'sprints' && Array.isArray(body.sprints)) {
+    const sprints = body.sprints as { name: string; value: number; spend: number; trendPct: number; trend: string }[]
+    if (!sprints.length) return NextResponse.json({ analysis: 'No time-series data to analyze yet — try a longer date range.' })
+    const line = (s: any) => `${s.name} — ${body.metricLabel || 'metric'} ${Math.round(s.value * 100) / 100}, spend ${Math.round(s.spend)} ${currency}, trend ${s.trend} (${s.trendPct >= 0 ? '+' : ''}${Math.round(s.trendPct)}% recent vs earlier)`
+    const list = sprints.slice(0, 25).map(line).join('\n')
+    const prompt = `You are Mello, a sharp performance-marketing analyst. This is a SPRINT (over-time) view of the "${tpl.title}" report — each row is one ${groupBy}, with its ${body.metricLabel || 'metric'} trend across ${body.increment || 'weekly'} buckets. "Fatiguing" = declining; "Scaling" = improving; "Stable" = flat.
+
+Rows (by spend):
+${list}
+
+Write a momentum read in 3 short markdown sections:
+**Scaling — push budget** — name the 1-3 creatives with the strongest improving trend; say why they're worth more spend.
+**Fatiguing — refresh or cut** — name the 1-3 declining creatives eating budget; for each say kill or iterate, and what to change.
+**This week's move** — ONE concrete prioritized action.
+Be specific with names + numbers. Under 150 words. No preamble.`
+    try {
+      const res = await llm.messages.create({ model: 'gpt-4o', max_tokens: 500, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
+      return NextResponse.json({ analysis: res.content[0]?.text || 'Could not generate analysis.' })
+    } catch (e: any) {
+      return NextResponse.json({ error: e?.message || 'Analysis failed' }, { status: 200 })
+    }
+  }
+
   if (!Array.isArray(rows) || rows.length === 0) return NextResponse.json({ analysis: 'Not enough data to analyze yet — this report has no ads with spend in the selected period.' })
 
   const cols = (metrics as MetricKey[]).map(m => METRICS[m]?.label || m)

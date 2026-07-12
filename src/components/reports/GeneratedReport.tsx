@@ -734,10 +734,12 @@ function SprintView({ templateKey, dateRange, groupBy, sort, metrics, currency }
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const [aiText, setAiText] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
 
   useEffect(() => {
     let live = true
-    setLoading(true); setErr('')
+    setLoading(true); setErr(''); setAiText('')
     const p = new URLSearchParams({ template: templateKey, dateRange, groupBy, metric, increment })
     fetch(`/api/reports/sprints?${p}`).then(r => r.json()).then(j => {
       if (!live) return
@@ -746,6 +748,24 @@ function SprintView({ templateKey, dateRange, groupBy, sort, metrics, currency }
     }).catch(e => live && setErr(e.message)).finally(() => live && setLoading(false))
     return () => { live = false }
   }, [templateKey, dateRange, groupBy, metric, increment])
+
+  const analyzeTrends = async () => {
+    if (!data?.series?.length) return
+    setAiLoading(true); setAiText('')
+    try {
+      const res = await fetch('/api/reports/analyze', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateKey, mode: 'sprints', groupBy, currency,
+          metricLabel: data.metricLabel, increment: data.increment,
+          sprints: (data.series || []).map((s: any) => ({ name: s.name, value: s.metricTotal, spend: s.totalSpend, trendPct: s.trendPct, trend: s.trendGood === null ? 'Stable' : s.trendGood ? 'Scaling' : 'Fatiguing' })),
+        }),
+      })
+      const j = await res.json()
+      setAiText(j.analysis || j.error || 'Could not analyze.')
+    } catch (e: any) { setAiText(e.message) }
+    finally { setAiLoading(false) }
+  }
 
   const fmt = METRICS[metric]?.format || 'number'
   const tickFmt = (v: any) => fmt === 'currency' ? (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : String(Math.round(v))) : fmt === 'percent' ? v + '%' : fmt === 'ratio' ? v + 'x' : fmt === 'score' ? String(Math.round(v)) : new Intl.NumberFormat('en-US', { notation: 'compact' }).format(v)
@@ -768,6 +788,10 @@ function SprintView({ templateKey, dateRange, groupBy, sort, metrics, currency }
         <select value={metric} onChange={e => setMetric(e.target.value as MetricKey)} style={{ padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }}>
           {metrics.map((m: MetricKey) => <option key={m} value={m}>{METRICS[m]?.label || m}</option>)}
         </select>
+        <button onClick={analyzeTrends} disabled={aiLoading || !data?.series?.length} title="Mello reads the momentum trends"
+          style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#0e1b12', border: 'none', borderRadius: 999, padding: '6px 13px', fontSize: 12, fontWeight: 800, color: '#dffe95', cursor: aiLoading ? 'default' : 'pointer', fontFamily: FONT, opacity: aiLoading || !data?.series?.length ? 0.6 : 1 }}>
+          ✨ {aiLoading ? 'Reading trends…' : 'Analyze trends'}
+        </button>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: 3 }}>
           {(['daily', 'weekly', 'monthly'] as const).map(inc => (
@@ -775,6 +799,17 @@ function SprintView({ templateKey, dateRange, groupBy, sort, metrics, currency }
           ))}
         </div>
       </div>
+
+      {(aiText || aiLoading) && (
+        <div style={{ marginBottom: 14, background: 'linear-gradient(180deg,#f6faef,#fff)', border: '1px solid #e3ecd4', borderRadius: 12, padding: '13px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: aiText ? 8 : 0 }}>
+            <span style={{ fontSize: 12.5 }}>✨</span>
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#5a7a3a' }}>Mello · momentum read</span>
+          </div>
+          {aiLoading ? <div style={{ fontSize: 12.5, color: '#9aa196' }}>Reading the trends…</div>
+            : <div style={{ fontSize: 13, lineHeight: 1.6, color: '#243d17', whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: mdLite(aiText) }} />}
+        </div>
+      )}
 
       {loading ? <div style={{ padding: 60, textAlign: 'center', color: '#9aa196', fontSize: 13 }}>Building sprint…</div>
         : err ? <div style={{ padding: 40, textAlign: 'center', color: '#c0392b', fontSize: 13 }}>{err}</div>
