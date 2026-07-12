@@ -309,13 +309,15 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             </div>
           </div>
 
-          {/* Table panel */}
-          <TablePanel rows={rows} metrics={metrics} sort={sort} dir={dir} currency={currency} net={net} groupLabel={groupLabel}
-            onSort={toggleSort} count={data?.count}
-            tagCols={tagCols} onToggleTagCol={(c: string) => setTagCols(cols => cols.includes(c) ? cols.filter(x => x !== c) : [...cols, c])}
-            settings={{ heatOn, perPage, showTags, showLaunch, showStatus }}
-            setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus}
-            presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} onSee={setGroupBy} />
+          {/* Table panel — shown in table view (cards view shows the grid above instead) */}
+          {view === 'table' && (
+            <TablePanel rows={rows} metrics={metrics} sort={sort} dir={dir} currency={currency} net={net} groupLabel={groupLabel}
+              onSort={toggleSort} count={data?.count}
+              tagCols={tagCols} onToggleTagCol={(c: string) => setTagCols(cols => cols.includes(c) ? cols.filter(x => x !== c) : [...cols, c])}
+              settings={{ heatOn, perPage, showTags, showLaunch, showStatus }}
+              setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus}
+              presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} onSee={setGroupBy} />
+          )}
         </>
       )}
 
