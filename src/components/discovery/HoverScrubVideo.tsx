@@ -8,12 +8,13 @@
  */
 import { useRef, useState } from 'react'
 
-export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', initials = '', onPlayingChange }: {
+export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', initials = '', onPlayingChange, onError }: {
   src: string
   poster?: string
   brandBg?: string
   initials?: string
   onPlayingChange?: (playing: boolean) => void
+  onError?: () => void   // fired if the video can't load (dead blob/YouTube src) so callers can fall back
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const vidRef = useRef<HTMLVideoElement>(null)
@@ -68,7 +69,7 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
       {/* lazily-mounted video */}
       {mountVideo && (
         <video ref={vidRef} key={src} src={src} muted playsInline preload="metadata"
-          onLoadedMetadata={() => setReady(true)} onCanPlay={() => setLoading(false)} onWaiting={() => setLoading(true)}
+          onLoadedMetadata={() => setReady(true)} onCanPlay={() => setLoading(false)} onWaiting={() => setLoading(true)} onError={() => onError?.()}
           onPlaying={() => setLoading(false)} onTimeUpdate={() => { if (playing) { const v = vidRef.current!; setProgress(v.duration ? v.currentTime / v.duration : 0) } }}
           onEnded={() => { setPlay(false); setProgress(0) }}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000', opacity: ready ? 1 : 0, transition: 'opacity .15s', zIndex: 2 }} />
