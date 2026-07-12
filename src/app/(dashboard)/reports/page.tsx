@@ -1,8 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import AccountSelector from '@/components/AccountSelector'
 import CreateReportModal from '@/components/reports/CreateReportModal'
 import GeneratedReport from '@/components/reports/GeneratedReport'
+
+export const dynamic = 'force-dynamic'
 
 const fmt = (n: number, currency = 'PKR') =>
   new Intl.NumberFormat('en-PK', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
@@ -26,14 +29,17 @@ export default function ReportsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [activeReport, setActiveReport] = useState<{ templateKey: string; savedId?: string; name?: string; config?: any } | null>(null)
 
-  // Deep-links: ?create=1 opens the picker; ?report=<id> opens a saved report; ?template=<key>&... a shared one.
+  // Deep-links (reactive — fires on every URL change, so sidebar shortcuts work while already on /reports):
+  // ?create=1 opens the picker; ?report=<id> opens a saved report; ?template=<key>&... a template/shared one.
+  const searchParams = useSearchParams()
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search)
-    if (p.get('create')) { setShowCreate(true); return }
+    const p = new URLSearchParams(searchParams?.toString() || '')
+    if (p.get('create')) { setShowCreate(true); setActiveReport(null); return }
+    setShowCreate(false)
     const rid = p.get('report')
     if (rid) {
       fetch('/api/reports/saved').then(r => r.json()).then(j => {
-        const found = (j.reports || []).find((x: any) => x.id === rid)
+        const found = [...(j.reports || []), ...(j.shared || [])].find((x: any) => x.id === rid)
         if (found) setActiveReport({ templateKey: found.template_key, savedId: found.id, name: found.name, config: found.config })
       }).catch(() => {})
       return
@@ -47,8 +53,10 @@ export default function ReportsPage() {
       if (p.get('sort')) cfg.sort = p.get('sort')
       if (p.get('dir')) cfg.dir = p.get('dir')
       setActiveReport({ templateKey: t, config: cfg })
+    } else {
+      setActiveReport(null)   // plain /reports → default insights view
     }
-  }, [])
+  }, [searchParams])
 
   const saveReport = async (payload: { id?: string; name: string; templateKey: string; config: any }) => {
     try {
@@ -105,11 +113,12 @@ export default function ReportsPage() {
   if (activeReport) {
     return (
       <GeneratedReport
+        key={activeReport.savedId || `${activeReport.templateKey}:${activeReport.config?.groupBy || ''}`}
         templateKey={activeReport.templateKey}
         savedId={activeReport.savedId}
         initialName={activeReport.name}
         initialConfig={activeReport.config}
-        onBack={() => { setActiveReport(null); if (window.location.search) window.history.replaceState({}, '', '/reports') }}
+        onBack={() => { if (window.location.search) window.history.replaceState({}, '', '/reports'); setActiveReport(null) }}
         onSave={saveReport}
       />
     )
