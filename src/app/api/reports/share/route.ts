@@ -6,11 +6,32 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
+import { waitUntil } from '@vercel/functions'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getUserOrg } from '@/lib/org'
 import { uploadBufferToR2, r2PublicUrl } from '@/lib/r2'
 import { recordSnapshot } from '@/lib/reports/snapshots'
 import { sendEmail, emailShell, emailEnabled } from '@/lib/email'
+
+// Freeze creative thumbnails into R2 so a shared snapshot keeps its images forever (Meta's thumbnail
+// URLs are temporary/signed and would otherwise expire). Re-uploads the snapshot JSON with the frozen
+// URLs. Runs in the BACKGROUND (via waitUntil) so the Share click returns instantly.
+async function freezeThumbnails(token: string, snapshot: any) {
+  let changed = false
+  await Promise.all((snapshot.rows as any[]).slice(0, 60).map(async (r, i) => {
+    const t = r?.thumbnail
+    if (!t || typeof t !== 'string' || t.startsWith('data:') || t.includes('.r2.dev') || t.includes('r2.cloudflarestorage') || t.includes('cdn.tryselfmade')) return
+    try {
+      const res = await fetch(`https://images.weserv.nl/?url=${encodeURIComponent(t)}&w=240&output=webp&q=80`)
+      if (!res.ok) return
+      const buf = Buffer.from(await res.arrayBuffer())
+      if (!buf.length || buf.length > 2_000_000) return
+      const frozen = await uploadBufferToR2(buf, `shared-reports/${token}/t${i}.webp`, 'image/webp')
+      if (frozen) { r.thumbnail = frozen; changed = true }
+    } catch { /* keep the original url on failure */ }
+  }))
+  if (changed) await uploadBufferToR2(Buffer.from(JSON.stringify(snapshot)), `shared-reports/${token}.json`, 'application/json')
+}
 
 export const dynamic = 'force-dynamic'
 const APP_URL = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
@@ -40,27 +61,14 @@ export async function POST(req: NextRequest) {
   }
 
   const token = randomUUID().replace(/-/g, '').slice(0, 22)
-
-  // Freeze creative thumbnails into R2 so the shared snapshot keeps its images forever — Meta's
-  // thumbnail URLs are temporary/signed and would otherwise expire and go blank in a client's link.
-  // Best-effort, bounded to the visible rows; rows without a thumbnail (Meta returned none) stay as-is.
-  await Promise.all((snapshot.rows as any[]).slice(0, 60).map(async (r, i) => {
-    const t = r?.thumbnail
-    if (!t || typeof t !== 'string' || t.startsWith('data:') || t.includes('.r2.dev') || t.includes('r2.cloudflarestorage') || t.includes('cdn.tryselfmade')) return
-    try {
-      const proxied = `https://images.weserv.nl/?url=${encodeURIComponent(t)}&w=240&output=webp&q=80`
-      const res = await fetch(proxied)
-      if (!res.ok) return
-      const buf = Buffer.from(await res.arrayBuffer())
-      if (!buf.length || buf.length > 2_000_000) return
-      const frozen = await uploadBufferToR2(buf, `shared-reports/${token}/t${i}.webp`, 'image/webp')
-      if (frozen) r.thumbnail = frozen
-    } catch { /* keep the original url on failure */ }
-  }))
-
+  // Upload immediately with the original thumbnail URLs so the link works right away; the background
+  // freeze below swaps them for permanent R2 copies within a few seconds.
   const url = await uploadBufferToR2(Buffer.from(JSON.stringify(snapshot)), `shared-reports/${token}.json`, 'application/json')
   if (!url) return NextResponse.json({ error: 'Sharing is not configured (storage unavailable).' }, { status: 503 })
   const shareUrl = `${APP_URL}/r/${token}`
+
+  // Persist thumbnails to R2 AFTER the response returns — never blocks the Share click.
+  try { waitUntil(freezeThumbnails(token, snapshot)) } catch { /* not on Vercel (e.g. local) — skip */ }
 
   // File a copy in the org's Snapshots archive (frozen, listable at /snapshots). Best-effort.
   try {
