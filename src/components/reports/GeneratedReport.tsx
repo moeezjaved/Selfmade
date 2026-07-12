@@ -76,6 +76,8 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [aiOpen, setAiOpen] = useState(false)
   const [aiText, setAiText] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const [askMode, setAskMode] = useState(false)
+  const [askText, setAskText] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -105,12 +107,13 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const removeMetric = (m: MetricKey) => { if (metrics.length > 1) setMetrics(metrics.filter(x => x !== m)) }
   const addMetric = (m: MetricKey) => { if (!metrics.includes(m)) setMetrics([...metrics, m]); setAddOpen(false) }
 
-  const runAI = async () => {
-    setAiOpen(true); setAiLoading(true); setAiText('')
+  const runAI = async (mode = 'analyze', question = '') => {
+    setAiOpen(true); setAskMode(mode === 'ask' && !question); if (mode === 'ask' && !question) return
+    setAiLoading(true); setAiText('')
     try {
       const res = await fetch('/api/reports/analyze', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateKey, metrics, rows: rows.slice(0, 15), netResults: net, currency, groupBy }),
+        body: JSON.stringify({ templateKey, metrics, rows: rows.slice(0, 15), netResults: net, currency, groupBy, mode, question }),
       })
       const json = await res.json()
       setAiText(json.analysis || json.error || 'No analysis available.')
@@ -156,7 +159,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           <div style={{ fontSize: 13.5, fontWeight: 500, color: '#6f7a68', marginTop: 3 }}>{tpl.description}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
-          <button onClick={runAI} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#dffe95', color: '#0e1b12', border: 'none', fontFamily: FONT, fontSize: 13.5, fontWeight: 700, padding: '10px 16px', borderRadius: 11, cursor: 'pointer', boxShadow: '0 5px 14px -6px rgba(223,254,149,.9)' }}>
+          <button onClick={() => runAI('analyze')} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#dffe95', color: '#0e1b12', border: 'none', fontFamily: FONT, fontSize: 13.5, fontWeight: 700, padding: '10px 16px', borderRadius: 11, cursor: 'pointer', boxShadow: '0 5px 14px -6px rgba(223,254,149,.9)' }}>
             <svg width="15" height="15" viewBox="0 0 20 20" fill="#0e1b12"><path d="M10 1.5l1.7 4.6 4.8 1.7-4.8 1.7L10 14.1 8.3 9.5 3.5 7.8l4.8-1.7z" /><circle cx="16" cy="15" r="1.5" /></svg>
             Analyze
           </button>
@@ -172,9 +175,17 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       {aiOpen && (
         <div style={{ background: 'linear-gradient(135deg,#faf5ff,#f3e8ff)', border: '1px solid #e9d5ff', borderRadius: 16, padding: '16px 20px', marginBottom: 16, position: 'relative' }}>
           <button onClick={() => setAiOpen(false)} style={{ position: 'absolute', top: 12, right: 14, border: 'none', background: 'transparent', cursor: 'pointer', color: '#a855f7', fontSize: 14 }}>✕</button>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', marginBottom: 8 }}>✨ Mello's analysis</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', marginBottom: 8 }}>✨ Ask Mello</div>
+          {askMode && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: aiText || aiLoading ? 14 : 0 }}>
+              <input value={askText} onChange={e => setAskText(e.target.value)} autoFocus placeholder="Ask anything about this report…"
+                onKeyDown={e => { if (e.key === 'Enter' && askText.trim()) runAI('ask', askText.trim()) }}
+                style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid #e9d5ff', background: '#fff', fontFamily: FONT, fontSize: 13.5, color: '#3b0764', outline: 'none' }} />
+              <button onClick={() => askText.trim() && runAI('ask', askText.trim())} style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#a855f7)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }}>Ask</button>
+            </div>
+          )}
           {aiLoading ? <div style={{ color: '#9333ea', fontSize: 13 }}>Reading your data…</div>
-            : <div style={{ fontSize: 13.5, color: '#3b0764', lineHeight: 1.65 }} dangerouslySetInnerHTML={{ __html: mdLite(aiText) }} />}
+            : aiText ? <div style={{ fontSize: 13.5, color: '#3b0764', lineHeight: 1.65 }} dangerouslySetInnerHTML={{ __html: mdLite(aiText) }} /> : null}
         </div>
       )}
 
@@ -200,6 +211,26 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 11, padding: '9px 13px', fontFamily: FONT, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: aiTags ? 'none' : '1px solid rgba(124,58,237,.3)', background: aiTags ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : '#faf5ff', color: aiTags ? '#fff' : '#7c3aed' }}>✨ AI tags</button>
         <ReportFilters filters={filters} onChange={setFilters} />
       </div>
+
+      {/* Mello quick-prompt chips */}
+      {!loading && rows.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+          {[
+            { key: 'ask', label: 'Ask me anything', icon: '💬' },
+            { key: 'brief', label: 'Write a brief from top performers', icon: '📝' },
+            { key: 'working', label: "What's working and what's not", icon: '📊' },
+            { key: 'themes', label: 'What themes are in my ads?', icon: '🏷️' },
+            { key: 'analyze', label: 'Analyze this report', icon: '✨' },
+          ].map(c => (
+            <button key={c.key} onClick={() => runAI(c.key)}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 15px', borderRadius: 999, border: '1px solid rgba(26,58,26,.12)', background: c.key === 'analyze' ? 'linear-gradient(135deg,#faf5ff,#f3e8ff)' : '#fff', color: '#3a4636', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+              onMouseEnter={e => e.currentTarget.style.background = c.key === 'analyze' ? '#f3e8ff' : '#f4f6f0'}
+              onMouseLeave={e => e.currentTarget.style.background = c.key === 'analyze' ? 'linear-gradient(135deg,#faf5ff,#f3e8ff)' : '#fff'}>
+              <span style={{ fontSize: 13 }}>{c.icon}</span>{c.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* AI tagging progress */}
       {!loading && data?.tagRemaining > 0 && (
