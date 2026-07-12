@@ -24,6 +24,14 @@ const QUICK_REPORTS: { emoji: string; label: string; href: string }[] = [
   { emoji: '🧩', label: 'Ad Format Comparison', href: '/reports?template=ad_format' },
   { emoji: '🚀', label: 'Launch Analysis', href: '/reports?template=launch_analysis' },
 ]
+const FROM_TEMPLATES: { emoji: string; label: string; href: string }[] = [
+  { emoji: '💵', label: 'Top converters', href: '/reports?template=top_converters' },
+  { emoji: '⚖️', label: 'Scalers', href: '/reports?template=scalers' },
+  { emoji: '🏋️', label: 'Heavies', href: '/reports?template=heavies' },
+  { emoji: '😴', label: 'Bottom performers', href: '/reports?template=bottom_cpm' },
+  { emoji: '🛤️', label: 'Customer journey', href: '/reports?template=customer_journey' },
+  { emoji: '🔻', label: 'Funnel comparison', href: '/reports?template=funnel' },
+]
 const CREATIVE_PATTERNS: { emoji: string; label: string; href: string }[] = [
   { emoji: '🎞️', label: 'Asset Type', href: '/reports?template=top_performers&groupBy=format' },
   { emoji: '🎨', label: 'Visual Format', href: '/reports?template=visual_analysis' },
@@ -98,6 +106,9 @@ export default function SavedReportsNav() {
       </Folder>
       <Folder title="Creative Patterns">
         {CREATIVE_PATTERNS.map(s => <Shortcut key={s.label} s={s} />)}
+      </Folder>
+      <Folder title="From Templates">
+        {FROM_TEMPLATES.map(s => <Shortcut key={s.label} s={s} />)}
       </Folder>
     </div>
   )

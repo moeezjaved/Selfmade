@@ -37,9 +37,13 @@ function metricColor(key: MetricKey, v: number): string | undefined {
 }
 
 const DATE_RANGES = [
-  { key: 'last_7d', label: '7d' }, { key: 'last_14d', label: '14d' },
-  { key: 'last_30d', label: '30d' }, { key: 'last_60d', label: '60d' }, { key: 'last_90d', label: '90d' },
+  { key: 'today', label: 'Today' }, { key: 'yesterday', label: 'Yesterday' },
+  { key: 'this_week', label: 'This week' }, { key: 'last_week', label: 'Last week' },
+  { key: 'this_month', label: 'This month' }, { key: 'last_month', label: 'Last month' },
+  { key: 'last_7d', label: 'Last 7 days' }, { key: 'last_14d', label: 'Last 14 days' },
+  { key: 'last_30d', label: 'Last 30 days' }, { key: 'last_90d', label: 'Last 90 days' }, { key: 'last_365d', label: 'Last 365 days' },
 ]
+const DR_LABEL: Record<string, string> = Object.fromEntries(DATE_RANGES.map(d => [d.key, d.label]))
 
 export default function GeneratedReport({ templateKey, onBack, onSave, onDelete, initialName, savedId, initialConfig }: {
   templateKey: string
@@ -71,6 +75,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [showTags, setShowTags] = useState<boolean>((ic as any).showTags !== false)
   const [showLaunch, setShowLaunch] = useState<boolean>(!!(ic as any).showLaunch)
   const [showStatus, setShowStatus] = useState<boolean>(!!(ic as any).showStatus)
+  const [cardAspect, setCardAspect] = useState<string>((ic as any).cardAspect || '4 / 5')  // 9:16 | 4:5 | 1:1 creative tile size
   const needsTagData = aiTags || tagCols.some(c => c !== 'asset_type') || filters.some(f => FILTER_FIELD_BY_KEY[f.field]?.type === 'tag')
   // Column presets (Custom dropdown + KPI picker). User presets persist in localStorage.
   const [showPicker, setShowPicker] = useState(false)
@@ -145,7 +150,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const doSave = async () => {
     if (!onSave) return
     setSaving(true)
-    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters, aiTags, tagCols, heatOn, perPage, showTags, showLaunch, showStatus } })
+    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters, aiTags, tagCols, heatOn, perPage, showTags, showLaunch, showStatus, cardAspect } })
     setSaving(false)
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) }
   }
@@ -228,9 +233,9 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
         </label>
         <label style={pill}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a3a1a" strokeWidth="1.8"><rect x="3" y="4" width="18" height="17" rx="2.5" /><path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" /></svg>
-          Last {dateRange.replace('last_', '').replace('d', ' days')}
+          {DR_LABEL[dateRange] || dateRange}
           <select value={dateRange} onChange={e => setDateRange(e.target.value)} style={pillSelect}>
-            {DATE_RANGES.map(d => <option key={d.key} value={d.key}>Last {d.label}</option>)}
+            {DATE_RANGES.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
           </select>
           <Chevron />
         </label>
@@ -245,8 +250,9 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           {[
             { key: 'ask', label: 'Ask me anything', icon: '💬' },
             { key: 'brief', label: 'Write a brief from top performers', icon: '📝' },
+            { key: 'testing', label: 'Give me a testing plan', icon: '🧪' },
+            { key: 'patterns', label: 'Spot patterns in winners', icon: '🔍' },
             { key: 'working', label: "What's working and what's not", icon: '📊' },
-            { key: 'themes', label: 'What themes are in my ads?', icon: '🏷️' },
             { key: 'analyze', label: 'Analyze this report', icon: '✨' },
           ].map(c => (
             <button key={c.key} onClick={() => runAI(c.key)}
@@ -328,7 +334,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
                   ))}
                 </div>
               </div>
-              {view === 'card' && <CardsGrid rows={rows} metrics={metrics} sort={sort} currency={currency} onSee={setGroupBy} onOpenAd={(id: string, nm?: string) => setDetailAd({ id, name: nm })} />}
+              {view === 'card' && <CardsGrid rows={rows} metrics={metrics} sort={sort} currency={currency} aspect={cardAspect} onSee={setGroupBy} onOpenAd={(id: string, nm?: string) => setDetailAd({ id, name: nm })} />}
             </div>
           </div>
 
@@ -336,8 +342,8 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           <TablePanel rows={rows} metrics={metrics} sort={sort} dir={dir} currency={currency} net={net} groupLabel={groupLabel}
             onSort={toggleSort} count={data?.count}
             tagCols={tagCols} onToggleTagCol={(c: string) => setTagCols(cols => cols.includes(c) ? cols.filter(x => x !== c) : [...cols, c])}
-            settings={{ heatOn, perPage, showTags, showLaunch, showStatus }}
-            setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus}
+            settings={{ heatOn, perPage, showTags, showLaunch, showStatus, cardAspect }}
+            setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus} setCardAspect={setCardAspect}
             presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} onSee={setGroupBy}
             onOpenAd={(id: string, nm?: string) => setDetailAd({ id, name: nm })} />
         </>
@@ -407,7 +413,7 @@ const AI_TAG_COLOR: Record<string, [string, string]> = {
 const cap1 = (s: string) => (s || '').charAt(0).toUpperCase() + (s || '').slice(1)
 const STATUS_COLOR: Record<string, [string, string]> = { active: ['#f0fdf4', '#15803d'], paused: ['#f4f6f0', '#7c8577'], archived: ['#faf5f0', '#9a7b5a'] }
 
-function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setHeatOn, setPerPage, setShowTags, setShowLaunch, setShowStatus, presets, onApplyPreset, onCustomize, onSee, onOpenAd }: any) {
+function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setHeatOn, setPerPage, setShowTags, setShowLaunch, setShowStatus, setCardAspect, presets, onApplyPreset, onCustomize, onSee, onOpenAd }: any) {
   const [menu, setMenu] = useState<string | null>(null)
   const colMax: Record<string, number> = {}
   for (const m of metrics as MetricKey[]) colMax[m] = Math.max(...rows.map((r: any) => r.metrics[m] || 0), 0.0001)
@@ -489,6 +495,17 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
               <SettingRow label="Show tags"><Toggle on={settings.showTags} onClick={() => setShowTags(!settings.showTags)} /></SettingRow>
               <SettingRow label="Show active status"><Toggle on={settings.showStatus} onClick={() => setShowStatus(!settings.showStatus)} /></SettingRow>
               <SettingRow label="Show launch date"><Toggle on={settings.showLaunch} onClick={() => setShowLaunch(!settings.showLaunch)} /></SettingRow>
+              <div style={{ padding: '8px 10px', borderTop: '1px solid rgba(26,58,26,.06)', marginTop: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#3a4636', marginBottom: 8 }}>Creative aspect ratio</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {([['9 / 16', '9:16'], ['4 / 5', '4:5'], ['1 / 1', '1:1']] as const).map(([val, lbl]) => (
+                    <button key={val} onClick={() => setCardAspect(val)} style={{ flex: 1, padding: '6px 4px', borderRadius: 9, border: settings.cardAspect === val ? '2px solid #6fb03a' : '1px solid rgba(26,58,26,.14)', background: settings.cardAspect === val ? '#f0f7ee' : '#fff', cursor: 'pointer', fontFamily: FONT, fontSize: 11, fontWeight: 700, color: '#0e1b12', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                      <span style={{ width: val === '9 / 16' ? 14 : val === '4 / 5' ? 20 : 22, aspectRatio: val, background: '#c8d6c0', borderRadius: 3 }} />
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -610,13 +627,15 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   </button>
 }
 
-function CardsGrid({ rows, metrics, sort, currency, onSee, onOpenAd }: any) {
+function CardsGrid({ rows, metrics, sort, currency, aspect = '4 / 5', onSee, onOpenAd }: any) {
+  // Wider tiles for taller aspect ratios so 9:16 doesn't get absurdly narrow.
+  const minW = aspect === '9 / 16' ? 220 : aspect === '1 / 1' ? 300 : 280
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px,100%),1fr))', gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${minW}px,100%),1fr))`, gap: 16 }}>
       {rows.map((r: any, i: number) => (
         <div key={r.key + i} className="rp-card" onClick={() => r.adId && onOpenAd?.(r.adId, r.name)} style={{ border: '1px solid rgba(26,58,26,.1)', borderRadius: 16, overflow: 'hidden', background: '#fff', cursor: r.adId ? 'pointer' : 'default' }}>
-          {/* creative preview — portrait 4:5 to match Motion's card size */}
-          <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#0e1b12', overflow: 'hidden' }}>
+          {/* creative preview — aspect set by the card display setting (9:16 / 4:5 / 1:1) */}
+          <div style={{ position: 'relative', aspectRatio: aspect, background: '#0e1b12', overflow: 'hidden' }}>
             {r.thumbnail
               ? <img src={cdn(r.thumbnail, 500)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.visibility = 'hidden' }} />
               : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, color: '#c6d2ba' }}>{r.format === 'video' ? '🎬' : r.format === 'carousel' ? '🎠' : '🖼️'}</div>}
