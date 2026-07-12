@@ -311,6 +311,13 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
                     {metrics.length > 1 && <span onClick={() => removeMetric(m)} title="Remove" style={{ cursor: 'pointer', color: '#6a7a52', marginLeft: -1 }}>✕</span>}
                   </span>
                 ))}
+                {/* Save the current metric/tag columns as a reusable preset (Motion's floating ＋ Save). */}
+                <button onClick={() => { const n = prompt('Save these columns as a preset. Name:'); if (n?.trim()) savePreset(n.trim(), metrics, tagCols) }}
+                  title="Save these columns as a preset"
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#dffe95', border: 'none', borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#0e1b12', cursor: 'pointer', fontFamily: FONT }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#eaffb0'} onMouseLeave={e => e.currentTarget.style.background = '#dffe95'}>
+                  ＋ Save
+                </button>
                 <div style={{ flex: 1 }} />
                 {/* view toggle: cards / table-only */}
                 <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: 3 }}>
