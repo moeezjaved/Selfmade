@@ -310,8 +310,9 @@ function CommentsTab({ adId }: { adId: string }) {
   if (!comments.length) return (
     <div style={{ background: '#f4f6f0', borderRadius: 14, padding: '36px 20px', textAlign: 'center' }}>
       <div style={{ fontSize: 26, marginBottom: 8 }}>💬</div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: '#0e1b12' }}>No comments for this ad</div>
-      <div style={{ fontSize: 12.5, color: '#7c8577', marginTop: 5 }}>Comments left on this ad will appear here automatically.</div>
+      <div style={{ display: 'inline-block', fontSize: 10, fontWeight: 800, color: '#b45309', background: '#fffbeb', padding: '2px 9px', borderRadius: 100, marginBottom: 8 }}>COMING SOON</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#0e1b12' }}>Ad comments</div>
+      <div style={{ fontSize: 12.5, color: '#7c8577', marginTop: 5, lineHeight: 1.5 }}>Reading the comments left on this ad’s post needs an extra Meta permission we’re requesting. Once approved, they’ll appear here automatically.</div>
     </div>
   )
   return (

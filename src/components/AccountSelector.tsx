@@ -112,6 +112,18 @@ export default function AccountSelector({ onAccountChange }: Props) {
               )}
             </button>
           ))}
+
+          {/* Other ad platforms — coming soon */}
+          <div style={{ padding: '10px 12px 6px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'rgba(255,255,255,0.3)', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: 2 }}>
+            Available to connect
+          </div>
+          {[['🎵', 'TikTok'], ['▶️', 'YouTube'], ['💼', 'LinkedIn'], ['🌊', 'Northbeam'], ['📊', 'Google Analytics']].map(([icon, label]) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', cursor: 'not-allowed', opacity: 0.7 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{icon}</div>
+              <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>{label}</div>
+              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#dffe95', background: 'rgba(223,254,149,0.1)', padding: '2px 7px', borderRadius: 100, flexShrink: 0 }}>SOON</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
