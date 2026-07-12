@@ -188,6 +188,15 @@ export const TEMPLATES: ReportTemplate[] = [
     metrics: ['spend', 'roas', 'conversions', 'ctr', 'cpa'], sort: 'spend', sortDir: 'desc' },
 ]
 
+// Column presets (Motion's "Custom" dropdown) — named metric/tag-column sets. Built-ins ship with the
+// app; user presets are saved in localStorage (no DB migration needed).
+export type ColumnPreset = { name: string; metrics: MetricKey[]; tagCols?: string[]; builtin?: boolean }
+export const BUILTIN_PRESETS: ColumnPreset[] = [
+  { name: 'Facebook Ecommerce', metrics: ['spend', 'roas', 'conversions', 'revenue', 'cpa', 'ctr'], builtin: true },
+  { name: 'Facebook SaaS', metrics: ['spend', 'cpc', 'ctr', 'link_click', 'conversions', 'cpa'], builtin: true },
+  { name: 'Facebook Video', metrics: ['spend', 'roas', 'hook_rate', 'hold_rate', 'thruplay', 'ctr'], builtin: true },
+]
+
 export const TEMPLATE_BY_KEY: Record<string, ReportTemplate> =
   Object.fromEntries(TEMPLATES.map(t => [t.key, t]))
 

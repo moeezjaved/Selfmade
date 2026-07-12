@@ -6,9 +6,10 @@
  * AI analysis (Mello), and Save / Share. onSave persists via the reports page (Stage 3).
  */
 import { useState, useEffect, useCallback } from 'react'
-import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, type MetricKey, type GroupByKey, type ReportFilter } from '@/lib/reports/templates'
+import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, BUILTIN_PRESETS, type MetricKey, type GroupByKey, type ReportFilter, type ColumnPreset } from '@/lib/reports/templates'
 import ShareMenu from './ShareMenu'
 import ReportFilters from './ReportFilters'
+import MetricPicker from './MetricPicker'
 
 const ALL_METRICS = Object.keys(METRICS) as MetricKey[]
 
@@ -63,6 +64,15 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [showLaunch, setShowLaunch] = useState<boolean>(!!(ic as any).showLaunch)
   const [showStatus, setShowStatus] = useState<boolean>(!!(ic as any).showStatus)
   const needsTagData = aiTags || tagCols.some(c => c !== 'asset_type')
+  // Column presets (Custom dropdown + KPI picker). User presets persist in localStorage.
+  const [showPicker, setShowPicker] = useState(false)
+  const [userPresets, setUserPresets] = useState<ColumnPreset[]>([])
+  useEffect(() => { try { const s = localStorage.getItem('selfmade_report_presets'); if (s) setUserPresets(JSON.parse(s)) } catch {} }, [])
+  const applyPreset = (p: ColumnPreset) => { setMetrics(p.metrics); setTagCols(p.tagCols || []) }
+  const savePreset = (nm: string, m: MetricKey[], t: string[]) => {
+    setUserPresets(prev => { const next = [...prev.filter(x => x.name !== nm), { name: nm, metrics: m, tagCols: t }]; try { localStorage.setItem('selfmade_report_presets', JSON.stringify(next)) } catch {} ; return next })
+    setMetrics(m); setTagCols(t)
+  }
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -303,8 +313,15 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             onSort={toggleSort} count={data?.count}
             tagCols={tagCols} onToggleTagCol={(c: string) => setTagCols(cols => cols.includes(c) ? cols.filter(x => x !== c) : [...cols, c])}
             settings={{ heatOn, perPage, showTags, showLaunch, showStatus }}
-            setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus} />
+            setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus}
+            presets={[...BUILTIN_PRESETS, ...userPresets]} onApplyPreset={applyPreset} onCustomize={() => setShowPicker(true)} />
         </>
+      )}
+
+      {showPicker && (
+        <MetricPicker metrics={metrics} tagCols={tagCols}
+          onApply={(m, t) => { setMetrics(m); setTagCols(t) }}
+          onSavePreset={savePreset} onClose={() => setShowPicker(false)} />
       )}
 
       <style>{`
@@ -353,7 +370,7 @@ const AI_TAG_COLOR: Record<string, [string, string]> = {
 const cap1 = (s: string) => (s || '').charAt(0).toUpperCase() + (s || '').slice(1)
 const STATUS_COLOR: Record<string, [string, string]> = { active: ['#f0fdf4', '#15803d'], paused: ['#f4f6f0', '#7c8577'], archived: ['#faf5f0', '#9a7b5a'] }
 
-function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setHeatOn, setPerPage, setShowTags, setShowLaunch, setShowStatus }: any) {
+function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setHeatOn, setPerPage, setShowTags, setShowLaunch, setShowStatus, presets, onApplyPreset, onCustomize }: any) {
   const [menu, setMenu] = useState<string | null>(null)
   const colMax: Record<string, number> = {}
   for (const m of metrics as MetricKey[]) colMax[m] = Math.max(...rows.map((r: any) => r.metrics[m] || 0), 0.0001)
@@ -393,6 +410,27 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
       {/* toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px', borderBottom: '1px solid rgba(26,58,26,.08)', position: 'relative' }}>
         {menu && <div onClick={() => setMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />}
+
+        {/* Custom (presets) */}
+        <div style={{ position: 'relative', zIndex: 20 }}>
+          <button style={{ ...toolBtn, background: menu === 'custom' ? '#eaeee2' : '#f4f6f0' }} onClick={() => setMenu(menu === 'custom' ? null : 'custom')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="2.5" /><path d="M3 9h18M9 21V9" strokeLinecap="round" /></svg>
+            Custom <Chevron />
+          </button>
+          {menu === 'custom' && (
+            <div style={{ ...menuBox, width: 220 }}>
+              {(presets || []).map((p: any) => (
+                <button key={p.name} onClick={() => { onApplyPreset(p); setMenu(null) }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0e1b12', fontFamily: FONT }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f4f6f0'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <span style={{ flex: 1 }}>{p.name}</span>{p.builtin && <span style={{ fontSize: 9, fontWeight: 700, color: '#9aa196' }}>PRESET</span>}
+                </button>
+              ))}
+              <div style={{ height: 1, background: 'rgba(26,58,26,.08)', margin: '6px 4px' }} />
+              <button onClick={() => { onCustomize(); setMenu(null) }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#2d7a2d', fontFamily: FONT }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f0f7ee'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>⚙ Customize columns</button>
+            </div>
+          )}
+        </div>
 
         {/* Table settings */}
         <div style={{ position: 'relative', zIndex: 20 }}>
