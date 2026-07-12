@@ -55,6 +55,14 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const [view, setView] = useState<'card' | 'table'>(ic.view || (creativeGroup ? 'card' : 'table'))
   const [filters, setFilters] = useState<ReportFilter[]>((ic as any).filters || [])
   const [aiTags, setAiTags] = useState<boolean>(!!(ic as any).aiTags)
+  // Table settings + AI-tag columns (Motion's Table settings / AI tags toolbar).
+  const [tagCols, setTagCols] = useState<string[]>((ic as any).tagCols || [])
+  const [heatOn, setHeatOn] = useState<boolean>((ic as any).heatOn !== false)
+  const [perPage, setPerPage] = useState<number>((ic as any).perPage || 20)
+  const [showTags, setShowTags] = useState<boolean>((ic as any).showTags !== false)
+  const [showLaunch, setShowLaunch] = useState<boolean>(!!(ic as any).showLaunch)
+  const [showStatus, setShowStatus] = useState<boolean>(!!(ic as any).showStatus)
+  const needsTagData = aiTags || tagCols.some(c => c !== 'asset_type')
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -74,7 +82,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
     try {
       const p = new URLSearchParams({ template: templateKey, dateRange, groupBy, sort, dir, metrics: metrics.join(',') })
       if (filters.length) p.set('filters', JSON.stringify(filters))
-      if (aiTags) p.set('aiTags', '1')
+      if (needsTagData) p.set('aiTags', '1')
       const res = await fetch(`/api/reports/generate?${p}`)
       const json = await res.json()
       if (json.error && !json.rows?.length) setError(json.error === 'no_account' ? 'Connect a Meta ad account to build this report.' : json.error)
@@ -82,7 +90,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       setAiText('') // stale once controls change
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
-  }, [templateKey, dateRange, groupBy, sort, dir, metrics, filters, aiTags])
+  }, [templateKey, dateRange, groupBy, sort, dir, metrics, filters, needsTagData])
 
   useEffect(() => { load() }, [load])
 
@@ -113,7 +121,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
   const doSave = async () => {
     if (!onSave) return
     setSaving(true)
-    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters, aiTags } })
+    const ok = await onSave({ id: savedId, name, templateKey, config: { groupBy, dateRange, metrics, sort, dir, view, filters, aiTags, tagCols, heatOn, perPage, showTags, showLaunch, showStatus } })
     setSaving(false)
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) }
   }
@@ -261,7 +269,10 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
 
           {/* Table panel */}
           <TablePanel rows={rows} metrics={metrics} sort={sort} dir={dir} currency={currency} net={net} groupLabel={groupLabel}
-            onSort={toggleSort} count={data?.count} />
+            onSort={toggleSort} count={data?.count}
+            tagCols={tagCols} onToggleTagCol={(c: string) => setTagCols(cols => cols.includes(c) ? cols.filter(x => x !== c) : [...cols, c])}
+            settings={{ heatOn, perPage, showTags, showLaunch, showStatus }}
+            setHeatOn={setHeatOn} setPerPage={setPerPage} setShowTags={setShowTags} setShowLaunch={setShowLaunch} setShowStatus={setShowStatus} />
         </>
       )}
 
@@ -291,21 +302,104 @@ const heatable = (m: MetricKey) => METRICS[m].goodHigh && m !== 'spend'
 // Net Results shows an average (not a sum) for rate/cost metrics.
 const isAvg = (m: MetricKey) => ['percent', 'ratio', 'seconds'].includes(METRICS[m].format) || ['cpm', 'cpc', 'cpa'].includes(m)
 
-function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count }: any) {
+// AI-tag column definitions (Motion's "AI tags" menu). asset_type maps to the derived format.
+const AI_TAG_COLS: { key: string; label: string; group: string }[] = [
+  { key: 'asset_type', label: 'Asset Type', group: 'Visual' },
+  { key: 'visual_format', label: 'Visual Format', group: 'Visual' },
+  { key: 'intended_audience', label: 'Intended Audience', group: 'Persona' },
+  { key: 'messaging_theme', label: 'Messaging theme', group: 'Messaging' },
+  { key: 'offer_type', label: 'Offer Type', group: 'Messaging' },
+  { key: 'hook_tactic', label: 'Hook Tactic', group: 'Hook' },
+  { key: 'headline_tactic', label: 'Headline Tactic', group: 'Hook' },
+]
+const AI_TAG_LABEL: Record<string, string> = Object.fromEntries(AI_TAG_COLS.map(c => [c.key, c.label]))
+const AI_TAG_COLOR: Record<string, [string, string]> = {
+  asset_type: ['#eef4dc', '#41611b'], visual_format: ['#fff7ed', '#c2410c'], hook_tactic: ['#eff6ff', '#1d4ed8'],
+  messaging_theme: ['#f0fdf4', '#15803d'], offer_type: ['#fdf2f8', '#be185d'], intended_audience: ['#f0fdfa', '#0f766e'],
+  headline_tactic: ['#faf5ff', '#7c3aed'],
+}
+const cap1 = (s: string) => (s || '').charAt(0).toUpperCase() + (s || '').slice(1)
+const STATUS_COLOR: Record<string, [string, string]> = { active: ['#f0fdf4', '#15803d'], paused: ['#f4f6f0', '#7c8577'], archived: ['#faf5f0', '#9a7b5a'] }
+
+function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSort, count, tagCols, onToggleTagCol, settings, setHeatOn, setPerPage, setShowTags, setShowLaunch, setShowStatus }: any) {
+  const [menu, setMenu] = useState<string | null>(null)
   const colMax: Record<string, number> = {}
   for (const m of metrics as MetricKey[]) colMax[m] = Math.max(...rows.map((r: any) => r.metrics[m] || 0), 0.0001)
+
+  // Dimension columns rendered before the metrics: launch date, status, then AI-tag columns.
+  const dimCols: { key: string; label: string }[] = []
+  if (settings.showLaunch) dimCols.push({ key: '__launch', label: 'Launch date' })
+  if (settings.showStatus) dimCols.push({ key: '__status', label: 'Status' })
+  for (const c of tagCols) dimCols.push({ key: c, label: AI_TAG_LABEL[c] || c })
+
+  const visibleRows = settings.perPage >= 9999 ? rows : rows.slice(0, settings.perPage)
+
+  const dimCell = (r: any, key: string) => {
+    if (key === '__launch') return <span style={{ fontSize: 12.5, color: r.launchDate ? '#3a4636' : '#b5c5b5' }}>{r.launchDate || '—'}</span>
+    if (key === '__status') { const [bg, fg] = STATUS_COLOR[r.status] || STATUS_COLOR.paused; return <span style={{ fontSize: 11, fontWeight: 700, background: bg, color: fg, padding: '3px 9px', borderRadius: 6 }}>{cap1(r.status || 'paused')}</span> }
+    const val = key === 'asset_type' ? cap1(r.format) : (r.tags?.[key] || '')
+    if (!val || ['Unknown', 'None', 'Other'].includes(val)) return <span style={{ fontSize: 12, color: '#c2ccc0' }}>—</span>
+    const [bg, fg] = AI_TAG_COLOR[key] || ['#f4f6f0', '#3a4636']
+    return <span style={{ fontSize: 11, fontWeight: 700, background: bg, color: fg, padding: '3px 9px', borderRadius: 6, whiteSpace: 'nowrap' }}>{val}</span>
+  }
+
   return (
     <div style={panelStyle}>
       {/* toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px', borderBottom: '1px solid rgba(26,58,26,.08)' }}>
-        <span style={toolBtn}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="2.5" /><path d="M3 9h18M9 21V9" strokeLinecap="round" /></svg>
-          Custom <Chevron />
-        </span>
-        <span style={{ ...toolBtn, background: '#fff', border: '1px solid rgba(26,58,26,.12)' }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" /></svg>
-          Table settings
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px', borderBottom: '1px solid rgba(26,58,26,.08)', position: 'relative' }}>
+        {menu && <div onClick={() => setMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />}
+
+        {/* Table settings */}
+        <div style={{ position: 'relative', zIndex: 20 }}>
+          <button style={{ ...toolBtn, background: menu === 'settings' ? '#eaeee2' : '#f4f6f0' }} onClick={() => setMenu(menu === 'settings' ? null : 'settings')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" /></svg>
+            Table settings <Chevron />
+          </button>
+          {menu === 'settings' && (
+            <div style={menuBox}>
+              <SettingRow label="Color formatting">
+                <Toggle on={settings.heatOn} onClick={() => setHeatOn(!settings.heatOn)} />
+              </SettingRow>
+              <SettingRow label="Results per page">
+                <select value={settings.perPage} onChange={e => setPerPage(Number(e.target.value))} style={miniSelect}>
+                  {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                  <option value={9999}>All</option>
+                </select>
+              </SettingRow>
+              <SettingRow label="Show tags"><Toggle on={settings.showTags} onClick={() => setShowTags(!settings.showTags)} /></SettingRow>
+              <SettingRow label="Show active status"><Toggle on={settings.showStatus} onClick={() => setShowStatus(!settings.showStatus)} /></SettingRow>
+              <SettingRow label="Show launch date"><Toggle on={settings.showLaunch} onClick={() => setShowLaunch(!settings.showLaunch)} /></SettingRow>
+            </div>
+          )}
+        </div>
+
+        {/* AI tags */}
+        <div style={{ position: 'relative', zIndex: 20 }}>
+          <button style={{ ...toolBtn, background: '#fff', border: '1px solid rgba(26,58,26,.12)' }} onClick={() => setMenu(menu === 'aitags' ? null : 'aitags')}>
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="#7c3aed"><path d="M10 1.5l1.7 4.6 4.8 1.7-4.8 1.7L10 14.1 8.3 9.5 3.5 7.8l4.8-1.7z" /></svg>
+            AI tags <Chevron />
+          </button>
+          {menu === 'aitags' && (
+            <div style={{ ...menuBox, width: 230 }}>
+              {['Visual', 'Persona', 'Messaging', 'Hook'].map(grp => (
+                <div key={grp}>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', color: '#9aa196', padding: '8px 10px 4px', textTransform: 'uppercase' }}>{grp}</div>
+                  {AI_TAG_COLS.filter(c => c.group === grp).map(c => {
+                    const on = tagCols.includes(c.key)
+                    return (
+                      <button key={c.key} onClick={() => onToggleTagCol(c.key)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 8, border: 'none', background: on ? '#f0f7ee' : 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0e1b12', fontFamily: FONT }}
+                        onMouseEnter={e => { if (!on) e.currentTarget.style.background = '#f4f6f0' }} onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent' }}>
+                        <span style={{ flex: 1 }}>{c.label}</span>
+                        {on && <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#2d7a2d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, fontWeight: 600, color: '#7c8577' }}>{count || rows.length} ad {(count || rows.length) === 1 ? 'group' : 'groups'}</span>
       </div>
@@ -314,12 +408,13 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
           <thead>
             <tr style={{ background: '#fafcf5', borderBottom: '1px solid rgba(26,58,26,.08)' }}>
-              <th style={{ ...thStyle, textAlign: 'left', minWidth: 250, paddingLeft: 18 }}>
+              <th style={{ ...thStyle, textAlign: 'left', minWidth: 240, paddingLeft: 18 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 11 }}>
                   <span style={{ width: 16, height: 16, borderRadius: 5, background: '#0e1b12', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#dffe95" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
                   {(groupLabel || 'Creative').toUpperCase()}
                 </span>
               </th>
+              {dimCols.map(dc => <th key={dc.key} style={{ ...thStyle, textAlign: 'left' }}>{dc.label.toUpperCase()}</th>)}
               {metrics.map((m: MetricKey) => (
                 <th key={m} style={{ ...thStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14 }} onClick={() => onSort(m)}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: sort === m ? '#0e1b12' : '#8a9182' }}>
@@ -330,7 +425,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
             </tr>
           </thead>
           <tbody>
-            {rows.map((r: any, i: number) => (
+            {visibleRows.map((r: any, i: number) => (
               <tr key={r.key + i} className="rp-row" style={{ borderBottom: '1px solid rgba(26,58,26,.06)', transition: 'background .12s' }}>
                 <td style={{ ...tdStyle, textAlign: 'left', paddingLeft: 18 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
@@ -339,13 +434,14 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0e1b12', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{r.name}</div>
                       <div style={{ fontSize: 11.5, fontWeight: 500, color: '#9aa196' }}>{r.adCount} {r.adCount === 1 ? 'ad' : 'ads'}</div>
-                      <TagPills tags={r.tags} max={3} />
+                      {settings.showTags && <TagPills tags={r.tags} max={3} />}
                     </div>
                   </div>
                 </td>
+                {dimCols.map(dc => <td key={dc.key} style={{ ...tdStyle, textAlign: 'left' }}>{dimCell(r, dc.key)}</td>)}
                 {metrics.map((m: MetricKey) => {
                   const val = r.metrics[m] || 0
-                  const showHeat = heatable(m)
+                  const showHeat = settings.heatOn && heatable(m)
                   return (
                     <td key={m} style={{ ...tdStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14 }}>
                       {showHeat ? (
@@ -367,6 +463,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a9182" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" strokeLinecap="round" /></svg>
                 </span>
               </td>
+              {dimCols.map(dc => <td key={dc.key} style={{ ...tdStyle, textAlign: 'left', color: '#5f6b5a' }}>—</td>)}
               {metrics.map((m: MetricKey) => (
                 <td key={m} style={{ ...tdStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14, fontSize: 13, fontWeight: 700, color: isAvg(m) ? '#dffe95' : '#f4f7ef', fontVariantNumeric: 'tabular-nums' }}>
                   {isAvg(m) ? 'Avg ' : ''}{fmtMetric(net[m] || 0, m, currency)}
@@ -378,6 +475,17 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
       </div>
     </div>
   )
+}
+
+const menuBox: React.CSSProperties = { position: 'absolute', left: 0, top: '112%', zIndex: 21, background: '#fff', border: '1px solid rgba(26,58,26,.12)', borderRadius: 12, boxShadow: '0 14px 40px rgba(0,0,0,.16)', padding: 8, width: 260 }
+const miniSelect: React.CSSProperties = { padding: '4px 8px', borderRadius: 7, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
+function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', fontSize: 13, fontWeight: 600, color: '#3a4636' }}>{label}{children}</div>
+}
+function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return <button onClick={onClick} style={{ width: 34, height: 20, borderRadius: 999, border: 'none', cursor: 'pointer', background: on ? '#6fb03a' : '#d4d9cd', position: 'relative', transition: 'background .15s', flexShrink: 0 }}>
+    <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .15s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+  </button>
 }
 
 function CardsGrid({ rows, metrics, sort, currency }: any) {
