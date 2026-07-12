@@ -131,6 +131,16 @@ export async function headObjectSize(key: string): Promise<number | null> {
   catch { return null }
 }
 
+/** Read an object's text body directly from R2 (authoritative — bypasses any CDN caching). */
+export async function getObjectText(key: string): Promise<string | null> {
+  const client = getClient(); const bucket = process.env.R2_BUCKET_NAME
+  if (!client || !bucket) return null
+  try {
+    const r = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
+    return (await r.Body?.transformToString()) ?? null
+  } catch { return null }
+}
+
 /** Delete an object from R2 (best-effort). */
 export async function deleteFromR2(key: string): Promise<void> {
   const client = getClient(); const bucket = process.env.R2_BUCKET_NAME

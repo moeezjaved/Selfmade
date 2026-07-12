@@ -13,7 +13,7 @@ import type { UserProfile } from '@/types'
 import {
   Settings, LogOut, Menu, X, Check, LifeBuoy, ChevronsUpDown, Zap, Sparkles, CreditCard, Users,
   Compass, Target, TrendingUp, Star, Bookmark, Image as ImageIcon, Heart,
-  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, ChevronRight, Trophy,
+  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, ChevronRight, Trophy, Camera,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -42,6 +42,7 @@ const AREAS = [
       { href: '/insights',   icon: LineChart,   label: 'Scale & Insights', badge: 'NEW' },
       { href: '/reports',    icon: BarChart2,   label: 'Reports',          badge: 'NEW' },
       { href: '/leaderboard',icon: Trophy,      label: 'Leaderboard',      badge: 'NEW' },
+      { href: '/snapshots',  icon: Camera,      label: 'Snapshots',        badge: null },
     ],
   },
   {
