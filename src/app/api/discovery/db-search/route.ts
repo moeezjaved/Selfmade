@@ -121,6 +121,9 @@ export async function GET(request: NextRequest) {
     const country = searchParams.get('country') || 'ALL'
     const sort = searchParams.get('sort') || 'recent'
     const days = parseInt(searchParams.get('days') || '0')
+    // "launched in the last N days" cutoff — shared by the main query AND the semantic gap-fill below
+    // so both honour the window (the semantic RPC has no date param → we filter its rows in-process).
+    const sinceDate = days > 0 ? new Date(Date.now() - days * 86400000).toISOString() : null
     const page = parseInt(searchParams.get('page') || '0')
 
     // Free-plan discovery cap (spec §4.2): Free sees ~3 pages/query. Only look up the plan past the
@@ -377,8 +380,7 @@ export async function GET(request: NextRequest) {
     }
     if (platforms) baseQuery = baseQuery.overlaps('platforms', platforms.split(','))
     // Time filter: ads LAUNCHED within the last N days (start_date).
-    if (days > 0) {
-      const sinceDate = new Date(Date.now() - days * 86400000).toISOString()
+    if (sinceDate) {
       // Filter by LAUNCH date, not last_seen. last_seen is bumped on every crawl, so nearly every
       // active ad falls inside any recent window → the filter appeared to do nothing. start_date now
       // has ~100% coverage (epoch extraction), and "last N days" = ads that started in that window,
@@ -599,6 +601,9 @@ export async function GET(request: NextRequest) {
           for (const v of rows.slice(offset)) {
             if (ads.length >= limit) break
             if (floor != null && typeof v.similarity === 'number' && v.similarity < floor) continue
+            // Honour the days filter — the semantic RPC has no date param, so drop out-of-window
+            // (or undated) rows here, exactly like the main query's start_date >= sinceDate.
+            if (sinceDate && (!v.start_date || v.start_date < sinceDate)) continue
             if (haveIds.has(v.ad_id)) continue
             const h = v.image_hash || v.video_hash
             if (h && haveHashes.has(h)) continue
