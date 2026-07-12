@@ -50,12 +50,13 @@ export async function GET(req: NextRequest, { params }: { params: { adId: string
     const cr = adObj?.creative || {}
     const spec = cr.object_story_spec || {}
 
-    // Creative video source (playable) — needs the video_id.
-    let videoUrl: string | null = null, videoLen = 0
+    // Creative video source (playable) — needs the video_id. The video's `picture` is a higher-res
+    // poster than the creative's thumbnail_url, so prefer it.
+    let videoUrl: string | null = null, videoLen = 0, videoPic: string | null = null
     const vid = cr.video_id || spec.video_data?.video_id
-    if (vid) { const v = await g(`${vid}?fields=source,length,picture`); videoUrl = v?.source || null; videoLen = num(v?.length) }
+    if (vid) { const v = await g(`${vid}?fields=source,length,picture`); videoUrl = v?.source || null; videoLen = num(v?.length); videoPic = v?.picture || null }
 
-    const thumbnail = cr.thumbnail_url || cr.image_url || spec.video_data?.image_url || spec.link_data?.picture || null
+    const thumbnail = videoPic || cr.image_url || cr.thumbnail_url || spec.video_data?.image_url || spec.link_data?.picture || null
     const body = spec.link_data?.message || spec.video_data?.message || cr.body || null
     const cta = spec.link_data?.call_to_action?.type || spec.video_data?.call_to_action?.type || null
     const landing = spec.link_data?.link || spec.video_data?.call_to_action?.value?.link || null

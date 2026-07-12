@@ -141,6 +141,7 @@ export async function GET(req: NextRequest) {
         || afs?.images?.[0]?.url || afs?.videos?.[0]?.thumbnail_url || null
       adMeta.set(a.id, {
         thumbnail,
+        videoId: cr.video_id || spec?.video_data?.video_id || afs?.videos?.[0]?.video_id || null,
         format: inferFormat(a.creative),
         landingPage: spec?.link_data?.link || spec?.video_data?.call_to_action?.value?.link || afs?.link_urls?.[0]?.website_url || null,
         launchDate: a.created_time ? String(a.created_time).slice(0, 10) : null,
@@ -149,6 +150,20 @@ export async function GET(req: NextRequest) {
         // Normalize Meta's effective_status to active | paused | archived for the status filter.
         status: /ARCHIV/.test(a.effective_status) ? 'archived' : /ACTIVE/.test(a.effective_status) ? 'active' : 'paused',
       })
+    }
+
+    // 2a) Video posters — many video creatives return no thumbnail_url in the bulk edge. Batch-fetch
+    // the video's `picture` (higher-res poster) for those, so cards show a real frame not a placeholder.
+    const needPoster = Array.from(adMeta.values()).filter((m: any) => !m.thumbnail && m.videoId)
+    const vidIds = Array.from(new Set(needPoster.map((m: any) => m.videoId))).slice(0, 100)
+    if (vidIds.length) {
+      const picById: Record<string, string> = {}
+      for (let i = 0; i < vidIds.length; i += 50) {
+        const chunk = vidIds.slice(i, i + 50)
+        const res = await fetch(`https://graph.facebook.com/${V}/?ids=${chunk.join(',')}&fields=picture&access_token=${token}`).then(r => r.json()).catch(() => ({}))
+        for (const id of chunk) if (res?.[id]?.picture) picById[id] = res[id].picture
+      }
+      for (const m of Array.from(adMeta.values())) if (!m.thumbnail && m.videoId && picById[m.videoId]) m.thumbnail = picById[m.videoId]
     }
 
     // 2b) AI creative tags. Grouping by an AI dimension, or the "AI tags" toggle (aiTags=1), RUNS the
