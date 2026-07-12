@@ -17,6 +17,30 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { templateKey, metrics, rows, netResults, currency, groupBy, mode, question } = body
+
+  // Leaderboard analysis — week-over-week shift buckets (no report template involved).
+  if (mode === 'leaderboard' && body.shifts) {
+    const line = (c: any) => `${c.name} — spend ${c.spend} ${currency} (${c.spendDelta == null ? 'new' : (c.spendDelta >= 0 ? '+' : '') + Math.round(c.spendDelta) + '%'}), ROAS ${c.roas}x (${c.roasDelta == null ? 'n/a' : (c.roasDelta >= 0 ? '+' : '') + Math.round(c.roasDelta) + '%'})`
+    const sec = (t: string, arr: any[]) => arr?.length ? `${t}:\n${arr.map(line).join('\n')}` : `${t}: none`
+    const s = body.shifts
+    const prompt = `You are Mello, a sharp performance-marketing analyst. This is the week-over-week creative leaderboard for a DTC brand (currency ${currency}). Spend movement drives the bucket; ROAS is reported independently.
+
+${sec('SCALING (spend up)', s.scaling)}
+${sec('DECLINING (spend down)', s.declining)}
+${sec('NEWLY LAUNCHED', s.newly)}
+${sec('RECENTLY PAUSED', s.paused)}
+
+Write a tight weekly read in markdown, 3 short sections:
+**Double down** — which scaling creatives deserve more budget and why (watch ROAS — spend up with ROAS down is a warning).
+**Fix or cut** — declining/paused creatives that matter, with a specific call.
+**This week's move** — ONE concrete prioritized action.
+Name specific creatives + numbers. Under 150 words. No preamble.`
+    try {
+      const res = await llm.messages.create({ model: 'gpt-4o', max_tokens: 500, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
+      return NextResponse.json({ analysis: res.content[0]?.text || 'Could not generate analysis.' })
+    } catch (e: any) { return NextResponse.json({ error: e?.message || 'Analysis failed' }, { status: 200 }) }
+  }
+
   const tpl = TEMPLATE_BY_KEY[templateKey]
   if (!tpl) return NextResponse.json({ error: 'Unknown template' }, { status: 400 })
 
