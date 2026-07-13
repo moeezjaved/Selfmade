@@ -30,6 +30,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [productName, setProductName] = useState('')
   const [benefit, setBenefit] = useState('')
   const [tier, setTier] = useState<'premium' | 'fast'>('premium')
+  const [look, setLook] = useState('match')            // creator ethnicity/look override
+  const [mode, setMode] = useState<'ugc' | 'faithful'>('ugc')
+  const [suggestedMode, setSuggestedMode] = useState<'ugc' | 'faithful'>('ugc')
+  const [sceneCount, setSceneCount] = useState(2)
 
   const [phase, setPhase] = useState<Phase>('form')
   const [jobId, setJobId] = useState<string | null>(null)
@@ -40,8 +44,13 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
 
-  const cost = tier === 'premium' ? 400 : 250
+  // UGC = one clip; Faithful = scene-by-scene + stitch, priced by scene count (credit_pricing
+  // video_clone_xN rows — keep these numbers in sync with that table).
+  const UGC_COST = { premium: 400, fast: 250 } as const
+  const FAITHFUL_COST: Record<number, { premium: number; fast: number }> = { 2: { premium: 750, fast: 475 }, 3: { premium: 1100, fast: 690 }, 4: { premium: 1450, fast: 900 } }
+  const cost = mode === 'faithful' ? (FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier] : UGC_COST[tier]
   const busy = phase === 'analyzing' || phase === 'generating'
+  const LOOKS = ['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic']
 
   useEffect(() => {
     fetch('/api/brands').then(r => r.json()).then((j) => {
@@ -84,6 +93,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       const start = await fetch('/api/discovery/clone-video', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages: chosen, tier,
+          characterLook: look !== 'match' ? look : undefined,
           productDetails: { name: productName.trim() || undefined, benefit: benefit.trim() || undefined } }),
       }).then(r => r.json())
       if (!start.jobId) { setErr(start.error || 'Could not start.'); setPhase('form'); return }
@@ -91,6 +101,9 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       const st = await pollUntil(start.jobId, 'analyzing')   // wait for 'review'
       if (st.error) { setErr(st.error); setPhase('form'); return }
       setDraftScript(st.script || '')
+      const sug = st.suggestedMode === 'faithful' ? 'faithful' : 'ugc'
+      setSuggestedMode(sug); setMode(sug)
+      setSceneCount(Math.min(4, Math.max(2, Number(st.sceneCount) || 2)))
       setPhase('review')
     } catch (e: any) { setErr(String(e?.message || e)); setPhase('form') }
   }
@@ -102,7 +115,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     try {
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId, script: draftScript }),
+        body: JSON.stringify({ jobId, script: draftScript, mode }),
       }).then(r => r.json())
       if (ap.error) { setErr(ap.error === 'insufficient_credits' ? 'Not enough credits.' : ap.error); setPhase('review'); return }
       refreshCredits()   // credits reserved on approve → drop the sidebar counter now
@@ -131,8 +144,29 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                 <div style={{ fontSize: 12.5, color: '#8aa', background: '#101b12', border: '1px solid #22331c', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Pencil size={14} color={LIME} /> Review the script before we spend credits. Edit anything — the video says exactly this.
                 </div>
+
+                {/* Clone mode — suggested from the analysis. Faithful = scene-by-scene recreation of a
+                    multi-scene / B-roll ad; UGC = one talking-head creator. */}
                 <section>
-                  <Label>Voiceover script</Label>
+                  <Label>Clone style</Label>
+                  {suggestedMode === 'faithful' && (
+                    <div style={{ fontSize: 11.5, color: '#cfe3b8', background: '#141f10', border: '1px solid #2c4030', borderRadius: 8, padding: '7px 10px', marginBottom: 8 }}>
+                      🎬 This ad is cinematic / B-roll style — a faithful scene-by-scene clone will match it much better than a talking head.
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setMode('faithful')} style={tierBtn(mode === 'faithful')}>
+                      Faithful · {sceneCount} scenes · {(FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]} cr{suggestedMode === 'faithful' ? ' ★' : ''}
+                    </button>
+                    <button onClick={() => setMode('ugc')} style={tierBtn(mode === 'ugc')}>
+                      UGC creator · 1 clip · {UGC_COST[tier]} cr{suggestedMode === 'ugc' ? ' ★' : ''}
+                    </button>
+                  </div>
+                  <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{mode === 'faithful' ? 'Recreates the ad\'s scenes (b-roll, lifestyle, product shots) with your product, then stitches them — longer render, closest to the original.' : 'One creator speaks your script to camera — fastest and cheapest.'}</p>
+                </section>
+
+                <section>
+                  <Label>{mode === 'faithful' ? 'Voiceover (spread across scenes)' : 'Voiceover script'}</Label>
                   <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={7}
                     style={{ ...input, width: '100%', resize: 'vertical', lineHeight: 1.5 }} />
                 </section>
@@ -188,10 +222,19 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                 </section>
 
                 <section>
+                  <Label>On-camera creator <span style={{ color: '#5f6f63', fontWeight: 400 }}>· match the ad, or recast</span></Label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {LOOKS.map((l) => (
+                      <button key={l} onClick={() => setLook(l)} style={chip(look === l)}>{l === 'match' ? 'Match original' : l}</button>
+                    ))}
+                  </div>
+                </section>
+
+                <section>
                   <Label>Quality</Label>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => setTier('premium')} style={tierBtn(tier === 'premium')}>Premium · 400 cr</button>
-                    <button onClick={() => setTier('fast')} style={tierBtn(tier === 'fast')}>Fast · 250 cr</button>
+                    <button onClick={() => setTier('premium')} style={tierBtn(tier === 'premium')}>Premium · from 400 cr</button>
+                    <button onClick={() => setTier('fast')} style={tierBtn(tier === 'fast')}>Fast · from 250 cr</button>
                   </div>
                 </section>
 

@@ -93,6 +93,8 @@ export async function POST(req: NextRequest) {
     duration: body.duration || 10,
     aspect: body.aspect || '9:16',
     tier,
+    // Creator-look override (Pakistani / Indian / Arab / …); 'match' or absent = copy the reference.
+    character_look: typeof body.characterLook === 'string' && body.characterLook.trim() ? body.characterLook.trim().slice(0, 60) : null,
   }
 
   const { data: row, error } = await admin.from('creative_generations').insert({
