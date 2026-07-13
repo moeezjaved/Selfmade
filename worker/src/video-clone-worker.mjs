@@ -149,8 +149,8 @@ async function buildScenePlan(beat, product, nImages, nScenes, look, voiceover) 
   const recast = look && look !== 'match'
   const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). The reference ad is a MULTI-SCENE / B-roll style ad. Clone it FAITHFULLY, scene by scene — this is a CLONE of its edit structure, not a talking-head rewrite.
 Rules:
-- Split the beat sheet into EXACTLY ${nScenes} scenes covering its full arc (hook first). Each scene = one continuous shot.
-- Per scene, write ONE dense Seedance prompt: subject → action → camera (match the reference's framing/movement) → lighting → mood. Match the reference scene's setting and energy. Cinematic b-roll, lifestyle moments and product close-ups are all allowed — do NOT force anyone to talk to camera.
+- Map the beat sheet's beats (in the "beats" array) onto EXACTLY ${nScenes} scenes, IN ORDER, covering the ad's full arc (hook first). Each scene must RECREATE a specific reference beat — its subject, its action, its shot type — not invent a new one. If there are more beats than scenes, group adjacent beats; if fewer, expand the strongest beats. Each scene = one continuous shot.
+- Per scene, write ONE dense Seedance prompt that reproduces THAT reference beat: subject → the exact action from the beat → camera (copy the reference's framing/movement) → lighting → mood. Stay faithful to what the reference actually shows in that beat (e.g. a couple close-up stays a couple close-up; a gym shot stays a gym shot). Cinematic b-roll, lifestyle moments and product close-ups are all allowed — do NOT force anyone to talk to camera, and do NOT drift to a generic studio.
 - PRODUCT SWAP — wherever the reference features its product, feature the user's product (${refList || 'the product'}) instead, matching ${refList || 'the product'} exactly. The product must appear (held / in use / close-up) in at least half of the scenes.
 - PEOPLE — when a scene has people, ${recast ? `recast them as ${look} in appearance (user's explicit choice), keeping the reference's age range, wardrobe style and energy` : 'copy the reference people (age/ethnicity/wardrobe/energy) from the beat sheet'}.
 ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera speech (ambience/music energy only). Design the visuals to fit this voiceover's arc, in order: "${String(voiceover).replace(/"/g, "'")}". Put the chunk each scene covers in its "script" field for reference only — do NOT write spoken dialogue into the prompt.` : '- No dialogue — scenes are music/ambience-driven b-roll. Leave "script" empty.'}
@@ -293,13 +293,19 @@ async function ttsVoiceover(text, id, voice) {
   return f
 }
 async function muxVoiceover(videoIn, voMp3, out) {
+  // The narration is frequently LONGER than the stitched scenes (a 30-day script vs ~35s of clips) —
+  // it must NEVER be cut off mid-sentence (that produced videos ending on 'day 21'). Freeze-extend
+  // the last video frame (tpad, generous 180s that -shortest trims back) so the video always outlasts
+  // the audio; mix ducked ambient with the FULL narration (duration=longest); -shortest caps the
+  // output to the narration length — the final shot holds like an end-card for any tail.
   try {
-    // Duck the scenes' ambient audio under the narration.
-    await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex', '[0:a]volume=0.22[a0];[a0][1:a]amix=inputs=2:duration=first:dropout_transition=0[a]',
-      '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
+    await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex',
+      '[0:v]tpad=stop_mode=clone:stop_duration=180[vp];[0:a]volume=0.22[a0];[a0][1:a]amix=inputs=2:duration=longest[a]',
+      '-map', '[vp]', '-map', '[a]', '-shortest', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
   } catch {
-    // No/odd ambient stream → narration only.
-    await ff(['-y', '-i', videoIn, '-i', voMp3, '-map', '0:v', '-map', '1:a', '-shortest', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
+    // No/odd ambient stream → narration over the frame-extended video only.
+    await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex', '[0:v]tpad=stop_mode=clone:stop_duration=180[vp]',
+      '-map', '[vp]', '-map', '1:a', '-shortest', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
   }
 }
 
