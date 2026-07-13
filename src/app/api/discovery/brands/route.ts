@@ -96,8 +96,9 @@ export async function GET(req: NextRequest) {
     brands: brands.map(b => ({
       pageId: b.page_id,
       name: b.name,
-      // Avatar: stored value if the import had one, else derive from the FB page id (public picture endpoint).
-      avatar: b.avatar_url || `https://graph.facebook.com/${b.page_id}/picture?type=square`,
+      // Avatar: the FB page picture is a hotlink-protected redirect the browser can't load directly, and
+      // weserv blocks graph.facebook.com — so serve it through our own same-origin, cached image proxy.
+      avatar: `/api/discovery/brand-avatar/${b.page_id}`,
       industry: b.industry,
       // Ad count: prefer our LIVE crawl count (accurate, grows as you crawl); fall back to the
       // imported source count (e.g. Foreplay's "# community ads" when that column is provided).
