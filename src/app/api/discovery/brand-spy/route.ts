@@ -214,6 +214,15 @@ export async function POST(req: NextRequest) {
     if (!pageId) return NextResponse.json({ error: 'Paste a Meta Ad Library page URL (…view_all_page_id=123…) or a numeric page ID — not a keyword search.' }, { status: 400 })
     const name = (body.name || '').trim().toLowerCase() || pageId
 
+    // crawlOnly = "pull this brand's ads into our catalog" WITHOUT tracking/following/charging the user
+    // (used when someone opens a directory brand we haven't crawled). Just enqueues the crawl at tier 0
+    // (priority 9, last_crawled_at null) — the droplet crawler picks it up next, IPRoyal-safe like all
+    // crawls. No plan gate, no credits, no follow. Idempotent.
+    if (body.crawlOnly) {
+      await ensureTracked(admin, pageId, name, true)
+      return NextResponse.json({ pageId, crawlOnly: true })
+    }
+
     // Already SPYING this brand? Re-open is a no-op (refresh the crawl, keep the follow). A plain
     // ❤️ follow (spied=false) is NOT "already spying" — it falls through so the spy upgrades it.
     const { data: prior } = await admin
