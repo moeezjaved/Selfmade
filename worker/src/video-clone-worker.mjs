@@ -353,6 +353,59 @@ async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, 
   return { videoUrl: url, requestId: request_id }
 }
 
+// ── Generic fal queue submit + poll (any model) ───────────────────────────────
+async function falQueueRun(model, input, iters = 200) {
+  const sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
+  if (!sub.ok) throw new Error(`fal ${model} submit ${sub.status} ${(await sub.text()).slice(0, 200)}`)
+  const { request_id, status_url, response_url } = await sub.json()
+  const statusUrl = status_url || `https://queue.fal.run/${model}/requests/${request_id}/status`
+  const resultUrl = response_url || `https://queue.fal.run/${model}/requests/${request_id}`
+  for (let i = 0; i < iters; i++) {
+    await sleep(6000)
+    const sr = await fetch(statusUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
+    if (!sr.ok) continue
+    const st = await sr.json()
+    if (st.status === 'COMPLETED') break
+    if (st.status === 'FAILED' || st.status === 'ERROR') throw new Error(`fal ${model} ${st.status}`)
+  }
+  const rr = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
+  if (!rr.ok) throw new Error(`fal ${model} result ${rr.status}: ${(await rr.text()).slice(0, 200)}`)
+  return rr.json()
+}
+
+// ── Pose-guided people-scene restyle (Wan VACE): copies the source's MOVEMENT SKELETON — blocking,
+// gesture, camera — while generating entirely NEW people (no faces copied → no likeness issue).
+// preprocess:true makes VACE derive the pose control from the raw footage itself. ──
+async function restyleScene({ prompt, refVideoUrl, imageUrls, duration, aspect }) {
+  const input = {
+    prompt: `${prompt} Entirely new people with different faces than the reference — but the exact same motion, blocking, energy and camera movement.`,
+    video_url: refVideoUrl,
+    task: 'pose', preprocess: true,
+    ref_image_urls: (imageUrls || []).slice(0, 3),
+    resolution: '580p',
+    aspect_ratio: aspect === '9:16' ? '9:16' : 'auto',
+    num_frames: Math.min(161, Math.max(81, Math.round((duration || 5) * 16) + 1)),
+    frames_per_second: 16,
+    video_quality: 'high', enable_safety_checker: false,
+  }
+  const data = await falQueueRun(process.env.WAN_VACE_MODEL || 'fal-ai/wan-vace-14b', input)
+  const url = data?.video?.url || data?.data?.video?.url
+  if (!url) throw new Error('vace returned no video url')
+  return url
+}
+
+// VACE clips have no audio track; a silent AAC track keeps the concat demuxer's streams aligned
+// with the (audio-bearing) Seedance clips. Returns the original file when audio already exists.
+function probeOut(args) { return new Promise((res) => { const p = spawn('ffprobe', args); let out = ''; p.stdout.on('data', (d) => { out += d.toString() }); p.on('close', () => res(out)); p.on('error', () => res(null)) }) }
+async function ensureAudio(file) {
+  const out = await probeOut(['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', file])
+  if (out === null || /audio/.test(out)) return file   // has audio, or no ffprobe → assume fine
+  const fixed = file.replace(/\.mp4$/, '.aud.mp4')
+  await ff(['-y', '-i', file, '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+    '-shortest', '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '96k', fixed])
+  return fixed
+}
+
 // ── PHASE A: analyse the competitor video + draft a script → status='review' (awaits approval) ──
 async function analyzeJob(job) {
   const meta = job.clone_meta || {}
@@ -398,29 +451,42 @@ async function generateJob(job) {
           // Scenes render VISUALS ONLY (ambience, no spoken dialogue) — the narration is one
           // continuous TTS track muxed after the stitch, so the voice can't change between scenes.
 
-          // PEOPLE-FREE scenes get the SOURCE FOOTAGE segment as a motion reference: cut the exact
-          // beat range from the original ad → Seedance inherits its real camera movement and
-          // composition (no faces → no likeness block). People-scenes stay prompt-only.
+          // Cut the exact beat range from the original ad as this scene's structural reference.
           let sceneRef = null
-          if (!s.has_people && job.source_video_url && s.src_start != null) {
+          if (job.source_video_url && s.src_start != null) {
             const refDur = Math.min(14, Math.max(3, (s.src_end != null ? s.src_end : s.src_start + s.duration) - s.src_start))
             try { sceneRef = await trimReference(job.source_video_url, job.id, { start: s.src_start, duration: refDur, tag: `sc${i}` }) }
             catch (e) { console.warn(`scene ${i + 1} trim:`, e.message) }
           }
-          console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s${sceneRef ? ', motion-ref' : ''})`)
-          let videoUrl
-          try {
-            ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier }))
-          } catch (e) {
-            // Safety net: Gemini mislabeled a people-free scene → fal blocks the ref → prompt-only retry.
-            if (sceneRef && /content_policy_violation|likeness|real people/i.test(e.message)) {
-              console.warn(`scene ${i + 1} ref blocked (likeness) — retrying prompt-only`)
-              ;({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier }))
-            } else throw e
+
+          let videoUrl = null
+          if (s.has_people && sceneRef && process.env.CLONE_PEOPLE_RESTYLE !== '0') {
+            // PEOPLE scene → pose-guided restyle (Wan VACE): copies the movement skeleton + camera
+            // from the source with entirely NEW people. Falls back to prompt-only Seedance on error.
+            console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, pose-restyle)`)
+            try { videoUrl = await restyleScene({ prompt: s.prompt, refVideoUrl: sceneRef, imageUrls: productImages, duration: s.duration, aspect: meta.aspect }) }
+            catch (e) { console.warn(`scene ${i + 1} restyle failed (${e.message}) — falling back to prompt-only`) }
           }
-          const f = `${base}-${i}.mp4`
+          if (!videoUrl && !s.has_people && sceneRef) {
+            // PEOPLE-FREE b-roll → source segment straight into Seedance as a motion reference
+            // (no faces → no likeness block); prompt-only retry if fal objects anyway.
+            console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, motion-ref)`)
+            try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier })) }
+            catch (e) {
+              if (/content_policy_violation|likeness|real people/i.test(e.message)) console.warn(`scene ${i + 1} ref blocked (likeness) — retrying prompt-only`)
+              else throw e
+            }
+          }
+          if (!videoUrl) {
+            console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, prompt-only)`)
+            ;({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier }))
+          }
+          let f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
-          tmp.push(f); files.push(f)
+          tmp.push(f)
+          f = await ensureAudio(f)          // VACE clips are silent → pad a silent track for concat
+          if (!tmp.includes(f)) tmp.push(f)
+          files.push(f)
         }
         const cat = `${base}-cat.mp4`
         tmp.push(cat)
