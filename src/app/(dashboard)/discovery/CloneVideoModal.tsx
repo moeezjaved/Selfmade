@@ -90,22 +90,35 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const LOOKS = ['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic']
 
   // 🔊 Audition the narrator saying the script's first sentence — before any credits are spent.
+  // The TTS fetch can outlive Chrome's click-activation window, making audio.play() reject silently.
+  // So: cache the fetched audio keyed by voice+sentence — if play is blocked, we tell the user to tap
+  // again, and the second tap plays the CACHED audio instantly (inside a fresh click gesture).
+  const previewCache = useRef<Map<string, string>>(new Map())
   const previewVoice = async () => {
     if (previewing) return
     const sentence = draftScript.trim().split(/(?<=[.!?۔؟])\s+/)[0]?.slice(0, 200) || draftScript.trim().slice(0, 200)
     if (!sentence) return
-    setPreviewing(true)
+    const cacheKey = `${voice}|${sentence}`
+    setPreviewing(true); setErr(null)
     try {
-      const r = await fetch('/api/discovery/clone-video/voice-preview', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: sentence, voice }),
-      })
-      if (!r.ok) return
-      const blob = await r.blob()
-      const audio = new Audio(URL.createObjectURL(blob))
+      let url = previewCache.current.get(cacheKey)
+      if (!url) {
+        const r = await fetch('/api/discovery/clone-video/voice-preview', {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: sentence, voice }),
+        })
+        if (!r.ok) { setErr('Voice preview is unavailable right now — the render itself is unaffected.'); setPreviewing(false); return }
+        url = URL.createObjectURL(await r.blob())
+        previewCache.current.set(cacheKey, url)
+      }
+      const audio = new Audio(url)
       audio.onended = () => setPreviewing(false)
-      await audio.play()
+      try { await audio.play() } catch {
+        // Autoplay gate ate the click — the audio is cached now, so the next tap plays instantly.
+        setErr('Ready — tap 🔊 once more to play.')
+        setPreviewing(false); return
+      }
     } catch { setPreviewing(false) }
-    finally { setTimeout(() => setPreviewing(false), 15000) }
+    finally { setTimeout(() => setPreviewing(false), 20000) }
   }
 
   useEffect(() => {
