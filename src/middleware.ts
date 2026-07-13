@@ -41,6 +41,10 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === '/') return NextResponse.next()
 
+  // Public image proxy for brand avatars (serves only public Facebook Page pictures) — must not be
+  // auth-gated, or the <img> requests get 307'd to /login and every avatar falls back to a letter.
+  if (pathname.startsWith('/api/discovery/brand-avatar/')) return NextResponse.next()
+
   // ── Admin routes ────────────────────────────────────────────────
   if (pathname.startsWith('/admin')) {
     if (pathname === '/admin/login') return NextResponse.next()
