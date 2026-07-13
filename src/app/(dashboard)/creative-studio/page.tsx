@@ -23,7 +23,7 @@ const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center',
 const btnGhost: React.CSSProperties = { ...btn, background: '#fff', color: DARK, border: '1px solid #cbd5cb' }
 const input: React.CSSProperties = { width: '100%', padding: '9px 11px', border: '1px solid #d1d5db', borderRadius: 9, fontSize: 13, fontFamily: 'inherit', color: '#111', outline: 'none' }
 
-type Gen = { id: string; image_url: string | null; type: string; tier: string; prompt?: string | null; brand_name?: string | null; source_ad_id?: string | null; media_type?: string; status?: string; created_at: string }
+type Gen = { id: string; image_url: string | null; type: string; tier: string; prompt?: string | null; brand_name?: string | null; source_ad_id?: string | null; source_thumb?: string | null; source_video_url?: string | null; media_type?: string; status?: string; created_at: string }
 type Product = { id: string; name?: string | null; image_urls?: string[] }
 type BrandKit = { colors?: string[]; extraColors?: string[]; palette?: Record<string, string>; fonts?: { heading?: string | null; body?: string | null; headingWeight?: string | null; bodyWeight?: string | null }; logo?: string | null }
 type Brand = { id: string; name: string; website?: string | null; tone?: string | null; usps?: string[]; products?: Product[]; brand_kit?: BrandKit }
@@ -130,6 +130,17 @@ function Generations() {
                     <img src={g.image_url || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   )}
                   {g.media_type === 'video' && g.status !== 'processing' && <span style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.6)', color: '#fff', borderRadius: 6, fontSize: 10, fontWeight: 700, padding: '2px 6px' }}>🎬 Video</span>}
+                  {/* Subtle "cloned from" chip — the competitor ad this output was cloned from, so the
+                      user can eyeball source-vs-result without it dominating the card. */}
+                  {g.status !== 'processing' && (g.source_thumb || g.source_video_url) && (
+                    <span title="Cloned from this ad" style={{ position: 'absolute', bottom: 6, left: 6, width: 34, height: 44, borderRadius: 5, overflow: 'hidden', border: '2px solid rgba(255,255,255,.82)', boxShadow: '0 2px 6px rgba(0,0,0,.45)', background: '#0d120e', opacity: 0.9 }}>
+                      {g.source_thumb
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={g.source_thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <video src={g.source_video_url || ''} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                      <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 6.5, fontWeight: 800, textAlign: 'center', color: '#fff', background: 'rgba(0,0,0,.6)', letterSpacing: '.04em', padding: '1px 0' }}>SOURCE</span>
+                    </span>
+                  )}
                 </button>
                 <div style={{ padding: '9px 11px' }}>
                   <div style={{ display: 'flex', gap: 5, marginBottom: 5 }}>
@@ -228,6 +239,17 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
               <button onClick={() => downloadCreative(creativeFilename({ brand: gen.brand_name, ext: (img || '').match(/\.(jpg|jpeg|webp|png)(\?|$)/i)?.[1] || 'png', kind: gen.type, date: new Date(gen.created_at) }))} disabled={downloading} style={{ ...btnGhost, justifyContent: 'center' }}><Download size={15} /> {downloading ? 'Downloading…' : 'Download'}</button>
               <button onClick={copyUrl} style={{ ...btnGhost, justifyContent: 'center' }}><Link2 size={15} /> {copied ? 'Copied ✓' : 'Copy URL'}</button>
             </>
+          )}
+          {(gen.source_thumb || gen.source_video_url) && (
+            <a href={gen.source_ad_id ? `/discovery/${gen.source_ad_id}` : undefined} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', padding: 8, border: '1px solid #e2e8f0', borderRadius: 9 }}>
+              <span style={{ width: 34, height: 44, borderRadius: 5, overflow: 'hidden', flexShrink: 0, background: '#0d120e', display: 'block' }}>
+                {gen.source_thumb
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={gen.source_thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <video src={gen.source_video_url || ''} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+              </span>
+              <span style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.35 }}><b style={{ color: '#374151' }}>Cloned from</b><br />the original ad{gen.source_ad_id ? ' →' : ''}</span>
+            </a>
           )}
           <button onClick={del} style={{ ...btnGhost, justifyContent: 'center', color: '#b91c1c', borderColor: '#f0c4c4' }}><Trash2 size={15} /> Delete</button>
         </div>

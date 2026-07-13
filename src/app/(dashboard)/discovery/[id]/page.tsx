@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from 'react'
 import CloneModal from '../CloneModal'
+import CloneVideoModal from '../CloneVideoModal'
 import { useParams, useRouter } from 'next/navigation'
 import { X, Bookmark, Link as LinkIcon, Download, Sparkles, ExternalLink } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
@@ -283,6 +284,7 @@ function AiPanel({ ad }: { ad: Ad }) {
   const { balance, pricing } = useCredits()
   const isVideo = ad.format === 'Video' || !!ad.videoUrl
   const [cloneOpen, setCloneOpen] = useState(false)
+  const [cloneVideoOpen, setCloneVideoOpen] = useState(false)
   const [script, setScript] = useState<any>(null)
   const [thin, setThin] = useState(false)
   const [gen, setGen] = useState<string | null>(null)
@@ -322,8 +324,18 @@ function AiPanel({ ad }: { ad: Ad }) {
       </div>
 
       {isVideo ? (
-        !script ? (
-          <button style={{ ...ctaS, opacity: loading ? 0.6 : 1 }} disabled={loading}
+        <>
+        {/* Primary action for a video ad: clone it into the user's OWN product ad (Seedance). */}
+        <button style={ctaS} onClick={() => setCloneVideoOpen(true)}>
+          <Sparkles size={16} /> Clone this video · from 250 cr
+        </button>
+        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Recreate this ad’s hook &amp; pacing with your product — you approve the script before any credits are spent.</div>
+        {cloneVideoOpen && <CloneVideoModal sourceAdId={ad.id} sourceVideoUrl={ad.videoUrl} sourcePoster={ad.thumbnailUrl} onClose={() => setCloneVideoOpen(false)} />}
+        {/* Secondary: script tools (transcribe → framework → duplicate). */}
+        <div style={{ borderTop: '1px solid #eef2f0', marginTop: 14, paddingTop: 12 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Or turn it into a script</div>
+        {!script ? (
+          <button style={{ ...ctaS, background: '#f1f5f2', color: '#1a3a1a', opacity: loading ? 0.6 : 1 }} disabled={loading}
             onClick={() => run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 2, d => { setScript(d.script); setThin(!!d.thinSpeech) })}>
             <Sparkles size={16} /> {loading ? 'Transcribing…' : `Generate Script · ${cost('transcribe', 2)} cr`}
           </button>
@@ -350,7 +362,9 @@ function AiPanel({ ad }: { ad: Ad }) {
             )}
             {gen && <div style={{ marginTop: 10, fontSize: 12, color: '#111', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 10, whiteSpace: 'pre-wrap' }}>{gen}</div>}
           </div>
-        )
+        )}
+        </div>
+        </>
       ) : (
         <>
           <button style={ctaS} onClick={() => setCloneOpen(true)}>
