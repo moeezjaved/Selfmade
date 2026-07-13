@@ -219,8 +219,18 @@ export async function POST(req: NextRequest) {
     // (priority 9, last_crawled_at null) — the droplet crawler picks it up next, IPRoyal-safe like all
     // crawls. No plan gate, no credits, no follow. Idempotent.
     if (body.crawlOnly) {
+      // Per-plan DAILY cap on on-demand pulls — protects IPRoyal (each pull = a crawl session) and is
+      // a natural upgrade lever. Counts this user's BRAND_PULLED events since midnight.
+      const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+      const { count: pullsToday } = await admin.from('activity_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id).eq('action_type', 'BRAND_PULLED').gte('created_at', startOfDay.toISOString())
+      const billingOwner = await resolveBillingOwner(admin, user.id)
+      const gate = await requireUnder(admin, billingOwner, 'expressPulls', pullsToday || 0)
+      if (gate) return NextResponse.json(gate, { status: 402 })
       await ensureTracked(admin, pageId, name, true)
-      return NextResponse.json({ pageId, crawlOnly: true })
+      await logActivity(admin, user.id, 'BRAND_PULLED', `Pulled ads for ${name}`)
+      return NextResponse.json({ pageId, crawlOnly: true, pullsToday: (pullsToday || 0) + 1 })
     }
 
     // Already SPYING this brand? Re-open is a no-op (refresh the crawl, keep the follow). A plain

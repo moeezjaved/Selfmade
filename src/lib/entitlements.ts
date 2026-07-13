@@ -48,13 +48,14 @@ export async function requireFeature(admin: SupabaseClient, ownerId: string, fea
   return upsell(ent.planId, feature, { feature, message: `${names[feature] || feature} is available on the ${firstPlanWith(feature)} plan and up.` })
 }
 
-/** Gate a countable limit (brandSpy, seats). Returns null if under the cap, else an upsell. */
-export async function requireUnder(admin: SupabaseClient, ownerId: string, limit: 'brandSpy' | 'seats', current: number): Promise<UpsellResponse | null> {
+/** Gate a countable limit (brandSpy, seats, expressPulls). Returns null if under the cap, else an upsell. */
+export async function requireUnder(admin: SupabaseClient, ownerId: string, limit: 'brandSpy' | 'seats' | 'expressPulls', current: number): Promise<UpsellResponse | null> {
   const ent = await getEntitlements(admin, ownerId)
-  const max = ent[limit]
+  const max = (ent as any)[limit]
   if (max === Infinity || current < max) return null
+  const noun = limit === 'brandSpy' ? 'tracked brands' : limit === 'seats' ? 'seats' : 'brand pulls per day'
   return upsell(ent.planId, limit, {
     current, max: max === Infinity ? null : max,
-    message: `Your ${ent.label} plan includes ${max === Infinity ? 'unlimited' : max} ${limit === 'brandSpy' ? 'tracked brands' : 'seats'}. Upgrade to add more.`,
+    message: `Your ${ent.label} plan includes ${max === Infinity ? 'unlimited' : max} ${noun}.${limit === 'expressPulls' ? ' Upgrade for more, or try again tomorrow.' : ' Upgrade to add more.'}`,
   })
 }

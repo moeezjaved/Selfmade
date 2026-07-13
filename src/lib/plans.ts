@@ -15,6 +15,7 @@ export interface PlanEntitlements {
   welcomeCredits?: number      // one-time top-up grant on signup (free only)
   seats: number
   brandSpy: number             // tracked-brand cap (Infinity = unlimited)
+  expressPulls: number         // on-demand brand ad-pulls PER DAY (IPRoyal cost control + upgrade lever)
   discoveryPages: number | null // Free is capped; null = uncapped
   aiInsights: boolean          // Patterns / AI Insights
   launch: boolean              // Launch Ads
@@ -30,31 +31,31 @@ export interface PlanEntitlements {
 export const PLANS: Record<PlanId, PlanEntitlements> = {
   free: {
     label: 'Free', priceMonthly: 0, priceAnnualMonthly: 0,
-    monthlyCredits: 20, welcomeCredits: 60, seats: 1, brandSpy: 1, discoveryPages: 3,
+    monthlyCredits: 20, welcomeCredits: 60, seats: 1, brandSpy: 1, expressPulls: 3, discoveryPages: 3,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: false,
     teamBoards: false, assetsGb: 0.5,
   },
   starter: {
     label: 'Starter', priceMonthly: 39, priceAnnualMonthly: 29,
-    monthlyCredits: 150, seats: 1, brandSpy: 15, discoveryPages: null,
+    monthlyCredits: 150, seats: 1, brandSpy: 15, expressPulls: 15, discoveryPages: null,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: true, canBuyCredits: true,
     teamBoards: false, assetsGb: 5,
   },
   pro: {
     label: 'Pro', priceMonthly: 99, priceAnnualMonthly: 74,
-    monthlyCredits: 500, seats: 3, brandSpy: 50, discoveryPages: null,
+    monthlyCredits: 500, seats: 3, brandSpy: 50, expressPulls: 50, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: false, api: true, exports: true, canBuyCredits: true,
     teamBoards: true, assetsGb: 50, mostPopular: true,
   },
   business: {
     label: 'Business', priceMonthly: 249, priceAnnualMonthly: 186,
-    monthlyCredits: 2000, seats: 10, brandSpy: 150, discoveryPages: null,
+    monthlyCredits: 2000, seats: 10, brandSpy: 150, expressPulls: 200, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
     teamBoards: true, assetsGb: 250,
   },
   enterprise: {
     label: 'Enterprise', priceMonthly: 0, priceAnnualMonthly: 0,
-    monthlyCredits: null, seats: 25, brandSpy: Infinity, discoveryPages: null,
+    monthlyCredits: null, seats: 25, brandSpy: Infinity, expressPulls: Infinity, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
     teamBoards: true, assetsGb: null,
   },
