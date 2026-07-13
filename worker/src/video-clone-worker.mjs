@@ -28,6 +28,14 @@ const GEMINI_MODEL = process.env.GEMINI_VIDEO_ANALYZE_MODEL || 'gemini-2.5-flash
 const OPENAI_KEY = process.env.OPENAI_API_KEY
 const OPENAI_MODEL = process.env.CLONE_PROMPT_MODEL || 'gpt-4o'
 const FAL_KEY = process.env.FAL_KEY
+// ── fal spend telemetry. Rates measured from real fal billing (2026-07-13: seedance-2.0
+// reference-to-video billed $34.94 / 2,495.7k tokens ≈ $0.21 per second of premium video). Each
+// job's estimated fal cost is passed to commit_credits as metadata.actual_cost_usd, which the
+// existing /admin/margins dashboard reads → live margin per action, no more guessing. ──
+const SEEDANCE_USD_PER_SEC = Number(process.env.FAL_SEEDANCE_USD_PER_SEC || 0.21)
+const SEEDANCE_FAST_USD_PER_SEC = Number(process.env.FAL_SEEDANCE_FAST_USD_PER_SEC || 0.09)
+const VACE_EST_USD_PER_RUN = Number(process.env.FAL_VACE_EST_USD || 0.5)
+const clipCost = (tier, secs) => (tier === 'fast' ? SEEDANCE_FAST_USD_PER_SEC : SEEDANCE_USD_PER_SEC) * (Number(secs) || 10)
 const EVERY = 8000
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -83,6 +91,32 @@ const LANG_NAME = {
 }
 const langName = (code) => LANG_NAME[code] || LANG_NAME.en
 
+// ── Product truth: LOOK at the user's product photo before writing anything. The script writer only
+// had a name + optional benefit, so a gummies reference ad cloned for a capsules product kept saying
+// "gummies". gpt-4o vision describes what the product ACTUALLY is; every prompt builder then gets a
+// hard rule to describe it truthfully and never inherit the reference product's form. ──
+async function describeProduct(imageUrl) {
+  if (!imageUrl) return null
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o', max_tokens: 120, temperature: 0.2,
+      messages: [{ role: 'user', content: [
+        { type: 'text', text: 'Describe this product for an ad script in ONE dense sentence: exactly what it IS (form factor — capsules / gummies / powder / spray / bottle / device / garment …), its packaging, colors, and any readable label text. State only what is visible — no guesses.' },
+        { type: 'image_url', image_url: { url: imageUrl } },
+      ] }],
+    }),
+  })
+  if (!r.ok) throw new Error(`vision ${r.status}`)
+  const j = await r.json()
+  const text = (j.choices?.[0]?.message?.content || '').trim()
+  return text || null
+}
+function productTruthRule(product) {
+  const seen = product && product.observed ? `The product's ACTUAL appearance (described from its real photos): ${product.observed}. ` : ''
+  return `- PRODUCT TRUTH — ${seen}The script and visuals must describe THE USER'S product truthfully: its real form factor, type and packaging. NEVER inherit the reference ad's product form, flavor or claims (e.g. reference sells gummies but the user's product is capsules → say and show capsules). When unsure, describe only what the product photos show.`
+}
+
 // ── Creator-look override: the user can recast the on-camera creator(s) to a chosen ethnicity/look
 // (Pakistani / Indian / Arab / …) while keeping everything else from the reference. 'match' (or empty)
 // = today's behavior: copy the reference creator exactly. ──
@@ -106,6 +140,7 @@ a real-looking creator talks straight to the phone camera and delivers the scrip
 - The creator must be SPEAKING ALOUD to the viewer, lips moving in sync — NOT a silent scene, NOT b-roll with background music. Describe their mouth moving, natural gestures, eye contact with the lens.
 - PRODUCT IS THE HERO — the creator physically HOLDS the user's product (${refList || 'the product'}) in their hand for MOST of the clip: brings it up to the lens, turns it, and actively USES/demonstrates it across several beats (e.g. takes a puff / applies it / shows how it works), then a close-up of it in-hand. Do NOT show a single static product shot — it must be handled and in-use throughout, and match ${refList || 'the product'} exactly.
 - REPLICATE THE REFERENCE FAITHFULLY — this is a CLONE, not a reinvention. Use the beat sheet's EXACT setting (${(beat && beat.setting) || 'as analysed'}), ${lookClause(beat, look)}, the same camera work, and the same beat timing. The ONLY things you change: swap in the user's product${recast ? ', recast the creator as instructed' : ''} and adapt the spoken words to it. Do NOT change the location${recast ? '' : ', do NOT change the people\'s ethnicity or look'}, do NOT move them to a generic sofa/studio.
+${productTruthRule(product)}
 - UGC realism: iPhone selfie, arm's length, natural light, authentic handheld, no on-screen captions/subtitles.
 - LANGUAGE: the creator speaks ${L}. ${nonEn ? `TRANSCREATE, never translate — write the script NATIVELY the way a real local creator talks in an ad (local idioms, local rhythm). Use the language's own script/alphabet.` : `NEVER the reference ad's language if it differs — the clone speaks English.`} Replicate the scene and the people; only the words are ${nonEn ? 'in the chosen language' : 'English'}.
 ${forcedScript ? '- CRITICAL — the creator says these EXACT words aloud to camera, lip-synced, word for word: "' + forcedScript.replace(/"/g, "'") + '". Weave "they say to camera: …" into the prompt so the model generates SPOKEN dialogue in that language, not narration.' : '- The creator speaks a natural line to camera; put the exact words in the script field.'}
@@ -157,6 +192,7 @@ Rules:
 - Per scene, write ONE dense Seedance prompt that reproduces THAT reference beat: subject → the exact action from the beat → camera (copy the reference's framing/movement) → lighting → mood. Stay faithful to what the reference actually shows in that beat (e.g. a couple close-up stays a couple close-up; a gym shot stays a gym shot). Cinematic b-roll, lifestyle moments and product close-ups are all allowed — do NOT force anyone to talk to camera, and do NOT drift to a generic studio.
 - PRODUCT SWAP — wherever the reference features its product, feature the user's product (${refList || 'the product'}) instead, matching ${refList || 'the product'} exactly. The product must appear (held / in use / close-up) in at least half of the scenes.
 - PEOPLE — when a scene has people, ${recast ? `recast them as ${look} in appearance (user's explicit choice), keeping the reference's age range, wardrobe style and energy` : 'copy the reference people (age/ethnicity/wardrobe/energy) from the beat sheet'}.
+${productTruthRule(product)}
 ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera speech (ambience/music energy only). Design the visuals to fit this voiceover's arc, in order: "${String(voiceover).replace(/"/g, "'")}". Put the chunk each scene covers in its "script" field for reference only — do NOT write spoken dialogue into the prompt.` : '- No dialogue — scenes are music/ambience-driven b-roll. Leave "script" empty.'}
 - Per scene pick "duration": 5 for a quick cut, 10 for a longer beat (numbers only).
 - Per scene also report: "has_people": true if ANY person/face is visible in that reference beat (false = pure product/object/environment b-roll), and "src_start"/"src_end": the SECONDS range of the reference footage this scene recreates (derive from the beats' "t" ranges, e.g. "4-9s" → 4 and 9).
@@ -192,6 +228,7 @@ async function buildSegmentPlan(beat, product, nImages, script, nSegments, look)
 - "character": ONE dense reusable paragraph describing the on-camera creator in precise repeatable detail — age, ${recast ? `${look} appearance (user's explicit choice)` : `ethnicity/look copied from the reference avatar (${(beat && beat.avatar) || 'as analysed'})`}, hair, wardrobe, plus the exact setting (${(beat && beat.setting) || 'as analysed'}). The SAME paragraph opens every segment prompt so the person cannot drift.
 - "voice": one short line describing their voice (tone, pace, energy) — reused each segment for audio consistency.
 - Per segment "action": what they physically do with the user's product (${refList || 'the product'}) in that segment — hold it up, demonstrate, close-up — following the reference beats in order.
+${productTruthRule(product)}
 Return ONLY minified JSON: {"character":"","voice":"","segments":[{"script":"","action":""}]}  (exactly ${nSegments} segments).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || {})}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nAPPROVED SCRIPT (split this, verbatim):\n${script}`
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -418,7 +455,15 @@ async function analyzeJob(job) {
     let beat = null
     if (job.source_video_url) { try { beat = await analyzeVideo(job.source_video_url) } catch (e) { console.warn('analyze:', e.message) } }
     const productImages = Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []
-    const { prompt, script, gloss } = await buildSeedancePrompt(beat, meta.product_details || { name: 'the product' }, productImages.length, null, meta.character_look, meta.language)
+    // LOOK at the product photo once (vision) so scripts describe what it actually is — capsules vs
+    // gummies etc. Persisted into product_details so every later prompt builder gets it too.
+    let productDetails = meta.product_details || { name: 'the product' }
+    if (!productDetails.observed && productImages[0]) {
+      try { const obs = await describeProduct(productImages[0]); if (obs) productDetails = { ...productDetails, observed: obs } }
+      catch (e) { console.warn('describeProduct:', e.message) }
+    }
+    meta.product_details = productDetails
+    const { prompt, script, gloss } = await buildSeedancePrompt(beat, productDetails, productImages.length, null, meta.character_look, meta.language)
     // Suggest faithful (scene-by-scene) cloning when the source is a multi-scene / B-roll ad —
     // collapsing those into a talking head isn't a clone. The user picks the mode at approve time.
     const cinematic = detectCinematic(beat)
@@ -451,6 +496,7 @@ async function generateJob(job) {
         : await buildScenePlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, nScenes, meta.character_look, finalScript)
       const base = join(tmpdir(), `fj-${job.id}`)
       const tmp = []
+      let falCost = 0   // estimated fal spend for this job (checkpoint reuses cost nothing)
       try {
         const files = []
         // Checkpointing: each finished clip URL is stamped into clone_meta immediately, so a worker
@@ -489,14 +535,14 @@ async function generateJob(job) {
             // PEOPLE scene → pose-guided restyle (Wan VACE): copies the movement skeleton + camera
             // from the source with entirely NEW people. Falls back to prompt-only Seedance on error.
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, pose-restyle)`)
-            try { videoUrl = await restyleScene({ prompt: s.prompt, refVideoUrl: sceneRef, imageUrls: productImages, duration: s.duration, aspect: meta.aspect }) }
+            try { videoUrl = await restyleScene({ prompt: s.prompt, refVideoUrl: sceneRef, imageUrls: productImages, duration: s.duration, aspect: meta.aspect }); falCost += VACE_EST_USD_PER_RUN }
             catch (e) { console.warn(`scene ${i + 1} restyle failed (${e.message}) — falling back to prompt-only`) }
           }
           if (!videoUrl && !s.has_people && sceneRef) {
             // PEOPLE-FREE b-roll → source segment straight into Seedance as a motion reference
             // (no faces → no likeness block); prompt-only retry if fal objects anyway.
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, motion-ref)`)
-            try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier })) }
+            try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier })); falCost += clipCost(meta.tier, s.duration) }
             catch (e) {
               if (/content_policy_violation|likeness|real people/i.test(e.message)) console.warn(`scene ${i + 1} ref blocked (likeness) — retrying prompt-only`)
               else throw e
@@ -505,6 +551,7 @@ async function generateJob(job) {
           if (!videoUrl) {
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, prompt-only)`)
             ;({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier }))
+            falCost += clipCost(meta.tier, s.duration)
           }
           let f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
@@ -534,8 +581,8 @@ async function generateJob(job) {
         const key = `creatives/${job.user_id}/${job.id}.mp4`
         await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
         const url = `${R2_PUBLIC}/${key}`
-        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: finalScript } })
-        if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'faithful', scenes: scenes.length } })
+        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
+        if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'faithful', scenes: scenes.length, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (faithful, ${scenes.length} scenes) ${job.id} → ${url}`)
       } finally {
         for (const f of tmp) await rm(f, { force: true }).catch(() => {})
@@ -556,6 +603,7 @@ async function generateJob(job) {
         : await buildSegmentPlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, finalScript, nSeg, meta.character_look)
       const base = join(tmpdir(), `sj-${job.id}`)
       const tmp = []
+      let falCost = 0
       try {
         const files = []
         const segClips = meta.segment_clips || {}
@@ -576,6 +624,7 @@ async function generateJob(job) {
           const imgs = anchor ? [anchor, ...productImages].slice(0, 9) : productImages
           console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${anchor ? ' (anchored)' : ''}`)
           const { videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier })
+          falCost += clipCost(meta.tier, 15)
           const f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
           tmp.push(f); files.push(f)
@@ -591,8 +640,8 @@ async function generateJob(job) {
         const key = `creatives/${job.user_id}/${job.id}.mp4`
         await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
         const url = `${R2_PUBLIC}/${key}`
-        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, script: finalScript } })
-        if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'ugc_long', segments: nSeg } })
+        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
+        if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'ugc_long', segments: nSeg, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (long UGC, ${nSeg} segments) ${job.id} → ${url}`)
       } finally {
         for (const f of tmp) await rm(f, { force: true }).catch(() => {})
@@ -630,8 +679,9 @@ async function generateJob(job) {
     await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
     const url = `${R2_PUBLIC}/${key}`
 
-    await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, seedance_prompt: prompt, script, fal_request_id: requestId } })
-    if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { fal_request_id: requestId } })
+    const falCost = clipCost(meta.tier, meta.duration || 10)
+    await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, seedance_prompt: prompt, script, fal_request_id: requestId, fal_cost_est: +falCost.toFixed(2) } })
+    if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { fal_request_id: requestId, actual_cost_usd: +falCost.toFixed(2) } })
     console.log(`🎬 cloned ${job.id} → ${url}`)
   } catch (e) {
     console.warn(`generate ${job.id} failed:`, e.message)
@@ -640,13 +690,36 @@ async function generateJob(job) {
   }
 }
 
-async function tick() {
-  const sel = 'select=id,user_id,tier,source_video_url,clone_meta,credit_tx&type=eq.video_clone&order=created_at.asc&limit=2'
-  const analyzing = await getJSON(`creative_generations?${sel}&status=eq.analyzing`).catch(() => [])
-  for (const j of analyzing || []) await analyzeJob(j)
-  const generating = await getJSON(`creative_generations?${sel}&status=eq.processing&image_url=is.null`).catch(() => [])
-  for (const j of generating || []) await generateJob(j)
+// ── Concurrent pump. The old loop was fully SERIAL: one 20-minute faithful render blocked every
+// other user's ANALYSIS (user B couldn't even get a script drafted until user A's video finished).
+// Now analyses (fast, cheap) and generations run as independent concurrent pools; the in-flight set
+// prevents double-pickup across poll ticks (single container, so process-local state suffices —
+// rows stay in their status while being worked, and checkpointing makes crash-restarts safe).
+const MAX_ANALYZE = Number(process.env.CLONE_ANALYZE_CONCURRENCY || 3)
+const MAX_GEN = Number(process.env.CLONE_GEN_CONCURRENCY || 2)
+const inflight = new Set()
+let anActive = 0
+let genActive = 0
+
+async function pump() {
+  const sel = 'select=id,user_id,tier,source_video_url,clone_meta,credit_tx&type=eq.video_clone&order=created_at.asc&limit=6'
+  if (anActive < MAX_ANALYZE) {
+    const analyzing = await getJSON(`creative_generations?${sel}&status=eq.analyzing`).catch(() => [])
+    for (const j of analyzing || []) {
+      if (inflight.has(j.id) || anActive >= MAX_ANALYZE) continue
+      inflight.add(j.id); anActive++
+      analyzeJob(j).catch((e) => console.warn('analyze crash:', e?.message)).finally(() => { inflight.delete(j.id); anActive-- })
+    }
+  }
+  if (genActive < MAX_GEN) {
+    const generating = await getJSON(`creative_generations?${sel}&status=eq.processing&image_url=is.null`).catch(() => [])
+    for (const j of generating || []) {
+      if (inflight.has(j.id) || genActive >= MAX_GEN) continue
+      inflight.add(j.id); genActive++
+      generateJob(j).catch((e) => console.warn('generate crash:', e?.message)).finally(() => { inflight.delete(j.id); genActive-- })
+    }
+  }
 }
 
-console.log('🎬 video-clone-worker up — analyse→review (approval gate)→generate')
-for (;;) { try { await tick() } catch (e) { console.warn('tick error:', e?.message || e) } await sleep(EVERY) }
+console.log(`🎬 video-clone-worker up — analyse→review (approval gate)→generate · concurrency A${MAX_ANALYZE}/G${MAX_GEN}`)
+for (;;) { try { await pump() } catch (e) { console.warn('tick error:', e?.message || e) } await sleep(EVERY) }
