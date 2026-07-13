@@ -690,6 +690,40 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
   )
 }
 
+// First-time-spy screen: this brand isn't crawled yet. One click pulls its ads into our catalog
+// (the crawler fetches ad-JSON, then thumbs/posters/DNA apply automatically like every discovery ad).
+function PullBrand({ name, pageId, pulling, onPull }: { name: string; pageId: string; pulling: boolean; onPull: () => void }) {
+  return (
+    <div style={{ padding: 24, maxWidth: 720, margin: '0 auto' }}>
+      <Link href="/discovery/brands" style={{ fontSize: 13, color: '#2075ff', textDecoration: 'none' }}>← All brands</Link>
+      <div style={{ marginTop: 28, background: '#fff', border: '1px solid #e6e6e6', borderRadius: 16, padding: '40px 28px', textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 10 }}>{pulling ? '📡' : '⚡'}</div>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111', margin: '0 0 6px' }}>{name}</h1>
+        {pulling ? (
+          <>
+            <div style={{ fontSize: 14, color: '#374151', marginBottom: 18 }}>Pulling this brand’s ads into your catalog… they’ll appear here as we find them. This first-time spy usually takes under a minute.</div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#6b7280', fontSize: 13 }}>
+              <span style={{ width: 14, height: 14, border: '2px solid #dfe4d8', borderTopColor: '#1a3a1a', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} /> Searching Meta for {name}’s ads…
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 24 }}>
+              {[0, 1, 2].map(i => <div key={i} style={{ width: 86, height: 150, borderRadius: 10, background: 'linear-gradient(100deg,#f2f4f0 30%,#e9ede6 50%,#f2f4f0 70%)', backgroundSize: '200% 100%', animation: 'shimmer 1.3s infinite' }} />)}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 14, color: '#374151', marginBottom: 22, lineHeight: 1.55 }}>We don’t have {name}’s ads in your catalog yet. Pull them now — we’ll crawl their full ad history, then apply thumbnails, posters and AI creative-DNA automatically, just like every ad in Discovery.</div>
+            <button onClick={onPull} style={{ background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 15, padding: '13px 26px', borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>⚡ Pull {name}’s ads</button>
+            <div style={{ marginTop: 14 }}>
+              <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&view_all_page_id=${pageId}`} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: '#9ca3af', textDecoration: 'none' }}>or view raw in Meta Ad Library ↗</a>
+            </div>
+          </>
+        )}
+      </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}@keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}`}</style>
+    </div>
+  )
+}
+
 export default function BrandSpyDetail() {
   const { pageId } = useParams<{ pageId: string }>()
   const [d, setD] = useState<Spy | null>(null)
@@ -698,6 +732,8 @@ export default function BrandSpyDetail() {
   const [tab, setTab] = useState<typeof TABS[number][0]>('overview')
   const [drawerAd, setDrawerAd] = useState<Card | null>(null)
 
+  const [pulling, setPulling] = useState(false)
+
   useEffect(() => {
     if (!pageId) return
     setLoading(true)
@@ -705,6 +741,21 @@ export default function BrandSpyDetail() {
       .then((r) => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then(setD).catch((e) => setErr(String(e))).finally(() => setLoading(false))
   }, [pageId])
+
+  // First-time spy: this brand isn't in our catalog yet → enqueue a crawl and poll until ads land,
+  // streaming them in. IPRoyal-safe (crawlOnly just queues; the existing crawler does the ad-JSON pull).
+  const startPull = () => {
+    if (pulling) return
+    setPulling(true)
+    fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, crawlOnly: true }) }).catch(() => {})
+    const started = Date.now()
+    const iv = setInterval(() => {
+      fetch(`/api/discovery/brand-spy/${pageId}`).then(r => r.ok ? r.json() : null).then(j => {
+        if (j) setD(j)
+        if ((j?.summary?.total || 0) > 0 || Date.now() - started > 150000) { clearInterval(iv); setPulling(false) }
+      }).catch(() => {})
+    }, 4000)
+  }
 
   const exportCsv = () => {
     if (!d) return
@@ -723,6 +774,9 @@ export default function BrandSpyDetail() {
   if (loading) return <div style={{ padding: 32, color: '#6b7280' }}>Loading Brand Spy…</div>
   if (err || !d) return <div style={{ padding: 32, color: '#b91c1c' }}>Couldn’t load: {err}</div>
   const s = d.summary
+  // Brand not in our catalog yet → offer to pull its ads (or show the live "pulling" state).
+  if (s.total === 0) return <PullBrand name={d.brand?.name || 'this brand'} pageId={pageId} pulling={pulling} onPull={startPull} />
+
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto', overflowX: 'hidden' }}>

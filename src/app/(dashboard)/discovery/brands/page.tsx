@@ -150,8 +150,9 @@ export default function BrandsPage() {
         </div>
         {brands.map(b => (
           <div key={b.pageId} style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 640, padding: '11px 16px', borderBottom: '1px solid #f8fafc' }}>
-            {/* Brand → opens this brand's Meta Ad Library (avatar + name both clickable). */}
-            <a href={b.adLibraryUrl} target="_blank" rel="noopener noreferrer" title="Open in Meta Ad Library"
+            {/* Brand → opens OUR brand page (spy dashboard); auto-crawls its ads if we don't have them
+                yet. "Ad Library" stays as a separate button for the raw Meta view. */}
+            <a href={`/discovery/brand-spy/${b.pageId}`} title={`Open ${b.name} on Selfmade`}
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, textDecoration: 'none', color: 'inherit' }}>
               {/* Letter avatar underneath; the real picture overlays it and, if it fails to load,
                   onError hides the img so the letter shows through — no broken-image icon. */}
