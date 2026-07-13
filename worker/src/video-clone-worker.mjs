@@ -137,8 +137,12 @@ function detectCinematic(beat) {
   return noTalker || words < 8
 }
 function sceneCountFor(beat) {
+  // Scale with BOTH the beat count and the source duration — Gemini returns 3-8 beats regardless of
+  // length, so beats alone undercounted badly (a 60s multi-cut ad got 2 scenes). ~15s of source per
+  // scene, capped at 4 (the priced x2-x4 rows).
   const beats = Array.isArray(beat && beat.beats) ? beat.beats.length : 4
-  return Math.min(4, Math.max(2, Math.ceil(beats / 2)))
+  const secs = Number(beat && beat.duration_seconds) || 15
+  return Math.min(4, Math.max(2, Math.ceil(beats / 2), Math.ceil(secs / 15)))
 }
 
 // ── gpt-4o: beat sheet → per-scene Seedance prompts for FAITHFUL mode. Each reference scene becomes
