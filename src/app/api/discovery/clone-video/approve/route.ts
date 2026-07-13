@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { jobId, script } = await req.json().catch(() => ({}))
+  const { jobId, script, mode } = await req.json().catch(() => ({}))
   if (!jobId) return NextResponse.json({ error: 'jobId required' }, { status: 400 })
 
   const admin = createAdminClient()
@@ -27,7 +27,14 @@ export async function POST(req: NextRequest) {
   if ((row as any).status !== 'review') return NextResponse.json({ error: `job is ${(row as any).status}, not awaiting approval` }, { status: 409 })
 
   const meta = (row as any).clone_meta || {}
-  const action = meta.tier === 'fast' ? 'video_clone_fast' : 'video_clone'
+  // Mode: 'ugc' (one talking-head clip, default) or 'faithful' (scene-by-scene + stitch — priced by
+  // scene count via the video_clone_xN credit_pricing rows). Scene count is server-side (worker's
+  // analysis), clamped 2-4, so the client can't pick a cheaper row than the work costs.
+  const chosenMode = mode === 'faithful' ? 'faithful' : 'ugc'
+  const nScenes = Math.min(4, Math.max(2, Number(meta.scene_count) || 2))
+  const action = chosenMode === 'faithful'
+    ? `video_clone_x${nScenes}${meta.tier === 'fast' ? '_fast' : ''}`
+    : (meta.tier === 'fast' ? 'video_clone_fast' : 'video_clone')
 
   // Reserve now — this is the billable moment (the user has approved the script).
   const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: action })
@@ -39,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   const finalScript = (typeof script === 'string' && script.trim()) ? script.trim() : (meta.script || '')
   const { error } = await admin.from('creative_generations').update({
-    status: 'processing', credit_tx: txId, clone_meta: { ...meta, final_script: finalScript },
+    status: 'processing', credit_tx: txId, clone_meta: { ...meta, final_script: finalScript, mode: chosenMode, scene_count: nScenes },
   }).eq('id', jobId).eq('user_id', user.id)
 
   if (error) {
