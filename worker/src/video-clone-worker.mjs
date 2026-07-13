@@ -155,7 +155,8 @@ Rules:
 - PEOPLE — when a scene has people, ${recast ? `recast them as ${look} in appearance (user's explicit choice), keeping the reference's age range, wardrobe style and energy` : 'copy the reference people (age/ethnicity/wardrobe/energy) from the beat sheet'}.
 ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera speech (ambience/music energy only). Design the visuals to fit this voiceover's arc, in order: "${String(voiceover).replace(/"/g, "'")}". Put the chunk each scene covers in its "script" field for reference only — do NOT write spoken dialogue into the prompt.` : '- No dialogue — scenes are music/ambience-driven b-roll. Leave "script" empty.'}
 - Per scene pick "duration": 5 for a quick cut, 10 for a longer beat (numbers only).
-Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5}]}  (exactly ${nScenes} scenes, in order).`
+- Per scene also report: "has_people": true if ANY person/face is visible in that reference beat (false = pure product/object/environment b-roll), and "src_start"/"src_end": the SECONDS range of the reference footage this scene recreates (derive from the beats' "t" ranges, e.g. "4-9s" → 4 and 9).
+Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has_people":false,"src_start":0,"src_end":5}]}  (exactly ${nScenes} scenes, in order).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || { note: 'analysis unavailable — infer a natural multi-scene structure' })}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nProduct image tokens: ${refList || '(none)'}.`
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
@@ -170,6 +171,9 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5}]}  
   return scenes.slice(0, nScenes).map((s) => ({
     prompt: String(s.prompt), script: String(s.script || ''),
     duration: Number(s.duration) >= 8 ? 10 : 5,
+    has_people: s.has_people !== false,   // default TRUE (safe: no ref video unless surely people-free)
+    src_start: Number.isFinite(+s.src_start) ? Math.max(0, +s.src_start) : null,
+    src_end: Number.isFinite(+s.src_end) ? +s.src_end : null,
   }))
 }
 
@@ -226,19 +230,24 @@ function ff(args) {
     p.on('error', reject)
   })
 }
-async function trimReference(url, id) {
-  const base = join(tmpdir(), `ref-${id}`)
+async function trimReference(url, id, opts = {}) {
+  // opts.start/duration cut a SPECIFIC segment (per-scene motion reference for faithful mode);
+  // defaults keep the original behavior: first 14s (where the hook lives).
+  const start = Math.max(0, Number(opts.start) || 0)
+  const dur = Math.min(14, Math.max(2, Number(opts.duration) || 14))
+  const tag = opts.tag || 'ref'
+  const base = join(tmpdir(), `ref-${id}-${tag}`)
   const inFile = `${base}.in.mp4`, outFile = `${base}.out.mp4`
   try {
     const r = await fetch(url)
     if (!r.ok) throw new Error(`fetch ref ${r.status}`)
     await writeFile(inFile, Buffer.from(await r.arrayBuffer()))
-    // first 14s; cap longer side at 1280 (shorter → ≤720); yuv420p h264 for compatibility.
-    await ff(['-y', '-i', inFile, '-t', '14',
+    // cut [start, start+dur]; cap longer side at 1280 (shorter → ≤720); yuv420p h264 for compatibility.
+    await ff(['-y', '-ss', String(start), '-i', inFile, '-t', String(dur),
       '-vf', "scale='if(gt(iw,ih),1280,-2)':'if(gt(iw,ih),-2,1280)'",
       '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', outFile])
     const mp4 = await readFile(outFile)
-    const key = `creatives/tmp/${id}-ref.mp4`
+    const key = `creatives/tmp/${id}-${tag}.mp4`
     await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=86400' }))
     return `${R2_PUBLIC}/${key}`
   } finally {
@@ -388,8 +397,27 @@ async function generateJob(job) {
           const s = scenes[i]
           // Scenes render VISUALS ONLY (ambience, no spoken dialogue) — the narration is one
           // continuous TTS track muxed after the stitch, so the voice can't change between scenes.
-          console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s)`)
-          const { videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier })
+
+          // PEOPLE-FREE scenes get the SOURCE FOOTAGE segment as a motion reference: cut the exact
+          // beat range from the original ad → Seedance inherits its real camera movement and
+          // composition (no faces → no likeness block). People-scenes stay prompt-only.
+          let sceneRef = null
+          if (!s.has_people && job.source_video_url && s.src_start != null) {
+            const refDur = Math.min(14, Math.max(3, (s.src_end != null ? s.src_end : s.src_start + s.duration) - s.src_start))
+            try { sceneRef = await trimReference(job.source_video_url, job.id, { start: s.src_start, duration: refDur, tag: `sc${i}` }) }
+            catch (e) { console.warn(`scene ${i + 1} trim:`, e.message) }
+          }
+          console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s${sceneRef ? ', motion-ref' : ''})`)
+          let videoUrl
+          try {
+            ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier }))
+          } catch (e) {
+            // Safety net: Gemini mislabeled a people-free scene → fal blocks the ref → prompt-only retry.
+            if (sceneRef && /content_policy_violation|likeness|real people/i.test(e.message)) {
+              console.warn(`scene ${i + 1} ref blocked (likeness) — retrying prompt-only`)
+              ;({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier }))
+            } else throw e
+          }
           const f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
           tmp.push(f); files.push(f)
