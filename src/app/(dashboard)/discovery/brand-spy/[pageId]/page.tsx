@@ -692,7 +692,7 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
 
 // First-time-spy screen: this brand isn't crawled yet. One click pulls its ads into our catalog
 // (the crawler fetches ad-JSON, then thumbs/posters/DNA apply automatically like every discovery ad).
-function PullBrand({ name, pageId, pulling, onPull }: { name: string; pageId: string; pulling: boolean; onPull: () => void }) {
+function PullBrand({ name, pageId, pulling, onPull, capMsg }: { name: string; pageId: string; pulling: boolean; onPull: () => void; capMsg?: string }) {
   return (
     <div style={{ padding: 24, maxWidth: 720, margin: '0 auto' }}>
       <Link href="/discovery/brands" style={{ fontSize: 13, color: '#2075ff', textDecoration: 'none' }}>← All brands</Link>
@@ -712,6 +712,7 @@ function PullBrand({ name, pageId, pulling, onPull }: { name: string; pageId: st
         ) : (
           <>
             <div style={{ fontSize: 14, color: '#374151', marginBottom: 22, lineHeight: 1.55 }}>We don’t have {name}’s ads in your catalog yet. Pull them now — we’ll crawl their full ad history, then apply thumbnails, posters and AI creative-DNA automatically, just like every ad in Discovery.</div>
+            {capMsg && <div style={{ margin: '0 auto 16px', maxWidth: 440, background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 600 }}>⚡ {capMsg} <a href="/settings" style={{ color: '#1a3a1a', textDecoration: 'underline' }}>Upgrade →</a></div>}
             <button onClick={onPull} style={{ background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 15, padding: '13px 26px', borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>⚡ Pull {name}’s ads</button>
             <div style={{ marginTop: 14 }}>
               <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&view_all_page_id=${pageId}`} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: '#9ca3af', textDecoration: 'none' }}>or view raw in Meta Ad Library ↗</a>
@@ -733,6 +734,7 @@ export default function BrandSpyDetail() {
   const [drawerAd, setDrawerAd] = useState<Card | null>(null)
 
   const [pulling, setPulling] = useState(false)
+  const [capMsg, setCapMsg] = useState('')
 
   useEffect(() => {
     if (!pageId) return
@@ -744,10 +746,13 @@ export default function BrandSpyDetail() {
 
   // First-time spy: this brand isn't in our catalog yet → enqueue a crawl and poll until ads land,
   // streaming them in. IPRoyal-safe (crawlOnly just queues; the existing crawler does the ad-JSON pull).
-  const startPull = () => {
+  const startPull = async () => {
     if (pulling) return
-    setPulling(true)
-    fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, crawlOnly: true }) }).catch(() => {})
+    setPulling(true); setCapMsg('')
+    try {
+      const r = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, crawlOnly: true }) })
+      if (r.status === 402) { const j = await r.json().catch(() => ({})); setCapMsg(j.message || 'You’ve hit your daily brand-pull limit. Upgrade for more, or try again tomorrow.'); setPulling(false); return }
+    } catch { /* enqueue is best-effort; polling below still surfaces anything that lands */ }
     const started = Date.now()
     const iv = setInterval(() => {
       fetch(`/api/discovery/brand-spy/${pageId}`).then(r => r.ok ? r.json() : null).then(j => {
@@ -775,7 +780,7 @@ export default function BrandSpyDetail() {
   if (err || !d) return <div style={{ padding: 32, color: '#b91c1c' }}>Couldn’t load: {err}</div>
   const s = d.summary
   // Brand not in our catalog yet → offer to pull its ads (or show the live "pulling" state).
-  if (s.total === 0) return <PullBrand name={d.brand?.name || 'this brand'} pageId={pageId} pulling={pulling} onPull={startPull} />
+  if (s.total === 0) return <PullBrand name={d.brand?.name || 'this brand'} pageId={pageId} pulling={pulling} onPull={startPull} capMsg={capMsg} />
 
 
   return (
