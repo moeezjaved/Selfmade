@@ -97,6 +97,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ page
   }
   const ownCount = ads.length
 
+  // Name fallback: an un-crawled brand has 0 indexed ads → no page_name yet, so the header would
+  // show the raw page_id. The directory (605K brands) carries the real name — use it so the Pull
+  // screen reads "Just Jeans", not "100002386717".
+  if (!name) {
+    try {
+      const { data: dir } = await admin.from('brand_directory').select('name').eq('page_id', pageId).maybeSingle()
+      if ((dir as any)?.name) name = (dir as any).name
+    } catch { /* directory optional */ }
+  }
+
   // AFFILIATE / creator ads — other pages running ads that reference this brand's domain, tagged
   // `aff:<pageId>` by the crawler's affiliate-discovery pass. Merged into the brand view the way
   // Atria counts them toward the brand total. Needs the seed_terms GIN index (migration 041);
