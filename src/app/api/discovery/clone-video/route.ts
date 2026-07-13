@@ -95,6 +95,9 @@ export async function POST(req: NextRequest) {
     tier,
     // Creator-look override (Pakistani / Indian / Arab / …); 'match' or absent = copy the reference.
     character_look: typeof body.characterLook === 'string' && body.characterLook.trim() ? body.characterLook.trim().slice(0, 60) : null,
+    // Script/voiceover language (transcreated natively, never translated) + narration voice.
+    language: /^[a-z]{2}$/.test(String(body.language || '')) ? body.language : 'en',
+    voice: ['nova', 'shimmer', 'onyx', 'echo'].includes(String(body.voice || '')) ? body.voice : 'nova',
   }
 
   const { data: row, error } = await admin.from('creative_generations').insert({

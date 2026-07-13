@@ -70,6 +70,19 @@ async function analyzeVideo(videoUrl) {
   try { return JSON.parse(text) } catch { console.warn('gemini non-JSON beat sheet'); return null }
 }
 
+// ── Language: scripts are TRANSCREATED (written natively), never translated. Real UGC in
+// Urdu/Hindi/Arabic code-switches English product words — that authenticity is the moat. ──
+const LANG_NAME = {
+  en: 'English',
+  ur: 'Urdu — natural Karachi-creator style; code-switch English product/beauty/tech words exactly where a real Pakistani creator would (e.g. "yeh serum literally 2 hafton mein…")',
+  hi: 'Hindi — natural Mumbai-creator style; Hinglish code-switching where a real Indian creator would',
+  ar: 'Arabic — Modern Standard with a friendly Gulf flavour; keep brand/product names as-is',
+  es: 'Spanish — natural Latin-American creator style',
+  fr: 'French — natural creator style',
+  de: 'German — natural creator style',
+}
+const langName = (code) => LANG_NAME[code] || LANG_NAME.en
+
 // ── Creator-look override: the user can recast the on-camera creator(s) to a chosen ethnicity/look
 // (Pakistani / Indian / Arab / …) while keeping everything else from the reference. 'match' (or empty)
 // = today's behavior: copy the reference creator exactly. ──
@@ -82,9 +95,11 @@ function lookClause(beat, look) {
 
 // ── gpt-4o: beat sheet + product → Seedance prompt + script. When forcedScript is given (the user's
 // APPROVED/edited voiceover) the prompt is built around EXACTLY that script. ──
-async function buildSeedancePrompt(beat, product, nImages, forcedScript, look) {
+async function buildSeedancePrompt(beat, product, nImages, forcedScript, look, lang) {
   const refList = Array.from({ length: nImages }, (_, i) => `@Image${i + 1}`).join(', ')
   const recast = look && look !== 'match'
+  const L = langName(lang)
+  const nonEn = lang && lang !== 'en'
   const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). This is a TALKING-HEAD UGC ad:
 a real-looking creator talks straight to the phone camera and delivers the script out loud. Rules:
 - ONE dense paragraph: subject (the on-camera creator) → they SPEAK to camera → action/product → camera → lighting → mood, then a short beat-by-beat timeline.
@@ -92,9 +107,9 @@ a real-looking creator talks straight to the phone camera and delivers the scrip
 - PRODUCT IS THE HERO — the creator physically HOLDS the user's product (${refList || 'the product'}) in their hand for MOST of the clip: brings it up to the lens, turns it, and actively USES/demonstrates it across several beats (e.g. takes a puff / applies it / shows how it works), then a close-up of it in-hand. Do NOT show a single static product shot — it must be handled and in-use throughout, and match ${refList || 'the product'} exactly.
 - REPLICATE THE REFERENCE FAITHFULLY — this is a CLONE, not a reinvention. Use the beat sheet's EXACT setting (${(beat && beat.setting) || 'as analysed'}), ${lookClause(beat, look)}, the same camera work, and the same beat timing. The ONLY things you change: swap in the user's product${recast ? ', recast the creator as instructed' : ''} and adapt the spoken words to it. Do NOT change the location${recast ? '' : ', do NOT change the people\'s ethnicity or look'}, do NOT move them to a generic sofa/studio.
 - UGC realism: iPhone selfie, arm's length, natural light, authentic handheld, no on-screen captions/subtitles.
-- LANGUAGE: the creator speaks in ENGLISH with a natural English delivery — NEVER the reference ad's language (e.g. if the reference was Hindi/other, the clone is still ENGLISH). Replicate the scene and the people, but the words are English.
-${forcedScript ? '- CRITICAL — the creator says these EXACT English words aloud to camera, lip-synced, word for word: "' + forcedScript.replace(/"/g, "'") + '". Weave "she says to camera in English: …" into the prompt so the model generates ENGLISH spoken dialogue, not narration.' : '- The creator speaks a natural English line to camera; put the exact words in the script field.'}
-Return ONLY minified JSON: {"prompt":"","script":""}  (script = the exact words the creator speaks).`
+- LANGUAGE: the creator speaks ${L}. ${nonEn ? `TRANSCREATE, never translate — write the script NATIVELY the way a real local creator talks in an ad (local idioms, local rhythm). Use the language's own script/alphabet.` : `NEVER the reference ad's language if it differs — the clone speaks English.`} Replicate the scene and the people; only the words are ${nonEn ? 'in the chosen language' : 'English'}.
+${forcedScript ? '- CRITICAL — the creator says these EXACT words aloud to camera, lip-synced, word for word: "' + forcedScript.replace(/"/g, "'") + '". Weave "they say to camera: …" into the prompt so the model generates SPOKEN dialogue in that language, not narration.' : '- The creator speaks a natural line to camera; put the exact words in the script field.'}
+Return ONLY minified JSON: {"prompt":"","script":""${nonEn ? ',"gloss":""' : ''}}  (script = the exact words the creator speaks${nonEn ? '; gloss = a one-line ENGLISH summary of what the script says, so the user can sanity-check' : ''}).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || { note: 'analysis unavailable — infer a natural UGC structure' })}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nProduct image tokens: ${refList || '(none)'}.`
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
@@ -105,7 +120,7 @@ Return ONLY minified JSON: {"prompt":"","script":""}  (script = the exact words 
   const j = await r.json()
   const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
   if (!out.prompt) throw new Error('no prompt from gpt')
-  return { prompt: String(out.prompt), script: String(out.script || forcedScript || '') }
+  return { prompt: String(out.prompt), script: String(out.script || forcedScript || ''), gloss: out.gloss ? String(out.gloss) : null }
 }
 
 // ── Faithful/Cinematic mode: is the source a multi-scene / B-roll ad (vs a talking-head UGC)? ──
@@ -185,14 +200,14 @@ Return ONLY minified JSON: {"character":"","voice":"","segments":[{"script":"","
 }
 
 // Compose one segment's Seedance prompt: verbatim character block + continuity anchor + exact words.
-function segmentPrompt(plan, seg, i, total, hasAnchor, nImages) {
+function segmentPrompt(plan, seg, i, total, hasAnchor, nImages, lang) {
   const productRef = hasAnchor
     ? (nImages ? `@Image2${nImages > 1 ? `–@Image${nImages + 1}` : ''}` : 'the product')
     : (nImages ? `@Image1${nImages > 1 ? `–@Image${nImages}` : ''}` : 'the product')
   const parts = [plan.character]
   if (hasAnchor) parts.push(`This is segment ${i + 1} of ${total} of ONE continuous selfie take. @Image1 shows this exact creator one moment ago — treat it as ground truth: the SAME face, hair, outfit, room and lighting, continuing seamlessly. The user's product is ${productRef} and must match it exactly.`)
   else parts.push(`The user's product is ${productRef} and must match it exactly.`)
-  parts.push(`They speak to camera in ENGLISH — ${plan.voice} — lips moving in sync, saying these exact words aloud: "${String(seg.script || '').replace(/"/g, "'")}"`)
+  parts.push(`They speak to camera in ${langName(lang).split(' — ')[0]} — ${plan.voice} — lips moving in sync, saying these exact words aloud: "${String(seg.script || '').replace(/"/g, "'")}"`)
   if (seg.action) parts.push(String(seg.action))
   parts.push('UGC realism: iPhone selfie framing at arm\'s length, natural light, authentic handheld, no on-screen captions.')
   return parts.filter(Boolean).join(' ')
@@ -267,10 +282,10 @@ async function lastFrameAnchor(file, id, idx) {
 // ── Single-voice narration (faithful/b-roll mode): one TTS track for the WHOLE script, muxed over
 // the stitched video. Per-clip generated voices differ audibly between scenes; b-roll needs no lip
 // sync, so one continuous voice is both correct and more professional. OpenAI TTS (key already set).
-async function ttsVoiceover(text, id) {
+async function ttsVoiceover(text, id, voice) {
   const r = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: process.env.CLONE_TTS_MODEL || 'gpt-4o-mini-tts', voice: process.env.CLONE_TTS_VOICE || 'nova', input: String(text).slice(0, 4000), response_format: 'mp3' }),
+    body: JSON.stringify({ model: process.env.CLONE_TTS_MODEL || 'gpt-4o-mini-tts', voice: voice || process.env.CLONE_TTS_VOICE || 'nova', input: String(text).slice(0, 4000), response_format: 'mp3' }),
   })
   if (!r.ok) throw new Error(`tts ${r.status} ${(await r.text()).slice(0, 120)}`)
   const f = join(tmpdir(), `vo-${id}.mp3`)
@@ -331,12 +346,12 @@ async function analyzeJob(job) {
     let beat = null
     if (job.source_video_url) { try { beat = await analyzeVideo(job.source_video_url) } catch (e) { console.warn('analyze:', e.message) } }
     const productImages = Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []
-    const { prompt, script } = await buildSeedancePrompt(beat, meta.product_details || { name: 'the product' }, productImages.length, null, meta.character_look)
+    const { prompt, script, gloss } = await buildSeedancePrompt(beat, meta.product_details || { name: 'the product' }, productImages.length, null, meta.character_look, meta.language)
     // Suggest faithful (scene-by-scene) cloning when the source is a multi-scene / B-roll ad —
     // collapsing those into a talking head isn't a clone. The user picks the mode at approve time.
     const cinematic = detectCinematic(beat)
     const scenes = sceneCountFor(beat)
-    await stamp({ status: 'review', clone_meta: { ...meta, beat_sheet: beat, seedance_prompt: prompt, script, suggested_mode: cinematic ? 'faithful' : 'ugc', scene_count: scenes } })
+    await stamp({ status: 'review', clone_meta: { ...meta, beat_sheet: beat, seedance_prompt: prompt, script, script_gloss: gloss, suggested_mode: cinematic ? 'faithful' : 'ugc', scene_count: scenes } })
     console.log(`📝 drafted ${job.id} → awaiting approval (suggest=${cinematic ? 'faithful' : 'ugc'}, scenes=${scenes})`)
   } catch (e) {
     console.warn(`analyze ${job.id} failed:`, e.message)
@@ -379,7 +394,7 @@ async function generateJob(job) {
         let finalFile = cat
         if (finalScript.trim()) {
           try {
-            const vo = await ttsVoiceover(finalScript, job.id)
+            const vo = await ttsVoiceover(finalScript, job.id, meta.voice)
             tmp.push(vo)
             const mixed = `${base}-vo.mp4`
             tmp.push(mixed)
@@ -414,7 +429,7 @@ async function generateJob(job) {
         const files = []
         let anchor = null
         for (let i = 0; i < plan.segments.length; i++) {
-          const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, !!anchor, productImages.length)
+          const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, !!anchor, productImages.length, meta.language)
           const imgs = anchor ? [anchor, ...productImages].slice(0, 9) : productImages
           console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${anchor ? ' (anchored)' : ''}`)
           const { videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier })
@@ -441,7 +456,7 @@ async function generateJob(job) {
 
     // ── UGC mode (default): one talking-head clip, unchanged behavior. ──
     // Rebuild the prompt around the approved (possibly edited) script so the voiceover matches exactly.
-    const { prompt, script } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, finalScript, meta.character_look)
+    const { prompt, script } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, finalScript, meta.character_look, meta.language)
 
     // Trim the competitor clip to fal's ≤15s / ≤720p reference limits (raw ad videos exceed them).
     let refVideo = null
