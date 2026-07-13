@@ -1390,9 +1390,19 @@ export default function DiscoveryPage() {
     const timer = setTimeout(async () => {
       setDropdownLoading(true)
       try {
-        const res = await fetch(`/api/discovery/pages?q=${encodeURIComponent(searchInput.trim())}`)
-        const data = await res.json()
-        setDropdownBrands(data.pages || [])
+        const term = searchInput.trim()
+        // Search BOTH: crawled brands (pages, with live ad counts) AND the full 605K brand directory —
+        // so any Foreplay brand is findable and clickable → pull its ads on our brand page.
+        const [pagesData, dirData] = await Promise.all([
+          fetch(`/api/discovery/pages?q=${encodeURIComponent(term)}`).then(r => r.json()).catch(() => ({ pages: [] })),
+          fetch(`/api/discovery/brands?q=${encodeURIComponent(term)}`).then(r => r.json()).catch(() => ({ brands: [] })),
+        ])
+        const crawled = pagesData.pages || []
+        const seen = new Set(crawled.map((p: any) => String(p.pageId)))
+        const dir = (dirData.brands || [])
+          .filter((b: any) => !seen.has(String(b.pageId)))
+          .map((b: any) => ({ pageId: b.pageId, name: b.name, picture: b.avatar || null, category: b.industry || '', adCount: b.adCount || 0 }))
+        setDropdownBrands([...crawled, ...dir].slice(0, 8))
       } catch {
         setDropdownBrands([])
       } finally {
@@ -1886,12 +1896,11 @@ export default function DiscoveryPage() {
                     <button key={brand.pageId}
                       onMouseDown={e => {
                         e.preventDefault()
-                        // Clicking a brand suggestion opens that brand's full analytics VIEW
-                        // (/discovery/brand — overview, hooks, personas, angles…). NOT the Brand Spy
-                        // tracked-brand page: viewing from search must not imply spying or light up
-                        // the Brand Spy menu. Tracking a brand is an explicit "Spy this brand" action.
+                        // Open our brand page. If we already have this brand's ads it shows the full
+                        // analytics; if not (a directory brand we've never crawled) it offers a one-click
+                        // "Pull this brand's ads" — same destination as the Brands directory, unified.
                         setShowDropdown(false)
-                        router.push(`/discovery/brand/${brand.pageId}`)
+                        router.push(`/discovery/brand-spy/${brand.pageId}`)
                       }}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
