@@ -304,19 +304,18 @@ function TranscriptTab({ adId, hasVideo }: { adId: string; hasVideo: boolean }) 
 
 function CommentsTab({ adId }: { adId: string }) {
   const [comments, setComments] = useState<any[]>([])
+  const [reason, setReason] = useState<string>('')
   const [loading, setLoading] = useState(true)
-  useEffect(() => { fetch(`/api/reports/ad/${adId}/comments`).then(r => r.json()).then(j => setComments(j.comments || [])).catch(() => {}).finally(() => setLoading(false)) }, [adId])
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/reports/ad/${adId}/comments`).then(r => r.json())
+      .then(j => { setComments(j.comments || []); setReason(j.reason || '') })
+      .catch(() => setReason('unavailable')).finally(() => setLoading(false))
+  }, [adId])
   if (loading) return <div style={{ padding: 30, color: '#7c8577', textAlign: 'center' }}>Loading comments…</div>
-  if (!comments.length) return (
-    <div style={{ background: '#f4f6f0', borderRadius: 14, padding: '36px 20px', textAlign: 'center' }}>
-      <div style={{ fontSize: 26, marginBottom: 8 }}>💬</div>
-      <div style={{ display: 'inline-block', fontSize: 10, fontWeight: 800, color: '#b45309', background: '#fffbeb', padding: '2px 9px', borderRadius: 100, marginBottom: 8 }}>COMING SOON</div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: '#0e1b12' }}>Ad comments</div>
-      <div style={{ fontSize: 12.5, color: '#7c8577', marginTop: 5, lineHeight: 1.5 }}>Reading the comments left on this ad’s post needs an extra Meta permission we’re requesting. Once approved, they’ll appear here automatically.</div>
-    </div>
-  )
-  return (
+  if (comments.length) return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#7c8577' }}>{comments.length} comment{comments.length === 1 ? '' : 's'} on this ad’s post</div>
       {comments.map(c => (
         <div key={c.id} style={{ background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 12, padding: '12px 14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -326,6 +325,19 @@ function CommentsTab({ adId }: { adId: string }) {
           <div style={{ fontSize: 13.5, color: '#1a2a1a', lineHeight: 1.5 }}>{c.message}</div>
         </div>
       ))}
+    </div>
+  )
+  // Working-feature empty states — reason distinguishes "no comments" from "can't read this one".
+  const msg = reason === 'no_post' ? 'This ad doesn’t reference a Page post, so it has no comments.'
+    : reason === 'no_page_access' ? 'Comments live on the Page that owns this ad. Connect that Page (or grant Page access) to read them here.'
+    : reason === 'no_account' ? 'Connect your Meta account to read comments on your ads.'
+    : reason === 'unavailable' ? 'Comments couldn’t be loaded for this ad right now.'
+    : 'No comments on this ad’s post yet.'
+  return (
+    <div style={{ background: '#f4f6f0', borderRadius: 14, padding: '36px 20px', textAlign: 'center' }}>
+      <div style={{ fontSize: 26, marginBottom: 8 }}>💬</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#0e1b12' }}>Ad comments</div>
+      <div style={{ fontSize: 12.5, color: '#7c8577', marginTop: 5, lineHeight: 1.5 }}>{msg}</div>
     </div>
   )
 }
