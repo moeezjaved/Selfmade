@@ -9,6 +9,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import CloneModal from '../../CloneModal'
 import CloneVideoModal from '../../CloneVideoModal'
+import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 import { openCredits } from '@/components/credits/CreditModal'
 import { useIsMobile } from '@/lib/useIsMobile'
 import {
@@ -314,11 +315,18 @@ function AdCard({ a, onOpen, onClone }: { a: Card; onOpen: (a: Card) => void; on
       <div style={{ fontSize: 11, color: '#9ca3af', padding: '0 12px 8px' }}>{fmtDate(a.startDate)}{a.isActive ? ' – Present' : a.stopDate ? ` – ${fmtDate(a.stopDate)}` : ''}</div>
       {a.body && <div style={{ fontSize: 12, color: '#374151', padding: '0 12px 8px', lineHeight: 1.4, maxHeight: 52, overflow: 'hidden' }}>{a.body.slice(0, 120)}</div>}
       <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#f3f4f6' }}>
-        {img ? <img src={img} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c4c4c4', fontSize: 12 }}>no preview</div>}
-        {isVideo && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>▶</div></div>}
-        <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[a.format || ''] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{a.format || 'Ad'}</span>
-        {(a.daysRunning || 0) > 0 && <span style={{ position: 'absolute', bottom: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{a.daysRunning}d</span>}
-        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(a) }} style={{ position: 'absolute', bottom: 8, left: 8, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: '#111', border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Clone</button>}
+        {/* Video → Motion-style hover-scrub + lime play/progress ring (parity with Discovery). Loads
+            the video lazily on hover, so nothing downloads until the user engages. Falls back to the
+            poster if the source is dead/expired. Non-video (or missing src) → static poster. */}
+        {a.videoUrl
+          ? <HoverScrubVideo src={a.videoUrl} poster={img || undefined} initials={(a.pageName || '?').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)} />
+          : img
+            ? <img src={img} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c4c4c4', fontSize: 12 }}>no preview</div>}
+        {isVideo && !a.videoUrl && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>▶</div></div>}
+        <span style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[a.format || ''] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{a.format || 'Ad'}</span>
+        {(a.daysRunning || 0) > 0 && <span style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 10, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{a.daysRunning}d</span>}
+        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(a) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 10, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: '#111', border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Clone</button>}
       </div>
     </div>
   )
