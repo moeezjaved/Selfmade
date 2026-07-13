@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     // Faithful-mode hints for the review UI: what the analysis suggests + how many scenes it found.
     suggestedMode: meta.suggested_mode || 'ugc',
     sceneCount: meta.scene_count || 2,
+    sourceSeconds: Number(meta?.beat_sheet?.duration_seconds) || null,
     error: (row as any).status === 'failed' ? (meta.error || 'generation failed') : null,
   })
 }

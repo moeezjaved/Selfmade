@@ -34,6 +34,8 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [mode, setMode] = useState<'ugc' | 'faithful'>('ugc')
   const [suggestedMode, setSuggestedMode] = useState<'ugc' | 'faithful'>('ugc')
   const [sceneCount, setSceneCount] = useState(2)
+  const [durationBucket, setDurationBucket] = useState<'15' | '30' | '60' | 'match'>('15')
+  const [srcSecs, setSrcSecs] = useState<number | null>(null)
 
   const [phase, setPhase] = useState<Phase>('form')
   const [jobId, setJobId] = useState<string | null>(null)
@@ -48,7 +50,16 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // video_clone_xN rows — keep these numbers in sync with that table).
   const UGC_COST = { premium: 400, fast: 250 } as const
   const FAITHFUL_COST: Record<number, { premium: number; fast: number }> = { 2: { premium: 750, fast: 475 }, 3: { premium: 1100, fast: 690 }, 4: { premium: 1450, fast: 900 } }
-  const cost = mode === 'faithful' ? (FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier] : UGC_COST[tier]
+  // 'match' resolves to the nearest bucket from the source ad's analysed duration.
+  const resolvedBucket = durationBucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(durationBucket)
+  const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1
+  const cost = mode === 'faithful'
+    ? (FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]
+    : nSegs > 1 ? (FAITHFUL_COST[nSegs] || FAITHFUL_COST[2])[tier] : UGC_COST[tier]
+  // Speaking-time meter: ~2.3 words/sec. Longer than the target → the render talks fast.
+  const words = draftScript.trim() ? draftScript.trim().split(/\s+/).length : 0
+  const spokenSecs = Math.round(words / 2.3)
+  const targetSecs = mode === 'faithful' ? sceneCount * 8 : resolvedBucket
   const busy = phase === 'analyzing' || phase === 'generating'
   const LOOKS = ['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic']
 
@@ -104,6 +115,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       const sug = st.suggestedMode === 'faithful' ? 'faithful' : 'ugc'
       setSuggestedMode(sug); setMode(sug)
       setSceneCount(Math.min(4, Math.max(2, Number(st.sceneCount) || 2)))
+      setSrcSecs(Number(st.sourceSeconds) || null)
       setPhase('review')
     } catch (e: any) { setErr(String(e?.message || e)); setPhase('form') }
   }
@@ -115,7 +127,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     try {
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId, script: draftScript, mode }),
+        body: JSON.stringify({ jobId, script: draftScript, mode, durationBucket }),
       }).then(r => r.json())
       if (ap.error) { setErr(ap.error === 'insufficient_credits' ? 'Not enough credits.' : ap.error); setPhase('review'); return }
       refreshCredits()   // credits reserved on approve → drop the sidebar counter now
@@ -165,10 +177,31 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{mode === 'faithful' ? 'Recreates the ad\'s scenes (b-roll, lifestyle, product shots) with your product, then stitches them — longer render, closest to the original.' : 'One creator speaks your script to camera — fastest and cheapest.'}</p>
                 </section>
 
+                {/* Length buckets (UGC only): 15s = classic single clip; 30/60s = frame-chained
+                    segments stitched into one take. 'Match original' auto-picks the nearest bucket. */}
+                {mode === 'ugc' && (
+                  <section>
+                    <Label>Video length</Label>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button onClick={() => setDurationBucket('15')} style={tierBtn(durationBucket === '15')}>15s · {UGC_COST[tier]} cr</button>
+                      <button onClick={() => setDurationBucket('30')} style={tierBtn(durationBucket === '30')}>30s · {FAITHFUL_COST[2][tier]} cr</button>
+                      <button onClick={() => setDurationBucket('60')} style={tierBtn(durationBucket === '60')}>60s · {FAITHFUL_COST[4][tier]} cr</button>
+                      {srcSecs ? <button onClick={() => setDurationBucket('match')} style={tierBtn(durationBucket === 'match')}>Match original · {srcSecs}s → {(srcSecs <= 22 ? 15 : srcSecs <= 45 ? 30 : 60)}s</button> : null}
+                    </div>
+                    {nSegs > 1 && <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{nSegs} chained clips of the same creator, stitched into one take — cuts land at natural pauses, like real UGC.</p>}
+                  </section>
+                )}
+
                 <section>
-                  <Label>{mode === 'faithful' ? 'Voiceover (spread across scenes)' : 'Voiceover script'}</Label>
+                  <Label>{mode === 'faithful' ? 'Voiceover (one continuous narration)' : 'Voiceover script'}</Label>
                   <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={7}
                     style={{ ...input, width: '100%', resize: 'vertical', lineHeight: 1.5 }} />
+                  {/* Speaking-time meter — the "talks too fast" guard. ~2.3 words/sec. */}
+                  {words > 0 && (
+                    <div style={{ fontSize: 11, marginTop: 6, color: spokenSecs > targetSecs + 4 ? '#ffb4b4' : spokenSecs > targetSecs ? '#f5d78e' : '#9fb0a4' }}>
+                      {words} words ≈ {spokenSecs}s spoken · target ~{targetSecs}s{spokenSecs > targetSecs + 4 ? ' — too long, the delivery will feel rushed. Trim it or pick a longer length.' : spokenSecs > targetSecs ? ' — a touch long; consider trimming.' : ' — fits comfortably.'}
+                    </div>
+                  )}
                 </section>
                 {err && <div style={errBox}>{err}</div>}
                 <div style={{ display: 'flex', gap: 8 }}>
