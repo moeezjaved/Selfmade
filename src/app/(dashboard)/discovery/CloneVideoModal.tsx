@@ -258,7 +258,11 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       <button onClick={() => setDurationBucket('15')} style={tierBtn(durationBucket === '15')}>15s · {UGC_COST[tier]} cr</button>
                       <button onClick={() => setDurationBucket('30')} style={tierBtn(durationBucket === '30')}>30s · {FAITHFUL_COST[2][tier]} cr</button>
                       <button onClick={() => setDurationBucket('60')} style={tierBtn(durationBucket === '60')}>60s · {FAITHFUL_COST[4][tier]} cr</button>
-                      {srcSecs ? <button onClick={() => setDurationBucket('match')} style={tierBtn(durationBucket === 'match')}>Match original · {srcSecs}s → {(srcSecs <= 22 ? 15 : srcSecs <= 45 ? 30 : 60)}s</button> : null}
+                      {srcSecs ? (() => {
+                        const b = srcSecs <= 22 ? 15 : srcSecs <= 45 ? 30 : 60
+                        const c = b === 15 ? UGC_COST[tier] : (FAITHFUL_COST[b === 60 ? 4 : 2] || FAITHFUL_COST[2])[tier]
+                        return <button onClick={() => setDurationBucket('match')} style={tierBtn(durationBucket === 'match')}>Match original ({srcSecs}s → {b}s) · {c} cr</button>
+                      })() : null}
                     </div>
                     {nSegs > 1 && <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{nSegs} chained clips of the same creator, stitched into one take — cuts land at natural pauses, like real UGC.</p>}
                   </section>
