@@ -44,9 +44,10 @@ async function rpc(fn, body) { const r = await fetch(`${U}/rest/v1/rpc/${fn}`, {
 
 // ── Gemini: watch the competitor video → structured beat sheet ────────────────
 const BEAT_SCHEMA_PROMPT = `You are a UGC ad director. Watch this video ad and return ONLY minified JSON (no prose, no code fence):
-{"setting":"","avatar":"","camera":"","hook_type":"","beats":[{"t":"0-2s","action":""}],"product_role":"","transcript":"","tone":"","duration_seconds":0}
+{"setting":"","avatar":"","camera":"","hook_type":"","beats":[{"t":"0-2s","action":""}],"product_role":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
 - setting: physical scene. avatar: who's on camera (age, look, wardrobe) or "none". camera: framing + movement.
-- hook_type: first-3-seconds pattern. beats: 3-8 time-ranged actions. transcript: exact spoken words. Be concrete.`
+- hook_type: first-3-seconds pattern. beats: 3-8 time-ranged actions. transcript: exact spoken words. Be concrete.
+- is_talking_head: true ONLY if a person ON CAMERA speaks the main audio to the viewer (lips visibly delivering it). A narrator VOICEOVER over b-roll/lifestyle/montage footage = false. Multiple scene cuts with no consistent on-camera speaker = false.`
 
 async function analyzeVideo(videoUrl) {
   if (!GEMINI_KEY) return null
@@ -112,6 +113,9 @@ Return ONLY minified JSON: {"prompt":"","script":""}  (script = the exact words 
 // would NOT be a clone. We suggest faithful scene-by-scene cloning instead (user still chooses).
 function detectCinematic(beat) {
   if (!beat) return false
+  // Gemini watched the video — trust its explicit call (a VO-over-b-roll ad has a long transcript
+  // but is NOT a talking head; the heuristic below can't tell those apart).
+  if (typeof beat.is_talking_head === 'boolean') return !beat.is_talking_head
   const words = String(beat.transcript || '').trim().split(/\s+/).filter(Boolean).length
   const avatar = String(beat.avatar || '').toLowerCase().trim()
   const noTalker = !avatar || avatar === 'none' || avatar.startsWith('none')
@@ -134,7 +138,7 @@ Rules:
 - Per scene, write ONE dense Seedance prompt: subject → action → camera (match the reference's framing/movement) → lighting → mood. Match the reference scene's setting and energy. Cinematic b-roll, lifestyle moments and product close-ups are all allowed — do NOT force anyone to talk to camera.
 - PRODUCT SWAP — wherever the reference features its product, feature the user's product (${refList || 'the product'}) instead, matching ${refList || 'the product'} exactly. The product must appear (held / in use / close-up) in at least half of the scenes.
 - PEOPLE — when a scene has people, ${recast ? `recast them as ${look} in appearance (user's explicit choice), keeping the reference's age range, wardrobe style and energy` : 'copy the reference people (age/ethnicity/wardrobe/energy) from the beat sheet'}.
-${voiceover ? `- VOICEOVER — distribute this English voiceover across the scenes, a natural chunk per scene, in order (write it into each scene's "script"; if a scene is pure b-roll its script may be empty): "${String(voiceover).replace(/"/g, "'")}"` : '- No dialogue needed; scenes may be music/ambience-driven. Leave "script" empty unless a line obviously belongs.'}
+${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera speech (ambience/music energy only). Design the visuals to fit this voiceover's arc, in order: "${String(voiceover).replace(/"/g, "'")}". Put the chunk each scene covers in its "script" field for reference only — do NOT write spoken dialogue into the prompt.` : '- No dialogue — scenes are music/ambience-driven b-roll. Leave "script" empty.'}
 - Per scene pick "duration": 5 for a quick cut, 10 for a longer beat (numbers only).
 Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5}]}  (exactly ${nScenes} scenes, in order).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || { note: 'analysis unavailable — infer a natural multi-scene structure' })}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nProduct image tokens: ${refList || '(none)'}.`
@@ -152,6 +156,46 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5}]}  
     prompt: String(s.prompt), script: String(s.script || ''),
     duration: Number(s.duration) >= 8 ? 10 : 5,
   }))
+}
+
+// ── gpt-4o: split the APPROVED script into N contiguous segments for long-form UGC (30/60s).
+// Returns ONE reusable character paragraph + ONE voice description — pasted VERBATIM into every
+// segment prompt so the person/voice can't drift between clips — plus per-segment script + action. ──
+async function buildSegmentPlan(beat, product, nImages, script, nSegments, look) {
+  const refList = Array.from({ length: nImages }, (_, i) => `@Image${i + 1}`).join(', ')
+  const recast = look && look !== 'match'
+  const sys = `You direct a ${nSegments}-segment TALKING-HEAD UGC ad (segments are stitched into one continuous video). Rules:
+- Split the user's voiceover script into EXACTLY ${nSegments} contiguous chunks at natural sentence boundaries — in order, no overlap, no rewriting; together they must be the full script word-for-word.
+- "character": ONE dense reusable paragraph describing the on-camera creator in precise repeatable detail — age, ${recast ? `${look} appearance (user's explicit choice)` : `ethnicity/look copied from the reference avatar (${(beat && beat.avatar) || 'as analysed'})`}, hair, wardrobe, plus the exact setting (${(beat && beat.setting) || 'as analysed'}). The SAME paragraph opens every segment prompt so the person cannot drift.
+- "voice": one short line describing their voice (tone, pace, energy) — reused each segment for audio consistency.
+- Per segment "action": what they physically do with the user's product (${refList || 'the product'}) in that segment — hold it up, demonstrate, close-up — following the reference beats in order.
+Return ONLY minified JSON: {"character":"","voice":"","segments":[{"script":"","action":""}]}  (exactly ${nSegments} segments).`
+  const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || {})}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nAPPROVED SCRIPT (split this, verbatim):\n${script}`
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.5, response_format: { type: 'json_object' },
+      messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }] }),
+  })
+  if (!r.ok) throw new Error(`openai segments ${r.status} ${(await r.text()).slice(0, 160)}`)
+  const j = await r.json()
+  const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
+  const segs = Array.isArray(out.segments) ? out.segments.filter((s) => s && (s.script || s.action)) : []
+  if (!segs.length || !out.character) throw new Error('no segment plan from gpt')
+  return { character: String(out.character), voice: String(out.voice || 'the same natural voice as before'), segments: segs.slice(0, nSegments) }
+}
+
+// Compose one segment's Seedance prompt: verbatim character block + continuity anchor + exact words.
+function segmentPrompt(plan, seg, i, total, hasAnchor, nImages) {
+  const productRef = hasAnchor
+    ? (nImages ? `@Image2${nImages > 1 ? `–@Image${nImages + 1}` : ''}` : 'the product')
+    : (nImages ? `@Image1${nImages > 1 ? `–@Image${nImages}` : ''}` : 'the product')
+  const parts = [plan.character]
+  if (hasAnchor) parts.push(`This is segment ${i + 1} of ${total} of ONE continuous selfie take. @Image1 shows this exact creator one moment ago — treat it as ground truth: the SAME face, hair, outfit, room and lighting, continuing seamlessly. The user's product is ${productRef} and must match it exactly.`)
+  else parts.push(`The user's product is ${productRef} and must match it exactly.`)
+  parts.push(`They speak to camera in ENGLISH — ${plan.voice} — lips moving in sync, saying these exact words aloud: "${String(seg.script || '').replace(/"/g, "'")}"`)
+  if (seg.action) parts.push(String(seg.action))
+  parts.push('UGC realism: iPhone selfie framing at arm\'s length, natural light, authentic handheld, no on-screen captions.')
+  return parts.filter(Boolean).join(' ')
 }
 
 // ── Trim the competitor video to fal's reference limits (≤15.1s, 480-720p) ────
@@ -188,30 +232,59 @@ async function trimReference(url, id) {
   }
 }
 
-// ── Stitch N generated clips into one mp4 (faithful mode). Re-encode via the concat demuxer —
-// clips come from the same model/resolution/aspect but re-encoding guarantees clean joins. ──
-async function stitchClips(urls, id) {
-  const base = join(tmpdir(), `stitch-${id}`)
-  const tmp = []
+// ── Multi-clip assembly helpers (faithful scenes + long-form UGC segments) ────
+async function downloadToFile(url, path) {
+  const r = await fetch(url)
+  if (!r.ok) throw new Error(`download clip ${r.status}`)
+  await writeFile(path, Buffer.from(await r.arrayBuffer()))
+}
+
+// Concat local clips into one mp4. Re-encode via the concat demuxer — clips come from the same
+// model/resolution/aspect but re-encoding guarantees clean joins.
+async function concatClips(files, out) {
+  const list = `${out}.txt`
+  await writeFile(list, files.map((f) => `file '${f}'`).join('\n'))
   try {
-    const parts = []
-    for (let i = 0; i < urls.length; i++) {
-      const f = `${base}-${i}.mp4`
-      const r = await fetch(urls[i])
-      if (!r.ok) throw new Error(`download clip ${i + 1} ${r.status}`)
-      await writeFile(f, Buffer.from(await r.arrayBuffer()))
-      tmp.push(f); parts.push(f)
-    }
-    const list = `${base}-list.txt`
-    await writeFile(list, parts.map((f) => `file '${f}'`).join('\n'))
-    tmp.push(list)
-    const out = `${base}-out.mp4`
-    tmp.push(out)
     await ff(['-y', '-f', 'concat', '-safe', '0', '-i', list,
       '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
-    return await readFile(out)
-  } finally {
-    for (const f of tmp) await rm(f, { force: true }).catch(() => {})
+  } finally { await rm(list, { force: true }).catch(() => {}) }
+}
+
+// Continuity anchor: extract a clip's final frame and host it on R2, so the NEXT segment can take it
+// as @Image1 ("the exact same creator/room as this frame"). Identity flows through actual pixels,
+// not just a text description — the main defence against character drift across stitched clips.
+async function lastFrameAnchor(file, id, idx) {
+  const jpg = `${file}.last.jpg`
+  try {
+    await ff(['-y', '-sseof', '-0.15', '-i', file, '-frames:v', '1', '-q:v', '3', jpg])
+    const buf = await readFile(jpg)
+    const key = `creatives/tmp/${id}-seg${idx}-anchor.jpg`
+    await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: buf, ContentType: 'image/jpeg', CacheControl: 'public, max-age=86400' }))
+    return `${R2_PUBLIC}/${key}`
+  } finally { await rm(jpg, { force: true }).catch(() => {}) }
+}
+
+// ── Single-voice narration (faithful/b-roll mode): one TTS track for the WHOLE script, muxed over
+// the stitched video. Per-clip generated voices differ audibly between scenes; b-roll needs no lip
+// sync, so one continuous voice is both correct and more professional. OpenAI TTS (key already set).
+async function ttsVoiceover(text, id) {
+  const r = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: process.env.CLONE_TTS_MODEL || 'gpt-4o-mini-tts', voice: process.env.CLONE_TTS_VOICE || 'nova', input: String(text).slice(0, 4000), response_format: 'mp3' }),
+  })
+  if (!r.ok) throw new Error(`tts ${r.status} ${(await r.text()).slice(0, 120)}`)
+  const f = join(tmpdir(), `vo-${id}.mp3`)
+  await writeFile(f, Buffer.from(await r.arrayBuffer()))
+  return f
+}
+async function muxVoiceover(videoIn, voMp3, out) {
+  try {
+    // Duck the scenes' ambient audio under the narration.
+    await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex', '[0:a]volume=0.22[a0];[a0][1:a]amix=inputs=2:duration=first:dropout_transition=0[a]',
+      '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
+  } catch {
+    // No/odd ambient stream → narration only.
+    await ff(['-y', '-i', videoIn, '-i', voMp3, '-map', '0:v', '-map', '1:a', '-shortest', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
   }
 }
 
@@ -221,8 +294,16 @@ async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, 
   const input = { prompt, image_urls: (imageUrls || []).slice(0, 9), resolution: resolution || '720p', aspect_ratio: aspect || '9:16', generate_audio: true }
   if (videoUrl) input.video_urls = [videoUrl]
   if (duration) input.duration = String(duration)
-  const sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
-  if (!sub.ok) throw new Error(`fal submit ${sub.status} ${(await sub.text()).slice(0, 200)}`)
+  let sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
+  if (!sub.ok) {
+    const txt = (await sub.text()).slice(0, 300)
+    // Duration out of range for this model tier → retry once at the safe default.
+    if (/duration/i.test(txt) && input.duration && input.duration !== '10') {
+      input.duration = '10'
+      sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
+      if (!sub.ok) throw new Error(`fal submit ${sub.status} ${(await sub.text()).slice(0, 200)}`)
+    } else throw new Error(`fal submit ${sub.status} ${txt}`)
+  }
   const { request_id, status_url, response_url } = await sub.json()
   const statusUrl = status_url || `https://queue.fal.run/${model}/requests/${request_id}/status`
   const resultUrl = response_url || `https://queue.fal.run/${model}/requests/${request_id}`
@@ -278,21 +359,83 @@ async function generateJob(job) {
     if (meta.mode === 'faithful') {
       const nScenes = Math.min(4, Math.max(2, Number(meta.scene_count) || 2))
       const scenes = await buildScenePlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, nScenes, meta.character_look, finalScript)
-      const clipUrls = []
-      for (let i = 0; i < scenes.length; i++) {
-        const s = scenes[i]
-        const scenePrompt = s.script ? `${s.prompt} A voiceover says in English: "${s.script.replace(/"/g, "'")}".` : s.prompt
-        console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s)`)
-        const { videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: productImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier })
-        clipUrls.push(videoUrl)
+      const base = join(tmpdir(), `fj-${job.id}`)
+      const tmp = []
+      try {
+        const files = []
+        for (let i = 0; i < scenes.length; i++) {
+          const s = scenes[i]
+          // Scenes render VISUALS ONLY (ambience, no spoken dialogue) — the narration is one
+          // continuous TTS track muxed after the stitch, so the voice can't change between scenes.
+          console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s)`)
+          const { videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier })
+          const f = `${base}-${i}.mp4`
+          await downloadToFile(videoUrl, f)
+          tmp.push(f); files.push(f)
+        }
+        const cat = `${base}-cat.mp4`
+        tmp.push(cat)
+        await concatClips(files, cat)
+        let finalFile = cat
+        if (finalScript.trim()) {
+          try {
+            const vo = await ttsVoiceover(finalScript, job.id)
+            tmp.push(vo)
+            const mixed = `${base}-vo.mp4`
+            tmp.push(mixed)
+            await muxVoiceover(cat, vo, mixed)
+            finalFile = mixed
+          } catch (e) { console.warn(`tts/mux failed for ${job.id} (shipping without VO):`, e.message) }
+        }
+        const mp4 = await readFile(finalFile)
+        const key = `creatives/${job.user_id}/${job.id}.mp4`
+        await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
+        const url = `${R2_PUBLIC}/${key}`
+        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: finalScript } })
+        if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'faithful', scenes: scenes.length } })
+        console.log(`🎬 cloned (faithful, ${scenes.length} scenes) ${job.id} → ${url}`)
+      } finally {
+        for (const f of tmp) await rm(f, { force: true }).catch(() => {})
       }
-      const mp4 = await stitchClips(clipUrls, job.id)
-      const key = `creatives/${job.user_id}/${job.id}.mp4`
-      await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
-      const url = `${R2_PUBLIC}/${key}`
-      await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: finalScript } })
-      if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'faithful', scenes: scenes.length } })
-      console.log(`🎬 cloned (faithful, ${scenes.length} scenes) ${job.id} → ${url}`)
+      return
+    }
+
+    // ── LONG-FORM UGC (30/60s): the approved script splits into 2/4 segments at sentence
+    // boundaries; every segment prompt opens with the SAME character paragraph, and each clip after
+    // the first is anchored to the previous clip's final frame (@Image1) so the creator carries
+    // through the cuts. Clips keep Seedance's own lip-synced audio (a TTS overlay would break sync),
+    // with the voice description repeated verbatim to hold tone steady. ──
+    const nSeg = Math.min(4, Math.max(1, Number(meta.segments) || 1))
+    if (nSeg > 1) {
+      const plan = await buildSegmentPlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, finalScript, nSeg, meta.character_look)
+      const base = join(tmpdir(), `sj-${job.id}`)
+      const tmp = []
+      try {
+        const files = []
+        let anchor = null
+        for (let i = 0; i < plan.segments.length; i++) {
+          const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, !!anchor, productImages.length)
+          const imgs = anchor ? [anchor, ...productImages].slice(0, 9) : productImages
+          console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${anchor ? ' (anchored)' : ''}`)
+          const { videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier })
+          const f = `${base}-${i}.mp4`
+          await downloadToFile(videoUrl, f)
+          tmp.push(f); files.push(f)
+          if (i < plan.segments.length - 1) anchor = await lastFrameAnchor(f, job.id, i)
+        }
+        const cat = `${base}-cat.mp4`
+        tmp.push(cat)
+        await concatClips(files, cat)
+        const mp4 = await readFile(cat)
+        const key = `creatives/${job.user_id}/${job.id}.mp4`
+        await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
+        const url = `${R2_PUBLIC}/${key}`
+        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, script: finalScript } })
+        if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'ugc_long', segments: nSeg } })
+        console.log(`🎬 cloned (long UGC, ${nSeg} segments) ${job.id} → ${url}`)
+      } finally {
+        for (const f of tmp) await rm(f, { force: true }).catch(() => {})
+      }
       return
     }
 
