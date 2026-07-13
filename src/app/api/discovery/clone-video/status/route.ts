@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
     done: (row as any).status === 'done',
     url: (row as any).image_url || null,
     script: meta.script || null,
+    gloss: meta.script_gloss || null,
     // Faithful-mode hints for the review UI: what the analysis suggests + how many scenes it found.
     suggestedMode: meta.suggested_mode || 'ugc',
     sceneCount: meta.scene_count || 2,

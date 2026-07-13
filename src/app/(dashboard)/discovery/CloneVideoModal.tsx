@@ -31,6 +31,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [benefit, setBenefit] = useState('')
   const [tier, setTier] = useState<'premium' | 'fast'>('premium')
   const [look, setLook] = useState('match')            // creator ethnicity/look override
+  const [language, setLanguage] = useState('en')       // script + voiceover language (transcreated)
+  const [voice, setVoice] = useState('nova')           // narration voice (faithful mode + preview)
+  const [gloss, setGloss] = useState<string | null>(null)   // English one-liner for non-English scripts
+  const [previewing, setPreviewing] = useState(false)
   const [mode, setMode] = useState<'ugc' | 'faithful'>('ugc')
   const [suggestedMode, setSuggestedMode] = useState<'ugc' | 'faithful'>('ugc')
   const [sceneCount, setSceneCount] = useState(2)
@@ -56,12 +60,52 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const cost = mode === 'faithful'
     ? (FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]
     : nSegs > 1 ? (FAITHFUL_COST[nSegs] || FAITHFUL_COST[2])[tier] : UGC_COST[tier]
-  // Speaking-time meter: ~2.3 words/sec. Longer than the target → the render talks fast.
+  // Languages breathe differently — per-language speaking rates keep the meter honest.
+  const LANGS: { code: string; label: string; rate: number; rtl?: boolean }[] = [
+    { code: 'en', label: 'English', rate: 2.3 },
+    { code: 'ur', label: 'اردو Urdu', rate: 2.0, rtl: true },
+    { code: 'hi', label: 'हिन्दी Hindi', rate: 2.1 },
+    { code: 'ar', label: 'العربية Arabic', rate: 1.8, rtl: true },
+    { code: 'es', label: 'Español', rate: 2.6 },
+    { code: 'fr', label: 'Français', rate: 2.4 },
+    { code: 'de', label: 'Deutsch', rate: 2.2 },
+  ]
+  // Look → language pairing nudge ("picked Pakistani → speak Urdu?"). Suggests, never forces.
+  const PAIR: Record<string, { code: string; flag: string; name: string }> = {
+    Pakistani: { code: 'ur', flag: '🇵🇰', name: 'Urdu' },
+    Indian: { code: 'hi', flag: '🇮🇳', name: 'Hindi' },
+    Arab: { code: 'ar', flag: '🇦🇪', name: 'Arabic' },
+  }
+  const langCfg = LANGS.find((l) => l.code === language) || LANGS[0]
+  const VOICES = [
+    { id: 'nova', label: 'Nova · warm female' }, { id: 'shimmer', label: 'Shimmer · bright female' },
+    { id: 'onyx', label: 'Onyx · deep male' }, { id: 'echo', label: 'Echo · calm male' },
+  ]
+  // Speaking-time meter: per-language rate. Longer than the target → the render talks fast.
   const words = draftScript.trim() ? draftScript.trim().split(/\s+/).length : 0
-  const spokenSecs = Math.round(words / 2.3)
+  const spokenSecs = Math.round(words / langCfg.rate)
   const targetSecs = mode === 'faithful' ? sceneCount * 8 : resolvedBucket
   const busy = phase === 'analyzing' || phase === 'generating'
   const LOOKS = ['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic']
+
+  // 🔊 Audition the narrator saying the script's first sentence — before any credits are spent.
+  const previewVoice = async () => {
+    if (previewing) return
+    const sentence = draftScript.trim().split(/(?<=[.!?۔؟])\s+/)[0]?.slice(0, 200) || draftScript.trim().slice(0, 200)
+    if (!sentence) return
+    setPreviewing(true)
+    try {
+      const r = await fetch('/api/discovery/clone-video/voice-preview', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: sentence, voice }),
+      })
+      if (!r.ok) return
+      const blob = await r.blob()
+      const audio = new Audio(URL.createObjectURL(blob))
+      audio.onended = () => setPreviewing(false)
+      await audio.play()
+    } catch { setPreviewing(false) }
+    finally { setTimeout(() => setPreviewing(false), 15000) }
+  }
 
   useEffect(() => {
     fetch('/api/brands').then(r => r.json()).then((j) => {
@@ -104,7 +148,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       const start = await fetch('/api/discovery/clone-video', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages: chosen, tier,
-          characterLook: look !== 'match' ? look : undefined,
+          characterLook: look !== 'match' ? look : undefined, language, voice,
           productDetails: { name: productName.trim() || undefined, benefit: benefit.trim() || undefined } }),
       }).then(r => r.json())
       if (!start.jobId) { setErr(start.error || 'Could not start.'); setPhase('form'); return }
@@ -112,6 +156,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       const st = await pollUntil(start.jobId, 'analyzing')   // wait for 'review'
       if (st.error) { setErr(st.error); setPhase('form'); return }
       setDraftScript(st.script || '')
+      setGloss(st.gloss || null)
       const sug = st.suggestedMode === 'faithful' ? 'faithful' : 'ugc'
       setSuggestedMode(sug); setMode(sug)
       setSceneCount(Math.min(4, Math.max(2, Number(st.sceneCount) || 2)))
@@ -193,9 +238,18 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                 )}
 
                 <section>
-                  <Label>{mode === 'faithful' ? 'Voiceover (one continuous narration)' : 'Voiceover script'}</Label>
-                  <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={7}
-                    style={{ ...input, width: '100%', resize: 'vertical', lineHeight: 1.5 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <Label>{mode === 'faithful' ? 'Voiceover (one continuous narration)' : 'Voiceover script'}{language !== 'en' ? ` · ${(LANGS.find(l => l.code === language) || LANGS[0]).label}` : ''}</Label>
+                    {/* 🔊 Audition the narrator on the first sentence — free, before approving. */}
+                    <button onClick={previewVoice} disabled={previewing || !draftScript.trim()} style={{ ...chip(false), padding: '4px 11px', opacity: previewing ? 0.6 : 1 }}>
+                      {previewing ? '🔊 Playing…' : '🔊 Hear the voice'}
+                    </button>
+                  </div>
+                  <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={7} dir={langCfg.rtl ? 'rtl' : 'ltr'}
+                    style={{ ...input, width: '100%', resize: 'vertical', lineHeight: langCfg.rtl ? 1.9 : 1.5, fontSize: langCfg.rtl ? 15 : 13 }} />
+                  {gloss && language !== 'en' && (
+                    <div style={{ fontSize: 11, color: '#8fa596', marginTop: 6, fontStyle: 'italic' }}>In English: “{gloss}”</div>
+                  )}
                   {/* Speaking-time meter — the "talks too fast" guard. ~2.3 words/sec. */}
                   {words > 0 && (
                     <div style={{ fontSize: 11, marginTop: 6, color: spokenSecs > targetSecs + 4 ? '#ffb4b4' : spokenSecs > targetSecs ? '#f5d78e' : '#9fb0a4' }}>
@@ -259,6 +313,31 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {LOOKS.map((l) => (
                       <button key={l} onClick={() => setLook(l)} style={chip(look === l)}>{l === 'match' ? 'Match original' : l}</button>
+                    ))}
+                  </div>
+                  {/* Pairing nudge: picked Pakistani → offer Urdu, one tap. Suggests, never forces. */}
+                  {PAIR[look] && language === 'en' && (
+                    <button onClick={() => setLanguage(PAIR[look].code)} style={{ ...chip(false), marginTop: 8, border: `1px dashed ${LIME}`, background: '#141f10', color: LIME }}>
+                      {PAIR[look].flag} Speak {PAIR[look].name}?
+                    </button>
+                  )}
+                </section>
+
+                <section>
+                  <Label>Script &amp; voiceover language</Label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {LANGS.map((l) => (
+                      <button key={l.code} onClick={() => setLanguage(l.code)} style={chip(language === l.code)}>{l.label}</button>
+                    ))}
+                  </div>
+                  {language !== 'en' && <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>Written natively like a local creator would talk — not translated. You review it (with an English summary) before spending credits.</p>}
+                </section>
+
+                <section>
+                  <Label>Narration voice <span style={{ color: '#5f6f63', fontWeight: 400 }}>· you can preview it before approving</span></Label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {VOICES.map((v) => (
+                      <button key={v.id} onClick={() => setVoice(v.id)} style={chip(voice === v.id)}>{v.label}</button>
                     ))}
                   </div>
                 </section>
