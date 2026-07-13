@@ -441,15 +441,36 @@ async function generateJob(job) {
     // skipping the ref avoids fal's likeness blocks entirely. ──
     if (meta.mode === 'faithful') {
       const nScenes = Math.min(4, Math.max(2, Number(meta.scene_count) || 2))
-      const scenes = await buildScenePlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, nScenes, meta.character_look, finalScript)
+      // Reuse the stamped plan on resume — a fresh plan would mismatch the checkpointed clips.
+      const scenes = (Array.isArray(meta.scene_plan) && meta.scene_plan.length)
+        ? meta.scene_plan
+        : await buildScenePlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, nScenes, meta.character_look, finalScript)
       const base = join(tmpdir(), `fj-${job.id}`)
       const tmp = []
       try {
         const files = []
+        // Checkpointing: each finished clip URL is stamped into clone_meta immediately, so a worker
+        // restart (deploy/crash) RESUMES from the last completed scene instead of re-rendering —
+        // and re-billing fal for — the whole job.
+        const clipsDone = meta.scene_clips || {}
         for (let i = 0; i < scenes.length; i++) {
           const s = scenes[i]
           // Scenes render VISUALS ONLY (ambience, no spoken dialogue) — the narration is one
           // continuous TTS track muxed after the stitch, so the voice can't change between scenes.
+
+          // Resume path: this scene already rendered before a restart → reuse its clip.
+          if (clipsDone[i]) {
+            const f0 = `${base}-${i}.mp4`
+            try {
+              await downloadToFile(clipsDone[i], f0)
+              tmp.push(f0)
+              const fa = await ensureAudio(f0)
+              if (!tmp.includes(fa)) tmp.push(fa)
+              files.push(fa)
+              console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (checkpoint reuse)`)
+              continue
+            } catch { delete clipsDone[i] /* expired url → regenerate */ }
+          }
 
           // Cut the exact beat range from the original ad as this scene's structural reference.
           let sceneRef = null
@@ -487,6 +508,9 @@ async function generateJob(job) {
           f = await ensureAudio(f)          // VACE clips are silent → pad a silent track for concat
           if (!tmp.includes(f)) tmp.push(f)
           files.push(f)
+          // Checkpoint this scene so a restart never re-renders (or re-bills fal for) it.
+          clipsDone[i] = videoUrl
+          await stamp({ clone_meta: { ...meta, scene_plan: scenes, scene_clips: clipsDone } })
         }
         const cat = `${base}-cat.mp4`
         tmp.push(cat)
@@ -522,13 +546,28 @@ async function generateJob(job) {
     // with the voice description repeated verbatim to hold tone steady. ──
     const nSeg = Math.min(4, Math.max(1, Number(meta.segments) || 1))
     if (nSeg > 1) {
-      const plan = await buildSegmentPlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, finalScript, nSeg, meta.character_look)
+      // Reuse the stamped plan + clips on resume (see faithful-mode checkpointing note).
+      const plan = (meta.segment_plan && Array.isArray(meta.segment_plan.segments) && meta.segment_plan.segments.length)
+        ? meta.segment_plan
+        : await buildSegmentPlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, finalScript, nSeg, meta.character_look)
       const base = join(tmpdir(), `sj-${job.id}`)
       const tmp = []
       try {
         const files = []
+        const segClips = meta.segment_clips || {}
+        const segAnchors = meta.segment_anchors || {}
         let anchor = null
         for (let i = 0; i < plan.segments.length; i++) {
+          if (segClips[i]) {
+            const f0 = `${base}-${i}.mp4`
+            try {
+              await downloadToFile(segClips[i], f0)
+              tmp.push(f0); files.push(f0)
+              anchor = segAnchors[i] || anchor
+              console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length} (checkpoint reuse)`)
+              continue
+            } catch { delete segClips[i] /* expired url → regenerate */ }
+          }
           const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, !!anchor, productImages.length, meta.language)
           const imgs = anchor ? [anchor, ...productImages].slice(0, 9) : productImages
           console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${anchor ? ' (anchored)' : ''}`)
@@ -537,6 +576,9 @@ async function generateJob(job) {
           await downloadToFile(videoUrl, f)
           tmp.push(f); files.push(f)
           if (i < plan.segments.length - 1) anchor = await lastFrameAnchor(f, job.id, i)
+          segClips[i] = videoUrl
+          if (anchor) segAnchors[i] = anchor
+          await stamp({ clone_meta: { ...meta, segment_plan: plan, segment_clips: segClips, segment_anchors: segAnchors } })
         }
         const cat = `${base}-cat.mp4`
         tmp.push(cat)
