@@ -153,8 +153,13 @@ export default function BrandsPage() {
             {/* Brand → opens this brand's Meta Ad Library (avatar + name both clickable). */}
             <a href={b.adLibraryUrl} target="_blank" rel="noopener noreferrer" title="Open in Meta Ad Library"
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, textDecoration: 'none', color: 'inherit' }}>
-              {b.avatar ? <img src={b.avatar} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, background: '#eef2f7' }} />
-                : <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#eef2f7', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>{b.name.slice(0, 1)}</div>}
+              {/* Letter avatar underneath; the real picture overlays it and, if it fails to load,
+                  onError hides the img so the letter shows through — no broken-image icon. */}
+              <div style={{ position: 'relative', width: 34, height: 34, borderRadius: '50%', background: '#eef2f7', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0, overflow: 'hidden' }}>
+                {b.name.slice(0, 1).toUpperCase()}
+                {b.avatar && <img src={b.avatar} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+              </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                   onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
