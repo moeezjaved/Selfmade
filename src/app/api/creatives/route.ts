@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get('type')
 
   let q = admin.from('creative_generations')
-    .select('id, brand_id, source_ad_id, parent_id, type, tier, prompt, image_url, media_type, status, created_at')
+    .select('id, brand_id, source_ad_id, source_video_url, parent_id, type, tier, prompt, image_url, media_type, status, created_at')
     .eq('user_id', user.id).order('created_at', { ascending: false }).limit(300)
   if (brandId) q = q.eq('brand_id', brandId)
   if (type) q = q.eq('type', type)
@@ -33,7 +33,27 @@ export async function GET(req: NextRequest) {
     const { data: bs } = await admin.from('brands').select('id, name').in('id', brandIds)
     for (const b of (bs || []) as any[]) names.set(b.id, b.name)
   }
-  const creatives = (data || []).map((g: any) => ({ ...g, brand_name: g.brand_id ? names.get(g.brand_id) || null : null }))
+
+  // Attach a small "cloned from" thumbnail: the source ad's R2 poster/image. One batched lookup on
+  // discovery_creatives (permanent R2 urls) keyed by source_ad_id, so the gallery can show — subtly —
+  // which competitor ad each generation was cloned from, next to the output.
+  const srcIds = Array.from(new Set((data || []).map((g: any) => g.source_ad_id).filter(Boolean)))
+  const srcThumb = new Map<string, string>()
+  if (srcIds.length) {
+    const { data: cr } = await admin.from('discovery_creatives')
+      .select('ad_id, asset_type, r2_url, poster_url, position').in('ad_id', srcIds).order('position', { ascending: true })
+    for (const c of (cr || []) as any[]) {
+      if (srcThumb.has(c.ad_id)) continue   // first (lowest-position) creative per ad
+      const t = c.poster_url || (c.asset_type !== 'video' ? c.r2_url : null)
+      if (t) srcThumb.set(c.ad_id, t)
+    }
+  }
+
+  const creatives = (data || []).map((g: any) => ({
+    ...g,
+    brand_name: g.brand_id ? names.get(g.brand_id) || null : null,
+    source_thumb: g.source_ad_id ? srcThumb.get(g.source_ad_id) || null : null,
+  }))
   return NextResponse.json({ creatives })
 }
 
