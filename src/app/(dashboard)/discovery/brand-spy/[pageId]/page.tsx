@@ -759,7 +759,7 @@ export default function BrandSpyDetail() {
         if (j) setD(j)
         if ((j?.summary?.total || 0) > 0 || Date.now() - started > 150000) { clearInterval(iv); setPulling(false) }
       }).catch(() => {})
-    }, 4000)
+    }, 2500)
   }
 
   const exportCsv = () => {
