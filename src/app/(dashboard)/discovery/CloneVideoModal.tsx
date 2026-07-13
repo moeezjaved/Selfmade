@@ -249,6 +249,17 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{mode === 'faithful' ? 'Recreates the ad\'s scenes (b-roll, lifestyle, product shots) with your product, then stitches them — longer render, closest to the original.' : 'One creator speaks your script to camera — fastest and cheapest.'}</p>
                 </section>
 
+                {/* Quality — also on the setup screen, mirrored here so you can flip Fast↔Premium at
+                    approve time and watch the price update without going Back. */}
+                <section>
+                  <Label>Quality</Label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setTier('premium')} style={tierBtn(tier === 'premium')}>Premium · sharpest</button>
+                    <button onClick={() => setTier('fast')} style={tierBtn(tier === 'fast')}>Fast · ~40% cheaper</button>
+                  </div>
+                  <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>Fast renders quicker and costs less — ideal for testing. Premium for the final ad you’ll run.</p>
+                </section>
+
                 {/* Length buckets (UGC only): 15s = classic single clip; 30/60s = frame-chained
                     segments stitched into one take. 'Match original' auto-picks the nearest bucket. */}
                 {mode === 'ugc' && (
