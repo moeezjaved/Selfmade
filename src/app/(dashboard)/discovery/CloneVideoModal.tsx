@@ -45,6 +45,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [jobId, setJobId] = useState<string | null>(null)
   const [draftScript, setDraftScript] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)   // non-error info (e.g. still rendering)
   const [result, setResult] = useState<{ url: string; script?: string | null } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [mounted, setMounted] = useState(false)
@@ -127,15 +128,18 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   }
   const toggleSel = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : (s.length >= 4 ? s : [...s, id]))
 
-  // Poll a job until it leaves the given "waiting" status. Returns the final status payload.
-  const pollUntil = async (id: string, leave: string): Promise<any> => {
-    for (let i = 0; i < 200; i++) {
+  // Poll a job until it leaves the given "waiting" status. Returns the final payload, or
+  // { timedOut: true } once the budget is exhausted — the job KEEPS running server-side (multi-scene
+  // renders can outlast the tab), so a timeout is NOT a failure and NOT a refund.
+  const pollUntil = async (id: string, leave: string, maxMs = 800_000): Promise<any> => {
+    const iters = Math.ceil(maxMs / 4000)
+    for (let i = 0; i < iters; i++) {
       await sleep(4000)
       const st = await fetch(`/api/discovery/clone-video/status?id=${id}`).then(r => r.json()).catch(() => ({}))
       if (st.error) return { error: st.error }
       if (st.status && st.status !== leave) return st
     }
-    return { error: 'timed out — check My Creatives shortly' }
+    return { timedOut: true }
   }
 
   // Phase 1: analyse + draft script (free)
@@ -153,7 +157,8 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       }).then(r => r.json())
       if (!start.jobId) { setErr(start.error || 'Could not start.'); setPhase('form'); return }
       setJobId(start.jobId)
-      const st = await pollUntil(start.jobId, 'analyzing')   // wait for 'review'
+      const st = await pollUntil(start.jobId, 'analyzing', 400_000)   // wait for 'review'
+      if (st.timedOut) { setErr('Analysis is taking longer than usual — try again in a moment.'); setPhase('form'); return }
       if (st.error) { setErr(st.error); setPhase('form'); return }
       setDraftScript(st.script || '')
       setGloss(st.gloss || null)
@@ -168,7 +173,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // Phase 2: approve (spend credits) + generate
   const approve = async () => {
     if (!jobId) return
-    setErr(null); setPhase('generating')
+    setErr(null); setNotice(null); setPhase('generating')
     try {
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -176,8 +181,17 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       }).then(r => r.json())
       if (ap.error) { setErr(ap.error === 'insufficient_credits' ? 'Not enough credits.' : ap.error); setPhase('review'); return }
       refreshCredits()   // credits reserved on approve → drop the sidebar counter now
-      const st = await pollUntil(jobId, 'processing')   // wait for 'done'
-      if (st.error || !st.url) { setErr((st.error || 'generation failed') + ' — credits refunded.'); setPhase('review'); refreshCredits(); return }
+      // Multi-clip renders (faithful scenes, 30/60s segments) take much longer than one clip — give
+      // the poll a budget that covers a 4-clip job (~28 min) before falling back to background mode.
+      const budgetMs = (mode === 'faithful' || nSegs > 1) ? 1_680_000 : 800_000
+      const st = await pollUntil(jobId, 'processing', budgetMs)   // wait for 'done'
+      if (st.timedOut) {
+        // NOT a failure — the worker is still rendering and will finish + deliver to My Creatives.
+        // Credits stay reserved (auto-refunded only if it actually fails). Never say "refunded" here.
+        setNotice('Still rendering — multi-scene videos take a bit longer. It’ll appear in My Creatives when it’s ready. Your credits are reserved (you won’t be charged twice, and you’re auto-refunded if it fails).')
+        setPhase('review'); return
+      }
+      if (st.error || !st.url) { setErr((st.error || 'generation failed') + ' — credits were refunded.'); setPhase('review'); refreshCredits(); return }
       setResult({ url: st.url, script: st.script }); setPhase('done')
     } catch (e: any) { setErr(String(e?.message || e)); setPhase('review') }
   }
@@ -257,6 +271,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                     </div>
                   )}
                 </section>
+                {notice && <div style={noticeBox}>{notice} <a href="/creative-studio" style={{ color: LIME, fontWeight: 700 }}>Open My Creatives →</a></div>}
                 {err && <div style={errBox}>{err}</div>}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setPhase('form')} style={{ ...tierBtn(false), flex: '0 0 auto', padding: '11px 14px' }}>← Back</button>
@@ -382,6 +397,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
 function Label({ children }: { children: React.ReactNode }) { return <div style={{ fontSize: 12, fontWeight: 700, color: '#9fb0a4', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.04em' }}>{children}</div> }
 const input: React.CSSProperties = { background: '#0a0f0c', border: '1px solid #24331d', borderRadius: 9, padding: '9px 11px', color: '#e8f0e8', fontSize: 13, fontFamily: 'inherit', outline: 'none' }
 const errBox: React.CSSProperties = { background: '#2a1416', border: '1px solid #5a2a2e', color: '#ffb4b4', borderRadius: 10, padding: '10px 12px', fontSize: 12.5 }
+const noticeBox: React.CSSProperties = { background: '#141f10', border: '1px solid #2c4030', color: '#cfe3b8', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, lineHeight: 1.5 }
 const btnPrimary: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: LIME, color: '#14281a', border: 'none', borderRadius: 10, padding: '11px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
 const chip = (on: boolean): React.CSSProperties => ({ background: on ? LIME : '#16241a', color: on ? '#14281a' : '#cfe', border: `1px solid ${on ? LIME : '#2c4030'}`, borderRadius: 20, padding: '6px 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' })
 const tierBtn = (on: boolean): React.CSSProperties => ({ flex: 1, background: on ? '#1c3322' : '#0a0f0c', color: on ? LIME : '#9fb0a4', border: `1px solid ${on ? LIME : '#24331d'}`, borderRadius: 9, padding: '9px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' })
