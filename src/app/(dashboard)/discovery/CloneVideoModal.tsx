@@ -277,11 +277,20 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   {gloss && language !== 'en' && (
                     <div style={{ fontSize: 11, color: '#8fa596', marginTop: 6, fontStyle: 'italic' }}>In English: “{gloss}”</div>
                   )}
-                  {/* Speaking-time meter — the "talks too fast" guard. ~2.3 words/sec. */}
+                  {/* Speaking-time meter. In FAITHFUL mode the narration is our TTS at a natural pace and
+                      the video extends to fit it (closing shot holds) — so a long script is never
+                      "rushed", it just adds hold time. In UGC mode Seedance crams words into a fixed
+                      clip, so length genuinely matters — that's the only mode that warns about rushing. */}
                   {words > 0 && (
-                    <div style={{ fontSize: 11, marginTop: 6, color: spokenSecs > targetSecs + 4 ? '#ffb4b4' : spokenSecs > targetSecs ? '#f5d78e' : '#9fb0a4' }}>
-                      {words} words ≈ {spokenSecs}s spoken · target ~{targetSecs}s{spokenSecs > targetSecs + 4 ? ' — too long, the delivery will feel rushed. Trim it or pick a longer length.' : spokenSecs > targetSecs ? ' — a touch long; consider trimming.' : ' — fits comfortably.'}
-                    </div>
+                    mode === 'faithful' ? (
+                      <div style={{ fontSize: 11, marginTop: 6, color: '#9fb0a4' }}>
+                        {words} words ≈ {spokenSecs}s of narration · ~{targetSecs}s of scenes{spokenSecs > targetSecs + 4 ? ' — the closing shot holds while the voiceover finishes. Trim for a tighter cut, or leave it.' : ' — fits nicely.'}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11, marginTop: 6, color: spokenSecs > targetSecs + 4 ? '#ffb4b4' : spokenSecs > targetSecs ? '#f5d78e' : '#9fb0a4' }}>
+                        {words} words ≈ {spokenSecs}s spoken · target ~{targetSecs}s{spokenSecs > targetSecs + 4 ? ' — too long, the delivery will feel rushed. Trim it, or pick a longer length above.' : spokenSecs > targetSecs ? ' — a touch long; consider trimming.' : ' — fits comfortably.'}
+                      </div>
+                    )
                   )}
                 </section>
                 {notice && <div style={noticeBox}>{notice} <a href="/creative-studio" style={{ color: LIME, fontWeight: 700 }}>Open My Creatives →</a></div>}
