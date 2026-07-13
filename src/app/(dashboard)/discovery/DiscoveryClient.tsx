@@ -1275,54 +1275,81 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
 }
 
 // ── Page ─────────────────────────────────────────────────────
+// ── Feed-state persistence: opening an ad is a route change (/discovery → /discovery/[id]) which
+// unmounts the whole feed, wiping filters/search/scroll/loaded cards. We snapshot that state to
+// sessionStorage on unmount and restore it on return, so "close the ad" resumes exactly where you
+// left off. TTL-bounded so a stale tab doesn't resurrect an ancient feed. ──
+const DISCO_SNAP_KEY = 'discovery:snap:v1'
+const DISCO_SNAP_TTL = 30 * 60 * 1000
+function readDiscoSnap(): any {
+  try {
+    const raw = sessionStorage.getItem(DISCO_SNAP_KEY)
+    if (!raw) return null
+    const s = JSON.parse(raw)
+    if (!s || typeof s.t !== 'number' || Date.now() - s.t > DISCO_SNAP_TTL) return null
+    return s
+  } catch { return null }
+}
+
 export default function DiscoveryPage() {
   const router = useRouter()
   const isMobile = useIsMobile()
-  const [searchInput, setSearchInput] = useState('')
-  const [query, setQuery] = useState('')
-  const [searchMode, setSearchMode] = useState<'adcopy' | 'brand' | 'category'>('adcopy')
+  // Read the saved feed state ONCE (client only). The component renders a static skeleton until
+  // `mounted`, so lazy-initializing state from this can't cause an SSR/hydration mismatch.
+  const snapReadRef = useRef<any>(undefined)
+  if (snapReadRef.current === undefined) snapReadRef.current = (typeof window !== 'undefined' ? readDiscoSnap() : null)
+  const snap = snapReadRef.current as any
+  // When restoring loaded cards, skip the one initial fetchAds(true) that would clobber them.
+  const skipInitialFetchRef = useRef(!!(snap && Array.isArray(snap.rawAds) && snap.rawAds.length))
+  const scrollYRef = useRef(0)                         // live scroll (for the snapshot on unmount)
+  const pendingScrollRef = useRef<number>(snap?.scrollY || 0)  // scroll to restore after cards render
+  const scrollRestoredRef = useRef(false)
+  const feedSnapRef = useRef<any>({})                  // latest state → serialized on unmount
+  const [searchInput, setSearchInput] = useState(snap?.searchInput ?? '')
+  const [query, setQuery] = useState(snap?.query ?? '')
+  const [searchMode, setSearchMode] = useState<'adcopy' | 'brand' | 'category'>(snap?.searchMode ?? 'adcopy')
   const [chipTip, setChipTip] = useState<{ label: string; top: number; left: number } | null>(null)  // preset-chip explainer popup
-  const [rawAds, setRawAds] = useState<Ad[]>([])
+  const [rawAds, setRawAds] = useState<Ad[]>(snap?.rawAds ?? [])
   // Mirror of rawAds + a bounded "empty page" counter for infinite-scroll stall recovery (Bug 11):
   // a loadMore window that returns only already-seen creatives appends 0 rows, so the scroll sentinel
   // never re-fires and the feed stalls. When that happens we auto-advance to the next window.
   const rawAdsRef = useRef<Ad[]>([])
   const emptyStreakRef = useRef(0)
   useEffect(() => { rawAdsRef.current = rawAds }, [rawAds])
-  const [loading, setLoading] = useState(true)  // start in loading → grid shows the skeleton from
-  // the first render (not the empty state) until the initial fetch lands, so the load reads as a
-  // smooth skeleton→cards instead of blank/empty→sudden-burst.
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [hasMore, setHasMore] = useState(false)
+  const [loading, setLoading] = useState(snap ? false : true)  // restored feed → skip the skeleton;
+  // otherwise start in loading → grid shows the skeleton from the first render (not the empty state)
+  // until the initial fetch lands, so the load reads as a smooth skeleton→cards.
+  const [nextCursor, setNextCursor] = useState<string | null>(snap?.nextCursor ?? null)
+  const [hasMore, setHasMore] = useState(snap?.hasMore ?? false)
   const [error, setError] = useState('')
 
   // Server-side filters (trigger re-fetch)
-  const [sort, setSort] = useState('recommended')
-  const [status, setStatus] = useState('ALL')
-  const [platforms, setPlatforms] = useState<string[]>([])
+  const [sort, setSort] = useState<string>(snap?.sort ?? 'recommended')
+  const [status, setStatus] = useState<string>(snap?.status ?? 'ALL')
+  const [platforms, setPlatforms] = useState<string[]>(snap?.platforms ?? [])
   // Default ALL — we crawl country=ALL (worldwide), so per-country filtering isn't
   // active yet. Showing everything by default avoids hiding ads behind a US filter.
-  const [country, setCountry] = useState('ALL')
+  const [country, setCountry] = useState(snap?.country ?? 'ALL')
 
   // Client-side filters (applied to loaded ads instantly)
-  const [format, setFormat] = useState<string[]>([])
-  const [industry, setIndustry] = useState<string[]>([])
-  const [language, setLanguage] = useState<string[]>([])
-  const [theme, setTheme] = useState<string[]>([])
-  const [minDaysStr, setMinDaysStr] = useState('')        // → server run_time min (days_running ≥ N)
-  const [minBrandAdsStr, setMinBrandAdsStr] = useState('') // → server active_ads_count (brand_active_ads ≥ N)
+  const [format, setFormat] = useState<string[]>(snap?.format ?? [])
+  const [industry, setIndustry] = useState<string[]>(snap?.industry ?? [])
+  const [language, setLanguage] = useState<string[]>(snap?.language ?? [])
+  const [theme, setTheme] = useState<string[]>(snap?.theme ?? [])
+  const [minDaysStr, setMinDaysStr] = useState(snap?.minDaysStr ?? '')        // → server run_time min (days_running ≥ N)
+  const [minBrandAdsStr, setMinBrandAdsStr] = useState(snap?.minBrandAdsStr ?? '') // → server active_ads_count (brand_active_ads ≥ N)
   // GetHookd-parity filters (rollup-backed, server-side)
-  const [tiers, setTiers] = useState<string[]>([])
-  const [niches, setNiches] = useState<string[]>([])
-  const [adsPerBrandStr, setAdsPerBrandStr] = useState('')
-  const [minReuseStr, setMinReuseStr] = useState('')
+  const [tiers, setTiers] = useState<string[]>(snap?.tiers ?? [])
+  const [niches, setNiches] = useState<string[]>(snap?.niches ?? [])
+  const [adsPerBrandStr, setAdsPerBrandStr] = useState(snap?.adsPerBrandStr ?? '')
+  const [minReuseStr, setMinReuseStr] = useState(snap?.minReuseStr ?? '')
   // Creative-DNA filters (Phase C)
-  const [hookTypes, setHookTypes] = useState<string[]>([])
-  const [emotions, setEmotions] = useState<string[]>([])
-  const [angles, setAngles] = useState<string[]>([])
-  const [formatStyles, setFormatStyles] = useState<string[]>([])
-  const [visualStyles, setVisualStyles] = useState<string[]>([])
-  const [ctaStyles, setCtaStyles] = useState<string[]>([])
+  const [hookTypes, setHookTypes] = useState<string[]>(snap?.hookTypes ?? [])
+  const [emotions, setEmotions] = useState<string[]>(snap?.emotions ?? [])
+  const [angles, setAngles] = useState<string[]>(snap?.angles ?? [])
+  const [formatStyles, setFormatStyles] = useState<string[]>(snap?.formatStyles ?? [])
+  const [visualStyles, setVisualStyles] = useState<string[]>(snap?.visualStyles ?? [])
+  const [ctaStyles, setCtaStyles] = useState<string[]>(snap?.ctaStyles ?? [])
 
   // Top brands strip
   const [topBrands, setTopBrands] = useState<{ pageId: string; name: string; adCount: number; picture: string | null }[]>([])
@@ -1413,15 +1440,15 @@ export default function DiscoveryPage() {
   }, [searchInput])
 
   // Time filter (All time, 7d, 30d, 90d, 180d)
-  const [timeDays, setTimeDays] = useState(0)
+  const [timeDays, setTimeDays] = useState(snap?.timeDays ?? 0)
 
   // Brand drawer
   const [selectedBrand, setSelectedBrand] = useState<{ pageId: string; name: string } | null>(null)
 
-  const [searchSource, setSearchSource] = useState<'indexed' | 'live'>('indexed')
-  const [dbPage, setDbPage] = useState(0)
-  const [dbTotal, setDbTotal] = useState(0)
-  const [totalInDB, setTotalInDB] = useState(0)
+  const [searchSource, setSearchSource] = useState<'indexed' | 'live'>(snap?.searchSource ?? 'indexed')
+  const [dbPage, setDbPage] = useState<number>(snap?.dbPage ?? 0)
+  const [dbTotal, setDbTotal] = useState<number>(snap?.dbTotal ?? 0)
+  const [totalInDB, setTotalInDB] = useState<number>(snap?.totalInDB ?? 0)
 
   const fetchAds = useCallback(async (reset = true, cursor?: string, forcePage?: number) => {
     setLoading(true)
@@ -1588,9 +1615,27 @@ export default function DiscoveryPage() {
   // nothing on an empty search. (dbPage is intentionally NOT a dep — paginating must
   // not reset the grid; fetchAds(true) always loads page 0.)
   useEffect(() => {
+    // On a restored feed, the mount run would refetch page 0 and wipe the restored cards/scroll —
+    // consume that one run. Every later filter change fetches normally.
+    if (skipInitialFetchRef.current) { skipInitialFetchRef.current = false; return }
     fetchAds(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, searchMode, sort, status, platforms, country, format, industry, theme, timeDays, selectedBrand?.pageId, tiers, niches, minBrandAdsStr, minDaysStr, minReuseStr, adsPerBrandStr, hookTypes, emotions, angles, formatStyles, visualStyles, ctaStyles])
+
+  // Track scroll (for the snapshot) + persist the whole feed on unmount (i.e. when opening an ad),
+  // so returning resumes at the same filters, cards and scroll position.
+  useEffect(() => {
+    const onScroll = () => { scrollYRef.current = window.scrollY || window.pageYOffset || 0 }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      try {
+        const s = feedSnapRef.current || {}
+        const payload = { ...s, rawAds: Array.isArray(s.rawAds) ? s.rawAds.slice(0, 150) : [], scrollY: scrollYRef.current, t: Date.now() }
+        sessionStorage.setItem(DISCO_SNAP_KEY, JSON.stringify(payload))
+      } catch { /* quota / unavailable — resume just won't restore this time */ }
+    }
+  }, [])
 
   // TOP BRANDS strip — computed from the ACTUAL loaded results so it always matches
   // the grid (and sums to the matching count), including semantic-matched brands a
@@ -1635,6 +1680,22 @@ export default function DiscoveryPage() {
       return true
     })
   }, [rawAds, format, industry, language, theme])
+
+  // Restore scroll position after the restored cards render. masonic measures async and the page
+  // grows as cards settle, so re-apply the target scroll over a few frames until it sticks.
+  useEffect(() => {
+    if (!snap || scrollRestoredRef.current || !mounted) return
+    if (!pendingScrollRef.current || filteredAds.length === 0) { scrollRestoredRef.current = true; return }
+    let tries = 0
+    const apply = () => {
+      window.scrollTo(0, pendingScrollRef.current)
+      tries++
+      if (tries < 10 && Math.abs((window.scrollY || 0) - pendingScrollRef.current) > 6) requestAnimationFrame(apply)
+      else scrollRestoredRef.current = true
+    }
+    requestAnimationFrame(apply)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, filteredAds.length])
 
   // Masonry remount signature. masonic's positioner caches per-index geometry; when
   // a filter SHRINKS the result set without a remount, its cached range still points
@@ -1716,6 +1777,16 @@ export default function DiscoveryPage() {
     + hookTypes.length + emotions.length + angles.length + formatStyles.length + visualStyles.length + ctaStyles.length
 
   const isPermError = error.toLowerCase().includes('permission') || error.toLowerCase().includes('application does not')
+
+  // Keep the latest feed state ready to snapshot on unmount (opening an ad). Assigned every render so
+  // the unmount cleanup serializes current filters/search/cards without stale-closure risk.
+  feedSnapRef.current = {
+    searchInput, query, searchMode, sort, status, platforms, country,
+    format, industry, language, theme, minDaysStr, minBrandAdsStr,
+    tiers, niches, adsPerBrandStr, minReuseStr, hookTypes, emotions, angles,
+    formatStyles, visualStyles, ctaStyles, timeDays,
+    searchSource, dbPage, dbTotal, totalInDB, nextCursor, hasMore, rawAds,
+  }
 
   // CLIENT-ONLY render. This whole page is client-data driven (everything loads via useEffect) and
   // some of its first-paint content diverged server↔client → React hydration errors #418/#423/#425,
