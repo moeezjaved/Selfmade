@@ -70,6 +70,8 @@ export default function OnboardingPage() {
   const [cloneVideoAd, setCloneVideoAd] = useState<TopAd | null>(null)
   const [videoBuyFor, setVideoBuyFor] = useState<TopAd | null>(null)
   const [buying, setBuying] = useState(false)
+  const [showCloneIntro, setShowCloneIntro] = useState(false)   // "how the clone works" explainer (once)
+  const cloneIntroShownRef = useRef(false)
   const [cloned, setCloned] = useState<Set<string>>(new Set())  // ad ids the user has kicked off a clone for
 
   // ── Step 1: detect the store ──
@@ -268,7 +270,10 @@ export default function OnboardingPage() {
   const next = async () => {
     if (step === 0 && kit) saveBrand()               // fire-and-forget
     if (step === 2) firePulls()                       // pulls stream while they read step 4
-    if (step === 3) loadTopAds()                      // fetch each competitor's top ads for the clone step
+    if (step === 3) {                                 // entering the clone step
+      loadTopAds()                                    // fetch each competitor's top ads
+      if (!cloneIntroShownRef.current) { cloneIntroShownRef.current = true; setShowCloneIntro(true) }  // "how it works" once
+    }
     setStep((s) => Math.min(s + 1, STEPS.length - 1))
   }
 
@@ -524,6 +529,62 @@ export default function OnboardingPage() {
           </div>
         </div>
       </div>
+      {/* "How the clone works" explainer — overlays the clone step on first arrival. */}
+      {showCloneIntro && step === 4 && (() => {
+        const refThumb = picked.map((p) => topAds[p.pageId]?.image?.thumbnailUrl || topAds[p.pageId]?.video?.thumbnailUrl).find(Boolean) || null
+        const productImg = (kit?.productImages || [])[0] || kit?.logo || null
+        const accent = (kit?.colors || [])[0] || LIME
+        const Panel = ({ src, label, badge, glow }: { src: string | null; label: string; badge?: string; glow?: boolean }) => (
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ position: 'relative', aspectRatio: '3/4', borderRadius: 14, overflow: 'hidden', background: '#0d1b1a', border: glow ? `1.5px solid ${LIME}` : '1px solid rgba(255,255,255,0.1)', boxShadow: glow ? `0 0 24px ${LIME}44` : 'none' }}>
+              {src
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, background: glow ? `linear-gradient(135deg,${accent}22,${LIME}22)` : '#152928' }}>{glow ? '✨' : label === 'Your product' ? '📦' : '🎬'}</div>}
+              {glow && <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, transparent 55%, ${LIME}33)`, pointerEvents: 'none' }} />}
+              {badge && <span style={{ position: 'absolute', top: 6, left: 6, background: LIME, color: BG, fontSize: 9, fontWeight: 900, padding: '2px 6px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.04em' }}>{badge}</span>}
+            </div>
+            <div style={{ textAlign: 'center', fontSize: 11.5, fontWeight: 700, color: label === 'Your product' || glow ? 'white' : 'rgba(255,255,255,0.45)', marginTop: 6 }}>{label}</div>
+          </div>
+        )
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(6,14,13,0.8)', backdropFilter: 'blur(5px)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div style={{ width: '100%', maxWidth: 560, background: PANEL, border: `1px solid rgba(223,254,149,0.2)`, borderRadius: 24, padding: 30, position: 'relative' }}>
+              <button onClick={() => setShowCloneIntro(false)} style={{ position: 'absolute', top: 16, right: 16, width: 30, height: 30, borderRadius: '50%', background: '#0d1b1a', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 15 }}>×</button>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(223,254,149,0.12)', border: `1px solid ${LIME}`, color: LIME, fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 100, marginBottom: 16 }}>✦ How it works</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 8 }}>
+                <span style={{ width: 40, height: 40, borderRadius: 11, background: '#0d1b1a', border: `1px solid rgba(223,254,149,0.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🎬</span>
+                <h2 style={{ fontSize: 23, fontWeight: 900, color: 'white', letterSpacing: '-.02em', margin: 0 }}>Turn any ad into <em style={em}>your</em> ad.</h2>
+              </div>
+              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', margin: '0 0 20px', lineHeight: 1.5 }}>Take any competitor ad and rebuild it as a brand-new ad for <b style={{ color: 'white' }}>your</b> product — same winning structure, your brand.</p>
+
+              <div style={{ display: 'flex', gap: 20 }}>
+                <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4 }}>
+                  {['Pick a competitor ad you love', 'We drop in your product', 'Get a fresh ad in one click'].map((t, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', background: LIME, color: BG, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 12 }}>{i + 1}</span>
+                      <span style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.35 }}>{t}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                  <Panel src={refThumb} label="Reference" />
+                  <span style={{ alignSelf: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 18, fontWeight: 300 }}>+</span>
+                  <Panel src={productImg} label="Your product" />
+                  <span style={{ alignSelf: 'center', color: LIME, fontSize: 18 }}>→</span>
+                  <Panel src={productImg} label="Your new ad" badge="AI" glow />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 }}>
+                <button onClick={() => setShowCloneIntro(false)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Skip for now</button>
+                <button onClick={() => setShowCloneIntro(false)} style={{ background: LIME, color: BG, border: 'none', borderRadius: 100, padding: '11px 26px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Show me their top ads →</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Clone modals — the real Discovery components, mounted in-wizard. */}
       {cloneImageAd && <CloneModal ad={{ id: cloneImageAd.id, pageId: cloneImageAd.pageId, pageName: cloneImageAd.pageName, assetImageUrl: cloneImageAd.thumbnailUrl || undefined }} onClose={() => setCloneImageAd(null)} />}
       {cloneVideoAd && <CloneVideoModal sourceAdId={cloneVideoAd.id} sourcePoster={cloneVideoAd.thumbnailUrl || undefined} onClose={() => setCloneVideoAd(null)} />}
