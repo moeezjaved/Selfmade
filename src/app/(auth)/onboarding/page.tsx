@@ -179,7 +179,10 @@ export default function OnboardingPage() {
     await Promise.all(picked.map(async (b) => {
       const pick = async (format: string): Promise<TopAd | undefined> => {
         try {
-          const j = await fetch(`/api/discovery/db-search?pageId=${encodeURIComponent(b.pageId)}&format=${format}&sort=performance&status=ALL`).then((r) => r.json())
+          // q=<pageId> hits db-search's numeric-page-id branch (.eq page_id) — REQUIRED: the bare
+          // `pageId` param is only honored inside the q-block, so without q the filter is skipped and
+          // every brand gets the same GLOBAL top ad. mode=brand keeps the name canonicalization.
+          const j = await fetch(`/api/discovery/db-search?q=${encodeURIComponent(b.pageId)}&mode=brand&pageId=${encodeURIComponent(b.pageId)}&format=${format}&sort=performance&status=ALL`).then((r) => r.json())
           const a = (j?.ads || []).find((x: any) => (format === 'Video' ? x.videoUrl || x.format === 'Video' : x.thumbnailUrl))
           return a ? { id: a.id, pageId: a.pageId, pageName: a.pageName || b.name, thumbnailUrl: a.thumbnailUrl, videoUrl: a.videoUrl, format: a.format, performanceScore: a.performanceScore } : undefined
         } catch { return undefined }
@@ -249,6 +252,17 @@ export default function OnboardingPage() {
     // ads (Brand Spy), or the generic feed if they skipped competitors entirely.
     if (cloned.size > 0) router.push('/creative-studio')
     else router.push(picked[0] ? `/discovery/brand-spy/${picked[0].pageId}` : '/discovery')
+  }
+
+  // "See all their ads" — finish onboarding (best-effort) and land on that brand's full ad grid,
+  // where every card is cloneable. Lets a user who doesn't love the two top picks browse everything.
+  const seeAllAds = async (pageId: string) => {
+    setSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) await supabase.from('user_profiles').update({ niche: niche || null, onboarding_completed: true }).eq('user_id', user.id)
+    } catch { /* best-effort */ }
+    router.push(`/discovery/brand-spy/${pageId}`)
   }
 
   const next = async () => {
@@ -472,10 +486,15 @@ export default function OnboardingPage() {
                           {loadingAds ? 'Finding their best ads…' : `Still pulling ${b.name}'s ads — they'll be in your feed shortly. Clone another competitor for now.`}
                         </div>
                       ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
-                          {t?.image && <AdCard ad={t.image} kind="image" cost={costs.image} done={cloned.has(t.image.id)} onClone={() => openImageClone(t.image!)} />}
-                          {t?.video && <AdCard ad={t.video} kind="video" cost={costs.video} done={cloned.has(t.video.id)} lowCredit={balance !== null && balance < costs.video} onClone={() => onVideoClick(t.video!)} />}
-                        </div>
+                        <>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
+                            {t?.image && <AdCard ad={t.image} kind="image" cost={costs.image} done={cloned.has(t.image.id)} onClone={() => openImageClone(t.image!)} />}
+                            {t?.video && <AdCard ad={t.video} kind="video" cost={costs.video} done={cloned.has(t.video.id)} lowCredit={balance !== null && balance < costs.video} onClone={() => onVideoClick(t.video!)} />}
+                          </div>
+                          <button onClick={() => seeAllAds(b.pageId)} disabled={saving} style={{ marginTop: 8, background: 'none', border: 'none', color: LIME, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                            Not these? See all {pullCounts[b.pageId] ? `${pullCounts[b.pageId]} ` : ''}{b.name} ads →
+                          </button>
+                        </>
                       )}
                     </div>
                   )
