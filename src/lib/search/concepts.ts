@@ -29,8 +29,8 @@
 type Concept = { synonyms: string[]; related?: string[] }
 
 export const CONCEPTS: Record<string, Concept> = {
-  'hair loss':    { synonyms: ['thinning hair', 'hair thinning', 'hair thin', 'thin hair', 'thinning', 'balding', 'hair fall', 'hair falling', 'receding', 'receding hairline', 'bald spot', 'hair loss'], related: ['hair growth'] },
-  'hair growth':  { synonyms: ['regrow', 'regrowth', 'hair regrowth', 'thicker hair', 'fuller hair', 'hair growth'] },
+  'hair loss':    { synonyms: ['thinning hair', 'hair thinning', 'balding', 'hair fall', 'receding', 'hair loss'], related: ['hair growth'] },
+  'hair growth':  { synonyms: ['regrow', 'regrowth', 'hair regrowth', 'thicker hair'] },
   'activewear':   { synonyms: ['active wear', 'gym wear', 'gymwear', 'athleisure', 'workout clothes', 'athletic wear', 'athleticwear', 'sportswear'], related: ['leggings'] },
   'leggings':     { synonyms: ['legging', 'yoga pants'] },
   'weight loss':  { synonyms: ['fat loss', 'slimming', 'lose weight', 'weight management', 'glp-1'] },
@@ -42,29 +42,27 @@ export const CONCEPTS: Record<string, Concept> = {
   // that link flooded "skincare" with collagen brands). Keep related links DEFENSIBLE.
   'skincare':     { synonyms: ['skin care', 'serum', 'moisturizer', 'skin routine'], related: ['anti-aging'] },
   'anti-aging':   { synonyms: ['antiaging', 'wrinkles', 'fine lines', 'aging skin'] },
-  "men's health": { synonyms: ['mens health', 'men health', 'male health', 'mens wellness', 'male wellness', 'mens'], related: ['testosterone', 'hair loss', 'erectile dysfunction'] },
+  "men's health": { synonyms: ['mens health'], related: ['testosterone', 'hair loss', 'erectile dysfunction'] },
   "women's health": { synonyms: ['womens health'] },
   'protein':      { synonyms: ['protein powder', 'protein shake'] },
   'gut health':   { synonyms: ['bloating', 'digestion', 'digestive'] },
 }
 
-const norm = (s: string) => s.replace(/['’]/g, '').replace(/[,(){}]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
-
-// Reverse index: any synonym OR canonical key → its canonical concept name. Keys are norm()'d so
-// apostrophes/punctuation match consistently with the normalized query (men's health ⇄ mens health).
+// Reverse index: any synonym OR canonical key → its canonical concept name.
 const SYN_TO_CANON: Record<string, string> = (() => {
   const m: Record<string, string> = {}
   for (const [canon, c] of Object.entries(CONCEPTS)) {
-    m[norm(canon)] = canon
-    for (const s of c.synonyms) m[norm(s)] = canon
+    m[canon] = canon
+    for (const s of c.synonyms) m[s] = canon
   }
   return m
 })()
 
+const norm = (s: string) => s.replace(/[,(){}]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+
 export type Expansion = {
-  synonymTags: Set<string>  // same concept (canonical + its synonyms) → ranked tier 2 (RANKING ONLY)
-  relatedTags: Set<string>  // related concepts (canonical + their synonyms) → ranked tier 4 (RANKING ONLY)
-  canonicalTags: Set<string> // ONLY real stored tags (canonical + related keys) → the ONLY set that may become SQL arms
+  synonymTags: Set<string>  // same concept (canonical + its synonyms) → ranked tier 2
+  relatedTags: Set<string>  // related concepts (canonical + their synonyms) → ranked tier 4
   hit: boolean              // did the query map to any known concept?
 }
 
@@ -72,7 +70,6 @@ export type Expansion = {
 export function expandQuery(q: string): Expansion {
   const synonymTags = new Set<string>()
   const relatedTags = new Set<string>()
-  const canonicalTags = new Set<string>()
   const lc = norm(q)
   const compound = lc.replace(/\s+/g, '')
 
@@ -83,13 +80,6 @@ export function expandQuery(q: string): Expansion {
   }
 
   Array.from(concepts).forEach(canon => {
-    // canonicalTags = ONLY the tags the classifier actually stores (canonical keys + related keys).
-    // These are what the SQL should probe. The synonym lists are what USERS TYPE — they exist for
-    // query recognition + in-process ranking, and must NEVER become SQL arms: every synonym × 3
-    // array columns added an OR arm that matches nothing (tags are normalized to canonical), and
-    // that fan-out took the 'hair thin' search from ~0.6s to ~4.6s DB-side.
-    canonicalTags.add(canon)
-    for (const rel of CONCEPTS[canon].related || []) canonicalTags.add(rel)
     synonymTags.add(canon)
     for (const s of CONCEPTS[canon].synonyms) synonymTags.add(s)
     for (const rel of CONCEPTS[canon].related || []) {
@@ -99,7 +89,7 @@ export function expandQuery(q: string): Expansion {
   })
   // related shouldn't also live in the same-concept set
   Array.from(relatedTags).forEach(t => { if (synonymTags.has(t)) relatedTags.delete(t) })
-  return { synonymTags, relatedTags, canonicalTags, hit: concepts.size > 0 }
+  return { synonymTags, relatedTags, hit: concepts.size > 0 }
 }
 
 /**
