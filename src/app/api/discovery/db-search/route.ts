@@ -50,9 +50,6 @@ async function embedQuery(openai: OpenAI, q: string): Promise<number[]> {
 // format. Applied in-process to the candidate window so we need no stored column
 // or refresh cron yet; promote to a materialized score if the eval proves it out.
 // Weights are deliberately at the top so they're tunable against precision@10.
-// PostgREST array literal for the .ov/.cs operators. Strips chars that would break the {a,b} syntax
-// (commas/braces/quotes/backslash); spaces + apostrophes are safe inside array elements.
-const pgArray = (vals: string[]) => '{' + vals.map(v => v.replace(/[,{}"\\]/g, ' ').trim()).filter(Boolean).join(',') + '}'
 const RANK_W = { longevity: 1.0, active: 3.0, recency: 2.0, video: 0.6 }
 function qualityScore(ad: any): number {
   const days = Math.max(0, Number(ad.days_running) || 0)
@@ -264,7 +261,7 @@ export async function GET(request: NextRequest) {
     // drifts from what's actually shown.
     let keywordOr: string | null = null
     // Concept expansion (query-side synonym/sibling map) — empty for brand mode.
-    let expansion: Expansion = { synonymTags: new Set(), relatedTags: new Set(), canonicalTags: new Set(), hit: false }
+    let expansion: Expansion = { synonymTags: new Set(), relatedTags: new Set(), hit: false }
 
     // ── Build base query with ilike keyword search (fast, reliable) ──
     // Only show ads where we actually have a working R2 creative.
@@ -351,33 +348,24 @@ export async function GET(request: NextRequest) {
         // "hair growth" (related solution). Ranking keeps the solution ads below the
         // on-point ones. Mirrors the tag-side normalization (single concept source).
         expansion = expandQuery(q)
-        // SQL arms use ONLY canonical stored tags — synonyms are for recognition/ranking, and every
-        // synonym × 3 array columns was a no-op OR arm (tags are normalized to canonical) that blew
-        // the fan-out to ~60 arms and 4.6s DB-side on 'hair thin'. Canonical-only ≈ 14 arms, ~0.6s.
-        const expandedTags = Array.from(expansion.canonicalTags)
+        const expandedTags = [...Array.from(expansion.synonymTags), ...Array.from(expansion.relatedTags)]
         // Text dimensions: phrase AND compound form against the copy.
         const textVariants = Array.from(new Set([lcPhrase, compound].filter(Boolean)))
-        // Tag dimensions: phrase, compound, expanded canonical tags — and per-word arms ONLY when
-        // the concept map didn't hit (when it did, the canonical tags cover the intent; the generic
-        // single-word arms like {hair}/{thin} just multiply bitmap work for noise matches).
-        const tagVariants = Array.from(new Set([lcPhrase, compound, ...(expansion.hit ? [] : words), ...expandedTags].filter(Boolean)))
+        // Tag dimensions: phrase, compound, each significant word, AND expanded concept tags.
+        const tagVariants = Array.from(new Set([lcPhrase, compound, ...words, ...expandedTags].filter(Boolean)))
         const orParts = [
           // Text dimension via FULL-TEXT SEARCH on the GIN-indexed search_vector
           // (body+title+description+page_name). Replaces 4× `ilike '%...%'` which
           // seq-scanned ~95K rows and blew Supabase's statement timeout → "No ads
           // found". plfts = plainto_tsquery, so multi-word ANDs the terms. ~0.6s.
           ...textVariants.map(v => `search_vector.plfts(english).${v}`),
-          // AI topical/category tags — ONE array-OVERLAP (`ov`) per column, NOT one `cs` arm per tag.
-          // Per-tag `@>` arms made the OR wide enough (esp. multi-tag concepts like men's-health →
-          // testosterone/hair-loss/ED) that the planner flipped from GIN BitmapOr into a LIMIT-baited
-          // SEQ SCAN of the 4.4M-row table (8s+, EXPLAIN-proven). `topics && ARRAY[...]` is a SINGLE
-          // GIN-indexed condition matching any of the tags → estimate stays low → bitmap stays
-          // (~0.1s warm). NO industries arm (unreliable auto-detect col + it was the original flip
-          // trigger); it's still available via the explicit Industry filter.
-          ...(tagVariants.length ? [
-            `topics.ov.${pgArray(tagVariants)}`,
-            `brand_categories.ov.${pgArray(tagVariants)}`,
-          ] : []),
+          // AI topical/category tags (4th search dimension) — "active wear" now
+          // hits the "activewear" topic via the compound variant.
+          ...tagVariants.flatMap(v => [
+            `brand_categories.cs.{${v}}`,
+            `topics.cs.{${v}}`,
+            `industries.cs.{${v}}`,
+          ]),
         ]
         keywordOr = orParts.join(',')
         if (keywordOr) baseQuery = baseQuery.or(keywordOr)
