@@ -6,6 +6,9 @@
     "src/app/api/cron/reconcile-reservations/route.ts": {
       "maxDuration": 60
     },
+    "src/app/api/cron/warm-search/route.ts": {
+      "maxDuration": 120
+    },
     "src/app/api/m4/launch/route.ts": {
       "maxDuration": 300
     },
@@ -72,6 +75,10 @@
     {
       "path": "/api/cron/reconcile-reservations",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/warm-search",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

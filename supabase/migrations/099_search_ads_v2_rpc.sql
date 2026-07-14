@@ -31,15 +31,20 @@ CREATE OR REPLACE FUNCTION search_ads_v2(
   p_lim int DEFAULT 120,
   p_off int DEFAULT 0
 ) RETURNS SETOF discovery_ads_index
-LANGUAGE sql STABLE
+-- LANGUAGE plpgsql (NOT sql) IS LOAD-BEARING: a `LANGUAGE sql` function gets INLINED into the
+-- caller's query by the planner, and inlining DISCARDS the function-scoped SETs below → the seq-scan
+-- pins never applied through PostgREST, so the same body that ran 0.9s in psql took 7-18s live.
+-- plpgsql is a black box — never inlined — so enable_seqscan=off / jit=off actually take effect.
+LANGUAGE plpgsql STABLE
 -- Function-scoped planner pins (do NOT affect anything else): with parameters the planner uses a
 -- GENERIC plan — it can't see the constants, over-estimates the arms, flips to seq scans and JIT-
--- compiles the plan → the same body that runs 230ms with literals took 14-16s in the function.
--- Every access path here is index-driven by design, so seqscan off is strictly correct, and jit
--- off kills the per-call compile tax on the over-estimated plan.
+-- compiles the plan. Every access path here is index-driven by design, so seqscan off is strictly
+-- correct, and jit off kills the per-call compile tax on the over-estimated plan.
 SET enable_seqscan = off
 SET jit = off
 AS $$
+BEGIN
+  RETURN QUERY
   WITH allc AS MATERIALIZED (
     (SELECT ad_id,
        CASE WHEN search_vector @@ phraseto_tsquery('english', p_q) THEN 3 ELSE 1 END AS tier,
@@ -55,7 +60,7 @@ AS $$
        performance_score AS perf
      FROM discovery_ads_index
      WHERE has_creative AND search_vector @@ plainto_tsquery('english', p_q)
-     LIMIT 900)
+     LIMIT 450)  -- copy arm de-TOASTs search_vector per row (cold I/O); 450 is plenty to rank from
     UNION ALL
     (SELECT ad_id, 2,
        CASE p_sort
@@ -100,6 +105,7 @@ AS $$
   SELECT d.* FROM discovery_ads_index d
   JOIN page p USING (ad_id)
   ORDER BY p.tier DESC, p.sk DESC NULLS LAST, p.perf DESC NULLS LAST, d.ad_id;
+END;
 $$;
 
 -- us-east dropped default privileges, so a NEW function isn't executable by the API roles and
