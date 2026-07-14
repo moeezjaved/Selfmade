@@ -251,12 +251,12 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   <Label>Clone style</Label>
                   {suggestedMode === 'faithful' && (
                     <div style={{ fontSize: 11.5, color: '#cfe3b8', background: '#141f10', border: '1px solid #2c4030', borderRadius: 8, padding: '7px 10px', marginBottom: 8 }}>
-                      🎬 This ad is cinematic / B-roll style — a faithful scene-by-scene clone will match it much better than a talking head.
+                      🎬 This ad is cinematic / B-roll style — a scene-by-scene Cinematic clone will match it much better than a talking head.
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={() => setMode('faithful')} style={tierBtn(mode === 'faithful')}>
-                      Faithful · {sceneCount} scenes · {(FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]} cr{suggestedMode === 'faithful' ? ' ★' : ''}
+                      Cinematic · {sceneCount} scenes · {(FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]} cr{suggestedMode === 'faithful' ? ' ★' : ''}
                     </button>
                     <button onClick={() => setMode('ugc')} style={tierBtn(mode === 'ugc')}>
                       UGC creator · 1 clip · {UGC_COST[tier]} cr{suggestedMode === 'ugc' ? ' ★' : ''}
