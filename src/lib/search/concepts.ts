@@ -61,8 +61,9 @@ const SYN_TO_CANON: Record<string, string> = (() => {
 const norm = (s: string) => s.replace(/[,(){}]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
 
 export type Expansion = {
-  synonymTags: Set<string>  // same concept (canonical + its synonyms) → ranked tier 2
-  relatedTags: Set<string>  // related concepts (canonical + their synonyms) → ranked tier 4
+  synonymTags: Set<string>  // same concept (canonical + its synonyms) → ranked tier 2 (RANKING ONLY)
+  relatedTags: Set<string>  // related concepts (canonical + their synonyms) → ranked tier 4 (RANKING ONLY)
+  canonicalTags: Set<string> // ONLY real stored tags (canonical + related keys) → the ONLY set that may become SQL arms
   hit: boolean              // did the query map to any known concept?
 }
 
@@ -70,6 +71,7 @@ export type Expansion = {
 export function expandQuery(q: string): Expansion {
   const synonymTags = new Set<string>()
   const relatedTags = new Set<string>()
+  const canonicalTags = new Set<string>()
   const lc = norm(q)
   const compound = lc.replace(/\s+/g, '')
 
@@ -80,6 +82,13 @@ export function expandQuery(q: string): Expansion {
   }
 
   Array.from(concepts).forEach(canon => {
+    // canonicalTags = ONLY the tags the classifier actually stores (canonical keys + related keys).
+    // These are what the SQL should probe. The synonym lists are what USERS TYPE — they exist for
+    // query recognition + in-process ranking, and must NEVER become SQL arms: every synonym × 3
+    // array columns added an OR arm that matches nothing (tags are normalized to canonical), and
+    // that fan-out took the 'hair thin' search from ~0.6s to ~4.6s DB-side.
+    canonicalTags.add(canon)
+    for (const rel of CONCEPTS[canon].related || []) canonicalTags.add(rel)
     synonymTags.add(canon)
     for (const s of CONCEPTS[canon].synonyms) synonymTags.add(s)
     for (const rel of CONCEPTS[canon].related || []) {
@@ -89,7 +98,7 @@ export function expandQuery(q: string): Expansion {
   })
   // related shouldn't also live in the same-concept set
   Array.from(relatedTags).forEach(t => { if (synonymTags.has(t)) relatedTags.delete(t) })
-  return { synonymTags, relatedTags, hit: concepts.size > 0 }
+  return { synonymTags, relatedTags, canonicalTags, hit: concepts.size > 0 }
 }
 
 /**
