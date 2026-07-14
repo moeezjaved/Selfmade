@@ -53,8 +53,9 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
 
   // UGC = one clip; Faithful = scene-by-scene + stitch, priced by scene count (credit_pricing
   // video_clone_xN rows — keep these numbers in sync with that table).
-  const UGC_COST = { premium: 400, fast: 250 } as const
-  const FAITHFUL_COST: Record<number, { premium: number; fast: number }> = { 2: { premium: 750, fast: 475 }, 3: { premium: 1100, fast: 690 }, 4: { premium: 1450, fast: 900 } }
+  // 1 credit = 1¢. Kept in sync with credit_pricing (migration 095): video is cost-plus (2× fal).
+  const UGC_COST = { premium: 650, fast: 300 } as const
+  const FAITHFUL_COST: Record<number, { premium: number; fast: number }> = { 2: { premium: 1300, fast: 550 }, 3: { premium: 1900, fast: 800 }, 4: { premium: 2500, fast: 1100 } }
   // 'match' resolves to the nearest bucket from the source ad's analysed duration.
   const resolvedBucket = durationBucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(durationBucket)
   const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1

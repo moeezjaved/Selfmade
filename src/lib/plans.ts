@@ -31,25 +31,25 @@ export interface PlanEntitlements {
 export const PLANS: Record<PlanId, PlanEntitlements> = {
   free: {
     label: 'Free', priceMonthly: 0, priceAnnualMonthly: 0,
-    monthlyCredits: 20, welcomeCredits: 60, seats: 1, brandSpy: 1, expressPulls: 3, discoveryPages: 3,
+    monthlyCredits: 100, welcomeCredits: 500, seats: 1, brandSpy: 1, expressPulls: 3, discoveryPages: 3,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: false,
     teamBoards: false, assetsGb: 0.5,
   },
   starter: {
     label: 'Starter', priceMonthly: 39, priceAnnualMonthly: 29,
-    monthlyCredits: 150, seats: 1, brandSpy: 15, expressPulls: 15, discoveryPages: null,
+    monthlyCredits: 2000, seats: 1, brandSpy: 15, expressPulls: 15, discoveryPages: null,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: true, canBuyCredits: true,
     teamBoards: false, assetsGb: 5,
   },
   pro: {
     label: 'Pro', priceMonthly: 99, priceAnnualMonthly: 74,
-    monthlyCredits: 500, seats: 3, brandSpy: 50, expressPulls: 50, discoveryPages: null,
+    monthlyCredits: 5000, seats: 3, brandSpy: 50, expressPulls: 50, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: false, api: true, exports: true, canBuyCredits: true,
     teamBoards: true, assetsGb: 50, mostPopular: true,
   },
   business: {
     label: 'Business', priceMonthly: 249, priceAnnualMonthly: 186,
-    monthlyCredits: 2000, seats: 10, brandSpy: 150, expressPulls: 200, discoveryPages: null,
+    monthlyCredits: 15000, seats: 10, brandSpy: 150, expressPulls: 200, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
     teamBoards: true, assetsGb: 250,
   },
@@ -89,28 +89,32 @@ export function firstPlanWith(feature: keyof PlanEntitlements): PlanId {
 
 // ── Action costs (credits) — pricing spec §2.3. Mirrors the credit_pricing table (which is the
 // runtime source of truth via reserve_credits); kept here for client display + defaults. ──
+// 1 credit = 1¢. Runtime source of truth is the credit_pricing DB table (reserve_credits reads it);
+// these are the client display defaults, kept in sync with migration 095.
 export const ACTION_COSTS: Record<string, number> = {
-  transcribe: 2,
-  script_generate: 5,
-  script_duplicate: 5,
-  brand_analysis: 3,
-  review_mining: 3,
-  ask_mello: 1,
-  image_clone_pro: 15,      // 2K Nano Banana Pro — DEFAULT ad clone
-  image_clone_4k: 25,       // 4K / HD download
-  image_studio_pro: 15,     // 2K AI Ad Studio — original ad from inspiration + industry insights
-  image_studio_4k: 25,      // 4K / HD Studio ad
-  image_edit_pro: 10,       // iterative edit (one 2K Pro image)
-  video_clone: 40,          // short AI video clip
-  asset_ai_tag: 1,          // AI tagging of an uploaded asset (caption/embed + video clip analysis)
+  transcribe: 15,
+  script_generate: 35,
+  script_duplicate: 35,
+  brand_analysis: 20,
+  review_mining: 20,
+  ask_mello: 10,
+  image_clone_pro: 100,     // 2K Nano Banana Pro — DEFAULT ad clone
+  image_clone_4k: 160,      // 4K / HD download
+  image_studio_pro: 100,    // 2K AI Ad Studio — original ad from inspiration + industry insights
+  image_studio_4k: 160,     // 4K / HD Studio ad
+  image_edit_pro: 65,       // iterative edit (one 2K Pro image)
+  video_clone: 650,         // UGC 15s premium (2× fal cost) — video is a cost-plus loss-leader
+  video_captions: 250,      // TikTok-style burned captions — high-margin add-on
+  asset_ai_tag: 10,         // AI tagging of an uploaded asset (caption/embed + video clip analysis)
 }
 
 // ── Top-up packs — pricing spec §3.1 ──
 export interface TopupPack { id: string; credits: number; priceUsd: number }
+// 1 credit = 1¢. Bigger packs give progressively more than face value (bulk discount).
 export const TOPUP_PACKS: TopupPack[] = [
-  { id: 'small', credits: 250, priceUsd: 19 },
-  { id: 'medium', credits: 750, priceUsd: 49 },
-  { id: 'large', credits: 2000, priceUsd: 119 },
+  { id: 'small', credits: 2000, priceUsd: 19 },
+  { id: 'medium', credits: 5500, priceUsd: 49 },
+  { id: 'large', credits: 14000, priceUsd: 119 },
 ]
 
 /** Structured upsell payload returned by server gates so the UI shows the right modal. */
