@@ -101,3 +101,9 @@ AS $$
   JOIN page p USING (ad_id)
   ORDER BY p.tier DESC, p.sk DESC NULLS LAST, p.perf DESC NULLS LAST, d.ad_id;
 $$;
+
+-- us-east dropped default privileges, so a NEW function isn't executable by the API roles and
+-- PostgREST won't even see it until its schema cache reloads — without these the app's admin.rpc()
+-- silently fails and falls back to the slow path ([[project_useast_grants_gotcha]]).
+GRANT EXECUTE ON FUNCTION search_ads_v2(text, text[], text, int, int) TO service_role, anon, authenticated;
+NOTIFY pgrst, 'reload schema';
