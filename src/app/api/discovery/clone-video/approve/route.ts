@@ -90,8 +90,9 @@ export async function POST(req: NextRequest) {
     if (!t) { await refundAll(); return NextResponse.json({ error: 'insufficient_credits' }, { status: 402 }) }
     addonMeta.end_card = { offer: String(endCard.offer || '').slice(0, 60), cta: String(endCard.cta || 'Shop now').slice(0, 30), tx: t }
   }
-  // 3 hook variants (multi-clip modes only — re-renders scene/segment 1 twice more).
-  if (hookVariants && (chosenMode === 'faithful' || nSeg > 1)) {
+  // 3 hook variants — faithful mode only (that's the only path the worker renders them in; billing
+  // must never enable an add-on the worker won't produce, or the reservation strands).
+  if (hookVariants && chosenMode === 'faithful') {
     const t = await reserve('video_hook_variants')
     if (!t) { await refundAll(); return NextResponse.json({ error: 'insufficient_credits' }, { status: 402 }) }
     addonMeta.hook_variants_tx = t
