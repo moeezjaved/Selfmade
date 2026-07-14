@@ -31,8 +31,11 @@ export interface PlanEntitlements {
 export const PLANS: Record<PlanId, PlanEntitlements> = {
   free: {
     label: 'Free', priceMonthly: 0, priceAnnualMonthly: 0,
+    // canBuyCredits TRUE on Free (2026-07-14): the onboarding funnel sells the $9 Launch Pack to
+    // free users at the video-clone moment — blocking free users from buying credits killed the
+    // exact conversion we want. Subscriptions upsell separately.
     monthlyCredits: 100, welcomeCredits: 500, seats: 1, brandSpy: 1, expressPulls: 3, discoveryPages: 3,
-    aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: false,
+    aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: true,
     teamBoards: false, assetsGb: 0.5,
   },
   starter: {
@@ -111,7 +114,11 @@ export const ACTION_COSTS: Record<string, number> = {
 // ── Top-up packs — pricing spec §3.1 ──
 export interface TopupPack { id: string; credits: number; priceUsd: number }
 // 1 credit = 1¢. Bigger packs give progressively more than face value (bulk discount).
+// 'launch' = the onboarding micro-pack: $9 covers one video clone (650cr) + change — bought at the
+// moment of desire (they just tapped Clone video). One-time, no subscription — deliberately the
+// anti-Higgsfield (they paywall generation behind an annual-default sub).
 export const TOPUP_PACKS: TopupPack[] = [
+  { id: 'launch', credits: 900, priceUsd: 9 },
   { id: 'small', credits: 2000, priceUsd: 19 },
   { id: 'medium', credits: 5500, priceUsd: 49 },
   { id: 'large', credits: 14000, priceUsd: 119 },

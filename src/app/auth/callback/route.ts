@@ -30,6 +30,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/signup?error=business_email&email=${encodeURIComponent(email)}`)
   }
 
+  // First-time (or unfinished) users land in the competitor-first onboarding wizard instead of the
+  // dashboard — email signups already route there; this covers Google sign-ins. Best-effort: any
+  // lookup hiccup falls through to the normal destination rather than blocking login.
+  try {
+    const uid = data?.user?.id
+    if (uid && (!next || next === '/dashboard')) {
+      const { data: prof } = await supabase.from('user_profiles').select('onboarding_completed').eq('user_id', uid).maybeSingle()
+      if (!(prof as any)?.onboarding_completed) return NextResponse.redirect(`${origin}/onboarding`)
+    }
+  } catch { /* fall through */ }
+
   const dest = next.startsWith('/') ? next : '/dashboard'
   return NextResponse.redirect(`${origin}${dest}`)
 }
