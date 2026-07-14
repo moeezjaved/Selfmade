@@ -483,7 +483,7 @@ async function translateSegments(segments, targetLang) {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.3, response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: `Transcreate each caption line into natural ${langLabel} as a native ad caption (not literal translation; keep brand/product names as-is). Return ONLY {"lines":["…"]} with EXACTLY one line per input, same order.` },
+        { role: 'system', content: `Transcreate each caption line into natural ${langLabel} as a native ad caption (not literal translation; keep brand/product names as-is). Return ONLY JSON: {"lines":["…"]} with EXACTLY one line per input, same order.` },
         { role: 'user', content: JSON.stringify(segments.map((s) => s.text)) },
       ] }),
   })
@@ -556,7 +556,11 @@ async function captionJob(job) {
     if (!tr.segments.length && !tr.words.length) throw new Error('no speech detected to caption')
     // Same language → word-by-word karaoke; different language → transcreated phrase captions.
     const WHISPER_ISO = { english: 'en', urdu: 'ur', hindi: 'hi', arabic: 'ar', spanish: 'es', french: 'fr', german: 'de' }
-    const spoken = WHISPER_ISO[String(tr.language || '').toLowerCase()] || String(tr.language || 'en').slice(0, 2)
+    // Prefer the KNOWN voiceover language (from the source clone) — Whisper mis-detects generated
+    // speech and wrongly triggered the translate path (en→en). Fall back to Whisper only if unknown.
+    const spoken = meta.source_lang
+      ? String(meta.source_lang).slice(0, 2)
+      : (WHISPER_ISO[String(tr.language || '').toLowerCase()] || String(tr.language || 'en').slice(0, 2))
     const want = String(meta.caption_lang || 'en').slice(0, 2)
     const style = meta.caption_style || 'bold'
     let ass
@@ -597,7 +601,7 @@ async function transcreateScript(text, lang) {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.6, response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: `TRANSCREATE this ad voiceover into ${langName(lang)}. Same message, same energy, natural native delivery — never literal translation. Keep brand/product names as-is. Return ONLY {"script":""}.` },
+        { role: 'system', content: `TRANSCREATE this ad voiceover into ${langName(lang)}. Same message, same energy, natural native delivery — never literal translation. Keep brand/product names as-is. Return ONLY JSON: {"script":""}.` },
         { role: 'user', content: String(text) },
       ] }),
   })
@@ -613,7 +617,7 @@ async function hookVariantPrompts(scenePrompt) {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.8, response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: 'Given this Seedance prompt for an ad\'s OPENING scene, write 2 ALTERNATIVE hook treatments: (1) a bold-claim/curiosity pattern, (2) a visual-shock/pattern-interrupt. Same product, same setting language, same approximate duration and style constraints — only the hook concept changes. Return ONLY {"variants":["",""]}' },
+        { role: 'system', content: 'Given this Seedance prompt for an ad\'s OPENING scene, write 2 ALTERNATIVE hook treatments: (1) a bold-claim/curiosity pattern, (2) a visual-shock/pattern-interrupt. Same product, same setting language, same approximate duration and style constraints — only the hook concept changes. Return ONLY JSON: {"variants":["",""]}' },
         { role: 'user', content: String(scenePrompt) },
       ] }),
   })
