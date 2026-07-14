@@ -365,7 +365,10 @@ export async function GET(request: NextRequest) {
         //    OVERLAP (`col.ov.{a,b,c}` = the `&&` operator) makes it a clean BitmapOr: the whole
         //    keyword query drops to ~240ms. Overlap is semantically identical to OR-of-contains.
         // Stash for the ranked-RPC fast path below (search_ads_v2 ranks these IN the DB).
-        rpcArgs = { p_q: lcPhrase, p_tags: tagVariants }
+        // SPECIFIC tags only (phrase + compound + concept expansions) — per-word variants like
+        // 'men'/'health' hit million-row tag bitmaps and blow the function's index arms (62s
+        // measured). The classic or() path below keeps the word variants for recall.
+        rpcArgs = { p_q: lcPhrase, p_tags: Array.from(new Set([lcPhrase, compound, ...expandedTags].filter(Boolean))) }
         // Values are already comma/brace-free (clean() strips them), so an unquoted array literal is
         // safe inside or() — spaces are fine in PG array elements ({hair loss} = one element).
         const tagArr = tagVariants.join(',')
