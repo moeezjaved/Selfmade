@@ -177,6 +177,8 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   // Captions add-on (high-margin blade). Burns TikTok-style captions onto this finished video.
   const [capStyle, setCapStyle] = useState<'bold' | 'minimal' | 'boxed'>('bold')
   const [capLang, setCapLang] = useState('en')
+  const [capColor, setCapColor] = useState('#dffe95')   // accent (highlight word, or box for 'boxed')
+  const [capSize, setCapSize] = useState<'s' | 'm' | 'l'>('m')
   const [capBusy, setCapBusy] = useState(false)
   const [capErr, setCapErr] = useState<string | null>(null)
   const addCaptions = async () => {
@@ -184,7 +186,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
     try {
       const r = await fetch('/api/discovery/clone-video/captions', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sourceId: genId, style: capStyle, captionLang: capLang }),
+        body: JSON.stringify({ sourceId: genId, style: capStyle, captionLang: capLang, color: capColor, size: capSize }),
       })
       const j = await r.json()
       if (!r.ok || !j.jobId) { setCapErr(j.error === 'insufficient_credits' ? 'Not enough credits.' : (j.error || 'Could not start.')); setCapBusy(false); return }
@@ -267,6 +269,20 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                   <option value="hi">Captions in Hindi</option>
                   <option value="ar">Captions in Arabic</option>
                 </select>
+                {/* Accent colour (highlighted word, or the box for 'boxed') + size. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11.5, color: '#6b7280' }}>Colour</span>
+                  {['#dffe95', '#ffffff', '#ffd60a', '#ff375f', '#0a84ff', '#000000'].map((c) => (
+                    <button key={c} onClick={() => setCapColor(c)} title={c} style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', border: capColor.toLowerCase() === c ? '2px solid #1a3a1a' : '1px solid #d1d5db' }} />
+                  ))}
+                  <input type="color" value={capColor} onChange={(e) => setCapColor(e.target.value)} title="Custom colour" style={{ width: 26, height: 26, padding: 0, border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11.5, color: '#6b7280', marginRight: 2 }}>Size</span>
+                  {([['s', 'Small'], ['m', 'Medium'], ['l', 'Large']] as const).map(([v, l]) => (
+                    <button key={v} onClick={() => setCapSize(v)} style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${capSize === v ? '#1a3a1a' : '#d1d5db'}`, background: capSize === v ? '#f0fdf4' : '#fff', color: '#1a3a1a' }}>{l}</button>
+                  ))}
+                </div>
                 {capErr && <div style={{ fontSize: 12, color: '#dc2626' }}>{capErr}</div>}
                 <button onClick={addCaptions} disabled={capBusy} style={{ ...btn, justifyContent: 'center', opacity: capBusy ? 0.6 : 1 }}>
                   {capBusy ? <><Loader2 size={15} className="spin" /> Adding captions…</> : <><Sparkles size={15} /> Add captions · 100 cr</>}

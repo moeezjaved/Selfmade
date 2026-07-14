@@ -503,21 +503,49 @@ const CAPTION_STYLES = {
   minimal: { Fontname: 'FreeSans', Fontsize: 34, Bold: -1, PrimaryColour: '&H00FFFFFF', SecondaryColour: '&HA0FFFFFF', OutlineColour: '&H80000000', BackColour: '&H00000000', BorderStyle: 1, Outline: 2, Shadow: 0, Alignment: 2, MarginV: 70 },
   boxed:   { Fontname: 'FreeSans', Fontsize: 38, Bold: -1, PrimaryColour: '&H0014281A', SecondaryColour: '&H0014281A', OutlineColour: '&H0095FEDF', BackColour: '&H0095FEDF', BorderStyle: 3, Outline: 6, Shadow: 0, Alignment: 2, MarginV: 90 },
 }
-function assHead(style) {
-  const st = CAPTION_STYLES[style] || CAPTION_STYLES.bold
-  const styleLine = `Style: Default,${st.Fontname},${st.Fontsize},${st.PrimaryColour},${st.SecondaryColour},${st.OutlineColour},${st.BackColour},${st.Bold},0,0,0,100,100,0,0,${st.BorderStyle},${st.Outline},${st.Shadow},${st.Alignment},40,40,${st.MarginV},1`
-  return `[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n${styleLine}\n\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n`
+// #RRGGBB → ASS &H00BBGGRR (opaque). Returns null on bad input.
+function hexToAss(hex) {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex || ''))
+  if (!m) return null
+  const h = m[1]
+  return `&H00${h.slice(4, 6)}${h.slice(2, 4)}${h.slice(0, 2)}`.toUpperCase()
+}
+const SIZE_MULT = { s: 0.8, m: 1, l: 1.28 }
+// opts: { size?: 's'|'m'|'l', color?: '#RRGGBB' } — color recolors the accent (highlight word for
+// bold/minimal, the box for boxed); size scales the font.
+function assHead(style, opts = {}) {
+  const st = { ...(CAPTION_STYLES[style] || CAPTION_STYLES.bold) }
+  const fontsize = Math.round(st.Fontsize * (SIZE_MULT[opts.size] || 1))
+  const accent = hexToAss(opts.color)
+  if (accent) {
+    if (style === 'boxed') { st.OutlineColour = accent; st.BackColour = accent }
+    else { st.PrimaryColour = accent }
+  }
+  const styleLine = `Style: Default,${st.Fontname},${fontsize},${st.PrimaryColour},${st.SecondaryColour},${st.OutlineColour},${st.BackColour},${st.Bold},0,0,0,100,100,0,0,${st.BorderStyle},${st.Outline},${st.Shadow},${st.Alignment},90,90,${st.MarginV},1`
+  // WrapStyle 0 = smart wrapping (balanced lines) → long captions wrap instead of running off-screen.
+  return `[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n${styleLine}\n\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n`
 }
 const assSafe = (t) => String(t).replace(/\n/g, ' ').replace(/\{/g, '(').replace(/\}/g, ')')
+// Split a long segment into ≤7-word timed sub-lines so no single caption is a wall of text.
+function chunkSegment(s) {
+  const words = String(s.text).trim().split(/\s+/).filter(Boolean)
+  if (words.length <= 7) return [s]
+  const parts = Math.ceil(words.length / 7)
+  const per = Math.ceil(words.length / parts)
+  const dur = (s.end - s.start) / parts
+  const out = []
+  for (let i = 0; i < parts; i++) out.push({ start: s.start + i * dur, end: s.start + (i + 1) * dur, text: words.slice(i * per, (i + 1) * per).join(' ') })
+  return out
+}
 // Phrase captions (used for translated/cross-language captions).
-function buildAss(segments, style) {
-  const events = segments.filter((s) => s.text).map((s) =>
+function buildAss(segments, style, opts = {}) {
+  const events = segments.filter((s) => s.text).flatMap(chunkSegment).map((s) =>
     `Dialogue: 0,${assTime(s.start)},${assTime(s.end)},Default,,0,0,0,,${assSafe(s.text)}`).join('\n')
-  return assHead(style) + events + '\n'
+  return assHead(style, opts) + events + '\n'
 }
 // Word-by-word KARAOKE captions (same-language): words grouped into ~3-word lines; \k timing paints
 // each word from SecondaryColour → PrimaryColour exactly as it's spoken. The TikTok look.
-function buildKaraokeAss(words, style) {
+function buildKaraokeAss(words, style, opts = {}) {
   const groups = []
   for (let i = 0; i < words.length; i += 3) groups.push(words.slice(i, i + 3))
   const events = groups.map((g) => {
@@ -530,7 +558,7 @@ function buildKaraokeAss(words, style) {
     }).join(' ')
     return `Dialogue: 0,${assTime(start)},${assTime(end)},Default,,0,0,0,,${text}`
   }).join('\n')
-  return assHead(style) + events + '\n'
+  return assHead(style, opts) + events + '\n'
 }
 async function burnCaptions(videoUrl, assContent, id) {
   const base = join(tmpdir(), `cap-${id}`)
@@ -563,14 +591,15 @@ async function captionJob(job) {
       : (WHISPER_ISO[String(tr.language || '').toLowerCase()] || String(tr.language || 'en').slice(0, 2))
     const want = String(meta.caption_lang || 'en').slice(0, 2)
     const style = meta.caption_style || 'bold'
+    const opts = { size: meta.caption_size || 'm', color: meta.caption_color || null }
     let ass
     if (want !== spoken && tr.segments.length) {
       const translated = await translateSegments(tr.segments, want)
-      ass = buildAss(translated, style)
+      ass = buildAss(translated, style, opts)
     } else if (tr.words.length) {
-      ass = buildKaraokeAss(tr.words, style)
+      ass = buildKaraokeAss(tr.words, style, opts)
     } else {
-      ass = buildAss(tr.segments, style)
+      ass = buildAss(tr.segments, style, opts)
     }
     const segs = tr.segments.length ? tr.segments : tr.words
     const mp4 = await burnCaptions(src, ass, job.id)
