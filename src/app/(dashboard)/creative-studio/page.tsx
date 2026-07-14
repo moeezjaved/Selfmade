@@ -87,15 +87,17 @@ function Generations() {
   }, [])
   useEffect(() => { load() }, [load])
 
-  // Poll any in-flight video jobs until they finish, then refresh the gallery.
+  // Poll any in-flight jobs until they finish, then refresh the gallery. Image clones and
+  // animate/video jobs live on different status endpoints — pick by media_type.
   useEffect(() => {
     const processing = (gens || []).filter((g) => g.status === 'processing')
     if (processing.length === 0) return
     const t = setInterval(async () => {
       let anyDone = false
       await Promise.all(processing.map(async (g) => {
-        const r = await fetch(`/api/discovery/animate/status?id=${g.id}`).then((x) => x.json()).catch(() => ({}))
-        if (r.done) anyDone = true
+        const endpoint = g.media_type === 'image' ? 'clone-image' : 'animate'
+        const r = await fetch(`/api/discovery/${endpoint}/status?id=${g.id}`).then((x) => x.json()).catch(() => ({}))
+        if (r.done || r.failed) anyDone = true
       }))
       if (anyDone) load()
     }, 8000)
@@ -123,7 +125,7 @@ function Generations() {
               <div key={g.id} style={card}>
                 <button onClick={() => g.status !== 'processing' && setOpen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: g.status === 'processing' ? 'default' : 'pointer', background: '#0d120e', aspectRatio: '1', overflow: 'hidden', position: 'relative' }}>
                   {g.status === 'processing' ? (
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', justifyContent: 'center', color: LIME, fontSize: 12, fontWeight: 600 }}><Loader2 size={20} className="spin" /> Generating video…</div>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', justifyContent: 'center', color: LIME, fontSize: 12, fontWeight: 600 }}><Loader2 size={20} className="spin" /> Generating {g.media_type === 'video' ? 'video' : 'ad'}…</div>
                   ) : g.media_type === 'video' && g.image_url ? (
                     <video src={g.image_url} muted loop autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (

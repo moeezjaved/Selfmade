@@ -47,5 +47,14 @@ export async function GET(request: NextRequest) {
     const { error: rErr } = await admin.rpc('refund_credits', { p_tx: tx.id })
     if (!rErr) { refunded++; credits += Math.abs(tx.delta || 0) }
   }
-  return NextResponse.json({ ok: true, scanned: (stale || []).length, refunded, credits_returned: credits, stale_minutes: STALE_MINUTES })
+
+  // Mark killed image-clone jobs (waitUntil generation exceeded maxDuration) as failed so the
+  // client poll and My Creatives stop showing them "generating" forever. STALE_MINUTES > the 5-min
+  // maxDuration, so an in-flight generation is never touched.
+  const { data: deadJobs } = await admin.from('creative_generations')
+    .update({ status: 'failed' })
+    .eq('status', 'processing').eq('media_type', 'image')
+    .lt('created_at', cutoff)
+    .select('id')
+  return NextResponse.json({ ok: true, scanned: (stale || []).length, refunded, credits_returned: credits, failed_stale_jobs: (deadJobs || []).length, stale_minutes: STALE_MINUTES })
 }

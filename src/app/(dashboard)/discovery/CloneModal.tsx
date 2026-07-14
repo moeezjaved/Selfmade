@@ -64,6 +64,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [results, setResults] = useState<{ url: string; genId: string | null }[]>([])  // generated variations
+  const errRef = useRef<string | null>(null)  // first per-variation failure message during async polling
   const [activeIdx, setActiveIdx] = useState(0)                    // which variation is open for edit/download
   const [count, setCount] = useState(1)                            // how many variations to generate
   const [brandId, setBrandId] = useState<string | null>(null)      // selected saved brand (for linking generations)
@@ -194,28 +195,50 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         aspectRatio: aspect, logo: logo || undefined, imageSize, palette: palette || undefined,
       }
 
-      const settled = await Promise.all(Array.from({ length: count }, () =>
+      // ASYNC: enqueue `count` jobs (each reserves + returns a jobId in ~1s — no held-open request,
+      // so no 504), then POLL each until it finishes. Generation runs on the server via waitUntil;
+      // results are pushed in as they land so the user watches them appear one by one.
+      const enq = await Promise.all(Array.from({ length: count }, () =>
         fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-          .then(async (r) => {
-            const text = await r.text()
-            let j: any
-            try { j = JSON.parse(text) } catch { j = { error: `HTTP ${r.status}: ${(text || r.statusText).slice(0, 200)}` } }
-            return { ok: r.ok, j }
-          })
+          .then(async (r) => { const j = await r.json().catch(() => ({})); return { ok: r.ok, j } })
           .catch((e) => ({ ok: false, j: { error: `Network error: ${String(e?.message || e)}` } }))
       ))
-      const good = settled.filter((s) => s.ok).map((s) => ({ url: s.j.image as string, genId: (s.j.generationId as string) || null }))
-      if (good.length === 0) {
-        const j = settled.find((s) => !s.ok)?.j || {}
+      const jobIds = enq.filter((e) => e.ok && e.j.jobId).map((e) => e.j.jobId as string)
+      if (jobIds.length === 0) {
+        const j = enq.find((e) => !e.ok)?.j || {}
         setErr(j.error === 'insufficient_credits' ? 'Not enough credits.'
           : j.error === 'Image generation not configured (GEMINI_API_KEY)' ? 'Clone isn’t switched on yet (missing API key).'
-          : j.error || 'Generation failed — try again.')
+          : j.error || 'Couldn’t start the clone — try again.')
         return
       }
-      setResults(good); setActiveIdx(0)
-      refreshCredits()   // reflect the spend in the sidebar counter immediately (was only on refresh)
-      flyToCreatives(good[0]?.url)   // "saved to My Creatives" flourish
-      if (good.length < count) setErr(`${good.length} of ${count} variations generated (the rest failed).`)
+      refreshCredits()   // reservation already hit the balance
+
+      // Poll all jobs in parallel. Each resolves to a url (done), null (failed), or 'timeout'.
+      const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
+      const DEADLINE = Date.now() + 6 * 60_000   // generous — server maxDuration is 5 min
+      let firstShown = false
+      const pollOne = async (jobId: string): Promise<{ url: string; genId: string } | null> => {
+        while (Date.now() < DEADLINE) {
+          await sleep(2500)
+          try {
+            const s = await fetch(`/api/discovery/clone-image/status?id=${jobId}`).then((r) => r.json())
+            if (s.done && s.url) {
+              const item = { url: s.url as string, genId: (s.generationId as string) || jobId }
+              setResults((prev) => [...prev, item])   // show it the moment it lands
+              if (!firstShown) { firstShown = true; setActiveIdx(0); flyToCreatives(item.url) }
+              return item
+            }
+            if (s.failed) { if (!errRef.current) errRef.current = s.error || 'One variation failed — credits refunded.'; return null }
+          } catch { /* keep polling */ }
+        }
+        return null
+      }
+      errRef.current = null
+      const done = await Promise.all(jobIds.map(pollOne))
+      const okCount = done.filter(Boolean).length
+      if (okCount === 0) setErr(errRef.current || 'Generation is taking longer than usual — check My Creatives in a minute.')
+      else if (okCount < count) setErr(`${okCount} of ${count} variations generated${errRef.current ? ` — ${errRef.current}` : ''}.`)
+      refreshCredits()   // reflect any refunds from failed variations
     } catch (e: any) { setErr(String(e?.message || e)) }
     finally { setBusy(false) }
   }
@@ -271,7 +294,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
         {busy && !hasResults ? (
           <div style={{ background: '#f6f7f5', borderRadius: '0 0 16px 16px' }}>
-            <CloneGeneration helper="Cloning your ad · ~15–40 seconds · keep browsing" />
+            <CloneGeneration helper="Cloning your ad · ~30–90 seconds · they appear as they’re ready · keep browsing" />
           </div>
         ) : (
         <div style={{ display: 'grid', gridTemplateColumns: hasResults ? '1fr 1fr' : '1fr', gap: 0 }}>
