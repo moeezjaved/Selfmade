@@ -13,11 +13,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import CloneModal from '@/app/(dashboard)/discovery/CloneModal'
+import CloneVideoModal from '@/app/(dashboard)/discovery/CloneVideoModal'
 
 const LIME = '#dffe95'
 const BG = '#10211f'
 const PANEL = '#152928'
-const STEPS = ['Your store', 'Your niche', 'Your competitors', 'Clone sources']
+const STEPS = ['Your store', 'Your niche', 'Your competitors', 'Clone sources', 'Clone your first ad']
 const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/selfmade-save-ads/eekbcgdoonpmhoojoaggpfmfgcplaefi'
 
 const NICHES = ['Beauty & Skincare', 'Supplements', 'Apparel & Fashion', 'Fitness', 'Home & Kitchen', 'Pets', 'Baby & Kids', 'Electronics', 'SaaS', 'Jewelry']
@@ -56,6 +58,19 @@ export default function OnboardingPage() {
   // Step 4 — pulls
   const [pullCounts, setPullCounts] = useState<Record<string, number>>({})
   const pullsFiredRef = useRef(false)
+
+  // Step 5 — clone your first ad. Per competitor: their top-performing image + video ad.
+  type TopAd = { id: string; pageId: string; pageName: string; thumbnailUrl: string | null; videoUrl: string | null; format: string | null; performanceScore?: number | null }
+  const [topAds, setTopAds] = useState<Record<string, { image?: TopAd; video?: TopAd }>>({})
+  const [loadingAds, setLoadingAds] = useState(false)
+  const adsLoadedRef = useRef(false)
+  const [balance, setBalance] = useState<number | null>(null)
+  const [costs, setCosts] = useState<{ image: number; video: number }>({ image: 100, video: 650 })
+  const [cloneImageAd, setCloneImageAd] = useState<TopAd | null>(null)
+  const [cloneVideoAd, setCloneVideoAd] = useState<TopAd | null>(null)
+  const [videoBuyFor, setVideoBuyFor] = useState<TopAd | null>(null)
+  const [buying, setBuying] = useState(false)
+  const [cloned, setCloned] = useState<Set<string>>(new Set())  // ad ids the user has kicked off a clone for
 
   // ── Step 1: detect the store ──
   const detect = async () => {
@@ -147,6 +162,69 @@ export default function OnboardingPage() {
     ]))
   }
 
+  // ── Step 5: load each competitor's top image + top video ad (performance-ranked) + the balance ──
+  const loadTopAds = async () => {
+    if (adsLoadedRef.current) return
+    adsLoadedRef.current = true
+    setLoadingAds(true)
+    // Balance + live action costs (so the video gate + labels match the DB pricing).
+    try {
+      const bal = await fetch('/api/credits/balance').then((r) => r.json())
+      if (typeof bal?.balance === 'number') setBalance(bal.balance)
+      const img = bal?.pricing?.image_clone_pro?.credits, vid = bal?.pricing?.video_clone?.credits
+      setCosts({ image: img || 100, video: vid || 650 })
+    } catch { /* defaults stand */ }
+    // Top image + top video per competitor. db-search is performance-sorted and only returns ads
+    // that have real drained creatives (has_creative), so every card is cloneable.
+    await Promise.all(picked.map(async (b) => {
+      const pick = async (format: string): Promise<TopAd | undefined> => {
+        try {
+          const j = await fetch(`/api/discovery/db-search?pageId=${encodeURIComponent(b.pageId)}&format=${format}&sort=performance&status=ALL`).then((r) => r.json())
+          const a = (j?.ads || []).find((x: any) => (format === 'Video' ? x.videoUrl || x.format === 'Video' : x.thumbnailUrl))
+          return a ? { id: a.id, pageId: a.pageId, pageName: a.pageName || b.name, thumbnailUrl: a.thumbnailUrl, videoUrl: a.videoUrl, format: a.format, performanceScore: a.performanceScore } : undefined
+        } catch { return undefined }
+      }
+      const [image, video] = await Promise.all([pick('Image'), pick('Video')])
+      setTopAds((prev) => ({ ...prev, [b.pageId]: { image, video } }))
+    }))
+    setLoadingAds(false)
+  }
+
+  const openImageClone = (ad: TopAd) => { setCloned((s) => new Set(s).add(ad.id)); setCloneImageAd(ad) }
+  const onVideoClick = (ad: TopAd) => {
+    if (balance !== null && balance < costs.video) { setVideoBuyFor(ad); return }  // low credit → offer the pack
+    setCloned((s) => new Set(s).add(ad.id)); setCloneVideoAd(ad)
+  }
+  // Open the $9 Launch Pack checkout in a NEW TAB (keeps the wizard's state alive) and poll the
+  // balance here; the moment the webhook grants the pack we close the sheet and open the video clone.
+  const buyLaunchPack = async () => {
+    setBuying(true)
+    try {
+      const r = await fetch('/api/billing/topup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pack: 'launch' }) })
+      const d = await r.json()
+      if (d?.url) window.open(d.url, '_blank')
+      // else: not_configured / gated → sheet stays open, user can Skip
+    } catch { /* noop */ } finally { setBuying(false) }
+  }
+  // While the buy sheet is open, poll for the credits landing (webhook fulfillment).
+  useEffect(() => {
+    if (!videoBuyFor) return
+    const t = setInterval(async () => {
+      try {
+        const bal = await fetch('/api/credits/balance').then((r) => r.json())
+        if (typeof bal?.balance === 'number') {
+          setBalance(bal.balance)
+          if (bal.balance >= costs.video) {
+            const ad = videoBuyFor
+            setVideoBuyFor(null)
+            setCloned((s) => new Set(s).add(ad.id)); setCloneVideoAd(ad)  // straight into the clone
+          }
+        }
+      } catch { /* keep polling */ }
+    }, 4000)
+    return () => clearInterval(t)
+  }, [videoBuyFor, costs.video])
+
   // Live pull progress — poll each picked brand's catalog total while on step 4.
   useEffect(() => {
     if (step !== 3 || picked.length === 0) return
@@ -167,18 +245,20 @@ export default function OnboardingPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     await supabase.from('user_profiles').update({ niche: niche || null, onboarding_completed: true }).eq('user_id', user.id)
-    // Land ON their first competitor's ads (Brand Spy) — not the generic Discovery feed. If the crawl
-    // is still running it shows the live pull screen ("pulling their ads…"), which is the right story.
-    router.push(picked[0] ? `/discovery/brand-spy/${picked[0].pageId}` : '/discovery')
+    // Cloned something → My Creatives to watch it render. Otherwise land on their first competitor's
+    // ads (Brand Spy), or the generic feed if they skipped competitors entirely.
+    if (cloned.size > 0) router.push('/creative-studio')
+    else router.push(picked[0] ? `/discovery/brand-spy/${picked[0].pageId}` : '/discovery')
   }
 
   const next = async () => {
     if (step === 0 && kit) saveBrand()               // fire-and-forget
     if (step === 2) firePulls()                       // pulls stream while they read step 4
+    if (step === 3) loadTopAds()                      // fetch each competitor's top ads for the clone step
     setStep((s) => Math.min(s + 1, STEPS.length - 1))
   }
 
-  const canNext = [true, true, picked.length > 0, true][step]  // steps 1-2 skippable; ≥1 competitor to advance
+  const canNext = [true, true, picked.length > 0, true, true][step]  // steps 1-2 skippable; ≥1 competitor to advance
 
   const chip = (on: boolean): React.CSSProperties => ({
     background: on ? 'rgba(223,254,149,0.12)' : '#1c3533', border: `1.5px solid ${on ? LIME : 'rgba(223,254,149,0.12)'}`,
@@ -357,6 +437,55 @@ export default function OnboardingPage() {
                 🎁 <b style={{ color: LIME }}>Your free credits cover ~5 image clones.</b> Want a video clone? The <b style={{ color: LIME }}>$9 Launch Pack</b> (900 credits) covers your first AI video — one click, no subscription.
               </div>
             </>}
+
+            {/* ── Step 5: Clone your first ad ── */}
+            {step === 4 && <>
+              <h2 style={h2}>Clone your <em style={em}>first ad.</em></h2>
+              <p style={sub}>Here are your competitors&apos; top-performing ads. Pick one — we&apos;ll rebuild it with <b style={{ color: 'rgba(255,255,255,0.7)' }}>your</b> product. Images are covered by your free credits; video needs the Launch Pack.</p>
+
+              {loadingAds && Object.keys(topAds).length === 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {picked.map((b) => (
+                    <div key={b.pageId} style={{ display: 'flex', gap: 10 }}>
+                      {[0, 1].map((i) => <div key={i} style={{ flex: 1, aspectRatio: '4/5', borderRadius: 14, background: '#1c3533', animation: 'sm-pulse 1.2s infinite' }} />)}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {picked.map((b) => {
+                  const t = topAds[b.pageId]
+                  const hasAny = t && (t.image || t.video)
+                  return (
+                    <div key={b.pageId}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        {b.picture
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={b.picture} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
+                          : <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#1c3533', color: LIME, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11 }}>{b.name[0]?.toUpperCase()}</span>}
+                        <span style={{ fontSize: 14, fontWeight: 800, color: 'white' }}>{b.name}</span>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>top ads</span>
+                      </div>
+                      {!hasAny ? (
+                        <div style={{ background: '#1c3533', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: 14, padding: '16px', fontSize: 12.5, color: 'rgba(255,255,255,0.45)' }}>
+                          {loadingAds ? 'Finding their best ads…' : `Still pulling ${b.name}'s ads — they'll be in your feed shortly. Clone another competitor for now.`}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
+                          {t?.image && <AdCard ad={t.image} kind="image" cost={costs.image} done={cloned.has(t.image.id)} onClone={() => openImageClone(t.image!)} />}
+                          {t?.video && <AdCard ad={t.video} kind="video" cost={costs.video} done={cloned.has(t.video.id)} lowCredit={balance !== null && balance < costs.video} onClone={() => onVideoClick(t.video!)} />}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div style={{ marginTop: 18, fontSize: 12.5, color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 1.5 }}>
+                Not feeling these? You can skip and browse <b style={{ color: 'rgba(255,255,255,0.6)' }}>4.3M ads</b> in Discovery — clone any of them the same way.
+              </div>
+            </>}
           </div>
 
           {/* Nav */}
@@ -368,15 +497,86 @@ export default function OnboardingPage() {
               {step > 0 && <button onClick={() => setStep((s) => s - 1)} style={{ background: 'none', border: '1.5px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', padding: '10px 22px', borderRadius: 100, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>← Back</button>}
               {step < STEPS.length - 1
                 ? <button onClick={next} disabled={!canNext} style={{ background: canNext ? LIME : 'rgba(223,254,149,0.2)', color: canNext ? BG : 'rgba(255,255,255,0.3)', border: 'none', padding: '10px 28px', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: canNext ? 'pointer' : 'not-allowed' }}>
-                  {step === 2 && picked.length > 0 ? `Pull ${picked.length} brand${picked.length > 1 ? 's' : ''} →` : 'Next →'}
+                  {step === 2 && picked.length > 0 ? `Pull ${picked.length} brand${picked.length > 1 ? 's' : ''} →` : step === 3 ? 'Show me their top ads →' : 'Next →'}
                 </button>
-                : <button onClick={finish} disabled={saving} style={{ background: LIME, color: BG, border: 'none', padding: '10px 28px', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>{saving ? 'Opening…' : 'See their ads →'}</button>
+                : <button onClick={finish} disabled={saving} style={{ background: cloned.size > 0 ? LIME : 'transparent', color: cloned.size > 0 ? BG : 'rgba(255,255,255,0.7)', border: cloned.size > 0 ? 'none' : '1.5px solid rgba(255,255,255,0.18)', padding: '10px 28px', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>{saving ? 'Opening…' : cloned.size > 0 ? 'Go to my creatives →' : 'Skip — go to Discovery →'}</button>
               }
             </div>
           </div>
         </div>
       </div>
+      {/* Clone modals — the real Discovery components, mounted in-wizard. */}
+      {cloneImageAd && <CloneModal ad={{ id: cloneImageAd.id, pageId: cloneImageAd.pageId, pageName: cloneImageAd.pageName, assetImageUrl: cloneImageAd.thumbnailUrl || undefined }} onClose={() => setCloneImageAd(null)} />}
+      {cloneVideoAd && <CloneVideoModal sourceAdId={cloneVideoAd.id} sourcePoster={cloneVideoAd.thumbnailUrl || undefined} onClose={() => setCloneVideoAd(null)} />}
+
+      {/* Low-credit → Launch Pack sheet (video clone). */}
+      {videoBuyFor && (
+        <div onClick={() => setVideoBuyFor(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(8,16,15,0.72)', backdropFilter: 'blur(4px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: PANEL, border: `1px solid ${LIME}`, borderRadius: 22, padding: 28, textAlign: 'center' }}>
+            <div style={{ fontSize: 34, marginBottom: 10 }}>🎬</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: 'white', letterSpacing: '-.01em' }}>One step to your first video</div>
+            <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', lineHeight: 1.55, margin: '10px 0 18px' }}>
+              Video clones cost <b style={{ color: LIME }}>{costs.video} credits</b> each{balance !== null ? <> — you have <b style={{ color: 'white' }}>{balance}</b></> : ''}. Grab the <b style={{ color: LIME }}>Launch Pack</b> and we&apos;ll open your clone the moment it lands.
+            </p>
+            <div style={{ background: '#0d1b1a', border: '1px solid rgba(223,254,149,0.2)', borderRadius: 14, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: 'white' }}>Launch Pack</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>900 credits · one video + change</div>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: LIME }}>$9</div>
+            </div>
+            <button onClick={buyLaunchPack} disabled={buying} style={{ width: '100%', background: LIME, color: BG, border: 'none', borderRadius: 12, padding: '13px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', opacity: buying ? 0.6 : 1 }}>
+              {buying ? 'Opening checkout…' : 'Get the Launch Pack — $9'}
+            </button>
+            <button onClick={() => setVideoBuyFor(null)} style={{ marginTop: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Skip for now</button>
+            {buying && <div style={{ marginTop: 12, fontSize: 11.5, color: 'rgba(255,255,255,0.4)' }}>Complete checkout in the new tab — this page updates automatically.</div>}
+          </div>
+        </div>
+      )}
+
       <style>{`@keyframes sm-pulse{0%,100%{opacity:.35}50%{opacity:1}}`}</style>
+    </div>
+  )
+}
+
+/** One competitor ad tile — Discovery-style. Video scrubs/plays on hover; image is a static poster. */
+function AdCard({ ad, kind, cost, done, lowCredit, onClone }: {
+  ad: { id: string; thumbnailUrl: string | null; videoUrl: string | null }
+  kind: 'image' | 'video'; cost: number; done?: boolean; lowCredit?: boolean; onClone: () => void
+}) {
+  const vref = useRef<HTMLVideoElement | null>(null)
+  const LIME = '#dffe95'
+  const play = () => { const v = vref.current; if (v) { v.currentTime = 0; v.play().catch(() => {}) } }
+  const stop = () => { const v = vref.current; if (v) { v.pause() } }
+  return (
+    <div onMouseEnter={kind === 'video' ? play : undefined} onMouseLeave={kind === 'video' ? stop : undefined}
+      style={{ position: 'relative', aspectRatio: '4/5', borderRadius: 14, overflow: 'hidden', background: '#0d1b1a', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+      onClick={onClone}>
+      {kind === 'video' && ad.videoUrl
+        ? <video ref={vref} src={ad.videoUrl} poster={ad.thumbnailUrl || undefined} muted loop playsInline preload="none" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        : ad.thumbnailUrl
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={ad.thumbnailUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>No preview</div>}
+
+      {/* format + cost badges */}
+      <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 6 }}>
+        <span style={{ background: 'rgba(8,16,15,0.75)', color: 'white', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.04em' }}>{kind === 'video' ? '▶ Video' : 'Image'}</span>
+      </div>
+      {kind === 'video' && (
+        <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(8,16,15,0.7)', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <span style={{ color: 'white', fontSize: 12, marginLeft: 2 }}>▶</span>
+        </div>
+      )}
+
+      {/* clone overlay */}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 10, background: 'linear-gradient(transparent, rgba(8,16,15,0.9))' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+          <span style={{ background: done ? 'rgba(223,254,149,0.15)' : LIME, color: done ? LIME : '#10211f', fontSize: 12.5, fontWeight: 800, padding: '7px 12px', borderRadius: 100, border: done ? `1px solid ${LIME}` : 'none' }}>
+            {done ? '✓ Cloning' : kind === 'video' && lowCredit ? 'Clone — $9' : `Clone · ${cost}cr`}
+          </span>
+        </div>
+      </div>
     </div>
   )
 }
