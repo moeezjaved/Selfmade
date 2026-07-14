@@ -50,6 +50,9 @@ async function embedQuery(openai: OpenAI, q: string): Promise<number[]> {
 // format. Applied in-process to the candidate window so we need no stored column
 // or refresh cron yet; promote to a materialized score if the eval proves it out.
 // Weights are deliberately at the top so they're tunable against precision@10.
+// PostgREST array literal for the .ov/.cs operators. Strips chars that would break the {a,b} syntax
+// (commas/braces/quotes/backslash); spaces + apostrophes are safe inside array elements.
+const pgArray = (vals: string[]) => '{' + vals.map(v => v.replace(/[,{}"\\]/g, ' ').trim()).filter(Boolean).join(',') + '}'
 const RANK_W = { longevity: 1.0, active: 3.0, recency: 2.0, video: 0.6 }
 function qualityScore(ad: any): number {
   const days = Math.max(0, Number(ad.days_running) || 0)
@@ -364,17 +367,17 @@ export async function GET(request: NextRequest) {
           // seq-scanned ~95K rows and blew Supabase's statement timeout → "No ads
           // found". plfts = plainto_tsquery, so multi-word ANDs the terms. ~0.6s.
           ...textVariants.map(v => `search_vector.plfts(english).${v}`),
-          // AI topical/category tags (4th search dimension) — "active wear" now
-          // hits the "activewear" topic via the compound variant. NO industries arm here:
-          // adding industries.cs to the OR tipped the planner from BitmapOr (~0.1-0.4s) into a
-          // LIMIT-baited SEQ SCAN of the 4.4M-row table (~6-10s, EXPLAIN-proven) — the core of the
-          // "search is very slow" complaint. industries is the unreliable keyword-autodetect column
-          // anyway (topics/brand_categories are the accurate AI tags); it remains available via the
-          // explicit Industry filter.
-          ...tagVariants.flatMap(v => [
-            `brand_categories.cs.{${v}}`,
-            `topics.cs.{${v}}`,
-          ]),
+          // AI topical/category tags — ONE array-OVERLAP (`ov`) per column, NOT one `cs` arm per tag.
+          // Per-tag `@>` arms made the OR wide enough (esp. multi-tag concepts like men's-health →
+          // testosterone/hair-loss/ED) that the planner flipped from GIN BitmapOr into a LIMIT-baited
+          // SEQ SCAN of the 4.4M-row table (8s+, EXPLAIN-proven). `topics && ARRAY[...]` is a SINGLE
+          // GIN-indexed condition matching any of the tags → estimate stays low → bitmap stays
+          // (~0.1s warm). NO industries arm (unreliable auto-detect col + it was the original flip
+          // trigger); it's still available via the explicit Industry filter.
+          ...(tagVariants.length ? [
+            `topics.ov.${pgArray(tagVariants)}`,
+            `brand_categories.ov.${pgArray(tagVariants)}`,
+          ] : []),
         ]
         keywordOr = orParts.join(',')
         if (keywordOr) baseQuery = baseQuery.or(keywordOr)
