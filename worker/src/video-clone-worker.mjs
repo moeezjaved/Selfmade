@@ -459,13 +459,38 @@ async function transcribeSegments(videoUrl, scriptHint) {
   form.append('file', new Blob([buf], { type: 'video/mp4' }), 'clip.mp4')
   form.append('model', 'whisper-1')
   form.append('response_format', 'verbose_json')
+  form.append('timestamp_granularities[]', 'word')      // word-level timing → karaoke captions
+  form.append('timestamp_granularities[]', 'segment')
   if (scriptHint) form.append('prompt', String(scriptHint).slice(0, 800))  // locks spelling of names
   const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}` }, body: form,
   })
   if (!r.ok) throw new Error(`whisper ${r.status} ${(await r.text()).slice(0, 160)}`)
   const j = await r.json()
-  return Array.isArray(j.segments) ? j.segments.map((s) => ({ start: s.start, end: s.end, text: (s.text || '').trim() })) : []
+  return {
+    language: j.language || null,
+    segments: Array.isArray(j.segments) ? j.segments.map((s) => ({ start: s.start, end: s.end, text: (s.text || '').trim() })) : [],
+    words: Array.isArray(j.words) ? j.words.map((w) => ({ start: w.start, end: w.end, word: (w.word || '').trim() })).filter((w) => w.word) : [],
+  }
+}
+
+// Cross-language captions (Urdu VO + English captions etc.): transcreate each spoken phrase into the
+// caption language, keeping the segment timing. Word-level karaoke can't cross languages (word
+// alignment doesn't survive translation), so translated captions render as timed phrases instead.
+async function translateSegments(segments, targetLang) {
+  const langLabel = langName(targetLang).split(' — ')[0]
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.3, response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: `Transcreate each caption line into natural ${langLabel} as a native ad caption (not literal translation; keep brand/product names as-is). Return ONLY {"lines":["…"]} with EXACTLY one line per input, same order.` },
+        { role: 'user', content: JSON.stringify(segments.map((s) => s.text)) },
+      ] }),
+  })
+  if (!r.ok) throw new Error(`translate ${r.status}`)
+  const out = JSON.parse((await r.json()).choices?.[0]?.message?.content || '{}')
+  const lines = Array.isArray(out.lines) ? out.lines : []
+  return segments.map((s, i) => ({ ...s, text: String(lines[i] || s.text) }))
 }
 const assTime = (t) => {
   const cs = Math.max(0, Math.round(t * 100)); const h = Math.floor(cs / 360000), m = Math.floor((cs % 360000) / 6000), s = Math.floor((cs % 6000) / 100), c = cs % 100
@@ -473,26 +498,46 @@ const assTime = (t) => {
 }
 const CAPTION_STYLES = {
   // Big bold centered — the default TikTok look. Colors are &HAABBGGRR (ASS BGR + alpha).
-  bold:    { Fontname: 'Arial', Fontsize: 42, Bold: -1, PrimaryColour: '&H00FFFFFF', OutlineColour: '&H00000000', BackColour: '&H00000000', BorderStyle: 1, Outline: 3, Shadow: 1, Alignment: 2, MarginV: 90 },
-  minimal: { Fontname: 'Arial', Fontsize: 34, Bold: -1, PrimaryColour: '&H00FFFFFF', OutlineColour: '&H80000000', BackColour: '&H00000000', BorderStyle: 1, Outline: 2, Shadow: 0, Alignment: 2, MarginV: 70 },
-  boxed:   { Fontname: 'Arial', Fontsize: 38, Bold: -1, PrimaryColour: '&H0014281A', OutlineColour: '&H0095FEDF', BackColour: '&H0095FEDF', BorderStyle: 3, Outline: 6, Shadow: 0, Alignment: 2, MarginV: 90 },
+  // Karaoke: sung word = PrimaryColour (lime #dffe95 → BGR 95FEDF), upcoming = SecondaryColour (white).
+  bold:    { Fontname: 'FreeSans', Fontsize: 42, Bold: -1, PrimaryColour: '&H0095FEDF', SecondaryColour: '&H00FFFFFF', OutlineColour: '&H00000000', BackColour: '&H00000000', BorderStyle: 1, Outline: 3, Shadow: 1, Alignment: 2, MarginV: 90 },
+  minimal: { Fontname: 'FreeSans', Fontsize: 34, Bold: -1, PrimaryColour: '&H00FFFFFF', SecondaryColour: '&HA0FFFFFF', OutlineColour: '&H80000000', BackColour: '&H00000000', BorderStyle: 1, Outline: 2, Shadow: 0, Alignment: 2, MarginV: 70 },
+  boxed:   { Fontname: 'FreeSans', Fontsize: 38, Bold: -1, PrimaryColour: '&H0014281A', SecondaryColour: '&H0014281A', OutlineColour: '&H0095FEDF', BackColour: '&H0095FEDF', BorderStyle: 3, Outline: 6, Shadow: 0, Alignment: 2, MarginV: 90 },
 }
-function buildAss(segments, style) {
+function assHead(style) {
   const st = CAPTION_STYLES[style] || CAPTION_STYLES.bold
-  const styleLine = `Style: Default,${st.Fontname},${st.Fontsize},${st.PrimaryColour},&H000000FF,${st.OutlineColour},${st.BackColour},${st.Bold},0,0,0,100,100,0,0,${st.BorderStyle},${st.Outline},${st.Shadow},${st.Alignment},40,40,${st.MarginV},1`
-  const head = `[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n${styleLine}\n\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n`
-  const events = segments.filter((s) => s.text).map((s) => {
-    const txt = s.text.replace(/\n/g, ' ').replace(/\{/g, '(').replace(/\}/g, ')')
-    return `Dialogue: 0,${assTime(s.start)},${assTime(s.end)},Default,,0,0,0,,${txt}`
-  }).join('\n')
-  return head + events + '\n'
+  const styleLine = `Style: Default,${st.Fontname},${st.Fontsize},${st.PrimaryColour},${st.SecondaryColour},${st.OutlineColour},${st.BackColour},${st.Bold},0,0,0,100,100,0,0,${st.BorderStyle},${st.Outline},${st.Shadow},${st.Alignment},40,40,${st.MarginV},1`
+  return `[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n${styleLine}\n\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n`
 }
-async function burnCaptions(videoUrl, segments, style, id) {
+const assSafe = (t) => String(t).replace(/\n/g, ' ').replace(/\{/g, '(').replace(/\}/g, ')')
+// Phrase captions (used for translated/cross-language captions).
+function buildAss(segments, style) {
+  const events = segments.filter((s) => s.text).map((s) =>
+    `Dialogue: 0,${assTime(s.start)},${assTime(s.end)},Default,,0,0,0,,${assSafe(s.text)}`).join('\n')
+  return assHead(style) + events + '\n'
+}
+// Word-by-word KARAOKE captions (same-language): words grouped into ~3-word lines; \k timing paints
+// each word from SecondaryColour → PrimaryColour exactly as it's spoken. The TikTok look.
+function buildKaraokeAss(words, style) {
+  const groups = []
+  for (let i = 0; i < words.length; i += 3) groups.push(words.slice(i, i + 3))
+  const events = groups.map((g) => {
+    const start = g[0].start
+    const end = g[g.length - 1].end + 0.05
+    const text = g.map((w, wi) => {
+      const wEnd = wi < g.length - 1 ? g[wi + 1].start : w.end   // paint until the next word starts
+      const cs = Math.max(1, Math.round((wEnd - w.start) * 100))
+      return `{\\k${cs}}${assSafe(w.word)}`
+    }).join(' ')
+    return `Dialogue: 0,${assTime(start)},${assTime(end)},Default,,0,0,0,,${text}`
+  }).join('\n')
+  return assHead(style) + events + '\n'
+}
+async function burnCaptions(videoUrl, assContent, id) {
   const base = join(tmpdir(), `cap-${id}`)
   const inFile = `${base}.in.mp4`, assFile = `${base}.ass`, outFile = `${base}.out.mp4`
   try {
     await downloadToFile(videoUrl, inFile)
-    await writeFile(assFile, buildAss(segments, style))
+    await writeFile(assFile, assContent)
     // ass filter reads the file by path; escape not needed since path is tmp-safe.
     await ff(['-y', '-i', inFile, '-vf', `ass=${assFile}`, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', outFile])
     return await readFile(outFile)
@@ -507,9 +552,24 @@ async function captionJob(job) {
   try {
     const src = meta.caption_source_url || job.source_video_url
     if (!src) throw new Error('no source video')
-    const segs = await transcribeSegments(src, meta.script || meta.caption_script)
-    if (!segs.length) throw new Error('no speech detected to caption')
-    const mp4 = await burnCaptions(src, segs, meta.caption_style || 'bold', job.id)
+    const tr = await transcribeSegments(src, meta.script || meta.caption_script)
+    if (!tr.segments.length && !tr.words.length) throw new Error('no speech detected to caption')
+    // Same language → word-by-word karaoke; different language → transcreated phrase captions.
+    const WHISPER_ISO = { english: 'en', urdu: 'ur', hindi: 'hi', arabic: 'ar', spanish: 'es', french: 'fr', german: 'de' }
+    const spoken = WHISPER_ISO[String(tr.language || '').toLowerCase()] || String(tr.language || 'en').slice(0, 2)
+    const want = String(meta.caption_lang || 'en').slice(0, 2)
+    const style = meta.caption_style || 'bold'
+    let ass
+    if (want !== spoken && tr.segments.length) {
+      const translated = await translateSegments(tr.segments, want)
+      ass = buildAss(translated, style)
+    } else if (tr.words.length) {
+      ass = buildKaraokeAss(tr.words, style)
+    } else {
+      ass = buildAss(tr.segments, style)
+    }
+    const segs = tr.segments.length ? tr.segments : tr.words
+    const mp4 = await burnCaptions(src, ass, job.id)
     const key = `creatives/${job.user_id}/${job.id}.mp4`
     await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
     const url = `${R2_PUBLIC}/${key}`
@@ -521,6 +581,111 @@ async function captionJob(job) {
     await stamp({ status: 'failed', clone_meta: { ...meta, error: e.message } })
     if (job.credit_tx) await rpc('refund_credits', { p_tx: job.credit_tx })
   }
+}
+
+// ── Add-on helpers: extra-language outputs, branded end-card, hook variants ──────────────────────
+async function insertRow(body) {
+  const r = await fetch(`${U}/rest/v1/creative_generations`, { method: 'POST', headers: { ...H, Prefer: 'return=representation' }, body: JSON.stringify(body) })
+  if (!r.ok) throw new Error(`insert ${r.status} ${(await r.text()).slice(0, 120)}`)
+  const j = await r.json()
+  return j[0]
+}
+
+// Transcreate the approved voiceover into another language (native ad-speak, not translation).
+async function transcreateScript(text, lang) {
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.6, response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: `TRANSCREATE this ad voiceover into ${langName(lang)}. Same message, same energy, natural native delivery — never literal translation. Keep brand/product names as-is. Return ONLY {"script":""}.` },
+        { role: 'user', content: String(text) },
+      ] }),
+  })
+  if (!r.ok) throw new Error(`transcreate ${r.status}`)
+  const out = JSON.parse((await r.json()).choices?.[0]?.message?.content || '{}')
+  if (!out.script) throw new Error('no transcreated script')
+  return String(out.script)
+}
+
+// Two ALTERNATIVE hook treatments for the opening scene (question / bold-claim / visual-shock).
+async function hookVariantPrompts(scenePrompt) {
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.8, response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'Given this Seedance prompt for an ad\'s OPENING scene, write 2 ALTERNATIVE hook treatments: (1) a bold-claim/curiosity pattern, (2) a visual-shock/pattern-interrupt. Same product, same setting language, same approximate duration and style constraints — only the hook concept changes. Return ONLY {"variants":["",""]}' },
+        { role: 'user', content: String(scenePrompt) },
+      ] }),
+  })
+  if (!r.ok) throw new Error(`hooks ${r.status}`)
+  const out = JSON.parse((await r.json()).choices?.[0]?.message?.content || '{}')
+  const v = Array.isArray(out.variants) ? out.variants.filter(Boolean).slice(0, 2) : []
+  if (v.length < 2) throw new Error('no hook variants')
+  return v.map(String)
+}
+
+// Video dimensions (end-card must match the main render or concat breaks).
+async function videoDims(file) {
+  const out = await probeOut(['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=s=x:p=0', file])
+  const m = /(\d+)x(\d+)/.exec(out || '')
+  return m ? { w: +m[1], h: +m[2] } : { w: 720, h: 1280 }
+}
+
+// Branded end-card: brand-dark background + product image + name / offer / lime CTA pill, composed
+// entirely in ffmpeg (zero model cost), sized to the main video, with silent audio for clean concat.
+const EC_FONT = '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf'
+const ecText = (t, max) => String(t || '').replace(/[\\:'"%{}\n]/g, '').slice(0, max)
+async function makeEndCard(meta, dims, out, tmp) {
+  const ec = meta.end_card || {}
+  const name = ecText((meta.product_details && meta.product_details.name) || 'Your brand', 34)
+  const offer = ecText(ec.offer, 44)
+  const cta = ecText(ec.cta || 'Shop now', 26)
+  const { w, h } = dims
+  let imgFile = null
+  const imgUrl = (meta.product_image_urls || [])[0] || null
+  if (imgUrl) {
+    try {
+      imgFile = `${out}.prod.png`
+      if (imgUrl.startsWith('data:')) await writeFile(imgFile, Buffer.from(imgUrl.split(',')[1] || '', 'base64'))
+      else await downloadToFile(imgUrl, imgFile)
+      tmp.push(imgFile)
+    } catch { imgFile = null }
+  }
+  const fs1 = Math.round(h * 0.042), fs2 = Math.round(h * 0.032), fs3 = Math.round(h * 0.030)
+  const dt = (text, size, color, y, box) => `drawtext=fontfile=${EC_FONT}:text='${text}':fontsize=${size}:fontcolor=${color}:x=(w-text_w)/2:y=${y}${box ? `:box=1:boxcolor=0xdffe95:boxborderw=${Math.round(h * 0.016)}` : ''}`
+  const texts = [
+    dt(name, fs1, 'white', Math.round(h * 0.62)),
+    offer ? dt(offer, fs2, '0x95fedf', Math.round(h * 0.695)) : null,
+    dt(cta, fs3, '0x1a2814', Math.round(h * 0.78), true),
+  ].filter(Boolean).join(',')
+  const args = ['-y', '-f', 'lavfi', '-i', `color=c=0x0d130e:s=${w}x${h}:d=2.6:r=30`, '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100']
+  if (imgFile) args.push('-i', imgFile, '-filter_complex', `[2:v]scale=${Math.round(w * 0.72)}:-1[p];[0:v][p]overlay=(W-w)/2:${Math.round(h * 0.16)}[v0];[v0]${texts}[v]`, '-map', '[v]')
+  else args.push('-filter_complex', `[0:v]${texts}[v]`, '-map', '[v]')
+  args.push('-map', '1:a', '-t', '2.6', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', out)
+  await ff(args)
+}
+// Append the end-card to a finished local video. Returns the new path (or the input on any failure —
+// the caller then refunds just the end-card tx and ships the video without it).
+async function withEndCard(localIn, meta, id, tag, tmp) {
+  if (!meta.end_card) return { file: localIn, applied: false }
+  try {
+    const dims = await videoDims(localIn)
+    const card = `${localIn}.${tag}.card.mp4`
+    tmp.push(card)
+    await makeEndCard(meta, dims, card, tmp)
+    const outFile = `${localIn}.${tag}.final.mp4`
+    tmp.push(outFile)
+    await concatClips([localIn, card], outFile)
+    return { file: outFile, applied: true }
+  } catch (e) {
+    console.warn('end-card failed:', e.message)
+    return { file: localIn, applied: false }
+  }
+}
+async function uploadVideo(localFile, key) {
+  const buf = await readFile(localFile)
+  await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: buf, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
+  return `${R2_PUBLIC}/${key}`
 }
 
 // ── PHASE A: analyse the competitor video + draft a script → status='review' (awaits approval) ──
@@ -639,27 +804,77 @@ async function generateJob(job) {
           clipsDone[i] = videoUrl
           await stamp({ clone_meta: { ...meta, scene_plan: scenes, scene_clips: clipsDone } })
         }
-        const cat = `${base}-cat.mp4`
-        tmp.push(cat)
-        await concatClips(files, cat)
-        let finalFile = cat
-        if (finalScript.trim()) {
-          try {
-            const vo = await ttsVoiceover(finalScript, job.id, meta.voice)
-            tmp.push(vo)
-            const mixed = `${base}-vo.mp4`
-            tmp.push(mixed)
-            await muxVoiceover(cat, vo, mixed)
-            finalFile = mixed
-          } catch (e) { console.warn(`tts/mux failed for ${job.id} (shipping without VO):`, e.message) }
+        // Assemble a full cut from a clip list: concat → VO mux → end-card. Reused by the main cut,
+        // the hook variants (different scene 1) and the extra-language outputs (different VO).
+        const assemble = async (clipFiles, voText, tag) => {
+          const catX = `${base}-${tag}-cat.mp4`
+          tmp.push(catX)
+          await concatClips(clipFiles, catX)
+          let cut = catX
+          if (voText && voText.trim()) {
+            try {
+              const vo = await ttsVoiceover(voText, `${job.id}-${tag}`, meta.voice)
+              tmp.push(vo)
+              const mixed = `${base}-${tag}-vo.mp4`
+              tmp.push(mixed)
+              await muxVoiceover(catX, vo, mixed)
+              cut = mixed
+            } catch (e) { console.warn(`tts/mux (${tag}) failed for ${job.id} (shipping without VO):`, e.message) }
+          }
+          return withEndCard(cut, meta, job.id, tag, tmp)
         }
-        const mp4 = await readFile(finalFile)
-        const key = `creatives/${job.user_id}/${job.id}.mp4`
-        await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
-        const url = `${R2_PUBLIC}/${key}`
+
+        const main = await assemble(files, finalScript, 'main')
+        const url = await uploadVideo(main.file, `creatives/${job.user_id}/${job.id}.mp4`)
+        // Settle the end-card tx on the MAIN cut's outcome (applied → commit, failed → refund).
+        if (meta.end_card && meta.end_card.tx) {
+          if (main.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
+          else await rpc('refund_credits', { p_tx: meta.end_card.tx })
+        }
         await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'faithful', scenes: scenes.length, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (faithful, ${scenes.length} scenes) ${job.id} → ${url}`)
+
+        // ── EXTRA LANGUAGES: transcreate + new TTS over the SAME rendered visuals → own creative. ──
+        for (const ex of (Array.isArray(meta.extra_langs) ? meta.extra_langs : [])) {
+          try {
+            const script2 = await transcreateScript(finalScript || meta.script || '', ex.lang)
+            const cut = await assemble(files, script2, `lang-${ex.lang}`)
+            const url2 = await uploadVideo(cut.file, `creatives/${job.user_id}/${job.id}-${ex.lang}.mp4`)
+            await insertRow({ user_id: job.user_id, parent_id: job.id, type: 'video_clone', media_type: 'video', status: 'done', tier: job.tier || 'pro', prompt: `clone · ${ex.lang}`, image_url: url2, clone_meta: { language: ex.lang, script: script2, variant_of: job.id, variant: `lang-${ex.lang}` } })
+            if (ex.tx) await rpc('commit_credits', { p_tx: ex.tx, p_metadata: { lang: ex.lang, actual_cost_usd: 0.02 } })
+            console.log(`🌍 ${job.id} extra language ${ex.lang} → ${url2}`)
+          } catch (e) {
+            console.warn(`extra lang ${ex.lang} failed for ${job.id}:`, e.message)
+            if (ex.tx) await rpc('refund_credits', { p_tx: ex.tx })
+          }
+        }
+
+        // ── HOOK VARIANTS: re-render ONLY scene 1 two more ways, stitch two full alt cuts. ──
+        if (meta.hook_variants_tx) {
+          try {
+            const variants = await hookVariantPrompts(scenes[0].prompt)
+            let vCost = 0
+            const names = ['hookB', 'hookC']
+            for (let vi = 0; vi < variants.length; vi++) {
+              const { videoUrl } = await falGenerate({ prompt: variants[vi], imageUrls: productImages, resolution: meta.resolution, duration: scenes[0].duration, aspect: meta.aspect, tier: meta.tier })
+              vCost += clipCost(meta.tier, scenes[0].duration)
+              let vf = `${base}-${names[vi]}.mp4`
+              await downloadToFile(videoUrl, vf)
+              tmp.push(vf)
+              vf = await ensureAudio(vf)
+              if (!tmp.includes(vf)) tmp.push(vf)
+              const cut = await assemble([vf, ...files.slice(1)], finalScript, names[vi])
+              const urlV = await uploadVideo(cut.file, `creatives/${job.user_id}/${job.id}-${names[vi]}.mp4`)
+              await insertRow({ user_id: job.user_id, parent_id: job.id, type: 'video_clone', media_type: 'video', status: 'done', tier: job.tier || 'pro', prompt: `clone · hook variant ${vi + 2}`, image_url: urlV, clone_meta: { variant_of: job.id, variant: names[vi], hook_prompt: variants[vi], script: finalScript } })
+              console.log(`⚡ ${job.id} ${names[vi]} → ${urlV}`)
+            }
+            await rpc('commit_credits', { p_tx: meta.hook_variants_tx, p_metadata: { hook_variants: 2, actual_cost_usd: +vCost.toFixed(2) } })
+          } catch (e) {
+            console.warn(`hook variants failed for ${job.id}:`, e.message)
+            await rpc('refund_credits', { p_tx: meta.hook_variants_tx })
+          }
+        }
       } finally {
         for (const f of tmp) await rm(f, { force: true }).catch(() => {})
       }
@@ -712,10 +927,12 @@ async function generateJob(job) {
         const cat = `${base}-cat.mp4`
         tmp.push(cat)
         await concatClips(files, cat)
-        const mp4 = await readFile(cat)
-        const key = `creatives/${job.user_id}/${job.id}.mp4`
-        await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
-        const url = `${R2_PUBLIC}/${key}`
+        const fin = await withEndCard(cat, meta, job.id, 'main', tmp)
+        if (meta.end_card && meta.end_card.tx) {
+          if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
+          else await rpc('refund_credits', { p_tx: meta.end_card.tx })
+        }
+        const url = await uploadVideo(fin.file, `creatives/${job.user_id}/${job.id}.mp4`)
         await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'ugc_long', segments: nSeg, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (long UGC, ${nSeg} segments) ${job.id} → ${url}`)
@@ -748,12 +965,17 @@ async function generateJob(job) {
       } else throw e
     }
 
-    const dl = await fetch(videoUrl)
-    if (!dl.ok) throw new Error(`download result ${dl.status}`)
-    const mp4 = Buffer.from(await dl.arrayBuffer())
-    const key = `creatives/${job.user_id}/${job.id}.mp4`
-    await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
-    const url = `${R2_PUBLIC}/${key}`
+    const singleTmp = []
+    const singleFile = join(tmpdir(), `sc-${job.id}.mp4`)
+    singleTmp.push(singleFile)
+    await downloadToFile(videoUrl, singleFile)
+    const fin = await withEndCard(singleFile, meta, job.id, 'main', singleTmp)
+    if (meta.end_card && meta.end_card.tx) {
+      if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
+      else await rpc('refund_credits', { p_tx: meta.end_card.tx })
+    }
+    const url = await uploadVideo(fin.file, `creatives/${job.user_id}/${job.id}.mp4`)
+    for (const f of singleTmp) await rm(f, { force: true }).catch(() => {})
 
     const falCost = clipCost(meta.tier, meta.duration || 10)
     await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, seedance_prompt: prompt, script, fal_request_id: requestId, fal_cost_est: +falCost.toFixed(2) } })
@@ -763,6 +985,10 @@ async function generateJob(job) {
     console.warn(`generate ${job.id} failed:`, e.message)
     await stamp({ status: 'failed', clone_meta: { ...meta, error: e.message } })
     if (job.credit_tx) await rpc('refund_credits', { p_tx: job.credit_tx })
+    // Add-on reservations must never strand when the base render fails.
+    for (const ex of (Array.isArray(meta.extra_langs) ? meta.extra_langs : [])) if (ex.tx) await rpc('refund_credits', { p_tx: ex.tx })
+    if (meta.end_card && meta.end_card.tx) await rpc('refund_credits', { p_tx: meta.end_card.tx })
+    if (meta.hook_variants_tx) await rpc('refund_credits', { p_tx: meta.hook_variants_tx })
   }
 }
 

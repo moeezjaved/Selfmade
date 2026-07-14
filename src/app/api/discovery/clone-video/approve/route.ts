@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { jobId, script, mode, durationBucket } = await req.json().catch(() => ({}))
+  const { jobId, script, mode, durationBucket, extraLangs, endCard, hookVariants } = await req.json().catch(() => ({}))
   if (!jobId) return NextResponse.json({ error: 'jobId required' }, { status: 400 })
 
   const admin = createAdminClient()
@@ -60,14 +60,50 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: insufficient ? 'insufficient_credits' : 'reserve_failed' }, { status: insufficient ? 402 : 500 })
   }
   const txId = Array.isArray(tx) ? tx[0]?.id : (tx as any)?.id
+  const reserved: string[] = txId ? [txId] : []
+  const refundAll = async () => { for (const t of reserved) await admin.rpc('refund_credits', { p_tx: t }).then(() => {}, () => {}) }
+  const reserve = async (a: string): Promise<string | null> => {
+    const { data: t, error: e } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: a })
+    if (e) return null
+    const id = Array.isArray(t) ? t[0]?.id : (t as any)?.id
+    if (id) reserved.push(id)
+    return id || null
+  }
+
+  // ── Add-ons — each gets its OWN credit tx so a single add-on failing refunds only itself. ──
+  const LANGS = new Set(['en', 'ur', 'hi', 'ar', 'es', 'fr', 'de'])
+  const addonMeta: any = {}
+  // Extra language outputs (faithful only — remuxes the same rendered video with a new TTS track).
+  if (chosenMode === 'faithful' && Array.isArray(extraLangs) && extraLangs.length) {
+    const langs = Array.from(new Set(extraLangs.map(String))).filter((l) => LANGS.has(l) && l !== (meta.language || 'en')).slice(0, 2)
+    const list: { lang: string; tx: string }[] = []
+    for (const lang of langs) {
+      const t = await reserve('video_lang_extra')
+      if (!t) { await refundAll(); return NextResponse.json({ error: 'insufficient_credits' }, { status: 402 }) }
+      list.push({ lang, tx: t })
+    }
+    if (list.length) addonMeta.extra_langs = list
+  }
+  // Branded end-card (ffmpeg compose; offer + CTA text from the user).
+  if (endCard && (endCard.offer || endCard.cta)) {
+    const t = await reserve('video_endcard')
+    if (!t) { await refundAll(); return NextResponse.json({ error: 'insufficient_credits' }, { status: 402 }) }
+    addonMeta.end_card = { offer: String(endCard.offer || '').slice(0, 60), cta: String(endCard.cta || 'Shop now').slice(0, 30), tx: t }
+  }
+  // 3 hook variants (multi-clip modes only — re-renders scene/segment 1 twice more).
+  if (hookVariants && (chosenMode === 'faithful' || nSeg > 1)) {
+    const t = await reserve('video_hook_variants')
+    if (!t) { await refundAll(); return NextResponse.json({ error: 'insufficient_credits' }, { status: 402 }) }
+    addonMeta.hook_variants_tx = t
+  }
 
   const finalScript = (typeof script === 'string' && script.trim()) ? script.trim() : (meta.script || '')
   const { error } = await admin.from('creative_generations').update({
-    status: 'processing', credit_tx: txId, clone_meta: { ...meta, final_script: finalScript, mode: chosenMode, scene_count: nScenes, segments: nSeg },
+    status: 'processing', credit_tx: txId, clone_meta: { ...meta, ...addonMeta, final_script: finalScript, mode: chosenMode, scene_count: nScenes, segments: nSeg },
   }).eq('id', jobId).eq('user_id', user.id)
 
   if (error) {
-    if (txId) await admin.rpc('refund_credits', { p_tx: txId }).then(() => {}, () => {})
+    await refundAll()
     return NextResponse.json({ error: 'could not start generation' }, { status: 500 })
   }
   return NextResponse.json({ jobId, status: 'processing' })

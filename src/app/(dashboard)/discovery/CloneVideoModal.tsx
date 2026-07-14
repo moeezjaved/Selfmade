@@ -29,7 +29,9 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [selected, setSelected] = useState<string[]>([])
   const [productName, setProductName] = useState('')
   const [benefit, setBenefit] = useState('')
-  const [tier, setTier] = useState<'premium' | 'fast'>('premium')
+  // Fast tier removed from the UI (2026-07-14: fast renders tested visibly worse) — premium only.
+  // DB rows for *_fast stay (inactive path) so old jobs/history still resolve.
+  const tier = 'premium' as const
   const [look, setLook] = useState('match')            // creator ethnicity/look override
   const [language, setLanguage] = useState('en')       // script + voiceover language (transcreated)
   const [voice, setVoice] = useState('nova')           // narration voice (faithful mode + preview)
@@ -40,6 +42,12 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [sceneCount, setSceneCount] = useState(2)
   const [durationBucket, setDurationBucket] = useState<'15' | '30' | '60' | 'match'>('15')
   const [srcSecs, setSrcSecs] = useState<number | null>(null)
+  // Add-ons (each billed as its own tx; a failed add-on refunds itself, the base video still ships)
+  const [extraLangs, setExtraLangs] = useState<string[]>([])   // faithful only · +200 cr each
+  const [ecOn, setEcOn] = useState(false)                      // branded end-card · +50 cr
+  const [ecOffer, setEcOffer] = useState('')
+  const [ecCta, setEcCta] = useState('Shop now')
+  const [hooksOn, setHooksOn] = useState(false)                // 3 hook variants · +800 cr (faithful)
 
   const [phase, setPhase] = useState<Phase>('form')
   const [jobId, setJobId] = useState<string | null>(null)
@@ -59,9 +67,11 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // 'match' resolves to the nearest bucket from the source ad's analysed duration.
   const resolvedBucket = durationBucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(durationBucket)
   const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1
-  const cost = mode === 'faithful'
+  const baseCost = mode === 'faithful'
     ? (FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]
     : nSegs > 1 ? (FAITHFUL_COST[nSegs] || FAITHFUL_COST[2])[tier] : UGC_COST[tier]
+  const addonCost = (mode === 'faithful' ? extraLangs.length * 200 : 0) + (ecOn ? 50 : 0) + (hooksOn && mode === 'faithful' ? 800 : 0)
+  const cost = baseCost + addonCost
   // Languages breathe differently — per-language speaking rates keep the meter honest.
   const LANGS: { code: string; label: string; rate: number; rtl?: boolean }[] = [
     { code: 'en', label: 'English', rate: 2.3 },
@@ -191,7 +201,12 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     try {
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId, script: draftScript, mode, durationBucket }),
+        body: JSON.stringify({
+          jobId, script: draftScript, mode, durationBucket,
+          extraLangs: mode === 'faithful' ? extraLangs : [],
+          endCard: ecOn ? { offer: ecOffer.trim(), cta: ecCta.trim() || 'Shop now' } : null,
+          hookVariants: hooksOn && mode === 'faithful',
+        }),
       }).then(r => r.json())
       if (ap.error) { setErr(ap.error === 'insufficient_credits' ? 'Not enough credits.' : ap.error); setPhase('review'); return }
       refreshCredits()   // credits reserved on approve → drop the sidebar counter now
@@ -250,17 +265,6 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{mode === 'faithful' ? 'Recreates the ad\'s scenes (b-roll, lifestyle, product shots) with your product, then stitches them — longer render, closest to the original.' : 'One creator speaks your script to camera — fastest and cheapest.'}</p>
                 </section>
 
-                {/* Quality — also on the setup screen, mirrored here so you can flip Fast↔Premium at
-                    approve time and watch the price update without going Back. */}
-                <section>
-                  <Label>Quality</Label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => setTier('premium')} style={tierBtn(tier === 'premium')}>Premium · sharpest</button>
-                    <button onClick={() => setTier('fast')} style={tierBtn(tier === 'fast')}>Fast · ~40% cheaper</button>
-                  </div>
-                  <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>Fast renders quicker and costs less — ideal for testing. Premium for the final ad you’ll run.</p>
-                </section>
-
                 {/* Length buckets (UGC only): 15s = classic single clip; 30/60s = frame-chained
                     segments stitched into one take. 'Match original' auto-picks the nearest bucket. */}
                 {mode === 'ugc' && (
@@ -309,6 +313,39 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                     )
                   )}
                 </section>
+                {/* ── Power-ups: each is its own charge; if one fails it refunds itself and the base
+                    video still delivers. ── */}
+                <section style={{ borderTop: '1px solid #1c2a17', paddingTop: 14 }}>
+                  <Label>Power-ups <span style={{ color: '#5f6f63', fontWeight: 400 }}>· optional</span></Label>
+
+                  {mode === 'faithful' && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 12, color: '#9fb0a4', marginBottom: 6 }}>🌍 Also generate in <span style={{ color: '#5f6f63' }}>· +200 cr each · same video, native voiceover</span></div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {LANGS.filter((l) => l.code !== language).slice(0, 6).map((l) => {
+                          const on = extraLangs.includes(l.code)
+                          return <button key={l.code} onClick={() => setExtraLangs((prev) => on ? prev.filter((x) => x !== l.code) : prev.length >= 2 ? prev : [...prev, l.code])} style={chip(on)}>{l.label}</button>
+                        })}
+                      </div>
+                      {extraLangs.length > 0 && <div style={{ fontSize: 10.5, color: '#6f7f73', marginTop: 5 }}>Each arrives as its own ad in My Creatives.</div>}
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: 12 }}>
+                    <button onClick={() => setEcOn(!ecOn)} style={{ ...chip(ecOn), width: '100%', textAlign: 'left' }}>🏷 Branded end-card · +50 cr {ecOn ? '✓' : ''}</button>
+                    {ecOn && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                        <input value={ecOffer} onChange={(e) => setEcOffer(e.target.value)} placeholder="Offer (e.g. Buy 2 Get 1 Free)" style={{ ...input, flex: 2 }} />
+                        <input value={ecCta} onChange={(e) => setEcCta(e.target.value)} placeholder="CTA" style={{ ...input, flex: 1 }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {mode === 'faithful' && (
+                    <button onClick={() => setHooksOn(!hooksOn)} style={{ ...chip(hooksOn), width: '100%', textAlign: 'left' }}>⚡ 3 hook variants · +800 cr {hooksOn ? '✓' : ''} <span style={{ color: hooksOn ? '#14281a' : '#5f6f63', fontWeight: 400 }}>— same ad, 3 different openings to A/B test</span></button>
+                  )}
+                </section>
+
                 {notice && <div style={noticeBox}>{notice} <a href="/creative-studio" style={{ color: LIME, fontWeight: 700 }}>Open My Creatives →</a></div>}
                 {err && <div style={errBox}>{err}</div>}
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -392,14 +429,6 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                     {VOICES.map((v) => (
                       <button key={v.id} onClick={() => setVoice(v.id)} style={chip(voice === v.id)}>{v.label}</button>
                     ))}
-                  </div>
-                </section>
-
-                <section>
-                  <Label>Quality</Label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => setTier('premium')} style={tierBtn(tier === 'premium')}>Premium · from 400 cr</button>
-                    <button onClick={() => setTier('fast')} style={tierBtn(tier === 'fast')}>Fast · from 250 cr</button>
                   </div>
                 </section>
 
