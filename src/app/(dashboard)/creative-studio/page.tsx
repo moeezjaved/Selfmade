@@ -11,6 +11,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2 } from 'lucide-react'
 import { creativeFilename } from '@/lib/filename'
+import { refreshCredits } from '@/components/credits/CreditCounter'
 import StudioModal from '../discovery/StudioModal'
 
 async function fileToDataUrl(f: File): Promise<string> {
@@ -173,6 +174,30 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const isMobile = useIsMobile()
   const [copied, setCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  // Captions add-on (high-margin blade). Burns TikTok-style captions onto this finished video.
+  const [capStyle, setCapStyle] = useState<'bold' | 'minimal' | 'boxed'>('bold')
+  const [capLang, setCapLang] = useState('en')
+  const [capBusy, setCapBusy] = useState(false)
+  const [capErr, setCapErr] = useState<string | null>(null)
+  const addCaptions = async () => {
+    setCapBusy(true); setCapErr(null)
+    try {
+      const r = await fetch('/api/discovery/clone-video/captions', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sourceId: genId, style: capStyle, captionLang: capLang }),
+      })
+      const j = await r.json()
+      if (!r.ok || !j.jobId) { setCapErr(j.error === 'insufficient_credits' ? 'Not enough credits.' : (j.error || 'Could not start.')); setCapBusy(false); return }
+      // Poll the new caption job to done, then swap the preview to the captioned version.
+      for (let i = 0; i < 90; i++) {
+        await new Promise((res) => setTimeout(res, 4000))
+        const st = await fetch(`/api/discovery/clone-video/status?id=${j.jobId}`).then(x => x.json()).catch(() => ({}))
+        if (st.status === 'done' && st.url) { setImg(st.url); setGenId(j.jobId); refreshCredits(); onChanged(); break }
+        if (st.status === 'failed' || st.error) { setCapErr('Captioning failed — credits refunded.'); refreshCredits(); break }
+      }
+    } catch (e: any) { setCapErr(String(e?.message || e)) }
+    finally { setCapBusy(false) }
+  }
 
   // Force a real download. `<a download>` is ignored for cross-origin R2 URLs (browser just opens
   // them in a new tab), so fetch the bytes and save via an object URL instead.
@@ -227,6 +252,27 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Your video</div>
               <button onClick={() => downloadCreative(creativeFilename({ brand: gen.brand_name, ext: 'mp4', kind: gen.type, date: new Date(gen.created_at) }))} disabled={downloading} style={{ ...btn, justifyContent: 'center' }}><Download size={15} /> {downloading ? 'Downloading…' : 'Download MP4'}</button>
               <button onClick={copyUrl} style={{ ...btnGhost, justifyContent: 'center' }}><Link2 size={15} /> {copied ? 'Copied ✓' : 'Copy URL'}</button>
+
+              {/* Captions add-on — burn TikTok-style captions (85% of feed watches on mute). */}
+              <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>✨ Add captions <span style={{ color: '#9ca3af', fontWeight: 500 }}>· 250 cr</span></div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['bold', 'minimal', 'boxed'] as const).map((s) => (
+                    <button key={s} onClick={() => setCapStyle(s)} style={{ flex: 1, textTransform: 'capitalize', padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${capStyle === s ? '#1a3a1a' : '#d1d5db'}`, background: capStyle === s ? '#f0fdf4' : '#fff', color: '#1a3a1a' }}>{s}</button>
+                  ))}
+                </div>
+                <select value={capLang} onChange={(e) => setCapLang(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12.5, fontFamily: 'inherit' }}>
+                  <option value="en">Captions in English</option>
+                  <option value="ur">Captions in Urdu</option>
+                  <option value="hi">Captions in Hindi</option>
+                  <option value="ar">Captions in Arabic</option>
+                </select>
+                {capErr && <div style={{ fontSize: 12, color: '#dc2626' }}>{capErr}</div>}
+                <button onClick={addCaptions} disabled={capBusy} style={{ ...btn, justifyContent: 'center', opacity: capBusy ? 0.6 : 1 }}>
+                  {capBusy ? <><Loader2 size={15} className="spin" /> Adding captions…</> : <><Sparkles size={15} /> Add captions · 250 cr</>}
+                </button>
+                <p style={{ fontSize: 10.5, color: '#9ca3af', margin: 0 }}>Caption language is independent of the voiceover — e.g. Urdu VO with English captions.</p>
+              </div>
             </>
           ) : (
             <>
