@@ -101,8 +101,8 @@ export const ACTION_COSTS: Record<string, number> = {
   brand_analysis: 20,
   review_mining: 20,
   ask_mello: 10,
-  image_clone_pro: 100,     // 2K Nano Banana Pro — DEFAULT ad clone
-  image_clone_4k: 160,      // 4K / HD download
+  image_clone_pro: 15,      // 2K Nano Banana Pro — DEFAULT ad clone ($0.15, matches CloneModal)
+  image_clone_4k: 25,       // 4K / HD download ($0.25)
   image_studio_pro: 100,    // 2K AI Ad Studio — original ad from inspiration + industry insights
   image_studio_4k: 160,     // 4K / HD Studio ad
   image_edit_pro: 65,       // iterative edit (one 2K Pro image)

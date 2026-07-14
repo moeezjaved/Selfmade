@@ -1,5 +1,11 @@
 {
   "functions": {
+    "src/app/api/discovery/clone-image/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/cron/reconcile-reservations/route.ts": {
+      "maxDuration": 60
+    },
     "src/app/api/m4/launch/route.ts": {
       "maxDuration": 300
     },
@@ -62,6 +68,10 @@
     {
       "path": "/api/cron/automations",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-reservations",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

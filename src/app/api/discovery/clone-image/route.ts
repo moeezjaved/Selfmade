@@ -141,9 +141,13 @@ async function handle(req: NextRequest) {
 
     // Generate → verify → retry. The verifier (cheap Flash text call) checks product identity,
     // branding, and text; a failed check regenerates with ONE targeted correction appended (never
-    // a new standing prompt rule). Up to 2 retries, then the best attempt ships — QA never turns
-    // a paid generation into an error. Verifier fails OPEN on API errors.
-    const MAX_GENS = 3
+    // a new standing prompt rule). Then the best attempt ships — QA never turns a paid generation
+    // into an error. Verifier fails OPEN on API errors.
+    // MAX_GENS = 2 (was 3): a 2K Pro gen can take 30-60s and Google 503-storms trigger internal
+    // backoff retries — 3 full rounds could exceed Vercel's function budget → 504 (killed mid-flight,
+    // stranding the reservation). Two rounds keeps the worst case comfortably under maxDuration AND
+    // halves our worst-case API COGS. The reconcile-reservations cron is the backstop if we still 504.
+    const MAX_GENS = 2
     let gen: Awaited<ReturnType<typeof generateImage>> | null = null
     let best: { mimeType: string; dataB64: string } | null = null
     let verdictLog: string[] = []
