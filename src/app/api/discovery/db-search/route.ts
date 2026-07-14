@@ -261,7 +261,7 @@ export async function GET(request: NextRequest) {
     // drifts from what's actually shown.
     let keywordOr: string | null = null
     // Concept expansion (query-side synonym/sibling map) — empty for brand mode.
-    let expansion: Expansion = { synonymTags: new Set(), relatedTags: new Set(), hit: false }
+    let expansion: Expansion = { synonymTags: new Set(), relatedTags: new Set(), canonicalTags: new Set(), hit: false }
 
     // ── Build base query with ilike keyword search (fast, reliable) ──
     // Only show ads where we actually have a working R2 creative.
@@ -348,11 +348,16 @@ export async function GET(request: NextRequest) {
         // "hair growth" (related solution). Ranking keeps the solution ads below the
         // on-point ones. Mirrors the tag-side normalization (single concept source).
         expansion = expandQuery(q)
-        const expandedTags = [...Array.from(expansion.synonymTags), ...Array.from(expansion.relatedTags)]
+        // SQL arms use ONLY canonical stored tags — synonyms are for recognition/ranking, and every
+        // synonym × 3 array columns was a no-op OR arm (tags are normalized to canonical) that blew
+        // the fan-out to ~60 arms and 4.6s DB-side on 'hair thin'. Canonical-only ≈ 14 arms, ~0.6s.
+        const expandedTags = Array.from(expansion.canonicalTags)
         // Text dimensions: phrase AND compound form against the copy.
         const textVariants = Array.from(new Set([lcPhrase, compound].filter(Boolean)))
-        // Tag dimensions: phrase, compound, each significant word, AND expanded concept tags.
-        const tagVariants = Array.from(new Set([lcPhrase, compound, ...words, ...expandedTags].filter(Boolean)))
+        // Tag dimensions: phrase, compound, expanded canonical tags — and per-word arms ONLY when
+        // the concept map didn't hit (when it did, the canonical tags cover the intent; the generic
+        // single-word arms like {hair}/{thin} just multiply bitmap work for noise matches).
+        const tagVariants = Array.from(new Set([lcPhrase, compound, ...(expansion.hit ? [] : words), ...expandedTags].filter(Boolean)))
         const orParts = [
           // Text dimension via FULL-TEXT SEARCH on the GIN-indexed search_vector
           // (body+title+description+page_name). Replaces 4× `ilike '%...%'` which
@@ -360,11 +365,15 @@ export async function GET(request: NextRequest) {
           // found". plfts = plainto_tsquery, so multi-word ANDs the terms. ~0.6s.
           ...textVariants.map(v => `search_vector.plfts(english).${v}`),
           // AI topical/category tags (4th search dimension) — "active wear" now
-          // hits the "activewear" topic via the compound variant.
+          // hits the "activewear" topic via the compound variant. NO industries arm here:
+          // adding industries.cs to the OR tipped the planner from BitmapOr (~0.1-0.4s) into a
+          // LIMIT-baited SEQ SCAN of the 4.4M-row table (~6-10s, EXPLAIN-proven) — the core of the
+          // "search is very slow" complaint. industries is the unreliable keyword-autodetect column
+          // anyway (topics/brand_categories are the accurate AI tags); it remains available via the
+          // explicit Industry filter.
           ...tagVariants.flatMap(v => [
             `brand_categories.cs.{${v}}`,
             `topics.cs.{${v}}`,
-            `industries.cs.{${v}}`,
           ]),
         ]
         keywordOr = orParts.join(',')
