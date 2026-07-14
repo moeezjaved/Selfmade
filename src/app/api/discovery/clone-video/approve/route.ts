@@ -98,9 +98,14 @@ export async function POST(req: NextRequest) {
     addonMeta.hook_variants_tx = t
   }
 
+  // Single-clip UGC (the 15s bucket) must render a FULL 15s — Seedance supports 4-15s, but the clip
+  // was defaulting to 10s, so the ad ended early and the end-card landed at ~10-12s. (Multi-clip
+  // segments already render 15s each.)
+  const clipDuration = chosenMode === 'ugc' && nSeg === 1 ? 15 : (meta.duration || 10)
+
   const finalScript = (typeof script === 'string' && script.trim()) ? script.trim() : (meta.script || '')
   const { error } = await admin.from('creative_generations').update({
-    status: 'processing', credit_tx: txId, clone_meta: { ...meta, ...addonMeta, final_script: finalScript, mode: chosenMode, scene_count: nScenes, segments: nSeg },
+    status: 'processing', credit_tx: txId, clone_meta: { ...meta, ...addonMeta, final_script: finalScript, mode: chosenMode, scene_count: nScenes, segments: nSeg, duration: clipDuration },
   }).eq('id', jobId).eq('user_id', user.id)
 
   if (error) {
