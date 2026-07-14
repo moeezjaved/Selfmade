@@ -35,6 +35,15 @@ export async function GET(req: NextRequest) {
     suggestedMode: meta.suggested_mode || 'ugc',
     sceneCount: meta.scene_count || 2,
     sourceSeconds: Number(meta?.beat_sheet?.duration_seconds) || null,
-    error: (row as any).status === 'failed' ? (meta.error || 'generation failed') : null,
+    error: (row as any).status === 'failed' ? friendlyError(meta.error) : null,
   })
+}
+
+// Turn raw worker/fal errors into something a user can act on.
+function friendlyError(raw?: string): string {
+  const e = String(raw || '')
+  if (/content_policy_images/.test(e)) return 'One of your product photos was flagged by the video model (it may show a person or private info). Pick a different product photo — a clean shot of just the product works best — and try again.'
+  if (/content_policy_video/.test(e)) return 'The source ad was blocked for likeness — please try a different ad.'
+  if (/insufficient/.test(e)) return 'Not enough credits.'
+  return 'Generation failed — your credits were refunded. Please try again.'
 }

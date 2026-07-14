@@ -367,12 +367,19 @@ async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, 
   if (duration) input.duration = String(duration)
   let sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
   if (!sub.ok) {
-    const txt = (await sub.text()).slice(0, 300)
+    const txt = (await sub.text()).slice(0, 400)
     // Duration out of range for this model tier → retry once at the safe default.
     if (/duration/i.test(txt) && input.duration && input.duration !== '10') {
       input.duration = '10'
       sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
       if (!sub.ok) throw new Error(`fal submit ${sub.status} ${(await sub.text()).slice(0, 200)}`)
+    } else if (/content_policy_violation/i.test(txt)) {
+      // Tag WHICH input fal rejected so callers can react precisely: a flagged reference VIDEO can
+      // retry prompt-only, but a flagged product IMAGE means the user must pick a different photo.
+      const onImages = /image_urls/i.test(txt)
+      const e = new Error(onImages ? 'content_policy_images' : 'content_policy_video')
+      e.code = onImages ? 'content_policy_images' : 'content_policy_video'
+      throw e
     } else throw new Error(`fal submit ${sub.status} ${txt}`)
   }
   const { request_id, status_url, response_url } = await sub.json()
@@ -820,7 +827,8 @@ async function generateJob(job) {
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, motion-ref)`)
             try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier })); falCost += clipCost(meta.tier, s.duration) }
             catch (e) {
-              if (/content_policy_violation|likeness|real people/i.test(e.message)) console.warn(`scene ${i + 1} ref blocked (likeness) — retrying prompt-only`)
+              // Flagged VIDEO ref → drop it, prompt-only retry below. Flagged product IMAGE → surface.
+              if (e.code === 'content_policy_video') console.warn(`scene ${i + 1} ref blocked (likeness) — retrying prompt-only`)
               else throw e
             }
           }
@@ -996,7 +1004,7 @@ async function generateJob(job) {
     try {
       ({ videoUrl, requestId } = await falGenerate({ ...genArgs, videoUrl: refVideo }))
     } catch (e) {
-      if (refVideo && /content_policy_violation|likeness|real people/i.test(e.message)) {
+      if (refVideo && (e.code === 'content_policy_video' || /content_policy_violation|likeness|real people/i.test(e.message)) && e.code !== 'content_policy_images') {
         console.warn(`ref video blocked (likeness) for ${job.id} — retrying prompt-only`)
         ;({ videoUrl, requestId } = await falGenerate({ ...genArgs, videoUrl: null }))
       } else throw e
