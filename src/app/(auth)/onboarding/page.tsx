@@ -47,6 +47,11 @@ export default function OnboardingPage() {
   const [searching, setSearching] = useState(false)
   const [picked, setPicked] = useState<BrandPick[]>([])
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Manual add — for a competitor not in our list (paste their Meta Ad Library / Facebook link).
+  const [showManual, setShowManual] = useState(false)
+  const [manualName, setManualName] = useState('')
+  const [manualLink, setManualLink] = useState('')
+  const [manualErr, setManualErr] = useState('')
 
   // Step 4 — pulls
   const [pullCounts, setPullCounts] = useState<Record<string, number>>({})
@@ -116,6 +121,22 @@ export default function OnboardingPage() {
     return [...prev, b]
   })
 
+  // Pull the numeric Meta page-id out of a pasted link (Ad Library / page URL) or accept a raw id.
+  const extractPageId = (s: string): string | null => {
+    const t = s.trim()
+    const m = t.match(/view_all_page_id=(\d+)/) || t.match(/page_id=(\d+)/) || t.match(/facebook\.com\/(\d{6,})/) || t.match(/^(\d{6,})$/)
+    return m ? m[1] : null
+  }
+  const addManual = () => {
+    setManualErr('')
+    const id = extractPageId(manualLink)
+    if (!id) { setManualErr('Paste their Meta Ad Library link (it contains the page ID) or the numeric page ID.'); return }
+    if (picked.length >= 3) { setManualErr('You can pick up to 3.'); return }
+    if (picked.some((p) => p.pageId === id)) { setManualErr('Already added.'); return }
+    setPicked((prev) => [...prev, { pageId: id, name: manualName.trim() || `Brand ${id.slice(-4)}`, picture: null, adCount: '—' }])
+    setManualName(''); setManualLink(''); setShowManual(false)
+  }
+
   // ── Fire the express pulls + follows when entering step 4 (once) ──
   const firePulls = async () => {
     if (pullsFiredRef.current) return
@@ -146,7 +167,9 @@ export default function OnboardingPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     await supabase.from('user_profiles').update({ niche: niche || null, onboarding_completed: true }).eq('user_id', user.id)
-    router.push('/discovery')
+    // Land ON their first competitor's ads (Brand Spy) — not the generic Discovery feed. If the crawl
+    // is still running it shows the live pull screen ("pulling their ads…"), which is the right story.
+    router.push(picked[0] ? `/discovery/brand-spy/${picked[0].pageId}` : '/discovery')
   }
 
   const next = async () => {
@@ -269,6 +292,27 @@ export default function OnboardingPage() {
                   <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', alignSelf: 'center' }}>{picked.length}/3</span>
                 </div>
               )}
+
+              {/* Manual add — competitor not in our list. */}
+              <div style={{ marginTop: 16 }}>
+                {!showManual ? (
+                  <button onClick={() => setShowManual(true)} style={{ background: 'none', border: 'none', color: LIME, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                    + Can&apos;t find them? Add a competitor manually
+                  </button>
+                ) : (
+                  <div style={{ background: '#0d1b1a', border: '1px solid rgba(223,254,149,0.18)', borderRadius: 14, padding: 14 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'white', marginBottom: 8 }}>Add a competitor manually</div>
+                    <input style={{ ...input, padding: '10px 12px', fontSize: 14, marginBottom: 8 }} placeholder="Brand name (e.g. Nike)" value={manualName} onChange={(e) => setManualName(e.target.value)} />
+                    <input style={{ ...input, padding: '10px 12px', fontSize: 14 }} placeholder="Their Meta Ad Library link, or page ID" value={manualLink} onChange={(e) => setManualLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addManual()} />
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>Open their <a href="https://www.facebook.com/ads/library" target="_blank" rel="noreferrer" style={{ color: LIME }}>Ad Library</a> page and paste the URL — it has the page ID.</div>
+                    {manualErr && <div style={{ fontSize: 12, color: '#ffb4b4', marginTop: 6 }}>{manualErr}</div>}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button onClick={addManual} style={{ background: LIME, color: BG, border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Add</button>
+                      <button onClick={() => { setShowManual(false); setManualErr('') }} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 16px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </>}
 
             {/* ── Step 4: Clone sources + live pulls ── */}
