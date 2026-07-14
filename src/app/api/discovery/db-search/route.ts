@@ -262,6 +262,8 @@ export async function GET(request: NextRequest) {
     let keywordOr: string | null = null
     // Concept expansion (query-side synonym/sibling map) — empty for brand mode.
     let expansion: Expansion = { synonymTags: new Set(), relatedTags: new Set(), hit: false }
+    // Set when the keyword OR is built — feeds the ranked search_ads_v2 RPC fast path.
+    let rpcArgs: { p_q: string; p_tags: string[] } | null = null
 
     // ── Build base query with ilike keyword search (fast, reliable) ──
     // Only show ads where we actually have a working R2 creative.
@@ -362,6 +364,8 @@ export async function GET(request: NextRequest) {
         //    LIMIT — flipped the planner to a 5s+ SEQ SCAN. Collapsing each column to ONE array-
         //    OVERLAP (`col.ov.{a,b,c}` = the `&&` operator) makes it a clean BitmapOr: the whole
         //    keyword query drops to ~240ms. Overlap is semantically identical to OR-of-contains.
+        // Stash for the ranked-RPC fast path below (search_ads_v2 ranks these IN the DB).
+        rpcArgs = { p_q: lcPhrase, p_tags: tagVariants }
         // Values are already comma/brace-free (clean() strips them), so an unquoted array literal is
         // safe inside or() — spaces are fine in PG array elements ({hair loss} = one element).
         const tagArr = tagVariants.join(',')
@@ -495,18 +499,58 @@ export async function GET(request: NextRequest) {
                                                    // so loadMore fires more often (smoother)
     const fetchOffset = page * fetchLimit           // window-aligned — no overlap, no skip
     baseQuery = baseQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
+    // ── RANKED-RPC FAST PATH (search_ads_v2, migration 099) ─────────────────────
+    // For a plain keyword search (no filters), skip PostgREST's single-query planner traps entirely:
+    // the RPC grabs ≤1,500 candidates via the GIN BitmapOr (~240ms), ranks them IN the DB
+    // (phrase-in-copy > tag match > stems-anywhere, then sort key, then perf score) and pages from
+    // the ranked set. Fixes both the 10-15s seq-scan/index-walk flips AND the "arbitrary window"
+    // relevance problem (novels above hair brands) in one move. Any filter active → the classic
+    // or() query below, which expresses them all.
+    const bareKeywordSearch = !!rpcArgs && !pageId && mode !== 'brand' && status === 'ALL' &&
+      !platforms && !format && !industry && !theme && !language && country === 'ALL' && days === 0 &&
+      tiers.length === 0 && niches.length === 0 && activeAdsMin === 0 && runTimeBuckets.length === 0 &&
+      ctaTypes.length === 0 && minReuse === 0 && hideBrands.length === 0 && adsPerBrand === 0 &&
+      hookTypes.length === 0 && emotions.length === 0 && angles.length === 0 &&
+      formatStyles.length === 0 && visualStyles.length === 0 && ctaStyles.length === 0
+
     // Retry once on a statement_timeout (57014) — these are transient under the rollup/drain write
     // load and were surfacing as the "index was busy" banner after a couple of searches.
     let keywordData: any = null, kwErr: any = null, kwCount: number | null = null
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const r = await baseQuery
-      keywordData = r.data; kwErr = r.error; kwCount = r.count
-      if (!kwErr || kwErr.code !== '57014') break
-      await new Promise(res => setTimeout(res, 180))
+    let usedRpc = false
+    if (bareKeywordSearch && rpcArgs) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const r = await admin.rpc('search_ads_v2', { p_q: rpcArgs.p_q, p_tags: rpcArgs.p_tags, p_sort: sort, p_lim: fetchLimit, p_off: fetchOffset })
+        keywordData = r.data; kwErr = r.error
+        if (!kwErr || kwErr.code !== '57014') break
+        await new Promise(res => setTimeout(res, 180))
+      }
+      usedRpc = !kwErr
+      // Migration not applied yet (or any RPC failure) → fall straight back to the classic query.
+      if (kwErr) { keywordData = null; kwErr = null }
+    }
+    if (!usedRpc) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const r = await baseQuery
+        keywordData = r.data; kwErr = r.error; kwCount = r.count
+        if (!kwErr || kwErr.code !== '57014') break
+        await new Promise(res => setTimeout(res, 180))
+      }
     }
 
     if (kwErr) {
       return NextResponse.json({ ads: [], total: 0, totalInDB, source: 'indexed', searchMethod: 'error', timedOut: true })
+    }
+
+    // RPC rows arrive WITHOUT the discovery_creatives embed (SETOF returns bare table rows), and the
+    // dedup below drops any ad with no creatives — so batch-attach them here (one indexed IN query).
+    if (usedRpc && Array.isArray(keywordData) && keywordData.length) {
+      const ids = keywordData.map((a: any) => a.ad_id).filter(Boolean)
+      const { data: cres } = await admin.from('discovery_creatives')
+        .select('ad_id, position, asset_type, r2_url, hash, width, height, poster_url')
+        .in('ad_id', ids)
+      const byAd: Record<string, any[]> = {}
+      for (const c of (cres || []) as any[]) (byAd[c.ad_id] ||= []).push(c)
+      for (const a of keywordData as any[]) a.discovery_creatives = byAd[a.ad_id] || []
     }
 
     // 'recommended' sort = MATCH-TIER first, then quality WITHIN a tier. Once concept
