@@ -353,23 +353,23 @@ export async function GET(request: NextRequest) {
         const textVariants = Array.from(new Set([lcPhrase, compound].filter(Boolean)))
         // Tag dimensions: phrase, compound, each significant word, AND expanded concept tags.
         const tagVariants = Array.from(new Set([lcPhrase, compound, ...words, ...expandedTags].filter(Boolean)))
+        // PERF (proven via EXPLAIN ANALYZE on 4.4M rows):
+        //  • plfts (plainto) on search_vector = 458ms (GIN bitmap, no heap recheck).
+        //    phfts (phraseto) = 7.2s — it heap-rechecks every stem-match for phrase adjacency.
+        //    So we use plainto for SPEED and drop the romance-novel false-positives in-process
+        //    (matchTierWeight already demotes copy-only stem matches below tag/phrase matches).
+        //  • The tag dimension was ~30 separate `col.cs.{one}` OR-clauses, which — combined with
+        //    LIMIT — flipped the planner to a 5s+ SEQ SCAN. Collapsing each column to ONE array-
+        //    OVERLAP (`col.ov.{a,b,c}` = the `&&` operator) makes it a clean BitmapOr: the whole
+        //    keyword query drops to ~240ms. Overlap is semantically identical to OR-of-contains.
+        // Values are already comma/brace-free (clean() strips them), so an unquoted array literal is
+        // safe inside or() — spaces are fine in PG array elements ({hair loss} = one element).
+        const tagArr = tagVariants.join(',')
         const orParts = [
-          // Text dimension via FULL-TEXT SEARCH on the GIN-indexed search_vector
-          // (body+title+description+page_name). Replaces 4× `ilike '%...%'` which
-          // seq-scanned ~95K rows and blew Supabase's statement timeout → "No ads found".
-          // phfts = phraseto_tsquery: multi-word must appear as an ADJACENT PHRASE, not just
-          // both stems anywhere. This is the fix for "hair fall" surfacing romance-novel ads —
-          // their long copy contains "hair" and "fall(ing)" separately, which plainto_tsquery
-          // (AND-anywhere) matched. phrase-match excludes them; the tag/concept dimensions below
-          // keep recall for legitimately-related ads. Single-word queries are identical either way.
-          ...textVariants.map(v => `search_vector.phfts(english).${v}`),
-          // AI topical/category tags (4th search dimension) — "active wear" now
-          // hits the "activewear" topic via the compound variant.
-          ...tagVariants.flatMap(v => [
-            `brand_categories.cs.{${v}}`,
-            `topics.cs.{${v}}`,
-            `industries.cs.{${v}}`,
-          ]),
+          ...textVariants.map(v => `search_vector.plfts(english).${v}`),
+          `brand_categories.ov.{${tagArr}}`,
+          `topics.ov.{${tagArr}}`,
+          `industries.ov.{${tagArr}}`,
         ]
         keywordOr = orParts.join(',')
         if (keywordOr) baseQuery = baseQuery.or(keywordOr)
