@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       caption_source_url: (src as any).image_url,
       caption_style: STYLES.has(String(style)) ? style : 'bold',
       caption_lang: captionLang || meta.language || 'en',
+      source_lang: meta.language || 'en',   // known VO language → reliable karaoke-vs-translate call
       script: meta.script || meta.final_script || null,
       captioned_from: sourceId,
     },

@@ -104,7 +104,7 @@ export const ACTION_COSTS: Record<string, number> = {
   image_studio_4k: 160,     // 4K / HD Studio ad
   image_edit_pro: 65,       // iterative edit (one 2K Pro image)
   video_clone: 650,         // UGC 15s premium (2× fal cost) — video is a cost-plus loss-leader
-  video_captions: 250,      // TikTok-style burned captions — high-margin add-on
+  video_captions: 100,      // TikTok-style burned captions — high-margin add-on
   asset_ai_tag: 10,         // AI tagging of an uploaded asset (caption/embed + video clip analysis)
 }
 

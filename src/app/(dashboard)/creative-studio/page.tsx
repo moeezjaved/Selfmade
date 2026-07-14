@@ -255,7 +255,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
 
               {/* Captions add-on — burn TikTok-style captions (85% of feed watches on mute). */}
               <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>✨ Add captions <span style={{ color: '#9ca3af', fontWeight: 500 }}>· 250 cr</span></div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>✨ Add captions <span style={{ color: '#9ca3af', fontWeight: 500 }}>· 100 cr</span></div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {(['bold', 'minimal', 'boxed'] as const).map((s) => (
                     <button key={s} onClick={() => setCapStyle(s)} style={{ flex: 1, textTransform: 'capitalize', padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${capStyle === s ? '#1a3a1a' : '#d1d5db'}`, background: capStyle === s ? '#f0fdf4' : '#fff', color: '#1a3a1a' }}>{s}</button>
@@ -269,7 +269,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                 </select>
                 {capErr && <div style={{ fontSize: 12, color: '#dc2626' }}>{capErr}</div>}
                 <button onClick={addCaptions} disabled={capBusy} style={{ ...btn, justifyContent: 'center', opacity: capBusy ? 0.6 : 1 }}>
-                  {capBusy ? <><Loader2 size={15} className="spin" /> Adding captions…</> : <><Sparkles size={15} /> Add captions · 250 cr</>}
+                  {capBusy ? <><Loader2 size={15} className="spin" /> Adding captions…</> : <><Sparkles size={15} /> Add captions · 100 cr</>}
                 </button>
                 <p style={{ fontSize: 10.5, color: '#9ca3af', margin: 0 }}>Caption language is independent of the voiceover — e.g. Urdu VO with English captions.</p>
               </div>
