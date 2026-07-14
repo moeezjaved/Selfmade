@@ -356,9 +356,13 @@ export async function GET(request: NextRequest) {
         const orParts = [
           // Text dimension via FULL-TEXT SEARCH on the GIN-indexed search_vector
           // (body+title+description+page_name). Replaces 4× `ilike '%...%'` which
-          // seq-scanned ~95K rows and blew Supabase's statement timeout → "No ads
-          // found". plfts = plainto_tsquery, so multi-word ANDs the terms. ~0.6s.
-          ...textVariants.map(v => `search_vector.plfts(english).${v}`),
+          // seq-scanned ~95K rows and blew Supabase's statement timeout → "No ads found".
+          // phfts = phraseto_tsquery: multi-word must appear as an ADJACENT PHRASE, not just
+          // both stems anywhere. This is the fix for "hair fall" surfacing romance-novel ads —
+          // their long copy contains "hair" and "fall(ing)" separately, which plainto_tsquery
+          // (AND-anywhere) matched. phrase-match excludes them; the tag/concept dimensions below
+          // keep recall for legitimately-related ads. Single-word queries are identical either way.
+          ...textVariants.map(v => `search_vector.phfts(english).${v}`),
           // AI topical/category tags (4th search dimension) — "active wear" now
           // hits the "activewear" topic via the compound variant.
           ...tagVariants.flatMap(v => [
@@ -582,12 +586,14 @@ export async function GET(request: NextRequest) {
     // every exact match keeps its place; semantic only fills the empty slots. That
     // avoids the old replace-mode bug that capped "Mars Men" at 84 of 331 creatives.
     // SKIP brand mode (a brand's ad copy rarely resembles its own name semantically).
-    // GATED behind SEMANTIC_SEARCH_ENABLED: with embeddings only ~1.3% populated, this path adds a
-    // slow OpenAI+RPC round-trip (~9s on "nike"-style cold queries) that returns nothing useful and
-    // can surface as a fake "error/empty". Keep it OFF until the embed-backfill fills the corpus,
-    // then set SEMANTIC_SEARCH_ENABLED=1 in the env to turn it on. Also hard-capped by a timeout
-    // below so it can never hang the request even when enabled.
-    if (process.env.SEMANTIC_SEARCH_ENABLED === '1' && q && mode !== 'brand' && ads.length < limit && process.env.OPENAI_API_KEY && !semanticBlind) {
+    // HARD-DISABLED (2026-07-14): the semantic fill adds a per-query OpenAI embedding + pgvector
+    // round-trip that made search "slower than ever", and on keyword queries it returned loosely-
+    // related junk instead of on-point ads — the exact "worse than before HNSW" complaint. Keyword +
+    // tag/concept matching (above) is fast and precise. The env gate `SEMANTIC_SEARCH_ENABLED` proved
+    // too easy to leave on by accident, so we gate on a code constant now: flip SEMANTIC_FILL to true
+    // (and set OPENAI_API_KEY) to re-enable once the semantic ranking is genuinely better than keyword.
+    const SEMANTIC_FILL = false
+    if (SEMANTIC_FILL && q && mode !== 'brand' && ads.length < limit && process.env.OPENAI_API_KEY && !semanticBlind) {
       try {
         const queryVec = await embedQuery(getOpenAI(), q)
         const { data: vectorResults } = await admin.rpc('search_ads_semantic', {
