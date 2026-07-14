@@ -25,7 +25,7 @@ export default function SignupPage() {
   }, [])
 
   const emailErr = form.email && !emailDomain(form.email) ? 'Enter a valid email'
-    : form.email && isFreeEmail(form.email) ? 'Please use your business (work) email — personal addresses like Gmail aren’t accepted.'
+    : form.email && isFreeEmail(form.email) ? 'Please use a permanent email — temporary/disposable inboxes aren’t accepted.'
     : ''
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -52,7 +52,7 @@ export default function SignupPage() {
       <img src="/logo.png" alt="Selfmade" style={{ height: 34, filter: 'brightness(0)', margin: '0 auto 24px', display: 'block' }} />
       <div style={S.card}>
         <h1 style={S.h1}>Create your account</h1>
-        <p style={S.sub}>Sign up with your <b>business email</b> — 50 free credits, no card.</p>
+        <p style={S.sub}>Free to start — 600 credits, no card.</p>
 
         <button onClick={handleGoogle} style={S.google}><GoogleIcon /> Continue with Google</button>
 
