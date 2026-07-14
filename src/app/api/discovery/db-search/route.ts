@@ -810,7 +810,7 @@ export async function GET(request: NextRequest) {
       // has-creative rows are genuinely exhausted. (Plus the semantic gap-fill case.)
       hasMore: (keywordData?.length || 0) >= fetchLimit,
       totalInDB,
-      source: 'indexed',
+      source: usedRpc ? 'rpc' : 'indexed',   // 'rpc' = the ranked search_ads_v2 fast path (visible in DevTools)
       searchMethod,
     }
     // Cache only successful, non-empty pages (an empty result is usually a transient timeout
