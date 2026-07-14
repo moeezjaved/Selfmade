@@ -29,8 +29,8 @@
 type Concept = { synonyms: string[]; related?: string[] }
 
 export const CONCEPTS: Record<string, Concept> = {
-  'hair loss':    { synonyms: ['thinning hair', 'hair thinning', 'balding', 'hair fall', 'receding', 'hair loss'], related: ['hair growth'] },
-  'hair growth':  { synonyms: ['regrow', 'regrowth', 'hair regrowth', 'thicker hair'] },
+  'hair loss':    { synonyms: ['thinning hair', 'hair thinning', 'hair thin', 'thin hair', 'thinning', 'balding', 'hair fall', 'hair falling', 'receding', 'receding hairline', 'bald spot', 'hair loss'], related: ['hair growth'] },
+  'hair growth':  { synonyms: ['regrow', 'regrowth', 'hair regrowth', 'thicker hair', 'fuller hair', 'hair growth'] },
   'activewear':   { synonyms: ['active wear', 'gym wear', 'gymwear', 'athleisure', 'workout clothes', 'athletic wear', 'athleticwear', 'sportswear'], related: ['leggings'] },
   'leggings':     { synonyms: ['legging', 'yoga pants'] },
   'weight loss':  { synonyms: ['fat loss', 'slimming', 'lose weight', 'weight management', 'glp-1'] },
