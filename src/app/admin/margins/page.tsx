@@ -24,7 +24,7 @@ export default function MarginsPage() {
   return (
     <div style={{ padding: 28, maxWidth: 820 }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Margins</h1>
-      <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 20 }}>Realized margin per action (credits × $0.03 revenue vs logged model cost). Target 50–90%.</p>
+      <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 20 }}>Realized margin per action (credits × $0.01 revenue vs logged model cost). Video is intentionally low-margin (cost-plus loss-leader); captions/subscriptions carry the profit.</p>
       {loading ? <div style={{ color: '#9ca3af' }}>Loading…</div>
         : rows.length === 0 ? <div style={{ color: '#9ca3af' }}>No metered actions yet.</div>
         : (

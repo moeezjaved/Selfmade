@@ -9,7 +9,7 @@ import { isAdminToken } from '@/lib/admin/auth'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
-const CREDIT_RETAIL_USD = 0.03
+const CREDIT_RETAIL_USD = 0.01   // 1 credit = 1¢ (redenomination, migration 095)
 
 export async function GET() {
   const supabase = await createClient()
