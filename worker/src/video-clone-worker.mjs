@@ -611,21 +611,23 @@ async function transcreateScript(text, lang) {
   return String(out.script)
 }
 
-// Two ALTERNATIVE hook treatments for the opening scene (question / bold-claim / visual-shock).
+// Two ALTERNATIVE hook treatments for the opening scene, as the two named archetypes distinct from
+// the (kept) original: a question hook and a visual-shock/pattern-interrupt. Returns labelled objects
+// so each stitched version is clearly identifiable for A/B testing.
 async function hookVariantPrompts(scenePrompt) {
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.8, response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: 'Given this Seedance prompt for an ad\'s OPENING scene, write 2 ALTERNATIVE hook treatments: (1) a bold-claim/curiosity pattern, (2) a visual-shock/pattern-interrupt. Same product, same setting language, same approximate duration and style constraints — only the hook concept changes. Return ONLY JSON: {"variants":["",""]}' },
+        { role: 'system', content: 'Given this Seedance prompt for an ad\'s OPENING scene, write 2 ALTERNATIVE hook treatments so the advertiser can A/B test openings: (1) "Question hook" — opens on a curiosity/question pattern; (2) "Visual shock" — a pattern-interrupt / surprising visual. Same product, same setting language, same approximate duration and style — only the hook concept changes. Return ONLY JSON: {"variants":[{"label":"Question hook","prompt":""},{"label":"Visual shock","prompt":""}]}' },
         { role: 'user', content: String(scenePrompt) },
       ] }),
   })
   if (!r.ok) throw new Error(`hooks ${r.status}`)
   const out = JSON.parse((await r.json()).choices?.[0]?.message?.content || '{}')
-  const v = Array.isArray(out.variants) ? out.variants.filter(Boolean).slice(0, 2) : []
+  const v = (Array.isArray(out.variants) ? out.variants : []).filter((x) => x && x.prompt).slice(0, 2)
   if (v.length < 2) throw new Error('no hook variants')
-  return v.map(String)
+  return v.map((x, i) => ({ label: String(x.label || (i === 0 ? 'Question hook' : 'Visual shock')), prompt: String(x.prompt) }))
 }
 
 // Video dimensions (end-card must match the main render or concat breaks).
@@ -835,7 +837,7 @@ async function generateJob(job) {
           if (main.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
           else await rpc('refund_credits', { p_tx: meta.end_card.tx })
         }
-        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
+        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: finalScript, fal_cost_est: +falCost.toFixed(2), ...(meta.hook_variants_tx ? { hook_label: 'Original hook' } : {}) } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'faithful', scenes: scenes.length, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (faithful, ${scenes.length} scenes) ${job.id} → ${url}`)
 
@@ -859,19 +861,21 @@ async function generateJob(job) {
           try {
             const variants = await hookVariantPrompts(scenes[0].prompt)
             let vCost = 0
-            const names = ['hookB', 'hookC']
             for (let vi = 0; vi < variants.length; vi++) {
-              const { videoUrl } = await falGenerate({ prompt: variants[vi], imageUrls: productImages, resolution: meta.resolution, duration: scenes[0].duration, aspect: meta.aspect, tier: meta.tier })
+              const label = variants[vi].label
+              const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+              const { videoUrl } = await falGenerate({ prompt: variants[vi].prompt, imageUrls: productImages, resolution: meta.resolution, duration: scenes[0].duration, aspect: meta.aspect, tier: meta.tier })
               vCost += clipCost(meta.tier, scenes[0].duration)
-              let vf = `${base}-${names[vi]}.mp4`
+              let vf = `${base}-${slug}.mp4`
               await downloadToFile(videoUrl, vf)
               tmp.push(vf)
               vf = await ensureAudio(vf)
               if (!tmp.includes(vf)) tmp.push(vf)
-              const cut = await assemble([vf, ...files.slice(1)], finalScript, names[vi])
-              const urlV = await uploadVideo(cut.file, `creatives/${job.user_id}/${job.id}-${names[vi]}.mp4`)
-              await insertRow({ user_id: job.user_id, parent_id: job.id, type: 'video_clone', media_type: 'video', status: 'done', tier: job.tier || 'pro', prompt: `clone · hook variant ${vi + 2}`, image_url: urlV, clone_meta: { variant_of: job.id, variant: names[vi], hook_prompt: variants[vi], script: finalScript } })
-              console.log(`⚡ ${job.id} ${names[vi]} → ${urlV}`)
+              const cut = await assemble([vf, ...files.slice(1)], finalScript, slug)
+              const urlV = await uploadVideo(cut.file, `creatives/${job.user_id}/${job.id}-${slug}.mp4`)
+              // Clear A/B label so the user can tell the versions apart in My Creatives.
+              await insertRow({ user_id: job.user_id, parent_id: job.id, type: 'video_clone', media_type: 'video', status: 'done', tier: job.tier || 'pro', prompt: `Hook: ${label}`, image_url: urlV, clone_meta: { variant_of: job.id, hook_label: label, hook_prompt: variants[vi].prompt, script: finalScript } })
+              console.log(`⚡ ${job.id} hook「${label}」→ ${urlV}`)
             }
             await rpc('commit_credits', { p_tx: meta.hook_variants_tx, p_metadata: { hook_variants: 2, actual_cost_usd: +vCost.toFixed(2) } })
           } catch (e) {
