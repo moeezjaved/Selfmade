@@ -447,6 +447,82 @@ async function ensureAudio(file) {
   return fixed
 }
 
+// ── CAPTIONS (high-margin blade): Whisper word/segment timing on the finished audio → styled ASS →
+// ffmpeg burns TikTok-style captions. We already own the approved script, so we feed it to Whisper as
+// a prompt to lock spelling (brand/product names never garbled). Caption language is INDEPENDENT of
+// the voice (Urdu VO + English captions etc.). ──
+async function transcribeSegments(videoUrl, scriptHint) {
+  const vr = await fetch(videoUrl)
+  if (!vr.ok) throw new Error(`fetch clip ${vr.status}`)
+  const buf = Buffer.from(await vr.arrayBuffer())
+  const form = new FormData()
+  form.append('file', new Blob([buf], { type: 'video/mp4' }), 'clip.mp4')
+  form.append('model', 'whisper-1')
+  form.append('response_format', 'verbose_json')
+  if (scriptHint) form.append('prompt', String(scriptHint).slice(0, 800))  // locks spelling of names
+  const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}` }, body: form,
+  })
+  if (!r.ok) throw new Error(`whisper ${r.status} ${(await r.text()).slice(0, 160)}`)
+  const j = await r.json()
+  return Array.isArray(j.segments) ? j.segments.map((s) => ({ start: s.start, end: s.end, text: (s.text || '').trim() })) : []
+}
+const assTime = (t) => {
+  const cs = Math.max(0, Math.round(t * 100)); const h = Math.floor(cs / 360000), m = Math.floor((cs % 360000) / 6000), s = Math.floor((cs % 6000) / 100), c = cs % 100
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`
+}
+const CAPTION_STYLES = {
+  // Big bold centered — the default TikTok look. Colors are &HAABBGGRR (ASS BGR + alpha).
+  bold:    { Fontname: 'Arial', Fontsize: 42, Bold: -1, PrimaryColour: '&H00FFFFFF', OutlineColour: '&H00000000', BackColour: '&H00000000', BorderStyle: 1, Outline: 3, Shadow: 1, Alignment: 2, MarginV: 90 },
+  minimal: { Fontname: 'Arial', Fontsize: 34, Bold: -1, PrimaryColour: '&H00FFFFFF', OutlineColour: '&H80000000', BackColour: '&H00000000', BorderStyle: 1, Outline: 2, Shadow: 0, Alignment: 2, MarginV: 70 },
+  boxed:   { Fontname: 'Arial', Fontsize: 38, Bold: -1, PrimaryColour: '&H0014281A', OutlineColour: '&H0095FEDF', BackColour: '&H0095FEDF', BorderStyle: 3, Outline: 6, Shadow: 0, Alignment: 2, MarginV: 90 },
+}
+function buildAss(segments, style) {
+  const st = CAPTION_STYLES[style] || CAPTION_STYLES.bold
+  const styleLine = `Style: Default,${st.Fontname},${st.Fontsize},${st.PrimaryColour},&H000000FF,${st.OutlineColour},${st.BackColour},${st.Bold},0,0,0,100,100,0,0,${st.BorderStyle},${st.Outline},${st.Shadow},${st.Alignment},40,40,${st.MarginV},1`
+  const head = `[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n${styleLine}\n\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n`
+  const events = segments.filter((s) => s.text).map((s) => {
+    const txt = s.text.replace(/\n/g, ' ').replace(/\{/g, '(').replace(/\}/g, ')')
+    return `Dialogue: 0,${assTime(s.start)},${assTime(s.end)},Default,,0,0,0,,${txt}`
+  }).join('\n')
+  return head + events + '\n'
+}
+async function burnCaptions(videoUrl, segments, style, id) {
+  const base = join(tmpdir(), `cap-${id}`)
+  const inFile = `${base}.in.mp4`, assFile = `${base}.ass`, outFile = `${base}.out.mp4`
+  try {
+    await downloadToFile(videoUrl, inFile)
+    await writeFile(assFile, buildAss(segments, style))
+    // ass filter reads the file by path; escape not needed since path is tmp-safe.
+    await ff(['-y', '-i', inFile, '-vf', `ass=${assFile}`, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', outFile])
+    return await readFile(outFile)
+  } finally {
+    await rm(inFile, { force: true }).catch(() => {}); await rm(assFile, { force: true }).catch(() => {}); await rm(outFile, { force: true }).catch(() => {})
+  }
+}
+
+async function captionJob(job) {
+  const meta = job.clone_meta || {}
+  const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
+  try {
+    const src = meta.caption_source_url || job.source_video_url
+    if (!src) throw new Error('no source video')
+    const segs = await transcribeSegments(src, meta.script || meta.caption_script)
+    if (!segs.length) throw new Error('no speech detected to caption')
+    const mp4 = await burnCaptions(src, segs, meta.caption_style || 'bold', job.id)
+    const key = `creatives/${job.user_id}/${job.id}.mp4`
+    await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
+    const url = `${R2_PUBLIC}/${key}`
+    await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, caption_segments: segs.length } })
+    if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { captions: true, actual_cost_usd: 0.01 } })
+    console.log(`💬 captioned ${job.id} → ${url}`)
+  } catch (e) {
+    console.warn(`caption ${job.id} failed:`, e.message)
+    await stamp({ status: 'failed', clone_meta: { ...meta, error: e.message } })
+    if (job.credit_tx) await rpc('refund_credits', { p_tx: job.credit_tx })
+  }
+}
+
 // ── PHASE A: analyse the competitor video + draft a script → status='review' (awaits approval) ──
 async function analyzeJob(job) {
   const meta = job.clone_meta || {}
@@ -717,6 +793,16 @@ async function pump() {
       if (inflight.has(j.id) || genActive >= MAX_GEN) continue
       inflight.add(j.id); genActive++
       generateJob(j).catch((e) => console.warn('generate crash:', e?.message)).finally(() => { inflight.delete(j.id); genActive-- })
+    }
+  }
+  // Caption jobs (cheap: Whisper + ffmpeg burn) — their own type, share the gen concurrency budget.
+  if (genActive < MAX_GEN) {
+    const capSel = 'select=id,user_id,tier,source_video_url,clone_meta,credit_tx&type=eq.video_captions&status=eq.processing&image_url=is.null&order=created_at.asc&limit=4'
+    const captioning = await getJSON(`creative_generations?${capSel}`).catch(() => [])
+    for (const j of captioning || []) {
+      if (inflight.has(j.id) || genActive >= MAX_GEN) continue
+      inflight.add(j.id); genActive++
+      captionJob(j).catch((e) => console.warn('caption crash:', e?.message)).finally(() => { inflight.delete(j.id); genActive-- })
     }
   }
 }
