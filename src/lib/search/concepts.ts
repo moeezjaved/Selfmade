@@ -42,23 +42,24 @@ export const CONCEPTS: Record<string, Concept> = {
   // that link flooded "skincare" with collagen brands). Keep related links DEFENSIBLE.
   'skincare':     { synonyms: ['skin care', 'serum', 'moisturizer', 'skin routine'], related: ['anti-aging'] },
   'anti-aging':   { synonyms: ['antiaging', 'wrinkles', 'fine lines', 'aging skin'] },
-  "men's health": { synonyms: ['mens health'], related: ['testosterone', 'hair loss', 'erectile dysfunction'] },
+  "men's health": { synonyms: ['mens health', 'men health', 'male health', 'mens wellness', 'male wellness', 'mens'], related: ['testosterone', 'hair loss', 'erectile dysfunction'] },
   "women's health": { synonyms: ['womens health'] },
   'protein':      { synonyms: ['protein powder', 'protein shake'] },
   'gut health':   { synonyms: ['bloating', 'digestion', 'digestive'] },
 }
 
-// Reverse index: any synonym OR canonical key → its canonical concept name.
+const norm = (s: string) => s.replace(/['’]/g, '').replace(/[,(){}]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+
+// Reverse index: any synonym OR canonical key → its canonical concept name. Keys are norm()'d so
+// apostrophes/punctuation match consistently with the normalized query (men's health ⇄ mens health).
 const SYN_TO_CANON: Record<string, string> = (() => {
   const m: Record<string, string> = {}
   for (const [canon, c] of Object.entries(CONCEPTS)) {
-    m[canon] = canon
-    for (const s of c.synonyms) m[s] = canon
+    m[norm(canon)] = canon
+    for (const s of c.synonyms) m[norm(s)] = canon
   }
   return m
 })()
-
-const norm = (s: string) => s.replace(/[,(){}]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
 
 export type Expansion = {
   synonymTags: Set<string>  // same concept (canonical + its synonyms) → ranked tier 2 (RANKING ONLY)
