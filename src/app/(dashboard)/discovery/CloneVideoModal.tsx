@@ -63,7 +63,12 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // video_clone_xN rows — keep these numbers in sync with that table).
   // 1 credit = 1¢. Kept in sync with credit_pricing (migration 095): video is cost-plus (2× fal).
   const UGC_COST = { premium: 650, fast: 300 } as const
-  const FAITHFUL_COST: Record<number, { premium: number; fast: number }> = { 2: { premium: 1300, fast: 550 }, 3: { premium: 1900, fast: 800 }, 4: { premium: 2500, fast: 1100 } }
+  // Per-scene pricing (a faithful clone reproduces the ad's real shot count, up to 10). Formula
+  // matches the DB video_clone_xN rows exactly: premium = 100 + 600·n.
+  const faithfulCost = (n: number, t: 'premium' | 'fast') => t === 'fast' ? Math.round((100 + 600 * n) * 0.44 / 50) * 50 : 100 + 600 * n
+  const FAITHFUL_COST = new Proxy({} as Record<number, { premium: number; fast: number }>, {
+    get: (_t, k) => { const n = Number(k); return Number.isFinite(n) ? { premium: faithfulCost(n, 'premium'), fast: faithfulCost(n, 'fast') } : undefined },
+  })
   // 'match' resolves to the nearest bucket from the source ad's analysed duration.
   const resolvedBucket = durationBucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(durationBucket)
   const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1
@@ -188,7 +193,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       setGloss(st.gloss || null)
       const sug = st.suggestedMode === 'faithful' ? 'faithful' : 'ugc'
       setSuggestedMode(sug); setMode(sug)
-      setSceneCount(Math.min(4, Math.max(2, Number(st.sceneCount) || 2)))
+      setSceneCount(Math.min(10, Math.max(2, Number(st.sceneCount) || 2)))
       setSrcSecs(Number(st.sourceSeconds) || null)
       setPhase('review')
     } catch (e: any) { setErr(String(e?.message || e)); setPhase('form') }

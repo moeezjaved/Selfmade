@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   // scene count via the video_clone_xN credit_pricing rows). Scene count is server-side (worker's
   // analysis), clamped 2-4, so the client can't pick a cheaper row than the work costs.
   const chosenMode = mode === 'faithful' ? 'faithful' : 'ugc'
-  const nScenes = Math.min(4, Math.max(2, Number(meta.scene_count) || 2))
+  const nScenes = Math.max(2, Math.min(10, Number(meta.scene_count) || 2))
 
   // UGC length buckets: 15s = 1 clip (classic), 30s = 2 chained segments, 60s = 4. 'match' auto-picks
   // the nearest bucket from the source ad's analysed duration. Segments are priced by the same
