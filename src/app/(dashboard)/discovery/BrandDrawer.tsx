@@ -328,6 +328,8 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
+  const [pulling, setPulling] = useState(false)
+
   // Fetch brand data
   useEffect(() => {
     setLoading(true)
@@ -343,6 +345,23 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [pageId, timeDays])
+
+  // ON-DEMAND CRAWL: opening a brand in Discovery = user interest → refresh its ads so the freshest
+  // creatives are available to clone. Fire-and-forget; the server's freshness guard skips brands we
+  // crawled recently, and the per-plan daily cap bounds IPRoyal spend. Non-blocking: the drawer shows
+  // whatever we already have immediately, and fresh ads land on the next open. (Spy-only crawler picks
+  // it up right away since crawlOnly marks it priority=9 + last_crawled_at=null.)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/discovery/brand-spy', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ pageId, name: pageName, crawlOnly: true }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (!cancelled && d && d.crawlOnly && !d.alreadyFresh) setPulling(true) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [pageId, pageName])
 
   const initials = pageName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'
   const avatarBg = avatarColor(pageName)
@@ -476,6 +495,13 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
 
             {/* Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {pulling && (
+                <span title="We're pulling this brand's latest ads — refresh in a moment to see them"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: 8, fontSize: 12, fontWeight: 700, color: '#15803d' }}>
+                  <span style={{ width: 12, height: 12, border: '2px solid #bbf7d0', borderTopColor: '#15803d', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  Fetching latest ads…
+                </span>
+              )}
               <button
                 onClick={() => setFollowed(f => !f)}
                 style={{

@@ -219,6 +219,20 @@ export async function POST(req: NextRequest) {
     // (priority 9, last_crawled_at null) — the droplet crawler picks it up next, IPRoyal-safe like all
     // crawls. No plan gate, no credits, no follow. Idempotent.
     if (body.crawlOnly) {
+      // FRESHNESS GUARD: if we already crawled this brand recently, don't waste an IPRoyal pull (or
+      // the user's daily quota) re-crawling it — the drawer already has fresh ads. Casual browsing
+      // (click brand → drawer opens → this fires) must not burn pulls on brands we just refreshed.
+      // Only a genuinely stale/never-crawled brand triggers a real pull.
+      const FRESH_HOURS = 12
+      const { data: term } = await admin.from('discovery_crawl_terms')
+        .select('last_crawled_at, crawling_at').eq('page_id', pageId).maybeSingle()
+      const freshCut = Date.now() - FRESH_HOURS * 3600 * 1000
+      const lastCrawled = (term as any)?.last_crawled_at ? Date.parse((term as any).last_crawled_at) : 0
+      const crawlingNow = (term as any)?.crawling_at ? Date.parse((term as any).crawling_at) > Date.now() - 30 * 60 * 1000 : false
+      if (lastCrawled > freshCut || crawlingNow) {
+        return NextResponse.json({ pageId, crawlOnly: true, alreadyFresh: true })
+      }
+
       // Per-plan DAILY cap on on-demand pulls — protects IPRoyal (each pull = a crawl session) and is
       // a natural upgrade lever. Counts this user's BRAND_PULLED events since midnight.
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
