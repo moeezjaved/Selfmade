@@ -52,8 +52,9 @@ async function rpc(fn, body) { const r = await fetch(`${U}/rest/v1/rpc/${fn}`, {
 
 // ── Gemini: watch the competitor video → structured beat sheet ────────────────
 const BEAT_SCHEMA_PROMPT = `You are a UGC ad director. Watch this video ad and return ONLY minified JSON (no prose, no code fence):
-{"setting":"","avatar":"","camera":"","hook_type":"","beats":[{"t":"0-2s","action":""}],"scene_count":0,"product_role":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
+{"setting":"","avatar":"","camera":"","hook_type":"","beats":[{"t":"0-2s","action":""}],"scene_count":0,"on_screen_text":[{"t":"0-4s","text":""}],"product_role":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
 - setting: physical scene. avatar: who's on camera (age, look, wardrobe) or "none". camera: framing + movement.
+- on_screen_text: the BIG designed text CALLOUTS/graphics burned on screen (headlines, stats like "25g PROTEIN", prices, offers, CTAs) with the time range each is visible — NOT the spoken words, NOT tiny legal text. Empty array if the ad has no on-screen text.
 - hook_type: first-3-seconds pattern. beats: 3-8 time-ranged actions. transcript: exact spoken words. Be concrete.
 - scene_count: the EXACT number of distinct visual scenes/shots (hard cuts to a new location, subject, or camera setup) in the ad — count the real cuts you see, 1 for a single continuous take. This is the number of clips a faithful clone must reproduce, so be precise.
 - duration_seconds: the ad's real total length in seconds.
@@ -859,6 +860,38 @@ async function videoDims(file) {
 // entirely in ffmpeg (zero model cost), sized to the main video, with silent audio for clean concat.
 const EC_FONT = '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf'
 const ecText = (t, max) => String(t || '').replace(/[\\:'"%{}\n]/g, '').slice(0, max)
+
+// Parse a callout time range like "0-4s" / "2s" into seconds.
+function parseOverlayRange(t, dur) {
+  const m = String(t || '').match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)/)
+  if (m) return { start: +m[1], end: Math.max(+m[1] + 1, +m[2]) }
+  const s = String(t || '').match(/(\d+(?:\.\d+)?)/)
+  return s ? { start: +s[1], end: +s[1] + 3 } : { start: 0, end: dur }
+}
+// Burn the (adapted + user-edited) on-screen text callouts onto the FINISHED video — a post-step that
+// never touches the render. Bold white text with a dark outline near the top, at each callout's time
+// range. Best-effort: on any ffmpeg error the un-overlaid video ships (overlays are additive, not
+// load-bearing). Two callouts sharing a time window stack vertically so they don't overlap.
+async function burnOverlays(videoIn, overlays, id) {
+  const list = (Array.isArray(overlays) ? overlays : []).filter((o) => o && String(o.text || '').trim()).slice(0, 8)
+  if (!list.length) return videoIn
+  const dur = await probeDuration(videoIn) || 60
+  const esc = (s) => String(s).replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, '’').replace(/%/g, '\\%').replace(/,/g, '\\,')
+  let lastEnd = -99, row = 0
+  const filters = list.map((o) => {
+    const { start, end } = parseOverlayRange(o.t, dur)
+    row = start < lastEnd ? row + 1 : 0   // overlapping windows stack down instead of colliding
+    lastEnd = Math.max(lastEnd, end)
+    const y = `h*${(0.10 + row * 0.11).toFixed(2)}`
+    return `drawtext=fontfile=${EC_FONT}:text='${esc(o.text.slice(0, 60))}':fontsize=h/13:fontcolor=white:borderw=6:bordercolor=black@0.9:shadowx=2:shadowy=2:shadowcolor=black@0.6:x=(w-text_w)/2:y=${y}:enable='between(t\\,${start.toFixed(2)}\\,${Math.min(dur, end).toFixed(2)})'`
+  }).join(',')
+  const out = join(tmpdir(), `ov-${id}.mp4`)
+  try {
+    await ff(['-y', '-i', videoIn, '-vf', filters, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out])
+    console.log(`🔤 ${id} burned ${list.length} on-screen callout(s)`)
+    return out
+  } catch (e) { console.warn(`overlays burn failed for ${id}:`, e.message); return videoIn }
+}
 async function makeEndCard(meta, dims, out, tmp) {
   const ec = meta.end_card || {}
   const name = ecText((meta.product_details && meta.product_details.name) || 'Your brand', 34)
@@ -910,6 +943,25 @@ async function uploadVideo(localFile, key) {
   const buf = await readFile(localFile)
   await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: buf, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000, immutable' }))
   return `${R2_PUBLIC}/${key}`
+}
+
+// Adapt the source ad's on-screen text callouts to the user's product — swap the original's brand /
+// numbers for the user's, keep each callout's role + timing. Best-effort; returns [] on any failure.
+async function adaptOverlays(overlays, product, brandName) {
+  const list = (Array.isArray(overlays) ? overlays : []).filter((o) => o && String(o.text || '').trim()).slice(0, 8)
+  if (!list.length || !OPENAI_KEY) return list.map((o) => ({ t: o.t || '', text: String(o.text).trim() }))
+  const sys = `You adapt an ad's on-screen text CALLOUTS for a clone that features a DIFFERENT product. For each callout keep the SAME role and length (a stat stays a short stat, a price stays a price, a CTA stays a CTA), but swap the original's brand/product name for the user's. Keep numbers ONLY if they plausibly fit the user's product; if a stat/price is specific to the original and you don't know the user's value, make it generic rather than a false claim (e.g. "25g PROTEIN" for a milk brand → keep if it's a protein product, else drop the number). NEVER invent false claims. Return ONLY minified JSON: {"overlays":[{"t":"","text":""}]} — same count, order and timing as the input.`
+  const usr = `USER PRODUCT: ${JSON.stringify(product)}${brandName ? ` — brand name: ${brandName}` : ''}\n\nSOURCE CALLOUTS (adapt each):\n${JSON.stringify(list)}`
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.4, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }] }),
+    })
+    if (!r.ok) throw new Error(`overlays ${r.status}`)
+    const out = JSON.parse((await r.json()).choices?.[0]?.message?.content || '{}')
+    const adapted = Array.isArray(out.overlays) ? out.overlays.filter((o) => o && String(o.text || '').trim()).map((o) => ({ t: String(o.t || ''), text: String(o.text).trim().slice(0, 60) })) : []
+    return adapted.length ? adapted : list.map((o) => ({ t: o.t || '', text: String(o.text).trim() }))
+  } catch { return list.map((o) => ({ t: o.t || '', text: String(o.text).trim() })) }
 }
 
 // ── PHASE A: analyse the competitor video + draft a script → status='review' (awaits approval) ──
@@ -971,7 +1023,10 @@ async function analyzeJob(job) {
         if (cuts >= 1) { scenes = clampScenes(cuts, realSecs || Number(beat && beat.duration_seconds) || 15); console.log(`✂️ ${job.id} ffmpeg ${cuts} shots · ${(realSecs || 0).toFixed(1)}s → ${scenes} scenes (deterministic)`) }
       } catch (e) { console.warn(`cut-detect ${job.id}:`, e.message) }
     }
-    await stamp({ status: 'review', clone_meta: { ...meta, beat_sheet: beat, seedance_prompt: prompt, script, script_gloss: gloss, suggested_mode: cinematic ? 'faithful' : 'ugc', scene_count: scenes } })
+    // Auto-detect + adapt the ad's on-screen text callouts (25g PROTEIN, price, CTA…) for the user's
+    // product — shown editable in the review UI, burned on after the render (best-effort, never blocks).
+    const overlays = await adaptOverlays(beat && beat.on_screen_text, productDetails, meta.brand_name).catch(() => [])
+    await stamp({ status: 'review', clone_meta: { ...meta, beat_sheet: beat, seedance_prompt: prompt, script, script_gloss: gloss, suggested_mode: cinematic ? 'faithful' : 'ugc', scene_count: scenes, overlays } })
     console.log(`📝 drafted ${job.id} → awaiting approval (suggest=${cinematic ? 'faithful' : 'ugc'}, scenes=${scenes})`)
   } catch (e) {
     console.warn(`analyze ${job.id} failed:`, e.message)
@@ -1172,7 +1227,8 @@ async function generateJob(job) {
         await prog('Stitching + voiceover…', 86, 30)
         const main = await assemble(files, finalScript, 'main')
         await prog('Finishing up…', 95, 12)
-        const url = await uploadVideo(main.file, `creatives/${job.user_id}/${job.id}.mp4`)
+        const ovMain = await burnOverlays(main.file, meta.overlays, job.id); tmp.push(ovMain);
+        const url = await uploadVideo(ovMain, `creatives/${job.user_id}/${job.id}.mp4`)
         // Settle the end-card tx on the MAIN cut's outcome (applied → commit, failed → refund).
         if (meta.end_card && meta.end_card.tx) {
           if (main.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
@@ -1294,7 +1350,7 @@ async function generateJob(job) {
           if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
           else await rpc('refund_credits', { p_tx: meta.end_card.tx })
         }
-        const url = await uploadVideo(fin.file, `creatives/${job.user_id}/${job.id}.mp4`)
+        const ovFin = await burnOverlays(fin.file, meta.overlays, job.id); const url = await uploadVideo(ovFin, `creatives/${job.user_id}/${job.id}.mp4`)
         await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'ugc_long', segments: nSeg, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (long UGC, ${nSeg} segments) ${job.id} → ${url}`)
@@ -1336,7 +1392,7 @@ async function generateJob(job) {
       if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
       else await rpc('refund_credits', { p_tx: meta.end_card.tx })
     }
-    const url = await uploadVideo(fin.file, `creatives/${job.user_id}/${job.id}.mp4`)
+    const ovFin = await burnOverlays(fin.file, meta.overlays, job.id); const url = await uploadVideo(ovFin, `creatives/${job.user_id}/${job.id}.mp4`)
     for (const f of singleTmp) await rm(f, { force: true }).catch(() => {})
 
     const falCost = clipCost(meta.tier, meta.duration || 10)
