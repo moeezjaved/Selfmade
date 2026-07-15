@@ -73,12 +73,22 @@ async function analyzeVideo(videoUrl) {
     ] }],
     generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
   }
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  if (!r.ok) { console.warn('gemini analyze', r.status, (await r.text()).slice(0, 160)); return null }
-  const j = await r.json()
-  const text = j?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || ''
-  try { return JSON.parse(text) } catch { console.warn('gemini non-JSON beat sheet'); return null }
+  // RETRY on rate-limit/transient errors (429/500/503) — a missing beat sheet silently guts clone
+  // fidelity (no avatar → Seedance invents a random creator; that's how a woman's UGC came back as
+  // a man). Mirror geminiImage's retry ladder instead of giving up on the first 429.
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (r.ok) {
+      const j = await r.json()
+      const text = j?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || ''
+      try { return JSON.parse(text) } catch { console.warn('gemini non-JSON beat sheet'); return null }
+    }
+    console.warn(`gemini analyze ${r.status} (attempt ${attempt}/4)`, (await r.text()).slice(0, 120))
+    if (![429, 500, 503].includes(r.status) || attempt === 4) return null
+    await new Promise((res) => setTimeout(res, [0, 3000, 8000, 20000][attempt]))
+  }
+  return null
 }
 
 // ── Language: scripts are TRANSCREATED (written natively), never translated. Real UGC in
@@ -127,7 +137,7 @@ function lookClause(beat, look) {
   if (look && look !== 'match') {
     return `RECAST the on-camera creator(s) as ${look} in appearance — this is the user's explicit choice. Keep the reference creator's age range, wardrobe style, hair style vibe and energy (avatar field: ${(beat && beat.avatar) || 'as analysed'}), but the person's ethnicity/look must clearly read as ${look}`
   }
-  return `the EXACT creator(s) copying their age/ETHNICITY/hair/wardrobe from the avatar field (${(beat && beat.avatar) || 'as analysed'})`
+  return `the EXACT creator(s) copying their GENDER/age/ETHNICITY/hair/wardrobe from the avatar field (${(beat && beat.avatar) || 'as analysed'}) — describe them explicitly in the prompt (gender first); an undescribed creator renders as a random person`
 }
 
 // ── gpt-4o: beat sheet + product → Seedance prompt + script. When forcedScript is given (the user's
@@ -208,27 +218,38 @@ async function buildScenePlan(beat, product, nImages, nScenes, look, voiceover) 
   const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). The reference ad is a MULTI-SCENE / B-roll style ad. Clone it FAITHFULLY, scene by scene — this is a CLONE of its edit structure, not a talking-head rewrite.
 Rules:
 - Map the beat sheet's beats (in the "beats" array) onto EXACTLY ${nScenes} scenes, IN ORDER, covering the ad's full arc (hook first). Each scene must RECREATE a specific reference beat — its subject, its action, its shot type — not invent a new one. If there are more beats than scenes, group adjacent beats; if fewer, expand the strongest beats. Each scene = one continuous shot.
+- THE HOOK IS SACRED: scene 1 MUST recreate the reference's OPENING beat and start at src_start=0 — that's the attention hook (often a person / problem moment) and the reason the ad works. NEVER drop or skip the first beats. When there are more beats than scenes, MERGE adjacent beats into one continuous shot; dropping a beat that contains PEOPLE while keeping product-only beats is FORBIDDEN — people beats carry the story.
 - Per scene, write ONE dense Seedance prompt that reproduces THAT reference beat: subject → the exact action from the beat → camera (copy the reference's framing/movement) → lighting → mood. Stay faithful to what the reference actually shows in that beat (e.g. a couple close-up stays a couple close-up; a gym shot stays a gym shot). Cinematic b-roll, lifestyle moments and product close-ups are all allowed — do NOT force anyone to talk to camera, and do NOT drift to a generic studio.
 - ACTION IS MANDATORY: name the SPECIFIC physical action from the reference beat as a continuous on-camera MOTION the subject performs — applying/rolling/massaging the product onto skin or scalp, spraying, pumping, drinking, swatching, demonstrating — never a person merely standing and holding the product still. Write it as an active verb the video model can animate (e.g. "rolls the microneedling applicator across his hairline", not "holds the vial").
 - PRODUCT SWAP — wherever the reference features its product, feature the user's product (${refList || 'the product'}) instead, matching ${refList || 'the product'} exactly.
 - PRODUCT HERO FRAMING (critical for fidelity): whenever the product is the focus of a scene, frame it as a TIGHT PRODUCT CLOSE-UP that FILLS most of the frame — the exact container, cap/applicator and label clearly readable and in sharp focus. AI video renders a product accurately only when it's large in frame; a wide shot of a person holding it far from camera comes out as a generic blurry bottle. So for the product-reveal / product-in-use beats, write a close macro shot (hands + product filling the frame), NOT a full-body wide shot. At least half the scenes must feature the product this way.
-- PEOPLE — when a scene has people, ${recast ? `recast them as ${look} in appearance (user's explicit choice), keeping the reference's age range, wardrobe style and energy` : 'copy the reference people (age/ethnicity/wardrobe/energy) from the beat sheet'}.
+- PEOPLE — when a scene has people, ${recast ? `recast them as ${look} in appearance (user's explicit choice), keeping the reference's age range, wardrobe style and energy` : `copy the reference people EXACTLY — gender, age, ethnicity, hair, wardrobe, energy${beat && beat.avatar ? ` (the reference creator is: ${String(beat.avatar).replace(/"/g, "'")})` : ' (from the beat sheet)'}. Describe them explicitly in the prompt (e.g. 'a woman in her 30s with long red hair and glasses'), never just 'a person' — an undescribed person comes out as a random creator`}.
 ${productTruthRule(product)}
 ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera speech (ambience/music energy only). Design the visuals to fit this voiceover's arc, in order: "${String(voiceover).replace(/"/g, "'")}". Put the chunk each scene covers in its "script" field for reference only — do NOT write spoken dialogue into the prompt.` : '- No dialogue — scenes are music/ambience-driven b-roll. Leave "script" empty.'}
 - Per scene pick "duration": 5 for a quick cut, 10 for a longer beat (numbers only).
 - Per scene also report: "has_people": true if ANY person/face is visible in that reference beat (false = pure product/object/environment b-roll), "has_product": true if the user's product appears (held/used/shown) in that scene, and "src_start"/"src_end": the SECONDS range of the reference footage this scene recreates (derive from the beats' "t" ranges, e.g. "4-9s" → 4 and 9).
 Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has_people":false,"has_product":true,"src_start":0,"src_end":5}]}  (exactly ${nScenes} scenes, in order).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || { note: 'analysis unavailable — infer a natural multi-scene structure' })}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nProduct image tokens: ${refList || '(none)'}.`
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.7, response_format: { type: 'json_object' },
-      messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }] }),
-  })
-  if (!r.ok) throw new Error(`openai scenes ${r.status} ${(await r.text()).slice(0, 160)}`)
-  const j = await r.json()
-  const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
-  const scenes = Array.isArray(out.scenes) ? out.scenes.filter((s) => s && s.prompt) : []
-  if (!scenes.length) throw new Error('no scenes from gpt')
+  // VERIFIER (hook-drop): when beats > scenes, gpt has been seen "grouping" by DELETING the opening
+  // person/hook beats and keeping only product b-roll (a FÜM clone opened at src 5s — the coughing-man
+  // hook was gone). If the plan doesn't start at the source's beginning, retry once with a correction.
+  let scenes = []
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const messages = [{ role: 'system', content: sys }, { role: 'user', content: usr }]
+    if (attempt === 2) messages.push({ role: 'user', content: `Your previous plan skipped the reference's opening — scene 1 must start at src_start=0 and recreate the ORIGINAL FIRST BEAT (including its people). Merge later beats to fit ${nScenes} scenes. Regenerate the full JSON.` })
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.7, response_format: { type: 'json_object' }, messages }),
+    })
+    if (!r.ok) throw new Error(`openai scenes ${r.status} ${(await r.text()).slice(0, 160)}`)
+    const j = await r.json()
+    const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
+    scenes = Array.isArray(out.scenes) ? out.scenes.filter((s) => s && s.prompt) : []
+    if (!scenes.length) throw new Error('no scenes from gpt')
+    const firstStart = Number(scenes[0]?.src_start)
+    if (!(Number.isFinite(firstStart) && firstStart >= 3) || attempt === 2) break
+    console.warn(`scene plan dropped the hook (scene 1 starts at src ${firstStart}s) — retrying with correction`)
+  }
   const picked = scenes.slice(0, nScenes)
   // Per-scene duration follows the ad's REAL structure: use each scene's source time-range length
   // (src_end - src_start) when Gemini gave one; otherwise split the source duration evenly. Clamped to
@@ -1068,6 +1089,17 @@ async function generateJob(job) {
   const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0) } } }).catch(() => {})
   try {
     const finalScript = meta.final_script || meta.script || ''
+
+    // BEAT-SHEET BACKFILL — if analysis failed at draft time (e.g. a Gemini 429 burst), the job
+    // reached approval with beat_sheet null and every prompt lost the creator/setting ("avatar: as
+    // analysed" = nothing) → Seedance invents a random person. One more attempt here (analyzeVideo
+    // now retries internally) restores clone fidelity; still degrades gracefully if it fails again.
+    if (!meta.beat_sheet && job.source_video_url) {
+      try {
+        const late = await analyzeVideo(job.source_video_url)
+        if (late) { meta.beat_sheet = late; await stamp({ clone_meta: { ...meta } }) ; console.log(`🩹 ${job.id} beat sheet backfilled at generate time`) }
+      } catch (e) { console.warn('late analyze:', e?.message) }
+    }
 
     // Person-free product reference for fal — used by EVERY mode. Uploaded product photos often show a
     // hand holding the item, which fal's likeness filter rejects on image_urls (→ whole render 422s).
