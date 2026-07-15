@@ -498,8 +498,14 @@ async function muxVoiceover(videoIn, voMp3, out) {
   // the last frame holds only for however long the narration actually tails past the clips (usually ~0).
   const clipsDur = await probeDuration(videoIn)
   const voDur = await probeDuration(voMp3)
-  const target = Math.max(clipsDur || 0, voDur || 0) + 0.2
-  const pad = Math.max(0, +(target - (clipsDur || 0)).toFixed(2))   // freeze only the tail the VO needs
+  // DEAD-AIR GUARD: when the stitched video runs LONGER than the narration (scene durations can
+  // overshoot the source), don't keep the whole tail playing in silence — trim to the voiceover length
+  // plus a short product/b-roll tail. When the VO is longer, freeze-extend the video to it (as before).
+  const VO_TAIL = 2.5   // seconds of visuals allowed to run past the narration before we cut
+  const target = (voDur || 0) >= (clipsDur || 0)
+    ? (voDur || 0) + 0.2
+    : Math.min(clipsDur || 0, (voDur || 0) + VO_TAIL)
+  const pad = Math.max(0, +(target - (clipsDur || 0)).toFixed(2))   // freeze only the tail the VO needs (0 when trimming)
   try {
     await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex',
       `[0:v]tpad=stop_mode=clone:stop_duration=${pad}[vp];[0:a]volume=0.22[a0];[a0][1:a]amix=inputs=2:duration=longest[a]`,
