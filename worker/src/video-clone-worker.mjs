@@ -1016,21 +1016,19 @@ async function generateJob(job) {
             : s.prompt
 
           let videoUrl = null
-          // GENERATOR ROUTING BY CONTENT — the general fidelity rule (works for any product, not one
-          // vial): a scene where the PRODUCT appears goes to Seedance (sharp hands + sharp product —
-          // the same generator behind the UGC takes users rate as real) with the source motion ref +
-          // product-locked keyframe. VACE is reserved for people-scenes with NO product: it copies
-          // motion beautifully but renders soft hands/objects — exactly the "blurry clumsy hand,
-          // product shape off" seen in renders. Likeness-blocked ref → keyframe prompt-only below.
-          if (s.has_people && s.has_product !== false && sceneRef) {
-            console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, product-scene · seedance)`)
-            try {
-              ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
-              falCost += clipCost(meta.tier, s.duration)
-            } catch (e) {
-              if (e.code === 'content_policy_video' || e.code === 'content_policy_images') console.warn(`scene ${i + 1} ref blocked (likeness) — keyframe prompt-only fallback`)
-              else throw e
-            }
+          // GENERATOR ROUTING BY CONTENT — the general fidelity rule (any product, not one vial):
+          //  • PRODUCT scene → Seedance led by the FACELESS product keyframe (image-to-video), NO
+          //    real-person video ref. The faceless keyframe passes fal's likeness filter (it only
+          //    blocks faces in REFERENCE media, never faces Seedance GENERATES in its output), so
+          //    Seedance freely generates a fresh person around the pixel-locked product. Sharp product
+          //    + real person, no likeness block, no wasted blocked attempt. Motion is Seedance's own —
+          //    an accepted trade for a product that's actually correct.
+          //  • PEOPLE, NO product → VACE pose-restyle (motion copy is its strength; nothing to blur).
+          //  • PEOPLE-free b-roll → Seedance with the source motion ref (no faces → safe).
+          if (s.has_people && s.has_product !== false) {
+            console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, product-scene · seedance keyframe-led)`)
+            ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+            falCost += clipCost(meta.tier, s.duration)
           }
           if (!videoUrl && s.has_people && s.has_product === false && sceneRef && process.env.CLONE_PEOPLE_RESTYLE !== '0') {
             // PEOPLE-ONLY scene (no product in frame) → pose-guided restyle (Wan VACE): copies the
