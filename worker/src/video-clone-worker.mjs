@@ -211,8 +211,8 @@ Rules:
 ${productTruthRule(product)}
 ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera speech (ambience/music energy only). Design the visuals to fit this voiceover's arc, in order: "${String(voiceover).replace(/"/g, "'")}". Put the chunk each scene covers in its "script" field for reference only — do NOT write spoken dialogue into the prompt.` : '- No dialogue — scenes are music/ambience-driven b-roll. Leave "script" empty.'}
 - Per scene pick "duration": 5 for a quick cut, 10 for a longer beat (numbers only).
-- Per scene also report: "has_people": true if ANY person/face is visible in that reference beat (false = pure product/object/environment b-roll), and "src_start"/"src_end": the SECONDS range of the reference footage this scene recreates (derive from the beats' "t" ranges, e.g. "4-9s" → 4 and 9).
-Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has_people":false,"src_start":0,"src_end":5}]}  (exactly ${nScenes} scenes, in order).`
+- Per scene also report: "has_people": true if ANY person/face is visible in that reference beat (false = pure product/object/environment b-roll), "has_product": true if the user's product appears (held/used/shown) in that scene, and "src_start"/"src_end": the SECONDS range of the reference footage this scene recreates (derive from the beats' "t" ranges, e.g. "4-9s" → 4 and 9).
+Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has_people":false,"has_product":true,"src_start":0,"src_end":5}]}  (exactly ${nScenes} scenes, in order).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || { note: 'analysis unavailable — infer a natural multi-scene structure' })}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nProduct image tokens: ${refList || '(none)'}.`
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
@@ -239,6 +239,7 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
       prompt: String(s.prompt), script: String(s.script || ''),
       duration: dur,
       has_people: s.has_people !== false,   // default TRUE (safe: no ref video unless surely people-free)
+      has_product: s.has_product !== false, // default TRUE (safe: route to the high-fidelity generator)
       src_start: Number.isFinite(+s.src_start) ? Math.max(0, +s.src_start) : null,
       src_end: Number.isFinite(+s.src_end) ? +s.src_end : null,
     }
@@ -334,13 +335,35 @@ async function downloadToFile(url, path) {
 
 // Concat local clips into one mp4. Re-encode via the concat demuxer — clips come from the same
 // model/resolution/aspect but re-encoding guarantees clean joins.
-async function concatClips(files, out) {
+async function concatClips(files, out, durs) {
+  // Clips come from DIFFERENT generators (Seedance ~24fps, VACE 16fps, varying resolution/timebase).
+  // The concat demuxer assumes identical stream parameters; feeding it mixed clips produced broken
+  // timestamps — a ~3s FREEZE at the scene boundary and a stitched file ~5s LONGER than its clips
+  // (the "pauses at 10-13s" + 21s-for-16s-of-scenes the user hit). Normalize every clip to one format
+  // (first clip's WxH, 24fps, square pixels, 44.1k stereo) and trim each to its PLANNED duration
+  // before concatenating — deterministic for any mix of generators, any ad, any product.
+  const probe = await probeOut(['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=s=x:p=0', files[0]])
+  const [w, h] = String(probe || '').trim().split('x').map((n) => parseInt(n) || 0)
+  const W = w > 0 ? w : 720, H = h > 0 ? h : 1280
+  const normed = []
+  for (let i = 0; i < files.length; i++) {
+    const nf = `${out}.n${i}.mp4`
+    const args = ['-y', '-i', files[i]]
+    if (durs && Number(durs[i]) > 0) args.push('-t', String(Number(durs[i])))   // planned length is a hard cap per clip
+    args.push('-vf', `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,fps=24,setsar=1`,
+      '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', '44100', '-ac', '2', '-b:a', '128k', nf)
+    await ff(args)
+    normed.push(nf)
+  }
   const list = `${out}.txt`
-  await writeFile(list, files.map((f) => `file '${f}'`).join('\n'))
+  await writeFile(list, normed.map((f) => `file '${f}'`).join('\n'))
   try {
-    await ff(['-y', '-f', 'concat', '-safe', '0', '-i', list,
-      '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
-  } finally { await rm(list, { force: true }).catch(() => {}) }
+    // Normalized clips share identical parameters → stream-copy concat is safe and lossless.
+    await ff(['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-movflags', '+faststart', out])
+  } finally {
+    await rm(list, { force: true }).catch(() => {})
+    for (const f of normed) await rm(f, { force: true }).catch(() => {})
+  }
 }
 
 // Continuity anchor: extract a clip's final frame and host it on R2, so the NEXT segment can take it
@@ -560,10 +583,11 @@ async function detectSceneCuts(localFile) {
 // freeze-extend the stitched video into a multi-minute clip. Truncates at the last sentence boundary
 // that fits (supports the Devanagari danda '।' for Hindi/Urdu). This is the guard that stops a
 // few-second clone from rendering a 3-minute frozen video.
-function capScriptToSeconds(text, seconds) {
+function capScriptToSeconds(text, seconds, wps = 2.8) {
   const t = String(text || '').trim()
   if (!t || !seconds) return t
-  const maxWords = Math.max(8, Math.round(seconds * 2.8))
+  const rate = Number(wps) > 0.5 && Number(wps) < 8 ? Number(wps) : 2.8   // sane speaking-rate guard
+  const maxWords = Math.max(8, Math.round(seconds * rate))
   const words = t.split(/\s+/)
   if (words.length <= maxWords) return t
   let clip = words.slice(0, maxWords).join(' ')
@@ -871,14 +895,34 @@ async function analyzeJob(job) {
       try { const obs = await describeProduct(productImages[0]); if (obs) productDetails = { ...productDetails, observed: obs } }
       catch (e) { console.warn('describeProduct:', e.message) }
     }
+    // WHISPER — accurate source transcript + the ad's REAL speaking rate (words/sec), so the script is
+    // calibrated to the actual talker's pace instead of a fixed guess. Cheap (~0.15¢ for a 15s clip).
+    // Only apply the source rate when the CLONE language matches the source language — word density
+    // doesn't transfer across languages, so a translation keeps the safe default rate.
+    let srcRate = null
+    if (OPENAI_KEY && job.source_video_url) {
+      try {
+        const tr = await transcribeSegments(job.source_video_url)
+        const w = tr.words || []
+        if (w.length >= 4) {
+          const speech = Math.max(1, (w[w.length - 1].end || 0) - (w[0].start || 0))
+          const rate = w.length / speech
+          const cloneLang = (meta.language || 'en').slice(0, 2)
+          const srcLang = (tr.language || 'en').slice(0, 2)
+          if (cloneLang === srcLang) srcRate = rate
+          if (beat) beat.transcript = w.map((x) => x.word).join(' ').replace(/\s+/g, ' ').trim() || beat.transcript
+          console.log(`🎙 ${job.id} whisper: ${w.length} words / ${speech.toFixed(1)}s = ${rate.toFixed(1)} wps (src=${srcLang}, clone=${cloneLang})`)
+        }
+      } catch (e) { console.warn(`whisper source ${job.id}:`, e.message) }
+    }
     meta.product_details = productDetails
+    meta.source_wps = srcRate || null
     let { prompt, script, gloss } = await buildSeedancePrompt(beat, productDetails, productImages.length, null, meta.character_look, meta.language)
-    // Cap the drafted narration to the SOURCE's own talk-time so the clone matches the original length.
-    // A 14s ad shouldn't get a 24s script that then freeze-extends the video — the narration is the
-    // thing that was blowing the duration past the source. The user still sees + can edit this before
-    // approving. (~2.6 words/sec; small floor so very short ads still get a usable line.)
+    // Cap the drafted narration to the SOURCE's own talk-time so the clone matches the original length,
+    // using the ad's REAL words/sec when we have it (same language) — a fast talker's clone gets more
+    // words, a slow one fewer. The user still sees + can edit this before approving.
     const srcSecs = Number(beat && beat.duration_seconds) || 15
-    script = capScriptToSeconds(script, Math.max(8, srcSecs))
+    script = capScriptToSeconds(script, Math.max(8, srcSecs), srcRate || 2.8)
     // Suggest faithful (scene-by-scene) cloning when the source is a multi-scene / B-roll ad —
     // collapsing those into a talking head isn't a clone. The user picks the mode at approve time.
     const cinematic = detectCinematic(beat)
@@ -972,9 +1016,25 @@ async function generateJob(job) {
             : s.prompt
 
           let videoUrl = null
-          if (s.has_people && sceneRef && process.env.CLONE_PEOPLE_RESTYLE !== '0') {
-            // PEOPLE scene → pose-guided restyle (Wan VACE): copies the movement skeleton + camera
-            // from the source with entirely NEW people. Falls back to prompt-only Seedance on error.
+          // GENERATOR ROUTING BY CONTENT — the general fidelity rule (works for any product, not one
+          // vial): a scene where the PRODUCT appears goes to Seedance (sharp hands + sharp product —
+          // the same generator behind the UGC takes users rate as real) with the source motion ref +
+          // product-locked keyframe. VACE is reserved for people-scenes with NO product: it copies
+          // motion beautifully but renders soft hands/objects — exactly the "blurry clumsy hand,
+          // product shape off" seen in renders. Likeness-blocked ref → keyframe prompt-only below.
+          if (s.has_people && s.has_product !== false && sceneRef) {
+            console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, product-scene · seedance)`)
+            try {
+              ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+              falCost += clipCost(meta.tier, s.duration)
+            } catch (e) {
+              if (e.code === 'content_policy_video' || e.code === 'content_policy_images') console.warn(`scene ${i + 1} ref blocked (likeness) — keyframe prompt-only fallback`)
+              else throw e
+            }
+          }
+          if (!videoUrl && s.has_people && s.has_product === false && sceneRef && process.env.CLONE_PEOPLE_RESTYLE !== '0') {
+            // PEOPLE-ONLY scene (no product in frame) → pose-guided restyle (Wan VACE): copies the
+            // movement skeleton + camera from the source with entirely NEW people.
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, pose-restyle)`)
             try { videoUrl = await restyleScene({ prompt: scenePrompt, refVideoUrl: sceneRef, imageUrls: sceneImages, duration: s.duration, aspect: meta.aspect }); falCost += VACE_EST_USD_PER_RUN }
             catch (e) { console.warn(`scene ${i + 1} restyle failed (${e.message}) — falling back to prompt-only`) }
@@ -1021,7 +1081,7 @@ async function generateJob(job) {
         const assemble = async (clipFiles, voText, tag) => {
           const catX = `${base}-${tag}-cat.mp4`
           tmp.push(catX)
-          await concatClips(clipFiles, catX)
+          await concatClips(clipFiles, catX, scenes.map((sc) => sc.duration))   // hard-cap each clip to its planned length
           let cut = catX
           if (voText && voText.trim()) {
             try {
@@ -1158,7 +1218,7 @@ async function generateJob(job) {
         }
         const cat = `${base}-cat.mp4`
         tmp.push(cat)
-        await concatClips(files, cat)
+        await concatClips(files, cat, plan.segments.map(() => 15))   // long-form segments are 15s each
         const fin = await withEndCard(cat, meta, job.id, 'main', tmp)
         if (meta.end_card && meta.end_card.tx) {
           if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
