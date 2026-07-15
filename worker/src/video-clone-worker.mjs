@@ -1517,6 +1517,134 @@ async function generateJob(job) {
 
 // ── Concurrent pump. The old loop was fully SERIAL: one 20-minute faithful render blocked every
 // other user's ANALYSIS (user B couldn't even get a script drafted until user A's video finished).
+// ── TWEAK: post-render, per-scene fixes without a full re-render. The user clicks a chip on ONE
+// scene ("product looks wrong" / "wrong action" / …) or a whole-video op (trim / redo voiceover /
+// remove scene). We regenerate ONLY what's asked (≤1 fal clip), then re-stitch from the cached
+// scene_clips — everything else costs nothing. Failure is safe: the original video stays as-was
+// (image_url untouched until the new cut uploads) and the tweak tx refunds. ──
+const CHIP_FIX = {
+  redo:    '',
+  product: ' CRITICAL FIX: the product must EXACTLY match the attached reference — identical container, cap and label, sharp and readable — at its TRUE real-world size and proportion relative to the hand; never enlarged, stretched or out of proportion.',
+  action:  ' CRITICAL FIX: the person must ACTIVELY and visibly USE/apply the product on camera — real continuous motion (applying, rolling, spraying, demonstrating), never merely holding it still.',
+  person:  ' CRITICAL FIX: recast the on-camera person — natural, realistic, matching the reference creator description (gender, age range, hair, wardrobe); no uncanny or distorted features.',
+  closeup: ' CRITICAL FIX: reframe as a TIGHT macro close-up — camera moved close, hands + product filling the frame at true real-world scale, label sharp and readable.',
+}
+
+async function tweakJob(job) {
+  const meta = job.clone_meta || {}
+  const t = meta.tweak || {}
+  const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
+  const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0) } } }).catch(() => {})
+  // Restore the row to its previous DONE state (original video intact) + refund the tweak tx.
+  const bail = async (why) => {
+    console.warn(`tweak ${job.id} failed: ${why}`)
+    if (t.tx) await rpc('refund_credits', { p_tx: t.tx }).catch(() => {})
+    const { tweak, progress, ...rest } = meta
+    await stamp({ status: 'done', clone_meta: { ...rest, tweak_error: String(why).slice(0, 200) } })
+  }
+  try {
+    const scenes = Array.isArray(meta.scene_plan) ? [...meta.scene_plan] : []
+    const clips = { ...(meta.scene_clips || {}) }
+    if (!scenes.length || !Object.keys(clips).length) return bail('no cached scenes to tweak (older render)')
+    const base = join(tmpdir(), `tw-${job.id}`)
+    const tmp = []
+    let falCost = 0
+
+    // Product refs for a scene redo (clean product first — always person-free/safe).
+    const productImages = [meta.clean_product, ...(Array.isArray(meta.product_image_urls) ? meta.product_image_urls : [])].filter(Boolean).slice(0, 4)
+
+    // 1) Apply the requested change to the scene/clip lists.
+    let keep = scenes.map((_, i) => i)
+    if (t.type === 'remove_scene') {
+      const i = Number(t.scene)
+      if (!(i >= 0 && i < scenes.length)) return bail('bad scene index')
+      if (scenes.length < 3) return bail('need at least 2 scenes to keep')
+      keep = keep.filter((k) => k !== i)
+      await prog('Removing the scene + restitching…', 20, 40)
+    } else if (t.type === 'redo_scene') {
+      const i = Number(t.scene)
+      if (!(i >= 0 && i < scenes.length)) return bail('bad scene index')
+      const fix = CHIP_FIX[t.chip] ?? ''
+      const prompt = `${scenes[i].prompt}${fix}`
+      await prog(`Redoing scene ${i + 1}…`, 15, 90)
+      console.log(`🔧 ${job.id} tweak: redo scene ${i + 1} (chip=${t.chip || 'redo'})`)
+      // Mini-ladder: product refs → no refs (pure prompt). Same never-fail contract as the main render.
+      let videoUrl = null
+      try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: productImages, resolution: meta.resolution, duration: scenes[i].duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })) }
+      catch (e) {
+        if (e.code === 'content_policy_images' || e.code === 'content_policy_video') {
+          console.warn(`tweak scene ${i + 1} refs blocked — pure prompt`)
+          ;({ videoUrl } = await falGenerate({ prompt, imageUrls: [], resolution: meta.resolution, duration: scenes[i].duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+        } else throw e
+      }
+      falCost += clipCost(meta.tier, scenes[i].duration)
+      clips[i] = videoUrl
+    } else if (t.type === 'redo_vo' || t.type === 'trim') {
+      await prog(t.type === 'redo_vo' ? 'Re-recording the voiceover…' : 'Re-trimming…', 20, 40)
+    } else return bail(`unknown tweak type ${t.type}`)
+
+    // 2) Materialize the kept clips (expired fal URL → regenerate that scene at OUR cost, no extra charge).
+    const files = []
+    const durs = []
+    for (const i of keep) {
+      let f = `${base}-${i}.mp4`
+      try {
+        await downloadToFile(clips[i], f)
+      } catch {
+        console.warn(`tweak ${job.id}: cached clip ${i + 1} expired — regenerating (our cost)`)
+        await prog(`Refreshing scene ${i + 1}…`, 40, 60)
+        const { videoUrl } = await falGenerate({ prompt: scenes[i].prompt, imageUrls: productImages, resolution: meta.resolution, duration: scenes[i].duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })
+        falCost += clipCost(meta.tier, scenes[i].duration)
+        clips[i] = videoUrl
+        await downloadToFile(videoUrl, f)
+      }
+      tmp.push(f)
+      f = await ensureAudio(f)
+      if (!tmp.includes(f)) tmp.push(f)
+      files.push(f)
+      durs.push(scenes[i].duration)
+    }
+
+    // 3) Re-assemble: concat → VO → end-card → overlays → upload (versioned key so the old URL's CDN
+    //    cache can't serve a stale cut).
+    await prog('Stitching + voiceover…', 70, 45)
+    const cat = `${base}-cat.mp4`
+    tmp.push(cat)
+    await concatClips(files, cat, durs)
+    let cut = cat
+    const voText = t.type === 'redo_vo' ? (t.script || meta.final_script || meta.script || '') : (meta.final_script || meta.script || '')
+    if (voText && voText.trim()) {
+      try {
+        const clipDur = (await probeDuration(cat)) || durs.reduce((a, d) => a + (Number(d) || 5), 0)
+        const vo = await ttsVoiceover(capScriptToSeconds(voText, clipDur * 1.25 + 2), `${job.id}-tweak`, meta.voice)
+        tmp.push(vo)
+        const mixed = `${base}-vo.mp4`
+        tmp.push(mixed)
+        await muxVoiceover(cat, vo, mixed)
+        cut = mixed
+      } catch (e) { console.warn(`tweak tts/mux failed (shipping without VO):`, e.message) }
+    }
+    const carded = await withEndCard(cut, meta, job.id, 'tweak', tmp)
+    const burned = await burnOverlays(carded.file, meta.overlays, job.id)
+    tmp.push(burned)
+    await prog('Uploading…', 92, 10)
+    const ver = Math.random().toString(36).slice(2, 8)
+    const url = await uploadVideo(burned, `creatives/${job.user_id}/${job.id}-t${ver}.mp4`)
+
+    // 4) Persist: new cut is live; scene lists reflect a removal; tweak cleared.
+    const newScenes = keep.map((i) => scenes[i])
+    const newClips = {}
+    keep.forEach((i, k) => { newClips[k] = clips[i] })
+    const { tweak, progress, ...rest } = meta
+    await stamp({ status: 'done', image_url: url, clone_meta: { ...rest, scene_plan: newScenes, scene_clips: newClips, scene_count: newScenes.length, ...(t.type === 'redo_vo' && t.script ? { final_script: t.script } : {}), last_tweak: { type: t.type, scene: t.scene ?? null, chip: t.chip ?? null } } })
+    if (t.tx) await rpc('commit_credits', { p_tx: t.tx, p_metadata: { tweak: t.type, scene: t.scene ?? null, chip: t.chip ?? null, actual_cost_usd: +falCost.toFixed(2) } })
+    for (const f of tmp) await rm(f, { force: true }).catch(() => {})
+    console.log(`🔧 tweaked (${t.type}) ${job.id} → ${url} ($${falCost.toFixed(2)})`)
+  } catch (e) {
+    await bail(e?.message || e)
+  }
+}
+
 // Now analyses (fast, cheap) and generations run as independent concurrent pools; the in-flight set
 // prevents double-pickup across poll ticks (single container, so process-local state suffices —
 // rows stay in their status while being worked, and checkpointing makes crash-restarts safe).
@@ -1542,6 +1670,17 @@ async function pump() {
       if (inflight.has(j.id) || genActive >= MAX_GEN) continue
       inflight.add(j.id); genActive++
       generateJob(j).catch((e) => console.warn('generate crash:', e?.message)).finally(() => { inflight.delete(j.id); genActive-- })
+    }
+  }
+  // Tweak jobs — processing rows that STILL HAVE a video (image_url set) + clone_meta.tweak. They're
+  // excluded from the fresh-render branch by its image_url=is.null filter, so no double-handling.
+  if (genActive < MAX_GEN) {
+    const tweaks = await getJSON(`creative_generations?${sel}&status=eq.processing&image_url=not.is.null`).catch(() => [])
+    for (const j of tweaks || []) {
+      if (!j?.clone_meta?.tweak) continue
+      if (inflight.has(j.id) || genActive >= MAX_GEN) continue
+      inflight.add(j.id); genActive++
+      tweakJob(j).catch((e) => console.warn('tweak crash:', e?.message)).finally(() => { inflight.delete(j.id); genActive-- })
     }
   }
   // Caption jobs (cheap: Whisper + ffmpeg burn) — their own type, share the gen concurrency budget.
