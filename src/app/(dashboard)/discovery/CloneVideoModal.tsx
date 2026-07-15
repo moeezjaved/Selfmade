@@ -53,6 +53,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [phase, setPhase] = useState<Phase>('form')
   const [jobId, setJobId] = useState<string | null>(null)
   const [draftScript, setDraftScript] = useState('')
+  const [overlays, setOverlays] = useState<{ t: string; text: string }[]>([])  // auto-detected on-screen text callouts (editable)
   const [err, setErr] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)   // non-error info (e.g. still rendering)
   const [result, setResult] = useState<{ url: string; script?: string | null } | null>(null)
@@ -195,6 +196,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       if (st.timedOut) { setErr('Analysis is taking longer than usual — try again in a moment.'); setPhase('form'); return }
       if (st.error) { setErr(st.error); setPhase('form'); return }
       setDraftScript(st.script || '')
+      setOverlays(Array.isArray(st.overlays) ? st.overlays : [])
       setGloss(st.gloss || null)
       const sug = st.suggestedMode === 'faithful' ? 'faithful' : 'ugc'
       setSuggestedMode(sug); setMode(sug)
@@ -213,6 +215,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           jobId, script: draftScript, mode, durationBucket,
+          overlays: overlays.filter((o) => o.text.trim()),
           extraLangs: mode === 'faithful' ? extraLangs : [],
           endCard: ecOn ? { offer: ecOffer.trim(), cta: ecCta.trim() || 'Shop now' } : null,
           hookVariants: hooksOn && mode === 'faithful',
@@ -349,6 +352,29 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                     )
                   )}
                 </section>
+
+                {/* ── On-screen text callouts (auto-detected from the ad + adapted to your product; edit/remove/add) ── */}
+                <section style={{ borderTop: '1px solid #1c2a17', paddingTop: 14 }}>
+                  <Label>On-screen text <span style={{ color: '#5f6f63', fontWeight: 400 }}>· burned onto the video</span></Label>
+                  <p style={{ fontSize: 11, color: '#6f7f73', margin: '2px 0 8px' }}>Auto-detected from the ad and adapted to your product. Edit the words, remove any, or add your own.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {overlays.map((o, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10.5, color: '#6f7f73', width: 46, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{o.t || '—'}</span>
+                        <input value={o.text} onChange={(e) => setOverlays((prev) => prev.map((x, j) => j === i ? { ...x, text: e.target.value.slice(0, 60) } : x))}
+                          placeholder="Callout text (e.g. 30g PROTEIN)"
+                          style={{ ...input, flex: 1, padding: '8px 11px', fontSize: 13 }} />
+                        <button onClick={() => setOverlays((prev) => prev.filter((_, j) => j !== i))} title="Remove"
+                          style={{ background: 'none', border: 'none', color: '#8aa', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 4px' }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => setOverlays((prev) => [...prev, { t: '', text: '' }].slice(0, 8))}
+                    style={{ marginTop: 8, background: 'none', border: '1px dashed #2a3a24', color: '#9fb0a4', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    + Add text
+                  </button>
+                </section>
+
                 {/* ── Power-ups: each is its own charge; if one fails it refunds itself and the base
                     video still delivers. ── */}
                 <section style={{ borderTop: '1px solid #1c2a17', paddingTop: 14 }}>

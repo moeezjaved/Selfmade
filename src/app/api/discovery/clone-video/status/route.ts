@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
     sceneCount: meta.scene_count || 2,
     sourceSeconds: Number(meta?.beat_sheet?.duration_seconds) || null,
     progress: meta.progress || null,   // { label, pct, eta_sec } — live render step + ETA
+    overlays: Array.isArray(meta.overlays) ? meta.overlays : [],   // auto-detected on-screen text callouts (editable)
     error: (row as any).status === 'failed' ? friendlyError(meta.error) : null,
   })
 }

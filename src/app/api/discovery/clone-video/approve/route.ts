@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { jobId, script, mode, durationBucket, extraLangs, endCard, hookVariants } = await req.json().catch(() => ({}))
+  const { jobId, script, mode, durationBucket, extraLangs, endCard, hookVariants, overlays } = await req.json().catch(() => ({}))
   if (!jobId) return NextResponse.json({ error: 'jobId required' }, { status: 400 })
 
   const admin = createAdminClient()
@@ -108,7 +108,11 @@ export async function POST(req: NextRequest) {
 
   const finalScript = (typeof script === 'string' && script.trim()) ? script.trim() : (meta.script || '')
   const { error } = await admin.from('creative_generations').update({
-    status: 'processing', credit_tx: txId, clone_meta: { ...meta, ...addonMeta, final_script: finalScript, mode: chosenMode, scene_count: nScenes, segments: nSeg, duration: clipDuration },
+    // User-edited on-screen text callouts (falls back to the auto-detected ones). Sanitized + capped.
+    status: 'processing', credit_tx: txId, clone_meta: { ...meta, ...addonMeta, final_script: finalScript, mode: chosenMode, scene_count: nScenes, segments: nSeg, duration: clipDuration,
+      overlays: Array.isArray(overlays)
+        ? overlays.filter((o: any) => o && String(o.text || '').trim()).slice(0, 8).map((o: any) => ({ t: String(o.t || '').slice(0, 12), text: String(o.text).trim().slice(0, 60) }))
+        : (meta.overlays || []) },
   }).eq('id', jobId).eq('user_id', user.id)
 
   if (error) {
