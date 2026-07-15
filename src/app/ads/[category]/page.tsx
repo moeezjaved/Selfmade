@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: { params: { category: string 
   const { niche, ads } = await getData(params.category)
   if (!niche) return { title: 'Ad examples — Selfmade' }
   const title = `Winning ${niche} Ads on ${PLATFORM} — ${monthYear()} | Selfmade`
-  const description = `See the top-performing ${niche.toLowerCase()} ads running on ${PLATFORM} right now — real examples ranked by performance. Get ideas, then clone or generate your own with Selfmade.`
+  const description = `See the top-performing ${niche.toLowerCase()} ads running on ${PLATFORM} right now — real examples ranked by performance. Get ideas, then remake or generate your own with Selfmade.`
   return { title: { absolute: title }, description,
     alternates: { canonical: `/ads/${params.category}` },
     robots: ads.length < 6 ? { index: false, follow: true } : undefined,   // thin-content guard
@@ -115,7 +115,7 @@ export default async function AdsCategoryPage({ params }: { params: { category: 
       <section style={{ maxWidth: 1120, margin: '0 auto', padding: '30px 24px' }}>
         <div style={{ background: `linear-gradient(135deg,${LIME},#a8e63d)`, borderRadius: 24, padding: '40px 32px', textAlign: 'center' }}>
           <h2 style={{ fontSize: 'clamp(24px,4vw,34px)', fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 10px' }}>Want ads like these for your brand?</h2>
-          <p style={{ color: 'rgba(14,27,18,.7)', margin: '0 0 20px', fontSize: 16 }}>Clone any winner onto your product, or generate an original — free to start.</p>
+          <p style={{ color: 'rgba(14,27,18,.7)', margin: '0 0 20px', fontSize: 16 }}>Remake any winner onto your product, or generate an original — free to start.</p>
           <Link href="/signup" style={{ background: INK, color: '#fff', padding: '13px 26px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none' }}>Start for free →</Link>
         </div>
       </section>

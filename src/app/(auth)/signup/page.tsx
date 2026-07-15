@@ -67,7 +67,7 @@ export default function SignupPage() {
         <h1 style={S.h1}>Check your inbox</h1>
         <p style={{ ...S.sub, marginBottom: 4 }}>We sent a verification link to</p>
         <p style={{ fontWeight: 800, color: INK, marginBottom: 16 }}>{form.email.trim()}</p>
-        <p style={S.sub}>Click it to confirm your email and start cloning ads. Didn&apos;t get it? Check spam, or wait a minute and try again.</p>
+        <p style={S.sub}>Click it to confirm your email and start remaking ads. Didn&apos;t get it? Check spam, or wait a minute and try again.</p>
         <p style={{ ...S.legal, marginTop: 20 }}>Wrong email? <button onClick={() => setVerifySent(false)} style={{ ...S.link, background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}>Go back</button></p>
       </div>
     </div>

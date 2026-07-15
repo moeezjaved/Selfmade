@@ -81,7 +81,7 @@ function MiniAdCard({ ad, onClone }: { ad: Ad; onClone?: (ad: Ad) => void }) {
         <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[fmt] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{fmt}</span>
         {(ad.daysRunning || 0) > 0 && <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{ad.daysRunning}d</span>}
         {ad.snapshotUrl && <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" title="Open original" style={{ position: 'absolute', inset: 0, zIndex: 1 }} />}
-        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(ad) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 2, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: '#111', border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Clone</button>}
+        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(ad) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 2, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: '#111', border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Remake</button>}
       </div>
     </div>
   )

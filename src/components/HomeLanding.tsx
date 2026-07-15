@@ -133,7 +133,7 @@ function HeroMock({ ads }: { ads: string[] }) {
         <div style={{ fontSize: 20, fontWeight: 800, color: INK }}>3M+</div><div style={{ fontSize: 11, color: '#6b7280' }}>ads indexed</div>
       </div>
       <div className="float-idle" style={{ position: 'absolute', bottom: -16, left: -18, background: INK, color: '#fff', borderRadius: 14, boxShadow: '0 14px 34px rgba(14,27,18,.22)', padding: '10px 14px', animationDelay: '2s' }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: LIME }}>Clone in 1 click</div><div style={{ fontSize: 11, opacity: .7 }}>→ your product, your brand</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: LIME }}>Remake in 1 click</div><div style={{ fontSize: 11, opacity: .7 }}>→ your product, your brand</div>
       </div>
     </div>
   )
@@ -257,7 +257,7 @@ export default function HomeLanding() {
           <Mask delay={120}>Make them <span style={{ fontStyle: 'italic', color: GREEN }}>yours.</span> Launch in minutes.</Mask>
         </h1>
         <p style={{ fontSize: 'clamp(16px,2vw,19px)', color: '#4b5563', maxWidth: 640, margin: '22px auto 28px', lineHeight: 1.55 }}>
-          Selfmade turns 3M+ proven Meta ads into your next winner — spy on what's working, clone or generate your own with AI, and launch. The whole ad workflow in one place.
+          Selfmade turns 3M+ proven Meta ads into your next winner — spy on what's working, remake or generate your own with AI, and launch. The whole ad workflow in one place.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/signup" className="btn arrowp" style={btnPrimary}>Start for free <Arrow /></Link>
@@ -286,7 +286,7 @@ export default function HomeLanding() {
       <section style={{ ...wrap, padding: '40px 24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
           {[['“Went from a blank canvas to 5 on-brand ads before my coffee got cold.”', 'Jordan P.', 'DTC founder'],
-            ['“The clone feature alone paid for the year. I just feed it winners.”', 'Amara K.', 'Growth lead'],
+            ['“The remake feature alone paid for the year. I just feed it winners.”', 'Amara K.', 'Growth lead'],
             ['“It’s like having a creative strategist that never sleeps.”', 'Devin R.', 'Agency owner']].map(([q, n, r], i) => (
             <div key={i} className="lift" style={{ border: '1px solid #eef0ee', borderRadius: 20, padding: 22, background: '#fff' }}>
               <p style={{ fontSize: 15, color: INK, margin: '0 0 16px', lineHeight: 1.5, fontWeight: 500 }}>{q}</p>
@@ -331,7 +331,7 @@ export default function HomeLanding() {
                 ['Trending by industry', [1, 1, 0, 0]],
                 ['Brand Spy (watch any brand)', [1, 1, 1, 0]],
                 ['Create faster', null],
-                ['1-click Clone onto your product', [1, 0, 0, 0]],
+                ['1-click Remake onto your product', [1, 0, 0, 0]],
                 ['AI Ad Studio (original ads)', [1, 0, 0, 0]],
                 ['Brand kit + auto-detect', [1, 1, 0, 0]],
                 ['Iterative AI edits', [1, 1, 0, 0]],
@@ -369,7 +369,7 @@ export default function HomeLanding() {
       <section id="how" style={{ ...wrap, padding: '50px 24px' }}>
         {([
           ['01 · Discover', 'Know exactly what to make', 'Spy on any brand, search 3M+ ads, and see what’s actually performing — ranked by real performance, not guesses.', ['Search & filter 3M+ ads', 'Brand Spy on any competitor', 'Trending by your industry'], '3M+', 'ads to learn from', 'linear-gradient(135deg,#eaffb8,#c9f0a0)'],
-          ['02 · Create', 'Winners, on repeat', 'Clone a proven ad onto your product, or generate an original — Nano Banana Pro renders it in your exact brand kit at 2K/4K.', ['Pick a winner or start fresh', 'Drop in your product photos', 'Generate / clone in ~30s'], '~30s', 'per on-brand ad', 'linear-gradient(135deg,#dbeafe,#c7ddff)'],
+          ['02 · Create', 'Winners, on repeat', 'Remake a proven ad onto your product, or generate an original — Nano Banana Pro renders it in your exact brand kit at 2K/4K.', ['Pick a winner or start fresh', 'Drop in your product photos', 'Generate / remake in ~30s'], '~30s', 'per on-brand ad', 'linear-gradient(135deg,#dbeafe,#c7ddff)'],
           ['03 · Launch', 'Ship it and scale', 'Push straight to Meta, track what’s working in Campaigns & Reports, and let Mello suggest the next move.', ['Launch to Meta in a click', 'Track performance', 'Mello suggests what’s next'], '1', 'platform, end to end', 'linear-gradient(135deg,#f7d9ee,#efc7e6)'],
         ] as [string, string, string, string[], string, string, string][]).map(([kick, title, body, steps, stat, statSub, grad], i) => (
           <div key={i} style={{ marginBottom: 48 }}>
@@ -464,7 +464,7 @@ export default function HomeLanding() {
         </div>
         <div style={{ overflow: 'hidden', maskImage: 'linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)' }}>
           <div className="marquee-slow" style={{ display: 'flex', gap: 14, width: 'max-content', padding: '0 7px' }}>
-            {[...Array(2)].flatMap((_, k) => ['Cloned a competitor’s top ad in a minute — it converted better than our agency’s.', 'The industry insights are unreal. I know what to make before I open the editor.', 'Mello wrote the angle, the Studio designed it, I launched it. Same afternoon.', 'Finally one tool instead of five tabs.', 'The 4K exports look agency-grade.', 'Brand Spy is addictive — I check it every morning.'].map((t, i) => (
+            {[...Array(2)].flatMap((_, k) => ['Remade a competitor’s top ad in a minute — it converted better than our agency’s.', 'The industry insights are unreal. I know what to make before I open the editor.', 'Mello wrote the angle, the Studio designed it, I launched it. Same afternoon.', 'Finally one tool instead of five tabs.', 'The 4K exports look agency-grade.', 'Brand Spy is addictive — I check it every morning.'].map((t, i) => (
               <div key={t + k} className="lift" style={{ width: 300, flexShrink: 0, border: '1px solid #eef0ee', borderRadius: 16, padding: 18, background: '#fff' }}>
                 <p style={{ margin: '0 0 12px', fontSize: 14.5, color: INK, lineHeight: 1.5 }}>“{t}”</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)` }} /><span style={{ fontSize: 12.5, color: '#9ca3af' }}>Verified user</span></div>
@@ -502,9 +502,9 @@ export default function HomeLanding() {
       <section style={{ ...wrap, padding: '20px 24px 60px', maxWidth: 820 }}>
         <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, textAlign: 'center', letterSpacing: '-.02em', margin: '0 0 24px' }}><Mask style={{ display: 'inline-block' }}>Questions? <span style={{ fontStyle: 'italic', color: GREEN }}>Answered</span>.</Mask></h2>
         {[['Where do the ads come from?', 'We index millions of real, running ads from the Meta Ad Library — so you’re learning from ads with actual spend behind them, not mockups.'],
-          ['Do I need design skills?', 'No. Clone a proven ad onto your product with one click, or describe what you want and the AI Ad Studio generates it in your brand — no editor required.'],
+          ['Do I need design skills?', 'No. Remake a proven ad onto your product with one click, or describe what you want and the AI Ad Studio generates it in your brand — no editor required.'],
           ['Will the ads match my brand?', 'Yes. Set a Brand Kit (colors, fonts, logo, products) once — or let Selfmade auto-detect it from your site — and every generation stays on-brand.'],
-          ['How does pricing work?', 'Start free with 50 credits. Paid plans give you a monthly credit balance plus optional top-ups; generating, cloning, and editing each cost credits. See the pricing section above.'],
+          ['How does pricing work?', 'Start free with 50 credits. Paid plans give you a monthly credit balance plus optional top-ups; generating, remaking, and editing each cost credits. See the pricing section above.'],
           ['Can I launch ads from Selfmade?', 'Yes — connect Meta and push creatives straight to your ad account, then track performance in Campaigns & Reports.'],
           ['Is my data private?', 'Your brands, products, and creatives are yours alone and never shared.']].map(([q, a]) => <FAQItem key={q} q={q} a={a} />)}
       </section>

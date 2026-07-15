@@ -327,7 +327,7 @@ function AiPanel({ ad }: { ad: Ad }) {
         <>
         {/* Primary action for a video ad: clone it into the user's OWN product ad (Seedance). */}
         <button style={ctaS} onClick={() => setCloneVideoOpen(true)}>
-          <Sparkles size={16} /> Clone this video · from 650 cr
+          <Sparkles size={16} /> Remake this video · from 650 cr
         </button>
         <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Recreate this ad’s hook &amp; pacing with your product — you approve the script before any credits are spent.</div>
         {cloneVideoOpen && <CloneVideoModal sourceAdId={ad.id} sourceVideoUrl={ad.videoUrl} sourcePoster={ad.thumbnailUrl} onClose={() => setCloneVideoOpen(false)} />}
@@ -368,7 +368,7 @@ function AiPanel({ ad }: { ad: Ad }) {
       ) : (
         <>
           <button style={ctaS} onClick={() => setCloneOpen(true)}>
-            <Sparkles size={16} /> Clone ad · from {cost('image_clone', 5)} cr
+            <Sparkles size={16} /> Remake ad · from {cost('image_clone', 5)} cr
           </button>
           <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Composite your product onto this winning ad — Standard or Pro.</div>
           {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName }} onClose={() => setCloneOpen(false)} />}

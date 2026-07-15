@@ -137,7 +137,7 @@ export default async function SharedReportPage({ params }: { params: { token: st
 
         {/* Footer CTA */}
         <div style={{ marginTop: 26, textAlign: 'center', color: '#7a9a7a', fontSize: 13 }}>
-          Made with <a href="https://tryselfmade.ai" style={{ color: '#2d7a2d', fontWeight: 700, textDecoration: 'none' }}>Selfmade</a> — spy, clone, launch &amp; track winning ads.
+          Made with <a href="https://tryselfmade.ai" style={{ color: '#2d7a2d', fontWeight: 700, textDecoration: 'none' }}>Selfmade</a> — spy, remake, launch &amp; track winning ads.
         </div>
       </div>
 

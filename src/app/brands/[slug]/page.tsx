@@ -195,7 +195,7 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
         <p>
           {name} is running {ref.adCount.toLocaleString()} ads across Facebook and Instagram right now.
           {page.longestRunningDays >= 30 ? ` Their longest-running ad has been live for ${page.longestRunningDays} days — a strong signal it's a proven winner, since advertisers kill ads that don't convert.` : ''}
-          {' '}Use Selfmade to study their hooks, creative formats, and offers, then clone the winning
+          {' '}Use Selfmade to study their hooks, creative formats, and offers, then remake the winning
           structure for your own campaigns.
         </p>
       </section>

@@ -70,7 +70,7 @@ export default function LandingHero() {
       <div className="lh-anim" style={dna(158, 'lh-d2 6.5s linear infinite')}>Emotion · FOMO</div>
       <div className="lh-anim" style={dna(196, 'lh-d3 6.5s linear infinite')}>Angle · Before/After</div>
 
-      <div className="lh-anim" style={{ ...chip('lh-chipClone 6.5s linear infinite'), left: 452, top: 70 }}>CLONE</div>
+      <div className="lh-anim" style={{ ...chip('lh-chipClone 6.5s linear infinite'), left: 452, top: 70 }}>REMAKE</div>
       <div className="lh-anim lh-hide-static" style={{ ...chip('lh-chipLaunch 6.5s linear infinite'), left: 452, top: 70 }}>LAUNCH</div>
 
       <div className="lh-anim lh-hide-static" style={{ position: 'absolute', left: 454, top: 112, width: 150, height: 195, borderRadius: 12, background: 'rgba(223,254,149,.18)', border: '2px solid rgba(223,254,149,.5)', animation: 'lh-ghost 6.5s linear infinite' }} />

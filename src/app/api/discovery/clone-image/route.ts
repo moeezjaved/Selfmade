@@ -79,7 +79,7 @@ async function enqueue(req: NextRequest) {
   }).select('id').single()
   if (jErr || !job) {
     if (txId) await admin.rpc('refund_credits', { p_tx: txId }).then(() => {}, () => {})
-    return NextResponse.json({ error: 'could not start the clone' }, { status: 500 })
+    return NextResponse.json({ error: 'could not start the remake' }, { status: 500 })
   }
   const jobId = (job as any).id
 

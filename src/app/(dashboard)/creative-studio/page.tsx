@@ -110,14 +110,14 @@ function Generations() {
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         {(['all', 'clone', 'edit', 'inspired'] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} style={{ padding: '5px 12px', borderRadius: 20, border: `1px solid ${filter === f ? DARK : '#cbd5cb'}`, background: filter === f ? DARK : '#fff', color: filter === f ? LIME : '#374151', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize' }}>{f}</button>
+          <button key={f} onClick={() => setFilter(f)} style={{ padding: '5px 12px', borderRadius: 20, border: `1px solid ${filter === f ? DARK : '#cbd5cb'}`, background: filter === f ? DARK : '#fff', color: filter === f ? LIME : '#374151', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize' }}>{f === 'clone' ? 'remake' : f}</button>
         ))}
       </div>
 
       {gens === null ? <div style={{ color: '#9ca3af' }}>Loading…</div>
         : shown.length === 0 ? (
           <div style={{ ...card, padding: 40, textAlign: 'center', color: '#9ca3af' }}>
-            No creatives yet. Open <b style={{ color: DARK }}>Discovery</b>, hover any ad and hit <b style={{ color: DARK }}>Clone ad</b> — it’ll show up here.
+            No creatives yet. Open <b style={{ color: DARK }}>Discovery</b>, hover any ad and hit <b style={{ color: DARK }}>Remake ad</b> — it’ll show up here.
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px,100%), 1fr))', gap: 14 }}>
@@ -136,7 +136,7 @@ function Generations() {
                   {/* Subtle "cloned from" chip — the competitor ad this output was cloned from, so the
                       user can eyeball source-vs-result without it dominating the card. */}
                   {g.status !== 'processing' && (g.source_thumb || g.source_video_url) && (
-                    <span title="Cloned from this ad" style={{ position: 'absolute', bottom: 6, left: 6, width: 34, height: 44, borderRadius: 5, overflow: 'hidden', border: '2px solid rgba(255,255,255,.82)', boxShadow: '0 2px 6px rgba(0,0,0,.45)', background: '#0d120e', opacity: 0.9 }}>
+                    <span title="Remade from this ad" style={{ position: 'absolute', bottom: 6, left: 6, width: 34, height: 44, borderRadius: 5, overflow: 'hidden', border: '2px solid rgba(255,255,255,.82)', boxShadow: '0 2px 6px rgba(0,0,0,.45)', background: '#0d120e', opacity: 0.9 }}>
                       {g.source_thumb
                         // eslint-disable-next-line @next/next/no-img-element
                         ? <img src={g.source_thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -312,7 +312,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                   ? <img src={gen.source_thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   : <video src={gen.source_video_url || ''} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
               </span>
-              <span style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.35 }}><b style={{ color: '#374151' }}>Cloned from</b><br />the original ad{gen.source_ad_id ? ' →' : ''}</span>
+              <span style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.35 }}><b style={{ color: '#374151' }}>Remade from</b><br />the original ad{gen.source_ad_id ? ' →' : ''}</span>
             </a>
           )}
           <button onClick={del} style={{ ...btnGhost, justifyContent: 'center', color: '#b91c1c', borderColor: '#f0c4c4' }}><Trash2 size={15} /> Delete</button>
@@ -344,11 +344,11 @@ function Brands() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: '#6b7280' }}>Brands feed Clone & Script — voice, USPs, and product photos. Slots are set by your plan.</div>
+        <div style={{ fontSize: 13, color: '#6b7280' }}>Brands feed Remake & Script — voice, USPs, and product photos. Slots are set by your plan.</div>
         <button onClick={() => setAdding(true)} style={btn}><Plus size={15} /> Add brand</button>
       </div>
       {brands === null ? <div style={{ color: '#9ca3af' }}>Loading…</div>
-        : brands.length === 0 ? <div style={{ ...card, padding: 40, textAlign: 'center', color: '#9ca3af' }}>No brands yet. Add one to start cloning ads with your product.</div>
+        : brands.length === 0 ? <div style={{ ...card, padding: 40, textAlign: 'center', color: '#9ca3af' }}>No brands yet. Add one to start remaking ads with your product.</div>
           : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(260px,100%), 1fr))', gap: 14 }}>
               {brands.map((b) => {

@@ -326,7 +326,7 @@ function AdCard({ a, onOpen, onClone }: { a: Card; onOpen: (a: Card) => void; on
         {isVideo && !a.videoUrl && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>▶</div></div>}
         <span style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[a.format || ''] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{a.format || 'Ad'}</span>
         {(a.daysRunning || 0) > 0 && <span style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 10, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{a.daysRunning}d</span>}
-        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(a) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 10, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: '#111', border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Clone</button>}
+        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(a) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 10, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: '#111', border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Remake</button>}
       </div>
     </div>
   )
@@ -365,7 +365,7 @@ function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
             </div>
           </div>
           <div style={{ padding: 18, borderLeft: '1px solid #f3f4f6' }}>
-            <button onClick={() => setCloning(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', background: '#111', color: ACCENT, fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 10, fontFamily: 'inherit' }}>✨ Clone this ad</button>
+            <button onClick={() => setCloning(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', background: '#111', color: ACCENT, fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 10, fontFamily: 'inherit' }}>✨ Remake this ad</button>
             <a href={a.snapshotUrl || '#'} target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: ACCENT, color: '#111', fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 10, textDecoration: 'none', marginBottom: 14 }}>Open in Meta Ad Library ↗</a>
             {cloning && ((a.format || '').toLowerCase().includes('video') || !!a.videoUrl
               ? <CloneVideoModal sourceAdId={a.id} sourcePoster={a.thumbnailUrl || undefined} onClose={() => setCloning(false)} />

@@ -2,8 +2,8 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: { absolute: 'About Selfmade — Find, Clone & Launch Winning Ads' },
-  description: 'Selfmade turns 3M+ proven Meta ads into your next winner — discover what’s working, clone or generate your own with AI, and launch. Learn what we’re building.',
+  title: { absolute: 'About Selfmade — Find, Remake & Launch Winning Ads' },
+  description: 'Selfmade turns 3M+ proven Meta ads into your next winner — discover what’s working, remake or generate your own with AI, and launch. Learn what we’re building.',
   alternates: { canonical: '/about' },
 }
 const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
@@ -22,7 +22,7 @@ export default function About() {
         <h1 style={{ fontSize: 'clamp(30px,5vw,44px)', fontWeight: 800, letterSpacing: '-.02em', margin: '10px 0 18px' }}>The whole ad workflow, in one place.</h1>
         <div style={{ fontSize: 16.5, color: '#374151', lineHeight: 1.75 }}>
           <p>Selfmade is an ad-intelligence platform built by Meta ad experts. We index millions of real, running ads from the Meta Ad Library, score them by performance, and give you everything you need to turn a proven winner into your own launched ad — without stitching together a spy tool, a designer, and a launcher.</p>
-          <p><b>Discover</b> what’s working: search 3M+ ads, spy on any brand, and see what’s trending in your industry. <b>Create</b> in minutes: clone a winning ad onto your product with one click, or generate an original in your brand with the AI Ad Studio. <b>Launch &amp; scale</b>: push straight to Meta, track performance, and let Mello — your AI strategist — suggest what to make next.</p>
+          <p><b>Discover</b> what’s working: search 3M+ ads, spy on any brand, and see what’s trending in your industry. <b>Create</b> in minutes: remake a winning ad onto your product with one click, or generate an original in your brand with the AI Ad Studio. <b>Launch &amp; scale</b>: push straight to Meta, track performance, and let Mello — your AI strategist — suggest what to make next.</p>
           <p>Our goal is simple: no one should start an ad from a blank canvas when millions of proven formulas already exist. Selfmade turns that library into your unfair advantage.</p>
         </div>
         <div style={{ marginTop: 28 }}>
