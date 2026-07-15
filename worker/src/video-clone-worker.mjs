@@ -948,20 +948,34 @@ async function uploadVideo(localFile, key) {
 // Adapt the source ad's on-screen text callouts to the user's product — swap the original's brand /
 // numbers for the user's, keep each callout's role + timing. Best-effort; returns [] on any failure.
 async function adaptOverlays(overlays, product, brandName) {
-  const list = (Array.isArray(overlays) ? overlays : []).filter((o) => o && String(o.text || '').trim()).slice(0, 8)
-  if (!list.length || !OPENAI_KEY) return list.map((o) => ({ t: o.t || '', text: String(o.text).trim() }))
-  const sys = `You adapt an ad's on-screen text CALLOUTS for a clone that features a DIFFERENT product. For each callout keep the SAME role and length (a stat stays a short stat, a price stays a price, a CTA stays a CTA), but swap the original's brand/product name for the user's. Keep numbers ONLY if they plausibly fit the user's product; if a stat/price is specific to the original and you don't know the user's value, make it generic rather than a false claim (e.g. "25g PROTEIN" for a milk brand → keep if it's a protein product, else drop the number). NEVER invent false claims. Return ONLY minified JSON: {"overlays":[{"t":"","text":""}]} — same count, order and timing as the input.`
-  const usr = `USER PRODUCT: ${JSON.stringify(product)}${brandName ? ` — brand name: ${brandName}` : ''}\n\nSOURCE CALLOUTS (adapt each):\n${JSON.stringify(list)}`
+  // Dedup — Gemini repeats the same callout at every timestamp it's visible. Keep the FIRST time each
+  // unique text appears (its real timing), in order.
+  const seen = new Set()
+  const uniq = (Array.isArray(overlays) ? overlays : [])
+    .filter((o) => o && String(o.text || '').trim())
+    .map((o) => ({ t: String(o.t || ''), text: String(o.text).trim() }))
+    .filter((o) => { const k = o.text.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
+  if (!uniq.length) return []
+  if (!OPENAI_KEY) return uniq.slice(0, 6)
+  // FAITHFUL adaptation: preserve the source's callouts + TIMING; only swap the brand; keep the hero
+  // stats/prices/CTAs verbatim (the user edits those). Drop packaging-label noise. Never invent claims.
+  const sys = `You lightly adapt an ad's on-screen text CALLOUTS for a clone of a DIFFERENT product. STRICT RULES:
+1. KEEP each callout's EXACT timing "t" — never merge, re-time, or collapse to 0-1s.
+2. Only SWAP the source's brand/company name (e.g. "Country Delight", "HRX") for the user's brand. Leave STATS, PRICES, CTAs and TAGLINES EXACTLY as written (e.g. keep "25g PROTEIN", "₹47.00/450ml", "PROTEIN FOR ALL", "Download Now") — the user edits those himself.
+3. KEEP the punchy hero callouts (a big stat, a price, a CTA, a tagline); DROP pure packaging-label repeats (e.g. "Pasteurized Toned Milk", "450 ml", "Made from Buffalo Milk", tiny legal text).
+4. Return AT MOST 6, most important first, preserving each one's original timing. NEVER invent claims.
+Return ONLY minified JSON: {"overlays":[{"t":"","text":""}]}.`
+  const usr = `USER BRAND: ${brandName || (product && product.name) || 'the brand'}\nUSER PRODUCT: ${JSON.stringify(product)}\n\nAD CALLOUTS (deduped, with real timing — keep timing, swap brand, keep stats/CTAs):\n${JSON.stringify(uniq)}`
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.4, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }] }),
+      body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }] }),
     })
     if (!r.ok) throw new Error(`overlays ${r.status}`)
     const out = JSON.parse((await r.json()).choices?.[0]?.message?.content || '{}')
-    const adapted = Array.isArray(out.overlays) ? out.overlays.filter((o) => o && String(o.text || '').trim()).map((o) => ({ t: String(o.t || ''), text: String(o.text).trim().slice(0, 60) })) : []
-    return adapted.length ? adapted : list.map((o) => ({ t: o.t || '', text: String(o.text).trim() }))
-  } catch { return list.map((o) => ({ t: o.t || '', text: String(o.text).trim() })) }
+    const adapted = Array.isArray(out.overlays) ? out.overlays.filter((o) => o && String(o.text || '').trim()).slice(0, 6).map((o) => ({ t: String(o.t || ''), text: String(o.text).trim().slice(0, 60) })) : []
+    return adapted.length ? adapted : uniq.slice(0, 6)
+  } catch { return uniq.slice(0, 6) }
 }
 
 // ── PHASE A: analyse the competitor video + draft a script → status='review' (awaits approval) ──
