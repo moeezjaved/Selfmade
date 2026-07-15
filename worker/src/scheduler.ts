@@ -171,6 +171,17 @@ async function pickNextBrand(exclude: Set<string>): Promise<BrandRow | null> {
   const cutoff = new Date(Date.now() - MIN_BRAND_GAP_MIN * 60 * 1000).toISOString()
   const batch = Math.max(20, CONCURRENCY * 3)
 
+  // SPY-ONLY gate (2026-07-15): the crawler must NOT touch the ~51k discovery-population brands
+  // (priority < 9) unless discovery is explicitly enabled. Mirrors claim_next_brand's system_flags
+  // gate so ONE lever (crawl_discovery_enabled) controls both the RPC and this legacy fallback.
+  //   no row  → spy-only (default);  row present + live → full crawl.
+  let discoveryEnabled = false
+  try {
+    const { data: f } = await (supabase as any)
+      .from('system_flags').select('until').eq('key', 'crawl_discovery_enabled').maybeSingle()
+    discoveryEnabled = !!f && (f.until == null || Date.parse(f.until) > Date.now())
+  } catch { discoveryEnabled = false }
+
   // JUST-SPIED brands jump the whole queue — a user paid to Spy them (priority 9, the app
   // resets last_crawled_at = null), so they crawl on the very next free worker slot.
   const { data: spied } = await (supabase as any)
@@ -183,15 +194,18 @@ async function pickNextBrand(exclude: Set<string>): Promise<BrandRow | null> {
     .limit(batch)
   for (const b of (spied || []) as BrandRow[]) if (!exclude.has(b.page_id)) return b
 
-  // Brands that have NEVER been crawled — next priority
-  const { data: never } = await (supabase as any)
-    .from('discovery_crawl_terms')
-    .select('page_id, term, last_crawled_at')
-    .eq('is_active', true)
-    .not('page_id', 'is', null)
-    .is('last_crawled_at', null)
-    .limit(batch)
-  for (const b of (never || []) as BrandRow[]) if (!exclude.has(b.page_id)) return b
+  // Brands that have NEVER been crawled — next priority. DISCOVERY population (any priority), so
+  // only when discovery is enabled; otherwise spy-only skips it.
+  if (discoveryEnabled) {
+    const { data: never } = await (supabase as any)
+      .from('discovery_crawl_terms')
+      .select('page_id, term, last_crawled_at')
+      .eq('is_active', true)
+      .not('page_id', 'is', null)
+      .is('last_crawled_at', null)
+      .limit(batch)
+    for (const b of (never || []) as BrandRow[]) if (!exclude.has(b.page_id)) return b
+  }
 
   // SPIED brands due for a ~6h REFRESH — tracked brands re-crawl every 6h, ahead of the general
   // population, so their ad set stays current and drives new-ad alerts (mirrors claim_next_brand tier 2).
@@ -207,16 +221,18 @@ async function pickNextBrand(exclude: Set<string>): Promise<BrandRow | null> {
     .limit(batch)
   for (const b of (spiedDue || []) as BrandRow[]) if (!exclude.has(b.page_id)) return b
 
-  // Otherwise the oldest ones past the gap
-  const { data: aged } = await (supabase as any)
-    .from('discovery_crawl_terms')
-    .select('page_id, term, last_crawled_at')
-    .eq('is_active', true)
-    .not('page_id', 'is', null)
-    .lte('last_crawled_at', cutoff)
-    .order('last_crawled_at', { ascending: true })
-    .limit(batch)
-  for (const b of (aged || []) as BrandRow[]) if (!exclude.has(b.page_id)) return b
+  // Otherwise the oldest ones past the gap — DISCOVERY population, gated on discovery being enabled.
+  if (discoveryEnabled) {
+    const { data: aged } = await (supabase as any)
+      .from('discovery_crawl_terms')
+      .select('page_id, term, last_crawled_at')
+      .eq('is_active', true)
+      .not('page_id', 'is', null)
+      .lte('last_crawled_at', cutoff)
+      .order('last_crawled_at', { ascending: true })
+      .limit(batch)
+    for (const b of (aged || []) as BrandRow[]) if (!exclude.has(b.page_id)) return b
+  }
 
   return null
 }
