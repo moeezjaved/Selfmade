@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
     suggestedMode: meta.suggested_mode || 'ugc',
     sceneCount: meta.scene_count || 2,
     sourceSeconds: Number(meta?.beat_sheet?.duration_seconds) || null,
+    progress: meta.progress || null,   // { label, pct, eta_sec } — live render step + ETA
     error: (row as any).status === 'failed' ? friendlyError(meta.error) : null,
   })
 }
