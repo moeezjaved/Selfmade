@@ -84,26 +84,32 @@ export async function confirmUrlFor(userId: string): Promise<string> {
 }
 
 /**
- * Atomically claim a one-time lifecycle email so concurrent requests send it exactly once.
- * Returns true only for the caller that flipped the column from NULL → now().
+ * Claim a one-time lifecycle email via activity_logs so it sends exactly once. Reliable on this DB:
+ * the old version keyed on user_profiles columns that (a) don't exist here and (b) were matched by the
+ * wrong id (row PK vs auth user_id), so it silently never sent. activity_logs is always present and
+ * keyed by the auth user_id. Best-effort: a logging hiccup returns false (skip) rather than throwing.
  */
-async function claimOnce(userId: string, column: 'first_brand_email_at' | 'first_ad_email_at'): Promise<boolean> {
+async function claimOnceLog(userId: string, key: string): Promise<boolean> {
   const admin = createAdminClient()
-  const { data } = await admin.from('user_profiles')
-    .update({ [column]: new Date().toISOString() })
-    .eq('id', userId).is(column, null).select('id')
-  return Array.isArray(data) && data.length > 0
+  try {
+    const { data: prior } = await admin.from('activity_logs')
+      .select('id').eq('user_id', userId).eq('action_type', key).limit(1).maybeSingle()
+    if (prior) return false
+    await admin.from('activity_logs').insert({
+      user_id: userId, action_type: key, entity_type: 'account', description: `${key} sent`, performed_by: 'system',
+    })
+    return true
+  } catch { return false }
 }
 
 /** "Brand saved" — sent once, the first time a user creates a brand. */
 export async function sendFirstBrandEmail(userId: string, to: string, brandName: string) {
   if (!emailEnabled || !to) return
-  if (!(await claimOnce(userId, 'first_brand_email_at'))) return
-  const confirmUrl = await confirmUrlFor(userId)
+  if (!(await claimOnceLog(userId, 'FIRST_BRAND_EMAIL'))) return
   const html = emailShell({
     title: `Brand saved: ${brandName}`,
     intro: `Nice — <b>${brandName}</b> is saved. Every ad you clone will now use its product photos automatically. Manage it anytime from My Creatives → Brands.`,
-    ctaText: 'Clone an ad', ctaUrl: `${APP_URL}/discovery`, confirmUrl: confirmUrl || undefined,
+    ctaText: 'Clone an ad', ctaUrl: `${APP_URL}/discovery`,
   })
   await sendEmail(to, `Brand saved: ${brandName}`, html)
 }
@@ -111,12 +117,11 @@ export async function sendFirstBrandEmail(userId: string, to: string, brandName:
 /** "Your first ad is ready 🎉" — sent once, on the user's first generated creative. */
 export async function sendFirstAdEmail(userId: string, to: string, imageUrl?: string) {
   if (!emailEnabled || !to) return
-  if (!(await claimOnce(userId, 'first_ad_email_at'))) return
-  const confirmUrl = await confirmUrlFor(userId)
+  if (!(await claimOnceLog(userId, 'FIRST_AD_EMAIL'))) return
   const html = emailShell({
     title: `Your first ad is ready! 🎉`,
     intro: `You just cloned your first winning ad — great work. Try a few variations, tweak the headline, or clone another. Everything you make is saved in My Creatives.`,
-    imageUrl, ctaText: 'Open My Creatives', ctaUrl: `${APP_URL}/creative-studio`, confirmUrl: confirmUrl || undefined,
+    imageUrl, ctaText: 'Open My Creatives', ctaUrl: `${APP_URL}/creative-studio`,
   })
   await sendEmail(to, `Your first ad is ready! 🎉`, html)
 }

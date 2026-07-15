@@ -272,8 +272,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               )
             })}
-            {/* Saved reports live under the Reports item in the Analytics area. */}
-            {!melloActive && activeArea.key === 'analytics' && <SavedReportsNav />}
+            {/* Saved reports live under the Reports item in the Analytics area. Hidden while META_LIVE
+                is off — Reports is a Coming-soon (Meta-connected) surface, so its "Create report" +
+                saved list would be dead. */}
+            {META_LIVE && !melloActive && activeArea.key === 'analytics' && <SavedReportsNav />}
           </nav>
 
           {/* Save ads from — extension / IG-mobile entry points (Atria-style) */}
