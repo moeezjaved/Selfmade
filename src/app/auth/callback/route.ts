@@ -4,8 +4,9 @@
  * from /api/auth/callback, which is the Meta/Facebook ad-account OAuth.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { isFreeEmail } from '@/lib/email-domains'
+import { sendWelcomeEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,24 @@ export async function GET(request: NextRequest) {
     await supabase.auth.signOut()
     return NextResponse.redirect(`${origin}/signup?error=business_email&email=${encodeURIComponent(email)}`)
   }
+
+  // Welcome email — this callback fires for Google sign-ins AND email-verification confirmations, so
+  // it's the one place both new-account paths pass through. Idempotent via activity_logs, best-effort.
+  try {
+    const uid = data?.user?.id
+    if (uid && email) {
+      const admin = createAdminClient()
+      const { data: prior } = await admin.from('activity_logs')
+        .select('id').eq('user_id', uid).eq('action_type', 'WELCOME_EMAIL').limit(1).maybeSingle()
+      if (!prior) {
+        await admin.from('activity_logs').insert({
+          user_id: uid, action_type: 'WELCOME_EMAIL', entity_type: 'account',
+          description: 'Welcome email sent', performed_by: 'system',
+        })
+        await sendWelcomeEmail(email, (data?.user?.user_metadata?.full_name as string) || '')
+      }
+    }
+  } catch { /* best-effort */ }
 
   // First-time (or unfinished) users land in the competitor-first onboarding wizard instead of the
   // dashboard — email signups already route there; this covers Google sign-ins. Best-effort: any

@@ -22,6 +22,22 @@ const APP_URL = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http
 
 export const emailEnabled = !!KEY
 
+/**
+ * Welcome email — sent once when a new account is created (both email + Google signup). Self-contained:
+ * uses only sendEmail + emailShell (no user_profiles lifecycle columns, which aren't all present on
+ * this DB). Idempotency is handled by the caller via an activity_logs 'WELCOME_EMAIL' row.
+ */
+export async function sendWelcomeEmail(to: string, fullName?: string): Promise<boolean> {
+  if (!emailEnabled || !to) return false
+  const first = (fullName || '').trim().split(/\s+/)[0] || 'there'
+  const html = emailShell({
+    title: `Welcome to Selfmade, ${first} 👋`,
+    intro: `You're in — with <b>600 free credits</b> to start. The fastest way to see what Selfmade does: find a winning ad from any brand and clone it with <b>your</b> product in minutes. No designer, no filming, no waiting.`,
+    ctaText: 'Clone your first ad', ctaUrl: `${APP_URL}/discovery`,
+  })
+  return sendEmail(to, 'Welcome to Selfmade 👋 clone your first ad', html)
+}
+
 export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   if (!KEY || !to) return false
   try {
