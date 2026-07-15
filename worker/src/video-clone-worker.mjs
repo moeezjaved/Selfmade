@@ -423,6 +423,30 @@ async function composeKeyframe({ scenePrompt, productImageUrls, jobId, tag, aspe
   return `${R2_PUBLIC}/${key}`
 }
 
+// Person-free product reference: users upload product photos that often show a HAND holding the item,
+// and fal's likeness filter rejects any reference image containing a real person → the whole render
+// 422s on image_urls. Nano Banana re-shoots the product ALONE on a clean background (no hands, no
+// people), so the reference we hand fal is always safe — for any product, any uploaded photo. Runs
+// once per job (~1-2¢), cached in clone_meta.
+async function composeCleanProduct({ productImageUrls, jobId }) {
+  if (!GEMINI_KEY || !productImageUrls?.length) return null
+  const imgs = []
+  for (const u of productImageUrls.slice(0, 3)) { try { imgs.push(await fetchB64(u)) } catch { /* skip */ } }
+  if (!imgs.length) return null
+  const prompt = 'Studio product photo: the EXACT product from the attached photos, isolated on a clean seamless neutral-grey background. Identical container, cap/applicator, colours and label text — sharp and readable, product large and centered. NO hands, NO people, NO other objects — only the product.'
+  const body = { contents: [{ parts: [{ text: prompt }, ...imgs.map((i) => ({ inline_data: { mime_type: i.mime, data: i.b64 } }))] }], generationConfig: { responseModalities: ['IMAGE'] } }
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${GEMINI_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  if (!r.ok) throw new Error(`clean-product gemini ${r.status}`)
+  const j = await r.json()
+  const part = (j?.candidates?.[0]?.content?.parts || []).find((p) => p.inline_data || p.inlineData)
+  const inline = part?.inline_data || part?.inlineData
+  if (!inline?.data) throw new Error('clean-product: no image')
+  const key = `creatives/tmp/${jobId}-clean-product.png`
+  await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
+  return `${R2_PUBLIC}/${key}`
+}
+
 // ── Single-voice narration (faithful/b-roll mode): one TTS track for the WHOLE script, muxed over
 // the stitched video. Per-clip generated voices differ audibly between scenes; b-roll needs no lip
 // sync, so one continuous voice is both correct and more professional. OpenAI TTS (key already set).
@@ -954,6 +978,18 @@ async function generateJob(job) {
   try {
     const finalScript = meta.final_script || meta.script || ''
 
+    // Person-free product reference for fal — used by EVERY mode. Uploaded product photos often show a
+    // hand holding the item, which fal's likeness filter rejects on image_urls (→ whole render 422s).
+    // Nano Banana re-shoots the product alone on a clean background once (~1-2¢, cached on the row).
+    let cleanProduct = meta.clean_product || null
+    if (!cleanProduct && productImages.length) {
+      try {
+        cleanProduct = await composeCleanProduct({ productImageUrls: productImages, jobId: job.id })
+        if (cleanProduct) { console.log(`🧴 ${job.id} clean product ref composed`); await stamp({ clone_meta: { ...meta, clean_product: cleanProduct } }); meta.clean_product = cleanProduct }
+      } catch (e) { console.warn(`clean-product ${job.id}:`, e.message) }
+    }
+    const falProductImages = cleanProduct ? [cleanProduct] : productImages
+
     // ── FAITHFUL mode: clone the source's edit structure scene-by-scene, then stitch. Each scene is
     // its own Seedance clip with a scene-appropriate prompt (b-roll/lifestyle/product allowed — no
     // forced talking head). No video reference per scene: the beat sheet grounds each prompt, and
@@ -1010,7 +1046,7 @@ async function generateJob(job) {
               if (keyframe) console.log(`🖼 ${job.id} scene ${i + 1} keyframe composed (product-locked)`)
             } catch (e) { console.warn(`scene ${i + 1} keyframe failed (${e.message}) — continuing without`) }
           }
-          const sceneImages = keyframe ? [keyframe, ...productImages].slice(0, 9) : productImages
+          const sceneImages = keyframe ? [keyframe, ...falProductImages].slice(0, 9) : falProductImages
           const scenePrompt = keyframe
             ? `@Image1 shows the EXACT product in the creator's hands — identical container, cap/applicator and label. Whenever the product appears in this scene it must match @Image1 precisely, sharp and in focus, never a generic stand-in. ${s.prompt}`
             : s.prompt
@@ -1041,7 +1077,7 @@ async function generateJob(job) {
             // PEOPLE-FREE b-roll → source segment straight into Seedance as a motion reference
             // (no faces → no likeness block); prompt-only retry if fal objects anyway.
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, motion-ref)`)
-            try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })); falCost += clipCost(meta.tier, s.duration) }
+            try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: falProductImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })); falCost += clipCost(meta.tier, s.duration) }
             catch (e) {
               // Flagged VIDEO ref → drop it, prompt-only retry below. Flagged product IMAGE → surface.
               if (e.code === 'content_policy_video') console.warn(`scene ${i + 1} ref blocked (likeness) — retrying prompt-only`)
@@ -1059,7 +1095,7 @@ async function generateJob(job) {
               // the segment-anchor case. Drop the keyframe and salvage rather than failing the job.
               if (keyframe && e.code === 'content_policy_images') {
                 console.warn(`scene ${i + 1} keyframe blocked (likeness) — retrying without keyframe`)
-                ;({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+                ;({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
               } else throw e
             }
             falCost += clipCost(meta.tier, s.duration)
@@ -1133,7 +1169,7 @@ async function generateJob(job) {
             for (let vi = 0; vi < variants.length; vi++) {
               const label = variants[vi].label
               const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-              const { videoUrl } = await falGenerate({ prompt: variants[vi].prompt, imageUrls: productImages, resolution: meta.resolution, duration: scenes[0].duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })
+              const { videoUrl } = await falGenerate({ prompt: variants[vi].prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: scenes[0].duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })
               vCost += clipCost(meta.tier, scenes[0].duration)
               let vf = `${base}-${slug}.mp4`
               await downloadToFile(videoUrl, vf)
@@ -1189,7 +1225,7 @@ async function generateJob(job) {
             } catch { delete segClips[i] /* expired url → regenerate */ }
           }
           const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, !!anchor, productImages.length, meta.language)
-          const imgs = anchor ? [anchor, ...productImages].slice(0, 9) : productImages
+          const imgs = anchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages
           console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${anchor ? ' (anchored)' : ''}`)
           // The anchor is the previous clip's last frame — it shows the (AI) creator's face, which
           // fal's likeness policy rejects (422 content_policy). That was killing the whole job AFTER
@@ -1202,7 +1238,7 @@ async function generateJob(job) {
           } catch (e) {
             if (anchor && e.code === 'content_policy_images') {
               console.warn(`segment ${i + 1} anchor blocked (likeness) — retrying without anchor`)
-              ;({ videoUrl } = await falGenerate({ prompt, imageUrls: productImages, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
+              ;({ videoUrl } = await falGenerate({ prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
             } else throw e
           }
           falCost += clipCost(meta.tier, 15)
@@ -1244,7 +1280,7 @@ async function generateJob(job) {
     // (likeness policy) — which is nearly every UGC ad — so on a content_policy_violation we retry
     // WITHOUT the video: Gemini's beat sheet already grounds the prompt in the ad's structure/hook,
     // and Seedance generates a fresh (non-real) creator. Product-only/no-people videos keep the motion ref.
-    const genArgs = { prompt, imageUrls: productImages, resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier }
+    const genArgs = { prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier }
     let videoUrl, requestId
     try {
       ({ videoUrl, requestId } = await falGenerate({ ...genArgs, videoUrl: refVideo }))
