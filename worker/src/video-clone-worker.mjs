@@ -191,7 +191,10 @@ function sceneCountFor(beat) {
 // is ≥5s on Seedance, so a short fast-cut ad can't demand more scenes than duration/5 (else the clone
 // would run far longer than the source); and a hard ceiling of 10 for render time + cost sanity.
 function clampScenes(count, secs) {
-  const durCap = Math.max(2, Math.floor((Number(secs) || 15) / 5))
+  // Seedance's real minimum clip is ~4s, so a source can hold up to duration/4 scenes. Pass the REAL
+  // (ffprobe) duration, not Gemini's estimate — the estimate wobbled 13.6↔15s and flipped this cap
+  // (and the scene count/price) between re-analyses. Hard ceiling 10.
+  const durCap = Math.max(2, Math.floor((Number(secs) || 15) / 4))
   return Math.max(2, Math.min(count, durCap, 10))
 }
 
@@ -231,10 +234,10 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
   // faithful ~14s clone), not 3×10s = 30s. This is what makes "clone = match the source" hold for
   // whatever real scene count the source has.
   const srcSecs = Number(beat && beat.duration_seconds) || (picked.length * 7)
-  const evenSplit = Math.max(5, Math.min(15, Math.round(srcSecs / picked.length)))
+  const evenSplit = Math.max(4, Math.min(15, Math.round(srcSecs / picked.length)))
   return picked.map((s) => {
     const span = (Number.isFinite(+s.src_end) && Number.isFinite(+s.src_start)) ? Math.round(+s.src_end - +s.src_start) : 0
-    const dur = span > 0 ? Math.max(5, Math.min(15, span)) : evenSplit
+    const dur = span > 0 ? Math.max(4, Math.min(15, span)) : evenSplit
     return {
       prompt: String(s.prompt), script: String(s.script || ''),
       duration: dur,
@@ -958,8 +961,9 @@ async function analyzeJob(job) {
         const tmpSrc = join(tmpdir(), `cut-${job.id}.mp4`)
         await downloadToFile(job.source_video_url, tmpSrc)
         const cuts = await detectSceneCuts(tmpSrc)
+        const realSecs = await probeDuration(tmpSrc)   // deterministic source length (not Gemini's guess)
         await rm(tmpSrc, { force: true }).catch(() => {})
-        if (cuts >= 1) { scenes = clampScenes(cuts, Number(beat && beat.duration_seconds) || 15); console.log(`✂️ ${job.id} ffmpeg detected ${cuts} cuts → ${scenes} scenes (deterministic)`) }
+        if (cuts >= 1) { scenes = clampScenes(cuts, realSecs || Number(beat && beat.duration_seconds) || 15); console.log(`✂️ ${job.id} ffmpeg ${cuts} shots · ${(realSecs || 0).toFixed(1)}s → ${scenes} scenes (deterministic)`) }
       } catch (e) { console.warn(`cut-detect ${job.id}:`, e.message) }
     }
     await stamp({ status: 'review', clone_meta: { ...meta, beat_sheet: beat, seedance_prompt: prompt, script, script_gloss: gloss, suggested_mode: cinematic ? 'faithful' : 'ugc', scene_count: scenes } })
