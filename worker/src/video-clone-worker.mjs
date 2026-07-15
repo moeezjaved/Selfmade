@@ -208,6 +208,7 @@ async function buildScenePlan(beat, product, nImages, nScenes, look, voiceover) 
 Rules:
 - Map the beat sheet's beats (in the "beats" array) onto EXACTLY ${nScenes} scenes, IN ORDER, covering the ad's full arc (hook first). Each scene must RECREATE a specific reference beat — its subject, its action, its shot type — not invent a new one. If there are more beats than scenes, group adjacent beats; if fewer, expand the strongest beats. Each scene = one continuous shot.
 - Per scene, write ONE dense Seedance prompt that reproduces THAT reference beat: subject → the exact action from the beat → camera (copy the reference's framing/movement) → lighting → mood. Stay faithful to what the reference actually shows in that beat (e.g. a couple close-up stays a couple close-up; a gym shot stays a gym shot). Cinematic b-roll, lifestyle moments and product close-ups are all allowed — do NOT force anyone to talk to camera, and do NOT drift to a generic studio.
+- ACTION IS MANDATORY: name the SPECIFIC physical action from the reference beat as a continuous on-camera MOTION the subject performs — applying/rolling/massaging the product onto skin or scalp, spraying, pumping, drinking, swatching, demonstrating — never a person merely standing and holding the product still. Write it as an active verb the video model can animate (e.g. "rolls the microneedling applicator across his hairline", not "holds the vial").
 - PRODUCT SWAP — wherever the reference features its product, feature the user's product (${refList || 'the product'}) instead, matching ${refList || 'the product'} exactly.
 - PRODUCT HERO FRAMING (critical for fidelity): whenever the product is the focus of a scene, frame it as a TIGHT PRODUCT CLOSE-UP that FILLS most of the frame — the exact container, cap/applicator and label clearly readable and in sharp focus. AI video renders a product accurately only when it's large in frame; a wide shot of a person holding it far from camera comes out as a generic blurry bottle. So for the product-reveal / product-in-use beats, write a close macro shot (hands + product filling the frame), NOT a full-body wide shot. At least half the scenes must feature the product this way.
 - PEOPLE — when a scene has people, ${recast ? `recast them as ${look} in appearance (user's explicit choice), keeping the reference's age range, wardrobe style and energy` : 'copy the reference people (age/ethnicity/wardrobe/energy) from the beat sheet'}.
@@ -424,14 +425,13 @@ async function composeKeyframe({ scenePrompt, productImageUrls, jobId, tag, aspe
   const imgs = []
   for (const u of productImageUrls.slice(0, 3)) { try { imgs.push(await fetchB64(u)) } catch { /* skip */ } }
   if (!imgs.length) return null
-  const prompt = `Photorealistic vertical ${aspect || '9:16'} video still (single frame) for this scene: ${scenePrompt}\n` +
-    `NON-NEGOTIABLE: the product shown/held must be an EXACT match of the attached product photos — identical container type and size, cap/applicator, colours, and label text rendered sharp and readable. ` +
-    `Hold it close enough to camera that the product is large and crisp in frame. Natural UGC lighting, real skin texture, no on-screen text or watermarks.\n` +
+  const prompt = `Photorealistic vertical ${aspect || '9:16'} video still — the FIRST frame of this scene, captured MID-ACTION: ${scenePrompt}\n` +
+    `Show the hands actively USING the product the way the scene describes (mid-application — e.g. bringing the applicator to the scalp/skin, mid-roll, mid-spray, mid-pump), not a static posed hold. The product must be an EXACT match of the attached photos — identical container, cap/applicator, colours and label, sharp and readable, large in frame. Natural UGC lighting, real skin texture, no on-screen text or watermarks.\n` +
     // NO FACE — deliberate: fal's likeness filter rejects reference images containing realistic faces
-    // (it killed the segment anchors the same way). A chin-down hands+product frame carries ALL the
-    // product fidelity we need and gives the filter nothing to flag → the keyframe passes every time
-    // instead of falling back to the blurry no-keyframe path.
-    `FRAMING RULE: NO face may be visible — crop from the chin down or shoot over-the-shoulder; the hands and the product fill the frame.`
+    // (it killed the segment anchors the same way). Framing the ACTION from chin-down / behind /
+    // top-down keeps the face out while still showing the motion, so the keyframe passes the filter AND
+    // cues Seedance to animate the real action instead of a static hold.
+    `FRAMING RULE: NO face may be visible — crop from the chin down, over-the-shoulder, from behind, or top-down; the hands, the point of application and the product fill the frame.`
   const inline = await geminiImage(prompt, imgs)
   const key = `creatives/tmp/${jobId}-${tag}-keyframe.png`
   await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
@@ -1065,7 +1065,7 @@ async function generateJob(job) {
           }
           const sceneImages = keyframe ? [keyframe, ...falProductImages].slice(0, 9) : falProductImages
           const scenePrompt = keyframe
-            ? `@Image1 shows the EXACT product in the creator's hands — identical container, cap/applicator and label. Whenever the product appears in this scene it must match @Image1 precisely, sharp and in focus, never a generic stand-in. ${s.prompt}`
+            ? `${s.prompt} IMPORTANT — the creator PERFORMS this action fully and visibly on camera (e.g. applies/rolls/sprays/uses the product on themselves as described) — real, continuous movement, NOT just holding the product still. The product in their hands is EXACTLY @Image1 — identical container, cap/applicator, colour and label — kept sharp and identical throughout the motion.`
             : s.prompt
 
           let videoUrl = null
