@@ -37,6 +37,14 @@ export async function GET(req: NextRequest) {
     sourceSeconds: Number(meta?.beat_sheet?.duration_seconds) || null,
     progress: meta.progress || null,   // { label, pct, eta_sec } — live render step + ETA
     overlays: Array.isArray(meta.overlays) ? meta.overlays : [],   // auto-detected on-screen text callouts (editable)
+    // Tweak panel: a finished faithful render with cached per-scene clips can be fixed per-scene.
+    tweakable: (row as any).status === 'done' && meta.mode === 'faithful'
+      && Array.isArray(meta.scene_plan) && meta.scene_plan.length > 0
+      && !!meta.scene_clips && Object.keys(meta.scene_clips).length > 0,
+    tweakScenes: Array.isArray(meta.scene_plan) ? meta.scene_plan.map((s: any) => ({ duration: s.duration, hasPeople: !!s.has_people })) : [],
+    tweaking: !!meta.tweak,
+    tweakError: meta.tweak_error || null,
+    finalScript: meta.final_script || meta.script || null,
     error: (row as any).status === 'failed' ? friendlyError(meta.error) : null,
   })
 }
