@@ -876,15 +876,25 @@ async function burnOverlays(videoIn, overlays, id) {
   const list = (Array.isArray(overlays) ? overlays : []).filter((o) => o && String(o.text || '').trim()).slice(0, 8)
   if (!list.length) return videoIn
   const dur = await probeDuration(videoIn) || 60
+  const probe = await probeOut(['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=s=x:p=0', videoIn])
+  const [W, H] = String(probe || '').trim().split('x').map((n) => parseInt(n) || 0)
+  const vw = W > 0 ? W : 720, vh = H > 0 ? H : 1280
   const esc = (s) => String(s).replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, '’').replace(/%/g, '\\%').replace(/,/g, '\\,')
   let lastEnd = -99, row = 0
   const filters = list.map((o) => {
     const { start, end } = parseOverlayRange(o.t, dur)
-    row = start < lastEnd ? row + 1 : 0   // overlapping windows stack down instead of colliding
+    if (start < lastEnd) row += 1; else row = 0   // overlapping windows stack; cap at 2 lines
     lastEnd = Math.max(lastEnd, end)
-    const y = `h*${(0.10 + row * 0.11).toFixed(2)}`
-    return `drawtext=fontfile=${EC_FONT}:text='${esc(o.text.slice(0, 60))}':fontsize=h/13:fontcolor=white:borderw=6:bordercolor=black@0.9:shadowx=2:shadowy=2:shadowcolor=black@0.6:x=(w-text_w)/2:y=${y}:enable='between(t\\,${start.toFixed(2)}\\,${Math.min(dur, end).toFixed(2)})'`
-  }).join(',')
+    if (row > 1) return null
+    const txt = o.text.slice(0, 40)
+    // Auto-fit: shrink the font so the text never exceeds ~86% of the frame width (FreeSansBold ≈
+    // 0.52em/char), capped at a sensible max. Fixes the earlier edge cut-off on long callouts.
+    const fit = Math.floor((0.86 * vw) / Math.max(6, txt.length * 0.52))
+    const fs = Math.max(28, Math.min(Math.round(vh / 15), fit))
+    const y = row === 0 ? Math.round(vh * 0.09) : Math.round(vh * 0.09 + fs * 1.5)
+    const bw = Math.max(3, Math.round(fs * 0.08))
+    return `drawtext=fontfile=${EC_FONT}:text='${esc(txt)}':fontsize=${fs}:fontcolor=white:borderw=${bw}:bordercolor=black@0.9:shadowx=2:shadowy=2:shadowcolor=black@0.6:x=(w-text_w)/2:y=${y}:enable='between(t\\,${start.toFixed(2)}\\,${Math.min(dur, end).toFixed(2)})'`
+  }).filter(Boolean).join(',')
   const out = join(tmpdir(), `ov-${id}.mp4`)
   try {
     await ff(['-y', '-i', videoIn, '-vf', filters, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out])
