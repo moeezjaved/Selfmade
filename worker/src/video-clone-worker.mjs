@@ -397,6 +397,28 @@ async function fetchB64(url) {
   const buf = Buffer.from(await r.arrayBuffer())
   return { mime: r.headers.get('content-type') || 'image/jpeg', b64: buf.toString('base64') }
 }
+// Nano Banana image call with retry — gemini-*-image 503s ("high demand") constantly; without retry a
+// clean-product / keyframe silently skips and we lose the fidelity safety net for that render.
+async function geminiImage(prompt, imgs) {
+  const body = { contents: [{ parts: [{ text: prompt }, ...imgs.map((i) => ({ inline_data: { mime_type: i.mime, data: i.b64 } }))] }], generationConfig: { responseModalities: ['IMAGE'] } }
+  let lastErr = 'gemini image failed'
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${GEMINI_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (r.ok) {
+      const j = await r.json()
+      const part = (j?.candidates?.[0]?.content?.parts || []).find((p) => p.inline_data || p.inlineData)
+      const inline = part?.inline_data || part?.inlineData
+      if (inline?.data) return inline
+      lastErr = 'no image in response'
+    } else {
+      lastErr = `gemini image ${r.status}`
+      if (![429, 500, 503].includes(r.status)) break
+    }
+    if (attempt < 4) await sleep(1200 * attempt)
+  }
+  throw new Error(lastErr)
+}
 async function composeKeyframe({ scenePrompt, productImageUrls, jobId, tag, aspect }) {
   if (!GEMINI_KEY || !productImageUrls?.length) return null
   const imgs = []
@@ -410,17 +432,7 @@ async function composeKeyframe({ scenePrompt, productImageUrls, jobId, tag, aspe
     // product fidelity we need and gives the filter nothing to flag → the keyframe passes every time
     // instead of falling back to the blurry no-keyframe path.
     `FRAMING RULE: NO face may be visible — crop from the chin down or shoot over-the-shoulder; the hands and the product fill the frame.`
-  const body = {
-    contents: [{ parts: [{ text: prompt }, ...imgs.map((i) => ({ inline_data: { mime_type: i.mime, data: i.b64 } }))] }],
-    generationConfig: { responseModalities: ['IMAGE'] },
-  }
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${GEMINI_KEY}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  if (!r.ok) throw new Error(`keyframe gemini ${r.status}`)
-  const j = await r.json()
-  const part = (j?.candidates?.[0]?.content?.parts || []).find((p) => p.inline_data || p.inlineData)
-  const inline = part?.inline_data || part?.inlineData
-  if (!inline?.data) throw new Error('keyframe: no image')
+  const inline = await geminiImage(prompt, imgs)
   const key = `creatives/tmp/${jobId}-${tag}-keyframe.png`
   await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
   return `${R2_PUBLIC}/${key}`
@@ -437,14 +449,7 @@ async function composeCleanProduct({ productImageUrls, jobId }) {
   for (const u of productImageUrls.slice(0, 3)) { try { imgs.push(await fetchB64(u)) } catch { /* skip */ } }
   if (!imgs.length) return null
   const prompt = 'Studio product photo: the EXACT product from the attached photos, isolated on a clean seamless neutral-grey background. Identical container, cap/applicator, colours and label text — sharp and readable, product large and centered. NO hands, NO people, NO other objects — only the product.'
-  const body = { contents: [{ parts: [{ text: prompt }, ...imgs.map((i) => ({ inline_data: { mime_type: i.mime, data: i.b64 } }))] }], generationConfig: { responseModalities: ['IMAGE'] } }
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${GEMINI_KEY}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  if (!r.ok) throw new Error(`clean-product gemini ${r.status}`)
-  const j = await r.json()
-  const part = (j?.candidates?.[0]?.content?.parts || []).find((p) => p.inline_data || p.inlineData)
-  const inline = part?.inline_data || part?.inlineData
-  if (!inline?.data) throw new Error('clean-product: no image')
+  const inline = await geminiImage(prompt, imgs)
   const key = `creatives/tmp/${jobId}-clean-product.png`
   await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
   return `${R2_PUBLIC}/${key}`
@@ -979,6 +984,9 @@ async function generateJob(job) {
   const meta = job.clone_meta || {}
   const productImages = Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
+  // Live progress the modal polls: {label, pct, eta_sec}. fal gives no % for video gen, so WE report
+  // the real pipeline step + a running ETA (best-effort; never fails the render).
+  const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0) } } }).catch(() => {})
   try {
     const finalScript = meta.final_script || meta.script || ''
 
@@ -988,6 +996,7 @@ async function generateJob(job) {
     let cleanProduct = meta.clean_product || null
     if (!cleanProduct && productImages.length) {
       try {
+        await prog('Preparing your product…', 5, 0)
         cleanProduct = await composeCleanProduct({ productImageUrls: productImages, jobId: job.id })
         if (cleanProduct) { console.log(`🧴 ${job.id} clean product ref composed`); await stamp({ clone_meta: { ...meta, clean_product: cleanProduct } }); meta.clean_product = cleanProduct }
       } catch (e) { console.warn(`clean-product ${job.id}:`, e.message) }
@@ -1013,8 +1022,12 @@ async function generateJob(job) {
         // restart (deploy/crash) RESUMES from the last completed scene instead of re-rendering —
         // and re-billing fal for — the whole job.
         const clipsDone = meta.scene_clips || {}
+        const N = scenes.length
+        const PER_SCENE = 75   // ~seconds a scene render takes → drives the ETA
         for (let i = 0; i < scenes.length; i++) {
           const s = scenes[i]
+          // Live progress: scenes are the bulk of the wait (10%→82%), ETA = remaining scenes + finish.
+          await prog(`Creating scene ${i + 1} of ${N}…`, 10 + (i / N) * 72, (N - i) * PER_SCENE + 35)
           // Scenes render VISUALS ONLY (ambience, no spoken dialogue) — the narration is one
           // continuous TTS track muxed after the stitch, so the voice can't change between scenes.
 
@@ -1113,6 +1126,7 @@ async function generateJob(job) {
           // Checkpoint this scene so a restart never re-renders (or re-bills fal for) it.
           clipsDone[i] = videoUrl
           await stamp({ clone_meta: { ...meta, scene_plan: scenes, scene_clips: clipsDone } })
+          meta.scene_plan = scenes; meta.scene_clips = clipsDone   // keep meta current so progress writes don't clobber checkpoints
         }
         // Assemble a full cut from a clip list: concat → VO mux → end-card. Reused by the main cut,
         // the hook variants (different scene 1) and the extra-language outputs (different VO).
@@ -1139,7 +1153,9 @@ async function generateJob(job) {
           return withEndCard(cut, meta, job.id, tag, tmp)
         }
 
+        await prog('Stitching + voiceover…', 86, 30)
         const main = await assemble(files, finalScript, 'main')
+        await prog('Finishing up…', 95, 12)
         const url = await uploadVideo(main.file, `creatives/${job.user_id}/${job.id}.mp4`)
         // Settle the end-card tx on the MAIN cut's outcome (applied → commit, failed → refund).
         if (meta.end_card && meta.end_card.tx) {

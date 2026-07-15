@@ -42,6 +42,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [sceneCount, setSceneCount] = useState(2)
   const [durationBucket, setDurationBucket] = useState<'15' | '30' | '60' | 'match'>('15')
   const [srcSecs, setSrcSecs] = useState<number | null>(null)
+  const [genProgress, setGenProgress] = useState<{ label: string; pct: number; eta_sec: number } | null>(null)  // live render progress
   // Add-ons (each billed as its own tx; a failed add-on refunds itself, the base video still ships)
   const [extraLangs, setExtraLangs] = useState<string[]>([])   // faithful only · +200 cr each
   const [ecOn, setEcOn] = useState(false)                      // branded end-card · +50 cr
@@ -168,6 +169,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     for (let i = 0; i < iters; i++) {
       await sleep(4000)
       const st = await fetch(`/api/discovery/clone-video/status?id=${id}`).then(r => r.json()).catch(() => ({}))
+      if (st.progress) setGenProgress(st.progress)   // live step + ETA for the render bar
       if (st.error) return { error: st.error }
       if (st.status && st.status !== leave) return st
     }
@@ -205,7 +207,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // Phase 2: approve (spend credits) + generate
   const approve = async () => {
     if (!jobId) return
-    setErr(null); setNotice(null); setPhase('generating')
+    setErr(null); setNotice(null); setGenProgress(null); setPhase('generating')
     try {
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -244,9 +246,24 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
           </div>
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18, maxHeight: '80vh', overflow: 'auto' }}>
 
-            {/* ── GENERATING: the money-moment wait animation ── */}
+            {/* ── GENERATING: the money-moment wait animation + live progress ── */}
             {phase === 'generating' ? (
-              <CloneGeneration helper="Rendering your video · this can take a few minutes · keep browsing" />
+              <>
+                <CloneGeneration helper={genProgress?.label || 'Rendering your video · this can take a few minutes · keep browsing'} />
+                {genProgress && (
+                  <div style={{ padding: '0 20px 18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#e8f0e8' }}>{genProgress.label}</span>
+                      <span style={{ fontSize: 12, color: '#8aa', fontVariantNumeric: 'tabular-nums' }}>
+                        {genProgress.eta_sec > 0 ? `~${genProgress.eta_sec >= 60 ? `${Math.ceil(genProgress.eta_sec / 60)} min` : `${genProgress.eta_sec}s`} left` : ''}
+                      </span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 100, background: '#1c2620', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(98, Math.max(4, genProgress.pct))}%`, background: LIME, borderRadius: 100, transition: 'width .6s ease' }} />
+                    </div>
+                  </div>
+                )}
+              </>
             ) : phase === 'review' ? (
               <>
                 <div style={{ fontSize: 12.5, color: '#8aa', background: '#101b12', border: '1px solid #22331c', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
