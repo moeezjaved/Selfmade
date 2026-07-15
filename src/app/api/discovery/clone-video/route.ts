@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
   if (!sourceVideo) {
     const rawVids: string[] = ((ad as any)?.raw_video_urls || []).filter((u: any) => typeof u === 'string')
     const isVideoAd = /video/i.test((ad as any)?.format || '') || rawVids.length > 0
-    if (!isVideoAd) return NextResponse.json({ error: 'This is an image-only ad — use "Clone as image ad" instead.' }, { status: 400 })
+    if (!isVideoAd) return NextResponse.json({ error: 'This is an image-only ad — use "Remake as image ad" instead.' }, { status: 400 })
     if (rawVids.length === 0) return NextResponse.json({ error: 'This video hasn\'t finished downloading yet. It\'s queued — please try again in a few minutes.' }, { status: 409 })
     try {
       const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 60_000)
@@ -106,6 +106,6 @@ export async function POST(req: NextRequest) {
     source_video_url: sourceVideo, clone_meta, prompt: 'video clone', image_url: null,
   }).select('id').single()
 
-  if (error || !row) return NextResponse.json({ error: 'could not start the clone' }, { status: 500 })
+  if (error || !row) return NextResponse.json({ error: 'could not start the remake' }, { status: 500 })
   return NextResponse.json({ jobId: (row as any).id, status: 'analyzing' })
 }

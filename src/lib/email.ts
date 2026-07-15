@@ -32,10 +32,10 @@ export async function sendWelcomeEmail(to: string, fullName?: string): Promise<b
   const first = (fullName || '').trim().split(/\s+/)[0] || 'there'
   const html = emailShell({
     title: `Welcome to Selfmade, ${first} 👋`,
-    intro: `You're in — with <b>600 free credits</b> to start. The fastest way to see what Selfmade does: find a winning ad from any brand and clone it with <b>your</b> product in minutes. No designer, no filming, no waiting.`,
-    ctaText: 'Clone your first ad', ctaUrl: `${APP_URL}/discovery`,
+    intro: `You're in — with <b>600 free credits</b> to start. The fastest way to see what Selfmade does: find a winning ad from any brand and remake it with <b>your</b> product in minutes. No designer, no filming, no waiting.`,
+    ctaText: 'Remake your first ad', ctaUrl: `${APP_URL}/discovery`,
   })
-  return sendEmail(to, 'Welcome to Selfmade 👋 clone your first ad', html)
+  return sendEmail(to, 'Welcome to Selfmade 👋 remake your first ad', html)
 }
 
 export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
@@ -108,8 +108,8 @@ export async function sendFirstBrandEmail(userId: string, to: string, brandName:
   if (!(await claimOnceLog(userId, 'FIRST_BRAND_EMAIL'))) return
   const html = emailShell({
     title: `Brand saved: ${brandName}`,
-    intro: `Nice — <b>${brandName}</b> is saved. Every ad you clone will now use its product photos automatically. Manage it anytime from My Creatives → Brands.`,
-    ctaText: 'Clone an ad', ctaUrl: `${APP_URL}/discovery`,
+    intro: `Nice — <b>${brandName}</b> is saved. Every ad you remake will now use its product photos automatically. Manage it anytime from My Creatives → Brands.`,
+    ctaText: 'Remake an ad', ctaUrl: `${APP_URL}/discovery`,
   })
   await sendEmail(to, `Brand saved: ${brandName}`, html)
 }
@@ -120,7 +120,7 @@ export async function sendFirstAdEmail(userId: string, to: string, imageUrl?: st
   if (!(await claimOnceLog(userId, 'FIRST_AD_EMAIL'))) return
   const html = emailShell({
     title: `Your first ad is ready! 🎉`,
-    intro: `You just cloned your first winning ad — great work. Try a few variations, tweak the headline, or clone another. Everything you make is saved in My Creatives.`,
+    intro: `You just remade your first winning ad — great work. Try a few variations, tweak the headline, or remake another. Everything you make is saved in My Creatives.`,
     imageUrl, ctaText: 'Open My Creatives', ctaUrl: `${APP_URL}/creative-studio`,
   })
   await sendEmail(to, `Your first ad is ready! 🎉`, html)

@@ -245,7 +245,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: (phase === 'done') ? 900 : 560, background: '#0d130e', border: '1px solid #22331c', borderRadius: 18, overflow: 'hidden', display: (phase === 'done') ? 'grid' : 'block', gridTemplateColumns: (phase === 'done') ? '1fr 1fr' : undefined }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 20px', borderBottom: '1px solid #1c2a17' }}>
-            <Film size={17} color={LIME} /> <span style={{ fontSize: 16, fontWeight: 800, color: '#eaf6e6' }}>Clone as video ad</span>
+            <Film size={17} color={LIME} /> <span style={{ fontSize: 16, fontWeight: 800, color: '#eaf6e6' }}>Remake as video ad</span>
             <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#7a8a7e', cursor: 'pointer' }}><X size={18} /></button>
           </div>
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18, maxHeight: '80vh', overflow: 'auto' }}>
@@ -277,10 +277,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                 {/* Clone mode — suggested from the analysis. Faithful = scene-by-scene recreation of a
                     multi-scene / B-roll ad; UGC = one talking-head creator. */}
                 <section>
-                  <Label>Clone style</Label>
+                  <Label>Remake style</Label>
                   {suggestedMode === 'faithful' && (
                     <div style={{ fontSize: 11.5, color: '#cfe3b8', background: '#141f10', border: '1px solid #2c4030', borderRadius: 8, padding: '7px 10px', marginBottom: 8 }}>
-                      🎬 This ad is cinematic / B-roll style — a scene-by-scene Cinematic clone will match it much better than a talking head.
+                      🎬 This ad is cinematic / B-roll style — a scene-by-scene Cinematic remake will match it much better than a talking head.
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -307,7 +307,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                         const disabled = secs > cap
                         return <button key={v} onClick={() => !disabled && setDurationBucket(v)} disabled={disabled}
                           style={{ ...tierBtn(durationBucket === v), opacity: disabled ? 0.35 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
-                          title={disabled ? `Longer than the ${srcSecs}s source — a clone matches the original length` : ''}>{label}</button>
+                          title={disabled ? `Longer than the ${srcSecs}s source — a remake matches the original length` : ''}>{label}</button>
                       }
                       const matchCost = cap === 15 ? UGC_COST[tier] : (FAITHFUL_COST[cap === 60 ? 4 : 2] || FAITHFUL_COST[2])[tier]
                       return (
@@ -319,7 +319,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                         </div>
                       )
                     })()}
-                    {srcSecs ? <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>Source is {srcSecs}s — a clone matches the original length (longer options are disabled).{nSegs > 1 ? ` ${nSegs} chained clips stitched into one take.` : ''}</p>
+                    {srcSecs ? <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>Source is {srcSecs}s — a remake matches the original length (longer options are disabled).{nSegs > 1 ? ` ${nSegs} chained clips stitched into one take.` : ''}</p>
                       : nSegs > 1 ? <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{nSegs} chained clips of the same creator, stitched into one take — cuts land at natural pauses, like real UGC.</p> : null}
                   </section>
                 )}

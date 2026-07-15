@@ -384,7 +384,7 @@ export default function SavedAdsPage() {
                           {tier === 'winning' ? '🏆 Winning' : '⚡ Optimized'}
                         </span>
                       )}
-                      <button onClick={() => (isVid ? setCloneVid(saved) : setCloneImg(saved))} title={isVid ? 'Clone this video ad with your product' : 'Clone this ad with your product'}
+                      <button onClick={() => (isVid ? setCloneVid(saved) : setCloneImg(saved))} title={isVid ? 'Remake this video ad with your product' : 'Remake this ad with your product'}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1a3a1a', padding: 0, flexShrink: 0, display: 'flex' }}
                         onMouseEnter={e => (e.currentTarget.style.color = '#65a30d')}
                         onMouseLeave={e => (e.currentTarget.style.color = '#1a3a1a')}>
@@ -452,7 +452,7 @@ export default function SavedAdsPage() {
                         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 12px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 10, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
                         onMouseEnter={e => (e.currentTarget.style.background = '#12290f')}
                         onMouseLeave={e => (e.currentTarget.style.background = '#1a3a1a')}>
-                        <Sparkles size={14} /> Clone{isVid ? ' video' : ''} with my product
+                        <Sparkles size={14} /> Remake{isVid ? ' video' : ''} with my product
                       </button>
                     </div>
                   </div>

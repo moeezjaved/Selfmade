@@ -82,7 +82,7 @@ export default function BrandsPage() {
         </div>
         <button style={btn} onClick={() => setCreating(v => !v)}>{creating ? 'Cancel' : '+ New brand'}</button>
       </div>
-      <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 20 }}>Your brands feed Clone and Script Duplicate — voice, USPs, and real product photos.</p>
+      <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 20 }}>Your brands feed Remake and Script Duplicate — voice, USPs, and real product photos.</p>
 
       {creating && (
         <div style={{ ...card, marginBottom: 20 }}>
@@ -107,7 +107,7 @@ export default function BrandsPage() {
       )}
 
       {loading ? <div style={{ color: '#9ca3af' }}>Loading…</div>
-        : brands.length === 0 ? <div style={{ ...card, color: '#9ca3af', textAlign: 'center' }}>No brands yet — create your first to start cloning ads.</div>
+        : brands.length === 0 ? <div style={{ ...card, color: '#9ca3af', textAlign: 'center' }}>No brands yet — create your first to start remaking ads.</div>
         : brands.map(b => <BrandCard key={b.id} brand={b} onDelete={() => delBrand(b.id)} onEdit={editBrand} onAddProduct={addProduct} onDelProduct={delProduct} />)}
     </div>
   )

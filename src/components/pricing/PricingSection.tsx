@@ -30,8 +30,8 @@ const CMP: { group: string; rows: { label: string; get: (p: PlanId) => string }[
   { group: 'Creation — available on every tier, gated by credits', rows: [
     { label: 'Monthly credits', get: (p) => PLANS[p].monthlyCredits === null ? 'Custom' : PLANS[p].monthlyCredits!.toLocaleString() + (p === 'free' && PLANS[p].welcomeCredits ? ` (+${PLANS[p].welcomeCredits} welcome)` : '') },
     { label: 'Ask Mello · Scripts · Transcribe', get: () => '✓' },
-    { label: 'Image Clone (2K, Nano Banana Pro)', get: () => '✓' },
-    { label: 'Video Clone', get: () => '✓' },
+    { label: 'Image Remake (2K, Nano Banana Pro)', get: () => '✓' },
+    { label: 'Video Remake', get: () => '✓' },
     { label: 'Buy top-up credits', get: (p) => PLANS[p].canBuyCredits ? '✓' : '—' },
   ]},
   { group: 'Launch & analytics', rows: [
@@ -46,7 +46,7 @@ const CMP: { group: string; rows: { label: string; get: (p: PlanId) => string }[
 
 const FAQS: { q: string; a: string }[] = [
   { q: 'Is there a free trial?', a: 'Yes — 7 days on any paid plan, no card needed. Or start on the free plan forever.' },
-  { q: 'How do credits work?', a: 'One shared currency for AI actions (scripts, transcribe, Mello, Image Clone). Your plan refills monthly.' },
+  { q: 'How do credits work?', a: 'One shared currency for AI actions (scripts, transcribe, Mello, Image Remake). Your plan refills monthly.' },
   { q: 'Do unused credits roll over?', a: 'Plan credits reset each month (use them or lose them). Purchased top-up credits roll over for 12 months.' },
   { q: 'Can I buy more credits?', a: 'Yes — top-up packs (250/$19, 750/$49, 2,000/$119) on any paid plan.' },
   { q: 'What counts as a brand in Brand Spy?', a: 'Each advertiser you actively track. Your plan sets the limit (15 → 50 → 150 → unlimited).' },

@@ -19,7 +19,7 @@ import CloneVideoModal from '@/app/(dashboard)/discovery/CloneVideoModal'
 const LIME = '#dffe95'
 const BG = '#10211f'
 const PANEL = '#152928'
-const STEPS = ['Your store', 'Your niche', 'Your competitors', 'Clone sources', 'Clone your first ad']
+const STEPS = ['Your store', 'Your niche', 'Your competitors', 'Remake sources', 'Remake your first ad']
 const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/selfmade-save-ads/eekbcgdoonpmhoojoaggpfmfgcplaefi'
 
 const NICHES = ['Beauty & Skincare', 'Supplements', 'Apparel & Fashion', 'Fitness', 'Home & Kitchen', 'Pets', 'Baby & Kids', 'Electronics', 'SaaS', 'Jewelry']
@@ -314,7 +314,7 @@ export default function OnboardingPage() {
             {/* ── Step 1: Your store ── */}
             {step === 0 && <>
               <h2 style={h2}>Paste your store link —<br /><em style={em}>we&apos;ll do the rest.</em></h2>
-              <p style={sub}>We grab your logo, colors and product photos automatically — they become the ingredients for every ad you clone.</p>
+              <p style={sub}>We grab your logo, colors and product photos automatically — they become the ingredients for every ad you remake.</p>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input style={{ ...input, flex: 1 }} placeholder="yourstore.com" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && detect()} />
                 <button onClick={detect} disabled={detecting || !url.trim()} style={{ background: LIME, color: BG, border: 'none', borderRadius: 12, padding: '0 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', opacity: detecting || !url.trim() ? 0.55 : 1 }}>
@@ -340,7 +340,7 @@ export default function OnboardingPage() {
                       ))}
                     </div>
                   )}
-                  <div style={{ marginTop: 10, fontSize: 12, color: LIME }}>✓ Brand kit ready — your product photos will be swapped into the ads you clone.</div>
+                  <div style={{ marginTop: 10, fontSize: 12, color: LIME }}>✓ Brand kit ready — your product photos will be swapped into the ads you remake.</div>
                 </div>
               )}
               <div style={{ marginTop: 14, fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>No store yet? Just hit Next — you can add products any time in My Creatives.</div>
@@ -359,7 +359,7 @@ export default function OnboardingPage() {
             {/* ── Step 3: Competitors ── */}
             {step === 2 && <>
               <h2 style={h2}>Pick up to 3 competitors<br /><em style={em}>to spy on.</em></h2>
-              <p style={sub}>We&apos;ll pull their complete Meta ad history — every ad they&apos;re running worldwide — into your feed, ready to clone.</p>
+              <p style={sub}>We&apos;ll pull their complete Meta ad history — every ad they&apos;re running worldwide — into your feed, ready to remake.</p>
               <input style={input} placeholder={`Search 4.3M ads & 600K brands… ${niche ? `try “${niche.split(' ')[0].toLowerCase()}”` : 'e.g. Gymshark, Hims, AG1'}`} value={search} onChange={(e) => setSearch(e.target.value)} />
               {searching && <div style={{ marginTop: 10, fontSize: 12.5, color: 'rgba(255,255,255,0.4)' }}>Searching…</div>}
               {results.length > 0 && (
@@ -416,8 +416,8 @@ export default function OnboardingPage() {
 
             {/* ── Step 4: Clone sources + live pulls ── */}
             {step === 3 && <>
-              <h2 style={h2}>Three ways to feed<br /><em style={em}>the clone machine.</em></h2>
-              <p style={sub}>Any ad you can see, you can clone with your product — from your competitors, from anywhere on the internet, or from your own files.</p>
+              <h2 style={h2}>Three ways to feed<br /><em style={em}>the remake machine.</em></h2>
+              <p style={sub}>Any ad you can see, you can remake with your product — from your competitors, from anywhere on the internet, or from your own files.</p>
 
               {picked.length > 0 && (
                 <div style={{ background: '#0d1b1a', border: '1px solid rgba(223,254,149,0.2)', borderRadius: 14, padding: '12px 14px', marginBottom: 16 }}>
@@ -437,9 +437,9 @@ export default function OnboardingPage() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {[
-                  { icon: '🔎', title: 'Competitor ads — Discovery', desc: 'Search 4.3M live Meta ads worldwide (or by country). Hover any ad → Clone.', cta: null },
-                  { icon: '🧩', title: 'Any ad, anywhere — Chrome extension', desc: 'See a great ad on Instagram, TikTok or the Ad Library? Hover → Save. It lands in your boards, ready to clone.', cta: { label: 'Get the extension', href: CHROME_STORE_URL } },
-                  { icon: '📁', title: 'Your own files — Assets', desc: 'Upload videos or images you already have. Clone them with your product, add captions, remix hooks.', cta: null },
+                  { icon: '🔎', title: 'Competitor ads — Discovery', desc: 'Search 4.3M live Meta ads worldwide (or by country). Hover any ad → Remake.', cta: null },
+                  { icon: '🧩', title: 'Any ad, anywhere — Chrome extension', desc: 'See a great ad on Instagram, TikTok or the Ad Library? Hover → Save. It lands in your boards, ready to remake.', cta: { label: 'Get the extension', href: CHROME_STORE_URL } },
+                  { icon: '📁', title: 'Your own files — Assets', desc: 'Upload videos or images you already have. Remake them with your product, add captions, remix hooks.', cta: null },
                 ].map((c) => (
                   <div key={c.title} style={{ display: 'flex', gap: 12, background: '#1c3533', border: '1px solid rgba(223,254,149,0.1)', borderRadius: 14, padding: '14px 15px' }}>
                     <span style={{ fontSize: 24 }}>{c.icon}</span>
@@ -453,13 +453,13 @@ export default function OnboardingPage() {
               </div>
 
               <div style={{ marginTop: 16, background: 'rgba(223,254,149,0.07)', border: `1px dashed rgba(223,254,149,0.35)`, borderRadius: 14, padding: '12px 15px', fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>
-                🎁 <b style={{ color: LIME }}>Your free credits cover ~5 image clones.</b> Want a video clone? The <b style={{ color: LIME }}>$9 Launch Pack</b> (900 credits) covers your first AI video — one click, no subscription.
+                🎁 <b style={{ color: LIME }}>Your free credits cover ~5 image remakes.</b> Want a video remake? The <b style={{ color: LIME }}>$9 Launch Pack</b> (900 credits) covers your first AI video — one click, no subscription.
               </div>
             </>}
 
             {/* ── Step 5: Clone your first ad ── */}
             {step === 4 && <>
-              <h2 style={h2}>Clone your <em style={em}>first ad.</em></h2>
+              <h2 style={h2}>Remake your <em style={em}>first ad.</em></h2>
               <p style={sub}>Here are your competitors&apos; top-performing ads. Pick one — we&apos;ll rebuild it with <b style={{ color: 'rgba(255,255,255,0.7)' }}>your</b> product. Images are covered by your free credits; video needs the Launch Pack.</p>
 
               {loadingAds && Object.keys(topAds).length === 0 && (
@@ -488,7 +488,7 @@ export default function OnboardingPage() {
                       </div>
                       {!hasAny ? (
                         <div style={{ background: '#1c3533', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: 14, padding: '16px', fontSize: 12.5, color: 'rgba(255,255,255,0.45)' }}>
-                          {loadingAds ? 'Finding their best ads…' : `Still pulling ${b.name}'s ads — they'll be in your feed shortly. Clone another competitor for now.`}
+                          {loadingAds ? 'Finding their best ads…' : `Still pulling ${b.name}'s ads — they'll be in your feed shortly. Remake another competitor for now.`}
                         </div>
                       ) : (
                         <>
@@ -507,7 +507,7 @@ export default function OnboardingPage() {
               </div>
 
               <div style={{ marginTop: 18, fontSize: 12.5, color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 1.5 }}>
-                Not feeling these? You can skip and browse <b style={{ color: 'rgba(255,255,255,0.6)' }}>4.3M ads</b> in Discovery — clone any of them the same way.
+                Not feeling these? You can skip and browse <b style={{ color: 'rgba(255,255,255,0.6)' }}>4.3M ads</b> in Discovery — remake any of them the same way.
               </div>
             </>}
           </div>
@@ -596,7 +596,7 @@ export default function OnboardingPage() {
             <div style={{ fontSize: 34, marginBottom: 10 }}>🎬</div>
             <div style={{ fontSize: 20, fontWeight: 900, color: 'white', letterSpacing: '-.01em' }}>One step to your first video</div>
             <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', lineHeight: 1.55, margin: '10px 0 18px' }}>
-              Video clones cost <b style={{ color: LIME }}>{costs.video} credits</b> each{balance !== null ? <> — you have <b style={{ color: 'white' }}>{balance}</b></> : ''}. Grab the <b style={{ color: LIME }}>Launch Pack</b> and we&apos;ll open your clone the moment it lands.
+              Video remakes cost <b style={{ color: LIME }}>{costs.video} credits</b> each{balance !== null ? <> — you have <b style={{ color: 'white' }}>{balance}</b></> : ''}. Grab the <b style={{ color: LIME }}>Launch Pack</b> and we&apos;ll open your remake the moment it lands.
             </p>
             <div style={{ background: '#0d1b1a', border: '1px solid rgba(223,254,149,0.2)', borderRadius: 14, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ textAlign: 'left' }}>
@@ -653,7 +653,7 @@ function AdCard({ ad, kind, cost, done, lowCredit, onClone }: {
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 10, background: 'linear-gradient(transparent, rgba(8,16,15,0.9))' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
           <span style={{ background: done ? 'rgba(223,254,149,0.15)' : LIME, color: done ? LIME : '#10211f', fontSize: 12.5, fontWeight: 800, padding: '7px 12px', borderRadius: 100, border: done ? `1px solid ${LIME}` : 'none' }}>
-            {done ? '✓ Cloning' : kind === 'video' && lowCredit ? 'Clone — $9' : `Clone · ${cost}cr`}
+            {done ? '✓ Remaking' : kind === 'video' && lowCredit ? 'Remake — $9' : `Remake · ${cost}cr`}
           </span>
         </div>
       </div>

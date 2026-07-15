@@ -14,41 +14,41 @@ const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
 type Comp = { name: string; lacks: string; blurb: string; rows: [string, boolean][] }
 const COMPETITORS: Record<string, Comp> = {
   atria: { name: 'Atria', lacks: 'creative generation — it surfaces winning ads and insights, but you still leave to design and produce them',
-    blurb: 'Atria is a strong data-and-analytics platform, but it’s priced for bigger teams and leans on its own ad-spend dataset — Selfmade gives you a searchable 3M+ ad library, one-click cloning, and launch, at a price a solo founder or lean team can actually start on for free.',
-    rows: [['Search millions of Meta ads', true], ['Performance & trend insights', true], ['1-click Clone onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
+    blurb: 'Atria is a strong data-and-analytics platform, but it’s priced for bigger teams and leans on its own ad-spend dataset — Selfmade gives you a searchable 3M+ ad library, one-click remaking, and launch, at a price a solo founder or lean team can actually start on for free.',
+    rows: [['Search millions of Meta ads', true], ['Performance & trend insights', true], ['1-click Remake onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
   foreplay: { name: 'Foreplay', lacks: 'AI creation and launch — it’s a best-in-class swipe file and organizer, not a maker',
-    blurb: 'Foreplay is a great swipe file, but it stops at inspiration — there’s no cloning your product into a proven ad, no AI generation, and no launching. Selfmade takes you from “I found a winner” all the way to a live ad.',
-    rows: [['Save & organize ad inspiration', true], ['Discovery across Meta ads', true], ['1-click Clone onto your product', false], ['AI Ad Studio (generate originals)', false], ['Mello AI strategist', false]] },
+    blurb: 'Foreplay is a great swipe file, but it stops at inspiration — there’s no remaking your product into a proven ad, no AI generation, and no launching. Selfmade takes you from “I found a winner” all the way to a live ad.',
+    rows: [['Save & organize ad inspiration', true], ['Discovery across Meta ads', true], ['1-click Remake onto your product', false], ['AI Ad Studio (generate originals)', false], ['Mello AI strategist', false]] },
   motion: { name: 'Motion', lacks: 'ad discovery and creation — it’s a creative analytics/reporting tool for teams already running ads',
     blurb: 'Motion shows you creative analytics but still makes you build every single ad yourself, in another tool. Selfmade turns those insights into finished, on-brand ads you can generate and launch without leaving the platform.',
-    rows: [['Creative reporting & analytics', true], ['Search millions of Meta ads', true], ['1-click Clone onto your product', false], ['AI Ad Studio (generate originals)', false], ['Trending by industry', false]] },
+    rows: [['Creative reporting & analytics', true], ['Search millions of Meta ads', true], ['1-click Remake onto your product', false], ['AI Ad Studio (generate originals)', false], ['Trending by industry', false]] },
   gethookd: { name: 'GetHookd', lacks: 'the all-in-one create-and-launch workflow and a deep classified index',
-    blurb: 'GetHookd helps with hooks and inspiration, but it’s a piece of the puzzle, not the whole workflow. Selfmade covers discover → create → launch end to end, with Brand Spy, one-click cloning, and direct Meta publishing.',
-    rows: [['Ad spy / discovery', true], ['Performance scoring by percentile', false], ['1-click Clone onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
+    blurb: 'GetHookd helps with hooks and inspiration, but it’s a piece of the puzzle, not the whole workflow. Selfmade covers discover → create → launch end to end, with Brand Spy, one-click remaking, and direct Meta publishing.',
+    rows: [['Ad spy / discovery', true], ['Performance scoring by percentile', false], ['1-click Remake onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
   'adcreative-ai': { name: 'AdCreative.ai', lacks: 'real ad discovery — it generates from generic templates, not from proven winning ads',
-    blurb: 'AdCreative generates ads from templates, but it can’t show you what’s already winning in your market or clone a proven competitor ad onto your product. Selfmade pairs a 3M+ ad discovery engine with generation, so you create from evidence — not a blank template.',
+    blurb: 'AdCreative generates ads from templates, but it can’t show you what’s already winning in your market or remake a proven competitor ad onto your product. Selfmade pairs a 3M+ ad discovery engine with generation, so you create from evidence — not a blank template.',
     rows: [['AI creative generation', true], ['Grounded in real winning ads', false], ['Search millions of Meta ads', false], ['Brand Spy & trending', false], ['Launch straight to Meta', false]] },
   minea: { name: 'Minea', lacks: 'AI creation and launch — it’s a product/ad research tool, not a maker',
-    blurb: 'Minea is solid for product and ad research, especially for dropshipping. But finding a winning ad is only half the job — Minea leaves you to design and produce it. Selfmade turns any winner into your ad (clone or AI-generate in your brand) and pushes it live.',
-    rows: [['Ad & product research', true], ['Search across Meta ads', true], ['1-click Clone onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
+    blurb: 'Minea is solid for product and ad research, especially for dropshipping. But finding a winning ad is only half the job — Minea leaves you to design and produce it. Selfmade turns any winner into your ad (remake or AI-generate in your brand) and pushes it live.',
+    rows: [['Ad & product research', true], ['Search across Meta ads', true], ['1-click Remake onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
   bigspy: { name: 'BigSpy', lacks: 'performance calibration and any creation/launch — it’s a raw spy database',
-    blurb: 'BigSpy has a huge ad database but little signal — you’re left sifting raw results with no real performance ranking, and nothing to help you make your own. Selfmade adds a percentile-calibrated performance score, cloning, an AI studio, and launch on top of discovery.',
-    rows: [['Large ad database', true], ['Performance scoring by percentile', false], ['1-click Clone onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
+    blurb: 'BigSpy has a huge ad database but little signal — you’re left sifting raw results with no real performance ranking, and nothing to help you make your own. Selfmade adds a percentile-calibrated performance score, remaking, an AI studio, and launch on top of discovery.',
+    rows: [['Large ad database', true], ['Performance scoring by percentile', false], ['1-click Remake onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
   pipiads: { name: 'PiPiADS', lacks: 'Meta coverage plus creation and launch — it’s TikTok-spy focused',
-    blurb: 'PiPiADS is built for spying on TikTok ads (dropshipping-heavy). If your buyers are on Meta and you want to actually produce and ship creative, it stops short. Selfmade indexes millions of Meta ads and lets you clone or generate your own, then launch.',
-    rows: [['TikTok ad spy', true], ['Millions of Meta ads', false], ['1-click Clone onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
+    blurb: 'PiPiADS is built for spying on TikTok ads (dropshipping-heavy). If your buyers are on Meta and you want to actually produce and ship creative, it stops short. Selfmade indexes millions of Meta ads and lets you remake or generate your own, then launch.',
+    rows: [['TikTok ad spy', true], ['Millions of Meta ads', false], ['1-click Remake onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
   dropispy: { name: 'Dropispy', lacks: 'deep insights and any creation/launch — it’s a low-cost Facebook ad spy',
-    blurb: 'Dropispy is a budget Facebook ad-spy tool for dropshippers. It shows you ads but not what’s working or how to make yours. Selfmade covers discovery and adds performance scoring, 1-click cloning, an AI studio, and Meta launch — the full workflow.',
-    rows: [['Facebook ad spy', true], ['Performance scoring by percentile', false], ['1-click Clone onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
+    blurb: 'Dropispy is a budget Facebook ad-spy tool for dropshippers. It shows you ads but not what’s working or how to make yours. Selfmade covers discovery and adds performance scoring, 1-click remaking, an AI studio, and Meta launch — the full workflow.',
+    rows: [['Facebook ad spy', true], ['Performance scoring by percentile', false], ['1-click Remake onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
   adspy: { name: 'AdSpy', lacks: 'creation, launch, and a calibrated performance layer — it’s pure search',
-    blurb: 'AdSpy has a massive searchable ad library, but it’s search-only — no performance calibration, no way to make or ship your own creative. Selfmade adds the parts that turn a found ad into a launched one: cloning, an AI studio, and direct Meta launch.',
-    rows: [['Searchable ad library', true], ['Performance scoring by percentile', false], ['1-click Clone onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
+    blurb: 'AdSpy has a massive searchable ad library, but it’s search-only — no performance calibration, no way to make or ship your own creative. Selfmade adds the parts that turn a found ad into a launched one: remaking, an AI studio, and direct Meta launch.',
+    rows: [['Searchable ad library', true], ['Performance scoring by percentile', false], ['1-click Remake onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
   poweradspy: { name: 'PowerAdSpy', lacks: 'creation and launch — it’s a multi-platform spy tool',
-    blurb: 'PowerAdSpy aggregates ads across platforms for research, but it ends at discovery. Selfmade takes what you find and helps you produce it — clone a proven ad onto your product or generate an original in your brand, then launch straight to Meta.',
-    rows: [['Multi-platform ad spy', true], ['Search Meta ads', true], ['1-click Clone onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
+    blurb: 'PowerAdSpy aggregates ads across platforms for research, but it ends at discovery. Selfmade takes what you find and helps you produce it — remake a proven ad onto your product or generate an original in your brand, then launch straight to Meta.',
+    rows: [['Multi-platform ad spy', true], ['Search Meta ads', true], ['1-click Remake onto your product', false], ['AI Ad Studio (generate originals)', false], ['Launch straight to Meta', false]] },
   'meta-ad-library': { name: 'Meta Ad Library', lacks: 'search quality, performance ranking, saving, and any creation — it’s a raw compliance archive',
-    blurb: 'The Meta Ad Library is free and official, but it’s a transparency archive — clunky search, no performance ranking, no boards, and nothing to help you make an ad. Selfmade turns that same public data into a fast, ranked, save-and-create workflow: discover, clone or generate, and launch.',
-    rows: [['Public Meta ads', true], ['Fast search & filters', false], ['Performance ranking', false], ['Clone / AI-generate your own', false], ['Launch straight to Meta', false]] },
+    blurb: 'The Meta Ad Library is free and official, but it’s a transparency archive — clunky search, no performance ranking, no boards, and nothing to help you make an ad. Selfmade turns that same public data into a fast, ranked, save-and-create workflow: discover, remake or generate, and launch.',
+    rows: [['Public Meta ads', true], ['Fast search & filters', false], ['Performance ranking', false], ['Remake / AI-generate your own', false], ['Launch straight to Meta', false]] },
 }
 const KEYS = Object.keys(COMPETITORS)
 
@@ -58,7 +58,7 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
   const c = COMPETITORS[params.slug]
   if (!c) return { title: 'Alternatives — Selfmade' }
   const title = `The best ${c.name} alternative — Selfmade`
-  const description = `Looking for a ${c.name} alternative? Selfmade covers discovery like ${c.name}, then lets you clone or AI-generate the ad and launch — the whole workflow in one place.`
+  const description = `Looking for a ${c.name} alternative? Selfmade covers discovery like ${c.name}, then lets you remake or AI-generate the ad and launch — the whole workflow in one place.`
   return { title: { absolute: title }, description, alternates: { canonical: `/alternatives/${params.slug}` }, openGraph: { title, description } }
 }
 

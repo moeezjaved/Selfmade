@@ -1028,7 +1028,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
           onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
           onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
         >
-          <Copy size={14} strokeWidth={2.4} /> Clone ad
+          <Copy size={14} strokeWidth={2.4} /> Remake ad
         </button>
         )}
       </div>
@@ -1044,7 +1044,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
             onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
           >
-            <Film size={14} strokeWidth={2.4} /> Clone video
+            <Film size={14} strokeWidth={2.4} /> Remake video
           </button>
         </div>
       )}

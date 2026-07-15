@@ -9,8 +9,8 @@ import HomeLanding from '@/components/HomeLanding'
 
 const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
 const TITLE = 'Selfmade — Find Winning Meta Ads & Launch in Minutes'
-const DESC = 'Selfmade turns 3M+ proven Meta ads into your next winner. Spy on what’s working, clone or generate your own with AI, and launch — the whole ad workflow in one place.'
-const OG_DESC = 'Spy on 3M+ proven Meta ads, clone or generate your own with AI, and launch in minutes.'
+const DESC = 'Selfmade turns 3M+ proven Meta ads into your next winner. Spy on what’s working, remake or generate your own with AI, and launch — the whole ad workflow in one place.'
+const OG_DESC = 'Spy on 3M+ proven Meta ads, remake or generate your own with AI, and launch in minutes.'
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
@@ -29,7 +29,7 @@ const jsonLd = {
     {
       '@type': 'SoftwareApplication', name: 'Selfmade',
       applicationCategory: 'BusinessApplication', operatingSystem: 'Web', url: SITE,
-      description: 'AI-powered Meta ads platform to discover winning ads, clone or generate creatives, and launch in minutes.',
+      description: 'AI-powered Meta ads platform to discover winning ads, remake or generate creatives, and launch in minutes.',
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     },
   ],

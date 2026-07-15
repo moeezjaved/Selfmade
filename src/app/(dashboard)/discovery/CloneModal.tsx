@@ -169,7 +169,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         const jb = await rb.json()
         if (rb.status === 402 && jb.error === 'brand_limit_reached') {
           setBusy(false)
-          setErr(`You've used all ${jb.limit} brand slots on your plan. Upgrade to save more — or uncheck "Save as brand" to clone without saving.`)
+          setErr(`You've used all ${jb.limit} brand slots on your plan. Upgrade to save more — or uncheck "Save as brand" to remake without saving.`)
           setQuota({ used: jb.used, limit: jb.limit })
           return
         }
@@ -207,8 +207,8 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       if (jobIds.length === 0) {
         const j = enq.find((e) => !e.ok)?.j || {}
         setErr(j.error === 'insufficient_credits' ? 'Not enough credits.'
-          : j.error === 'Image generation not configured (GEMINI_API_KEY)' ? 'Clone isn’t switched on yet (missing API key).'
-          : j.error || 'Couldn’t start the clone — try again.')
+          : j.error === 'Image generation not configured (GEMINI_API_KEY)' ? 'Remake isn’t switched on yet (missing API key).'
+          : j.error || 'Couldn’t start the remake — try again.')
         return
       }
       refreshCredits()   // reservation already hit the balance
@@ -287,7 +287,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         {/* header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #1c2620', position: 'sticky', top: 0, background: '#0f1512', zIndex: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontWeight: 700, fontSize: 16 }}>
-            <Sparkles size={17} color={LIME} /> Clone this ad
+            <Sparkles size={17} color={LIME} /> Remake this ad
           </div>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#8aa', cursor: 'pointer' }}><X size={20} /></button>
         </div>
@@ -419,7 +419,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
             <button onClick={generate} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.7 : 1 }}>
               {busy ? <><Loader2 size={16} className="spin" /> {`Generating ${count > 1 ? `${count} variations` : ''}…`}</>
-                : <><Sparkles size={16} /> {hasResults ? 'Regenerate' : 'Generate'} {count > 1 ? `${count} variations` : 'clone'} · {totalCost} cr</>}
+                : <><Sparkles size={16} /> {hasResults ? 'Regenerate' : 'Generate'} {count > 1 ? `${count} variations` : 'remake'} · {totalCost} cr</>}
             </button>
           </div>
 
@@ -427,7 +427,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
           {active && (
             <div style={{ padding: 20, borderLeft: '1px solid #1c2620', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Label>{results.length > 1 ? `${results.length} variations` : 'Your cloned ad'}</Label>
+                <Label>{results.length > 1 ? `${results.length} variations` : 'Your remade ad'}</Label>
                 {history.some((h) => h.idx === activeIdx) && (
                   <button onClick={undo} style={{ background: 'transparent', border: '1px solid #2c4030', color: '#9fb0a4', borderRadius: 8, padding: '4px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>↶ Undo</button>
                 )}
@@ -447,7 +447,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <div style={{ position: 'relative' }}>
-                <img src={active.url} alt="cloned ad" style={{ width: '100%', borderRadius: 12, border: '1px solid #223', opacity: editing ? 0.5 : 1 }} />
+                <img src={active.url} alt="remade ad" style={{ width: '100%', borderRadius: 12, border: '1px solid #223', opacity: editing ? 0.5 : 1 }} />
                 {editing && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: LIME, gap: 8, fontSize: 13, fontWeight: 600 }}><Loader2 size={18} className="spin" /> Editing…</div>}
               </div>
 

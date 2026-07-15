@@ -46,7 +46,7 @@ export default function ComingSoonMeta({ feature }: { feature: string }) {
           </button>
           <Link href="/discovery"
             style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', color: '#1a3a1a', border: '1.5px solid #cdd8cf', fontWeight: 700, fontSize: 14, padding: '13px 24px', borderRadius: 12, textDecoration: 'none' }}>
-            Clone a winning ad now →
+            Remake a winning ad now →
           </Link>
         </div>
       </div>

@@ -15,7 +15,7 @@ const HOOKS = ['Question', 'Before & After', 'Testimonial', 'Story', 'Announceme
 
 export const metadata: Metadata = {
   title: 'Ad Examples Library — Winning Meta Ads by Category | Selfmade',
-  description: "Browse thousands of real, high-performing Meta ads by category and format. Find what's working, clone the winners, and launch your own with Selfmade. Start free.",
+  description: "Browse thousands of real, high-performing Meta ads by category and format. Find what's working, remake the winners, and launch your own with Selfmade. Start free.",
   alternates: { canonical: '/ads' },
 }
 
@@ -65,7 +65,7 @@ export default async function AdsHub() {
       <header style={{ maxWidth: 820, margin: '0 auto', padding: '52px 24px 20px' }}>
         <h1 style={{ fontSize: 'clamp(30px,5vw,48px)', fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 14px' }}>Winning ad examples, by category.</h1>
         <p style={{ fontSize: 17, color: '#4b5563', lineHeight: 1.6 }}>
-          Explore real ads that are running and performing right now — pulled straight from Selfmade&rsquo;s 3M+ ad index and organized by category and format. Pick your niche to see what&rsquo;s working today, then <Link href="/signup" style={{ color: INK, fontWeight: 700 }}>clone a winner onto your product</Link> or generate your own on-brand ad in about 30 seconds.
+          Explore real ads that are running and performing right now — pulled straight from Selfmade&rsquo;s 3M+ ad index and organized by category and format. Pick your niche to see what&rsquo;s working today, then <Link href="/signup" style={{ color: INK, fontWeight: 700 }}>remake a winner onto your product</Link> or generate your own on-brand ad in about 30 seconds.
         </p>
       </header>
 

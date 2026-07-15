@@ -21,7 +21,7 @@ export default function PrivacyPage() {
         <p style={P}>When you connect a Meta account, we access only the ad data needed to provide our services, through Meta’s official APIs. Access tokens are encrypted. You can revoke our access at any time in your Meta Business Settings, or by disconnecting inside Selfmade.</p>
 
         <h2 style={H2}>4. AI processing</h2>
-        <p style={P}>To power features like ad cloning, scripts, and insights, we send relevant content (e.g. the copy or image you’re working on) to trusted AI providers. We don’t use your private data to train third-party models beyond what’s required to return your result.</p>
+        <p style={P}>To power features like ad remaking, scripts, and insights, we send relevant content (e.g. the copy or image you’re working on) to trusted AI providers. We don’t use your private data to train third-party models beyond what’s required to return your result.</p>
 
         <h2 style={H2}>5. Data sharing</h2>
         <p style={P}>We share data only with service providers who help us operate (hosting, storage, payment processing, AI, email) under confidentiality obligations, and where required by law. We never sell your data.</p>

@@ -275,9 +275,9 @@ export default function AssetsPage() {
                         inside this image guard, so videos/audio had no hover download at all. */}
                     {a.file_type === 'image' && (
                       <>
-                        <button onClick={() => setCloneAsset(a)} title="Clone this creative with your product"
+                        <button onClick={() => setCloneAsset(a)} title="Remake this creative with your product"
                           style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <Sparkles size={11} /> Clone
+                          <Sparkles size={11} /> Remake
                         </button>
                         <button onClick={() => animate(a)} disabled={busyAnimate === a.id} title="Animate into a video (40 credits)"
                           style={{ background: 'rgba(14,27,18,0.85)', color: '#dffe95', border: 'none', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>

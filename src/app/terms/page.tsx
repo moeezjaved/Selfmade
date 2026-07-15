@@ -12,7 +12,7 @@ export default function TermsPage() {
         <p style={P}>These Terms govern your use of Selfmade (tryselfmade.ai). By creating an account or using the service, you agree to them.</p>
 
         <h2 style={H2}>1. The service</h2>
-        <p style={P}>Selfmade is an AI-powered ad-intelligence and creative platform: discover competitor ads, clone them with your own product, generate scripts and creatives, track brands, and (where connected) analyze and manage Meta campaigns.</p>
+        <p style={P}>Selfmade is an AI-powered ad-intelligence and creative platform: discover competitor ads, remake them with your own product, generate scripts and creatives, track brands, and (where connected) analyze and manage Meta campaigns.</p>
 
         <h2 style={H2}>2. Accounts & eligibility</h2>
         <p style={P}>You must provide accurate information, keep your credentials secure, and be responsible for activity under your account. You must be at least 18. We may suspend accounts that violate these Terms or applicable law.</p>
