@@ -1,4 +1,6 @@
 'use client'
+import ComingSoonMeta from '@/components/ComingSoonMeta'
+import { META_LIVE } from '@/lib/flags'
 import React, { useState, useEffect } from 'react'
 import { useIsMobile } from '@/lib/useIsMobile'
 
@@ -16,7 +18,7 @@ interface CampaignInsight {
   launchData?: {product:string,description:string,target_customer:string,competitor_domains:string}|null
 }
 
-export default function InsightsPage() {
+function InsightsPage() {
   const [campaigns, setCampaigns] = useState<CampaignInsight[]>([])
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string|null>(null)
@@ -327,4 +329,11 @@ export default function InsightsPage() {
       )}
     </div>
   )
+}
+
+// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
+// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+export default function InsightsPageGate() {
+  if (!META_LIVE) return <ComingSoonMeta feature="Scale & Insights" />
+  return <InsightsPage />
 }

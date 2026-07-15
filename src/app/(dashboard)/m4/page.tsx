@@ -1,4 +1,6 @@
 'use client'
+import ComingSoonMeta from '@/components/ComingSoonMeta'
+import { META_LIVE } from '@/lib/flags'
 import React, { useState } from 'react'
 import UpgradeGate from '@/components/UpgradeGate'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -155,7 +157,7 @@ function InterestSearch({onAdd}: {onAdd: (interest: {id:string,name:string,topic
   )
 }
 
-export default function M4Page() {
+function M4Page() {
   return <UpgradeGate feature="launch" name="Launch Ads"><M4Inner /></UpgradeGate>
 }
 function M4Inner() {
@@ -895,4 +897,11 @@ function M4Inner() {
       )}
     </div>
   )
+}
+
+// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
+// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+export default function M4PageGate() {
+  if (!META_LIVE) return <ComingSoonMeta feature="Launch Ads" />
+  return <M4Page />
 }

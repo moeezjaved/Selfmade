@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { META_LIVE } from '@/lib/flags'
 
 function ConnectMetaContent() {
   const router = useRouter()
@@ -82,5 +83,11 @@ function ConnectMetaContent() {
 }
 
 export default function ConnectMetaPage() {
+  // Launch-day gate: Meta OAuth is dead until the new Facebook app clears review
+  // (NEXT_PUBLIC_META_LIVE=1). Send users to the live spy→clone loop instead of a broken dialog.
+  if (!META_LIVE) {
+    if (typeof window !== 'undefined') window.location.replace('/discovery')
+    return <div style={{minHeight:'100vh',background:'#10211f'}}/>
+  }
   return <Suspense fallback={<div style={{minHeight:'100vh',background:'#10211f'}}/>}><ConnectMetaContent/></Suspense>
 }

@@ -1,4 +1,6 @@
 'use client'
+import ComingSoonMeta from '@/components/ComingSoonMeta'
+import { META_LIVE } from '@/lib/flags'
 /**
  * /snapshots — the archive of "Share once" snapshots: frozen, point-in-time, shareable copies of a
  * report's data. Created via Share report → Share once (NOT Save, which updates the live report).
@@ -11,7 +13,7 @@ const G11 = '#6f6f6f', G12 = '#171717', G9 = '#8f8f8f', G2 = '#f8f8f8'
 
 type Snap = { token: string; name: string; emoji: string; templateKey: string; note: string; createdAt: string; sharedBy: string; mode: string }
 
-export default function SnapshotsPage() {
+function SnapshotsPage() {
   const [snaps, setSnaps] = useState<Snap[]>([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState('')
@@ -89,3 +91,10 @@ function EmptyState() {
 }
 
 const btnLight: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', height: 32, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', color: G12, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, textDecoration: 'none', flexShrink: 0 }
+
+// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
+// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+export default function SnapshotsPageGate() {
+  if (!META_LIVE) return <ComingSoonMeta feature="Snapshots" />
+  return <SnapshotsPage />
+}

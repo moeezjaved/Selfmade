@@ -8,6 +8,7 @@ import UpsellModalHost from '@/components/UpsellModal'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { META_LIVE } from '@/lib/flags'
 import type { User } from '@supabase/supabase-js'
 import type { UserProfile } from '@/types'
 import {
@@ -36,13 +37,15 @@ const AREAS = [
   },
   {
     key: 'analytics', label: 'Analytics & Launch', railLabel: 'Launch', railIcon: Rocket, defaultHref: '/m4',
+    // While META_LIVE is off (new Facebook app in review) these pages show a coming-soon teaser,
+    // so badge them SOON here to set expectations before the click.
     items: [
-      { href: '/m4',         icon: Rocket,      label: 'Launch Ads',       badge: 'AI' },
-      { href: '/campaigns',  icon: Megaphone,   label: 'Campaigns',        badge: null },
-      { href: '/insights',   icon: LineChart,   label: 'Scale & Insights', badge: 'NEW' },
-      { href: '/reports',    icon: BarChart2,   label: 'Reports',          badge: 'NEW' },
-      { href: '/leaderboard',icon: Trophy,      label: 'Leaderboard',      badge: 'NEW' },
-      { href: '/snapshots',  icon: Camera,      label: 'Snapshots',        badge: null },
+      { href: '/m4',         icon: Rocket,      label: 'Launch Ads',       badge: META_LIVE ? 'AI' : 'SOON' },
+      { href: '/campaigns',  icon: Megaphone,   label: 'Campaigns',        badge: META_LIVE ? null : 'SOON' },
+      { href: '/insights',   icon: LineChart,   label: 'Scale & Insights', badge: META_LIVE ? 'NEW' : 'SOON' },
+      { href: '/reports',    icon: BarChart2,   label: 'Reports',          badge: META_LIVE ? 'NEW' : 'SOON' },
+      { href: '/leaderboard',icon: Trophy,      label: 'Leaderboard',      badge: META_LIVE ? 'NEW' : 'SOON' },
+      { href: '/snapshots',  icon: Camera,      label: 'Snapshots',        badge: META_LIVE ? null : 'SOON' },
     ],
   },
   {
@@ -262,6 +265,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   )}
                   {(item.badge === 'NEW' || item.badge === 'New') && (
                     <span title="New" style={{width:7,height:7,borderRadius:99,background:isActive?"#0e1b12":"#dffe95",flexShrink:0}}/>
+                  )}
+                  {item.badge === 'SOON' && (
+                    <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 6px",borderRadius:99,background:"rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.45)",border:"1px solid rgba(255,255,255,0.12)",flexShrink:0}}>SOON</span>
                   )}
                 </Link>
               )
