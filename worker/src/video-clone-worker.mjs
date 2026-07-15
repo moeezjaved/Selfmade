@@ -557,7 +557,19 @@ async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, 
     if (st.status === 'FAILED' || st.status === 'ERROR') throw new Error(`fal job ${st.status}`)
   }
   const rr = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
-  if (!rr.ok) throw new Error(`fal result ${rr.status}: ${(await rr.text()).slice(0, 220)}`)
+  if (!rr.ok) {
+    const txt = (await rr.text()).slice(0, 400)
+    // fal moderates at TWO points: submit AND result. A likeness block surfacing at the RESULT fetch
+    // used to throw un-coded ("fal result 422: …") so every content_policy fallback missed it and the
+    // whole job died. Classify it exactly like the submit path so the ladders catch it.
+    if (/content_policy_violation|likenesses of real people/i.test(txt)) {
+      const onImages = /image_urls/i.test(txt)
+      const e = new Error(onImages ? 'content_policy_images' : 'content_policy_video')
+      e.code = onImages ? 'content_policy_images' : 'content_policy_video'
+      throw e
+    }
+    throw new Error(`fal result ${rr.status}: ${txt.slice(0, 220)}`)
+  }
   const data = await rr.json()
   const url = data?.video?.url || data?.data?.video?.url
   if (!url) throw new Error('fal returned no video url')
@@ -580,7 +592,17 @@ async function falQueueRun(model, input, iters = 200) {
     if (st.status === 'FAILED' || st.status === 'ERROR') throw new Error(`fal ${model} ${st.status}`)
   }
   const rr = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
-  if (!rr.ok) throw new Error(`fal ${model} result ${rr.status}: ${(await rr.text()).slice(0, 200)}`)
+  if (!rr.ok) {
+    const txt = (await rr.text()).slice(0, 400)
+    // Same result-time moderation classification as falGenerate — see comment there.
+    if (/content_policy_violation|likenesses of real people/i.test(txt)) {
+      const onImages = /image_urls/i.test(txt)
+      const e = new Error(onImages ? 'content_policy_images' : 'content_policy_video')
+      e.code = onImages ? 'content_policy_images' : 'content_policy_video'
+      throw e
+    }
+    throw new Error(`fal ${model} result ${rr.status}: ${txt.slice(0, 200)}`)
+  }
   return rr.json()
 }
 
@@ -1205,13 +1227,20 @@ async function generateJob(job) {
             } catch (e) {
               // The keyframe shows the action (for an application shot, near the head) and Nano Banana
               // sometimes leaves a face in it → fal's likeness filter rejects it. Salvage: retry with
-              // just the person-free clean product ref + prompt (no keyframe) instead of failing the job.
-              if (e.code === 'content_policy_images') {
+              // just the person-free clean product ref + prompt (no keyframe). If THAT is blocked too,
+              // fall through to the bulletproof ladder below (videoUrl stays null) — a likeness block
+              // must never kill the job. Non-policy errors still surface.
+              if (e.code === 'content_policy_images' || e.code === 'content_policy_video') {
                 console.warn(`scene ${i + 1} keyframe blocked (likeness) — retry clean-product only`)
-                ;({ videoUrl } = await falGenerate({ prompt: `${s.prompt} The product is EXACTLY the attached reference — identical container, cap, colour and label, sharp and in focus.`, imageUrls: falProductImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+                try {
+                  ;({ videoUrl } = await falGenerate({ prompt: `${s.prompt} The product is EXACTLY the attached reference — identical container, cap, colour and label, sharp and in focus.`, imageUrls: falProductImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+                } catch (e2) {
+                  if (e2.code === 'content_policy_images' || e2.code === 'content_policy_video') console.warn(`scene ${i + 1} clean-product blocked too — falling to ladder`)
+                  else throw e2
+                }
               } else throw e
             }
-            falCost += clipCost(meta.tier, s.duration)
+            if (videoUrl) falCost += clipCost(meta.tier, s.duration)
           }
           if (!videoUrl && s.has_people && s.has_product === false && sceneRef && process.env.CLONE_PEOPLE_RESTYLE !== '0') {
             // PEOPLE-ONLY scene (no product in frame) → pose-guided restyle (Wan VACE): copies the
