@@ -1,4 +1,6 @@
 'use client'
+import ComingSoonMeta from '@/components/ComingSoonMeta'
+import { META_LIVE } from '@/lib/flags'
 /**
  * /leaderboard — week-over-week creative leaderboard. Two sections:
  *  1) Performance shifts — Scaling / Declining / Newly launched / Recently paused pill tabs, each a
@@ -42,7 +44,7 @@ function PlayDot() {
   </div>
 }
 
-export default function LeaderboardPage() {
+function LeaderboardPage() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -272,4 +274,11 @@ function mdLite(s: string): string {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/^\s*[-•]\s+(.*)$/gm, '• $1')
     .replace(/\n/g, '<br/>')
+}
+
+// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
+// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+export default function LeaderboardPageGate() {
+  if (!META_LIVE) return <ComingSoonMeta feature="Leaderboard" />
+  return <LeaderboardPage />
 }

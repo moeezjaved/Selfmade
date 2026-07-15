@@ -1,4 +1,6 @@
 'use client'
+import ComingSoonMeta from '@/components/ComingSoonMeta'
+import { META_LIVE } from '@/lib/flags'
 import { useState, useEffect, useRef } from 'react'
 import UpgradeGate from '@/components/UpgradeGate'
 
@@ -68,7 +70,7 @@ function ColHeader({ children, style }: { children: React.ReactNode; style?: Rea
   )
 }
 
-export default function CampaignsPage() {
+function CampaignsPage() {
   return <UpgradeGate feature="campaigns" name="Campaigns"><CampaignsInner /></UpgradeGate>
 }
 function CampaignsInner() {
@@ -814,4 +816,11 @@ function CampaignsInner() {
       `}</style>
     </div>
   )
+}
+
+// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
+// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+export default function CampaignsPageGate() {
+  if (!META_LIVE) return <ComingSoonMeta feature="Campaigns" />
+  return <CampaignsPage />
 }

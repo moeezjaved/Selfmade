@@ -1,4 +1,6 @@
 'use client'
+import ComingSoonMeta from '@/components/ComingSoonMeta'
+import { META_LIVE } from '@/lib/flags'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import AccountSelector from '@/components/AccountSelector'
@@ -16,7 +18,7 @@ const roasBg = (r: number) => r >= 2 ? 'rgba(134,239,172,0.12)' : r >= 1 ? 'rgba
 
 type SortKey = 'roas' | 'spend' | 'revenue' | 'conversions' | 'ctr' | 'cpa' | 'cpm'
 
-export default function ReportsPage() {
+function ReportsPage() {
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState('last_7d')
   const [data, setData] = useState<any>(null)
@@ -675,4 +677,11 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
       )}
     </div>
   )
+}
+
+// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
+// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+export default function ReportsPageGate() {
+  if (!META_LIVE) return <ComingSoonMeta feature="Reports" />
+  return <ReportsPage />
 }

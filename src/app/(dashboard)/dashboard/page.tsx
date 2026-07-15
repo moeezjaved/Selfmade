@@ -1,4 +1,6 @@
 'use client'
+import ComingSoonMeta from '@/components/ComingSoonMeta'
+import { META_LIVE } from '@/lib/flags'
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -17,7 +19,7 @@ interface DashboardData {
   lastSynced: string | null
 }
 
-export default function DashboardPage() {
+function DashboardPage() {
   const router = useRouter()
   const supabase = createClient()
 
@@ -546,4 +548,11 @@ export default function DashboardPage() {
       </div>
     </div>
   )
+}
+
+// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
+// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+export default function DashboardPageGate() {
+  if (!META_LIVE) return <ComingSoonMeta feature="KPI Dashboard" />
+  return <DashboardPage />
 }
