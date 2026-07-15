@@ -1065,7 +1065,16 @@ async function analyzeJob(job) {
         const cuts = await detectSceneCuts(tmpSrc)
         const realSecs = await probeDuration(tmpSrc)   // deterministic source length (not Gemini's guess)
         await rm(tmpSrc, { force: true }).catch(() => {})
-        if (cuts >= 1) { scenes = clampScenes(cuts, realSecs || Number(beat && beat.duration_seconds) || 15); console.log(`✂️ ${job.id} ffmpeg ${cuts} shots · ${(realSecs || 0).toFixed(1)}s → ${scenes} scenes (deterministic)`) }
+        if (cuts >= 1) {
+          // Take the MAX of ffmpeg's hard-cut count and Gemini's semantic scene_count. ffmpeg's 0.6
+          // threshold only catches HARD cuts — it misses dissolves and cuts between similar frames
+          // (the FÜM ad's colour→B&W of the SAME man didn't register), so alone it UNDERCOUNTS and the
+          // planner is forced to drop a real scene (the person). Gemini "watches" semantically and
+          // counts those. Max = the clone never has FEWER scenes than the source actually shows.
+          const geminiScenes = Math.round(Number(beat && beat.scene_count) || 0)
+          scenes = clampScenes(Math.max(cuts, geminiScenes), realSecs || Number(beat && beat.duration_seconds) || 15)
+          console.log(`✂️ ${job.id} ffmpeg ${cuts} + gemini ${geminiScenes} → ${scenes} scenes · ${(realSecs || 0).toFixed(1)}s`)
+        }
       } catch (e) { console.warn(`cut-detect ${job.id}:`, e.message) }
     }
     // Auto-detect + adapt the ad's on-screen text callouts (25g PROTEIN, price, CTA…) for the user's
