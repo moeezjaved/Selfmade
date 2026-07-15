@@ -1080,7 +1080,17 @@ async function generateJob(job) {
           //  • PEOPLE-free b-roll → Seedance with the source motion ref (no faces → safe).
           if (s.has_people && s.has_product !== false) {
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, product-scene · seedance keyframe-led)`)
-            ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+            try {
+              ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+            } catch (e) {
+              // The keyframe shows the action (for an application shot, near the head) and Nano Banana
+              // sometimes leaves a face in it → fal's likeness filter rejects it. Salvage: retry with
+              // just the person-free clean product ref + prompt (no keyframe) instead of failing the job.
+              if (e.code === 'content_policy_images') {
+                console.warn(`scene ${i + 1} keyframe blocked (likeness) — retry clean-product only`)
+                ;({ videoUrl } = await falGenerate({ prompt: `${s.prompt} The product is EXACTLY the attached reference — identical container, cap, colour and label, sharp and in focus.`, imageUrls: falProductImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+              } else throw e
+            }
             falCost += clipCost(meta.tier, s.duration)
           }
           if (!videoUrl && s.has_people && s.has_product === false && sceneRef && process.env.CLONE_PEOPLE_RESTYLE !== '0') {
