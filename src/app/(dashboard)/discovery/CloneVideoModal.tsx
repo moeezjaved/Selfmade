@@ -54,6 +54,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [jobId, setJobId] = useState<string | null>(null)
   const [draftScript, setDraftScript] = useState('')
   const [overlays, setOverlays] = useState<{ t: string; text: string }[]>([])  // auto-detected on-screen text callouts (editable)
+  const [overlaysOn, setOverlaysOn] = useState(false)  // on-screen text is OPT-IN — clean video by default
   const [err, setErr] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)   // non-error info (e.g. still rendering)
   const [result, setResult] = useState<{ url: string; script?: string | null } | null>(null)
@@ -215,7 +216,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           jobId, script: draftScript, mode, durationBucket,
-          overlays: overlays.filter((o) => o.text.trim()),
+          overlays: overlaysOn ? overlays.filter((o) => o.text.trim()) : [],
           extraLangs: mode === 'faithful' ? extraLangs : [],
           endCard: ecOn ? { offer: ecOffer.trim(), cta: ecCta.trim() || 'Shop now' } : null,
           hookVariants: hooksOn && mode === 'faithful',
@@ -353,10 +354,19 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   )}
                 </section>
 
-                {/* ── On-screen text callouts (auto-detected from the ad + adapted to your product; edit/remove/add) ── */}
+                {/* ── On-screen text callouts (OPT-IN — off by default so every video ships clean;
+                    when on, they're auto-detected from the ad + adapted to your product; edit/remove/add) ── */}
                 <section style={{ borderTop: '1px solid #1c2a17', paddingTop: 14 }}>
-                  <Label>On-screen text <span style={{ color: '#5f6f63', fontWeight: 400 }}>· burned onto the video</span></Label>
-                  <p style={{ fontSize: 11, color: '#6f7f73', margin: '2px 0 8px' }}>Auto-detected from the ad and adapted to your product. Edit the words, remove any, or add your own.</p>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={overlaysOn} onChange={(e) => setOverlaysOn(e.target.checked)}
+                      style={{ width: 15, height: 15, accentColor: '#7db56a', cursor: 'pointer' }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#cfe3c4' }}>Add on-screen text <span style={{ color: '#5f6f63', fontWeight: 400 }}>· burned onto the video</span></span>
+                  </label>
+                  {!overlaysOn && (
+                    <p style={{ fontSize: 11, color: '#6f7f73', margin: '6px 0 0' }}>Off — your video renders clean, no text. Turn on to add callouts like <b style={{ color: '#9fb0a4' }}>25g PROTEIN</b> (auto-detected from the ad, fully editable).</p>
+                  )}
+                  {overlaysOn && (<>
+                  <p style={{ fontSize: 11, color: '#6f7f73', margin: '8px 0 8px' }}>Auto-detected from the ad and adapted to your product. Edit the words, remove any, or add your own.</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {overlays.map((o, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -373,6 +383,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                     style={{ marginTop: 8, background: 'none', border: '1px dashed #2a3a24', color: '#9fb0a4', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
                     + Add text
                   </button>
+                  </>)}
                 </section>
 
                 {/* ── Power-ups: each is its own charge; if one fails it refunds itself and the base
