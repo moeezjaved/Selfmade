@@ -1094,14 +1094,18 @@ async function analyzeJob(job) {
         const realSecs = await probeDuration(tmpSrc)   // deterministic source length (not Gemini's guess)
         await rm(tmpSrc, { force: true }).catch(() => {})
         if (cuts >= 1) {
-          // Take the MAX of ffmpeg's hard-cut count and Gemini's semantic scene_count. ffmpeg's 0.6
-          // threshold only catches HARD cuts — it misses dissolves and cuts between similar frames
-          // (the FÜM ad's colour→B&W of the SAME man didn't register), so alone it UNDERCOUNTS and the
-          // planner is forced to drop a real scene (the person). Gemini "watches" semantically and
-          // counts those. Max = the clone never has FEWER scenes than the source actually shows.
+          // CINEMATIC (multi-shot) sources: take the MAX of ffmpeg's hard-cut count and Gemini's
+          // semantic scene_count. ffmpeg's 0.6 threshold misses dissolves and cuts between similar
+          // frames (the FÜM colour→B&W of the SAME man), so alone it UNDERCOUNTS and the planner drops
+          // a real scene. Max = never fewer scenes than the source actually shows.
+          // TALKING-HEAD (UGC) sources: it's really ONE continuous shot, but Gemini reports a "beat"
+          // per gesture/sentence (9+). Taking the max there OVERcounts (a talking head became 9 scenes).
+          // So only trust ffmpeg's real hard cuts for talking heads — no Gemini inflation.
           const geminiScenes = Math.round(Number(beat && beat.scene_count) || 0)
-          scenes = clampScenes(Math.max(cuts, geminiScenes), realSecs || Number(beat && beat.duration_seconds) || 15)
-          console.log(`✂️ ${job.id} ffmpeg ${cuts} + gemini ${geminiScenes} → ${scenes} scenes · ${(realSecs || 0).toFixed(1)}s`)
+          const talkingHead = beat && beat.is_talking_head === true || !cinematic
+          const target = talkingHead ? cuts : Math.max(cuts, geminiScenes)
+          scenes = clampScenes(target, realSecs || Number(beat && beat.duration_seconds) || 15)
+          console.log(`✂️ ${job.id} ffmpeg ${cuts} + gemini ${geminiScenes} (${talkingHead ? 'talking-head→ffmpeg' : 'cinematic→max'}) → ${scenes} scenes · ${(realSecs || 0).toFixed(1)}s`)
         }
       } catch (e) { console.warn(`cut-detect ${job.id}:`, e.message) }
     }
