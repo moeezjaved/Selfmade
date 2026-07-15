@@ -52,9 +52,11 @@ async function rpc(fn, body) { const r = await fetch(`${U}/rest/v1/rpc/${fn}`, {
 
 // ── Gemini: watch the competitor video → structured beat sheet ────────────────
 const BEAT_SCHEMA_PROMPT = `You are a UGC ad director. Watch this video ad and return ONLY minified JSON (no prose, no code fence):
-{"setting":"","avatar":"","camera":"","hook_type":"","beats":[{"t":"0-2s","action":""}],"product_role":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
+{"setting":"","avatar":"","camera":"","hook_type":"","beats":[{"t":"0-2s","action":""}],"scene_count":0,"product_role":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
 - setting: physical scene. avatar: who's on camera (age, look, wardrobe) or "none". camera: framing + movement.
 - hook_type: first-3-seconds pattern. beats: 3-8 time-ranged actions. transcript: exact spoken words. Be concrete.
+- scene_count: the EXACT number of distinct visual scenes/shots (hard cuts to a new location, subject, or camera setup) in the ad — count the real cuts you see, 1 for a single continuous take. This is the number of clips a faithful clone must reproduce, so be precise.
+- duration_seconds: the ad's real total length in seconds.
 - is_talking_head: true ONLY if a person ON CAMERA speaks the main audio to the viewer (lips visibly delivering it). A narrator VOICEOVER over b-roll/lifestyle/montage footage = false. Multiple scene cuts with no consistent on-camera speaker = false.`
 
 async function analyzeVideo(videoUrl) {
@@ -175,9 +177,22 @@ function sceneCountFor(beat) {
   // Scale with BOTH the beat count and the source duration — Gemini returns 3-8 beats regardless of
   // length, so beats alone undercounted badly (a 60s multi-cut ad got 2 scenes). ~15s of source per
   // scene, capped at 4 (the priced x2-x4 rows).
-  const beats = Array.isArray(beat && beat.beats) ? beat.beats.length : 4
+  // Reproduce the SOURCE's real cut structure: use Gemini's explicit scene_count (the actual number
+  // of hard cuts it saw), so a 3-shot ad clones as 3 scenes and a single take as 1 — accurate, not a
+  // formula. Clamped to 1-4 (the priced range + fal practicality). Falls back to a duration estimate
+  // (~8s/scene) only when Gemini didn't return a count. Counting real cuts is far more stable across
+  // re-analyses than the old beat-count heuristic that flip-flopped the price.
   const secs = Number(beat && beat.duration_seconds) || 15
-  return Math.min(4, Math.max(2, Math.ceil(beats / 2), Math.ceil(secs / 15)))
+  const detected = Math.round(Number(beat && beat.scene_count) || 0)
+  const count = detected > 0 ? detected : Math.round(secs / 8)
+  return clampScenes(count, secs)
+}
+// Faithful reproduces the ad's REAL shot count — up to 10 scenes, not a hard 4. Two guards: each clip
+// is ≥5s on Seedance, so a short fast-cut ad can't demand more scenes than duration/5 (else the clone
+// would run far longer than the source); and a hard ceiling of 10 for render time + cost sanity.
+function clampScenes(count, secs) {
+  const durCap = Math.max(2, Math.floor((Number(secs) || 15) / 5))
+  return Math.max(2, Math.min(count, durCap, 10))
 }
 
 // ── gpt-4o: beat sheet → per-scene Seedance prompts for FAITHFUL mode. Each reference scene becomes
@@ -190,7 +205,8 @@ async function buildScenePlan(beat, product, nImages, nScenes, look, voiceover) 
 Rules:
 - Map the beat sheet's beats (in the "beats" array) onto EXACTLY ${nScenes} scenes, IN ORDER, covering the ad's full arc (hook first). Each scene must RECREATE a specific reference beat — its subject, its action, its shot type — not invent a new one. If there are more beats than scenes, group adjacent beats; if fewer, expand the strongest beats. Each scene = one continuous shot.
 - Per scene, write ONE dense Seedance prompt that reproduces THAT reference beat: subject → the exact action from the beat → camera (copy the reference's framing/movement) → lighting → mood. Stay faithful to what the reference actually shows in that beat (e.g. a couple close-up stays a couple close-up; a gym shot stays a gym shot). Cinematic b-roll, lifestyle moments and product close-ups are all allowed — do NOT force anyone to talk to camera, and do NOT drift to a generic studio.
-- PRODUCT SWAP — wherever the reference features its product, feature the user's product (${refList || 'the product'}) instead, matching ${refList || 'the product'} exactly. The product must appear (held / in use / close-up) in at least half of the scenes.
+- PRODUCT SWAP — wherever the reference features its product, feature the user's product (${refList || 'the product'}) instead, matching ${refList || 'the product'} exactly.
+- PRODUCT HERO FRAMING (critical for fidelity): whenever the product is the focus of a scene, frame it as a TIGHT PRODUCT CLOSE-UP that FILLS most of the frame — the exact container, cap/applicator and label clearly readable and in sharp focus. AI video renders a product accurately only when it's large in frame; a wide shot of a person holding it far from camera comes out as a generic blurry bottle. So for the product-reveal / product-in-use beats, write a close macro shot (hands + product filling the frame), NOT a full-body wide shot. At least half the scenes must feature the product this way.
 - PEOPLE — when a scene has people, ${recast ? `recast them as ${look} in appearance (user's explicit choice), keeping the reference's age range, wardrobe style and energy` : 'copy the reference people (age/ethnicity/wardrobe/energy) from the beat sheet'}.
 ${productTruthRule(product)}
 ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera speech (ambience/music energy only). Design the visuals to fit this voiceover's arc, in order: "${String(voiceover).replace(/"/g, "'")}". Put the chunk each scene covers in its "script" field for reference only — do NOT write spoken dialogue into the prompt.` : '- No dialogue — scenes are music/ambience-driven b-roll. Leave "script" empty.'}
@@ -208,13 +224,25 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
   const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
   const scenes = Array.isArray(out.scenes) ? out.scenes.filter((s) => s && s.prompt) : []
   if (!scenes.length) throw new Error('no scenes from gpt')
-  return scenes.slice(0, nScenes).map((s) => ({
-    prompt: String(s.prompt), script: String(s.script || ''),
-    duration: Number(s.duration) >= 8 ? 10 : 5,
-    has_people: s.has_people !== false,   // default TRUE (safe: no ref video unless surely people-free)
-    src_start: Number.isFinite(+s.src_start) ? Math.max(0, +s.src_start) : null,
-    src_end: Number.isFinite(+s.src_end) ? +s.src_end : null,
-  }))
+  const picked = scenes.slice(0, nScenes)
+  // Per-scene duration follows the ad's REAL structure: use each scene's source time-range length
+  // (src_end - src_start) when Gemini gave one; otherwise split the source duration evenly. Clamped to
+  // Seedance's 5-15s range. Net effect: total ≈ the source length, so 3 scenes = 3 SHORTER clips (a
+  // faithful ~14s clone), not 3×10s = 30s. This is what makes "clone = match the source" hold for
+  // whatever real scene count the source has.
+  const srcSecs = Number(beat && beat.duration_seconds) || (picked.length * 7)
+  const evenSplit = Math.max(5, Math.min(15, Math.round(srcSecs / picked.length)))
+  return picked.map((s) => {
+    const span = (Number.isFinite(+s.src_end) && Number.isFinite(+s.src_start)) ? Math.round(+s.src_end - +s.src_start) : 0
+    const dur = span > 0 ? Math.max(5, Math.min(15, span)) : evenSplit
+    return {
+      prompt: String(s.prompt), script: String(s.script || ''),
+      duration: dur,
+      has_people: s.has_people !== false,   // default TRUE (safe: no ref video unless surely people-free)
+      src_start: Number.isFinite(+s.src_start) ? Math.max(0, +s.src_start) : null,
+      src_end: Number.isFinite(+s.src_end) ? +s.src_end : null,
+    }
+  })
 }
 
 // ── gpt-4o: split the APPROVED script into N contiguous segments for long-form UGC (30/60s).
@@ -329,6 +357,49 @@ async function lastFrameAnchor(file, id, idx) {
   } finally { await rm(jpg, { force: true }).catch(() => {}) }
 }
 
+// ── PRODUCT-PERFECT KEYFRAME (people-scenes) ─────────────────────────────────
+// The core fidelity trick: IMAGE models render a small product pixel-perfect (our image clone
+// proves it daily); VIDEO models invent a generic blurry bottle the moment a person holds it in a
+// wide shot. So for people+product scenes we no longer ask the video model to imagine the product:
+// Nano Banana composes a photoreal STILL of the scene's person holding the EXACT product (label
+// readable, correct container), and that still leads the video model's reference images — the video
+// model just has to MOVE a frame that is already correct. Cost ≈ 1-2¢/scene, pure fidelity upside.
+const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL_PRO || process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
+async function fetchB64(url) {
+  const r = await fetch(url)
+  if (!r.ok) throw new Error(`fetch ${r.status}`)
+  const buf = Buffer.from(await r.arrayBuffer())
+  return { mime: r.headers.get('content-type') || 'image/jpeg', b64: buf.toString('base64') }
+}
+async function composeKeyframe({ scenePrompt, productImageUrls, jobId, tag, aspect }) {
+  if (!GEMINI_KEY || !productImageUrls?.length) return null
+  const imgs = []
+  for (const u of productImageUrls.slice(0, 3)) { try { imgs.push(await fetchB64(u)) } catch { /* skip */ } }
+  if (!imgs.length) return null
+  const prompt = `Photorealistic vertical ${aspect || '9:16'} video still (single frame) for this scene: ${scenePrompt}\n` +
+    `NON-NEGOTIABLE: the product shown/held must be an EXACT match of the attached product photos — identical container type and size, cap/applicator, colours, and label text rendered sharp and readable. ` +
+    `Hold it close enough to camera that the product is large and crisp in frame. Natural UGC lighting, real skin texture, no on-screen text or watermarks.\n` +
+    // NO FACE — deliberate: fal's likeness filter rejects reference images containing realistic faces
+    // (it killed the segment anchors the same way). A chin-down hands+product frame carries ALL the
+    // product fidelity we need and gives the filter nothing to flag → the keyframe passes every time
+    // instead of falling back to the blurry no-keyframe path.
+    `FRAMING RULE: NO face may be visible — crop from the chin down or shoot over-the-shoulder; the hands and the product fill the frame.`
+  const body = {
+    contents: [{ parts: [{ text: prompt }, ...imgs.map((i) => ({ inline_data: { mime_type: i.mime, data: i.b64 } }))] }],
+    generationConfig: { responseModalities: ['IMAGE'] },
+  }
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${GEMINI_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  if (!r.ok) throw new Error(`keyframe gemini ${r.status}`)
+  const j = await r.json()
+  const part = (j?.candidates?.[0]?.content?.parts || []).find((p) => p.inline_data || p.inlineData)
+  const inline = part?.inline_data || part?.inlineData
+  if (!inline?.data) throw new Error('keyframe: no image')
+  const key = `creatives/tmp/${jobId}-${tag}-keyframe.png`
+  await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
+  return `${R2_PUBLIC}/${key}`
+}
+
 // ── Single-voice narration (faithful/b-roll mode): one TTS track for the WHOLE script, muxed over
 // the stitched video. Per-clip generated voices differ audibly between scenes; b-roll needs no lip
 // sync, so one continuous voice is both correct and more professional. OpenAI TTS (key already set).
@@ -343,19 +414,23 @@ async function ttsVoiceover(text, id, voice) {
   return f
 }
 async function muxVoiceover(videoIn, voMp3, out) {
-  // Narration can slightly outlast the stitched scenes; it must NEVER be cut off mid-sentence (that
-  // produced videos ending on 'day 21'). Freeze-extend the last frame so the video outlasts the
-  // audio, then -shortest trims to the (now duration-capped) narration. Cap the freeze at 20s — the
-  // VO is bounded to ~1.4× clip length upstream, so the tail is only a few seconds; 20s is a safety
-  // ceiling so a stray long track can never make a multi-minute frozen video (was 180s).
+  // The video length = max(clips, voiceover), computed EXPLICITLY and hard-cut with `-t`. We used to
+  // freeze-extend by a fixed 20s and rely on `-shortest` to trim back — but `-shortest` does NOT trim
+  // a tpad-generated (cloned-frame) video stream, so the freeze ran to its full length and produced a
+  // 42s video for a 17s voiceover. Computing the exact target and capping with -t removes the guesswork:
+  // the last frame holds only for however long the narration actually tails past the clips (usually ~0).
+  const clipsDur = await probeDuration(videoIn)
+  const voDur = await probeDuration(voMp3)
+  const target = Math.max(clipsDur || 0, voDur || 0) + 0.2
+  const pad = Math.max(0, +(target - (clipsDur || 0)).toFixed(2))   // freeze only the tail the VO needs
   try {
     await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex',
-      '[0:v]tpad=stop_mode=clone:stop_duration=20[vp];[0:a]volume=0.22[a0];[a0][1:a]amix=inputs=2:duration=longest[a]',
-      '-map', '[vp]', '-map', '[a]', '-shortest', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
+      `[0:v]tpad=stop_mode=clone:stop_duration=${pad}[vp];[0:a]volume=0.22[a0];[a0][1:a]amix=inputs=2:duration=longest[a]`,
+      '-map', '[vp]', '-map', '[a]', '-t', String(target.toFixed(2)), '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
   } catch {
     // No/odd ambient stream → narration over the frame-extended video only.
-    await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex', '[0:v]tpad=stop_mode=clone:stop_duration=20[vp]',
-      '-map', '[vp]', '-map', '1:a', '-shortest', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
+    await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex', `[0:v]tpad=stop_mode=clone:stop_duration=${pad}[vp]`,
+      '-map', '[vp]', '-map', '1:a', '-t', String(target.toFixed(2)), '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
   }
 }
 
@@ -366,10 +441,14 @@ async function muxVoiceover(videoIn, voMp3, out) {
 // natural real-time pacing on EVERY generation (harmless on the already-good UGC take, corrective on
 // the others). Kept to one sentence on purpose — prompt bloat degrades these models ([[project_clone_prompt_lesson]]).
 const REALISM = 'Natural real-time motion at normal human speed — lively, lifelike movement, absolutely NOT slow motion; photorealistic, sharp focus, real skin and eyes.'
-async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, aspect, tier }) {
+async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, aspect, tier, generateAudio }) {
   const model = tier === 'fast' ? 'bytedance/seedance-2.0/fast/reference-to-video' : 'bytedance/seedance-2.0/reference-to-video'
   const fullPrompt = /slow motion|real-time motion/i.test(prompt) ? prompt : `${prompt} ${REALISM}`
-  const input = { prompt: fullPrompt, image_urls: (imageUrls || []).slice(0, 9), resolution: resolution || '720p', aspect_ratio: aspect || '9:16', generate_audio: true }
+  // generate_audio defaults true (UGC/segments need Seedance's baked lip-synced speech), but FAITHFUL
+  // scenes pass false: they're silent b-roll with a TTS voiceover added in post, and asking Seedance
+  // to invent ambient audio just gave fal something to moderate → "Output audio has sensitive content"
+  // 422s that killed the whole job. Silent scenes can't be flagged for audio.
+  const input = { prompt: fullPrompt, image_urls: (imageUrls || []).slice(0, 9), resolution: resolution || '720p', aspect_ratio: aspect || '9:16', generate_audio: generateAudio !== false }
   if (videoUrl) input.video_urls = [videoUrl]
   if (duration) input.duration = String(duration)
   let sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
@@ -433,11 +512,14 @@ async function falQueueRun(model, input, iters = 200) {
 // preprocess:true makes VACE derive the pose control from the raw footage itself. ──
 async function restyleScene({ prompt, refVideoUrl, imageUrls, duration, aspect }) {
   const input = {
-    prompt: `${prompt} Entirely new people with different faces than the reference — but the exact same motion, blocking, energy and camera movement.`,
+    // Product fidelity clause: VACE prioritises the pose/motion, so without this the product held by
+    // the person degraded into a soft, generic bottle (it was pixel-perfect only in the product-only
+    // scene). Anchor it hard to the reference product images.
+    prompt: `${prompt} Entirely new people with different faces than the reference — but the exact same motion, blocking, energy and camera movement. The product held or shown must be rendered EXACTLY like the reference product image — identical shape, container, cap/applicator, colour and label text — kept sharp and in clear focus, never a generic or blurry stand-in.`,
     video_url: refVideoUrl,
     task: 'pose', preprocess: true,
     ref_image_urls: (imageUrls || []).slice(0, 3),
-    resolution: '580p',
+    resolution: '720p',   // was 580p — the low res was blurring the product in people-scenes
     aspect_ratio: aspect === '9:16' ? '9:16' : 'auto',
     num_frames: Math.min(161, Math.max(81, Math.round((duration || 5) * 16) + 1)),
     frames_per_second: 16,
@@ -458,6 +540,22 @@ async function probeDuration(file) {
   const d = parseFloat(String(out || '').trim())
   return Number.isFinite(d) && d > 0 ? d : 0
 }
+// Count the source's REAL hard cuts with ffmpeg scene-change detection → a DETERMINISTIC scene count
+// (same video always yields the same number → stable price). A vision model's cut count wavered ±1
+// between analyses; pixels don't. Returns 0 on failure so the caller falls back to Gemini/duration.
+async function detectSceneCuts(localFile) {
+  const log = await new Promise((res) => {
+    // Threshold 0.6 = HARD cuts only. Calibrated on real ads: 0.3-0.4 over-counted camera moves and
+    // fast action as scene changes; 0.6 lands on the true shot count and is stable up to 0.7.
+    const p = spawn('ffmpeg', ['-i', localFile, '-filter:v', "select='gt(scene,0.6)',showinfo", '-an', '-f', 'null', '-'])
+    let err = ''
+    p.stderr.on('data', (d) => { err += d.toString() })
+    p.on('close', () => res(err)); p.on('error', () => res(''))
+  })
+  const cuts = (log.match(/Parsed_showinfo/g) || []).length
+  return cuts > 0 ? cuts + 1 : 0   // N cut-points → N+1 scenes
+}
+
 // Cap a voiceover script to fit ~`seconds` of speech (~2.8 words/sec) so a too-long script can NEVER
 // freeze-extend the stitched video into a multi-minute clip. Truncates at the last sentence boundary
 // that fits (supports the Devanagari danda '।' for Hindi/Urdu). This is the guard that stops a
@@ -774,11 +872,28 @@ async function analyzeJob(job) {
       catch (e) { console.warn('describeProduct:', e.message) }
     }
     meta.product_details = productDetails
-    const { prompt, script, gloss } = await buildSeedancePrompt(beat, productDetails, productImages.length, null, meta.character_look, meta.language)
+    let { prompt, script, gloss } = await buildSeedancePrompt(beat, productDetails, productImages.length, null, meta.character_look, meta.language)
+    // Cap the drafted narration to the SOURCE's own talk-time so the clone matches the original length.
+    // A 14s ad shouldn't get a 24s script that then freeze-extends the video — the narration is the
+    // thing that was blowing the duration past the source. The user still sees + can edit this before
+    // approving. (~2.6 words/sec; small floor so very short ads still get a usable line.)
+    const srcSecs = Number(beat && beat.duration_seconds) || 15
+    script = capScriptToSeconds(script, Math.max(8, srcSecs))
     // Suggest faithful (scene-by-scene) cloning when the source is a multi-scene / B-roll ad —
     // collapsing those into a talking head isn't a clone. The user picks the mode at approve time.
     const cinematic = detectCinematic(beat)
-    const scenes = sceneCountFor(beat)
+    // Scene count — prefer a DETERMINISTIC ffmpeg cut count (stable price across re-analyses); fall
+    // back to Gemini's scene_count / duration when the source can't be probed.
+    let scenes = sceneCountFor(beat)
+    if (job.source_video_url) {
+      try {
+        const tmpSrc = join(tmpdir(), `cut-${job.id}.mp4`)
+        await downloadToFile(job.source_video_url, tmpSrc)
+        const cuts = await detectSceneCuts(tmpSrc)
+        await rm(tmpSrc, { force: true }).catch(() => {})
+        if (cuts >= 1) { scenes = clampScenes(cuts, Number(beat && beat.duration_seconds) || 15); console.log(`✂️ ${job.id} ffmpeg detected ${cuts} cuts → ${scenes} scenes (deterministic)`) }
+      } catch (e) { console.warn(`cut-detect ${job.id}:`, e.message) }
+    }
     await stamp({ status: 'review', clone_meta: { ...meta, beat_sheet: beat, seedance_prompt: prompt, script, script_gloss: gloss, suggested_mode: cinematic ? 'faithful' : 'ugc', scene_count: scenes } })
     console.log(`📝 drafted ${job.id} → awaiting approval (suggest=${cinematic ? 'faithful' : 'ugc'}, scenes=${scenes})`)
   } catch (e) {
@@ -800,7 +915,7 @@ async function generateJob(job) {
     // forced talking head). No video reference per scene: the beat sheet grounds each prompt, and
     // skipping the ref avoids fal's likeness blocks entirely. ──
     if (meta.mode === 'faithful') {
-      const nScenes = Math.min(4, Math.max(2, Number(meta.scene_count) || 2))
+      const nScenes = Math.max(2, Math.min(10, Number(meta.scene_count) || 2))
       // Reuse the stamped plan on resume — a fresh plan would mismatch the checkpointed clips.
       const scenes = (Array.isArray(meta.scene_plan) && meta.scene_plan.length)
         ? meta.scene_plan
@@ -841,19 +956,34 @@ async function generateJob(job) {
             catch (e) { console.warn(`scene ${i + 1} trim:`, e.message) }
           }
 
+          // PEOPLE+PRODUCT scenes: compose a product-perfect keyframe FIRST (Nano Banana still of the
+          // person holding the EXACT product) and lead the video model's references with it — the
+          // video model animates a frame that's already correct instead of inventing a blurry bottle.
+          let keyframe = null
+          if (s.has_people && productImages.length) {
+            try {
+              keyframe = await composeKeyframe({ scenePrompt: s.prompt, productImageUrls: productImages, jobId: job.id, tag: `sc${i}`, aspect: meta.aspect })
+              if (keyframe) console.log(`🖼 ${job.id} scene ${i + 1} keyframe composed (product-locked)`)
+            } catch (e) { console.warn(`scene ${i + 1} keyframe failed (${e.message}) — continuing without`) }
+          }
+          const sceneImages = keyframe ? [keyframe, ...productImages].slice(0, 9) : productImages
+          const scenePrompt = keyframe
+            ? `@Image1 shows the EXACT product in the creator's hands — identical container, cap/applicator and label. Whenever the product appears in this scene it must match @Image1 precisely, sharp and in focus, never a generic stand-in. ${s.prompt}`
+            : s.prompt
+
           let videoUrl = null
           if (s.has_people && sceneRef && process.env.CLONE_PEOPLE_RESTYLE !== '0') {
             // PEOPLE scene → pose-guided restyle (Wan VACE): copies the movement skeleton + camera
             // from the source with entirely NEW people. Falls back to prompt-only Seedance on error.
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, pose-restyle)`)
-            try { videoUrl = await restyleScene({ prompt: s.prompt, refVideoUrl: sceneRef, imageUrls: productImages, duration: s.duration, aspect: meta.aspect }); falCost += VACE_EST_USD_PER_RUN }
+            try { videoUrl = await restyleScene({ prompt: scenePrompt, refVideoUrl: sceneRef, imageUrls: sceneImages, duration: s.duration, aspect: meta.aspect }); falCost += VACE_EST_USD_PER_RUN }
             catch (e) { console.warn(`scene ${i + 1} restyle failed (${e.message}) — falling back to prompt-only`) }
           }
           if (!videoUrl && !s.has_people && sceneRef) {
             // PEOPLE-FREE b-roll → source segment straight into Seedance as a motion reference
             // (no faces → no likeness block); prompt-only retry if fal objects anyway.
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, motion-ref)`)
-            try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier })); falCost += clipCost(meta.tier, s.duration) }
+            try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })); falCost += clipCost(meta.tier, s.duration) }
             catch (e) {
               // Flagged VIDEO ref → drop it, prompt-only retry below. Flagged product IMAGE → surface.
               if (e.code === 'content_policy_video') console.warn(`scene ${i + 1} ref blocked (likeness) — retrying prompt-only`)
@@ -861,8 +991,19 @@ async function generateJob(job) {
             }
           }
           if (!videoUrl) {
-            console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, prompt-only)`)
-            ;({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier }))
+            // Prompt-only fallback — still keyframe-led for people scenes, so even without a motion
+            // reference the product stays locked to the composed frame.
+            console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, prompt-only${keyframe ? '+keyframe' : ''})`)
+            try {
+              ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+            } catch (e) {
+              // The keyframe shows an (AI) face — fal's likeness filter sometimes rejects it, same as
+              // the segment-anchor case. Drop the keyframe and salvage rather than failing the job.
+              if (keyframe && e.code === 'content_policy_images') {
+                console.warn(`scene ${i + 1} keyframe blocked (likeness) — retrying without keyframe`)
+                ;({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: productImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+              } else throw e
+            }
             falCost += clipCost(meta.tier, s.duration)
           }
           let f = `${base}-${i}.mp4`
@@ -884,11 +1025,11 @@ async function generateJob(job) {
           let cut = catX
           if (voText && voText.trim()) {
             try {
-              // Cap the VO to the actual stitched-clip length (+40% natural tail) BEFORE TTS, so a
-              // runaway script can't freeze-extend the video into minutes. The frame holds only for
-              // the small remaining tail, not 3 minutes.
-              const clipDur = await probeDuration(catX)
-              const voForTts = clipDur ? capScriptToSeconds(voText, clipDur * 1.4 + 3) : voText
+              // Cap the VO to the stitched-clip length (+small tail) BEFORE TTS, so a long script can't
+              // freeze-extend the video past the source. Fall back to the known scene-duration sum if
+              // ffprobe can't read the concat (that fallback is why an earlier render still hit 42s).
+              const clipDur = (await probeDuration(catX)) || scenes.reduce((a, s) => a + (Number(s.duration) || 5), 0) || 15
+              const voForTts = capScriptToSeconds(voText, clipDur * 1.25 + 2)
               const vo = await ttsVoiceover(voForTts, `${job.id}-${tag}`, meta.voice)
               tmp.push(vo)
               const mixed = `${base}-${tag}-vo.mp4`
@@ -934,7 +1075,7 @@ async function generateJob(job) {
             for (let vi = 0; vi < variants.length; vi++) {
               const label = variants[vi].label
               const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-              const { videoUrl } = await falGenerate({ prompt: variants[vi].prompt, imageUrls: productImages, resolution: meta.resolution, duration: scenes[0].duration, aspect: meta.aspect, tier: meta.tier })
+              const { videoUrl } = await falGenerate({ prompt: variants[vi].prompt, imageUrls: productImages, resolution: meta.resolution, duration: scenes[0].duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })
               vCost += clipCost(meta.tier, scenes[0].duration)
               let vf = `${base}-${slug}.mp4`
               await downloadToFile(videoUrl, vf)
