@@ -101,7 +101,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // Speaking-time meter: per-language rate. Longer than the target → the render talks fast.
   const words = draftScript.trim() ? draftScript.trim().split(/\s+/).length : 0
   const spokenSecs = Math.round(words / langCfg.rate)
-  const targetSecs = mode === 'faithful' ? sceneCount * 8 : resolvedBucket
+  // Faithful scenes split the SOURCE length (each clip ≥5s on Seedance), so the video ≈ the source
+  // duration, floored at sceneCount×5 — NOT sceneCount×8 (that overstated it as ~24s and made a
+  // correctly-sized ~12s script look "too small" against a video that's really ~15s).
+  const targetSecs = mode === 'faithful' ? Math.max(srcSecs || 0, sceneCount * 5) : resolvedBucket
   const busy = phase === 'analyzing' || phase === 'generating'
   const LOOKS = ['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic']
 
