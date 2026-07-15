@@ -17,6 +17,7 @@ export default function SignupPage() {
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
   const [bizModal, setBizModal] = useState<string | null>(null)   // email → show business-email popup
+  const [verifySent, setVerifySent] = useState(false)             // 'Confirm email' on → show check-inbox screen
 
   // A blocked Google sign-in (personal email) bounces here with ?error=business_email — pop the modal.
   useEffect(() => {
@@ -34,17 +35,43 @@ export default function SignupPage() {
     if (isFreeEmail(form.email)) { setBizModal(form.email); return }
     if (form.password.length < 8) { toast.error('Password must be at least 8 characters'); return }
     setLoading(true)
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: form.email.trim(),
       password: form.password,
-      options: { data: { full_name: `${form.firstName} ${form.lastName}`.trim() } },
+      options: {
+        data: { full_name: `${form.firstName} ${form.lastName}`.trim() },
+        // Where Supabase's verification link lands once 'Confirm email' is enabled (PKCE → our
+        // callback exchanges the code + sends the session cookie, then routes to onboarding).
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+      },
     })
-    if (error) { toast.error(error.message); setLoading(false) }
-    else router.push('/onboarding')
+    if (error) { toast.error(error.message); setLoading(false); return }
+    // Fire the welcome email (best-effort, non-blocking).
+    fetch('/api/auth/welcome', { method: 'POST' }).catch(() => {})
+    // If 'Confirm email' is ON in Supabase, signUp returns NO session → show a check-your-inbox
+    // screen instead of pushing into an app the user can't access yet. If OFF (current state),
+    // a session is returned → straight to onboarding (unchanged behaviour).
+    if (!data.session) { setVerifySent(true); setLoading(false); return }
+    router.push('/onboarding')
   }
   const handleGoogle = async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } })
   }
+
+  if (verifySent) return (
+    <div style={S.page}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo.png" alt="Selfmade" style={{ height: 34, filter: 'brightness(0)', margin: '0 auto 24px', display: 'block' }} />
+      <div style={{ ...S.card, textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>📬</div>
+        <h1 style={S.h1}>Check your inbox</h1>
+        <p style={{ ...S.sub, marginBottom: 4 }}>We sent a verification link to</p>
+        <p style={{ fontWeight: 800, color: INK, marginBottom: 16 }}>{form.email.trim()}</p>
+        <p style={S.sub}>Click it to confirm your email and start cloning ads. Didn&apos;t get it? Check spam, or wait a minute and try again.</p>
+        <p style={{ ...S.legal, marginTop: 20 }}>Wrong email? <button onClick={() => setVerifySent(false)} style={{ ...S.link, background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}>Go back</button></p>
+      </div>
+    </div>
+  )
 
   return (
     <div style={S.page}>
