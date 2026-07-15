@@ -343,26 +343,33 @@ async function ttsVoiceover(text, id, voice) {
   return f
 }
 async function muxVoiceover(videoIn, voMp3, out) {
-  // The narration is frequently LONGER than the stitched scenes (a 30-day script vs ~35s of clips) —
-  // it must NEVER be cut off mid-sentence (that produced videos ending on 'day 21'). Freeze-extend
-  // the last video frame (tpad, generous 180s that -shortest trims back) so the video always outlasts
-  // the audio; mix ducked ambient with the FULL narration (duration=longest); -shortest caps the
-  // output to the narration length — the final shot holds like an end-card for any tail.
+  // Narration can slightly outlast the stitched scenes; it must NEVER be cut off mid-sentence (that
+  // produced videos ending on 'day 21'). Freeze-extend the last frame so the video outlasts the
+  // audio, then -shortest trims to the (now duration-capped) narration. Cap the freeze at 20s — the
+  // VO is bounded to ~1.4× clip length upstream, so the tail is only a few seconds; 20s is a safety
+  // ceiling so a stray long track can never make a multi-minute frozen video (was 180s).
   try {
     await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex',
-      '[0:v]tpad=stop_mode=clone:stop_duration=180[vp];[0:a]volume=0.22[a0];[a0][1:a]amix=inputs=2:duration=longest[a]',
+      '[0:v]tpad=stop_mode=clone:stop_duration=20[vp];[0:a]volume=0.22[a0];[a0][1:a]amix=inputs=2:duration=longest[a]',
       '-map', '[vp]', '-map', '[a]', '-shortest', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
   } catch {
     // No/odd ambient stream → narration over the frame-extended video only.
-    await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex', '[0:v]tpad=stop_mode=clone:stop_duration=180[vp]',
+    await ff(['-y', '-i', videoIn, '-i', voMp3, '-filter_complex', '[0:v]tpad=stop_mode=clone:stop_duration=20[vp]',
       '-map', '[vp]', '-map', '1:a', '-shortest', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out])
   }
 }
 
 // ── fal Seedance 2.0 reference-to-video (queue REST) ──────────────────────────
+// Seedance defaults to dreamy SLOW MOTION when a clip is conditioned on a still image (faithful
+// scenes, anchored long-form segments) — which is exactly why the voiceover clones looked slow/unreal
+// next to a single UGC take that rides the source video's real motion. This one-line directive forces
+// natural real-time pacing on EVERY generation (harmless on the already-good UGC take, corrective on
+// the others). Kept to one sentence on purpose — prompt bloat degrades these models ([[project_clone_prompt_lesson]]).
+const REALISM = 'Natural real-time motion at normal human speed — lively, lifelike movement, absolutely NOT slow motion; photorealistic, sharp focus, real skin and eyes.'
 async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, aspect, tier }) {
   const model = tier === 'fast' ? 'bytedance/seedance-2.0/fast/reference-to-video' : 'bytedance/seedance-2.0/reference-to-video'
-  const input = { prompt, image_urls: (imageUrls || []).slice(0, 9), resolution: resolution || '720p', aspect_ratio: aspect || '9:16', generate_audio: true }
+  const fullPrompt = /slow motion|real-time motion/i.test(prompt) ? prompt : `${prompt} ${REALISM}`
+  const input = { prompt: fullPrompt, image_urls: (imageUrls || []).slice(0, 9), resolution: resolution || '720p', aspect_ratio: aspect || '9:16', generate_audio: true }
   if (videoUrl) input.video_urls = [videoUrl]
   if (duration) input.duration = String(duration)
   let sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
@@ -445,6 +452,27 @@ async function restyleScene({ prompt, refVideoUrl, imageUrls, duration, aspect }
 // VACE clips have no audio track; a silent AAC track keeps the concat demuxer's streams aligned
 // with the (audio-bearing) Seedance clips. Returns the original file when audio already exists.
 function probeOut(args) { return new Promise((res) => { const p = spawn('ffprobe', args); let out = ''; p.stdout.on('data', (d) => { out += d.toString() }); p.on('close', () => res(out)); p.on('error', () => res(null)) }) }
+// Duration of a media file in seconds (0 if unknown).
+async function probeDuration(file) {
+  const out = await probeOut(['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file])
+  const d = parseFloat(String(out || '').trim())
+  return Number.isFinite(d) && d > 0 ? d : 0
+}
+// Cap a voiceover script to fit ~`seconds` of speech (~2.8 words/sec) so a too-long script can NEVER
+// freeze-extend the stitched video into a multi-minute clip. Truncates at the last sentence boundary
+// that fits (supports the Devanagari danda '।' for Hindi/Urdu). This is the guard that stops a
+// few-second clone from rendering a 3-minute frozen video.
+function capScriptToSeconds(text, seconds) {
+  const t = String(text || '').trim()
+  if (!t || !seconds) return t
+  const maxWords = Math.max(8, Math.round(seconds * 2.8))
+  const words = t.split(/\s+/)
+  if (words.length <= maxWords) return t
+  let clip = words.slice(0, maxWords).join(' ')
+  const lastStop = Math.max(clip.lastIndexOf('.'), clip.lastIndexOf('!'), clip.lastIndexOf('?'), clip.lastIndexOf('।'))
+  if (lastStop > clip.length * 0.5) clip = clip.slice(0, lastStop + 1)
+  return clip.trim()
+}
 async function ensureAudio(file) {
   const out = await probeOut(['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', file])
   if (out === null || /audio/.test(out)) return file   // has audio, or no ffprobe → assume fine
@@ -856,7 +884,12 @@ async function generateJob(job) {
           let cut = catX
           if (voText && voText.trim()) {
             try {
-              const vo = await ttsVoiceover(voText, `${job.id}-${tag}`, meta.voice)
+              // Cap the VO to the actual stitched-clip length (+40% natural tail) BEFORE TTS, so a
+              // runaway script can't freeze-extend the video into minutes. The frame holds only for
+              // the small remaining tail, not 3 minutes.
+              const clipDur = await probeDuration(catX)
+              const voForTts = clipDur ? capScriptToSeconds(voText, clipDur * 1.4 + 3) : voText
+              const vo = await ttsVoiceover(voForTts, `${job.id}-${tag}`, meta.voice)
               tmp.push(vo)
               const mixed = `${base}-${tag}-vo.mp4`
               tmp.push(mixed)
@@ -959,7 +992,20 @@ async function generateJob(job) {
           const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, !!anchor, productImages.length, meta.language)
           const imgs = anchor ? [anchor, ...productImages].slice(0, 9) : productImages
           console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${anchor ? ' (anchored)' : ''}`)
-          const { videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier })
+          // The anchor is the previous clip's last frame — it shows the (AI) creator's face, which
+          // fal's likeness policy rejects (422 content_policy). That was killing the whole job AFTER
+          // earlier segments already cost fal money. On that rejection, retry this segment WITHOUT the
+          // anchor (product images only) — we lose a little cross-cut continuity but salvage the render
+          // and the fal spend. content_policy on the PRODUCT image (no anchor) still surfaces.
+          let videoUrl
+          try {
+            ({ videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
+          } catch (e) {
+            if (anchor && e.code === 'content_policy_images') {
+              console.warn(`segment ${i + 1} anchor blocked (likeness) — retrying without anchor`)
+              ;({ videoUrl } = await falGenerate({ prompt, imageUrls: productImages, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
+            } else throw e
+          }
           falCost += clipCost(meta.tier, 15)
           const f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
