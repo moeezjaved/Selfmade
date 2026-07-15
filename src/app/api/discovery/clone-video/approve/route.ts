@@ -36,13 +36,16 @@ export async function POST(req: NextRequest) {
   // UGC length buckets: 15s = 1 clip (classic), 30s = 2 chained segments, 60s = 4. 'match' auto-picks
   // the nearest bucket from the source ad's analysed duration. Segments are priced by the same
   // video_clone_xN rows as faithful scenes (same per-clip cost), and clamped server-side.
+  // CLONE = MATCH THE SOURCE. Never render LONGER than the source ad — a 14s ad must not become a
+  // 60s clone (that's what produced the padded/slow 3-minute video). The source's own analysed length
+  // is the ceiling; the user may pick a SHORTER bucket but not a longer one.
+  const srcSecs = Number(meta?.beat_sheet?.duration_seconds) || 15
+  const srcBucketCap = srcSecs <= 22 ? 15 : srcSecs <= 45 ? 30 : 60
   let nSeg = 1
   if (chosenMode === 'ugc') {
     let bucket: number = Number(durationBucket) || 15
-    if (durationBucket === 'match') {
-      const secs = Number(meta?.beat_sheet?.duration_seconds) || 15
-      bucket = secs <= 22 ? 15 : secs <= 45 ? 30 : 60
-    }
+    if (durationBucket === 'match') bucket = srcBucketCap
+    bucket = Math.min(bucket, srcBucketCap)   // hard ceiling: can't exceed the source's own length
     nSeg = bucket >= 60 ? 4 : bucket >= 30 ? 2 : 1
   }
 

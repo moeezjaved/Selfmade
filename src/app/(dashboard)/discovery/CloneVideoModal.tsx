@@ -270,17 +270,28 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                 {mode === 'ugc' && (
                   <section>
                     <Label>Video length</Label>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <button onClick={() => setDurationBucket('15')} style={tierBtn(durationBucket === '15')}>15s · {UGC_COST[tier]} cr</button>
-                      <button onClick={() => setDurationBucket('30')} style={tierBtn(durationBucket === '30')}>30s · {FAITHFUL_COST[2][tier]} cr</button>
-                      <button onClick={() => setDurationBucket('60')} style={tierBtn(durationBucket === '60')}>60s · {FAITHFUL_COST[4][tier]} cr</button>
-                      {srcSecs ? (() => {
-                        const b = srcSecs <= 22 ? 15 : srcSecs <= 45 ? 30 : 60
-                        const c = b === 15 ? UGC_COST[tier] : (FAITHFUL_COST[b === 60 ? 4 : 2] || FAITHFUL_COST[2])[tier]
-                        return <button onClick={() => setDurationBucket('match')} style={tierBtn(durationBucket === 'match')}>Match original ({srcSecs}s → {b}s) · {c} cr</button>
-                      })() : null}
-                    </div>
-                    {nSegs > 1 && <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{nSegs} chained clips of the same creator, stitched into one take — cuts land at natural pauses, like real UGC.</p>}
+                    {(() => {
+                      // A clone can't be LONGER than the source — cap the offered buckets to the
+                      // source's own length so a 14s ad can't be stretched to 30/60s.
+                      const cap = srcSecs ? (srcSecs <= 22 ? 15 : srcSecs <= 45 ? 30 : 60) : 60
+                      const lenBtn = (v: '15' | '30' | '60', secs: number, label: string) => {
+                        const disabled = secs > cap
+                        return <button key={v} onClick={() => !disabled && setDurationBucket(v)} disabled={disabled}
+                          style={{ ...tierBtn(durationBucket === v), opacity: disabled ? 0.35 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
+                          title={disabled ? `Longer than the ${srcSecs}s source — a clone matches the original length` : ''}>{label}</button>
+                      }
+                      const matchCost = cap === 15 ? UGC_COST[tier] : (FAITHFUL_COST[cap === 60 ? 4 : 2] || FAITHFUL_COST[2])[tier]
+                      return (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {lenBtn('15', 15, `15s · ${UGC_COST[tier]} cr`)}
+                          {lenBtn('30', 30, `30s · ${FAITHFUL_COST[2][tier]} cr`)}
+                          {lenBtn('60', 60, `60s · ${FAITHFUL_COST[4][tier]} cr`)}
+                          {srcSecs ? <button onClick={() => setDurationBucket('match')} style={tierBtn(durationBucket === 'match')}>Match original ({srcSecs}s) · {matchCost} cr</button> : null}
+                        </div>
+                      )
+                    })()}
+                    {srcSecs ? <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>Source is {srcSecs}s — a clone matches the original length (longer options are disabled).{nSegs > 1 ? ` ${nSegs} chained clips stitched into one take.` : ''}</p>
+                      : nSegs > 1 ? <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{nSegs} chained clips of the same creator, stitched into one take — cuts land at natural pauses, like real UGC.</p> : null}
                   </section>
                 )}
 
