@@ -1106,24 +1106,30 @@ async function generateJob(job) {
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, motion-ref)`)
             try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: falProductImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })); falCost += clipCost(meta.tier, s.duration) }
             catch (e) {
-              // Flagged VIDEO ref → drop it, prompt-only retry below. Flagged product IMAGE → surface.
-              if (e.code === 'content_policy_video') console.warn(`scene ${i + 1} ref blocked (likeness) — retrying prompt-only`)
+              // ANY content-policy block (video ref OR image — fal mislabels which) → drop the refs and
+              // let the bulletproof ladder below salvage. Real errors still surface.
+              if (e.code === 'content_policy_video' || e.code === 'content_policy_images') console.warn(`scene ${i + 1} ref blocked (likeness) — laddering down`)
               else throw e
             }
           }
           if (!videoUrl) {
-            // Prompt-only fallback — still keyframe-led for people scenes, so even without a motion
-            // reference the product stays locked to the composed frame.
+            // BULLETPROOF FALLBACK LADDER — a scene must NEVER fail the whole job on a likeness block.
+            // Step down until fal accepts: keyframe/product images → product-only image → PURE PROMPT
+            // (text can't be flagged for likeness). Product fidelity degrades a step at a time, but the
+            // render always completes.
+            const step = async (imgs, promptForImgs) => (await falGenerate({ prompt: imgs.length ? promptForImgs : s.prompt, imageUrls: imgs, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })).videoUrl
+            const blocked = (e) => e.code === 'content_policy_images' || e.code === 'content_policy_video'
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, prompt-only${keyframe ? '+keyframe' : ''})`)
-            try {
-              ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
-            } catch (e) {
-              // The keyframe shows an (AI) face — fal's likeness filter sometimes rejects it, same as
-              // the segment-anchor case. Drop the keyframe and salvage rather than failing the job.
-              if (keyframe && e.code === 'content_policy_images') {
-                console.warn(`scene ${i + 1} keyframe blocked (likeness) — retrying without keyframe`)
-                ;({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
-              } else throw e
+            try { videoUrl = await step(sceneImages, scenePrompt) }
+            catch (e1) {
+              if (!blocked(e1)) throw e1
+              console.warn(`scene ${i + 1} images blocked — retry product-only`)
+              try { videoUrl = await step(falProductImages, `${s.prompt} The product is EXACTLY the attached reference — same container, colour and label, sharp.`) }
+              catch (e2) {
+                if (!blocked(e2)) throw e2
+                console.warn(`scene ${i + 1} product image blocked too — retry pure prompt (no images)`)
+                videoUrl = await step([], s.prompt)
+              }
             }
             falCost += clipCost(meta.tier, s.duration)
           }
