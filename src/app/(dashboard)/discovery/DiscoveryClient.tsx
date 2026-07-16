@@ -685,7 +685,7 @@ function MoreMenu({ ad }: { ad: Ad }) {
       </button>
       {open && (
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 160, zIndex: 100, padding: 4, fontFamily: 'inherit' }}>
-          <a href={`/discovery/${ad.id}`} onClick={() => setOpen(false)}
+          <a href={`/discovery/${ad.id}`} onClick={() => { saveDiscoSnapNow(); setOpen(false) }}
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 13, color: '#1f2937', textDecoration: 'none', borderRadius: 6, cursor: 'pointer' }}
             onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -893,7 +893,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
     {videoCloneOpen && <CloneVideoModal sourceAdId={ad.id} sourcePoster={slide?.poster || undefined} onClose={() => setVideoCloneOpen(false)} />}
     <div
       className="ad-card-visual"
-      onClick={() => router.push(`/discovery/${ad.id}`)}
+      onClick={() => { saveDiscoSnapNow(); router.push(`/discovery/${ad.id}`) }}
       style={{
         position: 'relative', width: '100%', paddingBottom: `${aspectPct}%`,
         background: '#f1f3f5', overflow: 'hidden', lineHeight: 0, cursor: 'pointer',
@@ -1223,6 +1223,7 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
           // Don't navigate if user clicked an interactive child (button, video controls, etc.)
           const target = e.target as HTMLElement
           if (target.closest('button, a, video')) return
+          saveDiscoSnapNow()   // persist search + scroll before opening the ad, so closing restores it
           router.push(`/discovery/${ad.id}`)
         }}
         style={{ cursor: 'pointer' }}
@@ -1281,6 +1282,15 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
 // left off. TTL-bounded so a stale tab doesn't resurrect an ancient feed. ──
 const DISCO_SNAP_KEY = 'discovery:snap:v1'
 const DISCO_SNAP_TTL = 30 * 60 * 1000
+// Module-level so ANY card (across sub-components) can save the feed the instant it's clicked —
+// the most reliable moment, before navigation. The page keeps `latestFeedSnap` current each render.
+let latestFeedSnap: any = {}
+function saveDiscoSnapNow() {
+  try {
+    const s = latestFeedSnap || {}
+    sessionStorage.setItem(DISCO_SNAP_KEY, JSON.stringify({ ...s, rawAds: Array.isArray(s.rawAds) ? s.rawAds.slice(0, 150) : [], scrollY: (typeof window !== 'undefined' ? window.scrollY : 0) || 0, t: Date.now() }))
+  } catch { /* best-effort */ }
+}
 function readDiscoSnap(): any {
   try {
     const raw = sessionStorage.getItem(DISCO_SNAP_KEY)
@@ -1622,18 +1632,29 @@ export default function DiscoveryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, searchMode, sort, status, platforms, country, format, industry, theme, timeDays, selectedBrand?.pageId, tiers, niches, minBrandAdsStr, minDaysStr, minReuseStr, adsPerBrandStr, hookTypes, emotions, angles, formatStyles, visualStyles, ctaStyles])
 
-  // Track scroll (for the snapshot) + persist the whole feed on unmount (i.e. when opening an ad),
-  // so returning resumes at the same filters, cards and scroll position.
+  // Track scroll (for the snapshot) + persist the whole feed so returning from an ad resumes at the
+  // same search, filters, cards and scroll position. We persist on pagehide/visibilitychange (fires
+  // reliably BEFORE the route change, unlike the React unmount cleanup which can race the navigation)
+  // AND on unmount as a fallback.
   useEffect(() => {
     const onScroll = () => { scrollYRef.current = window.scrollY || window.pageYOffset || 0 }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      window.removeEventListener('scroll', onScroll)
+    const persist = () => {
       try {
         const s = feedSnapRef.current || {}
-        const payload = { ...s, rawAds: Array.isArray(s.rawAds) ? s.rawAds.slice(0, 150) : [], scrollY: scrollYRef.current, t: Date.now() }
+        const payload = { ...s, rawAds: Array.isArray(s.rawAds) ? s.rawAds.slice(0, 150) : [], scrollY: scrollYRef.current || window.scrollY || 0, t: Date.now() }
         sessionStorage.setItem(DISCO_SNAP_KEY, JSON.stringify(payload))
       } catch { /* quota / unavailable — resume just won't restore this time */ }
+    }
+    const onHide = () => persist()
+    const onVis = () => { if (document.visibilityState === 'hidden') persist() }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('pagehide', onHide)
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('pagehide', onHide)
+      document.removeEventListener('visibilitychange', onVis)
+      persist()
     }
   }, [])
 
@@ -1787,6 +1808,7 @@ export default function DiscoveryPage() {
     formatStyles, visualStyles, ctaStyles, timeDays,
     searchSource, dbPage, dbTotal, totalInDB, nextCursor, hasMore, rawAds,
   }
+  latestFeedSnap = feedSnapRef.current   // keep the module-level saver current for card clicks
 
   // CLIENT-ONLY render. This whole page is client-data driven (everything loads via useEffect) and
   // some of its first-paint content diverged server↔client → React hydration errors #418/#423/#425,
