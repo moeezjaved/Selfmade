@@ -42,9 +42,22 @@ export default function BrandsPage() {
     if (!form.name.trim() || saving) return
     setSaving(true); setMsg(null)
     try {
+      // Auto-detect product photos from the store URL (Shopify /products.json + og/JSON-LD fallback),
+      // so the brand is immediately usable in Remake with REAL product images — no manual URL pasting.
+      let detected: string[] = []
+      if (form.website?.trim()) {
+        setMsg({ ok: true, text: 'Detecting products from your site…' })
+        try {
+          const dr = await fetch('/api/discovery/detect-product', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ url: form.website.trim() }),
+          }).then((x) => x.json())
+          detected = Array.isArray(dr?.productImages) ? dr.productImages.slice(0, 12) : []
+        } catch { /* detection is best-effort — brand still saves without it */ }
+      }
       const r = await fetch('/api/brands', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...form, industry: csv(form.industry), usps: csv(form.usps) }),
+        body: JSON.stringify({ ...form, industry: csv(form.industry), usps: csv(form.usps), product_images: detected }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) {
@@ -55,7 +68,8 @@ export default function BrandsPage() {
         return
       }
       setForm({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '' })
-      setCreating(false); setMsg({ ok: true, text: `✓ “${(d.brand?.name || form.name)}” saved.` })
+      setCreating(false)
+      setMsg({ ok: true, text: detected.length ? `✓ “${(d.brand?.name || form.name)}” saved with ${detected.length} product photo${detected.length === 1 ? '' : 's'} detected.` : `✓ “${(d.brand?.name || form.name)}” saved.` })
       await load()
     } catch { setMsg({ ok: false, text: 'Network error — please try again.' }) }
     finally { setSaving(false) }
