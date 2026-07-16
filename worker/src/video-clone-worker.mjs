@@ -1433,10 +1433,18 @@ async function generateJob(job) {
           try {
             ({ videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
           } catch (e) {
-            if (anchor && e.code === 'content_policy_images') {
-              console.warn(`segment ${i + 1} anchor blocked (likeness) — retrying without anchor`)
-              ;({ videoUrl } = await falGenerate({ prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
-            } else throw e
+            const segBlocked = (x) => x.code === 'content_policy_images' || x.code === 'content_policy_video'
+            if (!segBlocked(e)) throw e
+            // Ladder: anchor+products blocked → products only → PURE PROMPT. A segment must never
+            // kill the whole long-form render on a moderation block (same contract as faithful mode).
+            console.warn(`segment ${i + 1} refs blocked (likeness) — laddering down`)
+            try {
+              ({ videoUrl } = await falGenerate({ prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
+            } catch (e2) {
+              if (!segBlocked(e2)) throw e2
+              console.warn(`segment ${i + 1} product image blocked too — pure prompt`)
+              ;({ videoUrl } = await falGenerate({ prompt, imageUrls: [], resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
+            }
           }
           falCost += clipCost(meta.tier, 15)
           const f = `${base}-${i}.mp4`
@@ -1477,15 +1485,31 @@ async function generateJob(job) {
     // (likeness policy) — which is nearly every UGC ad — so on a content_policy_violation we retry
     // WITHOUT the video: Gemini's beat sheet already grounds the prompt in the ad's structure/hook,
     // and Seedance generates a fresh (non-real) creator. Product-only/no-people videos keep the motion ref.
-    const genArgs = { prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier }
+    const genArgs = { prompt, resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier }
+    // NEVER-FAIL LADDER (same contract as faithful mode): a moderation block on ANY reference must
+    // degrade fidelity a step, not kill the render. fal moderation is borderline/non-deterministic —
+    // the same product photo can pass one render and fail the next, and some product CATEGORIES
+    // (e.g. smoking/vaping devices) are rejected outright no matter the shot. Ordered rungs, best
+    // fidelity first, ending in PURE PROMPT (text can't be flagged) so a usable ad always ships:
+    //   1. clean product + motion-ref video   2. clean product only   3. ORIGINAL uploaded photo
+    //   4. pure prompt (no refs — product from the description only).
+    const blockedUgc = (e) => e.code === 'content_policy_images' || e.code === 'content_policy_video' || /content_policy_violation|likeness|real people/i.test(String(e.message))
+    const rungs = [
+      { imageUrls: falProductImages, videoUrl: refVideo || null, tag: 'clean+motion' },
+      { imageUrls: falProductImages, videoUrl: null, tag: 'clean product' },
+      { imageUrls: productImages.slice(0, 4), videoUrl: null, tag: 'original photo' },
+      { imageUrls: [], videoUrl: null, tag: 'pure prompt' },
+    ].filter((r, i) => i === 0 || r.imageUrls.length || i === 3)   // skip empty-image middle rungs
     let videoUrl, requestId
-    try {
-      ({ videoUrl, requestId } = await falGenerate({ ...genArgs, videoUrl: refVideo }))
-    } catch (e) {
-      if (refVideo && (e.code === 'content_policy_video' || /content_policy_violation|likeness|real people/i.test(e.message)) && e.code !== 'content_policy_images') {
-        console.warn(`ref video blocked (likeness) for ${job.id} — retrying prompt-only`)
-        ;({ videoUrl, requestId } = await falGenerate({ ...genArgs, videoUrl: null }))
-      } else throw e
+    for (let ri = 0; ri < rungs.length; ri++) {
+      try {
+        ({ videoUrl, requestId } = await falGenerate({ ...genArgs, imageUrls: rungs[ri].imageUrls, videoUrl: rungs[ri].videoUrl }))
+        if (ri > 0) console.warn(`ugc ${job.id}: landed on rung "${rungs[ri].tag}"`)
+        break
+      } catch (e) {
+        if (!blockedUgc(e) || ri === rungs.length - 1) throw e
+        console.warn(`ugc ${job.id}: "${rungs[ri].tag}" blocked — laddering down`)
+      }
     }
 
     const singleTmp = []
