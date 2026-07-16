@@ -183,6 +183,37 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const [capSize, setCapSize] = useState<'s' | 'm' | 'l'>('m')
   const [capBusy, setCapBusy] = useState(false)
   const [capErr, setCapErr] = useState<string | null>(null)
+  // ── Tweak (video remakes): per-scene fixes (faithful) or whole-clip re-roll (UGC), same rail as
+  // the post-render modal — so users can come back and fix a video LATER from My Creatives. ──
+  const [tw, setTw] = useState<{ tweakable: boolean; ugcTweakable: boolean; scenes: { duration: number }[] } | null>(null)
+  const [twSel, setTwSel] = useState<number | null>(null)
+  const [twBusy, setTwBusy] = useState(false)
+  const [twMsg, setTwMsg] = useState<string | null>(null)
+  useEffect(() => {
+    if (gen.type !== 'video_clone' || gen.media_type !== 'video' || !gen.image_url) return
+    fetch(`/api/discovery/clone-video/status?id=${gen.id}`).then((r) => r.json())
+      .then((st) => setTw({ tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, scenes: st.tweakScenes || [] }))
+      .catch(() => {})
+  }, [gen.id, gen.type, gen.media_type, gen.image_url])
+  const runTweak = async (body: Record<string, unknown>) => {
+    if (twBusy) return
+    setTwBusy(true); setTwMsg(null)
+    try {
+      const r = await fetch('/api/discovery/clone-video/tweak', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jobId: gen.id, ...body }),
+      }).then((x) => x.json())
+      if (r.error) { setTwMsg(r.error === 'insufficient_credits' ? 'Not enough credits.' : r.error); setTwBusy(false); return }
+      for (let i = 0; i < 200; i++) {
+        await new Promise((res) => setTimeout(res, 4000))
+        const st = await fetch(`/api/discovery/clone-video/status?id=${gen.id}`).then((x) => x.json()).catch(() => ({}))
+        if (st.tweakError) { setTwMsg(`Tweak failed (${st.tweakError}) — original video untouched, charge refunded.`); break }
+        if (st.status === 'done' && st.url && st.url !== img) { setImg(st.url); setTwMsg('Updated ✓'); setTwSel(null); onChanged(); break }
+        if (st.status === 'done' && i > 2) { setTwMsg('Updated ✓'); setTwSel(null); break }
+      }
+    } catch (e: any) { setTwMsg(String(e?.message || e)) }
+    setTwBusy(false)
+  }
   const addCaptions = async () => {
     setCapBusy(true); setCapErr(null)
     try {
@@ -256,6 +287,52 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Your video</div>
               <button onClick={() => downloadCreative(creativeFilename({ brand: gen.brand_name, ext: 'mp4', kind: gen.type, date: new Date(gen.created_at) }))} disabled={downloading} style={{ ...btn, justifyContent: 'center' }}><Download size={15} /> {downloading ? 'Downloading…' : 'Download MP4'}</button>
               <button onClick={copyUrl} style={{ ...btnGhost, justifyContent: 'center' }}><Link2 size={15} /> {copied ? 'Copied ✓' : 'Copy URL'}</button>
+
+              {/* ── Tweak — fix this remake later, right from My Creatives (same rail as the render
+                  modal): per-scene chips for faithful, whole-clip fix chips for single-clip UGC. ── */}
+              {tw && (tw.tweakable || tw.ugcTweakable) && (
+                <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>🔧 Tweak this video</div>
+                  {twBusy ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1a3a1a', fontSize: 12.5 }}><Loader2 size={14} className="spin" /> Tweaking… (~2–3 min, the video updates here)</div>
+                  ) : tw.tweakable ? (<>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {tw.scenes.map((s, i) => (
+                        <button key={i} onClick={() => setTwSel(twSel === i ? null : i)}
+                          style={{ padding: '6px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${twSel === i ? '#1a3a1a' : '#d1d5db'}`, background: twSel === i ? '#f0fdf4' : '#fff', color: '#1a3a1a' }}>
+                          Scene {i + 1} · {s.duration}s
+                        </button>
+                      ))}
+                    </div>
+                    {twSel != null && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {[['size', 'Product too big/small'], ['product', 'Product wrong'], ['action', 'Wrong action'], ['person', 'Person off'], ['closeup', 'Close-up'], ['redo', 'Redo']].map(([k, label]) => (
+                          <button key={k} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: k })}
+                            style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #d1d5db', background: '#fff', color: '#1a3a1a' }}>
+                            {label} · 600cr
+                          </button>
+                        ))}
+                        {tw.scenes.length > 2 && (
+                          <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })}
+                            style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #d1d5db', background: '#fff', color: '#15803d' }}>
+                            Remove · free
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>) : (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {[['size', 'Product too big/small'], ['product', 'Product looks wrong'], ['person', 'Person looks off'], ['action', 'Not using the product'], ['redo', 'Just re-roll it']].map(([k, label]) => (
+                        <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k })}
+                          style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #d1d5db', background: '#fff', color: '#1a3a1a' }}>
+                          {label} · 450cr
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {twMsg && <div style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? '#15803d' : '#b91c1c' }}>{twMsg}</div>}
+                </div>
+              )}
 
               {/* Captions add-on — burn TikTok-style captions (85% of feed watches on mute). */}
               <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
