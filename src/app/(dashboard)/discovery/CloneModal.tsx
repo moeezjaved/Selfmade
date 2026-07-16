@@ -57,6 +57,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
   const [headline, setHeadline] = useState('')
   const [aspect, setAspect] = useState<'original' | '1:1' | '4:5' | '9:16'>('original')
+  const [look, setLook] = useState('match')   // recast the on-image model (default keep the original)
   const [imageSize, setImageSize] = useState<'2K' | '4K'>('2K')
   const tier: 'pro' = 'pro'   // Pro (Nano Banana Pro) always — best product fidelity + text
   const [emailDaily, setEmailDaily] = useState(true)
@@ -192,7 +193,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         ...(ad.assetImageUrl ? { refImageUrl: ad.assetImageUrl } : { adId: ad.id }),
         productImages: chosen, tier, brandId: useBrandId || undefined,
         brandName: bName.trim() || undefined, colors, newHeadline: headline.trim() || undefined,
-        aspectRatio: aspect, logo: logo || undefined, imageSize, palette: palette || undefined,
+        aspectRatio: aspect, logo: logo || undefined, imageSize, palette: palette || undefined, look,
       }
 
       // ASYNC: enqueue `count` jobs (each reserves + returns a jobId in ~1s — no held-open request,
@@ -383,6 +384,15 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
               <Label>3 · Options</Label>
               <input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="New on-screen headline (optional)" style={input} />
               <div style={{ fontSize: 11, color: '#8aa', marginTop: -4 }}>💡 Type your headline here for accurate on-image text — otherwise the model writes (and sometimes misspells) its own.</div>
+              {/* On-image model — keep the original person, or recast to a look (matches the video flow) */}
+              <div>
+                <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>On-image model <span style={{ color: '#5f6f63' }}>· for ads with a person</span></div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {(['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic'] as const).map((v) => (
+                    <button key={v} onClick={() => setLook(v)} style={{ ...tierBtn(look === v), padding: '7px 11px', fontSize: 11.5, flex: '0 0 auto' }}>{v === 'match' ? 'Match original' : v}</button>
+                  ))}
+                </div>
+              </div>
               {/* Aspect ratio */}
               <div>
                 <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Aspect ratio</div>

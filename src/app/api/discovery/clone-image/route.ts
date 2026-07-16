@@ -99,7 +99,7 @@ async function runGeneration(input: {
     await admin.from('creative_generations').update({ status: 'failed', clone_meta: { tx_id: txId, error: msg } }).eq('id', jobId)
   }
   try {
-    const { adId, refImageUrl, productImageB64, productImages, productMimeType, newHeadline, brandName, colors, brandId, aspectRatio } = body || {}
+    const { adId, refImageUrl, productImageB64, productImages, productMimeType, newHeadline, brandName, colors, brandId, aspectRatio, look } = body || {}
     const useTier: 'default' | 'pro' = 'pro'
     const rawProducts: string[] = Array.isArray(productImages) && productImages.length
       ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
@@ -117,7 +117,12 @@ async function runGeneration(input: {
     const brandLookupP = brandId
       ? admin.from('brands').select('brand_kit').eq('id', String(brandId)).maybeSingle().then((r: any) => (r.data as any)?.brand_kit || {})
       : Promise.resolve<any>(null)
-    const [adData, kit] = await Promise.all([adLookupP, brandLookupP])
+    // The user's REAL price (if they set one on the product) — used to replace the original ad's price
+    // instead of letting the model invent one.
+    const priceLookupP = brandId
+      ? admin.from('brand_products').select('price').eq('brand_id', String(brandId)).not('price', 'is', null).limit(1).maybeSingle().then((r: any) => (r.data as any)?.price || null)
+      : Promise.resolve<string | null>(null)
+    const [adData, kit, productPrice] = await Promise.all([adLookupP, brandLookupP, priceLookupP])
 
     // Reference = a discovery ad (creative + classified DNA) OR an uploaded ASSET image URL.
     let ad: any = { hook_type: null, format_style: null, angle: null, emotion: null, cta: null, page_name: brandName || 'your creative' }
@@ -165,9 +170,10 @@ async function runGeneration(input: {
     if (products.length === 0) return await fail('could not load product image(s)')
 
     const productDesc = await describeProduct(products[0]).catch(() => null)
+    const priceStr = productPrice ? (/^\s*[\$£€₨₹]|rs\.?/i.test(String(productPrice)) ? String(productPrice).trim() : `$${String(productPrice).trim()}`) : null
     const prompt = buildClonePrompt({
       brandName, colors: kitColors, newHeadline, aspectRatio: resolvedAspect, fonts: kitFonts, palette: kitPalette, hasLogo: !!logoImg,
-      productDesc: productDesc || undefined,
+      productDesc: productDesc || undefined, productPrice: priceStr, look: typeof look === 'string' ? look : undefined,
       dna: { hook_type: ad.hook_type, format_style: ad.format_style, angle: ad.angle, emotion: ad.emotion, cta: ad.cta },
     })
     const genImages = logoImg ? [refImg, ...products, logoImg] : [refImg, ...products]

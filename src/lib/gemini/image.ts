@@ -223,6 +223,8 @@ export function buildStudioPrompt(opts: {
 export function buildClonePrompt(opts: {
   brandName?: string; colors?: string[]; newHeadline?: string; aspectRatio?: string; hasLogo?: boolean
   productDesc?: string   // short "what the product is" (e.g. "pesto sauce jar") — grounds scene/copy adaptation
+  productPrice?: string | null   // the user's real price, if they set one — used to replace the original's price
+  look?: string          // recast the on-camera person: 'match' (default, keep original) or an ethnicity/look
   palette?: BrandPalette
   fonts?: { heading?: string | null; body?: string | null; headingWeight?: string | null; bodyWeight?: string | null }
   dna?: { hook_type?: string | null; format_style?: string | null; angle?: string | null; emotion?: string[] | null; cta?: string | null }
@@ -265,16 +267,27 @@ export function buildClonePrompt(opts: {
   //     "remove the competitor's logo/product" line conditions the output ON those things. So state
   //     only the desired end state (whose product/brand appears), never what must be absent.
   const brand = opts.brandName ? `"${opts.brandName}"` : "the user's brand"
+  // Recast the person (optional). Default 'match' keeps image 1's model — same pose/framing/lighting.
+  const recast = opts.look && opts.look.toLowerCase() !== 'match'
+    ? `• Person: recast the model as ${opts.look} in appearance — keep the EXACT same pose, framing, hand position, expression, lighting and composition; only the person's ethnicity/look changes.`
+    : ''
+  // Price/number rule — NEVER invent. Use the user's real price if given; otherwise drop the price.
+  const priceRule = opts.productPrice
+    ? `• Price: wherever image 1 shows a price, show "${opts.productPrice}" instead — never any other number.`
+    : `• Price: do NOT invent a price. If image 1 shows a price tag/badge and none is given for the user's product, OMIT the price entirely (remove the badge) — never make up a number, discount, or claim.`
   return [
     `Clone the winning ad in image 1 into an ad for the USER'S product${opts.productDesc ? ` (${opts.productDesc})` : ''}${opts.brandName ? ` by brand ${brand}` : ''}, shown in the image(s) after it. Keep image 1's layout, composition, structure${keep ? `, and ${keep}` : ''}, and premium quality — with these swaps:`,
     `• Product: exactly ONE product appears — the user's, rendered precisely from its photo: its own real shape, proportions, label text and colors, even when that shape differs completely from image 1's product (e.g. a jar in place of a dropper bottle).`,
+    `• Product state: preserve the product's PHYSICAL STATE from image 1 — if the reference shows it open / cap off / dropper out / lid removed / mid-use, show the user's product in that SAME open, in-use state (don't seal or cap a product the original showed open).`,
+    recast,
     `• Branding: every visible logo, brand name, tagline and label in the final ad belongs to ${brand} only.`,
     `• Scene & copy: the background, props and all supporting text fit the user's product and what it is.`,
+    priceRule,
     opts.newHeadline ? `Headline, rendered exactly: "${opts.newHeadline}".` : `Write one short, punchy headline that fits the user's product.`,
     d.cta ? `Include a clear CTA button ("${d.cta}").` : '',
     brandStyle ? `Use on-brand styling where it fits: ${brandStyle}.` : '',
     logoLine,
-    `Spell every word correctly, never repeat a word, keep on-image text minimal. No gibberish, no watermarks.`,
+    `Spell every word correctly, never repeat a word, invent NO numbers or claims, keep on-image text minimal. No gibberish, no watermarks.`,
     opts.aspectRatio && opts.aspectRatio !== 'original' ? `Compose at a ${opts.aspectRatio} aspect ratio.` : `Keep the same aspect ratio as image 1.`,
     `Output one photorealistic, ready-to-publish ad image.`,
   ].filter(Boolean).join(' ')
