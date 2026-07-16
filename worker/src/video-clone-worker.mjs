@@ -1513,12 +1513,9 @@ async function generateJob(job) {
           // earlier segments already cost fal money. On that rejection, retry this segment WITHOUT the
           // anchor (product images only) — we lose a little cross-cut continuity but salvage the render
           // and the fal spend. content_policy on the PRODUCT image (no anchor) still surfaces.
-          // English → Seedance baked lip-sync; other languages → silent segments, one clean TTS dub
-          // over the full concat (Seedance can't reliably speak non-English).
-          const segAudio = (meta.language || 'en').slice(0, 2) === 'en'
           let videoUrl
           try {
-            ({ videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier, generateAudio: segAudio }))
+            ({ videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
           } catch (e) {
             const segBlocked = (x) => x.code === 'content_policy_images' || x.code === 'content_policy_video'
             if (!segBlocked(e)) throw e
@@ -1526,11 +1523,11 @@ async function generateJob(job) {
             // kill the whole long-form render on a moderation block (same contract as faithful mode).
             console.warn(`segment ${i + 1} refs blocked (likeness) — laddering down`)
             try {
-              ({ videoUrl } = await falGenerate({ prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier, generateAudio: segAudio }))
+              ({ videoUrl } = await falGenerate({ prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
             } catch (e2) {
               if (!segBlocked(e2)) throw e2
               console.warn(`segment ${i + 1} product image blocked too — pure prompt`)
-              ;({ videoUrl } = await falGenerate({ prompt, imageUrls: [], resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier, generateAudio: segAudio }))
+              ;({ videoUrl } = await falGenerate({ prompt, imageUrls: [], resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
             }
           }
           falCost += clipCost(meta.tier, 15)
@@ -1542,20 +1539,9 @@ async function generateJob(job) {
           if (anchor) segAnchors[i] = anchor
           await stamp({ clone_meta: { ...meta, segment_plan: plan, segment_clips: segClips, segment_anchors: segAnchors } })
         }
-        let cat = `${base}-cat.mp4`
+        const cat = `${base}-cat.mp4`
         tmp.push(cat)
         await concatClips(files, cat, plan.segments.map(() => 15))   // long-form segments are 15s each
-        // Non-English → the segments are silent; dub one continuous TTS voiceover over the whole concat.
-        if ((meta.language || 'en').slice(0, 2) !== 'en' && (finalScript || '').trim()) {
-          try {
-            const vo = await ttsVoiceover(capScriptToSeconds(finalScript, files.length * 15 * 1.1 + 1), `${job.id}-segvo`, meta.voice)
-            tmp.push(vo)
-            const dubbed = `${base}-dub.mp4`; tmp.push(dubbed)
-            await muxVoiceover(cat, vo, dubbed)
-            cat = dubbed
-            console.log(`🎙 ${job.id} dubbed long-form UGC in ${(meta.language || '').slice(0, 2)}`)
-          } catch (e) { console.warn(`segment dub ${job.id} (shipping silent):`, e.message) }
-        }
         const fin = await withEndCard(cat, meta, job.id, 'main', tmp)
         if (meta.end_card && meta.end_card.tx) {
           if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
@@ -1583,14 +1569,7 @@ async function generateJob(job) {
     // (likeness policy) — which is nearly every UGC ad — so on a content_policy_violation we retry
     // WITHOUT the video: Gemini's beat sheet already grounds the prompt in the ad's structure/hook,
     // and Seedance generates a fresh (non-real) creator. Product-only/no-people videos keep the motion ref.
-    // AUDIO by language: Seedance bakes convincing LIP-SYNCED speech in ENGLISH, but for other
-    // languages (Urdu/Hindi/Arabic…) its baked audio is unreliable — wrong words, English bleed, or a
-    // narration-style track. So for non-English we render the clip SILENT and dub our own clean TTS
-    // voiceover in the target language over it (the creator's mouth still moves — a localized-dub look,
-    // far better than garbled/English baked audio).
-    const cloneLang = (meta.language || 'en').slice(0, 2)
-    const nativeAudio = cloneLang === 'en'
-    const genArgs = { prompt, resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: nativeAudio }
+    const genArgs = { prompt, resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier }
     await prog('Filming your video…', 35, 150)   // the fal render is one long await — keep the bar moving
     // NEVER-FAIL LADDER (same contract as faithful mode): a moderation block on ANY reference must
     // degrade fidelity a step, not kill the render. fal moderation is borderline/non-deterministic —
@@ -1650,22 +1629,6 @@ async function generateJob(job) {
         }
       }
     } catch (e) { console.warn(`scale-verify ${job.id}:`, e.message) }
-
-    // NON-ENGLISH DUB: the clip is silent (generateAudio was false) → lay a clean TTS voiceover in the
-    // target language over it. Best-effort: if TTS/mux fails, ship the silent clip rather than nothing.
-    if (!nativeAudio && (finalScript || script || '').trim()) {
-      try {
-        await prog('Adding native voiceover…', 84, 25)
-        const vo = await ttsVoiceover(capScriptToSeconds(finalScript || script, (meta.duration || 15) * 1.15 + 1), `${job.id}-ugcvo`, meta.voice)
-        singleTmp.push(vo)
-        const dubbed = join(tmpdir(), `sc-${job.id}-dub.mp4`)
-        singleTmp.push(dubbed)
-        await muxVoiceover(singleFile, vo, dubbed)
-        await rm(singleFile, { force: true }).catch(() => {})
-        await writeFile(singleFile, await readFile(dubbed))   // keep singleFile as the delivered path
-        console.log(`🎙 ${job.id} dubbed UGC in ${cloneLang}`)
-      } catch (e) { console.warn(`ugc dub ${job.id} (shipping silent):`, e.message) }
-    }
 
     const fin = await withEndCard(singleFile, meta, job.id, 'main', singleTmp)
     if (meta.end_card && meta.end_card.tx) {
