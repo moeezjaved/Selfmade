@@ -22,6 +22,31 @@ const APP_URL = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http
 
 export const emailEnabled = !!KEY
 
+/** Credit top-up receipt — sent when a one-time credit pack purchase completes. */
+export async function sendTopupEmail(to: string, credits: number, amountUsd: number): Promise<boolean> {
+  if (!emailEnabled || !to) return false
+  const html = emailShell({
+    title: `${credits.toLocaleString()} credits added 🎉`,
+    intro: `Your payment of <b>$${amountUsd.toFixed(2)}</b> went through and <b>${credits.toLocaleString()} credits</b> are in your account now. Use them on any image or video remake — they never expire.`,
+    ctaText: 'Start remaking', ctaUrl: `${APP_URL}/discovery`,
+  })
+  return sendEmail(to, `Your ${credits.toLocaleString()} credits are ready`, html)
+}
+
+/** Subscription receipt — sent when a plan starts (checkout completes). */
+export async function sendSubscriptionEmail(to: string, planLabel: string, cycle: string, trialing: boolean): Promise<boolean> {
+  if (!emailEnabled || !to) return false
+  const cyc = cycle === 'annual' ? 'annual' : 'monthly'
+  const html = emailShell({
+    title: trialing ? `Your ${planLabel} trial is live 🚀` : `Welcome to ${planLabel} 🚀`,
+    intro: trialing
+      ? `Your <b>${planLabel}</b> plan (${cyc}) is active with a <b>7-day free trial</b> — you won't be charged until it ends, and you can cancel anytime from Billing. Your monthly credits are in your account now.`
+      : `Your <b>${planLabel}</b> plan (${cyc}) is active and your monthly credits have been added. Manage or change your plan anytime from Billing.`,
+    ctaText: 'Open Selfmade', ctaUrl: `${APP_URL}/discovery`,
+  })
+  return sendEmail(to, trialing ? `Your ${planLabel} trial is live` : `Welcome to ${planLabel}`, html)
+}
+
 /**
  * Welcome email — sent once when a new account is created (both email + Google signup). Self-contained:
  * uses only sendEmail + emailShell (no user_profiles lifecycle columns, which aren't all present on
