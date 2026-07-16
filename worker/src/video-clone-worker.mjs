@@ -274,10 +274,11 @@ function sceneCountFor(beat) {
 // is ≥5s on Seedance, so a short fast-cut ad can't demand more scenes than duration/5 (else the clone
 // would run far longer than the source); and a hard ceiling of 10 for render time + cost sanity.
 function clampScenes(count, secs) {
-  // Seedance's real minimum clip is ~4s, so a source can hold up to duration/4 scenes. Pass the REAL
-  // (ffprobe) duration, not Gemini's estimate — the estimate wobbled 13.6↔15s and flipped this cap
-  // (and the scene count/price) between re-analyses. Hard ceiling 10.
-  const durCap = Math.max(2, Math.floor((Number(secs) || 15) / 4))
+  // Scenes can be as short as the source's real cuts (~1.5s each) — Seedance renders each at its 4s
+  // minimum and the stitch trims to true length, so the cap is the source duration / ~1.5s, NOT /4
+  // (the old /4 cap collapsed an 8s fast-cut ad to 2 scenes). Pass the REAL (ffprobe) duration, not
+  // Gemini's estimate. Hard ceiling 10 for cost/render-time sanity.
+  const durCap = Math.max(2, Math.floor((Number(secs) || 15) / 1.5))
   return Math.max(2, Math.min(count, durCap, 10))
 }
 
@@ -328,11 +329,14 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
   // Seedance's 5-15s range. Net effect: total ≈ the source length, so 3 scenes = 3 SHORTER clips (a
   // faithful ~14s clone), not 3×10s = 30s. This is what makes "clone = match the source" hold for
   // whatever real scene count the source has.
+  // Durations follow the source's REAL cut lengths — fast-cut ads have 1-2s scenes and the clone
+  // keeps them. Seedance can't RENDER below ~4s, so short scenes are rendered at 4s and TRIMMED to
+  // their true length at stitch (concatClips hard-caps each clip to its planned duration).
   const srcSecs = Number(beat && beat.duration_seconds) || (picked.length * 7)
-  const evenSplit = Math.max(4, Math.min(15, Math.round(srcSecs / picked.length)))
+  const evenSplit = Math.max(1, Math.min(15, Math.round(srcSecs / picked.length)))
   return picked.map((s) => {
-    const span = (Number.isFinite(+s.src_end) && Number.isFinite(+s.src_start)) ? Math.round(+s.src_end - +s.src_start) : 0
-    const dur = span > 0 ? Math.max(4, Math.min(15, span)) : evenSplit
+    const span = (Number.isFinite(+s.src_end) && Number.isFinite(+s.src_start)) ? Math.round((+s.src_end - +s.src_start) * 10) / 10 : 0
+    const dur = span > 0 ? Math.max(1, Math.min(15, span)) : evenSplit
     return {
       prompt: String(s.prompt), script: String(s.script || ''),
       duration: dur,
@@ -1289,6 +1293,11 @@ async function generateJob(job) {
             } catch { delete clipsDone[i] /* expired url → regenerate */ }
           }
 
+          // Seedance's minimum render is ~4s: short scenes (fast-cut ads have 1-2s shots) RENDER at
+          // 4s and are TRIMMED to their true planned duration by concatClips — so the final cut keeps
+          // the source's real rhythm. fal cost is on the rendered seconds.
+          const renderDur = Math.max(4, Math.min(15, Math.ceil(Number(s.duration) || 4)))
+
           // Cut the exact beat range from the original ad as this scene's structural reference.
           let sceneRef = null
           if (job.source_video_url && s.src_start != null) {
@@ -1325,7 +1334,7 @@ async function generateJob(job) {
           if (s.has_people && s.has_product !== false) {
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, product-scene · seedance keyframe-led)`)
             try {
-              ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+              ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, resolution: meta.resolution, duration: renderDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
             } catch (e) {
               // The keyframe shows the action (for an application shot, near the head) and Nano Banana
               // sometimes leaves a face in it → fal's likeness filter rejects it. Salvage: retry with
@@ -1335,27 +1344,27 @@ async function generateJob(job) {
               if (e.code === 'content_policy_images' || e.code === 'content_policy_video') {
                 console.warn(`scene ${i + 1} keyframe blocked (likeness) — retry clean-product only`)
                 try {
-                  ;({ videoUrl } = await falGenerate({ prompt: `${s.prompt} The product is EXACTLY the attached reference — identical container, cap, colour and label, sharp and in focus.`, imageUrls: falProductImages, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+                  ;({ videoUrl } = await falGenerate({ prompt: `${s.prompt} The product is EXACTLY the attached reference — identical container, cap, colour and label, sharp and in focus.`, imageUrls: falProductImages, resolution: meta.resolution, duration: renderDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
                 } catch (e2) {
                   if (e2.code === 'content_policy_images' || e2.code === 'content_policy_video') console.warn(`scene ${i + 1} clean-product blocked too — falling to ladder`)
                   else throw e2
                 }
               } else throw e
             }
-            if (videoUrl) falCost += clipCost(meta.tier, s.duration)
+            if (videoUrl) falCost += clipCost(meta.tier, renderDur)
           }
           if (!videoUrl && s.has_people && s.has_product === false && sceneRef && process.env.CLONE_PEOPLE_RESTYLE !== '0') {
             // PEOPLE-ONLY scene (no product in frame) → pose-guided restyle (Wan VACE): copies the
             // movement skeleton + camera from the source with entirely NEW people.
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, pose-restyle)`)
-            try { videoUrl = await restyleScene({ prompt: scenePrompt, refVideoUrl: sceneRef, imageUrls: sceneImages, duration: s.duration, aspect: meta.aspect }); falCost += VACE_EST_USD_PER_RUN }
+            try { videoUrl = await restyleScene({ prompt: scenePrompt, refVideoUrl: sceneRef, imageUrls: sceneImages, duration: renderDur, aspect: meta.aspect }); falCost += VACE_EST_USD_PER_RUN }
             catch (e) { console.warn(`scene ${i + 1} restyle failed (${e.message}) — falling back to prompt-only`) }
           }
           if (!videoUrl && !s.has_people && sceneRef) {
             // PEOPLE-FREE b-roll → source segment straight into Seedance as a motion reference
             // (no faces → no likeness block); prompt-only retry if fal objects anyway.
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, motion-ref)`)
-            try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: falProductImages, videoUrl: sceneRef, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })); falCost += clipCost(meta.tier, s.duration) }
+            try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: falProductImages, videoUrl: sceneRef, resolution: meta.resolution, duration: renderDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false })); falCost += clipCost(meta.tier, renderDur) }
             catch (e) {
               // ANY content-policy block (video ref OR image — fal mislabels which) → drop the refs and
               // let the bulletproof ladder below salvage. Real errors still surface.
@@ -1368,7 +1377,7 @@ async function generateJob(job) {
             // Step down until fal accepts: keyframe/product images → product-only image → PURE PROMPT
             // (text can't be flagged for likeness). Product fidelity degrades a step at a time, but the
             // render always completes.
-            const step = async (imgs, promptForImgs) => (await falGenerate({ prompt: imgs.length ? promptForImgs : s.prompt, imageUrls: imgs, resolution: meta.resolution, duration: s.duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })).videoUrl
+            const step = async (imgs, promptForImgs) => (await falGenerate({ prompt: imgs.length ? promptForImgs : s.prompt, imageUrls: imgs, resolution: meta.resolution, duration: renderDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false })).videoUrl
             const blocked = (e) => e.code === 'content_policy_images' || e.code === 'content_policy_video'
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, prompt-only${keyframe ? '+keyframe' : ''})`)
             try { videoUrl = await step(sceneImages, scenePrompt) }
@@ -1382,7 +1391,7 @@ async function generateJob(job) {
                 videoUrl = await step([], s.prompt)
               }
             }
-            falCost += clipCost(meta.tier, s.duration)
+            falCost += clipCost(meta.tier, renderDur)
           }
           let f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
