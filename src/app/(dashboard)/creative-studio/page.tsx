@@ -123,10 +123,18 @@ function Generations() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px,100%), 1fr))', gap: 14 }}>
             {shown.map((g) => (
               <div key={g.id} style={card}>
-                <button onClick={() => g.status !== 'processing' && setOpen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: g.status === 'processing' ? 'default' : 'pointer', background: '#0d120e', aspectRatio: '1', overflow: 'hidden', position: 'relative' }}>
+                <button onClick={() => g.status !== 'processing' && g.image_url && setOpen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: g.status === 'processing' || !g.image_url ? 'default' : 'pointer', background: '#0d120e', aspectRatio: '1', overflow: 'hidden', position: 'relative' }}>
                   {g.status === 'processing' ? (
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', justifyContent: 'center', color: LIME, fontSize: 12, fontWeight: 600 }}><Loader2 size={20} className="spin" /> Generating {g.media_type === 'video' ? 'video' : 'ad'}…</div>
-                  ) : g.media_type === 'video' && g.image_url ? (
+                  ) : !g.image_url ? (
+                    // Draft / failed video jobs have no rendered file (e.g. approval never happened for
+                    // lack of credits) — show an honest state tile, never an empty black <video>.
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', justifyContent: 'center', color: '#9fb0a4', fontSize: 12, fontWeight: 600, padding: 12, textAlign: 'center' }}>
+                      {g.status === 'failed'
+                        ? <><span style={{ fontSize: 20 }}>⚠️</span> Failed — credits refunded</>
+                        : <><span style={{ fontSize: 20 }}>📝</span> Draft — not generated yet<span style={{ fontWeight: 400, fontSize: 11, color: '#6f7f73' }}>Open the ad in Discovery and hit Remake to finish it</span></>}
+                    </div>
+                  ) : g.media_type === 'video' ? (
                     <video src={g.image_url} muted loop autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
