@@ -1580,11 +1580,19 @@ async function generateJob(job) {
     // "leak"). Re-cap to the clip's real seconds at the target language's speaking rate so the speech
     // fills the clip cleanly and ends on a real sentence.
     const UGC_WPS = { en: 2.3, ur: 1.9, hi: 2.0, ar: 1.7, es: 2.5, fr: 2.4, de: 2.1 }
-    const clipSecs = Number(meta.duration) || 15
     const fitRate = UGC_WPS[(meta.language || 'en').slice(0, 2)] || 2.1
-    const fitScript = capScriptToSeconds(finalScript, clipSecs, fitRate)
-    if (fitScript !== finalScript) console.log(`✂️ ${job.id} UGC script fit to ${clipSecs}s (${finalScript.split(/\s+/).length}→${fitScript.split(/\s+/).length} words)`)
-    // Rebuild the prompt around the (clip-fitted) approved script so the spoken audio matches exactly.
+    const bucketSecs = Number(meta.duration) || 15         // the user's chosen MAX bucket (15/…)
+    const fitScript = capScriptToSeconds(finalScript, bucketSecs, fitRate)
+    // FIT THE CLIP LENGTH TO THE SPEECH — the bucket (15s) is a MAX, not a fixed length. If the source
+    // ad (and its transcreated script) is only ~8s, render an ~8-9s clip, NOT 15s: Seedance fills any
+    // leftover seconds with HALLUCINATED audio (the "voice hibernates after 8s" bug). We also never
+    // exceed the source's own length (clone = match the source). Clamped to Seedance's 5-15s range.
+    const scriptWords = (fitScript || '').trim().split(/\s+/).filter(Boolean).length
+    const speechSecs = scriptWords ? scriptWords / fitRate : bucketSecs
+    const srcSecs = Number(meta?.beat_sheet?.duration_seconds) || Number(meta.source_seconds) || bucketSecs
+    const clipSecs = Math.max(5, Math.min(bucketSecs, Math.ceil(Math.min(speechSecs + 1, srcSecs + 0.5))))
+    if (clipSecs !== bucketSecs) console.log(`⏱ ${job.id} UGC clip fit to ${clipSecs}s (speech≈${speechSecs.toFixed(1)}s, src≈${srcSecs}s, bucket=${bucketSecs}s) — no dead-air tail`)
+    // Rebuild the prompt around the (fitted) approved script so the spoken audio matches exactly.
     const { prompt, script } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, fitScript, meta.character_look, meta.language)
 
     // Trim the competitor clip to fal's ≤15s / ≤720p reference limits (raw ad videos exceed them).
@@ -1595,7 +1603,7 @@ async function generateJob(job) {
     // (likeness policy) — which is nearly every UGC ad — so on a content_policy_violation we retry
     // WITHOUT the video: Gemini's beat sheet already grounds the prompt in the ad's structure/hook,
     // and Seedance generates a fresh (non-real) creator. Product-only/no-people videos keep the motion ref.
-    const genArgs = { prompt, resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier }
+    const genArgs = { prompt, resolution: meta.resolution, duration: clipSecs, aspect: meta.aspect, tier: meta.tier }
     await prog('Filming your video…', 35, 150)   // the fal render is one long await — keep the bar moving
     // NEVER-FAIL LADDER (same contract as faithful mode): a moderation block on ANY reference must
     // degrade fidelity a step, not kill the render. fal moderation is borderline/non-deterministic —
@@ -1648,7 +1656,7 @@ async function generateJob(job) {
           if (blockedUgc(e)) { try { ({ videoUrl: fixedUrl } = await falGenerate({ ...genArgs, prompt: fixPrompt, imageUrls: [], videoUrl: null })) } catch { /* keep original */ } }
         }
         if (fixedUrl) {
-          falCostUgc += clipCost(meta.tier, meta.duration || 15)
+          falCostUgc += clipCost(meta.tier, clipSecs)
           await downloadToFile(fixedUrl, singleFile)
           const v2 = await verifyProductScale(singleFile, anchor, `${job.id}-r2`)
           console.log(`📏 ${job.id} scale after auto-fix: ${v2} (shipping this cut)`)
@@ -1664,7 +1672,7 @@ async function generateJob(job) {
     const ovFin = await burnOverlays(fin.file, meta.overlays, job.id); const url = await uploadVideo(ovFin, `creatives/${job.user_id}/${job.id}.mp4`)
     for (const f of singleTmp) await rm(f, { force: true }).catch(() => {})
 
-    const falCost = clipCost(meta.tier, meta.duration || 10) + falCostUgc
+    const falCost = clipCost(meta.tier, clipSecs) + falCostUgc
     await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, seedance_prompt: prompt, script, fal_request_id: requestId, fal_cost_est: +falCost.toFixed(2) } })
     if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { fal_request_id: requestId, actual_cost_usd: +falCost.toFixed(2) } })
     console.log(`🎬 cloned ${job.id} → ${url}`)
