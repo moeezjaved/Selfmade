@@ -1154,7 +1154,11 @@ async function generateJob(job) {
         if (cleanProduct) { console.log(`🧴 ${job.id} clean product ref composed`); await stamp({ clone_meta: { ...meta, clean_product: cleanProduct } }); meta.clean_product = cleanProduct }
       } catch (e) { console.warn(`clean-product ${job.id}:`, e.message) }
     }
-    const falProductImages = cleanProduct ? [cleanProduct] : productImages
+    // ONE product ref, always (2026-07-16, Moeez's field observation): each extra reference image adds
+    // "visual weight" and Seedance inflates the product's size in frame — one image renders the product
+    // at true scale, several render it oversized. So the video generator gets exactly ONE product ref:
+    // the clean re-shoot when we have it, else the user's FIRST selected photo.
+    const falProductImages = (cleanProduct ? [cleanProduct] : productImages).slice(0, 1)
 
     // ── FAITHFUL mode: clone the source's edit structure scene-by-scene, then stitch. Each scene is
     // its own Seedance clip with a scene-appropriate prompt (b-roll/lifestyle/product allowed — no
@@ -1497,7 +1501,7 @@ async function generateJob(job) {
     const rungs = [
       { imageUrls: falProductImages, videoUrl: refVideo || null, tag: 'clean+motion' },
       { imageUrls: falProductImages, videoUrl: null, tag: 'clean product' },
-      { imageUrls: productImages.slice(0, 4), videoUrl: null, tag: 'original photo' },
+      { imageUrls: productImages.slice(0, 1), videoUrl: null, tag: 'original photo' },
       { imageUrls: [], videoUrl: null, tag: 'pure prompt' },
     ].filter((r, i) => i === 0 || r.imageUrls.length || i === 3)   // skip empty-image middle rungs
     let videoUrl, requestId
@@ -1548,6 +1552,7 @@ async function generateJob(job) {
 // (image_url untouched until the new cut uploads) and the tweak tx refunds. ──
 const CHIP_FIX = {
   redo:    '',
+  size:    ' CRITICAL FIX: the product is rendered at the WRONG SIZE. Show it at its TRUE real-world scale relative to the hand and face — a small handheld item stays small between the fingers. Get it readable by bringing the CAMERA closer, never by enlarging the product. An oversized, out-of-proportion product looks fake.',
   product: ' CRITICAL FIX: the product must EXACTLY match the attached reference — identical container, cap and label, sharp and readable — at its TRUE real-world size and proportion relative to the hand; never enlarged, stretched or out of proportion.',
   action:  ' CRITICAL FIX: the person must ACTIVELY and visibly USE/apply the product on camera — real continuous motion (applying, rolling, spraying, demonstrating), never merely holding it still.',
   person:  ' CRITICAL FIX: recast the on-camera person — natural, realistic, matching the reference creator description (gender, age range, hair, wardrobe); no uncanny or distorted features.',
@@ -1567,15 +1572,62 @@ async function tweakJob(job) {
     await stamp({ status: 'done', clone_meta: { ...rest, tweak_error: String(why).slice(0, 200) } })
   }
   try {
-    const scenes = Array.isArray(meta.scene_plan) ? [...meta.scene_plan] : []
-    const clips = { ...(meta.scene_clips || {}) }
-    if (!scenes.length || !Object.keys(clips).length) return bail('no cached scenes to tweak (older render)')
     const base = join(tmpdir(), `tw-${job.id}`)
     const tmp = []
     let falCost = 0
 
     // Product refs for a scene redo (clean product first — always person-free/safe).
-    const productImages = [meta.clean_product, ...(Array.isArray(meta.product_image_urls) ? meta.product_image_urls : [])].filter(Boolean).slice(0, 4)
+    // ONE ref only — same true-scale rule as the main render (extra refs inflate the product's size).
+    const productImages = [meta.clean_product, ...(Array.isArray(meta.product_image_urls) ? meta.product_image_urls : [])].filter(Boolean).slice(0, 1)
+
+    // ── UGC single-clip fix: re-roll the WHOLE clip with a chip-targeted corrective prompt and a
+    // single product ref (fal moderation is a fresh dice-roll each time, so re-sending the image
+    // usually locks the real product back in). Same never-fail ladder, then end-card/overlays. ──
+    if (t.type === 'redo_ugc') {
+      const fix = CHIP_FIX[t.chip] ?? ''
+      await prog('Re-rolling your video…', 15, 150)
+      console.log(`🔧 ${job.id} tweak: redo UGC clip (chip=${t.chip || 'redo'})`)
+      const { prompt } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, 1, meta.final_script || meta.script || null, meta.character_look, meta.language)
+      const fullPrompt = `${prompt}${fix}`
+      const rawFirst = (Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []).slice(0, 1)
+      const rungs = [
+        { imageUrls: productImages, tag: 'clean product' },
+        ...(rawFirst.length && rawFirst[0] !== productImages[0] ? [{ imageUrls: rawFirst, tag: 'original photo' }] : []),
+        { imageUrls: [], tag: 'pure prompt' },
+      ]
+      const blocked = (e) => e.code === 'content_policy_images' || e.code === 'content_policy_video'
+      let videoUrl = null
+      for (let ri = 0; ri < rungs.length; ri++) {
+        try {
+          ({ videoUrl } = await falGenerate({ prompt: fullPrompt, imageUrls: rungs[ri].imageUrls, resolution: meta.resolution, duration: meta.duration || 15, aspect: meta.aspect, tier: meta.tier }))
+          if (ri > 0) console.warn(`tweak ugc ${job.id}: landed on rung "${rungs[ri].tag}"`)
+          break
+        } catch (e) {
+          if (!blocked(e) || ri === rungs.length - 1) throw e
+          console.warn(`tweak ugc ${job.id}: "${rungs[ri].tag}" blocked — laddering down`)
+        }
+      }
+      falCost += clipCost(meta.tier, meta.duration || 15)
+      const f = `${base}-ugc.mp4`
+      tmp.push(f)
+      await downloadToFile(videoUrl, f)
+      await prog('Finishing up…', 85, 20)
+      const fin = await withEndCard(f, meta, job.id, 'tweak', tmp)
+      const burned = await burnOverlays(fin.file, meta.overlays, job.id)
+      tmp.push(burned)
+      const ver = Math.random().toString(36).slice(2, 8)
+      const url = await uploadVideo(burned, `creatives/${job.user_id}/${job.id}-t${ver}.mp4`)
+      const { tweak, progress, ...rest } = meta
+      await stamp({ status: 'done', image_url: url, clone_meta: { ...rest, last_tweak: { type: t.type, chip: t.chip ?? null } } })
+      if (t.tx) await rpc('commit_credits', { p_tx: t.tx, p_metadata: { tweak: t.type, chip: t.chip ?? null, actual_cost_usd: +falCost.toFixed(2) } })
+      for (const x of tmp) await rm(x, { force: true }).catch(() => {})
+      console.log(`🔧 tweaked (redo_ugc) ${job.id} → ${url} ($${falCost.toFixed(2)})`)
+      return
+    }
+
+    const scenes = Array.isArray(meta.scene_plan) ? [...meta.scene_plan] : []
+    const clips = { ...(meta.scene_clips || {}) }
+    if (!scenes.length || !Object.keys(clips).length) return bail('no cached scenes to tweak (older render)')
 
     // 1) Apply the requested change to the scene/clip lists.
     let keep = scenes.map((_, i) => i)
