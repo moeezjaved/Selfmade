@@ -45,6 +45,7 @@ export default function BrandsPage() {
       // Auto-detect product photos from the store URL (Shopify /products.json + og/JSON-LD fallback),
       // so the brand is immediately usable in Remake with REAL product images — no manual URL pasting.
       let detected: string[] = []
+      let detectedName = ''
       if (form.website?.trim()) {
         setMsg({ ok: true, text: 'Detecting products from your site…' })
         try {
@@ -53,11 +54,12 @@ export default function BrandsPage() {
             body: JSON.stringify({ url: form.website.trim() }),
           }).then((x) => x.json())
           detected = Array.isArray(dr?.productImages) ? dr.productImages.slice(0, 12) : []
+          detectedName = (dr?.productTitle || '').trim()
         } catch { /* detection is best-effort — brand still saves without it */ }
       }
       const r = await fetch('/api/brands', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...form, industry: csv(form.industry), usps: csv(form.usps), product_images: detected }),
+        body: JSON.stringify({ ...form, industry: csv(form.industry), usps: csv(form.usps), product_images: detected, product_name: detectedName || undefined }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) {

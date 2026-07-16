@@ -53,21 +53,36 @@ export async function POST(req: NextRequest) {
   Array.from(html.matchAll(/srcset=["']([^"']+)["']/gi)).forEach((m) => push(m[1].split(',')[0].trim().split(' ')[0])) // first srcset
   Array.from(html.matchAll(/(https?:)?\/\/cdn\.shopify\.com\/[^\s"'<>)]+\.(?:jpg|jpeg|png|webp)/gi)).forEach((m) => push(m[0])) // shopify CDN
 
-  // Shopify /products.json → EVERY product's images (the big win + the ACCURATE product shots).
+  // Shopify products → accurate product shots. If the URL is a SPECIFIC product page
+  // (/products/<handle>), fetch just THAT product (exactly what the user pointed at); otherwise pull
+  // the whole store's products.json.
   let shopify = false
+  let productTitle: string | null = null
   const productImgs = new Set<string>()          // accurate product photos only (not homepage junk)
   const pushProd = (u?: string | null) => { const a = u && abs(u, url); if (a && !JUNK.test(a)) { const c = a.split('?')[0]; productImgs.add(c); imgs.add(c) } }
-  try {
-    const pr = await fetch(`${origin}/products.json?limit=100`, { headers: UA })
-    if (pr.ok) {
-      const j = await pr.json().catch(() => null) as any
-      const products = j?.products || []
-      if (Array.isArray(products) && products.length) {
-        shopify = true
-        for (const p of products) for (const im of (p.images || [])) pushProd(im?.src)
+  const handle = (url.match(/\/products\/([^/?#]+)/i)?.[1] || '').trim()
+  if (handle) {
+    try {
+      const pr = await fetch(`${origin}/products/${handle}.json`, { headers: UA })
+      if (pr.ok) {
+        const p = ((await pr.json().catch(() => null)) as any)?.product
+        if (p) { shopify = true; productTitle = p.title || null; for (const im of (p.images || [])) pushProd(im?.src) }
       }
-    }
-  } catch { /* not shopify or blocked — fine */ }
+    } catch { /* fall through to store-wide */ }
+  }
+  // Store-wide fallback (or a non-product URL): every product's images.
+  if (!productImgs.size) {
+    try {
+      const pr = await fetch(`${origin}/products.json?limit=100`, { headers: UA })
+      if (pr.ok) {
+        const products = ((await pr.json().catch(() => null)) as any)?.products || []
+        if (Array.isArray(products) && products.length) {
+          shopify = true
+          for (const p of products) for (const im of (p.images || [])) pushProd(im?.src)
+        }
+      }
+    } catch { /* not shopify or blocked — fine */ }
+  }
 
   const productImages = Array.from(productImgs).slice(0, 24)   // real products (Shopify)
   const images = Array.from(imgs).slice(0, 24)                 // everything (fallback)
@@ -144,7 +159,7 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    brandName, images, productImages, colors: colorList, fonts, logo, palette, shopify,
+    brandName, productTitle, images, productImages, colors: colorList, fonts, logo, palette, shopify,
     brandKit: { colors: colorList, fonts, logo, palette },
     source: url,
   })
