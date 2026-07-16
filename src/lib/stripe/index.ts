@@ -117,6 +117,13 @@ export async function handleStripeWebhook(payload: string, signature: string) {
   const { createAdminClient } = await import('@/lib/supabase/server')
   const supabase = createAdminClient()
 
+  // Resolve a user's email for receipts — prefer what Stripe collected, else the auth record.
+  const emailFor = async (ownerId?: string | null, fromSession?: string | null): Promise<string | null> => {
+    if (fromSession) return fromSession
+    if (!ownerId) return null
+    try { const { data } = await supabase.auth.admin.getUserById(ownerId); return (data as any)?.user?.email || null } catch { return null }
+  }
+
   // During the free trial we grant only a small credit allowance (not the full plan pool) so a
   // user can't sign up, burn thousands of credits of compute, and cancel before the first charge.
   // The cap is written to subscriptions.monthly_credits_override, which apply_plan reads; it's
@@ -134,6 +141,11 @@ export async function handleStripeWebhook(payload: string, signature: string) {
         const amount = parseFloat(session.metadata.amount_usd || '0')
         if (credits > 0) {
           await supabase.rpc('grant_topup_pack', { p_user: ownerId, p_credits: credits, p_amount: amount, p_stripe: session.payment_intent as string })
+          try {
+            const { sendTopupEmail } = await import('@/lib/email')
+            const to = await emailFor(ownerId, session.customer_details?.email)
+            if (to) await sendTopupEmail(to, credits, amount)
+          } catch { /* receipt is best-effort, never fail the webhook */ }
         }
         break
       }
@@ -177,6 +189,15 @@ export async function handleStripeWebhook(payload: string, signature: string) {
 
       // Flip the plan + refill plan credits to the new allotment immediately (spec §5).
       if (plan) await supabase.rpc('apply_plan', { p_user: userId, p_plan: plan, p_reset: periodEnd })
+
+      // Subscription receipt (best-effort).
+      try {
+        const { sendSubscriptionEmail } = await import('@/lib/email')
+        const { PLANS } = await import('@/lib/plans')
+        const to = await emailFor(userId, session.customer_details?.email)
+        const label = (plan && (PLANS as any)[plan]?.label) || (plan ? plan[0].toUpperCase() + plan.slice(1) : 'your plan')
+        if (to) await sendSubscriptionEmail(to, label, cycle, startingTrial)
+      } catch { /* receipt is best-effort */ }
       break
     }
 
