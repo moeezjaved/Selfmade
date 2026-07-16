@@ -26,27 +26,39 @@ export async function POST(req: NextRequest) {
   const priceId = process.env[`STRIPE_PRICE_${planId.toUpperCase()}_${billingCycle.toUpperCase()}`]
   if (!priceId) return NextResponse.json({ error: 'not_configured', message: `Set STRIPE_PRICE_${planId.toUpperCase()}_${billingCycle.toUpperCase()} in env.` }, { status: 503 })
 
-  const { stripe } = await import('@/lib/stripe')
-  const admin = createAdminClient()
+  try {
+    const { stripe } = await import('@/lib/stripe')
+    const admin = createAdminClient()
 
-  // Reuse or create the Stripe customer.
-  const { data: sub } = await admin.from('subscriptions').select('stripe_customer_id').eq('owner_id', user.id).maybeSingle()
-  let customerId = (sub as any)?.stripe_customer_id as string | undefined
-  if (!customerId) {
-    const c = await stripe.customers.create({ email: user.email || undefined, metadata: { owner_id: user.id } })
-    customerId = c.id
-    await admin.from('subscriptions').upsert({ owner_id: user.id, stripe_customer_id: customerId }, { onConflict: 'owner_id' })
+    // Reuse or create the Stripe customer. A STALE customer id (e.g. a test-mode customer saved while
+    // a LIVE key is now in use) makes checkout throw "No such customer" → recreate it in that case.
+    const { data: sub } = await admin.from('subscriptions').select('stripe_customer_id').eq('owner_id', user.id).maybeSingle()
+    let customerId = (sub as any)?.stripe_customer_id as string | undefined
+    if (customerId) {
+      try { const ex = await stripe.customers.retrieve(customerId); if ((ex as any)?.deleted) customerId = undefined } catch { customerId = undefined }
+    }
+    if (!customerId) {
+      const c = await stripe.customers.create({ email: user.email || undefined, metadata: { owner_id: user.id } })
+      customerId = c.id
+      await admin.from('subscriptions').upsert({ owner_id: user.id, stripe_customer_id: customerId }, { onConflict: 'owner_id' })
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      subscription_data: { trial_period_days: 7, metadata: { owner_id: user.id, plan: planId, cycle: billingCycle } },
+      metadata: { owner_id: user.id, plan: planId, cycle: billingCycle },
+      success_url: `${APP_URL}/pricing?upgraded=1`,
+      cancel_url: `${APP_URL}/pricing`,
+      allow_promotion_codes: true,
+    })
+    return NextResponse.json({ url: session.url })
+  } catch (e: any) {
+    // Surface Stripe's real reason (bad price id, test/live key mismatch, …) as JSON instead of a
+    // bare 500 — the client was getting "Unexpected end of JSON input" from an empty error body.
+    const msg = e?.raw?.message || e?.message || 'checkout_failed'
+    console.error('billing/checkout error:', e?.type, e?.code, msg, `price=${priceId}`)
+    return NextResponse.json({ error: 'checkout_failed', message: msg, code: e?.code || null }, { status: 400 })
   }
-
-  const session = await stripe.checkout.sessions.create({
-    mode: 'subscription',
-    customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
-    subscription_data: { trial_period_days: 7, metadata: { owner_id: user.id, plan: planId, cycle: billingCycle } },
-    metadata: { owner_id: user.id, plan: planId, cycle: billingCycle },
-    success_url: `${APP_URL}/pricing?upgraded=1`,
-    cancel_url: `${APP_URL}/pricing`,
-    allow_promotion_codes: true,
-  })
-  return NextResponse.json({ url: session.url })
 }
