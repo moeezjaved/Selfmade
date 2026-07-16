@@ -127,7 +127,74 @@ async function describeProduct(imageUrl) {
 }
 function productTruthRule(product) {
   const seen = product && product.observed ? `The product's ACTUAL appearance (described from its real photos): ${product.observed}. ` : ''
-  return `- PRODUCT TRUTH — ${seen}The script and visuals must describe THE USER'S product truthfully: its real form factor, type and packaging. NEVER inherit the reference ad's product form, flavor or claims (e.g. reference sells gummies but the user's product is capsules → say and show capsules). When unsure, describe only what the product photos show.`
+  // Vision-measured size anchor (productSizeProfile) — grounded in the real photos, not a language
+  // model's guess. The prompt writers are told to use THIS anchor verbatim in their opening scale
+  // sentence, which is what actually keeps video models from inflating the product.
+  const size = product && product.size_anchor
+    ? `SIZE ANCHOR (measured from the real photos — use VERBATIM in the opening scale sentence): the product is ${product.size_anchor}${product.hand_relation ? `; in a hand it ${product.hand_relation}` : ''}. `
+    : ''
+  return `- PRODUCT TRUTH — ${seen}${size}The script and visuals must describe THE USER'S product truthfully: its real form factor, type and packaging. NEVER inherit the reference ad's product form, flavor or claims (e.g. reference sells gummies but the user's product is capsules → say and show capsules). When unsure, describe only what the product photos show.`
+}
+
+// ── Vision-grounded SIZE PROFILE: Gemini/gpt-4o LOOKS at the real product photos and outputs a
+// concrete real-world size anchor ("a slim pen-sized device, ~12cm" / "fits between two fingers").
+// This replaces the prompt-writer GUESSING the size from text — the anchor is measured from pixels
+// (packaging cues, caps, labels, held-in-hand shots all calibrate it). ~1¢, cached on the job. ──
+async function productSizeProfile(imageUrls) {
+  const imgs = (imageUrls || []).filter(Boolean).slice(0, 3)
+  if (!imgs.length || !OPENAI_KEY) return null
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o', max_tokens: 160, temperature: 0.1, response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: [
+        { type: 'text', text: 'Estimate this product\'s REAL-WORLD physical size from the photos (use packaging conventions, caps, labels, any hands or objects for calibration). Return ONLY JSON: {"anchor":"<size comparison to ONE concrete everyday object, e.g. \'a slim marker-pen-sized device, roughly 12 cm tall\' or \'a palm-sized jar\'>","hand_relation":"<how it sits in an adult hand, e.g. \'fits between two fingers\' or \'fills the palm\'>","approx_cm":<number, longest dimension>}' },
+        ...imgs.map((u) => ({ type: 'image_url', image_url: { url: u } })),
+      ] }],
+    }),
+  })
+  if (!r.ok) throw new Error(`size vision ${r.status}`)
+  const j = await r.json()
+  try {
+    const p = JSON.parse(j.choices?.[0]?.message?.content || '{}')
+    if (!p.anchor) return null
+    return { anchor: String(p.anchor).slice(0, 140), hand_relation: String(p.hand_relation || '').slice(0, 100), approx_cm: Number(p.approx_cm) || null }
+  } catch { return null }
+}
+
+// ── AUTO SIZE-VERIFIER: after a UGC render, LOOK at frames of the finished video and judge whether
+// the product's size relative to the hand/face is realistic. Same verify-and-retry pattern that
+// fixed image clones ("new failure → new verifier check, never a new prompt paragraph"). ~1¢. ──
+async function verifyProductScale(localFile, sizeAnchor, id) {
+  if (!OPENAI_KEY) return 'unknown'
+  const frames = []
+  try {
+    const dur = (await probeDuration(localFile)) || 15
+    for (const pct of [0.35, 0.7]) {
+      const f = join(tmpdir(), `sv-${id}-${Math.round(pct * 100)}.jpg`)
+      await ff(['-y', '-ss', String(Math.max(0.5, dur * pct)), '-i', localFile, '-frames:v', '1', '-q:v', '5', '-vf', 'scale=512:-1', f])
+      const b = await readFile(f)
+      frames.push(`data:image/jpeg;base64,${b.toString('base64')}`)
+      await rm(f, { force: true }).catch(() => {})
+    }
+  } catch (e) { console.warn(`scale-verify frames ${id}:`, e.message); return 'unknown' }
+  if (!frames.length) return 'unknown'
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', max_tokens: 60, temperature: 0, response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: `These are frames from a UGC ad where a person holds a product${sizeAnchor ? ` (its true size: ${sizeAnchor})` : ''}. Judge ONLY the product's size relative to the person's hand/face: is it rendered at a realistic real-world scale, or unnaturally OVERSIZED (inflated, out of proportion)? Return ONLY JSON: {"verdict":"oversized"|"correct"|"unclear"}` },
+          ...frames.map((u) => ({ type: 'image_url', image_url: { url: u } })),
+        ] }],
+      }),
+    })
+    if (!r.ok) return 'unknown'
+    const j = await r.json()
+    const v = JSON.parse(j.choices?.[0]?.message?.content || '{}').verdict
+    return v === 'oversized' || v === 'correct' ? v : 'unknown'
+  } catch { return 'unknown' }
 }
 
 // ── Creator-look override: the user can recast the on-camera creator(s) to a chosen ethnicity/look
@@ -1057,6 +1124,14 @@ async function analyzeJob(job) {
       try { const obs = await describeProduct(productImages[0]); if (obs) productDetails = { ...productDetails, observed: obs } }
       catch (e) { console.warn('describeProduct:', e.message) }
     }
+    // Vision-measured SIZE ANCHOR (all selected photos — box + product both calibrate it). Grounds the
+    // prompts' true-scale sentence in the real photos instead of a text guess. Cached on the job.
+    if (!productDetails.size_anchor && productImages.length) {
+      try {
+        const sp = await productSizeProfile(productImages)
+        if (sp) { productDetails = { ...productDetails, size_anchor: sp.anchor, hand_relation: sp.hand_relation, approx_cm: sp.approx_cm }; console.log(`📏 ${job.id} size anchor: ${sp.anchor}`) }
+      } catch (e) { console.warn('sizeProfile:', e.message) }
+    }
     // WHISPER — accurate source transcript + the ad's REAL speaking rate (words/sec), so the script is
     // calibrated to the actual talker's pace instead of a fixed guess. Cheap (~0.15¢ for a 15s clip).
     // Only apply the source rate when the CLONE language matches the source language — word density
@@ -1158,11 +1233,12 @@ async function generateJob(job) {
         if (cleanProduct) { console.log(`🧴 ${job.id} clean product ref composed`); await stamp({ clone_meta: { ...meta, clean_product: cleanProduct } }); meta.clean_product = cleanProduct }
       } catch (e) { console.warn(`clean-product ${job.id}:`, e.message) }
     }
-    // ONE product ref, always (2026-07-16, Moeez's field observation): each extra reference image adds
-    // "visual weight" and Seedance inflates the product's size in frame — one image renders the product
-    // at true scale, several render it oversized. So the video generator gets exactly ONE product ref:
-    // the clean re-shoot when we have it, else the user's FIRST selected photo.
-    const falProductImages = (cleanProduct ? [cleanProduct] : productImages).slice(0, 1)
+    // PRODUCT REFS (2026-07-16): extra reference images add "visual weight" and Seedance inflates the
+    // product's size — so refs are capped at TWO: the clean re-shoot (or first photo) + the user's
+    // second selected photo when they picked one (box + product together looked great on HAIRRESQ).
+    // The size guardrails (vision-measured anchor in every prompt + the post-render scale verifier
+    // with auto re-roll) are what make the second ref safe to allow.
+    const falProductImages = [cleanProduct || productImages[0], productImages[1]].filter(Boolean).slice(0, 2)
 
     // ── FAITHFUL mode: clone the source's edit structure scene-by-scene, then stitch. Each scene is
     // its own Seedance clip with a scene-appropriate prompt (b-roll/lifestyle/product allowed — no
@@ -1524,6 +1600,34 @@ async function generateJob(job) {
     const singleFile = join(tmpdir(), `sc-${job.id}.mp4`)
     singleTmp.push(singleFile)
     await downloadToFile(videoUrl, singleFile)
+
+    let falCostUgc = 0   // extra fal spend from the auto size-fix re-roll (ours to absorb)
+    // ── AUTO SIZE-VERIFIER (verify-and-retry, the pattern that fixed image clones): LOOK at the
+    // finished render; if the product is judged OVERSIZED vs its measured anchor, re-roll ONCE with
+    // a hard corrective prompt — the user never receives the inflated version. Bounded to one retry;
+    // the second roll ships regardless (never-fail). Check ~1¢; retry only costs on actual failures. ──
+    try {
+      const anchor = (meta.product_details && meta.product_details.size_anchor) || null
+      const verdict = await verifyProductScale(singleFile, anchor, job.id)
+      console.log(`📏 ${job.id} scale verdict: ${verdict}`)
+      if (verdict === 'oversized') {
+        await prog('Product size looked off — auto-fixing…', 80, 120)
+        const fixPrompt = `${prompt}${CHIP_FIX.size}${anchor ? ` The product's true size: ${anchor}.` : ''}`
+        let fixedUrl = null
+        try {
+          ({ videoUrl: fixedUrl } = await falGenerate({ ...genArgs, prompt: fixPrompt, videoUrl: null }))
+        } catch (e) {
+          if (blockedUgc(e)) { try { ({ videoUrl: fixedUrl } = await falGenerate({ ...genArgs, prompt: fixPrompt, imageUrls: [], videoUrl: null })) } catch { /* keep original */ } }
+        }
+        if (fixedUrl) {
+          falCostUgc += clipCost(meta.tier, meta.duration || 15)
+          await downloadToFile(fixedUrl, singleFile)
+          const v2 = await verifyProductScale(singleFile, anchor, `${job.id}-r2`)
+          console.log(`📏 ${job.id} scale after auto-fix: ${v2} (shipping this cut)`)
+        }
+      }
+    } catch (e) { console.warn(`scale-verify ${job.id}:`, e.message) }
+
     const fin = await withEndCard(singleFile, meta, job.id, 'main', singleTmp)
     if (meta.end_card && meta.end_card.tx) {
       if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
@@ -1532,7 +1636,7 @@ async function generateJob(job) {
     const ovFin = await burnOverlays(fin.file, meta.overlays, job.id); const url = await uploadVideo(ovFin, `creatives/${job.user_id}/${job.id}.mp4`)
     for (const f of singleTmp) await rm(f, { force: true }).catch(() => {})
 
-    const falCost = clipCost(meta.tier, meta.duration || 10)
+    const falCost = clipCost(meta.tier, meta.duration || 10) + falCostUgc
     await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, seedance_prompt: prompt, script, fal_request_id: requestId, fal_cost_est: +falCost.toFixed(2) } })
     if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { fal_request_id: requestId, actual_cost_usd: +falCost.toFixed(2) } })
     console.log(`🎬 cloned ${job.id} → ${url}`)
