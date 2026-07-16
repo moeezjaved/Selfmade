@@ -368,9 +368,9 @@ function AiPanel({ ad }: { ad: Ad }) {
       ) : (
         <>
           <button style={ctaS} onClick={() => setCloneOpen(true)}>
-            <Sparkles size={16} /> Remake ad · from {cost('image_clone', 5)} cr
+            <Sparkles size={16} /> Remake ad · from {cost('image_clone_pro', 15)} cr
           </button>
-          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Composite your product onto this winning ad — Standard or Pro.</div>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Composite your product onto this winning ad — 2K or 4K.</div>
           {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName }} onClose={() => setCloneOpen(false)} />}
         </>
       )}
