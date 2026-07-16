@@ -1570,6 +1570,7 @@ async function generateJob(job) {
     // WITHOUT the video: Gemini's beat sheet already grounds the prompt in the ad's structure/hook,
     // and Seedance generates a fresh (non-real) creator. Product-only/no-people videos keep the motion ref.
     const genArgs = { prompt, resolution: meta.resolution, duration: meta.duration, aspect: meta.aspect, tier: meta.tier }
+    await prog('Filming your video…', 35, 150)   // the fal render is one long await — keep the bar moving
     // NEVER-FAIL LADDER (same contract as faithful mode): a moderation block on ANY reference must
     // degrade fidelity a step, not kill the render. fal moderation is borderline/non-deterministic —
     // the same product photo can pass one render and fail the next, and some product CATEGORIES
@@ -1600,6 +1601,7 @@ async function generateJob(job) {
     const singleFile = join(tmpdir(), `sc-${job.id}.mp4`)
     singleTmp.push(singleFile)
     await downloadToFile(videoUrl, singleFile)
+    await prog('Checking product size…', 78, 30)
 
     let falCostUgc = 0   // extra fal spend from the auto size-fix re-roll (ours to absorb)
     // ── AUTO SIZE-VERIFIER (verify-and-retry, the pattern that fixed image clones): LOOK at the
