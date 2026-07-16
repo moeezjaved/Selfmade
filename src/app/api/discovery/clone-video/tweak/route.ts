@@ -12,9 +12,10 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-const CHIPS = new Set(['redo', 'product', 'action', 'person', 'closeup'])
+const CHIPS = new Set(['redo', 'size', 'product', 'action', 'person', 'closeup'])
 const ACTIONS: Record<string, string | null> = {
   redo_scene: 'video_tweak_scene',
+  redo_ugc: 'video_tweak_ugc',    // re-roll the single UGC clip with a corrective prompt
   redo_vo: 'video_tweak_vo',
   remove_scene: null,   // ffmpeg-only → free
   trim: null,           // ffmpeg-only → free
@@ -49,6 +50,9 @@ export async function POST(req: NextRequest) {
     if (!(Number.isInteger(idx) && idx >= 0 && idx < scenes.length)) return NextResponse.json({ error: 'bad scene index' }, { status: 400 })
     if (type === 'remove_scene' && scenes.length < 3) return NextResponse.json({ error: 'keep at least 2 scenes' }, { status: 400 })
   }
+  // UGC clip re-roll: single-clip UGC renders only (multi-segment 30/60s would need a full re-render).
+  if (type === 'redo_ugc' && (meta.mode === 'faithful' || Number(meta.segments) > 1))
+    return NextResponse.json({ error: 'this fix applies to single-clip UGC videos' }, { status: 409 })
 
   // Reserve credits for paid tweaks (free ops skip billing entirely).
   let txId: string | null = null
@@ -65,7 +69,7 @@ export async function POST(req: NextRequest) {
   const tweak: Record<string, unknown> = {
     type,
     ...(type === 'redo_scene' || type === 'remove_scene' ? { scene: idx } : {}),
-    ...(type === 'redo_scene' ? { chip: CHIPS.has(String(chip)) ? String(chip) : 'redo' } : {}),
+    ...(type === 'redo_scene' || type === 'redo_ugc' ? { chip: CHIPS.has(String(chip)) ? String(chip) : 'redo' } : {}),
     ...(type === 'redo_vo' && typeof script === 'string' && script.trim() ? { script: script.trim().slice(0, 2000) } : {}),
     ...(txId ? { tx: txId } : {}),
   }

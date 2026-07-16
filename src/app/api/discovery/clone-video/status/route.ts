@@ -42,6 +42,8 @@ export async function GET(req: NextRequest) {
       && Array.isArray(meta.scene_plan) && meta.scene_plan.length > 0
       && !!meta.scene_clips && Object.keys(meta.scene_clips).length > 0,
     tweakScenes: Array.isArray(meta.scene_plan) ? meta.scene_plan.map((s: any) => ({ duration: s.duration, hasPeople: !!s.has_people })) : [],
+    // Single-clip UGC renders get whole-clip fix chips (re-roll with a corrective prompt).
+    ugcTweakable: (row as any).status === 'done' && meta.mode !== 'faithful' && Number(meta.segments || 1) === 1,
     tweaking: !!meta.tweak,
     tweakError: meta.tweak_error || null,
     finalScript: meta.final_script || meta.script || null,
