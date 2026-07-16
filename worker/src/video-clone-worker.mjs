@@ -745,8 +745,15 @@ function capScriptToSeconds(text, seconds, wps = 2.8) {
   const words = t.split(/\s+/)
   if (words.length <= maxWords) return t
   let clip = words.slice(0, maxWords).join(' ')
-  const lastStop = Math.max(clip.lastIndexOf('.'), clip.lastIndexOf('!'), clip.lastIndexOf('?'), clip.lastIndexOf('।'))
-  if (lastStop > clip.length * 0.5) clip = clip.slice(0, lastStop + 1)
+  // Sentence terminators across scripts — Latin (. ! ?), Devanagari danda (।), Urdu/Arabic full stop
+  // (۔) + question mark (؟), and ellipsis. Without the Urdu stop, an Urdu script got sliced MID-
+  // sentence, and Seedance "completed" the dangling clause in the tail with hallucinated/foreign
+  // audio (the language-leak at the end). Cutting on a real sentence end kills that.
+  const lastStop = Math.max(
+    clip.lastIndexOf('.'), clip.lastIndexOf('!'), clip.lastIndexOf('?'),
+    clip.lastIndexOf('।'), clip.lastIndexOf('۔'), clip.lastIndexOf('؟'), clip.lastIndexOf('…'),
+  )
+  if (lastStop > clip.length * 0.4) clip = clip.slice(0, lastStop + 1)
   return clip.trim()
 }
 async function ensureAudio(file) {
@@ -1557,9 +1564,19 @@ async function generateJob(job) {
       return
     }
 
-    // ── UGC mode (default): one talking-head clip, unchanged behavior. ──
-    // Rebuild the prompt around the approved (possibly edited) script so the voiceover matches exactly.
-    const { prompt, script } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, finalScript, meta.character_look, meta.language)
+    // ── UGC mode (default): one talking-head clip. ──
+    // FIT THE SCRIPT TO THE CLIP LENGTH. The draft was capped to the SOURCE ad's talk-time (e.g. a
+    // 41s Telugu ad), but the user may pick a SHORTER clip (15s). A too-long script crammed into a
+    // short clip makes Seedance rush, garble, and hallucinate a foreign-sounding tail (the audio
+    // "leak"). Re-cap to the clip's real seconds at the target language's speaking rate so the speech
+    // fills the clip cleanly and ends on a real sentence.
+    const UGC_WPS = { en: 2.3, ur: 1.9, hi: 2.0, ar: 1.7, es: 2.5, fr: 2.4, de: 2.1 }
+    const clipSecs = Number(meta.duration) || 15
+    const fitRate = UGC_WPS[(meta.language || 'en').slice(0, 2)] || 2.1
+    const fitScript = capScriptToSeconds(finalScript, clipSecs, fitRate)
+    if (fitScript !== finalScript) console.log(`✂️ ${job.id} UGC script fit to ${clipSecs}s (${finalScript.split(/\s+/).length}→${fitScript.split(/\s+/).length} words)`)
+    // Rebuild the prompt around the (clip-fitted) approved script so the spoken audio matches exactly.
+    const { prompt, script } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, fitScript, meta.character_look, meta.language)
 
     // Trim the competitor clip to fal's ≤15s / ≤720p reference limits (raw ad videos exceed them).
     let refVideo = null
