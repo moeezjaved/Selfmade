@@ -625,9 +625,20 @@ function AdCard({ ad, kind, cost, done, lowCredit, onClone }: {
   kind: 'image' | 'video'; cost: number; done?: boolean; lowCredit?: boolean; onClone: () => void
 }) {
   const vref = useRef<HTMLVideoElement | null>(null)
+  const [playing, setPlaying] = useState(false)
   const LIME = '#dffe95'
   const play = () => { const v = vref.current; if (v) { v.currentTime = 0; v.play().catch(() => {}) } }
-  const stop = () => { const v = vref.current; if (v) { v.pause() } }
+  const stop = () => { const v = vref.current; if (v && !playing) { v.pause() } }   // hover-out never stops an explicit ▶ play
+  // Explicit ▶ toggle — plays WITH sound (it's a preview, the user asked for it). stopPropagation so
+  // tapping ▶ never starts the clone flow (that was the "play button not working" bug: the badge was
+  // pointer-events:none and the card's click went straight to onClone).
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const v = vref.current
+    if (!v) return
+    if (v.paused) { v.muted = false; v.play().catch(() => { v.muted = true; v.play().catch(() => {}) }); setPlaying(true) }
+    else { v.pause(); v.muted = true; setPlaying(false) }
+  }
   return (
     <div onMouseEnter={kind === 'video' ? play : undefined} onMouseLeave={kind === 'video' ? stop : undefined}
       style={{ position: 'relative', aspectRatio: '4/5', borderRadius: 14, overflow: 'hidden', background: '#0d1b1a', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
@@ -643,10 +654,11 @@ function AdCard({ ad, kind, cost, done, lowCredit, onClone }: {
       <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 6 }}>
         <span style={{ background: 'rgba(8,16,15,0.75)', color: 'white', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.04em' }}>{kind === 'video' ? '▶ Video' : 'Image'}</span>
       </div>
-      {kind === 'video' && (
-        <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(8,16,15,0.7)', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-          <span style={{ color: 'white', fontSize: 12, marginLeft: 2 }}>▶</span>
-        </div>
+      {kind === 'video' && ad.videoUrl && (
+        <button onClick={togglePlay} aria-label={playing ? 'Pause preview' : 'Play preview'}
+          style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(8,16,15,0.78)', border: `1px solid ${playing ? LIME : 'rgba(255,255,255,0.25)'}`, borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2 }}>
+          <span style={{ color: playing ? LIME : 'white', fontSize: 13, marginLeft: playing ? 0 : 2 }}>{playing ? '❚❚' : '▶'}</span>
+        </button>
       )}
 
       {/* clone overlay */}
