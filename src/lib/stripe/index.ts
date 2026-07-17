@@ -244,10 +244,20 @@ export async function handleStripeWebhook(payload: string, signature: string) {
         await supabase.from('subscriptions').update({ extra_seats: 0, seats_subscription_id: null, updated_at: new Date().toISOString() }).eq('owner_id', userId)
         break
       }
+      // Grab the plan they HAD (for the email) before we reset it to free.
+      const { data: priorRow } = await supabase.from('subscriptions').select('plan').eq('owner_id', userId).maybeSingle()
       // Suspend to Free (spec §5 dunning / cancel): drop entitlements, keep data + top-up credits.
       await supabase.from('subscriptions').update({ status: 'canceled', plan: 'free', scheduled_plan: null, updated_at: new Date().toISOString() }).eq('owner_id', userId)
       await supabase.from('user_profiles').update({ subscription_status: 'canceled' }).eq('user_id', userId)
       await supabase.rpc('apply_plan', { p_user: userId, p_plan: 'free', p_reset: null })
+      // Warm win-back email (best-effort).
+      try {
+        const { sendSubscriptionCanceledEmail } = await import('@/lib/email')
+        const { PLANS } = await import('@/lib/plans')
+        const label = (PLANS as any)[(priorRow as any)?.plan]?.label || 'your'
+        const to = await emailFor(userId, null)
+        if (to) await sendSubscriptionCanceledEmail(to, label)
+      } catch { /* best-effort */ }
       break
     }
 

@@ -24,6 +24,12 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
   if (!row) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
+  // "Your first ad is ready" — also fire on VIDEO (was image-only). claimOnceLog(FIRST_AD_EMAIL) makes
+  // it idempotent and shared with the image path, so a user gets it exactly once, image or video.
+  if ((row as any).status === 'done' && (row as any).image_url) {
+    try { const { sendFirstAdEmail } = await import('@/lib/email'); await sendFirstAdEmail(user.id, user.email || '', (row as any).image_url) } catch { /* best-effort */ }
+  }
+
   const meta = (row as any).clone_meta || {}
   return NextResponse.json({
     status: (row as any).status,
