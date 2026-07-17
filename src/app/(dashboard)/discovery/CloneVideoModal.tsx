@@ -71,7 +71,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // UGC = one clip; Faithful = scene-by-scene + stitch, priced by scene count (credit_pricing
   // video_clone_xN rows — keep these numbers in sync with that table).
   // 1 credit = 1¢. Kept in sync with credit_pricing (migration 095): video is cost-plus (2× fal).
-  const UGC_COST = { premium: 650, fast: 300 } as const
+  const UGC_COST = { premium: 600, fast: 300 } as const   // premium = $6 (pricing v2; matches credit_pricing.video_clone)
   // Per-scene pricing (a faithful clone reproduces the ad's real shot count, up to 10). Formula
   // matches the DB video_clone_xN rows exactly: premium = 100 + 600·n.
   const faithfulCost = (n: number, t: 'premium' | 'fast') => t === 'fast' ? Math.round((100 + 600 * n) * 0.44 / 50) * 50 : 100 + 600 * n
