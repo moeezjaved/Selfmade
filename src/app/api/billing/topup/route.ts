@@ -26,26 +26,37 @@ export async function POST(req: NextRequest) {
   const p = TOPUP_PACKS.find((x) => x.id === pack)
   if (!p) return NextResponse.json({ error: 'invalid_pack' }, { status: 400 })
 
-  const { stripe } = await import('@/lib/stripe')
-  const { data: sub } = await admin.from('subscriptions').select('stripe_customer_id').eq('owner_id', user.id).maybeSingle()
-  let customerId = (sub as any)?.stripe_customer_id as string | undefined
-  if (!customerId) {
-    const c = await stripe.customers.create({ email: user.email || undefined, metadata: { owner_id: user.id } })
-    customerId = c.id
-    await admin.from('subscriptions').upsert({ owner_id: user.id, stripe_customer_id: customerId }, { onConflict: 'owner_id' })
-  }
+  try {
+    const { stripe } = await import('@/lib/stripe')
+    const { data: sub } = await admin.from('subscriptions').select('stripe_customer_id').eq('owner_id', user.id).maybeSingle()
+    let customerId = (sub as any)?.stripe_customer_id as string | undefined
+    // A STALE customer id (created in a DIFFERENT Stripe account — e.g. after switching accounts) makes
+    // checkout throw "No such customer". Validate it exists in the current account, else recreate.
+    if (customerId) {
+      try { const ex = await stripe.customers.retrieve(customerId); if ((ex as any)?.deleted) customerId = undefined } catch { customerId = undefined }
+    }
+    if (!customerId) {
+      const c = await stripe.customers.create({ email: user.email || undefined, metadata: { owner_id: user.id } })
+      customerId = c.id
+      await admin.from('subscriptions').upsert({ owner_id: user.id, stripe_customer_id: customerId }, { onConflict: 'owner_id' })
+    }
 
-  const session = await stripe.checkout.sessions.create({
-    mode: 'payment',
-    customer: customerId,
-    line_items: [{
-      quantity: 1,
-      price_data: { currency: 'usd', unit_amount: p.priceUsd * 100, product_data: { name: `Self Made — ${p.credits} credit top-up` } },
-    }],
-    // The webhook reads this to grant the pack + create the FIFO purchase row.
-    metadata: { owner_id: user.id, topup_pack: p.id, topup_credits: String(p.credits), amount_usd: String(p.priceUsd) },
-    success_url: `${APP_URL}/pricing?topped_up=1`,
-    cancel_url: `${APP_URL}/pricing`,
-  })
-  return NextResponse.json({ url: session.url })
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer: customerId,
+      line_items: [{
+        quantity: 1,
+        price_data: { currency: 'usd', unit_amount: p.priceUsd * 100, product_data: { name: `Self Made — ${p.credits} credit top-up` } },
+      }],
+      // The webhook reads this to grant the pack + create the FIFO purchase row.
+      metadata: { owner_id: user.id, topup_pack: p.id, topup_credits: String(p.credits), amount_usd: String(p.priceUsd) },
+      success_url: `${APP_URL}/pricing?topped_up=1`,
+      cancel_url: `${APP_URL}/pricing`,
+    })
+    return NextResponse.json({ url: session.url })
+  } catch (e: any) {
+    const msg = e?.raw?.message || e?.message || 'checkout_failed'
+    console.error('billing/topup error:', e?.type, e?.code, msg)
+    return NextResponse.json({ error: 'checkout_failed', message: msg, code: e?.code || null }, { status: 400 })
+  }
 }

@@ -54,6 +54,10 @@ export async function POST(req: NextRequest) {
   if (extra === 0) return NextResponse.json({ ok: true, extra: 0 })
 
   // ── First purchase → Checkout for a NEW seat subscription ──
+  // Validate the stored customer exists in the current account (stale after an account switch) → recreate.
+  if (customerId) {
+    try { const ex = await stripe.customers.retrieve(customerId); if ((ex as any)?.deleted) customerId = undefined } catch { customerId = undefined }
+  }
   if (!customerId) {
     const c = await stripe.customers.create({ email: user.email || undefined, metadata: { owner_id: org.ownerId } })
     customerId = c.id
