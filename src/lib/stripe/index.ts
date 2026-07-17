@@ -258,6 +258,15 @@ export async function handleStripeWebhook(payload: string, signature: string) {
       if (!userId) break
       await supabase.from('subscriptions').update({ status: 'past_due', updated_at: new Date().toISOString() }).eq('owner_id', userId)
       await supabase.from('user_profiles').update({ subscription_status: 'past_due' }).eq('user_id', userId)
+      // Nudge them to fix the card before we suspend — a silent failed renewal = a silently-lost customer.
+      try {
+        const { sendPaymentFailedEmail } = await import('@/lib/email')
+        const { PLANS } = await import('@/lib/plans')
+        const plan = (sub as any).items?.data?.[0]?.price?.id ? planFromPriceId((sub as any).items.data[0].price.id) : null
+        const label = (plan && (PLANS as any)[plan]?.label) || 'your plan'
+        const to = await emailFor(userId, (invoice as any).customer_email)
+        if (to) await sendPaymentFailedEmail(to, label)
+      } catch { /* best-effort */ }
       break
     }
 

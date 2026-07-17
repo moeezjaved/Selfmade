@@ -47,6 +47,17 @@ export async function sendSubscriptionEmail(to: string, planLabel: string, cycle
   return sendEmail(to, trialing ? `Your ${planLabel} trial is live` : `Welcome to ${planLabel}`, html)
 }
 
+/** Payment-failed notice — a renewal charge bounced. Nudge them to update their card before we suspend. */
+export async function sendPaymentFailedEmail(to: string, planLabel: string): Promise<boolean> {
+  if (!emailEnabled || !to) return false
+  const html = emailShell({
+    title: `Your ${planLabel} payment didn't go through`,
+    intro: `We couldn't charge your card for your <b>${planLabel}</b> plan. No stress — your account is still active for now. Update your card in Billing and we'll retry automatically. If it isn't fixed, the plan pauses and you'd drop to Free.`,
+    ctaText: 'Update payment method', ctaUrl: `${APP_URL}/pricing`,
+  })
+  return sendEmail(to, `Action needed: your ${planLabel} payment failed`, html)
+}
+
 /**
  * Welcome email — sent once when a new account is created (both email + Google signup). Self-contained:
  * uses only sendEmail + emailShell (no user_profiles lifecycle columns, which aren't all present on
