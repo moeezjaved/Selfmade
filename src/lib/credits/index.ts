@@ -9,11 +9,10 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveBillingOwner } from '@/lib/org'
-import { FREE_FOR_SUBSCRIBERS, imagesAreFree } from '@/lib/plans'
-
-// A reservation that cost nothing (subscriber's free image remake). Its id carries a sentinel prefix
-// so commit/refund can no-op — the reserve→run→commit/refund contract in every route still holds.
-const FREE_TX_PREFIX = 'free:'
+// NOTE: "free unlimited images for subscribers" (pricing v2) lives in the DB reserve_credits function
+// (migration 102), NOT here — because some routes call the RPC directly and would bypass an app-layer
+// check. reserve_credits returns a real 0-credit committed tx for subscriber image actions, so commit/
+// refund below work unchanged.
 
 export class InsufficientCreditsError extends Error {
   constructor(public need: number, public have: number) {
@@ -38,17 +37,6 @@ export async function reserveCredits(
 ): Promise<ReservedTx> {
   // Charge the ORG's shared wallet (owner), not the individual member — one team, one credit pool.
   const owner = await resolveBillingOwner(admin, userId)
-
-  // Pricing model v2: image remakes are FREE + unlimited for subscribers (Creator/Agency). Skip the
-  // reserve entirely and hand back a zero-cost sentinel tx (commit/refund no-op on it). Videos and
-  // everything else still meter normally; free/pay-as-you-go users still pay for images.
-  if (FREE_FOR_SUBSCRIBERS.has(action)) {
-    const { data: prof } = await admin.from('user_profiles').select('plan_id').eq('user_id', owner).maybeSingle()
-    if (imagesAreFree((prof as any)?.plan_id)) {
-      return { id: `${FREE_TX_PREFIX}${refId ?? owner}`, user_id: owner, action_type: action, delta: 0, balance_after: 0, status: 'free' }
-    }
-  }
-
   const { data, error } = await admin.rpc('reserve_credits', {
     p_user: owner, p_action: action, p_ref: refId ?? null,
   })
@@ -68,14 +56,12 @@ export async function reserveCredits(
 export async function commitCredits(
   admin: SupabaseClient, txId: string, metadata: Record<string, any> = {},
 ): Promise<void> {
-  if (txId.startsWith(FREE_TX_PREFIX)) return   // free subscriber image remake — nothing to finalize
   const { error } = await admin.rpc('commit_credits', { p_tx: txId, p_metadata: metadata })
   if (error) throw new Error(error.message)
 }
 
 /** Give credits back on failure. Idempotent — safe to call in a catch even if unsure. */
 export async function refundCredits(admin: SupabaseClient, txId: string): Promise<void> {
-  if (txId.startsWith(FREE_TX_PREFIX)) return   // free subscriber image remake — nothing to refund
   const { error } = await admin.rpc('refund_credits', { p_tx: txId })
   if (error) throw new Error(error.message)
 }
