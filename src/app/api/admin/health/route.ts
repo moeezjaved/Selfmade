@@ -139,21 +139,21 @@ export async function GET() {
 
   // ── Crawler runs (1h + 24h) ──
   const [{ data: runs1h }, { data: runs24h }] = await Promise.all([
-    admin.from('crawler_runs').select('id, status').gte('started_at', hourAgo).limit(500),
-    admin.from('crawler_runs')
+    raced(admin.from('crawler_runs').select('id, status').gte('started_at', hourAgo).limit(500), 6000, { data: [] }),
+    raced(admin.from('crawler_runs')
       .select('id, brand_name, started_at, finished_at, ads_discovered, ads_new, bytes_through_proxy, status, abort_reason')
       .gte('started_at', dayAgo)
       .order('started_at', { ascending: false })
-      .limit(50),
+      .limit(50), 6000, { data: [] }),
   ])
 
   // ── Currently-running crawler (if any) ──
-  const { data: runningRows } = await admin
+  const { data: runningRows } = await raced(admin
     .from('crawler_runs')
     .select('brand_name, brand_page_id, started_at')
     .eq('status', 'running')
     .order('started_at', { ascending: false })
-    .limit(1)
+    .limit(1), 5000, { data: [] })
   const currentlyRunning = runningRows?.[0] ?? null
 
   const successPct = (rows: any[] | null) => {
@@ -176,11 +176,11 @@ export async function GET() {
   const lastRunAt = (runs24h ?? [])[0]?.started_at ?? null
 
   // ── Worker bandwidth (24h) — newly tracked per migration 014 ──
-  const { data: workerRuns24h } = await admin
+  const { data: workerRuns24h } = await raced(admin
     .from('worker_runs')
     .select('bytes_proxy, bytes_droplet, ads_ok, ads_failed, finished_at')
     .gte('finished_at', dayAgo)
-    .limit(2000)
+    .limit(2000), 6000, { data: [] })
   const workerBytesProxy24h = (workerRuns24h ?? []).reduce((s: number, r: any) => s + Number(r.bytes_proxy ?? 0), 0)
   const workerBytesDroplet24h = (workerRuns24h ?? []).reduce((s: number, r: any) => s + Number(r.bytes_droplet ?? 0), 0)
 
@@ -190,13 +190,13 @@ export async function GET() {
   const bandwidth24h = totalProxyBytes24h   // keep variable name for back-compat
 
   // ── Per-brand snapshot (top 10 oldest-first active brands) ──
-  const { data: brandList } = await admin
+  const { data: brandList } = await raced(admin
     .from('discovery_crawl_terms')
     .select('term, page_id, last_crawled_at, is_active')
     .eq('is_active', true)
     .not('page_id', 'is', null)
     .order('last_crawled_at', { ascending: true, nullsFirst: true })
-    .limit(20)
+    .limit(20), 6000, { data: [] })
 
   // ── Next-crawl ETA computation ──
   // Scheduler picks oldest last_crawled_at first, with 45-min min gap per brand
@@ -228,8 +228,9 @@ export async function GET() {
     }
   }
 
-  const brandStats: any[] = []
-  for (const b of (brandList ?? []).slice(0, 10) as any[]) {
+  // Per-brand snapshots run CONCURRENTLY (was a sequential for-loop → up to 50 serial queries, the main
+  // cause of the 30s 504). Each brand still does its own small batch, but all 10 brands overlap.
+  const brandStats: any[] = await Promise.all(((brandList ?? []).slice(0, 10) as any[]).map(async (b) => {
     const [thumbed, fastReady, missing, failed] = await Promise.all([
       countWhere(admin, ['page_id', 'eq', b.page_id], ['thumbnail_url', 'not.is', null]),
       countWhere(admin, ['page_id', 'eq', b.page_id], ['raw_image_urls', 'not.is', null], ['thumbnail_url', 'is', null]),
@@ -241,13 +242,13 @@ export async function GET() {
     // Pull the brand's last 5 successful crawler_runs. Count avg new ads
     // per crawl. If recent crawls return ~0 new ads → brand is fully crawled.
     // Otherwise estimate remaining crawls + multiply by 45-min cooldown.
-    const { data: brandRecentRuns } = await admin
+    const { data: brandRecentRuns } = await raced(admin
       .from('crawler_runs')
       .select('ads_new, started_at')
       .eq('brand_page_id', b.page_id)
       .eq('status', 'success')
       .order('started_at', { ascending: false })
-      .limit(5)
+      .limit(5), 5000, { data: [] })
     const recent = (brandRecentRuns ?? []) as any[]
     let crawl_eta: any = null
     if (recent.length === 0) {
@@ -280,7 +281,7 @@ export async function GET() {
       }
     }
 
-    brandStats.push({
+    return {
       term: b.term,
       page_id: b.page_id,
       last_crawled_at: b.last_crawled_at,
@@ -289,8 +290,8 @@ export async function GET() {
       missing,
       failed,
       crawl_eta,
-    })
-  }
+    }
+  }))
 
   // ── Liveness check: ping droplet preview-server /health ──
   let preview_server_status: 'up' | 'down' | 'unknown' = 'unknown'
@@ -336,9 +337,11 @@ export async function GET() {
   let db_health: any = null
   try {
     const t0 = Date.now()
-    await admin.from('discovery_ads_index').select('ad_id').limit(1)
+    await raced(admin.from('discovery_ads_index').select('ad_id').limit(1), 4000, null)
     const probe_ms = Date.now() - t0
-    const { data: dbh } = await admin.rpc('db_write_health')
+    // db_write_health computes dead-tuple/bloat stats over a multi-million-row table — time-box it so a
+    // slow stats scan can't hang the route (fall back to null → panel shows "—" instead of 504-ing).
+    const dbh = await raced(admin.rpc('db_write_health').then((r: any) => r.data), 5000, null)
     const r = Array.isArray(dbh) ? dbh[0] : dbh
     db_health = {
       probe_ms,
@@ -351,11 +354,11 @@ export async function GET() {
   } catch { db_health = null }
 
   // ── Nightly rollup status (written by worker/src/nightly-rollup.mjs) ──
-  const { data: rollupRow } = await admin
+  const { data: rollupRow } = await raced(admin
     .from('discovery_rollup_status')
     .select('ran_at, total_rows, winners, bad_winners, fail_chunks, wrote, fetch_s, write_s, total_s')
     .eq('id', 1)
-    .maybeSingle()
+    .maybeSingle(), 5000, { data: null })
   const rollupAgeHours = rollupRow?.ran_at
     ? (Date.now() - new Date(rollupRow.ran_at).getTime()) / 3_600_000
     : null
@@ -504,6 +507,16 @@ async function racedCount(p: PromiseLike<any>, ms = 5000): Promise<{ count: numb
   return Promise.race([
     Promise.resolve(p).then((r: any) => ({ count: r?.count ?? null, error: r?.error ?? null })),
     new Promise<{ count: null; error: any }>((res) => setTimeout(() => res({ count: null, error: new Error('count timeout') }), ms)),
+  ])
+}
+
+// Generic time-box for any query that returns rows — falls back to `fallback` on timeout OR error so a
+// single slow query (under heavy crawl-write load) can never hang the 30s route into a 504. The
+// dashboard renders with partial data rather than spinning forever.
+async function raced(p: PromiseLike<any>, ms: number, fallback: any): Promise<any> {
+  return Promise.race([
+    Promise.resolve(p).catch(() => fallback),
+    new Promise<any>((res) => setTimeout(() => res(fallback), ms)),
   ])
 }
 
