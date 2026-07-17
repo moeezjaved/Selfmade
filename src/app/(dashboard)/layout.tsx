@@ -280,7 +280,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {/* Neutral resting style (matches the IG entry point) — the lime fill read as a
                   permanently-"selected" toggle. Both are just entry points, not a picked state. */}
               <a href="https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi" target="_blank" rel="noopener noreferrer" title="Install the Chrome extension" style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"6px 8px",borderRadius:8,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.7)",fontSize:11.5,fontWeight:700,textDecoration:"none"}}>🧩 Extension</a>
-              <Link href="/settings" title="Save from Instagram on mobile" style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"6px 8px",borderRadius:8,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.7)",fontSize:11.5,fontWeight:700,textDecoration:"none"}}>📱 IG</Link>
+              {/* IG saving isn't wired yet — show it as coming soon rather than linking to nothing. */}
+              <span title="Save from Instagram — coming soon" style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"6px 8px",borderRadius:8,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.38)",fontSize:11.5,fontWeight:700,cursor:"default"}}>📱 IG <span style={{fontSize:8.5,fontWeight:800,letterSpacing:".04em",padding:"1px 5px",borderRadius:20,background:"rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.5)",textTransform:"uppercase"}}>Soon</span></span>
             </div>
           </div>
 
