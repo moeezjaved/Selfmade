@@ -72,9 +72,9 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // video_clone_xN rows — keep these numbers in sync with that table).
   // 1 credit = 1¢. Kept in sync with credit_pricing (migration 095): video is cost-plus (2× fal).
   const UGC_COST = { premium: 600, fast: 300 } as const   // premium = $6 (pricing v2; matches credit_pricing.video_clone)
-  // Per-scene pricing (a faithful clone reproduces the ad's real shot count, up to 10). Formula
-  // matches the DB video_clone_xN rows exactly: premium = 100 + 600·n.
-  const faithfulCost = (n: number, t: 'premium' | 'fast') => t === 'fast' ? Math.round((100 + 600 * n) * 0.44 / 50) * 50 : 100 + 600 * n
+  // Per-scene / per-segment pricing: a clean $6 (600 cr) per 15-second clip / per scene — so 30s = $12,
+  // 60s = $24 (pricing v2, no stitching surcharge). Matches the DB video_clone_xN rows (600·n).
+  const faithfulCost = (n: number, t: 'premium' | 'fast') => t === 'fast' ? Math.round(600 * n * 0.44 / 50) * 50 : 600 * n
   const FAITHFUL_COST = new Proxy({} as Record<number, { premium: number; fast: number }>, {
     get: (_t, k) => { const n = Number(k); return Number.isFinite(n) ? { premium: faithfulCost(n, 'premium'), fast: faithfulCost(n, 'fast') } : undefined },
   })

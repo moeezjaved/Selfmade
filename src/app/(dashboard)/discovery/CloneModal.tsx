@@ -14,7 +14,8 @@ import { X, Upload, Link2, Loader2, Download, Sparkles, Check, Library } from 'l
 import { flyToCreatives } from '@/lib/flyToCreatives'
 import { creativeFilename } from '@/lib/filename'
 import CloneGeneration from '@/components/motion/CloneGeneration'
-import { refreshCredits } from '@/components/credits/CreditCounter'
+import { refreshCredits, useCredits } from '@/components/credits/CreditCounter'
+import { imagesAreFree } from '@/lib/plans'
 
 type Photo = { id: string; src: string; label?: string } // src = data: URL (upload) or http URL (detected/brand)
 type Brand = { id: string; name: string; website?: string | null; products?: { image_urls?: string[] }[] }
@@ -274,9 +275,12 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     return h.slice(0, -1)
   })
 
+  const { plan } = useCredits()
+  const imagesFree = imagesAreFree(plan)       // Creator/Agency: image remakes + edits are free
   const cost = imageSize === '4K' ? 25 : 15   // 2K → image_clone_pro (15) · 4K → image_clone_4k (25)
   const totalCost = cost * count
   const editCost = 10                          // Pro edit — matches image_edit_pro
+  const cr = (n: number) => imagesFree ? 'Free' : `${n} cr`   // label helper
   const hasResults = results.length > 0
 
   if (!mounted) return null
@@ -406,8 +410,8 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
               <div>
                 <div style={{ fontSize: 11.5, color: '#7a8a7e', marginBottom: 5 }}>Resolution</div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => setImageSize('2K')} style={{ flex: 1, ...tierBtn(imageSize === '2K'), padding: '8px 0' }}>2K · 15 cr</button>
-                  <button onClick={() => setImageSize('4K')} style={{ flex: 1, ...tierBtn(imageSize === '4K'), padding: '8px 0' }}>4K HD · 25 cr</button>
+                  <button onClick={() => setImageSize('2K')} style={{ flex: 1, ...tierBtn(imageSize === '2K'), padding: '8px 0' }}>2K · {cr(15)}</button>
+                  <button onClick={() => setImageSize('4K')} style={{ flex: 1, ...tierBtn(imageSize === '4K'), padding: '8px 0' }}>4K HD · {cr(25)}</button>
                 </div>
               </div>
               {/* Variations. */}
@@ -429,7 +433,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
             <button onClick={generate} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.7 : 1 }}>
               {busy ? <><Loader2 size={16} className="spin" /> {`Generating ${count > 1 ? `${count} variations` : ''}…`}</>
-                : <><Sparkles size={16} /> {hasResults ? 'Regenerate' : 'Generate'} {count > 1 ? `${count} variations` : 'remake'} · {totalCost} cr</>}
+                : <><Sparkles size={16} /> {hasResults ? 'Regenerate' : 'Generate'} {count > 1 ? `${count} variations` : 'remake'} · {cr(totalCost)}</>}
             </button>
           </div>
 
@@ -471,7 +475,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                   <span style={{ fontSize: 11, color: '#7a8a7e' }}>{editCost} credits per edit · ⌘↵ to apply</span>
                   <button onClick={applyEdit} disabled={editing || !editText.trim()} style={{ ...btnPrimary, padding: '8px 14px', fontSize: 12.5, opacity: (editing || !editText.trim()) ? 0.6 : 1 }}>
-                    {editing ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />} Apply edit · {editCost} cr
+                    {editing ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />} Apply edit · {cr(editCost)}
                   </button>
                 </div>
               </div>
