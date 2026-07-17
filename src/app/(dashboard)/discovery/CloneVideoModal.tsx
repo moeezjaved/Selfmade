@@ -458,6 +458,19 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
               </>
             ) : (
               <>
+                {sourceVideoUrl && (
+                  <section>
+                    <Label>{sourceAdId ? 'The ad you’re remaking' : 'Your video'}</Label>
+                    <div style={{ display: 'flex', justifyContent: 'center', background: '#0d160f', border: '1px solid #22331c', borderRadius: 12, padding: 10 }}>
+                      <video
+                        src={sourceVideoUrl} poster={sourcePoster || undefined} controls playsInline preload="metadata"
+                        style={{ maxHeight: 260, maxWidth: '100%', borderRadius: 8, background: '#000' }}
+                      />
+                    </div>
+                    {!sourceAdId && <div style={{ fontSize: 12, color: '#7fae72', marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}><Check size={13} /> Uploaded — we’ll remake this with your product.</div>}
+                  </section>
+                )}
+
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 12.5, color: '#8aa', lineHeight: 1.5, background: '#101b12', border: '1px solid #22331c', borderRadius: 10, padding: '10px 12px' }}>
                   {sourcePoster && /* eslint-disable-next-line @next/next/no-img-element */ <img src={sourcePoster} alt="" style={{ width: 44, height: 56, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
                   <span>We keep this winning ad’s <b style={{ color: LIME }}>pacing, hook &amp; vibe</b> and swap in <b style={{ color: LIME }}>your product</b> — you approve the script before any credits are spent.</span>
