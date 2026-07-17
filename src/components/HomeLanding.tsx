@@ -227,7 +227,7 @@ export default function HomeLanding() {
         <div style={{ ...wrap, height: 66, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <LogoMark color="#000" height={32} />
           <div className="nav-mid" style={{ display: 'flex', gap: 30 }}>
-            {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['/pricing', 'Pricing'], ['/blog', 'Blog']].map(([h, l]) => (
+            {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['#pricing', 'Pricing'], ['/blog', 'Blog']].map(([h, l]) => (
               <a key={h} href={h} className="navlink" style={{ fontSize: 14.5, fontWeight: 600, color: '#4b5563', textDecoration: 'none' }}>{l}</a>
             ))}
           </div>
@@ -240,7 +240,7 @@ export default function HomeLanding() {
         {/* mobile dropdown (shown via hamburger ≤820px) */}
         {menuOpen && (
           <div className="nav-menu" style={{ borderTop: '1px solid #f0f2ef', background: '#fff', padding: '10px 24px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['/pricing', 'Pricing'], ['/blog', 'Blog'], ['/login', 'Log in']].map(([h, l]) => (
+            {[['#how', 'How it works'], ['#compare', 'Why Selfmade'], ['#pricing', 'Pricing'], ['/blog', 'Blog'], ['/login', 'Log in']].map(([h, l]) => (
               <a key={h} href={h} onClick={() => setMenuOpen(false)} style={{ fontSize: 16, fontWeight: 700, color: INK, textDecoration: 'none', padding: '11px 4px', borderBottom: '1px solid #f6f7f5' }}>{l}</a>
             ))}
           </div>
