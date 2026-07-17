@@ -211,6 +211,16 @@ export default function OnboardingPage() {
       // else: not_configured / gated → sheet stays open, user can Skip
     } catch { /* noop */ } finally { setBuying(false) }
   }
+  // Second path: subscribe to Creator ($49/mo — unlimited images + 10 videos). Same new-tab + balance
+  // poll as the pack: the plan grant lands 6,000 credits, tripping the poll → opens the video clone.
+  const subscribeCreator = async () => {
+    setBuying(true)
+    try {
+      const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: 'starter', cycle: 'monthly' }) })
+      const d = await r.json()
+      if (d?.url) window.open(d.url, '_blank')
+    } catch { /* noop */ } finally { setBuying(false) }
+  }
   // While the buy sheet is open, poll for the credits landing (webhook fulfillment).
   useEffect(() => {
     if (!videoBuyFor) return
@@ -453,14 +463,14 @@ export default function OnboardingPage() {
               </div>
 
               <div style={{ marginTop: 16, background: 'rgba(223,254,149,0.07)', border: `1px dashed rgba(223,254,149,0.35)`, borderRadius: 14, padding: '12px 15px', fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>
-                🎁 <b style={{ color: LIME }}>Your free credits cover ~5 image remakes.</b> Want a video remake? The <b style={{ color: LIME }}>$9 Launch Pack</b> (900 credits) covers your first AI video — one click, no subscription.
+                🎁 <b style={{ color: LIME }}>Your first 5 image ads are free.</b> Want a video ad? Just <b style={{ color: LIME }}>$6</b> each — or go <b style={{ color: LIME }}>Creator ($49/mo)</b> for unlimited image ads + 10 videos a month.
               </div>
             </>}
 
             {/* ── Step 5: Clone your first ad ── */}
             {step === 4 && <>
               <h2 style={h2}>Remake your <em style={em}>first ad.</em></h2>
-              <p style={sub}>Here are your competitors&apos; top-performing ads. Pick one — we&apos;ll rebuild it with <b style={{ color: 'rgba(255,255,255,0.7)' }}>your</b> product. Images are covered by your free credits; video needs the Launch Pack.</p>
+              <p style={sub}>Here are your competitors&apos; top-performing ads. Pick one — we&apos;ll rebuild it with <b style={{ color: 'rgba(255,255,255,0.7)' }}>your</b> product. <b style={{ color: 'rgba(255,255,255,0.7)' }}>Image ads are free</b>; a video ad is $6.</p>
 
               {loadingAds && Object.keys(topAds).length === 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -594,21 +604,30 @@ export default function OnboardingPage() {
         <div onClick={() => setVideoBuyFor(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(8,16,15,0.72)', backdropFilter: 'blur(4px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: PANEL, border: `1px solid ${LIME}`, borderRadius: 22, padding: 28, textAlign: 'center' }}>
             <div style={{ fontSize: 34, marginBottom: 10 }}>🎬</div>
-            <div style={{ fontSize: 20, fontWeight: 900, color: 'white', letterSpacing: '-.01em' }}>One step to your first video</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: 'white', letterSpacing: '-.01em' }}>Make it a video</div>
             <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', lineHeight: 1.55, margin: '10px 0 18px' }}>
-              Video remakes cost <b style={{ color: LIME }}>{costs.video} credits</b> each{balance !== null ? <> — you have <b style={{ color: 'white' }}>{balance}</b></> : ''}. Grab the <b style={{ color: LIME }}>Launch Pack</b> and we&apos;ll open your remake the moment it lands.
+              Image ads are free — a <b style={{ color: LIME }}>video ad is $6</b>. Pick how you want it, and we&apos;ll open your remake the moment it&apos;s ready.
             </p>
-            <div style={{ background: '#0d1b1a', border: '1px solid rgba(223,254,149,0.2)', borderRadius: 14, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: 'white' }}>Launch Pack</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>900 credits · one video + change</div>
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: LIME }}>$9</div>
-            </div>
-            <button onClick={buyLaunchPack} disabled={buying} style={{ width: '100%', background: LIME, color: BG, border: 'none', borderRadius: 12, padding: '13px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', opacity: buying ? 0.6 : 1 }}>
-              {buying ? 'Opening checkout…' : 'Get the Launch Pack — $9'}
+
+            {/* Path 1 — pay as you go */}
+            <button onClick={buyLaunchPack} disabled={buying} style={{ width: '100%', textAlign: 'left', background: '#0d1b1a', border: '1px solid rgba(223,254,149,0.25)', borderRadius: 14, padding: '13px 16px', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: 'inherit', opacity: buying ? 0.6 : 1 }}>
+              <span>
+                <span style={{ display: 'block', fontSize: 15, fontWeight: 800, color: 'white' }}>Pay as you go</span>
+                <span style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>$9 → this video + a few more. No subscription.</span>
+              </span>
+              <span style={{ fontSize: 20, fontWeight: 900, color: LIME, flexShrink: 0 }}>$9</span>
             </button>
-            <button onClick={() => setVideoBuyFor(null)} style={{ marginTop: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Skip for now</button>
+
+            {/* Path 2 — subscribe (Creator) */}
+            <button onClick={subscribeCreator} disabled={buying} style={{ width: '100%', textAlign: 'left', background: LIME, border: 'none', borderRadius: 14, padding: '13px 16px', marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: 'inherit', opacity: buying ? 0.6 : 1 }}>
+              <span>
+                <span style={{ display: 'block', fontSize: 15, fontWeight: 800, color: BG }}>Go Creator</span>
+                <span style={{ display: 'block', fontSize: 12, color: 'rgba(14,27,18,0.7)' }}>Unlimited image ads + 10 videos / month</span>
+              </span>
+              <span style={{ fontSize: 20, fontWeight: 900, color: BG, flexShrink: 0 }}>$49<span style={{ fontSize: 11, fontWeight: 700 }}>/mo</span></span>
+            </button>
+
+            <button onClick={() => setVideoBuyFor(null)} style={{ marginTop: 8, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Skip for now</button>
             {buying && <div style={{ marginTop: 12, fontSize: 11.5, color: 'rgba(255,255,255,0.4)' }}>Complete checkout in the new tab — this page updates automatically.</div>}
           </div>
         </div>
@@ -665,7 +684,7 @@ function AdCard({ ad, kind, cost, done, lowCredit, onClone }: {
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 10, background: 'linear-gradient(transparent, rgba(8,16,15,0.9))' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
           <span style={{ background: done ? 'rgba(223,254,149,0.15)' : LIME, color: done ? LIME : '#10211f', fontSize: 12.5, fontWeight: 800, padding: '7px 12px', borderRadius: 100, border: done ? `1px solid ${LIME}` : 'none' }}>
-            {done ? '✓ Remaking' : kind === 'video' && lowCredit ? 'Remake — $9' : `Remake · ${cost}cr`}
+            {done ? '✓ Remaking' : kind === 'video' ? `Remake · $${Math.round(cost / 100)}` : 'Remake · Free'}
           </span>
         </div>
       </div>
