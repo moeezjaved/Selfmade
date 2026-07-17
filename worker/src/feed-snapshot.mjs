@@ -23,7 +23,9 @@ const H = { apikey: SRK, Authorization: `Bearer ${SRK}` }
 // Pre-warm the sorts the UI defaults to. Add more here if you want other bare-feed sorts instant.
 const SORTS = ['recommended', 'performance']
 
-const PAGES = [0, 1, 2]   // pre-warm the first 3 pages so eager-prefetch is instant (no "loading more")
+// Pre-warm the first 10 pages (~450 cards). Uncached deep pages run a ~3.8s live query; warming them
+// means a scrolling user hits the ~800ms cache instead, all the way down the feed — no mid-scroll stall.
+const PAGES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 async function refreshOne(sort, page) {
   const r = await fetch(`${APP}/api/discovery/db-search?sort=${sort}&page=${page}&fresh=1`, {
