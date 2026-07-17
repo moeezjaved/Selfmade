@@ -96,8 +96,8 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
             <div style={{ fontSize: 12, color: MUTED, minHeight: 16, marginBottom: 4 }}>{c.note}</div>
             <button onClick={() => cta(c)} disabled={busy === c.id || (variant === 'dashboard' && current === c.id)} style={{
               margin: '14px 0', padding: '11px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
-              background: (variant === 'dashboard' && current === c.id) ? '#eef2ec' : c.popular ? LIME : c.id === 'business' ? DARK : '#f2f6ee',
-              color: (variant === 'dashboard' && current === c.id) ? '#6b7280' : c.id === 'business' ? LIME : DARK,
+              background: (variant === 'dashboard' && current === c.id) ? '#eef2ec' : c.popular ? LIME : (c.id === 'business' || c.id === 'payg') ? DARK : '#f2f6ee',
+              color: (variant === 'dashboard' && current === c.id) ? '#6b7280' : (c.id === 'business' || c.id === 'payg') ? LIME : DARK,
             }}>{label(c)}</button>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13, color: '#333' }}>
               {c.feats.map((f, i) => (
@@ -123,9 +123,15 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
         {FAQS.map((f, i) => (
           <div key={i} style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 14, marginBottom: 10, overflow: 'hidden' }}>
             <button onClick={() => setFaq(faq === i ? null : i)} style={{ width: '100%', textAlign: 'left', padding: '16px 20px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14.5, color: '#111', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              {f.q}<span style={{ color: ACCENT, transform: faq === i ? 'rotate(45deg)' : 'none', transition: 'transform .15s' }}>+</span>
+              {f.q}<span style={{ color: ACCENT, transform: faq === i ? 'rotate(45deg)' : 'none', transition: 'transform .3s cubic-bezier(0,0,.2,1)' }}>+</span>
             </button>
-            {faq === i && <div style={{ padding: '0 20px 16px', fontSize: 13.5, color: '#555', lineHeight: 1.6 }}>{f.a}</div>}
+            {/* Smooth open/close via grid-rows 0fr→1fr (animates to the answer's real height — the old
+                conditional render just popped in instantly). */}
+            <div style={{ display: 'grid', gridTemplateRows: faq === i ? '1fr' : '0fr', transition: 'grid-template-rows .32s cubic-bezier(0,0,.2,1)' }}>
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ padding: '0 20px 16px', fontSize: 13.5, color: '#555', lineHeight: 1.6, opacity: faq === i ? 1 : 0, transition: 'opacity .25s ease' }}>{f.a}</div>
+              </div>
+            </div>
           </div>
         ))}
       </div>

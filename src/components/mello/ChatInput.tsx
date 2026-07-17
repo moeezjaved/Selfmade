@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, BookOpen } from 'lucide-react'
 
 export function ChatInput({ value, onChange, onSend, disabled, onOpenLibrary, placeholder }: {
@@ -12,6 +12,17 @@ export function ChatInput({ value, onChange, onSend, disabled, onOpenLibrary, pl
   placeholder?: string
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
+  // Real Meta connection status — the badge used to be hardcoded "Meta connected". null = still checking
+  // (hide the badge until we know), so we never falsely claim a connection.
+  const [metaConnected, setMetaConnected] = useState<boolean | null>(null)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/meta/accounts')
+      .then(r => (r.ok ? r.json() : { accounts: [] }))
+      .then(j => { if (alive) setMetaConnected((j.accounts?.length || 0) > 0) })
+      .catch(() => { if (alive) setMetaConnected(false) })
+    return () => { alive = false }
+  }, [])
 
   useEffect(() => {
     const el = ref.current
@@ -45,9 +56,11 @@ export function ChatInput({ value, onChange, onSend, disabled, onOpenLibrary, pl
               <BookOpen size={14} /> Prompts
             </button>
           )}
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: '#9aa593' }}>
-            <span style={{ width: 7, height: 7, borderRadius: 99, background: '#1877f2', display: 'inline-block' }} /> Meta connected
-          </span>
+          {metaConnected !== null && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: '#9aa593' }}>
+              <span style={{ width: 7, height: 7, borderRadius: 99, background: metaConnected ? '#1877f2' : '#c3ccb9', display: 'inline-block' }} /> {metaConnected ? 'Meta connected' : 'Meta not connected'}
+            </span>
+          )}
         </div>
         <button
           onClick={() => value.trim() && !disabled && onSend()}

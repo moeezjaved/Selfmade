@@ -147,8 +147,12 @@ function FAQItem({ q, a }: { q: string; a: string }) {
         <span style={{ fontSize: 16.5, fontWeight: 700, color: INK }}>{q}</span>
         <span style={{ fontSize: 26, color: '#9ca3af', flexShrink: 0, lineHeight: 1, transition: 'transform .3s cubic-bezier(0,0,.2,1)', transform: open ? 'rotate(45deg)' : 'none' }}>+</span>
       </button>
-      <div style={{ overflow: 'hidden', maxHeight: open ? 240 : 0, opacity: open ? 1 : 0, transition: 'max-height .35s cubic-bezier(0,0,.2,1), opacity .3s cubic-bezier(0,0,.2,1)' }}>
-        <p style={{ padding: '0 4px 22px', margin: 0, color: '#4b5563', fontSize: 15, lineHeight: 1.6, maxWidth: 760 }}>{a}</p>
+      {/* grid-rows 0fr→1fr animates to the answer's true height (no fixed max-height cap that clips long
+          answers or makes short ones pop early). */}
+      <div style={{ display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', transition: 'grid-template-rows .35s cubic-bezier(0,0,.2,1)' }}>
+        <div style={{ overflow: 'hidden' }}>
+          <p style={{ padding: '0 4px 22px', margin: 0, color: '#4b5563', fontSize: 15, lineHeight: 1.6, maxWidth: 760, opacity: open ? 1 : 0, transition: 'opacity .3s cubic-bezier(0,0,.2,1)' }}>{a}</p>
+        </div>
       </div>
     </div>
   )
