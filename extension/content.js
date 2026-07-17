@@ -14,6 +14,15 @@
   const HOST = location.hostname
   if (HOST.includes('tryselfmade.ai')) return
 
+  // Facebook's *management* surfaces (Ads Manager, Business Suite, Developers) are where you BUILD ads,
+  // not view them — the Save button trailing over the campaign builder / audience panels was pure noise
+  // ("this save button is everywhere on facebook, moves with scroll"). Never run there.
+  const IS_FB_TOOLS =
+    HOST.startsWith('adsmanager.') || HOST.startsWith('business.') || HOST.startsWith('developers.') ||
+    location.pathname.startsWith('/adsmanager') || location.pathname.startsWith('/business') ||
+    location.pathname.startsWith('/latest/') // Business Suite
+  if (IS_FB_TOOLS) return
+
   const IS_FB_ADLIB = HOST.includes('facebook.com') && location.pathname.includes('/ads/library')
   const IS_TT_ADLIB = HOST.includes('library.tiktok.com')
   const IS_TT_FEED = HOST.includes('tiktok.com') && !IS_TT_ADLIB
@@ -330,16 +339,17 @@
     }
     const scheduleHide = () => { clearTimeout(hideT); hideT = setTimeout(() => { btn.style.display = 'none'; target = null }, 400) }
     document.addEventListener('mouseover', (e) => {
-      let el = e.target
-      // Direct media hover (IG/TikTok/most sites).
-      if (el instanceof HTMLImageElement || el instanceof HTMLVideoElement) { clearTimeout(hideT); showFor(el); return }
-      // FB puts a click overlay ON TOP of the creative, so the hover target is a div/anchor — look for
-      // the media inside a nearby container so the Save button still appears over FB feed ads.
-      if (el instanceof Element) {
-        const box = el.closest('[role="article"], article, [data-ad-preview], [aria-label]') || el.parentElement
-        const media = box && biggestMediaIn(box)
-        if (media) { clearTimeout(hideT); showFor(media) }
-      }
+      const el = e.target
+      if (!(el instanceof Element)) return
+      // This hover button only ever runs on the Facebook feed (Ad Library / IG / TikTok use per-card
+      // buttons). Only offer Save over a SPONSORED post — NOT over friends' photos, Marketplace, groups,
+      // profile pics or any organic image. That over-showing (a Save button popping up on every image
+      // and trailing the cursor) was the "save button everywhere / moves with scroll" bug.
+      const box = el.closest('[role="article"], article, [data-ad-preview]')
+      if (!box || !looksLikeAd(box)) return
+      // FB paints the creative as an <img>/<video>, or as a background-image div under a click overlay.
+      const media = (el instanceof HTMLImageElement || el instanceof HTMLVideoElement) ? el : biggestMediaIn(box)
+      if (media) { clearTimeout(hideT); showFor(media) }
     }, true)
     document.addEventListener('mouseout', (e) => {
       if (e.target === btn || (e.target instanceof Element && e.target.closest('.sm-save-btn'))) return
