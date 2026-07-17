@@ -65,7 +65,7 @@ export default function OnboardingPage() {
   const [loadingAds, setLoadingAds] = useState(false)
   const adsLoadedRef = useRef(false)
   const [balance, setBalance] = useState<number | null>(null)
-  const [costs, setCosts] = useState<{ image: number; video: number }>({ image: 100, video: 650 })
+  const [costs, setCosts] = useState<{ image: number; video: number }>({ image: 100, video: 600 })
   const [cloneImageAd, setCloneImageAd] = useState<TopAd | null>(null)
   const [cloneVideoAd, setCloneVideoAd] = useState<TopAd | null>(null)
   const [videoBuyFor, setVideoBuyFor] = useState<TopAd | null>(null)
@@ -174,7 +174,7 @@ export default function OnboardingPage() {
       const bal = await fetch('/api/credits/balance').then((r) => r.json())
       if (typeof bal?.balance === 'number') setBalance(bal.balance)
       const img = bal?.pricing?.image_clone_pro?.credits, vid = bal?.pricing?.video_clone?.credits
-      setCosts({ image: img || 100, video: vid || 650 })
+      setCosts({ image: img || 100, video: vid || 600 })
     } catch { /* defaults stand */ }
     // Top image + top video per competitor. db-search is performance-sorted and only returns ads
     // that have real drained creatives (has_creative), so every card is cloneable.

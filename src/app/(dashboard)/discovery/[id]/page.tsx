@@ -327,7 +327,7 @@ function AiPanel({ ad }: { ad: Ad }) {
         <>
         {/* Primary action for a video ad: clone it into the user's OWN product ad (Seedance). */}
         <button style={ctaS} onClick={() => setCloneVideoOpen(true)}>
-          <Sparkles size={16} /> Remake this video · from 650 cr
+          <Sparkles size={16} /> Remake this video · from {cost('video_clone', 600)} cr
         </button>
         <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Recreate this ad’s hook &amp; pacing with your product — you approve the script before any credits are spent.</div>
         {cloneVideoOpen && <CloneVideoModal sourceAdId={ad.id} sourceVideoUrl={ad.videoUrl} sourcePoster={ad.thumbnailUrl} onClose={() => setCloneVideoOpen(false)} />}
