@@ -58,7 +58,9 @@ function MyCreativesInner() {
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid #dde7dd' }}>
         <Tab on={tab === 'generations'} onClick={() => setTab('generations')}><Sparkles size={15} /> Generations</Tab>
-        <Tab on={tab === 'brands'} onClick={() => setTab('brands')}><Store size={15} /> Brands</Tab>
+        {/* Brands lives at its own route (/brands) so the sidebar 'Brands' item highlights in sync —
+            an in-page tab left the sidebar showing 'My Creatives' while you were on Brands. */}
+        <Tab on={tab === 'brands'} onClick={() => router.push('/brands')}><Store size={15} /> Brands</Tab>
       </div>
       {tab === 'generations' ? <Generations key={reloadKey} /> : <Brands />}
       {studio && <StudioModal onClose={() => { setStudio(false); setReloadKey(k => k + 1); setTab('generations') }} />}
@@ -79,6 +81,14 @@ function Generations() {
   const [gens, setGens] = useState<Gen[] | null>(null)
   const [filter, setFilter] = useState<'all' | 'clone' | 'edit' | 'inspired'>('all')
   const [open, setOpen] = useState<Gen | null>(null)
+  const router = useRouter()
+  // A draft has no output yet — clicking it should take the user back to the source ad to finish the
+  // remake (drafts can't be generated from here). Falls back to Discovery if we don't have the source id.
+  const openGen = (g: Gen) => {
+    if (g.status === 'processing') return
+    if (g.image_url) { setOpen(g); return }
+    router.push(g.source_ad_id ? `/discovery/${g.source_ad_id}` : '/discovery')
+  }
 
   const load = useCallback(async () => {
     const r = await fetch('/api/creatives')
@@ -123,7 +133,7 @@ function Generations() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px,100%), 1fr))', gap: 14 }}>
             {shown.map((g) => (
               <div key={g.id} style={card}>
-                <button onClick={() => g.status !== 'processing' && g.image_url && setOpen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: g.status === 'processing' || !g.image_url ? 'default' : 'pointer', background: '#0d120e', aspectRatio: '1', overflow: 'hidden', position: 'relative' }}>
+                <button onClick={() => openGen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: g.status === 'processing' ? 'default' : 'pointer', background: '#0d120e', aspectRatio: '1', overflow: 'hidden', position: 'relative' }}>
                   {g.status === 'processing' ? (
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', justifyContent: 'center', color: LIME, fontSize: 12, fontWeight: 600 }}><Loader2 size={20} className="spin" /> Generating {g.media_type === 'video' ? 'video' : 'ad'}…</div>
                   ) : !g.image_url ? (
@@ -132,7 +142,7 @@ function Generations() {
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', justifyContent: 'center', color: '#9fb0a4', fontSize: 12, fontWeight: 600, padding: 12, textAlign: 'center' }}>
                       {g.status === 'failed'
                         ? <><span style={{ fontSize: 20 }}>⚠️</span> Failed — credits refunded</>
-                        : <><span style={{ fontSize: 20 }}>📝</span> Draft — not generated yet<span style={{ fontWeight: 400, fontSize: 11, color: '#6f7f73' }}>Open the ad in Discovery and hit Remake to finish it</span></>}
+                        : <><span style={{ fontSize: 20 }}>📝</span> Draft — not generated yet<span style={{ fontWeight: 400, fontSize: 11, color: '#6f7f73' }}>{g.source_ad_id ? 'Click to open the ad and finish it →' : 'Open it in Discovery and hit Remake to finish'}</span></>}
                     </div>
                   ) : g.media_type === 'video' ? (
                     <video src={g.image_url} muted loop autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

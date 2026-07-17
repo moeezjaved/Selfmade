@@ -28,13 +28,16 @@ export interface CreditState {
 }
 
 const BAL_CACHE = 'credits:lastBalance'
+// Module-level cache of the last-fetched state. Persists across component re-mounts within a session
+// (e.g. switching Discovery → AI Gen re-mounts the sidebar counter). It is NULL on the server and on the
+// very first client render — so SSR and first hydration still both render '…' and match (no #425). Only
+// AFTER the first live fetch does it hold a value, so subsequent re-mounts show the number with no '…'.
+let LAST: CreditState | null = null
 export function useCredits(): CreditState & { refetch: () => void } {
-  // IMPORTANT: initialize to a CONSTANT (same on server + client) — do NOT read localStorage in the
-  // useState initializer. That runs during SSR render: the server (no window) rendered '…' while the
-  // client rendered the cached '90' → React hydration #425/#418/#423 → the whole dashboard tree got
-  // discarded ("feed vanishes"). We seed from cache in the post-mount effect below instead, so the
-  // server HTML and first client render match. (Trades a 1-tick '…' on the pill for not breaking the page.)
-  const [s, setS] = useState<CreditState>({ balance: 0, plan: 'trial', reset_at: null, trialing: false, trial_ends_at: null, pricing: {}, loading: true })
+  // Seed from the module cache when available (re-mount) → instant number, no '…' flash, no hydration
+  // mismatch (null on first-ever render, matching the server). Do NOT read localStorage here — that would
+  // desync SSR ('…') from the client (cached number) → React #425/#418/#423 discards the whole tree.
+  const [s, setS] = useState<CreditState>(LAST ?? { balance: 0, plan: 'trial', reset_at: null, trialing: false, trial_ends_at: null, pricing: {}, loading: true })
   const refetch = useCallback(async () => {
     try {
       const r = await fetch('/api/credits/balance')
@@ -42,14 +45,18 @@ export function useCredits(): CreditState & { refetch: () => void } {
       const d = await r.json()
       const balance = d.balance ?? 0
       if (typeof window !== 'undefined') localStorage.setItem(BAL_CACHE, String(balance))
-      setS({ balance, plan: d.plan ?? 'trial', reset_at: d.reset_at ?? null, trialing: !!d.trialing, trial_ends_at: d.trial_ends_at ?? null, pricing: d.pricing ?? {}, loading: false })
+      const next: CreditState = { balance, plan: d.plan ?? 'trial', reset_at: d.reset_at ?? null, trialing: !!d.trialing, trial_ends_at: d.trial_ends_at ?? null, pricing: d.pricing ?? {}, loading: false }
+      LAST = next
+      setS(next)
     } catch { setS(p => ({ ...p, loading: false })) }
   }, [])
   useEffect(() => {
-    // Post-mount (client-only): seed instantly from the cached balance so the pill shows a real
-    // number while the live refetch lands — same UX as before, but without the hydration mismatch.
-    const cached = Number(localStorage.getItem(BAL_CACHE))
-    if (Number.isFinite(cached)) setS(p => ({ ...p, balance: cached, loading: false }))
+    // Post-mount (client-only): if the module cache was empty (first load / full refresh), seed instantly
+    // from the localStorage cache so the pill shows a real number while the live refetch lands.
+    if (!LAST) {
+      const cached = Number(localStorage.getItem(BAL_CACHE))
+      if (Number.isFinite(cached) && cached > 0) setS(p => ({ ...p, balance: cached, loading: false }))
+    }
     refetch()
     const h = () => refetch()
     window.addEventListener(REFRESH_EVENT, h)
@@ -58,16 +65,17 @@ export function useCredits(): CreditState & { refetch: () => void } {
   return { ...s, refetch }
 }
 
-/** Pre-action confirm. Returns true if the user proceeds (and can afford it).
- * On insufficient balance we no longer window.confirm — we pop the Buy-credits modal so the
- * user can top up in place, and block the action (returns false). */
+/** Pre-action affordability gate. Returns true if the user can afford it (and proceeds).
+ * No more browser-native window.confirm — the credit cost is already shown on every action button, so
+ * a second OS dialog was redundant friction (and looked un-branded). If they can't afford it we pop the
+ * in-app Buy-credits modal instead and block the action (returns false). */
 export function confirmCredits(action: string, credits: number, balance: number): boolean {
   if (typeof window === 'undefined') return false
   if (balance < credits) {
     openCredits('buy', `Not enough credits — ${action} needs ${credits}, you have ${balance.toLocaleString()}. Top up to continue.`)
     return false
   }
-  return window.confirm(`This ${action} uses ${credits} credits. You have ${balance}.\n\nProceed?`)
+  return true
 }
 
 export function CreditCounter({ compact = false }: { compact?: boolean }) {
