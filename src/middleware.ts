@@ -21,19 +21,18 @@ const PROTECTED = [
   '/discovery',
 ]
 
-// Pages that need an active subscription (billing itself is always accessible)
+// Pages that need an active subscription (billing itself is always accessible). Pricing v2: Free is a
+// real tier — the CORE make-an-ad loop (Discovery + My Creatives) is free-usable, so it's NOT gated
+// here (a cancelled/lapsed user drops to Free and must still browse + remake). Only the Meta-analytics
+// surfaces (coming-soon-flagged) stay behind the gate.
 const REQUIRES_SUBSCRIPTION = [
   '/dashboard',
   '/recommendations',
   '/campaigns',
-  '/creative-studio',
   '/ad-engine',
-  '/activity',
-  '/settings',
   '/reports',
   '/insights',
   '/m4',
-  '/discovery',
 ]
 
 export async function middleware(request: NextRequest) {
@@ -118,7 +117,8 @@ export async function middleware(request: NextRequest) {
     }
 
     if ((pathname === '/login' || pathname === '/signup') && user) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      // Land in Discovery (the make-an-ad hub), not the empty Meta-analytics dashboard.
+      return NextResponse.redirect(new URL('/discovery', request.url))
     }
 
     // ── Subscription gate ────────────────────────────────────────
