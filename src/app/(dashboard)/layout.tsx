@@ -15,7 +15,7 @@ import type { UserProfile } from '@/types'
 import {
   Settings, LogOut, Menu, X, Check, LifeBuoy, ChevronsUpDown, Zap, Sparkles, CreditCard, Users,
   Compass, Target, TrendingUp, Star, Bookmark, Image as ImageIcon, Heart,
-  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, ChevronRight, Trophy, Camera,
+  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, Trophy, Camera,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -236,18 +236,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <NotificationBell />
           </div>
 
-          {/* Primary action — restart the core remake loop from anywhere (spec: post-onboarding CTA) */}
+          {/* Primary action — the bold, always-there entry to the core remake loop (replaces the Ask
+              Mello card here; Mello stays reachable from the rail icon on the left). */}
           <div style={{ padding: '0 20px' }}><RemakeStarter /></div>
-
-          {/* Ask Mello card */}
-          <Link href="/mello" className="sm-mello-card">
-            <span className="sm-mello-mark"><Sparkles size={17} color="#0e1b12"/></span>
-            <span style={{flex:1,minWidth:0}}>
-              <span style={{display:"block",fontSize:13.5,fontWeight:700,color:"#f4f7ef"}}>Ask Mello</span>
-              <span style={{display:"block",fontSize:11.5,color:"#8a9182"}}>Analyze any creative</span>
-            </span>
-            <ChevronRight size={16} color="#8a9182" style={{flexShrink:0}}/>
-          </Link>
 
           <div style={{padding:"10px 20px 6px",fontSize:10,fontWeight:800,letterSpacing:".1em",textTransform:"uppercase",color:"rgba(255,255,255,0.28)"}}>Workspace</div>
 
