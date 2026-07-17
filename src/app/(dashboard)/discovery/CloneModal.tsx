@@ -94,6 +94,50 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     })()
   }, [])
 
+  // ── Draft autosave — an accidental close of this modal used to wipe the whole setup. Persist the
+  // configuration per-ad in localStorage and restore it on reopen, so no work is lost. ──
+  const draftKey = `remake-draft:v1:${ad.id}${ad.assetImageUrl ? ':asset' : ''}`
+  const [draftRestored, setDraftRestored] = useState(false)
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+    try {
+      const raw = localStorage.getItem(draftKey)
+      if (!raw) return
+      const d = JSON.parse(raw)
+      if (d.mode) setMode(d.mode)
+      if (d.brandId !== undefined) setBrandId(d.brandId)
+      if (typeof d.bName === 'string') setBName(d.bName)
+      if (typeof d.bSite === 'string') setBSite(d.bSite)
+      if (typeof d.headline === 'string') setHeadline(d.headline)
+      if (d.aspect) setAspect(d.aspect)
+      if (d.look) setLook(d.look)
+      if (d.imageSize) setImageSize(d.imageSize)
+      if (typeof d.count === 'number') setCount(d.count)
+      if (Array.isArray(d.photos)) setPhotos(d.photos)
+      if (Array.isArray(d.selected)) setSelected(d.selected)
+      if (typeof d.emailDaily === 'boolean') setEmailDaily(d.emailDaily)
+      if (typeof d.saveAsBrand === 'boolean') setSaveAsBrand(d.saveAsBrand)
+      if ((Array.isArray(d.photos) && d.photos.length) || d.headline || d.brandId) setDraftRestored(true)
+    } catch { /* corrupt draft — ignore */ }
+  }, [draftKey])
+  useEffect(() => {
+    if (!restoredRef.current) return
+    const payload = { mode, brandId, bName, bSite, headline, aspect, look, imageSize, count, photos, selected, emailDaily, saveAsBrand }
+    try { localStorage.setItem(draftKey, JSON.stringify(payload)) }
+    catch {
+      // Quota hit (large data: URL uploads) — persist the config without the heavy photo blobs.
+      try { localStorage.setItem(draftKey, JSON.stringify({ ...payload, photos: photos.filter((p) => !p.src.startsWith('data:')) })) } catch { /* give up */ }
+    }
+  }, [draftKey, mode, brandId, bName, bSite, headline, aspect, look, imageSize, count, photos, selected, emailDaily, saveAsBrand])
+  const clearDraft = () => {
+    try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
+    setMode(brands.length ? 'pick' : 'new'); setBrandId(null); setBName(''); setBSite('')
+    setPhotos([]); setSelected([]); setHeadline(''); setAspect('original'); setLook('match')
+    setImageSize('2K'); setCount(1); setDraftRestored(false)
+  }
+
   const addPhotos = (list: Photo[]) => {
     setPhotos((p) => {
       const seen = new Set(p.map((x) => x.src))
@@ -153,6 +197,11 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
 
   const toggleSel = (id: string) =>
     setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : (s.length >= 4 ? s : [...s, id]))
+
+  // Remove a photo from the picker entirely (distinct from deselecting) — the ✕ makes removal
+  // discoverable; before this the only way to "get rid of" a photo was a non-obvious click-to-deselect.
+  const removePhoto = (id: string) =>
+    setPhotos((p) => { setSelected((s) => s.filter((x) => x !== id)); return p.filter((x) => x.id !== id) })
 
   const generate = async () => {
     setErr(null)
@@ -305,6 +354,12 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         <div style={{ display: 'grid', gridTemplateColumns: hasResults ? '1fr 1fr' : '1fr', gap: 0 }}>
           {/* ── controls ── */}
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {draftRestored && !hasResults && (
+              <div style={{ fontSize: 11.5, color: '#9fb0a4', background: '#121c15', border: '1px solid #24331d', borderRadius: 8, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                ↩ Restored your last setup for this ad.
+                <button onClick={clearDraft} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#8aa', cursor: 'pointer', fontSize: 11.5, textDecoration: 'underline', fontFamily: 'inherit' }}>Start fresh</button>
+              </div>
+            )}
             {/* Brand */}
             <section>
               <Label>1 · Your brand</Label>
@@ -363,12 +418,17 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                 {photos.map((p) => {
                   const on = selected.includes(p.id)
                   return (
-                    <button key={p.id} onClick={() => toggleSel(p.id)} title={p.label}
-                      style={{ position: 'relative', width: 74, height: 74, borderRadius: 10, overflow: 'hidden', border: on ? `2px solid ${LIME}` : '2px solid #263', background: '#0a0f0c', cursor: 'pointer', padding: 0 }}>
+                    <div key={p.id} onClick={() => toggleSel(p.id)} title={on ? 'Click to deselect' : 'Click to select'}
+                      style={{ position: 'relative', width: 74, height: 74, borderRadius: 10, overflow: 'hidden', border: on ? `2px solid ${LIME}` : '2px solid #263', background: '#0a0f0c', cursor: 'pointer' }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={cdn(p.src)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: on ? 1 : 0.55 }} />
                       {on && <span style={{ position: 'absolute', top: 3, right: 3, background: LIME, color: '#14281a', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={12} strokeWidth={3} /></span>}
-                    </button>
+                      {/* Remove (✕) — always visible, top-left, so users know a photo can be taken out. */}
+                      <button onClick={(e) => { e.stopPropagation(); removePhoto(p.id) }} title="Remove photo" aria-label="Remove photo"
+                        style={{ position: 'absolute', top: 3, left: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.62)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                        <X size={11} strokeWidth={2.75} />
+                      </button>
+                    </div>
                   )
                 })}
                 <button onClick={() => fileRef.current?.click()} style={{ width: 74, height: 74, borderRadius: 10, border: '2px dashed #365', background: 'transparent', color: '#9fb0a4', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11 }}>
@@ -480,7 +540,10 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                 </div>
               </div>
 
-              <a href={active.url} download={creativeFilename({ brand: bName.trim() || ad.pageName, index: activeIdx + 1, kind: 'clone' })} style={{ ...btnPrimary, textDecoration: 'none', justifyContent: 'center' }}>
+              {/* Same-origin proxy download — active.url is on cross-origin R2 (no CORS + `download`
+                  ignored cross-origin), so link straight through the proxy for a real "Save as…". */}
+              <a href={`/api/creatives/download?url=${encodeURIComponent(active.url)}&name=${encodeURIComponent(creativeFilename({ brand: bName.trim() || ad.pageName, index: activeIdx + 1, kind: 'clone' }))}`}
+                download={creativeFilename({ brand: bName.trim() || ad.pageName, index: activeIdx + 1, kind: 'clone' })} style={{ ...btnPrimary, textDecoration: 'none', justifyContent: 'center' }}>
                 <Download size={15} /> Download{results.length > 1 ? ' this variation' : ''}
               </a>
               <p style={{ fontSize: 11.5, color: '#8aa', margin: 0 }}>All variations are saved in <b style={{ color: '#cfe' }}>My Creatives</b>. Edit any above, or Regenerate for fresh ones.</p>

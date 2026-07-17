@@ -1335,6 +1335,7 @@ export default function DiscoveryPage() {
   const [query, setQuery] = useState(snap?.query ?? '')
   const [searchMode, setSearchMode] = useState<'adcopy' | 'brand' | 'category'>(snap?.searchMode ?? 'adcopy')
   const [chipTip, setChipTip] = useState<{ label: string; top: number; left: number } | null>(null)  // preset-chip explainer popup
+  const [activeChip, setActiveChip] = useState<string | null>(null)  // which quick-filter chip is currently applied (for its selected look)
   const [rawAds, setRawAds] = useState<Ad[]>(snap?.rawAds ?? [])
   // Mirror of rawAds + a bounded "empty page" counter for infinite-scroll stall recovery (Bug 11):
   // a loadMore window that returns only already-seen creatives appends 0 rows, so the scroll sentinel
@@ -2062,16 +2063,21 @@ export default function DiscoveryPage() {
         {/* Preset chips (GetHookd-style quick filter combos) */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 2 }}>
           {[
-            { label: '🏆 Best of the Month', tip: 'The top-percentile ads of the last 30 days. "Winning" = ranked across our whole library by how long an ad runs (advertisers kill losers fast), how often the brand re-runs the same creative, and brand scale — must run ≥14 days. Meta doesn’t publish impressions, so we rank by signals advertisers can’t fake.', apply: () => { setTiers(['winning']); setNiches([]); setTimeDays(0); setSort('performance') } },
-            { label: '🔥 Winning ads', tip: 'Ads in the top percentile of our library. Scored by longevity (how long it runs), creative reuse (how often the brand re-runs it), and brand scale — must run ≥14 days to qualify. Meta hides impressions, so we rank by public signals advertisers can’t fake.', apply: () => { setTiers(['winning']); setSort('performance') } },
-            { label: '📊 Brands · 100+ active ads', apply: () => { setMinBrandAdsStr('100') } },
-            { label: '💄 Beauty ads', apply: () => { setNiches(['Beauty']) } },
-            { label: '👗 Fashion ads', apply: () => { setNiches(['Fashion']) } },
-          ].map((p: { label: string; tip?: string; apply: () => void }) => (
-            <button key={p.label} onClick={p.apply}
+            { label: '🏆 Best of the Month', tip: 'The top-percentile ads of the last 30 days. "Winning" = ranked across our whole library by how long an ad runs (advertisers kill losers fast), how often the brand re-runs the same creative, and brand scale — must run ≥14 days. Meta doesn’t publish impressions, so we rank by signals advertisers can’t fake.', apply: () => { setTiers(['winning']); setNiches([]); setTimeDays(0); setSort('performance') }, sig: () => tiers.includes('winning') && sort === 'performance' },
+            { label: '🔥 Winning ads', tip: 'Ads in the top percentile of our library. Scored by longevity (how long it runs), creative reuse (how often the brand re-runs it), and brand scale — must run ≥14 days to qualify. Meta hides impressions, so we rank by public signals advertisers can’t fake.', apply: () => { setTiers(['winning']); setSort('performance') }, sig: () => tiers.includes('winning') && sort === 'performance' },
+            { label: '📊 Brands · 100+ active ads', apply: () => { setMinBrandAdsStr('100') }, sig: () => minBrandAdsStr === '100' },
+            { label: '💄 Beauty ads', apply: () => { setNiches(['Beauty']) }, sig: () => niches.includes('Beauty') },
+            { label: '👗 Fashion ads', apply: () => { setNiches(['Fashion']) }, sig: () => niches.includes('Fashion') },
+          ].map((p: { label: string; tip?: string; apply: () => void; sig: () => boolean }) => {
+            // A chip is "selected" when the user clicked it AND its underlying filter is still applied
+            // (so changing a dropdown that removes the filter clears the highlight; the clicked-tracking
+            // disambiguates 'Winning ads' from the superset 'Best of the Month').
+            const on = activeChip === p.label && p.sig()
+            return (
+            <button key={p.label} onClick={() => { p.apply(); setActiveChip(p.label) }}
               onMouseEnter={p.tip ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setChipTip({ label: p.label, top: r.bottom + 5, left: Math.min(r.left, window.innerWidth - 280) }) } : undefined}
               onMouseLeave={p.tip ? () => setChipTip(null) : undefined}
-              style={{ position: 'relative', padding: '5px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, background: '#fff', color: '#374151', border: '1px solid #e2e8f0', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+              style={{ position: 'relative', padding: '5px 12px', borderRadius: 100, fontSize: 12, fontWeight: on ? 700 : 600, background: on ? '#1a3a1a' : '#fff', color: on ? '#dffe95' : '#374151', border: on ? '1px solid #1a3a1a' : '1px solid #e2e8f0', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
               {p.label}
               {p.tip && chipTip?.label === p.label && (
                 <span style={{ position: 'fixed', top: chipTip.top, left: chipTip.left, width: 270, zIndex: 9999,
@@ -2082,7 +2088,7 @@ export default function DiscoveryPage() {
                 </span>
               )}
             </button>
-          ))}
+          )})}
         </div>
 
         {/* Filter toolbar — every filter visible, uniform + evenly spaced. Wraps to tidy rows on
