@@ -117,6 +117,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [acctOpen, setAcctOpen] = useState(false)
   // Close the mobile drawer + account menu whenever the route changes.
   useEffect(() => { setNavOpen(false); setAcctOpen(false) }, [pathname])
+  // Esc closes the account dropdown (previously only re-clicking the avatar or an outside-click closed it).
+  useEffect(() => {
+    if (!acctOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAcctOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [acctOpen])
   // NOTE: this layout used to be gated behind a whole-layout `mounted` flag (returned a blank
   // placeholder until a post-mount effect flipped it). That was meant to dodge hydration #418/#423/
   // #425 — but those turned out to be browser EXTENSIONS injecting into <html>/<body>, not our code,
