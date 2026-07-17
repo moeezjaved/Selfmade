@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 
-type C = { id: string; image_url: string | null; type: string; media_type: string; status: string; tier: string; prompt: string | null; created_at: string; email: string; name: string; brand: string | null }
+type C = { id: string; image_url: string | null; type: string; media_type: string; status: string; tier: string; prompt: string | null; created_at: string; email: string; name: string; brand: string | null; source_ad_id?: string | null; source_thumb?: string | null }
 const fmt = (d: string) => new Date(d).toLocaleString()
 
 export default function AdminCreatives() {
@@ -32,7 +32,7 @@ export default function AdminCreatives() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 14 }}>
           {shown.map(c => (
             <div key={c.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ aspectRatio: '1', background: '#0d120e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ aspectRatio: '1', background: '#0d120e', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                 {c.status === 'processing' || c.status === 'analyzing' ? <span style={{ color: '#dffe95', fontSize: 12 }}>{c.status === 'analyzing' ? 'Analyzing…' : 'Generating…'}</span>
                   : !c.image_url ? <span style={{ color: '#9aa79a', fontSize: 11, textAlign: 'center', padding: 8 }}>{c.status === 'failed' ? '⚠️ Failed' : '📝 Draft · no output'}</span>
                   : c.media_type === 'video'
@@ -41,6 +41,18 @@ export default function AdminCreatives() {
                     // Click the image to open it full-size in a new tab.
                     // eslint-disable-next-line @next/next/no-img-element
                     : <a href={c.image_url} target="_blank" rel="noreferrer" style={{ width: '100%', height: '100%', display: 'block' }}><img src={c.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></a>}
+                {/* "Cloned from" — the source ad this creative was made from. Click to open it in Discovery. */}
+                {(c.source_thumb || c.source_ad_id) && (
+                  <a href={c.source_ad_id ? `/discovery/${c.source_ad_id}` : undefined} target="_blank" rel="noreferrer"
+                    title="Cloned from this ad — click to open the source" onClick={e => e.stopPropagation()}
+                    style={{ position: 'absolute', top: 6, left: 6, width: 40, borderRadius: 6, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.85)', boxShadow: '0 2px 8px rgba(0,0,0,0.5)', textDecoration: 'none', background: '#000', display: 'block' }}>
+                    {c.source_thumb
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={c.source_thumb} alt="source ad" style={{ width: '100%', height: 50, objectFit: 'cover', display: 'block' }} />
+                      : <div style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9aa79a', fontSize: 9 }}>ad ↗</div>}
+                    <div style={{ fontSize: 7.5, fontWeight: 800, color: '#fff', textAlign: 'center', letterSpacing: '.05em', padding: '1px 0', background: 'rgba(0,0,0,0.75)' }}>SOURCE</div>
+                  </a>
+                )}
               </div>
               <div style={{ padding: '9px 11px' }}>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 5, flexWrap: 'wrap' }}>
