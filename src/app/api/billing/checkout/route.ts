@@ -43,11 +43,14 @@ export async function POST(req: NextRequest) {
       await admin.from('subscriptions').upsert({ owner_id: user.id, stripe_customer_id: customerId }, { onConflict: 'owner_id' })
     }
 
+    // Pricing model v2: NO free trial — subscribe = pay now, full credits immediately. The low-friction
+    // "try it" path is pay-as-you-go (the $9 top-up pack), not a trial. This also removes the confusing
+    // partial-credit trial and the day-7 surprise-charge dispute risk.
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      subscription_data: { trial_period_days: 7, metadata: { owner_id: user.id, plan: planId, cycle: billingCycle } },
+      subscription_data: { metadata: { owner_id: user.id, plan: planId, cycle: billingCycle } },
       metadata: { owner_id: user.id, plan: planId, cycle: billingCycle },
       success_url: `${APP_URL}/pricing?upgraded=1`,
       cancel_url: `${APP_URL}/pricing`,

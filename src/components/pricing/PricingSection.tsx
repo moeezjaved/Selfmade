@@ -1,60 +1,43 @@
 'use client'
 /**
- * Shared pricing UI (Atria-style, green/lime brand) used on the public landing page AND the in-app
- * billing page. Tier cards + monthly/annual toggle + full feature-comparison grid + FAQ, all driven
- * by the PLANS config so the marketing page and backend never drift.
- *   variant="landing"   → CTAs go to /signup?plan=…  (logged-out)
- *   variant="dashboard" → CTAs start Stripe checkout / show current plan (logged-in)
+ * Pricing UI (v2, 2026-07-17) — the customer sees VIDEOS & IMAGES, never credits. Four cards:
+ * Free · Pay as you go · Creator · Agency. No trial (subscribe = pay now). Driven by PLANS so the
+ * marketing page and billing never drift (Creator = internal `starter`, Agency = internal `business`).
+ *   variant="landing"   → CTAs go to /signup  (logged-out)
+ *   variant="dashboard" → CTAs start Stripe checkout / open the Add-funds modal / show current plan
  */
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { PLANS, PLAN_ORDER, TOPUP_PACKS, normalizePlan, type PlanId } from '@/lib/plans'
+import { PLANS, ACTION_COSTS, normalizePlan, type PlanId } from '@/lib/plans'
+import { openCredits } from '@/components/credits/CreditModal'
 
-const DARK = '#14281a', LIME = '#dffe95', ACCENT = '#3a7000'
-const cur = (p: PlanId, cycle: 'monthly' | 'annual') =>
-  p === 'enterprise' ? 'Custom' : `$${cycle === 'annual' ? PLANS[p].priceAnnualMonthly : PLANS[p].priceMonthly}`
+const DARK = '#16321a', LIME = '#dffe95', ACCENT = '#3a7000', MUTED = '#6b7a6b'
+const IMG_USD = (ACTION_COSTS.image_clone_pro / 100).toFixed(2)   // 1 credit = 1¢
+const VID_USD = String(Math.round(ACTION_COSTS.video_clone / 100))
 
-const CMP: { group: string; rows: { label: string; get: (p: PlanId) => string }[] }[] = [
-  { group: 'Discovery & search', rows: [
-    { label: 'Ad discovery search', get: (p) => PLANS[p].discoveryPages ? `Capped (${PLANS[p].discoveryPages} pages)` : '✓' },
-    { label: 'Filters (perf · niche · hook · emotion · angle · format)', get: (p) => p === 'free' ? 'Basic' : '✓' },
-    { label: 'Top Picks (curated)', get: (p) => p === 'free' ? 'Preview' : '✓' },
-    { label: 'Saved ads / boards', get: (p) => p === 'free' ? '25 saves' : p === 'pro' || p === 'business' || p === 'enterprise' ? 'Team boards' : '✓' },
-  ]},
-  { group: 'Brand Spy', rows: [
-    { label: 'Brands tracked', get: (p) => PLANS[p].brandSpy === Infinity ? 'Unlimited' : String(PLANS[p].brandSpy) },
-  ]},
-  { group: 'Intelligence', rows: [
-    { label: 'Patterns / AI insights', get: (p) => PLANS[p].aiInsights ? '✓' : '—' },
-  ]},
-  { group: 'Creation — available on every tier, gated by credits', rows: [
-    { label: 'Monthly credits', get: (p) => PLANS[p].monthlyCredits === null ? 'Custom' : PLANS[p].monthlyCredits!.toLocaleString() + (p === 'free' && PLANS[p].welcomeCredits ? ` (+${PLANS[p].welcomeCredits} welcome)` : '') },
-    { label: 'Ask Mello · Scripts · Transcribe', get: () => '✓' },
-    { label: 'Image Remake (2K, Nano Banana Pro)', get: () => '✓' },
-    { label: 'Video Remake', get: () => '✓' },
-    { label: 'Buy top-up credits', get: (p) => PLANS[p].canBuyCredits ? '✓' : '—' },
-  ]},
-  { group: 'Launch & analytics', rows: [
-    { label: 'Launch ads', get: (p) => PLANS[p].launch ? '✓' : '—' },
-    { label: 'Campaigns · Scale · Deep Reports', get: (p) => PLANS[p].campaigns ? '✓' : '—' },
-  ]},
-  { group: 'Team & API', rows: [
-    { label: 'Seats', get: (p) => PLANS[p].seats + (p === 'enterprise' ? '+' : '') },
-    { label: 'API / MCP', get: (p) => PLANS[p].api ? '✓' : '—' },
-  ]},
+type CardId = 'free' | 'payg' | 'starter' | 'business'
+interface Card { id: CardId; tier: string; price: string; per: string; note: string; feats: string[]; cta: string; popular?: boolean }
+
+const CARDS: Card[] = [
+  { id: 'free', tier: 'Free', price: '$0', per: '', note: 'No card needed',
+    feats: ['5 image ads to try', 'Browse Discovery + Brand Spy', 'Remake any winning ad'], cta: 'Start free' },
+  { id: 'payg', tier: 'Pay as you go', price: `$${VID_USD}`, per: '/ video', note: 'No subscription',
+    feats: [`$${VID_USD} per video ad`, `$${IMG_USD} per image ad`, 'Top up any amount, anytime', 'Balance never expires'], cta: 'Add funds' },
+  { id: 'starter', tier: PLANS.starter.label, price: `$${PLANS.starter.priceMonthly}`, per: '/ month', note: 'For sellers running ads weekly',
+    feats: ['Unlimited image ads', `${PLANS.starter.videosPerMonth} video ads / month`, 'Full Discovery + Brand Spy', 'Save + organize in boards'], cta: 'Subscribe', popular: true },
+  { id: 'business', tier: PLANS.business.label, price: `$${PLANS.business.priceMonthly}`, per: '/ month', note: 'For teams & agencies',
+    feats: ['Unlimited image ads', `${PLANS.business.videosPerMonth} video ads / month`, `${PLANS.business.seats} team seats`, 'Priority generation'], cta: 'Subscribe' },
 ]
 
 const FAQS: { q: string; a: string }[] = [
-  { q: 'Is there a free trial?', a: 'Yes — 7 days on any paid plan, no card needed. Or start on the free plan forever.' },
-  { q: 'How do credits work?', a: 'One shared currency for AI actions (scripts, transcribe, Mello, Image Remake). Your plan refills monthly.' },
-  { q: 'Do unused credits roll over?', a: 'Plan credits reset each month (use them or lose them). Purchased top-up credits roll over for 12 months.' },
-  { q: 'Can I buy more credits?', a: 'Yes — top-up packs (250/$19, 750/$49, 2,000/$119) on any paid plan.' },
-  { q: 'What counts as a brand in Brand Spy?', a: 'Each advertiser you actively track. Your plan sets the limit (15 → 50 → 150 → unlimited).' },
-  { q: 'Can I change plans anytime?', a: 'Yes — upgrade instantly (prorated), downgrade at period end.' },
+  { q: 'How does pricing work?', a: `No credits, no math — you pay for what you make. An image ad is $${IMG_USD}, a video ad is $${VID_USD}. Buy as you go, or subscribe for unlimited images plus a monthly batch of videos.` },
+  { q: 'Is there a free trial?', a: `The free plan gives you 5 image ads to try, no card needed. Want to test a video? Pay as you go — one video is just $${VID_USD}, no subscription.` },
+  { q: 'What does "unlimited images" mean?', a: 'On Creator and Agency, image-ad remakes are free and unlimited (fair use). Videos are included up to your monthly count.' },
+  { q: 'What counts as one video ad?', a: 'A short-form ad up to about 30 seconds. Longer videos use a bit more of your monthly allowance.' },
+  { q: 'Can I cancel anytime?', a: 'Yes — one click. You keep everything you made, and any pay-as-you-go balance never expires.' },
+  { q: 'How much does an agency charge for the same thing?', a: `A UGC video from a freelancer runs $200–300 and takes a week. Here it's $${VID_USD} and about two minutes.` },
 ]
 
 export default function PricingSection({ variant = 'landing' }: { variant?: 'landing' | 'dashboard' }) {
-  const [cycle, setCycle] = useState<'monthly' | 'annual'>('monthly')
   const [current, setCurrent] = useState<PlanId | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [faq, setFaq] = useState<number | null>(0)
@@ -64,113 +47,78 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
     fetch('/api/credits/balance').then((r) => r.json()).then((j) => setCurrent(normalizePlan(j.plan))).catch(() => {})
   }, [variant])
 
-  const cta = async (p: PlanId) => {
-    if (p === 'enterprise') { window.location.href = 'mailto:hello@tryselfmade.ai?subject=Enterprise%20plan'; return }
-    if (variant === 'landing') { window.location.href = p === 'free' ? '/signup' : `/signup?plan=${p}&cycle=${cycle}`; return }
-    if (p === 'free' || current === p) return
-    setBusy(p)
+  const cta = async (c: Card) => {
+    if (variant === 'landing') {
+      window.location.href = c.id === 'starter' || c.id === 'business' ? `/signup?plan=${c.id}` : '/signup'
+      return
+    }
+    // dashboard
+    if (c.id === 'free') return
+    if (c.id === 'payg') { openCredits('buy'); return }
+    if (current === c.id) return
+    setBusy(c.id)
     try {
-      const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: p, cycle }) })
+      const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: c.id, cycle: 'monthly' }) })
       const j = await r.json()
       if (j.url) window.location.href = j.url
       else alert(j.error === 'not_configured' ? 'Billing isn’t fully configured yet (Stripe price IDs).' : (j.message || j.error || 'Could not start checkout.'))
     } finally { setBusy(null) }
   }
 
+  const label = (c: Card) => {
+    if (busy === c.id) return '…'
+    if (variant === 'dashboard' && current === c.id) return 'Current plan'
+    return c.cta
+  }
+
   return (
-    <div style={{ maxWidth: 1120, margin: '0 auto', color: '#0a0a0a' }}>
-      {/* toggle */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 30 }}>
-        <button onClick={() => setCycle('monthly')} style={toggle(cycle === 'monthly')}>Monthly</button>
-        <button onClick={() => setCycle('annual')} style={toggle(cycle === 'annual')}>
-          Annual <span style={{ fontSize: 11, background: LIME, color: DARK, borderRadius: 100, padding: '2px 8px', marginLeft: 6, fontWeight: 800 }}>−25%</span>
-        </button>
+    <div style={{ maxWidth: 1080, margin: '0 auto', color: '#16261a' }}>
+      {/* the one thing to remember */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: 30 }}>
+        <div style={chip}><span style={{ fontSize: 19 }}>🖼️</span><span style={{ fontSize: 14, color: MUTED, fontWeight: 600 }}>Image ad</span><b style={{ fontSize: 21, letterSpacing: '-.02em' }}>${IMG_USD}</b></div>
+        <div style={chip}><span style={{ fontSize: 19 }}>🎬</span><span style={{ fontSize: 14, color: MUTED, fontWeight: 600 }}>Video ad</span><b style={{ fontSize: 21, letterSpacing: '-.02em' }}>${VID_USD}</b></div>
       </div>
 
-      {/* tier cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(195px,100%), 1fr))', gap: 14, alignItems: 'stretch' }}>
-        {PLAN_ORDER.map((p) => {
-          const plan = PLANS[p]
-          const isCurrent = variant === 'dashboard' && current === p
-          return (
-            <div key={p} style={{
-              background: '#fff', borderRadius: 20, padding: '24px 20px', position: 'relative', display: 'flex', flexDirection: 'column',
-              border: plan.mostPopular ? `2px solid ${DARK}` : '1px solid rgba(0,0,0,0.09)',
-              boxShadow: plan.mostPopular ? '0 20px 60px rgba(20,40,26,0.14)' : '0 2px 12px rgba(0,0,0,0.04)',
-            }}>
-              {plan.mostPopular && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: DARK, color: LIME, fontSize: 11, fontWeight: 800, padding: '4px 12px', borderRadius: 100, whiteSpace: 'nowrap' }}>Most popular</div>}
-              <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT, letterSpacing: '.06em', textTransform: 'uppercase' }}>{plan.label}</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, margin: '8px 0 2px' }}>
-                <span style={{ fontSize: 34, fontWeight: 900, letterSpacing: '-0.03em' }}>{cur(p, cycle)}</span>
-                {p !== 'enterprise' && p !== 'free' && <span style={{ fontSize: 14, color: '#999', fontWeight: 600 }}>/mo</span>}
-              </div>
-              <div style={{ fontSize: 12, color: '#999', minHeight: 16 }}>
-                {p === 'enterprise' ? 'Let’s talk' : p === 'free' ? 'Free forever' : cycle === 'annual' ? `billed $${plan.priceAnnualMonthly * 12}/yr` : `${plan.monthlyCredits} credits/mo`}
-              </div>
-              <button onClick={() => cta(p)} disabled={isCurrent || busy === p} style={{
-                margin: '16px 0 14px', padding: '11px', borderRadius: 100, border: 'none', cursor: isCurrent ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
-                background: isCurrent ? '#eef2ec' : plan.mostPopular ? DARK : LIME, color: isCurrent ? '#6b7280' : plan.mostPopular ? LIME : DARK,
-              }}>
-                {busy === p ? '…' : isCurrent ? 'Current plan' : p === 'enterprise' ? 'Contact us' : p === 'free' ? (variant === 'landing' ? 'Start free' : 'Free') : (variant === 'landing' ? 'Start trial' : 'Upgrade')}
-              </button>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12.5, color: '#333' }}>
-                {[
-                  plan.monthlyCredits === null ? 'Custom credits' : `${plan.monthlyCredits.toLocaleString()} credits/mo`,
-                  plan.brandSpy === Infinity ? 'Unlimited brand spy' : `${plan.brandSpy} tracked brands`,
-                  `${plan.seats} seat${plan.seats > 1 ? 's' : ''}`,
-                  plan.aiInsights ? 'AI Insights + Patterns' : 'AI creation (credits)',
-                  plan.campaigns ? 'Campaigns + Reports' : plan.launch ? 'Launch ads' : 'Discovery + Spy',
-                ].map((f, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <span style={{ background: LIME, color: DARK, borderRadius: '50%', width: 17, height: 17, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0, marginTop: 1 }}>✓</span>
-                    {f}
-                  </div>
-                ))}
-              </div>
+      {/* four cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(215px,100%), 1fr))', gap: 14, alignItems: 'stretch' }}>
+        {CARDS.map((c) => (
+          <div key={c.id} style={{
+            background: '#fff', borderRadius: 18, padding: '22px 20px', position: 'relative', display: 'flex', flexDirection: 'column',
+            border: c.popular ? `2px solid ${DARK}` : '1px solid rgba(0,0,0,0.09)',
+            boxShadow: c.popular ? '0 18px 44px rgba(20,40,26,0.16)' : '0 2px 12px rgba(0,0,0,0.04)',
+          }}>
+            {c.popular && <div style={{ position: 'absolute', top: -11, left: 20, background: LIME, color: DARK, fontSize: 11, fontWeight: 800, padding: '5px 10px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.05em' }}>Most popular</div>}
+            <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT, letterSpacing: '.06em', textTransform: 'uppercase' }}>{c.tier}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, margin: '8px 0 2px' }}>
+              <span style={{ fontSize: 34, fontWeight: 900, letterSpacing: '-0.03em' }}>{c.price}</span>
+              {c.per && <span style={{ fontSize: 14, color: '#999', fontWeight: 600 }}>{c.per}</span>}
             </div>
-          )
-        })}
-      </div>
-
-      {/* comparison grid */}
-      <h3 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', margin: '56px 0 18px', textAlign: 'center' }}>Compare features</h3>
-      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table style={{ width: '100%', minWidth: 560, borderCollapse: 'collapse', fontSize: 12.5 }}>
-          <thead>
-            <tr style={{ background: '#f5f8f2' }}>
-              <th style={{ textAlign: 'left', padding: '12px 16px', fontWeight: 700, color: '#555' }}></th>
-              {PLAN_ORDER.map((p) => (
-                <th key={p} style={{ padding: '12px 8px', fontWeight: 800, color: PLANS[p].mostPopular ? ACCENT : '#333', textAlign: 'center' }}>{PLANS[p].label}{PLANS[p].mostPopular ? ' ★' : ''}</th>
+            <div style={{ fontSize: 12, color: MUTED, minHeight: 16, marginBottom: 4 }}>{c.note}</div>
+            <button onClick={() => cta(c)} disabled={busy === c.id || (variant === 'dashboard' && current === c.id)} style={{
+              margin: '14px 0', padding: '11px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
+              background: (variant === 'dashboard' && current === c.id) ? '#eef2ec' : c.popular ? LIME : c.id === 'business' ? DARK : '#f2f6ee',
+              color: (variant === 'dashboard' && current === c.id) ? '#6b7280' : c.id === 'business' ? LIME : DARK,
+            }}>{label(c)}</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13, color: '#333' }}>
+              {c.feats.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ background: LIME, color: DARK, borderRadius: '50%', width: 17, height: 17, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0, marginTop: 1 }}>✓</span>
+                  {f}
+                </div>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {CMP.map((sec) => (
-              <>
-                <tr key={sec.group}><td colSpan={6} style={{ padding: '12px 16px 6px', fontWeight: 800, color: ACCENT, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.04em', background: '#fafcf8' }}>{sec.group}</td></tr>
-                {sec.rows.map((r) => (
-                  <tr key={r.label} style={{ borderTop: '1px solid #f1f4ee' }}>
-                    <td style={{ padding: '9px 16px', color: '#444' }}>{r.label}</td>
-                    {PLAN_ORDER.map((p) => {
-                      const v = r.get(p)
-                      return <td key={p} style={{ padding: '9px 8px', textAlign: 'center', fontWeight: v === '✓' ? 800 : 600, color: v === '—' ? '#cbd0c8' : v === '✓' ? ACCENT : '#333' }}>{v}</td>
-                    })}
-                  </tr>
-                ))}
-              </>
-            ))}
-          </tbody>
-        </table>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* top-ups strip */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 24, fontSize: 13, color: '#555' }}>
-        <span style={{ fontWeight: 700, color: DARK }}>Top-ups:</span>
-        {TOPUP_PACKS.map((pk) => <span key={pk.id}>{pk.credits.toLocaleString()} credits — ${pk.priceUsd}</span>).reduce((acc: any[], el, i) => i ? [...acc, <span key={'d' + i} style={{ color: '#ccc' }}>·</span>, el] : [el], [])}
+      {/* agency anchor */}
+      <div style={{ marginTop: 28, padding: '18px 22px', borderRadius: 16, background: '#f2f8f0', border: '1px solid #d8e6d4', textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#16261a' }}>
+        A UGC video from a freelancer: <span style={{ color: MUTED, fontWeight: 500 }}>$200–300 and a week.</span> &nbsp;Here: ${VID_USD} and 2 minutes.
       </div>
+      <p style={{ marginTop: 12, fontSize: 12.5, color: MUTED, textAlign: 'center' }}>1 video ad = a short-form ad up to ~30s; longer videos use a bit more. Unlimited images are fair-use. Prices in USD.</p>
 
       {/* FAQ */}
-      <h3 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', margin: '52px 0 18px', textAlign: 'center' }}>Frequently asked questions</h3>
+      <h3 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', margin: '48px 0 18px', textAlign: 'center' }}>Frequently asked questions</h3>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
         {FAQS.map((f, i) => (
           <div key={i} style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 14, marginBottom: 10, overflow: 'hidden' }}>
@@ -185,4 +133,4 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
   )
 }
 
-const toggle = (on: boolean): React.CSSProperties => ({ padding: '9px 20px', borderRadius: 100, border: on ? `1.5px solid ${DARK}` : '1.5px solid rgba(0,0,0,0.12)', background: on ? DARK : '#fff', color: on ? LIME : '#555', fontWeight: 800, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center' })
+const chip: React.CSSProperties = { display: 'flex', alignItems: 'baseline', gap: 10, background: '#fff', border: '1px solid #e2e8e0', borderRadius: 14, padding: '13px 18px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }
