@@ -124,12 +124,9 @@ export async function handleStripeWebhook(payload: string, signature: string) {
     try { const { data } = await supabase.auth.admin.getUserById(ownerId); return (data as any)?.user?.email || null } catch { return null }
   }
 
-  // During the free trial we grant only a small credit allowance (not the full plan pool) so a
-  // user can't sign up, burn thousands of credits of compute, and cancel before the first charge.
-  // The cap is written to subscriptions.monthly_credits_override, which apply_plan reads; it's
-  // cleared to null the moment the trial converts to a paid subscription → full pool unlocks.
-  const TRIAL_CREDIT_CAP = parseInt(process.env.TRIAL_CREDIT_CAP || '150', 10)
-
+  // Pricing model v2 (2026-07-17): NO free trial. Subscribe = pay now, FULL credits immediately.
+  // The old TRIAL_CREDIT_CAP / monthly_credits_override dance is gone — the "try it" path is now
+  // pay-as-you-go (the $9 top-up), so plans never start in a capped/trialing state.
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
@@ -170,21 +167,19 @@ export async function handleStripeWebhook(payload: string, signature: string) {
       const cycle = session.metadata?.cycle || 'monthly'
       const periodEnd = new Date((sub as any).current_period_end * 1000).toISOString()
 
-      const startingTrial = sub.status === 'trialing'
       await supabase.from('subscriptions').upsert({
         owner_id: userId, plan: plan || undefined, billing_cycle: cycle, status: sub.status,
         stripe_customer_id: session.customer as string, stripe_subscription_id: subscriptionId,
         current_period_start: new Date((sub as any).current_period_start * 1000).toISOString(),
-        current_period_end: periodEnd, trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
-        // Cap credits during the trial; full pool unlocks when it converts (see subscription.updated).
-        monthly_credits_override: startingTrial ? TRIAL_CREDIT_CAP : null,
+        current_period_end: periodEnd, trial_end: null,
+        // No trial → full plan pool from day one.
+        monthly_credits_override: null,
         scheduled_plan: null, updated_at: new Date().toISOString(),
       }, { onConflict: 'owner_id' })
 
       await supabase.from('user_profiles').update({
         stripe_subscription_id: subscriptionId, stripe_customer_id: session.customer as string,
-        subscription_status: sub.status,
-        trial_ends_at: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+        subscription_status: sub.status, trial_ends_at: null,
       }).eq('user_id', userId)
 
       // Flip the plan + refill plan credits to the new allotment immediately (spec §5).
@@ -196,7 +191,7 @@ export async function handleStripeWebhook(payload: string, signature: string) {
         const { PLANS } = await import('@/lib/plans')
         const to = await emailFor(userId, session.customer_details?.email)
         const label = (plan && (PLANS as any)[plan]?.label) || (plan ? plan[0].toUpperCase() + plan.slice(1) : 'your plan')
-        if (to) await sendSubscriptionEmail(to, label, cycle, startingTrial)
+        if (to) await sendSubscriptionEmail(to, label, cycle, false)
       } catch { /* receipt is best-effort */ }
       break
     }
@@ -220,33 +215,23 @@ export async function handleStripeWebhook(payload: string, signature: string) {
       const mappedPlan = planFromPriceId((sub as any).items?.data?.[0]?.price?.id)
       const activeNow = sub.status === 'active' || sub.status === 'trialing'
 
-      // Trial just converted to a paid subscription? (Stripe sends the prior status in previous_attributes.)
-      const prevStatus = (event.data as any).previous_attributes?.status
-      const justConverted = prevStatus === 'trialing' && sub.status === 'active'
-
+      // Sync the PLAN column on portal upgrades/downgrades (they carry no plan metadata) — map the
+      // current price → tier; only flip on an active sub and only if we recognise the price. No trial
+      // handling (pricing v2 removed trials) → always the full pool.
       await supabase.from('subscriptions').update({
         status: sub.status, current_period_end: periodEnd,
         ...(mappedPlan && activeNow ? { plan: mappedPlan } : {}),
-        // Keep the credit cap while trialing; drop it the moment the sub is active (full pool unlocks).
-        ...(sub.status === 'trialing' ? { monthly_credits_override: TRIAL_CREDIT_CAP } : sub.status === 'active' ? { monthly_credits_override: null } : {}),
-        trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+        monthly_credits_override: null,
+        trial_end: null,
         updated_at: new Date().toISOString(),
       }).eq('owner_id', userId)
 
       await supabase.from('user_profiles').update({
-        subscription_status: sub.status,
-        trial_ends_at: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+        subscription_status: sub.status, trial_ends_at: null,
       }).eq('user_id', userId)
 
-      // Grant credits (apply_plan reads the override we just set → capped while trialing, full once active).
-      // On a trial→paid conversion the price map can miss, so fall back to the stored plan so the full
-      // pool always unlocks on the first real payment.
-      let creditPlan = mappedPlan
-      if (!creditPlan && justConverted) {
-        const { data: row } = await supabase.from('subscriptions').select('plan').eq('owner_id', userId).maybeSingle()
-        creditPlan = (row as any)?.plan || null
-      }
-      if (creditPlan && activeNow) await supabase.rpc('apply_plan', { p_user: userId, p_plan: creditPlan, p_reset: periodEnd })
+      // Grant the tier's full credit pool on any active plan change (upgrade/downgrade via portal).
+      if (mappedPlan && activeNow) await supabase.rpc('apply_plan', { p_user: userId, p_plan: mappedPlan, p_reset: periodEnd })
       break
     }
 

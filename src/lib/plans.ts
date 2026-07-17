@@ -11,7 +11,8 @@ export interface PlanEntitlements {
   label: string
   priceMonthly: number         // USD/mo (0 = free, null-ish for enterprise custom)
   priceAnnualMonthly: number   // USD/mo billed annually (~25% off)
-  monthlyCredits: number | null // null = custom (enterprise)
+  monthlyCredits: number | null // null = custom (enterprise). For SUBSCRIBERS this is the VIDEO budget
+                                // (images are free — see imagesUnlimited); 1 video = 600 cr.
   welcomeCredits?: number      // one-time top-up grant on signup (free only)
   seats: number
   brandSpy: number             // tracked-brand cap (Infinity = unlimited)
@@ -25,46 +26,66 @@ export interface PlanEntitlements {
   canBuyCredits: boolean       // top-ups allowed
   teamBoards: boolean          // shared/org-visible boards (Pro+); personal boards always allowed
   assetsGb: number | null      // uploaded-asset storage cap in GB (null = uncapped/custom)
+  // ── Pricing-model v2 (2026-07-17): the customer sees VIDEOS & IMAGES, never credits. ──
+  videosPerMonth?: number | null // how many video ads/mo the credit pool covers (display); null = pay-as-you-go / custom
+  imagesUnlimited?: boolean    // subscribers: image remakes are FREE + unlimited (charged 0 credits in reserveCredits)
+  hidden?: boolean             // kept as a valid tier but NOT shown on the pricing page (legacy 'pro')
   mostPopular?: boolean
 }
 
+// ── Pricing model v2 (2026-07-17, LOCKED) ── The customer sees VIDEOS & IMAGES, not credits.
+// Internal ids are KEPT to avoid a data migration: `starter` IS "Creator", `business` IS "Agency",
+// `pro` is hidden (legacy). Subscribers get FREE unlimited image ads; their credit pool = video budget
+// (1 video = 600 cr). Free = a taste of images; Pay-as-you-go (the $9 launch top-up) needs no plan.
 export const PLANS: Record<PlanId, PlanEntitlements> = {
   free: {
     label: 'Free', priceMonthly: 0, priceAnnualMonthly: 0,
-    // canBuyCredits TRUE on Free (2026-07-14): the onboarding funnel sells the $9 Launch Pack to
-    // free users at the video-clone moment — blocking free users from buying credits killed the
-    // exact conversion we want. Subscriptions upsell separately.
-    monthlyCredits: 100, welcomeCredits: 500, seats: 1, brandSpy: 1, expressPulls: 3, discoveryPages: 3,
+    // canBuyCredits TRUE on Free (2026-07-14): pay-as-you-go IS the "$9 test" — a free user buys the
+    // $9 Launch Pack (900 cr) at the video-clone moment and makes a real video. Subscriptions upsell
+    // separately. 75 cr = 5 image ads to try (video is gated by balance → upsell).
+    monthlyCredits: 75, welcomeCredits: 0, seats: 1, brandSpy: 1, expressPulls: 3, discoveryPages: 3,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: true,
-    teamBoards: false, assetsGb: 0.5,
+    teamBoards: false, assetsGb: 0.5, videosPerMonth: 0, imagesUnlimited: false,
   },
+  // "Creator" — the everyday plan. 6,000 cr = 10 video ads/mo; image ads free + unlimited.
   starter: {
-    label: 'Starter', priceMonthly: 39, priceAnnualMonthly: 29,
-    monthlyCredits: 2000, seats: 1, brandSpy: 15, expressPulls: 15, discoveryPages: null,
+    label: 'Creator', priceMonthly: 49, priceAnnualMonthly: 49,
+    monthlyCredits: 6000, seats: 1, brandSpy: 15, expressPulls: 15, discoveryPages: null,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: true, canBuyCredits: true,
-    teamBoards: false, assetsGb: 5,
+    teamBoards: false, assetsGb: 5, videosPerMonth: 10, imagesUnlimited: true, mostPopular: true,
   },
+  // Legacy 'pro' — kept valid for any existing subscriber, HIDDEN from the pricing page.
   pro: {
     label: 'Pro', priceMonthly: 99, priceAnnualMonthly: 74,
-    monthlyCredits: 5000, seats: 3, brandSpy: 50, expressPulls: 50, discoveryPages: null,
+    monthlyCredits: 12000, seats: 3, brandSpy: 50, expressPulls: 50, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: false, api: true, exports: true, canBuyCredits: true,
-    teamBoards: true, assetsGb: 50, mostPopular: true,
+    teamBoards: true, assetsGb: 50, videosPerMonth: 20, imagesUnlimited: true, hidden: true,
   },
+  // "Agency" — teams. 18,000 cr = 30 video ads/mo; image ads free + unlimited; 5 seats.
   business: {
-    label: 'Business', priceMonthly: 249, priceAnnualMonthly: 186,
-    monthlyCredits: 15000, seats: 10, brandSpy: 150, expressPulls: 200, discoveryPages: null,
+    label: 'Agency', priceMonthly: 149, priceAnnualMonthly: 149,
+    monthlyCredits: 18000, seats: 5, brandSpy: 50, expressPulls: 50, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
-    teamBoards: true, assetsGb: 250,
+    teamBoards: true, assetsGb: 50, videosPerMonth: 30, imagesUnlimited: true,
   },
   enterprise: {
     label: 'Enterprise', priceMonthly: 0, priceAnnualMonthly: 0,
     monthlyCredits: null, seats: 25, brandSpy: Infinity, expressPulls: Infinity, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
-    teamBoards: true, assetsGb: null,
+    teamBoards: true, assetsGb: null, videosPerMonth: null, imagesUnlimited: true,
   },
 }
 
-export const PLAN_ORDER: PlanId[] = ['free', 'starter', 'pro', 'business', 'enterprise']
+// Order for upsell math. 'pro' is intentionally OUT (hidden legacy) so nextPlan(Creator) → Agency.
+export const PLAN_ORDER: PlanId[] = ['free', 'starter', 'business', 'enterprise']
+
+/** Plans whose image remakes are free + unlimited (subscribers). Used by reserveCredits. */
+export function imagesAreFree(planId?: string | null): boolean {
+  return !!PLANS[normalizePlan(planId)]?.imagesUnlimited
+}
+
+/** The paid plans shown on the pricing page, in order (skips Free, hidden 'pro', and Enterprise card). */
+export const PRICING_PLANS: PlanId[] = ['starter', 'business']
 
 /** Map any legacy/unknown plan id to a valid PlanId (trial→free, core→starter, plus→pro). */
 export function normalizePlan(id?: string | null): PlanId {
@@ -106,10 +127,14 @@ export const ACTION_COSTS: Record<string, number> = {
   image_studio_pro: 100,    // 2K AI Ad Studio — original ad from inspiration + industry insights
   image_studio_4k: 160,     // 4K / HD Studio ad
   image_edit_pro: 65,       // iterative edit (one 2K Pro image)
-  video_clone: 650,         // UGC 15s premium (2× fal cost) — video is a cost-plus loss-leader
+  video_clone: 600,         // UGC 15s ($6.00 @ 1cr=1¢) — the "video ad = $6" anchor (v2 pricing)
   video_captions: 100,      // TikTok-style burned captions — high-margin add-on
   asset_ai_tag: 10,         // AI tagging of an uploaded asset (caption/embed + video clip analysis)
 }
+
+// Image-remake actions that are FREE + unlimited for subscribers (pricing model v2). Studio (original
+// ads) stays metered — it's a distinct premium feature, not the "image ad remake" we advertise free.
+export const FREE_FOR_SUBSCRIBERS = new Set(['image_clone_pro', 'image_clone_4k', 'image_edit_pro'])
 
 // ── Top-up packs — pricing spec §3.1 ──
 export interface TopupPack { id: string; credits: number; priceUsd: number }
