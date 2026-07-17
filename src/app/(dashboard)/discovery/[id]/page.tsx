@@ -10,6 +10,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { X, Bookmark, Link as LinkIcon, Download, Sparkles, ExternalLink } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
+import { imagesAreFree } from '@/lib/plans'
 import toast from 'react-hot-toast'
 import { useIsMobile } from '@/lib/useIsMobile'
 
@@ -281,7 +282,8 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 /** Format-aware AI actions: Scripts (transcribe → framework → duplicate) for VIDEO
  *  ads, Clone for IMAGE ads. Each action goes through the credit gate. */
 function AiPanel({ ad }: { ad: Ad }) {
-  const { balance, pricing } = useCredits()
+  const { balance, pricing, plan } = useCredits()
+  const imagesFree = imagesAreFree(plan)   // Creator/Agency: image remakes are free + unlimited
   const isVideo = ad.format === 'Video' || !!ad.videoUrl
   const [cloneOpen, setCloneOpen] = useState(false)
   const [cloneVideoOpen, setCloneVideoOpen] = useState(false)
@@ -368,7 +370,7 @@ function AiPanel({ ad }: { ad: Ad }) {
       ) : (
         <>
           <button style={ctaS} onClick={() => setCloneOpen(true)}>
-            <Sparkles size={16} /> Remake ad · from {cost('image_clone_pro', 15)} cr
+            <Sparkles size={16} /> Remake ad · {imagesFree ? 'Free' : `from ${cost('image_clone_pro', 15)} cr`}
           </button>
           <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Composite your product onto this winning ad — 2K or 4K.</div>
           {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName }} onClose={() => setCloneOpen(false)} />}
