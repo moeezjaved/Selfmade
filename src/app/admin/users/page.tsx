@@ -34,12 +34,15 @@ export default function UsersPage() {
       <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111', margin: '0 0 6px' }}>Users</h1>
       <p style={{ color: '#888', fontSize: '14px', margin: '0 0 24px' }}>{users.length} users</p>
 
-      <input
-        placeholder="Search by name or email…"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        style={{ width: '320px', padding: '10px 14px', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '13px', outline: 'none', marginBottom: '20px', boxSizing: 'border-box' }}
-      />
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <input
+          placeholder="Search by name or email…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ width: '320px', padding: '10px 14px', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+        />
+        <a href="/api/admin/users/export" download style={{ padding: '10px 14px', border: '1px solid #16321a', borderRadius: '8px', fontSize: '13px', fontWeight: 700, color: '#16321a', textDecoration: 'none', background: '#eef5eb' }}>⬇ Export all emails (CSV)</a>
+      </div>
 
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e8e8e8', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
