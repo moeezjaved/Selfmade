@@ -5,6 +5,7 @@ import { CreditCounter } from '@/components/credits/CreditCounter'
 import { CreditModal } from '@/components/credits/CreditModal'
 import { NotificationBell } from '@/components/NotificationBell'
 import UpsellModalHost from '@/components/UpsellModal'
+import RemakeStarter from '@/components/RemakeStarter'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -234,6 +235,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
             <NotificationBell />
           </div>
+
+          {/* Primary action — restart the core remake loop from anywhere (spec: post-onboarding CTA) */}
+          <div style={{ padding: '0 20px' }}><RemakeStarter /></div>
 
           {/* Ask Mello card */}
           <Link href="/mello" className="sm-mello-card">
