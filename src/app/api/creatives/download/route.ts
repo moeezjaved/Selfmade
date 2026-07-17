@@ -11,6 +11,7 @@
  * a general-purpose proxy.
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -21,6 +22,13 @@ const ALLOW_EXACT = ['cdn.tryselfmade.ai']
 const allowed = (host: string) => ALLOW_EXACT.includes(host) || ALLOW_SUFFIX.some((s) => host.endsWith(s))
 
 export async function GET(req: NextRequest) {
+  // Auth required — this streams bytes through our origin, so it must not be an anonymous relay. (The
+  // R2 objects are already public, so there's no data-exposure delta; this just stops the world from
+  // using our bandwidth, and scopes usage to logged-in users.)
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return new NextResponse('unauthorized', { status: 401 })
+
   const raw = req.nextUrl.searchParams.get('url')
   // Sanitize the download filename (header-injection + path safety); keep it human-readable.
   const name = (req.nextUrl.searchParams.get('name') || 'selfmade-ad').replace(/[^\w.\- ]+/g, '_').slice(0, 120).trim() || 'selfmade-ad'

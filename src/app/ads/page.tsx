@@ -81,7 +81,7 @@ export default async function AdsHub() {
 
       <section style={{ maxWidth: 820, margin: '0 auto', padding: '20px 24px 60px' }}>
         <p style={{ fontSize: 15, color: '#6b7280', lineHeight: 1.7 }}>
-          Selfmade indexes millions of real Meta ads so you never have to start from a blank canvas. Whether you sell skincare, supplements, apparel, or software, you can study the hooks and angles converting in your category, track any competitor with Brand Spy, and turn proven formulas into finished, on-brand ads with the AI Ad Studio — then launch straight to your ad account. Browse a category above to get started, free with 50 credits.
+          Selfmade indexes millions of real Meta ads so you never have to start from a blank canvas. Whether you sell skincare, supplements, apparel, or software, you can study the hooks and angles converting in your category, track any competitor with Brand Spy, and turn proven formulas into finished, on-brand ads with the AI Ad Studio — then launch straight to your ad account. Browse a category above to get started — free with 5 image ads, no card.
         </p>
       </section>
     </div>

@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { uploadBufferToR2 } from '@/lib/r2'
+import { isRateLimited } from '@/lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120   // may fetch the source mp4 from fbcdn on-demand if it isn't drained yet
@@ -28,6 +29,8 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Burst guard (fail-open) — cap scripted generation floods.
+  if (await isRateLimited(user.id)) return NextResponse.json({ error: 'rate_limited', message: 'Too many generations in a short time — please wait a moment and try again.' }, { status: 429 })
 
   const body = await req.json().catch(() => ({}))
   const sourceAdId = String(body.sourceAdId || '').trim()
