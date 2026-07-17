@@ -184,6 +184,17 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const isMobile = useIsMobile()
   const [copied, setCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  // Edit history — every AI edit produces a NEW image; keep the prior versions so the user can compare
+  // and restore instead of losing the picture they liked. Each entry is a full {img, genId} snapshot.
+  const [versions, setVersions] = useState<{ img: string; genId: string }[]>([])
+  const restoreVersion = (i: number) => {
+    const v = versions[i]
+    if (!v) return
+    const cur = img
+    // Swap: the current view drops into the slot we're restoring from, so it stays reversible.
+    setVersions((vs) => vs.map((x, j) => (j === i && cur != null ? { img: cur, genId } : x)))
+    setImg(v.img); setGenId(v.genId)
+  }
   // Captions add-on (high-margin blade). Burns TikTok-style captions onto this finished video.
   const [capStyle, setCapStyle] = useState<'bold' | 'minimal' | 'boxed'>('bold')
   const [capLang, setCapLang] = useState('en')
@@ -242,19 +253,18 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
     finally { setCapBusy(false) }
   }
 
-  // Force a real download. `<a download>` is ignored for cross-origin R2 URLs (browser just opens
-  // them in a new tab), so fetch the bytes and save via an object URL instead.
-  const downloadCreative = async (filename: string) => {
+  // Force a real download. `<a download>` is ignored for cross-origin R2 URLs and R2 sends no CORS
+  // headers, so the old blob-fetch failed silently. Stream through our same-origin proxy instead — it
+  // sets Content-Disposition: attachment, so this is a real "Save as…" with the right filename.
+  const downloadCreative = (filename: string) => {
     if (!img || downloading) return
     setDownloading(true)
     try {
-      const r = await fetch(img)
-      const b = await r.blob()
-      const u = URL.createObjectURL(b)
-      const a = document.createElement('a'); a.href = u; a.download = filename; a.click()
-      URL.revokeObjectURL(u)
-    } catch { window.open(img, '_blank') }   // fallback if the fetch is blocked
-    finally { setDownloading(false) }
+      const a = document.createElement('a')
+      a.href = `/api/creatives/download?url=${encodeURIComponent(img)}&name=${encodeURIComponent(filename)}`
+      a.download = filename
+      document.body.appendChild(a); a.click(); a.remove()
+    } finally { setTimeout(() => setDownloading(false), 1200) }
   }
   const copyUrl = () => { if (img) { navigator.clipboard?.writeText(img); setCopied(true); setTimeout(() => setCopied(false), 1500) } }
 
@@ -268,6 +278,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
       })
       const j = await r.json()
       if (!r.ok) { setErr(j.error === 'insufficient_credits' ? 'Not enough credits for this edit.' : j.error || 'Edit failed.'); return }
+      if (img) { const cur = img; setVersions((v) => [...v, { img: cur, genId }]) }   // keep the pre-edit version so it can be restored
       setImg(j.image); if (j.generationId) setGenId(j.generationId); setInstr('')
       onChanged()
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
@@ -380,6 +391,19 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
           ) : (
             <>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Edit creative</div>
+              {versions.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11.5, color: '#6b7280', marginBottom: 6, fontWeight: 600 }}>Previous versions <span style={{ color: '#9ca3af', fontWeight: 400 }}>· click to restore</span></div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {versions.map((v, i) => (
+                      <button key={i} onClick={() => restoreVersion(i)} title="Restore this version" style={{ width: 46, height: 46, borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0', padding: 0, cursor: 'pointer', background: '#0d120e' }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={v.img} alt={`version ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) applyEdit() }}
                 placeholder="Tweak this creative — headline, subhead, colors, scene, background…" style={{ ...input, resize: 'vertical' }} />
