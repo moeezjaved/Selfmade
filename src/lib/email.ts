@@ -47,6 +47,57 @@ export async function sendSubscriptionEmail(to: string, planLabel: string, cycle
   return sendEmail(to, trialing ? `Your ${planLabel} trial is live` : `Welcome to ${planLabel}`, html)
 }
 
+/** Subscription cancelled → dropped to Free. Warm win-back (work is saved, come back anytime). */
+export async function sendSubscriptionCanceledEmail(to: string, planLabel: string): Promise<boolean> {
+  if (!emailEnabled || !to) return false
+  const html = emailShell({
+    title: `Your ${planLabel} plan was cancelled`,
+    intro: `You're on the <b>Free</b> plan now — but nothing's lost. Every ad, brand and board you made is still here, and you can pick up right where you left off. Come back whenever you're ready; your best-performing remakes are waiting.`,
+    ctaText: 'Reactivate my plan', ctaUrl: `${APP_URL}/pricing`,
+  })
+  return sendEmail(to, `Your ${planLabel} plan was cancelled — your work is saved`, html)
+}
+
+/** Low-credits nudge — sent once per month when a user runs low, so they can top up before they're stuck. */
+export async function sendLowCreditsEmail(to: string): Promise<boolean> {
+  if (!emailEnabled || !to) return false
+  const html = emailShell({
+    title: `You're running low`,
+    intro: `Heads up — you don't have quite enough left for your next <b>video ad</b>. Top up in a few seconds (packs never expire) so you're not stopped mid-idea. Image ads stay free on Creator and Agency.`,
+    ctaText: 'Top up', ctaUrl: `${APP_URL}/pricing`,
+  })
+  return sendEmail(to, `You're running low — top up to keep creating`, html)
+}
+
+/** Fire a low-credits nudge at most once/calendar-month, when the owner can't afford another video. */
+export async function maybeLowCreditsEmail(userId: string, to: string): Promise<void> {
+  if (!emailEnabled || !to) return
+  try {
+    const { resolveBillingOwner } = await import('@/lib/org')
+    const admin = createAdminClient()
+    const owner = await resolveBillingOwner(admin, userId)
+    const { data: w } = await admin.from('credit_wallets').select('plan_credits_balance, topup_credits_balance').eq('owner_id', owner).maybeSingle()
+    const bal = Number((w as any)?.plan_credits_balance || 0) + Number((w as any)?.topup_credits_balance || 0)
+    if (bal >= 600) return   // still enough for a video → not "low"
+    const now = new Date()
+    const mk = `LOW_CREDITS_${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}`
+    if (!(await claimOnceLog(owner, mk))) return   // already nudged this month
+    await sendLowCreditsEmail(to)
+  } catch { /* best-effort */ }
+}
+
+/** Abandoned-onboarding nudge — signed up, never made an ad. Sent once, ~1–2 days after signup. */
+export async function sendOnboardingNudgeEmail(to: string, fullName?: string): Promise<boolean> {
+  if (!emailEnabled || !to) return false
+  const first = (fullName || '').trim().split(/\s+/)[0] || 'there'
+  const html = emailShell({
+    title: `${first}, your first ad is 2 minutes away`,
+    intro: `You signed up but haven't made an ad yet — and the first one's the fun part. Pick any winning ad, drop in your product, and get a scroll-stopping <b>image or video</b> back in about two minutes. Your first 5 image ads are free.`,
+    ctaText: 'Remake your first ad', ctaUrl: `${APP_URL}/discovery`,
+  })
+  return sendEmail(to, `${first}, make your first ad in 2 minutes 🎬`, html)
+}
+
 /** Payment-failed notice — a renewal charge bounced. Nudge them to update their card before we suspend. */
 export async function sendPaymentFailedEmail(to: string, planLabel: string): Promise<boolean> {
   if (!emailEnabled || !to) return false

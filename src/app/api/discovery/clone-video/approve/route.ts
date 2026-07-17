@@ -119,5 +119,8 @@ export async function POST(req: NextRequest) {
     await refundAll()
     return NextResponse.json({ error: 'could not start generation' }, { status: 500 })
   }
+  // Credits were just spent on a video — if they're now too low for another, nudge them (once/month).
+  try { const { maybeLowCreditsEmail } = await import('@/lib/email'); await maybeLowCreditsEmail(user.id, user.email || '') } catch { /* best-effort */ }
+
   return NextResponse.json({ jobId, status: 'processing' })
 }
