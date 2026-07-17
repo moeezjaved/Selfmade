@@ -157,5 +157,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/webhooks).*)'],
+  // Exclude ALL /api routes — they authenticate themselves (getUser/getSession in-handler) and return
+  // JSON 401s, so they never need the middleware's redirect logic. Running getUser() (a ~300-500ms POST
+  // to Supabase auth) in middleware on EVERY api call — db-search, credits/balance, notifications, on
+  // every scroll — was the biggest source of Discovery slowness. Pages still get full middleware.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/).*)'],
 }
