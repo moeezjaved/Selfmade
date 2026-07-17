@@ -273,13 +273,14 @@ const VISUALSTYLE_OPTS = ['Selfie / Handheld', 'Bathroom / Mirror', 'Kitchen / H
 const CTASTYLE_OPTS = [{ value: 'soft', label: 'Soft' }, { value: 'hard', label: 'Hard' }, { value: 'none', label: 'None' }]
 
 // ── FilterDropdown ───────────────────────────────────────────
-function FilterDropdown({ label, options, selected, onToggle, onClear, searchable }: {
+function FilterDropdown({ label, options, selected, onToggle, onClear, searchable, comingSoon }: {
   label: string
   options: { value: string; label: string; icon?: string }[]
   selected: string[]
   onToggle: (v: string) => void
   onClear: () => void
   searchable?: boolean
+  comingSoon?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -309,6 +310,21 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
   const visible = searchable
     ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
     : options
+
+  // Coming-soon filters (AI-DNA columns still being classified across the 4.6M-ad index) render as a
+  // disabled chip with a "Soon" badge — no slow unindexed query, no near-empty result set.
+  if (comingSoon) {
+    return (
+      <button disabled title="Coming soon" style={{
+        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+        background: '#f8fafc', border: '1px solid #eef2ee', borderRadius: 8, fontSize: 13, fontWeight: 600,
+        color: '#9aa79a', cursor: 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit',
+      }}>
+        {label}
+        <span style={{ background: '#eef2ee', color: '#6b7a6b', borderRadius: 100, fontSize: 9, fontWeight: 800, padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '.04em' }}>Soon</span>
+      </button>
+    )
+  }
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -2100,12 +2116,12 @@ export default function DiscoveryPage() {
           <FilterDropdown label="Platform" options={PLATFORM_OPTS.map(p => ({ value: p, label: PLATFORM_LABELS[p], icon: PLATFORM_ICONS[p] }))} selected={platforms} onToggle={toggle(setPlatforms)} onClear={() => setPlatforms([])} />
           <FilterDropdown label="Industry" options={INDUSTRY_LIST.map(i => ({ value: i, label: i }))} selected={industry} onToggle={toggle(setIndustry)} onClear={() => setIndustry([])} searchable />
           <FilterDropdown label="Status" options={STATUS_OPTS} selected={status !== 'ALL' ? [status] : []} onToggle={v => setStatus(prev => prev === v ? 'ALL' : v)} onClear={() => setStatus('ALL')} />
-          <FilterDropdown label="Niche" options={NICHE_OPTS} selected={niches} onToggle={toggle(setNiches)} onClear={() => setNiches([])} searchable />
-          <FilterDropdown label="Hook" options={HOOK_OPTS} selected={hookTypes} onToggle={toggle(setHookTypes)} onClear={() => setHookTypes([])} searchable />
-          <FilterDropdown label="Emotion" options={EMOTION_OPTS} selected={emotions} onToggle={toggle(setEmotions)} onClear={() => setEmotions([])} />
-          <FilterDropdown label="Angle" options={ANGLE_OPTS} selected={angles} onToggle={toggle(setAngles)} onClear={() => setAngles([])} />
-          <FilterDropdown label="UGC / Studio" options={FORMATSTYLE_OPTS} selected={formatStyles} onToggle={toggle(setFormatStyles)} onClear={() => setFormatStyles([])} />
-          <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable />
+          <FilterDropdown label="Niche" options={NICHE_OPTS} selected={niches} onToggle={toggle(setNiches)} onClear={() => setNiches([])} searchable comingSoon />
+          <FilterDropdown label="Hook" options={HOOK_OPTS} selected={hookTypes} onToggle={toggle(setHookTypes)} onClear={() => setHookTypes([])} searchable comingSoon />
+          <FilterDropdown label="Emotion" options={EMOTION_OPTS} selected={emotions} onToggle={toggle(setEmotions)} onClear={() => setEmotions([])} comingSoon />
+          <FilterDropdown label="Angle" options={ANGLE_OPTS} selected={angles} onToggle={toggle(setAngles)} onClear={() => setAngles([])} comingSoon />
+          <FilterDropdown label="UGC / Studio" options={FORMATSTYLE_OPTS} selected={formatStyles} onToggle={toggle(setFormatStyles)} onClear={() => setFormatStyles([])} comingSoon />
+          <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable comingSoon />
           <FilterDropdown label="Theme" options={THEME_LIST.map(t => ({ value: t, label: t }))} selected={theme} onToggle={toggle(setTheme)} onClear={() => setTheme([])} searchable />
 
           {/* Numeric thresholds — grouped in a subtle container so they read as one set, not scattered */}
