@@ -8,17 +8,12 @@
  * PATCH — body { countries?: string[], enabled?: boolean }
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { verifyAdminRequest } from '@/lib/admin/auth'
 
 export const dynamic = 'force-dynamic'
 
 const CONFIG_TERM = '__crawl_countries__'
-
-async function requireUser() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
-}
 
 async function readConfig(admin: ReturnType<typeof createAdminClient>) {
   const { data } = await admin
@@ -30,8 +25,8 @@ async function readConfig(admin: ReturnType<typeof createAdminClient>) {
   return data
 }
 
-export async function GET() {
-  if (!(await requireUser())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export async function GET(request: NextRequest) {
+  if (!verifyAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
   const cfg = await readConfig(admin)
   return NextResponse.json({
@@ -41,7 +36,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  if (!(await requireUser())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!verifyAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
   const body = await request.json().catch(() => ({}))
 
