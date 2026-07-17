@@ -25,6 +25,11 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user && !(await isAdminToken())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Hard wall-clock budget. The aggregation below fans out ~20 queries against multi-million-row tables;
+  // under heavy crawl-write load even the time-boxed ones can SUM past Vercel's 30s cap → 504 (which the
+  // dashboard can't render). Race the whole thing against 24s and return PARTIAL data (200) instead. The
+  // per-query time-boxes keep the common case returning full data quickly.
+  const full = (async (): Promise<NextResponse> => {
   const admin = createAdminClient() as any
   const now = new Date()
   const hourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
@@ -494,6 +499,15 @@ export async function GET() {
     })),
     alerts,
   })
+  })()
+
+  const partial = new Promise<NextResponse>((res) => setTimeout(() => res(NextResponse.json({
+    partial: true,
+    timestamp: new Date().toISOString(),
+    alerts: [{ level: 'warning', message: 'Health metrics timed out (database under heavy load) — showing partial data, retry shortly.' }],
+  })), 24_000))
+
+  return Promise.race([full, partial])
 }
 
 // Race a (possibly slow) count query against a short client-side timeout. We raised service_role's
