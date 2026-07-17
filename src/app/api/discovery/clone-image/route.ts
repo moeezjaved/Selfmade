@@ -20,6 +20,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateImage, buildClonePrompt, geminiEnabled, nearestAspect, describeProduct, verifyClonedAd } from '@/lib/gemini/image'
 import { uploadBufferToR2 } from '@/lib/r2'
 import { sendFirstAdEmail } from '@/lib/email'
+import { isRateLimited } from '@/lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // waitUntil generation runs up to this after the response is sent
@@ -48,6 +49,8 @@ async function enqueue(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
+  // Burst guard — images are free for subscribers, so cap scripted floods (fail-open).
+  if (await isRateLimited(user.id)) return NextResponse.json({ error: 'rate_limited', message: 'Too many generations in a short time — please wait a moment and try again.' }, { status: 429 })
 
   const body = await req.json().catch(() => ({}))
   const { adId, refImageUrl, productImageB64, productImages } = body || {}

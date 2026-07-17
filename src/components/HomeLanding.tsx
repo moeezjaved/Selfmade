@@ -493,7 +493,7 @@ export default function HomeLanding() {
       <section style={{ ...wrap, padding: '20px 24px 50px' }}>
         <Panel grad={`linear-gradient(135deg,${LIME},#a8e63d)`} style={{ textAlign: 'center', padding: '56px 40px' }}>
           <h2 style={{ fontSize: 'clamp(30px,5vw,52px)', fontWeight: 800, letterSpacing: '-.03em', margin: '0 auto 14px', maxWidth: 720, color: INK }}><Mask style={{ display: 'inline-block' }}>Your next winning ad is <span style={{ fontStyle: 'italic' }}>already</span> in here.</Mask></h2>
-          <p style={{ color: 'rgba(14,27,18,.7)', margin: '0 auto 24px', maxWidth: 460, fontSize: 16 }}>Start free with 50 credits. Find a winner, make it yours, launch today.</p>
+          <p style={{ color: 'rgba(14,27,18,.7)', margin: '0 auto 24px', maxWidth: 460, fontSize: 16 }}>Start free — 5 image ads, no card. Find a winner, make it yours, launch today.</p>
           <Link href="/signup" style={btnDark}>Start for free <Arrow c="#fff" /></Link>
         </Panel>
       </section>
@@ -504,7 +504,7 @@ export default function HomeLanding() {
         {[['Where do the ads come from?', 'We index millions of real, running ads from the Meta Ad Library — so you’re learning from ads with actual spend behind them, not mockups.'],
           ['Do I need design skills?', 'No. Remake a proven ad onto your product with one click, or describe what you want and the AI Ad Studio generates it in your brand — no editor required.'],
           ['Will the ads match my brand?', 'Yes. Set a Brand Kit (colors, fonts, logo, products) once — or let Selfmade auto-detect it from your site — and every generation stays on-brand.'],
-          ['How does pricing work?', 'Start free with 50 credits. Paid plans give you a monthly credit balance plus optional top-ups; generating, remaking, and editing each cost credits. See the pricing section above.'],
+          ['How does pricing work?', 'No credits, no math — you pay for what you make. An image ad is $0.15 and a video ad is $6. Start free with 5 image ads (no card), buy as you go, or subscribe for unlimited images plus a monthly batch of videos. See the pricing section above.'],
           ['Can I launch ads from Selfmade?', 'Yes — connect Meta and push creatives straight to your ad account, then track performance in Campaigns & Reports.'],
           ['Is my data private?', 'Your brands, products, and creatives are yours alone and never shared.']].map(([q, a]) => <FAQItem key={q} q={q} a={a} />)}
       </section>
@@ -549,7 +549,7 @@ function SeoFooter() {
             <FootCol title="Company" links={[['Blog', '/blog'], ['About', '/about'], ['Contact', '/contact'], ['Privacy', '/privacy'], ['Terms', '/terms']].map(([label, href]) => ({ label, href }))} />
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, color: '#111', marginBottom: 8 }}>Start free today</div>
-              <p style={{ color: '#6b7280', fontSize: 13.5, margin: '0 0 12px', maxWidth: 260 }}>50 credits, no card. Find a winner and make it yours.</p>
+              <p style={{ color: '#6b7280', fontSize: 13.5, margin: '0 0 12px', maxWidth: 260 }}>5 image ads free, no card. Find a winner and make it yours.</p>
               <Link href="/signup" className="btn arrowp" style={cta}>Start for free <Arrow /></Link>
             </div>
           </div>

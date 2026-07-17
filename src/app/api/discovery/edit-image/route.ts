@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateImage, geminiEnabled } from '@/lib/gemini/image'
 import { saveGeneration } from '@/lib/creatives'
+import { isRateLimited } from '@/lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // gemini-3-pro-image at 2K can exceed 60s → 504; Pro plan allows up to 300s
@@ -41,6 +42,8 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Burst guard (fail-open) — cap scripted edit floods.
+  if (await isRateLimited(user.id)) return NextResponse.json({ error: 'rate_limited', message: 'Too many edits in a short time — please wait a moment and try again.' }, { status: 429 })
   if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
 
   const { image, instruction, tier, parentId, brandId } = await req.json().catch(() => ({}))
