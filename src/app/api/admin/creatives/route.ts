@@ -24,19 +24,30 @@ export async function GET(request: NextRequest) {
 
   const userIds = Array.from(new Set(rows.map((r: any) => r.user_id).filter(Boolean)))
   const brandIds = Array.from(new Set(rows.map((r: any) => r.brand_id).filter(Boolean)))
-  const [authUsers, { data: profiles }, { data: brands }] = await Promise.all([
+  const srcIds = Array.from(new Set(rows.map((r: any) => r.source_ad_id).filter(Boolean)))
+  const [authUsers, { data: profiles }, { data: brands }, { data: srcCreatives }] = await Promise.all([
     userIds.length ? getAuthUsers(admin) : Promise.resolve(new Map()),
     userIds.length ? admin.from('user_profiles').select('user_id, full_name').in('user_id', userIds) : Promise.resolve({ data: [] } as any),
     brandIds.length ? admin.from('brands').select('id, name').in('id', brandIds) : Promise.resolve({ data: [] } as any),
+    // Source ad each clone was made from → its R2 poster/image, so admins can see what it was cloned from.
+    srcIds.length ? admin.from('discovery_creatives').select('ad_id, asset_type, r2_url, poster_url, position').in('ad_id', srcIds).order('position', { ascending: true }) : Promise.resolve({ data: [] } as any),
   ])
   const emailMap = Object.fromEntries(Array.from(authUsers.entries()).map(([id, u]: any) => [id, u.email]))
   const nameMap = Object.fromEntries((profiles || []).map((p: any) => [p.user_id, p.full_name]))
   const brandMap = Object.fromEntries((brands || []).map((b: any) => [b.id, b.name]))
+  const srcThumb = new Map<string, string>()
+  for (const c of (srcCreatives || []) as any[]) {
+    if (srcThumb.has(c.ad_id)) continue   // first (lowest-position) creative per source ad
+    const t = c.poster_url || (c.asset_type !== 'video' ? c.r2_url : null)
+    if (t) srcThumb.set(c.ad_id, t)
+  }
 
   const out = rows.map((r: any) => ({
     id: r.id, image_url: r.image_url, type: r.type, media_type: r.media_type || 'image', status: r.status || 'done',
     tier: r.tier, prompt: r.prompt, created_at: r.created_at,
     email: emailMap[r.user_id] || '', name: nameMap[r.user_id] || '', brand: r.brand_id ? brandMap[r.brand_id] || null : null,
+    source_ad_id: r.source_ad_id || null,
+    source_thumb: r.source_ad_id ? srcThumb.get(r.source_ad_id) || null : null,
   }))
   return NextResponse.json({ creatives: out, total: out.length })
 }
