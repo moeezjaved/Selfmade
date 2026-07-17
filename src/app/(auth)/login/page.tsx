@@ -21,7 +21,7 @@ export default function LoginPage() {
     setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     if (error) { toast.error(error.message); setLoading(false) }
-    else router.push('/dashboard')
+    else router.push('/discovery')
   }
   const handleGoogle = async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } })
