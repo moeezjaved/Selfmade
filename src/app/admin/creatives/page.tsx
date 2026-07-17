@@ -33,10 +33,14 @@ export default function AdminCreatives() {
           {shown.map(c => (
             <div key={c.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
               <div style={{ aspectRatio: '1', background: '#0d120e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {c.status === 'processing' ? <span style={{ color: '#dffe95', fontSize: 12 }}>Generating…</span>
-                  : c.media_type === 'video' && c.image_url ? <video src={c.image_url} muted loop autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {c.status === 'processing' || c.status === 'analyzing' ? <span style={{ color: '#dffe95', fontSize: 12 }}>{c.status === 'analyzing' ? 'Analyzing…' : 'Generating…'}</span>
+                  : !c.image_url ? <span style={{ color: '#9aa79a', fontSize: 11, textAlign: 'center', padding: 8 }}>{c.status === 'failed' ? '⚠️ Failed' : '📝 Draft · no output'}</span>
+                  : c.media_type === 'video'
+                    // Controls + first-frame preview (no autoplay) so admins can actually watch it.
+                    ? <video src={c.image_url} controls muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
+                    // Click the image to open it full-size in a new tab.
                     // eslint-disable-next-line @next/next/no-img-element
-                    : <img src={c.image_url || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                    : <a href={c.image_url} target="_blank" rel="noreferrer" style={{ width: '100%', height: '100%', display: 'block' }}><img src={c.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></a>}
               </div>
               <div style={{ padding: '9px 11px' }}>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 5, flexWrap: 'wrap' }}>
