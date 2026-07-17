@@ -253,18 +253,18 @@ export default function HomeLanding() {
           <span>🗂️ 3M+ ads indexed</span><span>·</span><span>🏷️ 611K brands tracked</span><span>·</span><span>⭐ 4.9 on G2</span>
         </div>
         <h1 style={{ fontSize: 'clamp(38px,6vw,64px)', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-.03em', margin: '0 auto', maxWidth: 900 }}>
-          <Mask>Find winning ads.</Mask>
-          <Mask delay={120}>Make them <span style={{ fontStyle: 'italic', color: GREEN }}>yours.</span> Launch in minutes.</Mask>
+          <Mask>Turn any winning ad</Mask>
+          <Mask delay={120}>into <span style={{ fontStyle: 'italic', color: GREEN }}>your</span> ad. In minutes.</Mask>
         </h1>
         <p style={{ fontSize: 'clamp(16px,2vw,19px)', color: '#4b5563', maxWidth: 640, margin: '22px auto 28px', lineHeight: 1.55 }}>
-          Selfmade turns 3M+ proven Meta ads into your next winner — spy on what's working, remake or generate your own with AI, and launch. The whole ad workflow in one place.
+          Find a proven Meta ad, swap in your product, and get a scroll-stopping <b>video or image</b> ad — in about two minutes. No filming, no designer, no waiting.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/signup" className="btn arrowp" style={btnPrimary}>Start for free <Arrow /></Link>
           <a href="#how" className="btn arrowp" style={btnDark}>See how it works <Arrow c="#fff" /></a>
         </div>
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center', flexWrap: 'wrap', marginTop: 20, fontSize: 13.5, color: '#6b7280', fontWeight: 600 }}>
-          {['No card to start', '50 free credits', 'Cancel anytime'].map(t => <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check /> {t}</span>)}
+          {['No card to start', '5 image ads free', 'Cancel anytime'].map(t => <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check /> {t}</span>)}
         </div>
         <div style={{ maxWidth: 720, margin: '48px auto 0', display: 'flex', justifyContent: 'center' }}><LandingHero /></div>
         <div style={{ maxWidth: 720, margin: '28px auto 0' }}><HeroMock ads={ads} /></div>
@@ -368,9 +368,9 @@ export default function HomeLanding() {
       {/* HOW IT WORKS ×3 */}
       <section id="how" style={{ ...wrap, padding: '50px 24px' }}>
         {([
-          ['01 · Discover', 'Know exactly what to make', 'Spy on any brand, search 3M+ ads, and see what’s actually performing — ranked by real performance, not guesses.', ['Search & filter 3M+ ads', 'Brand Spy on any competitor', 'Trending by your industry'], '3M+', 'ads to learn from', 'linear-gradient(135deg,#eaffb8,#c9f0a0)'],
-          ['02 · Create', 'Winners, on repeat', 'Remake a proven ad onto your product, or generate an original — Nano Banana Pro renders it in your exact brand kit at 2K/4K.', ['Pick a winner or start fresh', 'Drop in your product photos', 'Generate / remake in ~30s'], '~30s', 'per on-brand ad', 'linear-gradient(135deg,#dbeafe,#c7ddff)'],
-          ['03 · Launch', 'Ship it and scale', 'Push straight to Meta, track what’s working in Campaigns & Reports, and let Mello suggest the next move.', ['Launch to Meta in a click', 'Track performance', 'Mello suggests what’s next'], '1', 'platform, end to end', 'linear-gradient(135deg,#f7d9ee,#efc7e6)'],
+          ['01 · Find', 'Start from a proven winner', 'Search 3M+ live ads and spy on any brand to see what’s actually working — or upload a winning video you already found.', ['Search & filter 3M+ ads', 'Brand Spy on any competitor', 'Or bring your own video'], '3M+', 'winning ads to start from', 'linear-gradient(135deg,#eaffb8,#c9f0a0)'],
+          ['02 · Remake', 'Swap in your product', 'Drop in your product and get a video or image ad in your brand — pick the on-camera creator, the language, even the look. Rendered in about two minutes.', ['Video or image ad', 'Pick creator + language', 'On-brand in ~2 min'], '~2 min', 'per finished ad', 'linear-gradient(135deg,#dbeafe,#c7ddff)'],
+          ['03 · Download', 'Post it anywhere', 'Download your finished ad and run it on Meta, TikTok, or wherever you advertise. No filming, no designer, no editing.', ['Download in 2K / HD', 'Run on any platform', 'Make more in a click'], '$6', 'per video ad', 'linear-gradient(135deg,#f7d9ee,#efc7e6)'],
         ] as [string, string, string, string[], string, string, string][]).map(([kick, title, body, steps, stat, statSub, grad], i) => (
           <div key={i} style={{ marginBottom: 48 }}>
             <div style={{ textAlign: 'center', marginBottom: 22 }}>
