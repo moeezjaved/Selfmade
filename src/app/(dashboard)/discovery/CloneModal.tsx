@@ -89,6 +89,9 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
 
   // Wizard step (setup phase only): 0 Brand · 1 Photos · 2 Headline & style · 3 Picture options · 4 Review
   const [step, setStep] = useState(0)
+  const bodyRef = useRef<HTMLDivElement | null>(null)   // scroll container — reset to top on step change
+  // Reset the modal body to the top on every step change so the next step's heading is visible.
+  useEffect(() => { bodyRef.current?.scrollTo({ top: 0, behavior: 'auto' }) }, [step])
 
   // Iterative edit loop (chat-style) — each edit charges credits, applied to the ACTIVE variation.
   const [editText, setEditText] = useState('')
@@ -514,7 +517,7 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
 
             {/* pane */}
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px 12px' }}>
+              <div ref={bodyRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 28px 12px' }}>
                 {draftRestored && (
                   <div style={{ fontSize: 11.5, color: SEL_TEXT, background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 10, padding: '8px 11px', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
                     ↩ Restored your last setup for this ad.
