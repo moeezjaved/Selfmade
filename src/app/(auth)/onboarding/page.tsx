@@ -20,6 +20,7 @@ import { createClient } from '@/lib/supabase/client'
 import CloneModal from '@/app/(dashboard)/discovery/CloneModal'
 import CloneVideoModal from '@/app/(dashboard)/discovery/CloneVideoModal'
 import RadarSearch from '@/components/motion/RadarSearch'
+import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
 // ── Light theme tokens (same palette as the Remake wizard) ──
 const SHELL = '#f6f8f5', CARD = '#ffffff', INK = '#161c17', MUTED = '#68756b', FAINT = '#94a096'
@@ -356,7 +357,7 @@ export default function OnboardingPage() {
           </aside>
 
           {/* Main */}
-          <main style={{ flex: 1, padding: '36px 44px 26px', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <main className="ob-main" style={{ flex: 1, padding: '36px 44px 26px', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <div style={kicker}>Step {step + 1} of {STEPS.length}</div>
 
             {/* ── Step 1: Your brand ── */}
@@ -551,17 +552,17 @@ export default function OnboardingPage() {
                               <span style={{ fontSize: 12, fontWeight: 800, color: n ? LIME : 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>{n ? `${n} ads caught` : 'stalking…'}</span>
                             </div>
                             {/* chase track */}
-                            <div style={{ position: 'relative', height: 22, borderRadius: 100, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(223,254,149,0.12)', overflow: 'hidden' }}>
+                            <div style={{ position: 'relative', height: 34, borderRadius: 100, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(223,254,149,0.12)', overflow: 'hidden' }}>
                               {/* savanna ground shimmer */}
                               <div className="ob-anim" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, transparent 0%, rgba(223,254,149,0.08) 50%, transparent 100%)', backgroundSize: '200% 100%', animation: `ob-shimmer 2.6s linear ${bi * 0.4}s infinite` }} />
                               {/* progress fill */}
                               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: 'linear-gradient(90deg, rgba(63,143,79,0.55), rgba(223,254,149,0.35))', borderRadius: 100, transition: 'width 1.2s cubic-bezier(.22,1,.36,1)' }} />
                               {/* the deer — always just ahead of the leopard */}
-                              <span className="ob-anim" style={{ position: 'absolute', top: '50%', left: `calc(${Math.min(pct + 7, 97)}% )`, transform: 'translate(-50%,-50%)', fontSize: 13, animation: `ob-flee 0.55s ease-in-out ${bi * 0.2}s infinite`, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))' }}>🦌</span>
+                              <span className="ob-anim" style={{ position: 'absolute', top: '50%', left: `calc(${Math.min(pct + 8, 97)}% )`, transform: 'translate(-50%,-50%)', fontSize: 20, animation: `ob-flee 0.55s ease-in-out ${bi * 0.2}s infinite`, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))' }}>🦌</span>
                               {/* the leopard — sprinting at the progress edge */}
-                              <span className="ob-anim" style={{ position: 'absolute', top: '50%', left: `${pct}%`, transform: 'translate(-50%,-50%) scaleX(-1)', fontSize: 15, animation: `ob-pounce 0.55s ease-in-out ${bi * 0.2}s infinite`, transition: 'left 1.2s cubic-bezier(.22,1,.36,1)', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))' }}>🐆</span>
+                              <span className="ob-anim" style={{ position: 'absolute', top: '50%', left: `${pct}%`, transform: 'translate(-50%,-50%) scaleX(-1)', fontSize: 24, animation: `ob-pounce 0.55s ease-in-out ${bi * 0.2}s infinite`, transition: 'left 1.2s cubic-bezier(.22,1,.36,1)', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,.55))' }}>🐆</span>
                               {/* dust kicked up behind the leopard */}
-                              <span className="ob-anim" style={{ position: 'absolute', top: '58%', left: `calc(${pct}% - 16px)`, transform: 'translate(-50%,-50%)', fontSize: 8, opacity: 0.7, animation: `ob-dust 0.55s linear ${bi * 0.2}s infinite` }}>💨</span>
+                              <span className="ob-anim" style={{ position: 'absolute', top: '62%', left: `calc(${pct}% - 20px)`, transform: 'translate(-50%,-50%)', fontSize: 12, opacity: 0.7, animation: `ob-dust 0.55s linear ${bi * 0.2}s infinite` }}>💨</span>
                             </div>
                           </div>
                         )
@@ -616,7 +617,7 @@ export default function OnboardingPage() {
                         </div>
                       ) : (
                         <>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 12 }}>
+                          <div className="ob-adgrid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 12 }}>
                             {t?.image && <AdCard ad={t.image} kind="image" cost={costs.image} done={cloned.has(t.image.id)} onClone={() => openImageClone(t.image!)} />}
                             {t?.video && <AdCard ad={t.video} kind="video" cost={costs.video} done={cloned.has(t.video.id)} lowCredit={balance !== null && balance < costs.video} onClone={() => onVideoClick(t.video!)} />}
                           </div>
@@ -660,29 +661,32 @@ export default function OnboardingPage() {
         )
         return (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(23,37,28,0.35)', backdropFilter: 'blur(5px)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-            <div style={{ width: '100%', maxWidth: 560, background: CARD, border: `1px solid ${LINE}`, borderRadius: 22, padding: 30, position: 'relative', boxShadow: '0 30px 90px rgba(23,37,28,.25)' }}>
-              <button onClick={() => setShowCloneIntro(false)} style={{ position: 'absolute', top: 16, right: 16, width: 30, height: 30, borderRadius: '50%', background: '#f1f3f0', border: `1px solid ${LINE}`, color: MUTED, cursor: 'pointer', fontSize: 15 }}>×</button>
+            <div style={{ width: '100%', maxWidth: 620, maxHeight: '92vh', overflowY: 'auto', background: CARD, border: `1px solid ${LINE}`, borderRadius: 22, padding: 30, position: 'relative', boxShadow: '0 30px 90px rgba(23,37,28,.25)' }}>
+              <button onClick={() => setShowCloneIntro(false)} style={{ position: 'absolute', top: 16, right: 16, width: 30, height: 30, borderRadius: '50%', background: '#f1f3f0', border: `1px solid ${LINE}`, color: MUTED, cursor: 'pointer', fontSize: 15, zIndex: 2 }}>×</button>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: SELBG, border: `1px solid ${SELBORDER}`, color: SELTEXT, fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 100, marginBottom: 16 }}>✦ How it works</span>
-              <h2 style={{ fontSize: 23, fontWeight: 800, color: INK, letterSpacing: '-.02em', margin: '0 0 8px' }}>Turn any ad into your ad.</h2>
-              <p style={{ fontSize: 14, color: MUTED, margin: '0 0 20px', lineHeight: 1.5 }}>Take any competitor ad and rebuild it as a brand-new ad for <b style={{ color: INK }}>your</b> product — same winning structure, your brand.</p>
-              <div style={{ display: 'flex', gap: 20 }}>
-                <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4 }}>
-                  {['Pick a competitor ad you love', 'We drop in your product', 'Get a fresh ad in one click'].map((t, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', background: FOREST, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 12 }}>{i + 1}</span>
-                      <span style={{ fontSize: 13.5, color: INK, lineHeight: 1.35 }}>{t}</span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-                  <Panel src={refThumb} label="Reference" />
-                  <span style={{ alignSelf: 'center', color: FAINT, fontSize: 18, fontWeight: 300 }}>+</span>
-                  <Panel src={productImg} label="Your product" />
-                  <span style={{ alignSelf: 'center', color: GREEN, fontSize: 18 }}>→</span>
-                  <Panel src={productImg} label="Your new ad" badge="AI" glow />
-                </div>
+              <h2 style={{ fontSize: 24, fontWeight: 800, color: INK, letterSpacing: '-.02em', margin: '0 0 8px' }}>Turn any ad into your ad.</h2>
+              <p style={{ fontSize: 14, color: MUTED, margin: '0 0 18px', lineHeight: 1.5 }}>Take any competitor ad and rebuild it as a brand-new ad for <b style={{ color: INK }}>your</b> product — same winning structure, your brand.</p>
+
+              {/* Big visual: reference + your product → your new ad (each panel gets full width now) */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20 }}>
+                <Panel src={refThumb} label="Reference" />
+                <span style={{ alignSelf: 'center', color: FAINT, fontSize: 22, fontWeight: 300 }}>+</span>
+                <Panel src={productImg} label="Your product" />
+                <span style={{ alignSelf: 'center', color: GREEN, fontSize: 22 }}>→</span>
+                <Panel src={productImg} label="Your new ad" badge="AI" glow />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 24 }}>
+
+              {/* The 3 steps as a clean row underneath */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                {['Pick a competitor ad you love', 'We drop in your product', 'Get a fresh ad in one click'].map((t, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, flex: '1 1 160px', background: '#fbfcfa', border: `1px solid ${LINE}`, borderRadius: 12, padding: '10px 12px' }}>
+                    <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', background: FOREST, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 12 }}>{i + 1}</span>
+                    <span style={{ fontSize: 12.5, color: INK, lineHeight: 1.3 }}>{t}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 22 }}>
                 <button onClick={() => setShowCloneIntro(false)} style={btnPrimary}>Show me their top ads →</button>
               </div>
             </div>
@@ -732,49 +736,35 @@ export default function OnboardingPage() {
         @keyframes ob-dust{0%{opacity:.7;transform:translate(-50%,-50%) scale(.7)}100%{opacity:0;transform:translate(-90%,-50%) scale(1.25)}}
         @media(prefers-reduced-motion:reduce){.ob-anim{animation:none!important}}
         @media(max-width:840px){.ob-rail{display:none!important}}
+        @media(max-width:640px){.ob-main{padding:24px 16px 18px!important}.ob-adgrid{grid-template-columns:1fr!important}}
       `}</style>
     </div>
   )
 }
 
-/** One competitor ad tile. Video scrubs/plays on hover (and an explicit ▶ toggle plays with sound). */
+/** One competitor ad tile. Video reuses the SAME Discovery component (HoverScrubVideo) — hover-scrub
+ * white line + lime play button + progress ring — so it's identical to the grid everywhere. */
 function AdCard({ ad, kind, cost, done, lowCredit, onClone }: {
   ad: { id: string; thumbnailUrl: string | null; videoUrl: string | null }
   kind: 'image' | 'video'; cost: number; done?: boolean; lowCredit?: boolean; onClone: () => void
 }) {
-  const vref = useRef<HTMLVideoElement | null>(null)
-  const [playing, setPlaying] = useState(false)
-  const play = () => { const v = vref.current; if (v) { v.currentTime = 0; v.play().catch(() => {}) } }
-  const stop = () => { const v = vref.current; if (v && !playing) { v.pause() } }
-  const togglePlay = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const v = vref.current
-    if (!v) return
-    if (v.paused) { v.muted = false; v.play().catch(() => { v.muted = true; v.play().catch(() => {}) }); setPlaying(true) }
-    else { v.pause(); v.muted = true; setPlaying(false) }
-  }
+  const [videoDead, setVideoDead] = useState(false)
+  const showVideo = kind === 'video' && !!ad.videoUrl && !videoDead
   return (
-    <div onMouseEnter={kind === 'video' ? play : undefined} onMouseLeave={kind === 'video' ? stop : undefined}
-      style={{ position: 'relative', aspectRatio: '4/5', borderRadius: 15, overflow: 'hidden', background: '#0f1a12', border: `1.5px solid ${LINE}`, cursor: 'pointer' }}
-      onClick={onClone}>
-      {kind === 'video' && ad.videoUrl
-        ? <video ref={vref} src={ad.videoUrl} poster={ad.thumbnailUrl || undefined} muted loop playsInline preload="none" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+    <div onClick={onClone}
+      style={{ position: 'relative', aspectRatio: '4/5', borderRadius: 15, overflow: 'hidden', background: '#0f1a12', border: `1.5px solid ${LINE}`, cursor: 'pointer' }}>
+      {showVideo
+        ? <HoverScrubVideo src={ad.videoUrl!} poster={ad.thumbnailUrl || undefined} onError={() => setVideoDead(true)} />
         : ad.thumbnailUrl
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={ad.thumbnailUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>No preview</div>}
 
-      <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 6 }}>
-        <span style={{ background: 'rgba(8,16,15,0.78)', color: kind === 'video' ? '#dffe95' : 'white', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.04em' }}>{kind === 'video' ? '▶ Video' : '🖼 Image'}</span>
+      <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10 }}>
+        <span style={{ background: 'rgba(8,16,15,0.78)', color: kind === 'video' ? '#dffe95' : 'white', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.04em' }}>{kind === 'video' ? '🎬 Video' : '🖼 Image'}</span>
       </div>
-      {kind === 'video' && ad.videoUrl && (
-        <button onClick={togglePlay} aria-label={playing ? 'Pause preview' : 'Play preview'}
-          style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: 'rgba(255,255,255,0.95)', border: 'none', borderRadius: '50%', width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2, boxShadow: '0 4px 14px rgba(0,0,0,.25)' }}>
-          <span style={{ color: '#17251c', fontSize: 15, marginLeft: playing ? 0 : 3 }}>{playing ? '❚❚' : '▶'}</span>
-        </button>
-      )}
 
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 10, background: 'linear-gradient(transparent, rgba(8,16,15,0.9))' }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 10, background: 'linear-gradient(transparent, rgba(8,16,15,0.9))', zIndex: 10, pointerEvents: 'none' }}>
         <span style={{ background: done ? 'rgba(223,254,149,0.2)' : '#dffe95', color: done ? '#dffe95' : '#17251c', fontSize: 12.5, fontWeight: 800, padding: '7px 12px', borderRadius: 100, border: done ? '1px solid #dffe95' : 'none' }}>
           {done ? '✓ Remaking' : kind === 'video' ? `Remake · $${Math.round(cost / 100)}` : 'Remake · Free'}
         </span>
