@@ -11,7 +11,8 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2 } from 'lucide-react'
 import { creativeFilename } from '@/lib/filename'
-import { refreshCredits } from '@/components/credits/CreditCounter'
+import { refreshCredits, useCredits } from '@/components/credits/CreditCounter'
+import { imagesAreFree } from '@/lib/plans'
 import StudioModal from '../discovery/StudioModal'
 
 async function fileToDataUrl(f: File): Promise<string> {
@@ -190,7 +191,9 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const tier: 'pro' = 'pro'   // Pro-only (Nano Banana Pro)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const editCost = 10   // Pro edit — matches image_edit_pro
+  const { pricing, plan } = useCredits()
+  const editCost = pricing?.image_edit_pro?.credits ?? 15   // live DB price so shown == charged
+  const editFree = imagesAreFree(plan)                      // subscribers: edits are free
   const isMobile = useIsMobile()
   const [copied, setCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
@@ -418,7 +421,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) applyEdit() }}
                 placeholder="Tweak this creative — headline, subhead, colors, scene, background…" style={{ ...input, resize: 'vertical' }} />
               {err && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{err}</div>}
-              <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · {editCost} cr</button>
+              <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · {editFree ? 'Free' : `${editCost} cr`}</button>
               <button onClick={() => downloadCreative(creativeFilename({ brand: gen.brand_name, ext: (img || '').match(/\.(jpg|jpeg|webp|png)(\?|$)/i)?.[1] || 'png', kind: gen.type, date: new Date(gen.created_at) }))} disabled={downloading} style={{ ...btnGhost, justifyContent: 'center' }}><Download size={15} /> {downloading ? 'Downloading…' : 'Download'}</button>
               <button onClick={copyUrl} style={{ ...btnGhost, justifyContent: 'center' }}><Link2 size={15} /> {copied ? 'Copied ✓' : 'Copy URL'}</button>
             </>

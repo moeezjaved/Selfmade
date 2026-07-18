@@ -324,11 +324,11 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     return h.slice(0, -1)
   })
 
-  const { plan } = useCredits()
+  const { plan, pricing } = useCredits()
   const imagesFree = imagesAreFree(plan)       // Creator/Agency: image remakes + edits are free
   const cost = imageSize === '4K' ? 25 : 15   // 2K → image_clone_pro (15) · 4K → image_clone_4k (25)
   const totalCost = cost * count
-  const editCost = 10                          // Pro edit — matches image_edit_pro
+  const editCost = pricing?.image_edit_pro?.credits ?? 15   // live DB price (image_edit_pro) so the shown cost always == what's charged
   const cr = (n: number) => imagesFree ? 'Free' : `${n} cr`   // label helper
   const hasResults = results.length > 0
 

@@ -126,7 +126,7 @@ export const ACTION_COSTS: Record<string, number> = {
   image_clone_4k: 25,       // 4K / HD download ($0.25)
   image_studio_pro: 100,    // 2K AI Ad Studio — original ad from inspiration + industry insights
   image_studio_4k: 160,     // 4K / HD Studio ad
-  image_edit_pro: 65,       // iterative edit (one 2K Pro image)
+  image_edit_pro: 15,       // iterative edit — one 2K Pro image, same cost as a fresh clone ($0.15). Free for subscribers.
   video_clone: 600,         // UGC 15s ($6.00 @ 1cr=1¢) — the "video ad = $6" anchor (v2 pricing)
   video_captions: 100,      // TikTok-style burned captions — high-margin add-on
   asset_ai_tag: 10,         // AI tagging of an uploaded asset (caption/embed + video clip analysis)
