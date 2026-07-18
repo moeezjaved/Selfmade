@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 
-type Row = { user_id: string; email: string; name: string; plan: string; status: string; cycle: string; plan_credits: number; topup_credits: number; renews: string | null; last_active: string | null; joined: string | null }
+type Row = { user_id: string; email: string; name: string; plan: string; status: string; cycle: string; plan_credits: number; topup_credits: number; credits_used: number; renews: string | null; last_active: string | null; joined: string | null }
 const PLAN_COLORS: Record<string, string> = { free: '#94a3b8', starter: '#0ea5e9', pro: '#16a34a', business: '#7c3aed', enterprise: '#111' }
 const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString() : '—'
 
@@ -39,7 +39,7 @@ export default function AdminSubscriptions() {
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-              {['User', 'Plan', 'Status', 'Plan cr', 'Top-up cr', 'Renews', 'Last active', 'Joined'].map(h => <th key={h} style={{ padding: '10px 14px', fontWeight: 700, color: '#475569' }}>{h}</th>)}
+              {['User', 'Plan', 'Status', 'Plan cr', 'Top-up cr', 'Used', 'Renews', 'Last active', 'Joined'].map(h => <th key={h} style={{ padding: '10px 14px', fontWeight: 700, color: '#475569' }}>{h}</th>)}
             </tr></thead>
             <tbody>
               {shown.map(r => (
@@ -49,6 +49,7 @@ export default function AdminSubscriptions() {
                   <td style={{ padding: '10px 14px', color: r.status === 'past_due' ? '#dc2626' : r.status === 'canceled' ? '#94a3b8' : '#16a34a', fontWeight: 600 }}>{r.status}</td>
                   <td style={{ padding: '10px 14px' }}>{r.plan_credits.toLocaleString()}</td>
                   <td style={{ padding: '10px 14px' }}>{r.topup_credits.toLocaleString()}</td>
+                  <td style={{ padding: '10px 14px', fontWeight: 600, color: (r.credits_used || 0) > 0 ? '#0f172a' : '#94a3b8' }}>{(r.credits_used || 0).toLocaleString()}</td>
                   <td style={{ padding: '10px 14px', color: '#64748b' }}>{fmt(r.renews)}</td>
                   <td style={{ padding: '10px 14px', color: '#64748b' }}>{fmt(r.last_active)}</td>
                   <td style={{ padding: '10px 14px', color: '#64748b' }}>{fmt(r.joined)}</td>
