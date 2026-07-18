@@ -246,7 +246,10 @@ export function buildClonePrompt(opts: {
       opts.palette?.accent || opts.palette?.background ? `brand colors: ${[opts.palette?.background && `bg ${opts.palette.background}`, opts.palette?.accent && `accent ${opts.palette.accent}`].filter(Boolean).join(', ')}` : (opts.colors?.length ? `brand colors ${opts.colors.join(', ')}` : ''),
     ].filter(Boolean).join(' ')
     return [
-      `Clone the winning ad in image 1 into an ad for a SERVICE / app / website${opts.brandName ? ` by ${b}` : ''}${opts.productDesc ? ` — ${opts.productDesc}` : ''}. Keep image 1's layout, composition, structure${keepS ? `, and ${keepS}` : ''}, and premium quality — with these changes:`,
+      `Clone the winning ad in image 1 into an ad for a SERVICE / app / website${opts.brandName ? ` by ${b}` : ''}. Keep image 1's layout, composition, structure${keepS ? `, and ${keepS}` : ''}, and premium quality — with these changes:`,
+      opts.productDesc
+        ? `• WHAT ${b} ACTUALLY IS: ${opts.productDesc}. EVERY word of copy on the ad (headline, bullets, benefits, comparisons, CTA) must be about THIS — never guess the business from the brand name, and never write about a different kind of product or service.`
+        : `• You are NOT told what ${b} does — so keep all copy generic to the brand name and image 1's structure; do NOT invent a business category, features or benefits.`,
       `• CRITICAL: this brand has NO physical product. NEVER invent, add or render any bottle, jar, box, package, device or physical item. If image 1 shows a physical product, REPLACE it — with the app/website shown on a phone or laptop screen, the brand logo, an abstract/graphic treatment, or a relevant person/lifestyle scene — never a made-up object.`,
       opts.hasLogo ? `• The attached image is the brand's logo or an app/site screenshot: feature it naturally (logo placed cleanly; a screenshot shown on a device screen).` : `• If no logo/screenshot is provided, represent the service through typography, the brand name, and a relevant lifestyle scene — not an object.`,
       recastS,

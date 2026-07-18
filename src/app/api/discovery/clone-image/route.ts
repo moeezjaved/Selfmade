@@ -135,14 +135,15 @@ async function runGeneration(input: {
           .select('hook_type, format_style, angle, emotion, cta, page_name, discovery_creatives(asset_type, r2_url, poster_url, position, width, height)')
           .eq('ad_id', String(adId)).maybeSingle().then((r: any) => r.data)
     const brandLookupP = brandId
-      ? admin.from('brands').select('brand_kit').eq('id', String(brandId)).maybeSingle().then((r: any) => (r.data as any)?.brand_kit || {})
+      ? admin.from('brands').select('brand_kit, description, usps, industry, target_audience, website').eq('id', String(brandId)).maybeSingle().then((r: any) => r.data || {})
       : Promise.resolve<any>(null)
     // The user's REAL price (if they set one on the product) — used to replace the original ad's price
     // instead of letting the model invent one.
     const priceLookupP = brandId
       ? admin.from('brand_products').select('price').eq('brand_id', String(brandId)).not('price', 'is', null).limit(1).maybeSingle().then((r: any) => (r.data as any)?.price || null)
       : Promise.resolve<string | null>(null)
-    const [adData, kit, productPrice] = await Promise.all([adLookupP, brandLookupP, priceLookupP])
+    const [adData, brandRow, productPrice] = await Promise.all([adLookupP, brandLookupP, priceLookupP])
+    const kit = (brandRow as any)?.brand_kit || (brandRow ? {} : null)
 
     // Reference = a discovery ad (creative + classified DNA) OR an uploaded ASSET image URL.
     let ad: any = { hook_type: null, format_style: null, angle: null, emotion: null, cta: null, page_name: brandName || 'your creative' }
@@ -198,7 +199,33 @@ async function runGeneration(input: {
     if (products.length === 0 && !isService) return await fail('could not load product image(s)')
 
     // Service brands have no product to describe; physical brands ground the scene/copy on it.
-    const productDesc = (!isService && products[0]) ? await describeProduct(products[0]).catch(() => null) : null
+    let productDesc = (!isService && products[0]) ? await describeProduct(products[0]).catch(() => null) : null
+    // SERVICE grounding — without this the model guesses what the brand does from its NAME alone
+    // (e.g. "Selfmade" → invented self-improvement copy for an AI-ads platform). Source of truth:
+    // the user-written brand description/USPs first, the website's own meta description as fallback.
+    if (isService) {
+      const parts = [
+        (brandRow as any)?.description && String((brandRow as any).description).trim(),
+        Array.isArray((brandRow as any)?.usps) && (brandRow as any).usps.length ? `Key selling points: ${(brandRow as any).usps.slice(0, 4).join(', ')}` : null,
+        Array.isArray((brandRow as any)?.industry) && (brandRow as any).industry.length ? `Industry: ${(brandRow as any).industry.slice(0, 3).join(', ')}` : null,
+        (brandRow as any)?.target_audience ? `Audience: ${String((brandRow as any).target_audience).trim()}` : null,
+      ].filter(Boolean) as string[]
+      if (!parts.length && (brandRow as any)?.website) {
+        // Best-effort: the site's own og/meta description says what the service actually is.
+        try {
+          let site = String((brandRow as any).website).trim()
+          if (!/^https?:\/\//i.test(site)) site = `https://${site}`
+          const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000)
+          const html = (await (await fetch(site, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SelfmadeBot/1.0)' } })).text()).slice(0, 300_000)
+          clearTimeout(t)
+          const metaDesc = html.match(/<meta[^>]+(?:property=["']og:description["']|name=["']description["'])[^>]+content=["']([^"']+)["']/i)?.[1]
+            || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property=["']og:description["']|name=["']description["'])/i)?.[1]
+            || html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]
+          if (metaDesc) parts.push(metaDesc.trim().slice(0, 300))
+        } catch { /* best-effort — prompt still forbids invented claims */ }
+      }
+      if (parts.length) productDesc = parts.join('. ').slice(0, 600)
+    }
     const priceStr = productPrice ? (/^\s*[\$£€₨₹]|rs\.?/i.test(String(productPrice)) ? String(productPrice).trim() : `$${String(productPrice).trim()}`) : null
     const prompt = buildClonePrompt({
       brandName, colors: kitColors, newHeadline, aspectRatio: resolvedAspect, fonts: kitFonts, palette: kitPalette, hasLogo: !!logoImg,
