@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import CloneModal from '@/app/(dashboard)/discovery/CloneModal'
 import CloneVideoModal from '@/app/(dashboard)/discovery/CloneVideoModal'
+import RadarSearch from '@/components/motion/RadarSearch'
 
 // ── Light theme tokens (same palette as the Remake wizard) ──
 const SHELL = '#f6f8f5', CARD = '#ffffff', INK = '#161c17', MUTED = '#68756b', FAINT = '#94a096'
@@ -530,21 +531,43 @@ export default function OnboardingPage() {
               </div>
 
               {picked.length > 0 && (
-                <div style={{ marginTop: 16, background: '#fbfcfa', border: `1px solid ${LINE}`, borderRadius: 14, padding: '13px 15px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: SELTEXT, marginBottom: 9, display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <span style={{ width: 12, height: 12, borderRadius: '50%', border: `2px solid #d8ebb9`, borderTopColor: GREEN, display: 'inline-block', animation: 'ob-spin 1s linear infinite' }} /> Pulling your competitors’ ads now…
+                // ── THE HUNT — the money moment of this step. Dark spy-radar panel: the radar sweeps
+                // for competitor ads while each brand is a chase track (🐆 sprinting after 🦌); every
+                // ad found = prey caught. Reduced-motion users get a calm static version (RadarSearch
+                // + the animations are all gated on prefers-reduced-motion).
+                <div style={{ marginTop: 16, background: 'radial-gradient(120% 160% at 20% 0%, #16301c 0%, #0e1b12 60%, #0b1610 100%)', border: '1px solid rgba(223,254,149,0.25)', borderRadius: 18, padding: '18px 20px', overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+                    <div style={{ flexShrink: 0, transform: 'scale(0.82)', margin: -18 }}><RadarSearch caption="" /></div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: '-.01em' }}>🐆 On the hunt — grabbing their winning ads…</div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 3, marginBottom: 14 }}>Every ad they’ve ever run on Meta, pulled straight into your feed. This keeps running — no need to wait.</div>
+                      {picked.map((b, bi) => {
+                        const n = pullCounts[b.pageId] || 0
+                        const pct = n ? Math.min(92, 18 + (n % 400) / 4.6) : 8
+                        return (
+                          <div key={b.pageId} style={{ padding: '7px 0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
+                              <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{b.name}</span>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: n ? LIME : 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>{n ? `${n} ads caught` : 'stalking…'}</span>
+                            </div>
+                            {/* chase track */}
+                            <div style={{ position: 'relative', height: 22, borderRadius: 100, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(223,254,149,0.12)', overflow: 'hidden' }}>
+                              {/* savanna ground shimmer */}
+                              <div className="ob-anim" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, transparent 0%, rgba(223,254,149,0.08) 50%, transparent 100%)', backgroundSize: '200% 100%', animation: `ob-shimmer 2.6s linear ${bi * 0.4}s infinite` }} />
+                              {/* progress fill */}
+                              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: 'linear-gradient(90deg, rgba(63,143,79,0.55), rgba(223,254,149,0.35))', borderRadius: 100, transition: 'width 1.2s cubic-bezier(.22,1,.36,1)' }} />
+                              {/* the deer — always just ahead of the leopard */}
+                              <span className="ob-anim" style={{ position: 'absolute', top: '50%', left: `calc(${Math.min(pct + 7, 97)}% )`, transform: 'translate(-50%,-50%)', fontSize: 13, animation: `ob-flee 0.55s ease-in-out ${bi * 0.2}s infinite`, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))' }}>🦌</span>
+                              {/* the leopard — sprinting at the progress edge */}
+                              <span className="ob-anim" style={{ position: 'absolute', top: '50%', left: `${pct}%`, transform: 'translate(-50%,-50%) scaleX(-1)', fontSize: 15, animation: `ob-pounce 0.55s ease-in-out ${bi * 0.2}s infinite`, transition: 'left 1.2s cubic-bezier(.22,1,.36,1)', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))' }}>🐆</span>
+                              {/* dust kicked up behind the leopard */}
+                              <span className="ob-anim" style={{ position: 'absolute', top: '58%', left: `calc(${pct}% - 16px)`, transform: 'translate(-50%,-50%)', fontSize: 8, opacity: 0.7, animation: `ob-dust 0.55s linear ${bi * 0.2}s infinite` }}>💨</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
-                  {picked.map((b) => {
-                    const n = pullCounts[b.pageId] || 0
-                    const pct = Math.min(95, 15 + (n % 400) / 4.5)
-                    return (
-                      <div key={b.pageId} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: MUTED, padding: '5px 0' }}>
-                        <span style={{ minWidth: 110, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
-                        <span style={{ flex: 1, height: 6, borderRadius: 100, background: '#eef1ed', overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${n ? pct : 10}%`, background: GREEN, borderRadius: 100, transition: 'width 1s' }} /></span>
-                        <span style={{ color: n ? GREEN : FAINT, fontWeight: 700, minWidth: 62, textAlign: 'right' }}>{n ? `${n} ads` : 'crawling…'}</span>
-                      </div>
-                    )
-                  })}
                 </div>
               )}
 
@@ -700,7 +723,16 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <style>{`@keyframes ob-pulse{0%,100%{opacity:.5}50%{opacity:1}}@keyframes ob-spin{to{transform:rotate(360deg)}}@media(max-width:840px){.ob-rail{display:none!important}}`}</style>
+      <style>{`
+        @keyframes ob-pulse{0%,100%{opacity:.5}50%{opacity:1}}
+        @keyframes ob-spin{to{transform:rotate(360deg)}}
+        @keyframes ob-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+        @keyframes ob-pounce{0%,100%{transform:translate(-50%,-50%) scaleX(-1) translateY(0) rotate(0deg)}30%{transform:translate(-50%,-62%) scaleX(-1) translateY(-3px) rotate(-6deg)}60%{transform:translate(-50%,-44%) scaleX(-1) translateY(2px) rotate(4deg)}}
+        @keyframes ob-flee{0%,100%{transform:translate(-50%,-50%) translateY(0)}45%{transform:translate(-50%,-64%) translateY(-3px)}}
+        @keyframes ob-dust{0%{opacity:.7;transform:translate(-50%,-50%) scale(.7)}100%{opacity:0;transform:translate(-90%,-50%) scale(1.25)}}
+        @media(prefers-reduced-motion:reduce){.ob-anim{animation:none!important}}
+        @media(max-width:840px){.ob-rail{display:none!important}}
+      `}</style>
     </div>
   )
 }
