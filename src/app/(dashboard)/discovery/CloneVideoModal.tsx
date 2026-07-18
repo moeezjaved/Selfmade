@@ -215,7 +215,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       setSuggestedMode(sug); if (!modeTouched.current) setMode(sug)   // honour an explicit user pick from step 1
       setSceneCount(Math.min(10, Math.max(2, Number(st.sceneCount) || 2)))
       setSrcSecs(Number(st.sourceSeconds) || null)
-      setPhase('review'); setStep(5)   // land on the first review step (Length & format)
+      setPhase('review'); setStep(4)   // land on the first review step (Length & format)
     } catch (e: any) { setErr(String(e?.message || e)); setPhase('form') }
   }
 
@@ -273,8 +273,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   }
 
   // ── wizard plumbing ──
+  // UGC vs Cinematic is AUTO-DETECTED from the analysis (suggestedMode) — no up-front "choose look"
+  // step. The user can still switch on the "Length & format" step (step 5), where the ★ marks the
+  // recommendation. Form steps 0-3, review steps 4-6.
   const STEPS = [
-    { t: 'Choose your look', s: 'UGC or Cinematic' },
     { t: 'Your brand', s: 'Logo & product' },
     { t: 'Product photos', s: 'Up to 4' },
     { t: 'About your product', s: 'Optional · sharpens it' },
@@ -287,16 +289,16 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const brandName = brands.find((b) => b.id === brandId)?.name || productName.trim() || 'your brand'
   const selPhotos = photos.filter((p) => selected.includes(p.id))
 
-  // Footer Next: within the form, step 4 → analyse(); within review, step 7 → approve(); else advance.
+  // Footer Next: within the form, step 3 → analyse(); within review, step 6 → approve(); else advance.
   const goNext = () => {
-    if (phase === 'form') { if (step < 4) setStep(step + 1); else analyse() }
-    else { if (step < 7) setStep(step + 1); else approve() }
+    if (phase === 'form') { if (step < 3) setStep(step + 1); else analyse() }
+    else { if (step < 6) setStep(step + 1); else approve() }
   }
   const goBack = () => {
-    if (phase === 'review' && step === 5) { setPhase('form'); setStep(4) }   // back across the analysis gate
+    if (phase === 'review' && step === 4) { setPhase('form'); setStep(3) }   // back across the analysis gate
     else if (step > 0) setStep(step - 1)
   }
-  const railClickable = (i: number) => phase === 'form' ? i <= 4 : (i >= 5 && i <= 7)
+  const railClickable = (i: number) => phase === 'form' ? i <= 3 : (i >= 4 && i <= 6)
 
   if (!mounted) return null
   const wide = phase === 'done'
@@ -396,7 +398,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
           <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
             {/* step rail */}
             <div className="sm-rail" style={{ width: 232, flexShrink: 0, background: L_SIDE, borderRight: `1px solid ${L_LINE}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', color: L_FAINT, margin: '0 6px 10px', textTransform: 'uppercase' }}>8 quick steps</div>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', color: L_FAINT, margin: '0 6px 10px', textTransform: 'uppercase' }}>7 quick steps</div>
               {STEPS.map((s, i) => {
                 const clickable = railClickable(i)
                 return (
@@ -418,29 +420,11 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px 12px' }}>
 
-                {/* STEP 1 — look */}
+                {/* STEP 1 — brand */}
                 {step === 0 && (
                   <section>
                     <SourceCard sourceVideoUrl={sourceVideoUrl} sourcePoster={sourcePoster} hasSource={!!sourceAdId} />
-                    <Kicker>Step 1 of 8</Kicker>
-                    <H2>Choose your look</H2>
-                    <Lead>We turn this winning video into <b>your</b> video. Pick the style — no editing skills needed, and you can switch anytime before you pay.</Lead>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      <ChoiceCard on={mode === 'ugc'} onClick={() => pickLook('ugc')} rec="MOST POPULAR" emoji="🤳" title="UGC creator"
-                        body="A real-looking person holds your product and talks to camera — the influencer style that performs best on Instagram & TikTok. Fastest and cheapest."
-                        price={`15s · ${UGC_COST[tier]} cr (~$6)`} />
-                      <ChoiceCard on={mode === 'faithful'} onClick={() => pickLook('faithful')} emoji="🎬" title="Cinematic"
-                        body="We recreate the ad scene-by-scene (b-roll, lifestyle, product shots) with your product, then stitch it into one video. Closest match — takes a little longer."
-                        price={`from ${FAITHFUL_COST[2][tier]} cr · scales with scenes`} />
-                    </div>
-                    <InfoBar>💡 Not sure? Leave it on <b>UGC</b>. After we analyse the ad we’ll suggest Cinematic automatically if it’s a b-roll style video — you can switch on the “Length & format” step.</InfoBar>
-                  </section>
-                )}
-
-                {/* STEP 2 — brand */}
-                {step === 1 && (
-                  <section>
-                    <Kicker>Step 2 of 8</Kicker>
+                    <Kicker>Step 1 of 7</Kicker>
                     <H2>Whose ad is this going to be?</H2>
                     <Lead>Pick your brand — we automatically use its <b>product photos</b> so the video features your real product.</Lead>
                     {brands.length > 0 ? (
@@ -457,10 +441,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   </section>
                 )}
 
-                {/* STEP 3 — photos */}
-                {step === 2 && (
+                {/* STEP 2 — photos */}
+                {step === 1 && (
                   <section>
-                    <Kicker>Step 3 of 8</Kicker>
+                    <Kicker>Step 2 of 7</Kicker>
                     <H2>Show us your product</H2>
                     <Lead>These photos are swapped <b>into</b> the video. Clear photos on a plain background work best. Pick up to 4.</Lead>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -481,10 +465,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   </section>
                 )}
 
-                {/* STEP 4 — about */}
-                {step === 3 && (
+                {/* STEP 3 — about */}
+                {step === 2 && (
                   <section>
-                    <Kicker>Step 4 of 8 · optional</Kicker>
+                    <Kicker>Step 3 of 7 · optional</Kicker>
                     <H2>Tell us about the product</H2>
                     <Lead>30 seconds here makes the script noticeably better. Skip it if you’re in a hurry — we’ll work it out from your photos.</Lead>
                     <div className="field" style={{ marginBottom: 14 }}><FieldLabel>Product name</FieldLabel><input value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="e.g. AURA Hair Serum" style={{ ...input, width: '100%' }} /></div>
@@ -492,10 +476,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   </section>
                 )}
 
-                {/* STEP 5 — words & voice (still pre-analysis) */}
-                {step === 4 && (
+                {/* STEP 4 — words & voice (last pre-analysis step → 'Write my free script') */}
+                {step === 3 && (
                   <section>
-                    <Kicker>Step 5 of 8</Kicker>
+                    <Kicker>Step 4 of 7</Kicker>
                     <H2>The words &amp; the voice</H2>
                     <Lead><b>Good news: this part is free.</b> When you press <b>Write my free script</b>, we watch the winning ad and write a script for your product. You’ll read it and change any word before anything is charged.</Lead>
                     <div className="field" style={{ marginBottom: 16 }}>
@@ -524,10 +508,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   </section>
                 )}
 
-                {/* STEP 6 — length & format (review phase) */}
-                {step === 5 && (
+                {/* STEP 5 — length & format (review phase) · UGC/Cinematic switch lives here */}
+                {step === 4 && (
                   <section>
-                    <Kicker>Step 6 of 8</Kicker>
+                    <Kicker>Step 5 of 7</Kicker>
                     <H2>Length &amp; format</H2>
                     <Lead>How long, and whether to burn text onto the video. {suggestedMode === 'faithful' ? 'This ad is cinematic — we suggest the Cinematic style.' : ''}</Lead>
                     <div className="field" style={{ marginBottom: 16 }}>
@@ -584,10 +568,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   </section>
                 )}
 
-                {/* STEP 7 — extras */}
-                {step === 6 && (
+                {/* STEP 6 — extras */}
+                {step === 5 && (
                   <section>
-                    <Kicker>Step 7 of 8 · all optional</Kicker>
+                    <Kicker>Step 6 of 7 · all optional</Kicker>
                     <H2>Extras that squeeze more out of one video</H2>
                     <Lead>Each is a separate small charge, and each refunds itself automatically if it fails. Your main video is never at risk.</Lead>
                     <div onClick={() => setEcOn(!ecOn)} style={toggleRow(ecOn)}>
@@ -622,10 +606,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   </section>
                 )}
 
-                {/* STEP 8 — script & create */}
-                {step === 7 && (
+                {/* STEP 7 — script & create */}
+                {step === 6 && (
                   <section>
-                    <Kicker>Step 8 of 8</Kicker>
+                    <Kicker>Step 7 of 7</Kicker>
                     <H2>Your script — read it, tweak it, create</H2>
                     <Lead>This is exactly what the video will say. Edit any word. Nothing is charged until you press create.</Lead>
                     <div className="field" style={{ marginBottom: 14 }}>
@@ -644,12 +628,12 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       )}
                     </div>
                     <div style={{ border: `1px solid ${L_LINE}`, borderRadius: 16, overflow: 'hidden', marginBottom: 14 }}>
-                      <ReviewRow k="Style" v={mode === 'faithful' ? `Cinematic · ${sceneCount} scenes` : 'UGC creator'} onEdit={() => setStep(5)} />
-                      <ReviewRow k="Length" v={mode === 'faithful' ? `~${targetSecs}s` : `${resolvedBucket}s`} onEdit={() => setStep(5)} />
-                      <ReviewRow k="Brand" v={brandName} onEdit={() => setStep(1)} />
-                      <ReviewRow k="Language & voice" v={`${langCfg.label} · ${(VOICES.find(v => v.id === voice) || VOICES[0]).label.split(' · ')[0]}`} onEdit={() => setStep(4)} />
-                      <ReviewRow k="On camera" v={look === 'match' ? 'Match the original' : look} onEdit={() => setStep(4)} />
-                      <ReviewRow k="On-screen text" v={overlaysOn ? 'On' : 'Off — clean video'} onEdit={() => setStep(5)} last />
+                      <ReviewRow k="Style" v={mode === 'faithful' ? `Cinematic · ${sceneCount} scenes` : 'UGC creator'} onEdit={() => setStep(4)} />
+                      <ReviewRow k="Length" v={mode === 'faithful' ? `~${targetSecs}s` : `${resolvedBucket}s`} onEdit={() => setStep(4)} />
+                      <ReviewRow k="Brand" v={brandName} onEdit={() => setStep(0)} />
+                      <ReviewRow k="Language & voice" v={`${langCfg.label} · ${(VOICES.find(v => v.id === voice) || VOICES[0]).label.split(' · ')[0]}`} onEdit={() => setStep(3)} />
+                      <ReviewRow k="On camera" v={look === 'match' ? 'Match the original' : look} onEdit={() => setStep(3)} />
+                      <ReviewRow k="On-screen text" v={overlaysOn ? 'On' : 'Off — clean video'} onEdit={() => setStep(4)} last />
                     </div>
                     {notice && <div style={noticeBox}>{notice} <a href="/creative-studio" style={{ color: GREEN, fontWeight: 700 }}>Open My Creatives →</a></div>}
                   </section>
@@ -664,8 +648,8 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                 <span style={{ fontSize: 12, color: L_MUTED }}>{phase === 'review' ? <>Total <b style={{ color: L_INK }}>{cost} cr</b> · charged when you create</> : 'Free to preview — charged only after you approve the script'}</span>
                 <button onClick={goNext} disabled={busy} style={{ ...btnPrimary, marginLeft: 'auto', opacity: busy ? 0.7 : 1 }}>
                   {phase === 'form'
-                    ? (step < 4 ? <>Next <ChevronRight size={15} /></> : <><Pencil size={15} /> Write my free script</>)
-                    : (step < 7 ? <>Next <ChevronRight size={15} /></> : <><Sparkles size={15} /> Create video · {cost} cr</>)}
+                    ? (step < 3 ? <>Next <ChevronRight size={15} /></> : <><Pencil size={15} /> Write my free script</>)
+                    : (step < 6 ? <>Next <ChevronRight size={15} /></> : <><Sparkles size={15} /> Create video · {cost} cr</>)}
                 </button>
               </div>
             </div>
@@ -693,18 +677,6 @@ function SourceCard({ sourceVideoUrl, sourcePoster, hasSource }: { sourceVideoUr
         <div style={{ fontSize: 13.5, fontWeight: 700 }}>{hasSource ? 'The winning ad you’re remaking' : 'Your video'}</div>
         <div style={{ fontSize: 11.5, color: L_MUTED, marginTop: 2, lineHeight: 1.5 }}>We keep its <b style={{ color: L_INK }}>pacing, hook &amp; vibe</b> and swap in <b style={{ color: L_INK }}>your product</b> — you approve the script before any credits are spent.</div>
       </div>
-    </div>
-  )
-}
-
-function ChoiceCard({ on, onClick, rec, emoji, title, body, price }: { on: boolean; onClick: () => void; rec?: string; emoji: string; title: string; body: string; price: string }) {
-  return (
-    <div onClick={onClick} style={{ position: 'relative', border: `1.5px solid ${on ? SEL_BORDER : L_LINE}`, borderRadius: 16, padding: 16, cursor: 'pointer', background: on ? SEL_BG : '#fff', boxShadow: on ? '0 4px 16px -6px rgba(95,144,50,.25)' : 'none' }}>
-      {rec && <span style={{ position: 'absolute', top: -9, left: 14, background: FOREST, color: LIME, fontSize: 9.5, fontWeight: 800, letterSpacing: '.05em', padding: '3px 9px', borderRadius: 99 }}>{rec}</span>}
-      <span style={{ fontSize: 22, display: 'block', marginBottom: 8 }}>{emoji}</span>
-      <b style={{ fontSize: 15, display: 'block', marginBottom: 3 }}>{title}</b>
-      <p style={{ fontSize: 12, color: L_MUTED, lineHeight: 1.55, margin: 0 }}>{body}</p>
-      <span style={{ display: 'inline-block', marginTop: 9, fontSize: 11.5, fontWeight: 700, background: on ? FOREST : '#fff', color: on ? LIME : SEL_TEXT, border: `1px solid ${on ? FOREST : L_LINE}`, borderRadius: 99, padding: '3px 10px' }}>{price}</span>
     </div>
   )
 }
