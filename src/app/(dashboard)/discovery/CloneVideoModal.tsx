@@ -26,7 +26,7 @@ const uid = () => Math.random().toString(36).slice(2)
 const fileToDataUrl = (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) })
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePoster, onClose }: { sourceAdId: string; sourceVideoUrl?: string | null; sourcePoster?: string | null; onClose: () => void }) {
+export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePoster, onClose, onGenerated }: { sourceAdId: string; sourceVideoUrl?: string | null; sourcePoster?: string | null; onClose: () => void; onGenerated?: () => void }) {
   const [brands, setBrands] = useState<Brand[]>([])
   const [brandId, setBrandId] = useState<string | null>(null)
   // 'service' brand = app/site/service → no physical product; photos optional, creator talks about it.
@@ -208,6 +208,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       }).then(r => r.json())
       if (!start.jobId) { setErr(start.error || 'Could not start.'); setPhase('form'); return }
       setJobId(start.jobId)
+      onGenerated?.()   // a video job now exists in My Creatives — tell the host wizard
       const st = await pollUntil(start.jobId, 'analyzing', 400_000)   // wait for 'review'
       if (st.timedOut) { setErr('Analysis is taking longer than usual — try again in a moment.'); setPhase('form'); return }
       if (st.error) { setErr(st.error); setPhase('form'); return }
