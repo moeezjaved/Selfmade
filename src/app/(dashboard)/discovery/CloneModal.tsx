@@ -77,6 +77,10 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [brandCategory, setBrandCategory] = useState<'physical' | 'app' | 'service'>('physical')
   const brandType: 'physical' | 'service' = brandCategory === 'physical' ? 'physical' : 'service'
   const isService = brandType === 'service'
+  // Photos the user actually added THIS session (uploads, Assets, detect) or that belong to the brand
+  // they picked — as opposed to a stale pile restored from an old per-ad draft. For service brands we
+  // keep only these, so a fresh service brand never shows leftover product photos from past sessions.
+  const sessionPhotoIds = useRef<Set<string>>(new Set())
   const fileRef = useRef<HTMLInputElement>(null)
   const [mounted, setMounted] = useState(false)                    // portal guard (SSR-safe)
   useEffect(() => { setMounted(true) }, [])
@@ -125,16 +129,18 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       if (d.look) setLook(d.look)
       if (d.imageSize) setImageSize(d.imageSize)
       if (typeof d.count === 'number') setCount(d.count)
-      if (Array.isArray(d.photos)) setPhotos(d.photos)
-      if (Array.isArray(d.selected)) setSelected(d.selected)
+      if (d.brandCategory) setBrandCategory(d.brandCategory)
+      // NOTE: we intentionally do NOT restore photos/selected. Photos belong to the brand you pick
+      // (a saved brand reloads its own) or to what you add this session — restoring a stale per-ad
+      // photo blob caused leftover product photos to reappear (esp. confusing on service brands).
       if (typeof d.emailDaily === 'boolean') setEmailDaily(d.emailDaily)
       if (typeof d.saveAsBrand === 'boolean') setSaveAsBrand(d.saveAsBrand)
-      if ((Array.isArray(d.photos) && d.photos.length) || d.headline || d.brandId) setDraftRestored(true)
+      if (d.headline || d.brandId) setDraftRestored(true)
     } catch { /* corrupt draft — ignore */ }
   }, [draftKey])
   useEffect(() => {
     if (!restoredRef.current) return
-    const payload = { mode, brandId, bName, bSite, headline, aspect, look, imageSize, count, photos, selected, emailDaily, saveAsBrand }
+    const payload = { mode, brandId, brandCategory, bName, bSite, headline, aspect, look, imageSize, count, photos, selected, emailDaily, saveAsBrand }
     try { localStorage.setItem(draftKey, JSON.stringify(payload)) }
     catch {
       // Quota hit (large data: URL uploads) — persist the config without the heavy photo blobs.
@@ -155,9 +161,9 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   useEffect(() => {
     if (!isService) return
     setPhotos((p) => {
-      // Keep what the user chose (upload / Assets) AND site screenshots we pulled for the service —
-      // strip only product photos (a saved brand's 'saved' shots or a Shopify 'detected' product).
-      const keep = p.filter((x) => x.label === 'upload' || x.label === 'screenshot' || x.id.startsWith('asset:'))
+      // Keep only photos added this session or belonging to the picked brand — drop any stale pile
+      // restored from an old per-ad draft (that's the leftover product wall users were seeing).
+      const keep = p.filter((x) => sessionPhotoIds.current.has(x.id))
       if (keep.length === p.length) return p
       const keepIds = new Set(keep.map((k) => k.id))
       setSelected((s) => s.filter((id) => keepIds.has(id)))
@@ -165,7 +171,18 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     })
   }, [isService])
 
+  // After a draft restores a picked brand, reload THAT brand's own photos once the brand list is in
+  // (we no longer restore the stale photo blob) — unless the user already added photos this session.
+  const repickedRef = useRef(false)
+  useEffect(() => {
+    if (repickedRef.current || !brands.length || !brandId || mode !== 'pick') return
+    if (sessionPhotoIds.current.size > 0) { repickedRef.current = true; return }
+    const b = brands.find((x) => x.id === brandId)
+    if (b) { repickedRef.current = true; pickBrand(b) }
+  }, [brands, brandId, mode])
+
   const addPhotos = (list: Photo[], autoSelect = true) => {
+    list.forEach((x) => sessionPhotoIds.current.add(x.id))   // user-added this session → survives the service strip
     setPhotos((p) => {
       const seen = new Set(p.map((x) => x.src))
       const fresh = list.filter((x) => !seen.has(x.src))
@@ -196,6 +213,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     // Service brands store screenshots (not products) — label them 'screenshot' so they survive the
     // service photo-strip, and leave them unselected so the user opts into what fits.
     const ph = imgs.slice(0, 8).map((u) => ({ id: uid(), src: u, label: isSvc ? 'screenshot' : 'saved' }))
+    ph.forEach((x) => sessionPhotoIds.current.add(x.id))   // belongs to the picked brand → survives the service strip
     setPhotos(ph); setSelected(isSvc ? [] : ph.slice(0, 4).map((p) => p.id))
   }
 
