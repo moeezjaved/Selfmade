@@ -31,10 +31,20 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({} as any))
+  // Same server-to-server path as clone-image: the autopilot worker / admin tooling may enroll on a
+  // user's behalf with the shared secret. Otherwise the caller's session owns the enrollment.
+  const secret = req.headers.get('x-autopilot-secret')
+  const isService = !!secret && !!process.env.AUTOPILOT_SECRET && secret === process.env.AUTOPILOT_SECRET
+  let userId: string
+  if (isService && typeof body.asUserId === 'string' && body.asUserId) {
+    userId = body.asUserId
+  } else {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    userId = user.id
+  }
 
   const mediaType = body.mediaType === 'video' ? 'video' : 'image'
   const brandId = typeof body.brandId === 'string' && body.brandId ? body.brandId : null
@@ -48,7 +58,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await admin
     .from('ad_autopilot')
     .upsert({
-      user_id: user.id, brand_id: brandId, source_ad_id: sourceAdId, media_type: mediaType,
+      user_id: userId, brand_id: brandId, source_ad_id: sourceAdId, media_type: mediaType,
       settings, active: true,
     }, { onConflict: 'user_id,brand_id,source_ad_id,media_type' })
     .select('id')
