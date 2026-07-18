@@ -501,9 +501,18 @@ export async function GET() {
   })
   })()
 
+  // The partial MUST match the full response shape (the dashboard reads data.queue.total,
+  // data.daemons.preview_server.status, data.brands.map(...) etc. directly) — a bare {alerts} payload
+  // made those undefined and crashed the page. Return a complete zeroed skeleton instead.
   const partial = new Promise<NextResponse>((res) => setTimeout(() => res(NextResponse.json({
     partial: true,
     timestamp: new Date().toISOString(),
+    queue: { total: 0, thumbed: 0, video: 0, with_creative: 0, fast_path_ready: 0, missing: 0, pending: 0, failed: 0, thumbed_pct: 0, thumb_backlog: null, poster_backlog: null },
+    classify: { classifiable: null, done: null, backlog: null, pct_done: null, pct_left: null, error: 'timed out' },
+    activity: { runs_1h: 0, runs_24h: 0, success_rate_1h_pct: null, success_rate_24h_pct: null, bandwidth_24h_bytes: 0, bandwidth_24h_mb: 0, bandwidth_indexer_proxy_mb: 0, bandwidth_worker_proxy_mb: 0, bandwidth_worker_droplet_mb: 0, ads_discovered_24h: 0, last_run_at: null, last_success_at: null, minutes_since_last_run: null },
+    daemons: { preview_server: { status: 'unknown', latency_ms: null, url: null }, scheduler: { status: 'unknown', note: 'Health check timed out' }, worker: { status: 'unknown', recent_thumbnails_added: 0, note: 'Health check timed out' } },
+    currently_running: null, next_crawl: null, nightly_rollup: null, db_health: null,
+    brands: [], recent_runs: [],
     alerts: [{ level: 'warning', message: 'Health metrics timed out (database under heavy load) — showing partial data, retry shortly.' }],
   })), 24_000))
 
