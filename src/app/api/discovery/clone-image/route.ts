@@ -97,9 +97,9 @@ async function runGeneration(input: {
 }) {
   const { jobId, userId, userEmail, body, txId, imageSize } = input
   const admin = createAdminClient()
-  const fail = async (msg: string) => {
+  const fail = async (msg: string, reason?: string) => {
     if (txId) await admin.rpc('refund_credits', { p_tx: txId }).then(() => {}, () => {})
-    await admin.from('creative_generations').update({ status: 'failed', clone_meta: { tx_id: txId, error: msg } }).eq('id', jobId)
+    await admin.from('creative_generations').update({ status: 'failed', clone_meta: { tx_id: txId, error: msg, ...(reason ? { fail_reason: reason } : {}) } }).eq('id', jobId)
   }
   try {
     const { adId, refImageUrl, productImageB64, productImages, productMimeType, newHeadline, brandName, colors, brandId, aspectRatio, look } = body || {}
@@ -187,12 +187,13 @@ async function runGeneration(input: {
     const MAX_GENS = 3
     let gen: Awaited<ReturnType<typeof generateImage>> | null = null
     let best: { mimeType: string; dataB64: string } | null = null
+    let usedModel: string | null = null   // which Gemini model actually produced the winning image (admin telemetry)
     const verdictLog: string[] = []
     for (let i = 0; i < MAX_GENS; i++) {
       const attemptPrompt = i === 0 ? prompt : `${prompt} IMPORTANT CORRECTION: ${verdictLog[verdictLog.length - 1]}`
       gen = await generateImage(attemptPrompt, genImages, useTier, { aspectRatio: resolvedAspect, imageSize })
       if (!gen.ok) break
-      best = { mimeType: gen.mimeType, dataB64: gen.dataB64 }
+      best = { mimeType: gen.mimeType, dataB64: gen.dataB64 }; usedModel = gen.model
       const v = await verifyClonedAd(best, products[0], brandName)
       if (v.pass) { verdictLog.push('pass'); break }
       const fix = v.fix || [
@@ -205,7 +206,7 @@ async function runGeneration(input: {
     // Pro model congested (never downgraded) → a clear, retryable message; credits refund in fail().
     if (!best) {
       const raw = (gen && !gen.ok && gen.error) || 'generation failed'
-      return await fail(raw === 'pro_model_busy' ? 'The Pro image model is busy right now — please try again in a minute. You weren’t charged.' : raw)
+      return await fail(raw === 'pro_model_busy' ? 'The Pro image model is busy right now — please try again in a minute. You weren’t charged.' : raw, raw === 'pro_model_busy' ? 'pro_model_busy' : undefined)
     }
 
     // Upload to R2 and finalize the SAME job row (no second insert).
@@ -218,7 +219,7 @@ async function runGeneration(input: {
     await admin.from('creative_generations').update({
       status: 'done', image_url: url,
       prompt: newHeadline || null,
-      clone_meta: { tx_id: txId, image_size: imageSize },
+      clone_meta: { tx_id: txId, image_size: imageSize, model: usedModel },
     }).eq('id', jobId)
 
     if (userEmail) await sendFirstAdEmail(userId, userEmail, url).catch(() => {})
