@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CreditCounter } from '@/components/credits/CreditCounter'
+import { CreditCounter, useCredits } from '@/components/credits/CreditCounter'
+import { PLANS, normalizePlan } from '@/lib/plans'
 import { CreditModal } from '@/components/credits/CreditModal'
 import { NotificationBell } from '@/components/NotificationBell'
 import UpsellModalHost from '@/components/UpsellModal'
@@ -112,6 +113,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const { plan: effectivePlan } = useCredits()   // org-resolved plan (team members see the team's plan)
   const isMobile = useIsMobile()
   const [navOpen, setNavOpen] = useState(false)
   const [acctOpen, setAcctOpen] = useState(false)
@@ -163,9 +165,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.[0].toUpperCase() || 'A'
   const displayName = user?.user_metadata?.full_name || user?.email || 'User'
+  // Show the EFFECTIVE plan (org-resolved) so team members see the team's plan (e.g. "Agency"),
+  // not their individual 'free' profile — matching the Billing page. useCredits().plan comes from
+  // /api/credits/balance which resolves to the org owner.
   const planLabel = profile?.subscription_status === 'trialing'
     ? 'Trial'
-    : (profile?.plan_id ? profile.plan_id.charAt(0).toUpperCase() + profile.plan_id.slice(1) : 'Free')
+    : PLANS[normalizePlan(effectivePlan)]?.label || 'Free'
   const statusLabel = (profile?.subscription_status === 'canceled' || profile?.subscription_status === 'past_due') ? 'Inactive' : 'Active'
 
   return (

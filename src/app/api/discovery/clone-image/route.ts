@@ -219,7 +219,9 @@ async function runGeneration(input: {
     await admin.from('creative_generations').update({
       status: 'done', image_url: url,
       prompt: newHeadline || null,
-      clone_meta: { tx_id: txId, image_size: imageSize, model: usedModel },
+      // ref_url = the exact image we cloned from (discovery poster OR uploaded/asset reference), so the
+      // "cloned from" thumbnail shows for EVERY clone — including Brand-Spy/asset/upload ones with no source_ad_id.
+      clone_meta: { tx_id: txId, image_size: imageSize, model: usedModel, ref_url: refUrl },
     }).eq('id', jobId)
 
     if (userEmail) await sendFirstAdEmail(userId, userEmail, url).catch(() => {})
