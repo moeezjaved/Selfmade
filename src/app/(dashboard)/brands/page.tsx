@@ -34,9 +34,12 @@ export default function BrandsPage() {
   const [form, setForm] = useState<any>({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '', category: 'physical' })
   const isService = form.category !== 'physical'
   const [detected, setDetected] = useState<{ images: string[]; name: string } | null>(null)  // preview of URL-detected photos
+  const [detectedKit, setDetectedKit] = useState<any>(null)  // logo/colors/fonts/palette from the site
   const [detecting, setDetecting] = useState(false)
 
-  // Preview product photos from the store URL so the user SEES what we found before creating.
+  // Read the website so the user SEES what we found before creating. Physical → real product photos;
+  // service/app → the site's own imagery (hero + app/product-UI screenshots + og image), never
+  // Shopify product shots. Logo + colors are pulled for every type.
   const detectProducts = async () => {
     if (!form.website?.trim() || detecting) return
     setDetecting(true); setMsg(null); setDetected(null)
@@ -45,10 +48,21 @@ export default function BrandsPage() {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ url: form.website.trim() }),
       }).then((x) => x.json())
-      const imgs = Array.isArray(dr?.productImages) ? dr.productImages.slice(0, 12) : []
-      setDetected({ images: imgs, name: (dr?.productTitle || dr?.brandName || '').trim() })
-      if (!imgs.length) setMsg({ ok: false, text: 'No product photos found on that URL — you can still create the brand and add photos manually.' })
-      else if (dr?.productTitle && !form.name.trim()) setForm((f: any) => ({ ...f, name: dr.brandName || f.name }))
+      setDetectedKit({ colors: dr?.colors || [], fonts: dr?.fonts || null, logo: dr?.logo || null, palette: dr?.palette || null })
+      if (isService) {
+        const prod = new Set<string>(dr?.productImages || [])
+        const imgs = (dr?.images || []).filter((u: string) => !prod.has(u)).slice(0, 12)
+        setDetected({ images: imgs, name: (dr?.brandName || '').trim() })
+        setMsg(imgs.length
+          ? { ok: true, text: `Found ${imgs.length} screenshot${imgs.length === 1 ? '' : 's'}${dr?.logo ? ' + your logo' : ''}${dr?.colors?.length ? ' & colors' : ''}.` }
+          : { ok: false, text: 'No screenshots found — you can still create the brand and upload screenshots after.' })
+        if (dr?.brandName && !form.name.trim()) setForm((f: any) => ({ ...f, name: dr.brandName }))
+      } else {
+        const imgs = Array.isArray(dr?.productImages) ? dr.productImages.slice(0, 12) : []
+        setDetected({ images: imgs, name: (dr?.productTitle || dr?.brandName || '').trim() })
+        if (!imgs.length) setMsg({ ok: false, text: 'No product photos found on that URL — you can still create the brand and add photos manually.' })
+        else if (dr?.productTitle && !form.name.trim()) setForm((f: any) => ({ ...f, name: dr.brandName || f.name }))
+      }
     } catch { setMsg({ ok: false, text: 'Could not read that site — check the URL.' }) }
     finally { setDetecting(false) }
   }
@@ -65,26 +79,33 @@ export default function BrandsPage() {
     if (!form.name.trim() || saving) return
     setSaving(true); setMsg(null)
     try {
-      // Auto-detect product photos from the store URL (Shopify /products.json + og/JSON-LD fallback),
-      // so the brand is immediately usable in Remake with REAL product images — no manual URL pasting.
-      // Prefer the photos the user already previewed; otherwise detect inline now (best-effort).
+      // Read the website so the brand is immediately usable in Remake — physical → real product
+      // photos (Shopify /products.json + og/JSON-LD); service/app → the site's own screenshots/hero
+      // imagery. Prefer what the user already previewed; otherwise detect inline now (best-effort).
       let images: string[] = detected?.images || []
       let detectedName = detected?.name || ''
-      // Service brands have no physical product to detect — skip product-photo scraping entirely.
-      if (!isService && !detected && form.website?.trim()) {
-        setMsg({ ok: true, text: 'Detecting products from your site…' })
+      let kit: any = detectedKit
+      if (!detected && form.website?.trim()) {
+        setMsg({ ok: true, text: isService ? 'Reading your site…' : 'Detecting products from your site…' })
         try {
           const dr = await fetch('/api/discovery/detect-product', {
             method: 'POST', headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ url: form.website.trim() }),
           }).then((x) => x.json())
-          images = Array.isArray(dr?.productImages) ? dr.productImages.slice(0, 12) : []
-          detectedName = (dr?.productTitle || '').trim()
+          if (isService) {
+            const prod = new Set<string>(dr?.productImages || [])
+            images = (dr?.images || []).filter((u: string) => !prod.has(u)).slice(0, 12)
+            detectedName = (dr?.brandName || '').trim()
+          } else {
+            images = Array.isArray(dr?.productImages) ? dr.productImages.slice(0, 12) : []
+            detectedName = (dr?.productTitle || '').trim()
+          }
+          kit = { colors: dr?.colors || [], fonts: dr?.fonts || null, logo: dr?.logo || null, palette: dr?.palette || null }
         } catch { /* detection is best-effort — brand still saves without it */ }
       }
       const r = await fetch('/api/brands', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...form, brand_type: isService ? 'service' : 'physical', brand_kit: { category: form.category }, industry: csv(form.industry), usps: csv(form.usps), product_images: images, product_name: detectedName || undefined }),
+        body: JSON.stringify({ ...form, brand_type: isService ? 'service' : 'physical', brand_kit: { ...(kit || {}), category: form.category }, industry: csv(form.industry), usps: csv(form.usps), product_images: images, product_name: detectedName || undefined }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) {
@@ -95,7 +116,7 @@ export default function BrandsPage() {
         return
       }
       setForm({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '', category: 'physical' })
-      setDetected(null); setCreating(false)
+      setDetected(null); setDetectedKit(null); setCreating(false)
       setMsg({ ok: true, text: images.length ? `✓ “${(d.brand?.name || form.name)}” saved with ${images.length} product photo${images.length === 1 ? '' : 's'}.` : `✓ “${(d.brand?.name || form.name)}” saved.` })
       await load()
     } catch { setMsg({ ok: false, text: 'Network error — please try again.' }) }
@@ -151,32 +172,30 @@ export default function BrandsPage() {
           </div>
           <input style={input} placeholder="Brand name *" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <input style={{ ...input, flex: 1 }} placeholder={isService ? 'Website (optional — for your logo & colors)' : 'Website or product URL'} value={form.website}
-              onChange={e => { setForm({ ...form, website: e.target.value }); setDetected(null) }}
-              onKeyDown={e => e.key === 'Enter' && !isService && detectProducts()} />
-            {!isService && (
-              <button type="button" onClick={detectProducts} disabled={detecting || !form.website.trim()}
-                style={{ ...btn, whiteSpace: 'nowrap', opacity: (detecting || !form.website.trim()) ? 0.6 : 1 }}>
-                {detecting ? 'Detecting…' : 'Detect photos'}
-              </button>
-            )}
+            <input style={{ ...input, flex: 1 }} placeholder={isService ? 'Website (for your logo, colors & screenshots)' : 'Website or product URL'} value={form.website}
+              onChange={e => { setForm({ ...form, website: e.target.value }); setDetected(null); setDetectedKit(null) }}
+              onKeyDown={e => e.key === 'Enter' && detectProducts()} />
+            <button type="button" onClick={detectProducts} disabled={detecting || !form.website.trim()}
+              style={{ ...btn, whiteSpace: 'nowrap', opacity: (detecting || !form.website.trim()) ? 0.6 : 1 }}>
+              {detecting ? 'Reading…' : isService ? 'Detect from site' : 'Detect photos'}
+            </button>
           </div>
-          {isService && <div style={{ fontSize: 11.5, color: '#6b7280', margin: '2px 0 8px' }}>Service brands have no product photos — your ads show the creator talking about it (and you can add a logo/screenshots on the brand after saving).</div>}
+          {isService && <div style={{ fontSize: 11.5, color: '#6b7280', margin: '2px 0 8px' }}>We’ll pull your <b>logo, colors and any screenshots</b> from the site — no physical product is ever invented. You can also upload more screenshots on the brand after saving.</div>}
           {detected && (
             <div style={{ margin: '4px 0 10px' }}>
               {detected.images.length ? (
                 <>
-                  <div style={{ fontSize: 12, color: '#15803d', fontWeight: 600, marginBottom: 6 }}>✓ Found {detected.images.length} product photo{detected.images.length === 1 ? '' : 's'}{detected.name ? ` — ${detected.name}` : ''}</div>
+                  <div style={{ fontSize: 12, color: '#15803d', fontWeight: 600, marginBottom: 6 }}>✓ Found {detected.images.length} {isService ? 'screenshot' : 'product photo'}{detected.images.length === 1 ? '' : 's'}{detected.name ? ` — ${detected.name}` : ''}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 6 }}>
                     {detected.images.map((u, i) => (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img key={i} src={cdn(u, 128)} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb', background: '#f9fafb' }} />
                     ))}
                   </div>
-                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 5 }}>These become your brand’s product photos for Remake. Create the brand to save them.</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 5 }}>These become your brand’s {isService ? 'screenshots' : 'product photos'} for Remake. Create the brand to save them.</div>
                 </>
               ) : (
-                <div style={{ fontSize: 12, color: '#b45309' }}>No product photos found — you can still create the brand and add photos manually.</div>
+                <div style={{ fontSize: 12, color: '#b45309' }}>No {isService ? 'screenshots' : 'product photos'} found — you can still create the brand and add {isService ? 'screenshots' : 'photos'} manually.</div>
               )}
             </div>
           )}
