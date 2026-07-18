@@ -45,6 +45,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   // new-brand fields
   const [bName, setBName] = useState('')
   const [bSite, setBSite] = useState('')
+  const [bDesc, setBDesc] = useState('')   // service/app: what it does — grounds the ad copy (never guessed from the name)
   const [detecting, setDetecting] = useState(false)
   const [colors, setColors] = useState<string[]>([])
   const [fonts, setFonts] = useState<{ heading?: string | null; body?: string | null }>({})
@@ -278,7 +279,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         const httpImgs = photos.map((p) => p.src).filter((s) => /^https?:\/\//i.test(s))
         const rb = await fetch('/api/brands', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name: bName.trim(), website: bSite.trim() || null, product_images: httpImgs, brand_type: brandType, brand_kit: { colors, fonts, logo, palette, category: brandCategory } }),
+          body: JSON.stringify({ name: bName.trim(), website: bSite.trim() || null, description: bDesc.trim() || null, product_images: httpImgs, brand_type: brandType, brand_kit: { colors, fonts, logo, palette, category: brandCategory } }),
         })
         const jb = await rb.json()
         if (rb.status === 402 && jb.error === 'brand_limit_reached') {
@@ -532,7 +533,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                         {brands.map((b) => (
                           <button key={b.id} onClick={() => pickBrand(b)} style={chip(mode === 'pick' && bName === b.name)}>{b.name}</button>
                         ))}
-                        <button onClick={() => { setMode('new'); setBrandId(null); setBrandCategory('physical'); setBName(''); setBSite(''); setPhotos([]); setSelected([]) }} style={chipDashed(mode === 'new')}>＋ New brand</button>
+                        <button onClick={() => { setMode('new'); setBrandId(null); setBrandCategory('physical'); setBName(''); setBSite(''); setBDesc(''); setPhotos([]); setSelected([]) }} style={chipDashed(mode === 'new')}>＋ New brand</button>
                       </div>
                     )}
                     {/* Auto-loaded brand kit (saved brand) — confirmation only; the actual photos are
@@ -571,6 +572,12 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                           {brandCategory !== 'physical' && (
                             <div style={{ marginTop: 7, fontSize: 11.5, color: SEL_TEXT, background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }}>
                               Got it — we’ll build the ad around your brand, message and people, and <b>never invent a physical product</b>. Photos are optional on the next step.
+                            </div>
+                          )}
+                          {brandCategory !== 'physical' && (
+                            <div className="field" style={{ marginTop: 10 }}>
+                              <FieldLabel>What does it do? <i style={{ fontStyle: 'normal', fontWeight: 500, color: L_FAINT }}>· one line — the ad’s words come from this</i></FieldLabel>
+                              <input value={bDesc} onChange={(e) => setBDesc(e.target.value)} placeholder={brandCategory === 'app' ? 'e.g. AI platform that finds winning Facebook ads and remakes them for your brand' : 'e.g. Meta-ads agency for DTC skincare brands'} style={input} />
                             </div>
                           )}
                         </div>
