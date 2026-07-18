@@ -202,7 +202,11 @@ async function runGeneration(input: {
       ].filter(Boolean).join(' ')
       verdictLog.push(fix)
     }
-    if (!best) return await fail((gen && !gen.ok && gen.error) || 'generation failed')
+    // Pro model congested (never downgraded) → a clear, retryable message; credits refund in fail().
+    if (!best) {
+      const raw = (gen && !gen.ok && gen.error) || 'generation failed'
+      return await fail(raw === 'pro_model_busy' ? 'The Pro image model is busy right now — please try again in a minute. You weren’t charged.' : raw)
+    }
 
     // Upload to R2 and finalize the SAME job row (no second insert).
     const buf = Buffer.from(best.dataB64, 'base64')

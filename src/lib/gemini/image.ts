@@ -52,13 +52,14 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
   const wantAspect = opts?.aspectRatio && opts.aspectRatio !== 'original' ? opts.aspectRatio : null
   const proImageSize = opts?.imageSize || process.env.GEMINI_IMAGE_SIZE || '2K'
 
-  // MODEL CANDIDATES. The Pro image model (gemini-3-pro-image) frequently 503s ("high demand") on
-  // Google's side — a capacity outage, NOT our quota (the standard model works with the same key).
-  // So when Pro is requested, fall back to the standard model after retries: the user still gets an
-  // image instead of an error. imageSize (1K/2K/4K) is Pro-only — the standard model rejects it.
-  const candidates = (tier === 'pro' && MODEL_PRO !== MODEL_DEFAULT) ? [MODEL_PRO, MODEL_DEFAULT] : [modelFor(tier)]
+  // MODEL CANDIDATES. Pro is Pro-ONLY — we do NOT silently downgrade to the standard model. The Pro
+  // image model (gemini-3-pro-image) periodically 503s ("high demand") on Google's side; when it does
+  // we retry HARD (this runs in a 300s background job), and if it still can't, we surface a clear
+  // "Pro model is busy — try again in a minute" error and refund — a weaker image would erode trust
+  // (all our reference results were made on Pro). imageSize (1K/2K/4K) is Pro-only.
+  const candidates = [tier === 'pro' ? MODEL_PRO : modelFor(tier)]
   const RETRYABLE = new Set([429, 500, 502, 503, 504])
-  const MAX_TRIES = 4
+  const MAX_TRIES = tier === 'pro' ? 6 : 4   // ride out transient Pro-model 503s before giving up
   const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
   let lastErr = 'gemini failed'
 
@@ -99,7 +100,10 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
       }
     }
   }
-  return { ok: false, error: lastErr }
+  // Congestion on Google's Pro model (503/429/overloaded/unavailable) → a clear, retryable message
+  // instead of a raw error, so the UI can say "Pro model is busy — try again in a minute."
+  const busy = /\b(429|500|502|503|504)\b|overload|unavailable|high demand|resource_exhausted|rate/i.test(lastErr)
+  return { ok: false, error: busy ? 'pro_model_busy' : lastErr }
 }
 
 /**
