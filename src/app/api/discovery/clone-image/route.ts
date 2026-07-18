@@ -54,10 +54,12 @@ async function enqueue(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const { adId, refImageUrl, productImageB64, productImages } = body || {}
+  const isService = body?.productType === 'service'   // service/app brand → no physical product; photos optional
   const rawProducts: string[] = Array.isArray(productImages) && productImages.length
     ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
     : (productImageB64 ? [String(productImageB64)] : [])
-  if ((!adId && !refImageUrl) || rawProducts.length === 0) return NextResponse.json({ error: 'adId (or refImageUrl) and at least one product image required' }, { status: 400 })
+  // Physical clones need a product photo; service clones don't (they show logo/screenshots/people).
+  if ((!adId && !refImageUrl) || (rawProducts.length === 0 && !isService)) return NextResponse.json({ error: 'adId (or refImageUrl) and at least one product image required' }, { status: 400 })
 
   // Clone is Pro-only; resolution picks the price: 2K → image_clone_pro (15), 4K → image_clone_4k (25).
   const imageSize = body.imageSize === '4K' ? '4K' : '2K'
@@ -170,14 +172,17 @@ async function runGeneration(input: {
       })).then((xs) => xs.filter(Boolean) as { mimeType: string; dataB64: string }[]),
     ])
     if (!refImg) return await fail('could not load reference image')
-    if (products.length === 0) return await fail('could not load product image(s)')
+    const isService = body?.productType === 'service'   // no physical product to render
+    if (products.length === 0 && !isService) return await fail('could not load product image(s)')
 
-    const productDesc = await describeProduct(products[0]).catch(() => null)
+    // Service brands have no product to describe; physical brands ground the scene/copy on it.
+    const productDesc = (!isService && products[0]) ? await describeProduct(products[0]).catch(() => null) : null
     const priceStr = productPrice ? (/^\s*[\$£€₨₹]|rs\.?/i.test(String(productPrice)) ? String(productPrice).trim() : `$${String(productPrice).trim()}`) : null
     const prompt = buildClonePrompt({
       brandName, colors: kitColors, newHeadline, aspectRatio: resolvedAspect, fonts: kitFonts, palette: kitPalette, hasLogo: !!logoImg,
       productDesc: productDesc || undefined, productPrice: priceStr, look: typeof look === 'string' ? look : undefined,
       dna: { hook_type: ad.hook_type, format_style: ad.format_style, angle: ad.angle, emotion: ad.emotion, cta: ad.cta },
+      isService,
     })
     const genImages = logoImg ? [refImg, ...products, logoImg] : [refImg, ...products]
 
@@ -194,6 +199,9 @@ async function runGeneration(input: {
       gen = await generateImage(attemptPrompt, genImages, useTier, { aspectRatio: resolvedAspect, imageSize })
       if (!gen.ok) break
       best = { mimeType: gen.mimeType, dataB64: gen.dataB64 }; usedModel = gen.model
+      // Service ads have no product to verify against — accept the first good render (the prompt forbids
+      // inventing a physical product). Physical ads run the product/branding/text QA loop as before.
+      if (isService || !products[0]) { verdictLog.push('service'); break }
       const v = await verifyClonedAd(best, products[0], brandName)
       if (v.pass) { verdictLog.push('pass'); break }
       const fix = v.fix || [
