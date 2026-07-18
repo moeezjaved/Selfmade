@@ -48,14 +48,26 @@ export async function POST(req: NextRequest) {
 }
 
 async function enqueue(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
-  // Burst guard — images are free for subscribers, so cap scripted floods (fail-open).
-  if (await isRateLimited(user.id)) return NextResponse.json({ error: 'rate_limited', message: 'Too many generations in a short time — please wait a moment and try again.' }, { status: 429 })
-
   const body = await req.json().catch(() => ({}))
+  // Actor resolution: normal callers use their session. The Daily Ad Autopilot worker calls this
+  // server-to-server with a shared secret + the user it's generating for, so it reuses the EXACT
+  // clone generation + billing path (nothing about the generation changes). Auth boundary only.
+  const autopilotSecret = req.headers.get('x-autopilot-secret')
+  const isAutopilot = !!autopilotSecret && !!process.env.AUTOPILOT_SECRET && autopilotSecret === process.env.AUTOPILOT_SECRET
+  let actorId: string, actorEmail: string | null = null
+  if (isAutopilot) {
+    if (typeof body.asUserId !== 'string' || !body.asUserId) return NextResponse.json({ error: 'asUserId required' }, { status: 400 })
+    actorId = body.asUserId
+  } else {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    actorId = user.id; actorEmail = user.email || null
+  }
+  if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
+  // Burst guard — cap scripted floods (fail-open). Autopilot is server-paced, so it's exempt.
+  if (!isAutopilot && await isRateLimited(actorId)) return NextResponse.json({ error: 'rate_limited', message: 'Too many generations in a short time — please wait a moment and try again.' }, { status: 429 })
+
   const { adId, refImageUrl, productImageB64, productImages } = body || {}
   const isService = body?.productType === 'service'   // service/app brand → no physical product; photos optional
   const rawProducts: string[] = Array.isArray(productImages) && productImages.length
@@ -71,7 +83,7 @@ async function enqueue(req: NextRequest) {
   const admin = createAdminClient()
 
   // Reserve up front so insufficient-credits surfaces immediately (before we say "generating").
-  const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: action })
+  const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: actorId, p_action: action })
   if (rErr) {
     const insufficient = String(rErr.message || '').includes('insufficient_credits')
     return NextResponse.json({ error: insufficient ? 'insufficient_credits' : 'reserve_failed' }, { status: insufficient ? 402 : 500 })
@@ -81,9 +93,9 @@ async function enqueue(req: NextRequest) {
   // Job row — status='processing', no image yet. The client polls this id; it also becomes the
   // final My Creatives row once done (same as the video clone's creative_generations lifecycle).
   const { data: job, error: jErr } = await admin.from('creative_generations').insert({
-    user_id: user.id, brand_id: body.brandId || null, source_ad_id: adId ? String(adId) : null,
+    user_id: actorId, brand_id: body.brandId || null, source_ad_id: adId ? String(adId) : null,
     type: 'clone', media_type: 'image', tier: 'pro', status: 'processing',
-    clone_meta: { tx_id: txId, image_size: imageSize },
+    clone_meta: { tx_id: txId, image_size: imageSize, ...(isAutopilot ? { autopilot: true } : {}) },
   }).select('id').single()
   if (jErr || !job) {
     if (txId) await admin.rpc('refund_credits', { p_tx: txId }).then(() => {}, () => {})
@@ -92,7 +104,7 @@ async function enqueue(req: NextRequest) {
   const jobId = (job as any).id
 
   // Run the generation in the background of this invocation — returns to the user NOW.
-  waitUntil(runGeneration({ jobId, userId: user.id, userEmail: user.email || null, body, txId, imageSize }))
+  waitUntil(runGeneration({ jobId, userId: actorId, userEmail: actorEmail, body, txId, imageSize }))
   return NextResponse.json({ jobId, status: 'processing' })
 }
 

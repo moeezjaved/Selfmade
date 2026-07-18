@@ -62,6 +62,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [imageSize, setImageSize] = useState<'2K' | '4K'>('2K')
   const tier: 'pro' = 'pro'   // Pro (Nano Banana Pro) always — best product fidelity + text
   const [emailDaily, setEmailDaily] = useState(true)
+  const [autopilot, setAutopilot] = useState(false)   // Daily Ad Autopilot — a fresh ad for this brand every day ($0.15/day)
 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -295,6 +296,15 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         fetch('/api/follows', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ pageId: ad.pageId, brandName: ad.pageName, action: 'set_email', email_alerts: true }),
+        }).catch(() => {})
+      }
+
+      // Daily Ad Autopilot — enroll this brand/ad so the worker generates + emails one fresh ad a day.
+      // Needs a saved brand (its product photos + kit) and a real source ad to alternate/re-clone from.
+      if (autopilot && useBrandId && !ad.assetImageUrl) {
+        fetch('/api/autopilot', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ brandId: useBrandId, sourceAdId: ad.id, mediaType: 'image', settings: { aspect, image_size: imageSize, product_type: brandType, look } }),
         }).catch(() => {})
       }
 
@@ -684,8 +694,14 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                     </div>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 12.5, color: L_INK, cursor: 'pointer', background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 12, padding: '11px 13px' }}>
                       <input type="checkbox" checked={emailDaily} onChange={(e) => setEmailDaily(e.target.checked)} style={{ marginTop: 2, accentColor: GREEN }} />
-                      <span>📧 <b>Email me new winning ads like this, daily</b><br /><span style={{ color: L_MUTED, fontSize: 11.5 }}>Fresh top ads from {ad.pageName || 'this brand'} &amp; its niche — 2 credits per email, cancel anytime in Settings.</span></span>
+                      <span>📧 <b>Email me new winning ads like this, daily</b><br /><span style={{ color: L_MUTED, fontSize: 11.5 }}>Fresh top ads from {ad.pageName || 'this brand'} &amp; its niche — cancel anytime in Settings.</span></span>
                     </label>
+                    {!ad.assetImageUrl && (
+                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 12.5, color: L_INK, cursor: 'pointer', background: '#fff', border: `1.5px solid ${autopilot ? SEL_BORDER : L_LINE}`, borderRadius: 12, padding: '11px 13px', marginTop: 10 }}>
+                        <input type="checkbox" checked={autopilot} onChange={(e) => setAutopilot(e.target.checked)} style={{ marginTop: 2, accentColor: GREEN }} />
+                        <span>🚀 <b>Put this ad on autopilot</b><br /><span style={{ color: L_MUTED, fontSize: 11.5 }}>Get a brand-new ad for <b>{bName.trim() || 'this brand'}</b> emailed every day — we alternate a fresh take on this ad with a new competitor winner. <b>$0.15/day</b>, skipped when you’re out of credits, cancel anytime in Settings.{!isService && !brandId && !saveAsBrand ? ' Turn on “Save as a brand” so we can reuse your product.' : ''}</span></span>
+                      </label>
+                    )}
                   </section>
                 )}
 

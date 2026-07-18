@@ -92,6 +92,29 @@ export function newAdEmail({ brandName, adCount, pageId }) {
   }
 }
 
+/** Daily Ad Autopilot: one freshly-generated ad for the user's brand, emailed each day. The credit
+ * charge already happened during generation (same price as a manual clone) — this email is the
+ * delivery. kind = 'variation' (a new take on their ad) | 'fresh' (a new competitor winner cloned). */
+export function autopilotDailyEmail({ brandName, imageUrl, kind, creditsLeft }) {
+  const b = brandName || 'your brand'
+  const badge = kind === 'fresh' ? 'Fresh competitor angle · cloned with your product' : 'A new take on your ad'
+  const left = Number.isFinite(creditsLeft) ? ` · ${creditsLeft.toLocaleString()} credits left` : ''
+  const img = imageUrl
+    ? `<div style="margin:14px 0 4px"><img src="${imageUrl}" alt="Your daily ad" width="280" style="width:280px;max-width:100%;border-radius:12px;border:1px solid #e6ede2;display:block;margin:0 auto"></div>`
+    : ''
+  return {
+    subject: `Today's ad for ${b} is ready`,
+    html: emailShell({
+      heading: `Today's ad for ${b}`,
+      bodyHtml: `<span style="display:inline-block;background:#eaf3de;color:#3b6d11;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:6px">${badge}</span>${img}
+        <div style="margin-top:10px">Your daily ad is ready — rebuilt around your real product. Download it, tweak the words, or launch it as-is.</div>
+        <div style="margin-top:10px;font-size:12px;color:#9aaa9a">$0.15 charged to your credits${left}</div>`,
+      ctaText: 'Download or edit this ad →',
+      ctaPath: '/creative-studio',
+    }),
+  }
+}
+
 /** BUNDLED alert: ALL of a user's followed brands that shipped ads this cycle, in ONE email (2 credits
  * total, not per-brand). items = [{ brandName, count, pageId }]. */
 export function newAdBundleEmail({ items }) {
