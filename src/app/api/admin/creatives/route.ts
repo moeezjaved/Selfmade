@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || '300'), 500)
 
   let q = admin.from('creative_generations')
-    .select('id, user_id, brand_id, source_ad_id, type, media_type, status, tier, image_url, prompt, created_at, featured_on_landing')
+    .select('id, user_id, brand_id, source_ad_id, type, media_type, status, tier, image_url, prompt, created_at, featured_on_landing, clone_meta')
     .order('created_at', { ascending: false }).limit(limit)
   if (type) q = q.eq('type', type)
   const { data: creatives } = await q
@@ -47,7 +47,8 @@ export async function GET(request: NextRequest) {
     tier: r.tier, prompt: r.prompt, created_at: r.created_at,
     email: emailMap[r.user_id] || '', name: nameMap[r.user_id] || '', brand: r.brand_id ? brandMap[r.brand_id] || null : null,
     source_ad_id: r.source_ad_id || null,
-    source_thumb: r.source_ad_id ? srcThumb.get(r.source_ad_id) || null : null,
+    // discovery source thumbnail, else the stored reference image (asset/upload/Brand-Spy clones).
+    source_thumb: (r.source_ad_id ? srcThumb.get(r.source_ad_id) : null) || r.clone_meta?.ref_url || null,
     featured: !!r.featured_on_landing,
   }))
   return NextResponse.json({ creatives: out, total: out.length })

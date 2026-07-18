@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get('type')
 
   let q = admin.from('creative_generations')
-    .select('id, brand_id, source_ad_id, source_video_url, parent_id, type, tier, prompt, image_url, media_type, status, created_at')
+    .select('id, brand_id, source_ad_id, source_video_url, parent_id, type, tier, prompt, image_url, media_type, status, created_at, clone_meta')
     .eq('user_id', user.id).order('created_at', { ascending: false }).limit(300)
   if (brandId) q = q.eq('brand_id', brandId)
   if (type) q = q.eq('type', type)
@@ -49,11 +49,16 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const creatives = (data || []).map((g: any) => ({
-    ...g,
-    brand_name: g.brand_id ? names.get(g.brand_id) || null : null,
-    source_thumb: g.source_ad_id ? srcThumb.get(g.source_ad_id) || null : null,
-  }))
+  const creatives = (data || []).map((g: any) => {
+    const { clone_meta, ...rest } = g
+    return {
+      ...rest,
+      brand_name: g.brand_id ? names.get(g.brand_id) || null : null,
+      // "Cloned from" thumbnail: the discovery source ad, else the stored reference image
+      // (asset/upload/Brand-Spy clones that have no source_ad_id).
+      source_thumb: (g.source_ad_id ? srcThumb.get(g.source_ad_id) : null) || clone_meta?.ref_url || null,
+    }
+  })
   return NextResponse.json({ creatives })
 }
 
