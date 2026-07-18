@@ -148,6 +148,21 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     setImageSize('2K'); setCount(1); setDraftRestored(false)
   }
 
+  // Service / app brands have no product to insert — the ad is built from the brand kit + any logo
+  // or screenshots the user chooses to upload. Never let product photos (from a saved brand, a
+  // website detect, or a restored draft) sit in the picker: they'd be sent to the model and could
+  // reintroduce an invented product. Keep only what the user explicitly uploaded / pulled from Assets.
+  useEffect(() => {
+    if (!isService) return
+    setPhotos((p) => {
+      const keep = p.filter((x) => x.label === 'upload' || x.id.startsWith('asset:'))
+      if (keep.length === p.length) return p
+      const keepIds = new Set(keep.map((k) => k.id))
+      setSelected((s) => s.filter((id) => keepIds.has(id)))
+      return keep
+    })
+  }, [isService])
+
   const addPhotos = (list: Photo[]) => {
     setPhotos((p) => {
       const seen = new Set(p.map((x) => x.src))
@@ -724,7 +739,9 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3c473e', marginBottom: 6 }}>{children}</div>
 }
 function InfoBar({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 12, padding: '11px 13px', fontSize: 12.5, color: SEL_TEXT, lineHeight: 1.55, marginTop: 18 }}>{children}</div>
+  // Children include inline <b> tags — wrap in ONE span so the flex container doesn't turn each
+  // text node + <b> into a separate flex item (which scrambles the sentence order).
+  return <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 12, padding: '11px 13px', fontSize: 12.5, color: SEL_TEXT, lineHeight: 1.55, marginTop: 18 }}><span style={{ flex: 1, minWidth: 0 }}>{children}</span></div>
 }
 function ReviewRow({ k, v, onEdit, last }: { k: string; v: string; onEdit?: () => void; last?: boolean }) {
   return (
