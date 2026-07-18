@@ -24,6 +24,7 @@
   if (IS_FB_TOOLS) return
 
   const IS_FB_ADLIB = HOST.includes('facebook.com') && location.pathname.includes('/ads/library')
+  const IS_FB_FEED = HOST.includes('facebook.com') && !IS_FB_ADLIB   // the plain FB feed (sponsored posts)
   const IS_TT_ADLIB = HOST.includes('library.tiktok.com')
   const IS_TT_FEED = HOST.includes('tiktok.com') && !IS_TT_ADLIB
   const IS_IG = HOST.includes('instagram.com')
@@ -33,7 +34,9 @@
   // Surfaces where we inject a per-CARD Save button (Atria-style). There, the floating hover button
   // is redundant + annoying (it trails the mouse "everywhere"). Hover/FAB are only for the plain
   // Facebook FEED, which has no per-card buttons.
-  const HAS_CARDS = IS_FB_ADLIB || IS_TT_ADLIB || IS_IG || IS_TT_FEED
+  // FB FEED now gets per-card buttons too (was only the FAB, which grabbed the page's biggest media →
+  // saved the wrong ad + re-saves overwrote the same dedupe key). Per-card captures each ad's OWN media.
+  const HAS_CARDS = IS_FB_ADLIB || IS_FB_FEED || IS_TT_ADLIB || IS_IG || IS_TT_FEED
   const MIN = 140
 
   // ── Toast ─────────────────────────────────────────────────────────────────
@@ -103,6 +106,26 @@
         if (area > bestArea) { best = el; bestArea = area }
       }
     }
+    return best
+  }
+  // The FAB should save the ad the user is LOOKING AT — the largest media in the viewport, closest to
+  // centre — not the biggest media on the whole page (which was always the same ad → wrong save + the
+  // same dedupe key → overwrote the previous save).
+  function biggestVisibleMedia() {
+    const vw = window.innerWidth, vh = window.innerHeight, cx = vw / 2, cy = vh / 2
+    let best = null, bestScore = 0
+    const consider = (el) => {
+      const r = el.getBoundingClientRect()
+      const visW = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0))
+      const visH = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0))
+      const visArea = visW * visH
+      if (visArea < MIN * MIN) return
+      const dist = Math.hypot((r.left + r.right) / 2 - cx, (r.top + r.bottom) / 2 - cy)
+      const score = visArea / (1 + dist)     // large + centred wins
+      if (score > bestScore) { best = el; bestScore = score }
+    }
+    document.querySelectorAll('img, video').forEach(consider)
+    if (!best) document.querySelectorAll('div, a, span').forEach((el) => { if (bgUrl(el)) consider(el) })
     return best
   }
   function textFrom(scope, sels, max = 800) {
@@ -308,6 +331,13 @@
         // their blob video can't be saved anyway).
         if (r.width > 260 && (art.querySelector('img') || art.querySelector('video')) && looksLikeAd(art)) addCardButton(art, 'append')
       }
+    } else if (IS_FB_FEED) {
+      // One Save button per SPONSORED post — captures THAT ad's own media (fixes the FAB saving the
+      // wrong ad / overwriting). FB feed posts are [role="article"] blocks.
+      for (const art of document.querySelectorAll('[role="article"]')) {
+        const r = art.getBoundingClientRect()
+        if (r.width > 260 && r.height > 180 && (art.querySelector('img') || art.querySelector('video') || biggestMediaIn(art)) && looksLikeAd(art)) addCardButton(art, 'append')
+      }
     } else if (IS_TT_FEED) {
       for (const v of document.querySelectorAll('video')) {
         const container = v.closest('[class*="DivItemContainer"], [class*="DivContainer"], article, div[data-e2e]') || v.parentElement
@@ -402,8 +432,11 @@
     })
     fab.addEventListener('click', (e) => {
       if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; return }   // was a drag, not a click
-      const el = biggestMediaIn(document)
-      if (el) doSave(el, document, fab, { saving: '…', done: '✓' }, { revert: true })
+      const el = biggestVisibleMedia() || biggestMediaIn(document)
+      // Save the ad's whole card as scope (so brand/caption/permalink come from the right post),
+      // not the entire document.
+      const scope = (el && el.closest && el.closest('[role="article"], article, [data-ad-preview]')) || document
+      if (el) doSave(el, scope, fab, { saving: '…', done: '✓' }, { revert: true })
       else toast('No image or video found here', false)
     })
   }
@@ -413,7 +446,7 @@
   // plain Facebook feed). On the Ad Library / IG / TikTok the per-card buttons are the UX, so the
   // trailing hover button is suppressed. Nothing at all runs on YouTube/arbitrary sites.
   if (SUPPORTED) setupHover()
-  if (IS_FB_ADLIB || IS_TT_ADLIB || IS_IG || IS_TT_FEED) {
+  if (IS_FB_ADLIB || IS_FB_FEED || IS_TT_ADLIB || IS_IG || IS_TT_FEED) {
     scan()
     const obs = new MutationObserver(() => { clearTimeout(window.__smT); window.__smT = setTimeout(scan, 350) })
     obs.observe(document.body, { childList: true, subtree: true })
