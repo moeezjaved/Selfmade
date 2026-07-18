@@ -158,6 +158,16 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   )
 }
 
+// Hand-picked "Made with Selfmade" before→after showcase — a source winning ad and the remake we made
+// for the brand (all our own brands). Curated list (not an auto-feed) so nothing private/off-brand leaks.
+const R2_ = 'https://pub-4923da4504674f3ea83f76847da04b3b.r2.dev'
+const SHOWCASE: { brand: string; source: string; made: string }[] = [
+  { brand: 'Co natural — skincare', source: `${R2_}/thumbs/1fff3fff7fff64ff21fb31fb30ff30033003301f307f21fc33f0308078000000.webp`, made: `${R2_}/creatives/c4888816-4b52-4aa1-a5fd-27b7819f6d39/94ac6032-517a-417b-9e1b-0c779a5570d9.jpg` },
+  { brand: 'Ryze — supplements', source: `${R2_}/thumbs/ff00ff079f079e00cdc7cdc7c9c0ddffffedece1edffc9cf80608800fe000000.webp`, made: `${R2_}/creatives/c4888816-4b52-4aa1-a5fd-27b7819f6d39/83f3e6b1-43e9-4af8-82c5-5371621a20d8.jpg` },
+  { brand: 'Cheat Clean — food', source: `${R2_}/thumbs/0030fff0003200106244e764c7b3e380f3eff3e3fbe0c080e3f8fff8fff8fff8.webp`, made: `${R2_}/creatives/c4888816-4b52-4aa1-a5fd-27b7819f6d39/9bb8abb1-1ffb-4fdc-9b51-1859a0e585d5.png` },
+  { brand: 'ZIBAL — apparel', source: `${R2_}/thumbs/ff81fe1fe01fe00fe00fe007e007e003e443e003e003e003e013e003e003e003.webp`, made: `${R2_}/creatives/1e0d60d8-1d9b-4f23-b507-0accd2c3782f/00077381-6b5a-4c3b-ac6f-25e39ea76752.jpg` },
+]
+
 export default function HomeLanding() {
   const marqueeGrad = ['#c7f0a3', '#bfe0ff', '#f7c9e8', '#ffe6b0', '#d7c9ff', '#a8e63d', '#7fb8f5', '#ec8fd0', '#f5c15c', '#a98ff0']
   const [ads, setAds] = useState<string[]>([])
@@ -426,6 +436,34 @@ export default function HomeLanding() {
           {[['3M+', 'ads indexed'], ['611K', 'brands tracked'], ['36', 'industries'], ['2K / 4K', 'ad exports']].map(([n, l]) => (
             <div key={n} className="lift" style={{ border: '1px solid #eef0ee', borderRadius: 20, padding: '28px 20px', textAlign: 'center' }}>
               <div style={{ fontSize: 34, fontWeight: 800, color: INK }}>{n}</div><div style={{ fontSize: 13.5, color: '#6b7280', marginTop: 4 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* MADE WITH SELFMADE — before→after: source winning ad → the remake we made for the brand */}
+      <section style={{ ...wrap, padding: '30px 24px 10px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 22 }}>
+          <h2 style={{ fontSize: 'clamp(24px,3.4vw,34px)', fontWeight: 800, letterSpacing: '-.02em', margin: 0, color: INK }}>Made with Selfmade</h2>
+          <p style={{ color: '#6b7280', fontSize: 14.5, margin: '6px 0 0' }}>A real winning ad → remade for the brand, in one click. <span style={{ color: '#9ca3af' }}>Same layout, your product.</span></p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px,100%), 1fr))', gap: 16 }}>
+          {SHOWCASE.map((s) => (
+            <div key={s.brand} className="lift" style={{ background: '#fff', border: '1px solid #e9edf2', borderRadius: 16, padding: 14, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.source} alt="source winning ad" loading="lazy" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: '1px solid #eef0ee', background: '#f6f7f5' }} />
+                  <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.04em', color: '#9ca3af', marginTop: 6, textTransform: 'uppercase' }}>Winning ad</div>
+                </div>
+                <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: '50%', background: LIME, color: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16 }}>→</div>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.made} alt="remade with Selfmade" loading="lazy" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: `2px solid ${LIME}` }} />
+                  <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', color: GREEN, marginTop: 6, textTransform: 'uppercase' }}>Your remake</div>
+                </div>
+              </div>
+              <div style={{ marginTop: 10, fontSize: 12.5, fontWeight: 700, color: INK, textAlign: 'center' }}>{s.brand}</div>
             </div>
           ))}
         </div>
