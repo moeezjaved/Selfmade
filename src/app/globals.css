@@ -204,16 +204,17 @@
     text-align: left;
     width: 100%;
     position: relative;
-    color: rgba(255,255,255,0.72);
+    color: #3c473e;
     padding: 10px 14px;
     border-radius: 12px;
     margin-bottom: 2px;
     font-family: inherit;
     text-decoration: none;
   }
-  .sidebar-link:hover { color: #f4f7ef; background: rgba(255,255,255,0.05); }
-  .sidebar-link.active { background: #dffe95; color: #0e1b12; font-weight: 700; box-shadow: 0 4px 14px -6px rgba(223,254,149,.5); }
-  .sidebar-link.active:hover { background: #dffe95; color: #0e1b12; }
+  .sidebar-link:hover { color: #17251c; background: #ecf1ea; }
+  .sidebar-link.active { background: #fff; color: #17251c; font-weight: 700; box-shadow: inset 0 0 0 1px #e7ece7, 0 1px 3px rgba(23,37,28,.07); }
+  .sidebar-link.active:hover { background: #fff; color: #17251c; }
+  .sidebar-link.active svg { color: #3f8f4f; }
 
   /* Ask Mello card */
   .sm-mello-card {
@@ -230,21 +231,21 @@
   .rail-icon {
     width: 58px; padding: 8px 0 6px; border-radius: 14px;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-    color: rgba(255,255,255,0.5); transition: all 0.14s ease; flex-shrink: 0;
+    color: #68756b; transition: all 0.14s ease; flex-shrink: 0;
   }
   .rail-label {
     font-size: 9.5px; font-weight: 600; letter-spacing: 0.01em; line-height: 1;
     text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .rail-icon:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.9); }
-  .rail-icon.accent { color: #dffe95; }
-  .rail-icon.accent:hover { background: rgba(223,254,149,0.1); }
-  .rail-icon.active { background: rgba(223,254,149,0.12); color: #dffe95; border: 1px solid rgba(223,254,149,0.2); }
-  .rail-icon.active:hover { background: rgba(223,254,149,0.16); }
+  .rail-icon:hover { background: #ecf1ea; color: #17251c; }
+  .rail-icon.accent { color: #3f8f4f; }
+  .rail-icon.accent:hover { background: #e6f4e2; }
+  .rail-icon.active { background: #fff; color: #17251c; border: 1px solid #e7ece7; box-shadow: 0 1px 3px rgba(23,37,28,.08); }
+  .rail-icon.active:hover { background: #fff; }
 
   /* Account dropdown rows */
   .sm-acct-item { transition: background 0.12s ease; }
-  .sm-acct-item:hover { background: rgba(255,255,255,0.07); }
+  .sm-acct-item:hover { background: rgba(23,37,28,0.05); }
 
   /* ── DATA TABLE ── */
   .data-table { width: 100%; border-collapse: collapse; }

@@ -91,11 +91,11 @@ export function CreditCounter({ compact = false }: { compact?: boolean }) {
        style={{
          display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit',
          padding: compact ? '4px 10px' : '6px 12px', borderRadius: 999,
-         background: low ? '#fef2f2' : 'rgba(223,254,149,0.14)',
-         border: `1px solid ${low ? '#fecaca' : 'rgba(223,254,149,0.35)'}`,
-         color: low ? '#b91c1c' : '#dffe95', fontSize: 12, fontWeight: 700,
+         background: low ? '#fef2f2' : '#fff',
+         border: `1px solid ${low ? '#fecaca' : '#e7ece7'}`,
+         color: low ? '#b91c1c' : '#17251c', fontSize: 12, fontWeight: 700,
        }}>
-      <span style={{ fontSize: 13 }}>◆</span>
+      <span style={{ fontSize: 13, color: low ? '#b91c1c' : '#3f8f4f' }}>◆</span>
       <span>{loading ? '…' : balance.toLocaleString()}</span>
       <span style={{ opacity: 0.7, fontWeight: 600 }}>credits</span>
       {low && !loading && <span style={{ marginLeft: 4, fontWeight: 800 }}>· Top&nbsp;up</span>}
