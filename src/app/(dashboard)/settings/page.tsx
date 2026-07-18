@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [prefs, setPrefs] = useState<{ in_app: boolean; instant_email: boolean; digest_frequency: string }>({ in_app: true, instant_email: false, digest_frequency: 'weekly' })
   const [prefsSaved, setPrefsSaved] = useState(false)
   const [prefsSaving, setPrefsSaving] = useState(false)
+  const [autopilots, setAutopilots] = useState<{ id: string; brand_name: string | null; media_type: string; runs: number }[]>([])
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)  // null = still loading
   const [disconnecting, setDisconnecting] = useState(false)
   const [newPw, setNewPw] = useState(''); const [confirmPw, setConfirmPw] = useState(''); const [pwSaving, setPwSaving] = useState(false)
@@ -39,6 +40,8 @@ export default function SettingsPage() {
         .then(({ count }) => { if (!cancelled) setMetaConnected((count || 0) > 0) })
       // load notification prefs (non-blocking)
       fetch('/api/notifications/prefs').then(r => r.json()).then(j => { if (!cancelled && j.prefs) setPrefs(j.prefs) }).catch(() => {})
+      // load daily-autopilot enrollments (non-blocking)
+      fetch('/api/autopilot').then(r => r.json()).then(j => { if (!cancelled && Array.isArray(j.items)) setAutopilots(j.items) }).catch(() => {})
     })()
     return () => { cancelled = true }
   }, [])
@@ -50,6 +53,12 @@ export default function SettingsPage() {
       await fetch('/api/notifications/prefs', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) })
       setPrefsSaved(true); setTimeout(() => setPrefsSaved(false), 1800)
     } finally { setPrefsSaving(false) }
+  }
+
+  const stopAutopilot = async (id: string) => {
+    await fetch(`/api/autopilot?id=${id}`, { method: 'DELETE' }).catch(() => {})
+    setAutopilots((a) => a.filter((x) => x.id !== id))
+    toast.success('Daily ads turned off for this brand')
   }
 
   const saveProfile = async () => {
@@ -160,6 +169,27 @@ export default function SettingsPage() {
           >
             {pwSaving ? 'Updating…' : 'Update Password'}
           </button>
+        </div>
+      </div>
+
+      {/* Daily Ad Autopilot — one fresh ad per enrolled brand, emailed daily ($0.15/ad) */}
+      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
+        <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>
+          <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>🚀 Daily Ad Autopilot</div>
+          <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>A fresh ad for each brand below, generated and emailed every day at $0.15/ad. We skip days you’re out of credits. Runs until you turn it off.</div>
+        </div>
+        <div style={{padding:autopilots.length?12:22}}>
+          {autopilots.length === 0 ? (
+            <div style={{fontSize:13,color:'#7a9a7a'}}>No brands on autopilot yet. Turn it on from the Remake screen — the last step has a “Put this ad on autopilot” option.</div>
+          ) : autopilots.map((a) => (
+            <div key={a.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 10px',borderRadius:12,background:'#f8fcf6',marginBottom:8}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:600,color:'#1a3a1a'}}>{a.brand_name || 'Your brand'} <span style={{fontSize:11,fontWeight:600,color:'#3b6d11',background:'#eaf3de',borderRadius:20,padding:'2px 8px',marginLeft:4}}>{a.media_type === 'video' ? 'Video' : 'Image'}</span></div>
+                <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>{a.runs} ad{a.runs === 1 ? '' : 's'} sent so far · $0.15/day</div>
+              </div>
+              <button onClick={() => stopAutopilot(a.id)} style={{padding:'7px 14px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#b91c1c',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Turn off</button>
+            </div>
+          ))}
         </div>
       </div>
 
