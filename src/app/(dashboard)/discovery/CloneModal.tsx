@@ -215,7 +215,9 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       let useBrandId = brandId
       // If a new brand and "save" is on, persist it first (best-effort; http image URLs only).
       if (mode === 'new' && saveAsBrand && bName.trim()) {
-        const httpImgs = chosen.filter((s) => /^https?:\/\//i.test(s))
+        // Save ALL the brand's product photos (every detected/added http image), not just the ones
+        // selected for THIS generation — so the brand keeps its full photo set for next time.
+        const httpImgs = photos.map((p) => p.src).filter((s) => /^https?:\/\//i.test(s))
         const rb = await fetch('/api/brands', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ name: bName.trim(), website: bSite.trim() || null, product_images: httpImgs, brand_kit: { colors, fonts, logo, palette } }),
@@ -328,11 +330,12 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   })
 
   const { plan, pricing } = useCredits()
-  const imagesFree = imagesAreFree(plan)       // Creator/Agency: image remakes + edits are free
+  const imagesFree = imagesAreFree(plan)       // (always false now — images are charged on every plan)
   const cost = imageSize === '4K' ? 25 : 15   // 2K → image_clone_pro (15) · 4K → image_clone_4k (25)
   const totalCost = cost * count
   const editCost = pricing?.image_edit_pro?.credits ?? 15   // live DB price (image_edit_pro) so the shown cost always == what's charged
-  const cr = (n: number) => imagesFree ? 'Free' : `${n} cr`   // label helper
+  // Images are priced in dollars for the user (1 credit = 1¢) — $0.15 for 2K, $0.25 for 4K.
+  const cr = (n: number) => `$${(n / 100).toFixed(2)}`   // label helper
   const hasResults = results.length > 0
 
   // ── Wizard plumbing ──────────────────────────────────────────

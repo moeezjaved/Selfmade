@@ -52,27 +52,27 @@ export const PLANS: Record<PlanId, PlanEntitlements> = {
     label: 'Creator', priceMonthly: 49, priceAnnualMonthly: 49,
     monthlyCredits: 6000, seats: 1, brandSpy: 15, expressPulls: 15, discoveryPages: null,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: true, canBuyCredits: true,
-    teamBoards: false, assetsGb: 5, videosPerMonth: 10, imagesUnlimited: true, mostPopular: true,
+    teamBoards: false, assetsGb: 5, videosPerMonth: 10, imagesUnlimited: false, mostPopular: true,
   },
   // Legacy 'pro' — kept valid for any existing subscriber, HIDDEN from the pricing page.
   pro: {
     label: 'Pro', priceMonthly: 99, priceAnnualMonthly: 74,
     monthlyCredits: 12000, seats: 3, brandSpy: 50, expressPulls: 50, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: false, api: true, exports: true, canBuyCredits: true,
-    teamBoards: true, assetsGb: 50, videosPerMonth: 20, imagesUnlimited: true, hidden: true,
+    teamBoards: true, assetsGb: 50, videosPerMonth: 20, imagesUnlimited: false, hidden: true,
   },
   // "Agency" — teams. 18,000 cr = 30 video ads/mo; image ads free + unlimited; 5 seats.
   business: {
     label: 'Agency', priceMonthly: 149, priceAnnualMonthly: 149,
     monthlyCredits: 18000, seats: 5, brandSpy: 50, expressPulls: 50, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
-    teamBoards: true, assetsGb: 50, videosPerMonth: 30, imagesUnlimited: true,
+    teamBoards: true, assetsGb: 50, videosPerMonth: 30, imagesUnlimited: false,
   },
   enterprise: {
     label: 'Enterprise', priceMonthly: 0, priceAnnualMonthly: 0,
     monthlyCredits: null, seats: 25, brandSpy: Infinity, expressPulls: Infinity, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
-    teamBoards: true, assetsGb: null, videosPerMonth: null, imagesUnlimited: true,
+    teamBoards: true, assetsGb: null, videosPerMonth: null, imagesUnlimited: false,
   },
 }
 
