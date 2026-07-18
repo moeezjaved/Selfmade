@@ -101,6 +101,9 @@ export async function POST(req: NextRequest) {
     // Script/voiceover language (transcreated natively, never translated) + narration voice.
     language: /^[a-z]{2}$/.test(String(body.language || '')) ? body.language : 'en',
     voice: ['nova', 'shimmer', 'onyx', 'echo'].includes(String(body.voice || '')) ? body.voice : 'nova',
+    // 'service' = app/site/service brand → the worker's SERVICE prompt path (creator talks about it,
+    // never renders a physical product). Absent/'physical' = today's product-hero flow.
+    product_type: body.productType === 'service' ? 'service' : 'physical',
   }
 
   const { data: row, error } = await admin.from('creative_generations').insert({

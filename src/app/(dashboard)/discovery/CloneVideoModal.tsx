@@ -20,7 +20,7 @@ type Photo = { id: string; src: string }
 // Proxy external product URLs (hotlink-protected → raw <img> breaks). data:/R2 pass through.
 const cdn = (u: string) => (!u || u.startsWith('data:') || u.includes('.r2.dev') || u.includes('r2.cloudflarestorage') || u.includes('cdn.tryselfmade'))
   ? u : `https://images.weserv.nl/?url=${encodeURIComponent(u)}&w=160&q=72&output=webp`
-type Brand = { id: string; name: string; products?: { image_urls?: string[] }[] }
+type Brand = { id: string; name: string; brand_type?: string; products?: { image_urls?: string[] }[] }
 type Phase = 'form' | 'analyzing' | 'review' | 'generating' | 'done'
 const uid = () => Math.random().toString(36).slice(2)
 const fileToDataUrl = (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) })
@@ -29,6 +29,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePoster, onClose }: { sourceAdId: string; sourceVideoUrl?: string | null; sourcePoster?: string | null; onClose: () => void }) {
   const [brands, setBrands] = useState<Brand[]>([])
   const [brandId, setBrandId] = useState<string | null>(null)
+  // 'service' brand = app/site/service → no physical product; photos optional, creator talks about it.
+  const [brandType, setBrandType] = useState<'physical' | 'service'>('physical')
+  const isService = brandType === 'service'
   const [photos, setPhotos] = useState<Photo[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [productName, setProductName] = useState('')
@@ -163,7 +166,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const pickBrand = (b: Brand) => {
-    setBrandId(b.id); if (!productName) setProductName(b.name)
+    setBrandId(b.id); setBrandType(b.brand_type === 'service' ? 'service' : 'physical'); if (!productName) setProductName(b.name)
     const imgs = (b.products || []).flatMap((p) => p.image_urls || []).slice(0, 8)
     const ph = imgs.map((u) => ({ id: uid(), src: u }))
     setPhotos(ph); setSelected(ph.slice(0, 3).map((p) => p.id))
@@ -194,12 +197,12 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const analyse = async () => {
     setErr(null)
     const chosen = photos.filter((p) => selected.includes(p.id)).map((p) => p.src)
-    if (chosen.length === 0) { setErr('Add & select at least one product photo to swap in.'); return }
+    if (chosen.length === 0 && !isService) { setErr('Add & select at least one product photo to swap in.'); return }
     setPhase('analyzing')
     try {
       const start = await fetch('/api/discovery/clone-video', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages: chosen, tier,
+        body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages: chosen, tier, productType: brandType,
           characterLook: look !== 'match' ? look : undefined, language, voice,
           productDetails: { name: productName.trim() || undefined, benefit: benefit.trim() || undefined } }),
       }).then(r => r.json())
@@ -445,8 +448,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                 {step === 1 && (
                   <section>
                     <Kicker>Step 2 of 7</Kicker>
-                    <H2>Show us your product</H2>
-                    <Lead>These photos are swapped <b>into</b> the video. Clear photos on a plain background work best. Pick up to 4.</Lead>
+                    <H2>{isService ? 'Add a logo or screenshots (optional)' : 'Show us your product'}</H2>
+                    <Lead>{isService
+                      ? <>This is a <b>service</b> brand — photos are optional. Add a <b>logo or app/site screenshots</b> if you like (the creator can show them on their phone). You can skip and continue.</>
+                      : <>These photos are swapped <b>into</b> the video. Clear photos on a plain background work best. Pick up to 4.</>}</Lead>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                       {photos.map((p) => {
                         const on = selected.includes(p.id)
@@ -461,7 +466,9 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       <button onClick={() => fileRef.current?.click()} style={photoAdd}><Upload size={16} /> Upload</button>
                       <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => onUpload(e.target.files)} />
                     </div>
-                    <InfoBar>💡 The final video shows <b>your exact product</b> — we never invent a different bottle, label or price.</InfoBar>
+                    <InfoBar>{isService
+                      ? <>💡 Service brand — the creator <b>talks about your service/app</b> (and can show it on a phone). We never render a made-up physical product.</>
+                      : <>💡 The final video shows <b>your exact product</b> — we never invent a different bottle, label or price.</>}</InfoBar>
                   </section>
                 )}
 

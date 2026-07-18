@@ -11,6 +11,7 @@ interface Brand {
   id: string; name: string; website: string | null; description: string | null
   industry: string[]; usps: string[]; tone: string | null; target_audience: string | null
   preferred_words: string[]; avoid_words: string[]; products: Product[]
+  brand_type?: string
 }
 
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18 }
@@ -28,7 +29,8 @@ export default function BrandsPage() {
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const [form, setForm] = useState<any>({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '' })
+  const [form, setForm] = useState<any>({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '', brand_type: 'physical' })
+  const isService = form.brand_type === 'service'
   const [detected, setDetected] = useState<{ images: string[]; name: string } | null>(null)  // preview of URL-detected photos
   const [detecting, setDetecting] = useState(false)
 
@@ -66,7 +68,8 @@ export default function BrandsPage() {
       // Prefer the photos the user already previewed; otherwise detect inline now (best-effort).
       let images: string[] = detected?.images || []
       let detectedName = detected?.name || ''
-      if (!detected && form.website?.trim()) {
+      // Service brands have no physical product to detect — skip product-photo scraping entirely.
+      if (!isService && !detected && form.website?.trim()) {
         setMsg({ ok: true, text: 'Detecting products from your site…' })
         try {
           const dr = await fetch('/api/discovery/detect-product', {
@@ -89,7 +92,7 @@ export default function BrandsPage() {
           : d.error || 'Could not save the brand. Please try again.') })
         return
       }
-      setForm({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '' })
+      setForm({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '', brand_type: 'physical' })
       setDetected(null); setCreating(false)
       setMsg({ ok: true, text: images.length ? `✓ “${(d.brand?.name || form.name)}” saved with ${images.length} product photo${images.length === 1 ? '' : 's'}.` : `✓ “${(d.brand?.name || form.name)}” saved.` })
       await load()
@@ -97,6 +100,7 @@ export default function BrandsPage() {
     finally { setSaving(false) }
   }
   const delBrand = async (id: string) => { if (confirm('Delete this brand and its products?')) { await fetch(`/api/brands/${id}`, { method: 'DELETE' }); load() } }
+  const setBrandType = async (id: string, brand_type: string) => { await fetch(`/api/brands/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brand_type }) }); load() }
   const editBrand = async (id: string, patch: { name: string; website: string; tone: string }) => {
     await fetch(`/api/brands/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })
     load()
@@ -122,16 +126,36 @@ export default function BrandsPage() {
 
       {creating && (
         <div style={{ ...card, marginBottom: 20 }}>
+          {/* What kind of brand — a physical product (we composite real product photos) or a
+              service/app/website (the creator talks about it; we never render a physical product). */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3c473e', marginBottom: 7 }}>What does this brand sell?</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[['physical', '🧴 A physical product', 'We place your real product photos into ads'], ['service', '💻 An app, website or service', 'No physical product — the creator talks about it']].map(([v, label, sub]) => {
+                const on = form.brand_type === v
+                return (
+                  <button key={v} type="button" onClick={() => { setForm({ ...form, brand_type: v }); setDetected(null) }}
+                    style={{ flex: '1 1 220px', textAlign: 'left', border: `1.5px solid ${on ? '#a8cf6f' : '#e2e8f0'}`, background: on ? '#f4fbe6' : '#fff', borderRadius: 12, padding: '10px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: on ? '#2c4a1f' : '#111' }}>{label}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{sub}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
           <input style={input} placeholder="Brand name *" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <input style={{ ...input, flex: 1 }} placeholder="Website or product URL" value={form.website}
+            <input style={{ ...input, flex: 1 }} placeholder={isService ? 'Website (optional — for your logo & colors)' : 'Website or product URL'} value={form.website}
               onChange={e => { setForm({ ...form, website: e.target.value }); setDetected(null) }}
-              onKeyDown={e => e.key === 'Enter' && detectProducts()} />
-            <button type="button" onClick={detectProducts} disabled={detecting || !form.website.trim()}
-              style={{ ...btn, whiteSpace: 'nowrap', opacity: (detecting || !form.website.trim()) ? 0.6 : 1 }}>
-              {detecting ? 'Detecting…' : 'Detect photos'}
-            </button>
+              onKeyDown={e => e.key === 'Enter' && !isService && detectProducts()} />
+            {!isService && (
+              <button type="button" onClick={detectProducts} disabled={detecting || !form.website.trim()}
+                style={{ ...btn, whiteSpace: 'nowrap', opacity: (detecting || !form.website.trim()) ? 0.6 : 1 }}>
+                {detecting ? 'Detecting…' : 'Detect photos'}
+              </button>
+            )}
           </div>
+          {isService && <div style={{ fontSize: 11.5, color: '#6b7280', margin: '2px 0 8px' }}>Service brands have no product photos — your ads show the creator talking about it (and you can add a logo/screenshots on the brand after saving).</div>}
           {detected && (
             <div style={{ margin: '4px 0 10px' }}>
               {detected.images.length ? (
@@ -170,17 +194,19 @@ export default function BrandsPage() {
 
       {loading ? <div style={{ color: '#9ca3af' }}>Loading…</div>
         : brands.length === 0 ? <div style={{ ...card, color: '#9ca3af', textAlign: 'center' }}>No brands yet — create your first to start remaking ads.</div>
-        : brands.map(b => <BrandCard key={b.id} brand={b} onDelete={() => delBrand(b.id)} onEdit={editBrand} onAddProduct={addProduct} onDelProduct={delProduct} />)}
+        : brands.map(b => <BrandCard key={b.id} brand={b} onDelete={() => delBrand(b.id)} onEdit={editBrand} onSetType={setBrandType} onAddProduct={addProduct} onDelProduct={delProduct} />)}
     </div>
   )
 }
 
-function BrandCard({ brand, onDelete, onEdit, onAddProduct, onDelProduct }: {
+function BrandCard({ brand, onDelete, onEdit, onSetType, onAddProduct, onDelProduct }: {
   brand: Brand; onDelete: () => void
   onEdit: (id: string, patch: { name: string; website: string; tone: string }) => void
+  onSetType: (id: string, t: string) => void
   onAddProduct: (b: string, n: string, p: string, i: string) => void
   onDelProduct: (b: string, p: string) => void
 }) {
+  const isSvc = brand.brand_type === 'service'
   const [p, setP] = useState({ name: '', price: '', image: '' })
   const [editing, setEditing] = useState(false)
   const [ef, setEf] = useState({ name: brand.name, website: brand.website || '', tone: brand.tone || '' })
@@ -196,7 +222,14 @@ function BrandCard({ brand, onDelete, onEdit, onAddProduct, onDelProduct }: {
           </div>
         ) : (
           <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{brand.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{brand.name}</div>
+              <button onClick={() => onSetType(brand.id, isSvc ? 'physical' : 'service')}
+                title="Click to switch — service brands never render a physical product"
+                style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${isSvc ? '#c7d2fe' : '#e2e8f0'}`, background: isSvc ? '#e0e7ff' : '#f1f5f9', color: isSvc ? '#3730a3' : '#475569' }}>
+                {isSvc ? '💻 Service' : '🧴 Product'}
+              </button>
+            </div>
             {brand.website && <div style={{ fontSize: 12, color: '#6b7280' }}>{brand.website}</div>}
             {brand.tone && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Tone: {brand.tone}</div>}
           </div>

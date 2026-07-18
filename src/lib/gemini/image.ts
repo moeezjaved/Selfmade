@@ -232,7 +232,34 @@ export function buildClonePrompt(opts: {
   palette?: BrandPalette
   fonts?: { heading?: string | null; body?: string | null; headingWeight?: string | null; bodyWeight?: string | null }
   dna?: { hook_type?: string | null; format_style?: string | null; angle?: string | null; emotion?: string[] | null; cta?: string | null }
+  isService?: boolean    // SERVICE/app brand → clone the layout but NEVER render a physical product
 }): string {
+  // ── SERVICE branch — separate return so the physical-product prompt below is byte-identical to
+  // before. A service/app/website ad has NO physical product: never invent a bottle/box/jar. ──
+  if (opts.isService) {
+    const b = opts.brandName ? `"${opts.brandName}"` : "the user's brand"
+    const dS = opts.dna || {}
+    const keepS = [dS.hook_type && `hook style (${dS.hook_type})`, dS.format_style && `visual format (${dS.format_style})`, dS.angle && `angle (${dS.angle})`].filter(Boolean).join(', ')
+    const recastS = opts.look && opts.look.toLowerCase() !== 'match'
+      ? `• Any person shown: recast as ${opts.look} — same pose, framing, expression and lighting; only their look changes.` : ''
+    const brandStyleS = [
+      opts.palette?.accent || opts.palette?.background ? `brand colors: ${[opts.palette?.background && `bg ${opts.palette.background}`, opts.palette?.accent && `accent ${opts.palette.accent}`].filter(Boolean).join(', ')}` : (opts.colors?.length ? `brand colors ${opts.colors.join(', ')}` : ''),
+    ].filter(Boolean).join(' ')
+    return [
+      `Clone the winning ad in image 1 into an ad for a SERVICE / app / website${opts.brandName ? ` by ${b}` : ''}${opts.productDesc ? ` — ${opts.productDesc}` : ''}. Keep image 1's layout, composition, structure${keepS ? `, and ${keepS}` : ''}, and premium quality — with these changes:`,
+      `• CRITICAL: this brand has NO physical product. NEVER invent, add or render any bottle, jar, box, package, device or physical item. If image 1 shows a physical product, REPLACE it — with the app/website shown on a phone or laptop screen, the brand logo, an abstract/graphic treatment, or a relevant person/lifestyle scene — never a made-up object.`,
+      opts.hasLogo ? `• The attached image is the brand's logo or an app/site screenshot: feature it naturally (logo placed cleanly; a screenshot shown on a device screen).` : `• If no logo/screenshot is provided, represent the service through typography, the brand name, and a relevant lifestyle scene — not an object.`,
+      recastS,
+      `• Branding: every visible logo, name and label belongs to ${b} only.`,
+      `• Price: do NOT invent a price, discount or claim. If image 1 shows a price badge and none is given, omit it.`,
+      opts.newHeadline ? `Headline, rendered exactly: "${opts.newHeadline}".` : `Write one short, punchy headline about what the service does.`,
+      dS.cta ? `Include a clear CTA button ("${dS.cta}").` : '',
+      brandStyleS ? `Use on-brand styling where it fits: ${brandStyleS}.` : '',
+      `Spell every word correctly, never repeat a word, invent NO numbers or claims, keep on-image text minimal. No gibberish, no watermarks.`,
+      opts.aspectRatio && opts.aspectRatio !== 'original' ? `Compose at a ${opts.aspectRatio} aspect ratio.` : `Keep the same aspect ratio as image 1.`,
+      `Output one photorealistic, ready-to-publish ad image.`,
+    ].filter(Boolean).join(' ')
+  }
   const pal = opts.palette
   const paletteLine = pal && (pal.accent || pal.background || pal.heading || pal.cta)
     ? `Use this exact brand palette: ${[

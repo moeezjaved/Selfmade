@@ -125,7 +125,14 @@ async function describeProduct(imageUrl) {
   const text = (j.choices?.[0]?.message?.content || '').trim()
   return text || null
 }
-function productTruthRule(product) {
+function productTruthRule(product, isService) {
+  // SERVICE / app brand → there is NO physical product. This overrides any "product hero / hold /
+  // swap" language elsewhere in the prompt. Never render an invented object.
+  if (isService) {
+    const svc = product && (product.name || product.benefit)
+      ? `The service is "${product.name || 'the brand'}"${product.benefit ? ` — ${product.benefit}` : ''}. ` : ''
+    return `- SERVICE TRUTH — ${svc}This brand is a SERVICE / app / website, NOT a physical product. There is NO product to hold or show. NEVER invent or render a bottle, jar, box, package, device or any physical item. The creator speaks to camera ABOUT the service; allowed visuals: the creator talking, the creator showing the app/website on a phone or laptop screen (only if a screenshot is provided), and relevant lifestyle b-roll. Adapt the spoken words to the service's benefit.`
+  }
   const seen = product && product.observed ? `The product's ACTUAL appearance (described from its real photos): ${product.observed}. ` : ''
   // Vision-measured size anchor (productSizeProfile) — grounded in the real photos, not a language
   // model's guess. The prompt writers are told to use THIS anchor verbatim in their opening scale
@@ -209,23 +216,27 @@ function lookClause(beat, look) {
 
 // ── gpt-4o: beat sheet + product → Seedance prompt + script. When forcedScript is given (the user's
 // APPROVED/edited voiceover) the prompt is built around EXACTLY that script. ──
-async function buildSeedancePrompt(beat, product, nImages, forcedScript, look, lang) {
+async function buildSeedancePrompt(beat, product, nImages, forcedScript, look, lang, isService) {
   const refList = Array.from({ length: nImages }, (_, i) => `@Image${i + 1}`).join(', ')
   const recast = look && look !== 'match'
   const L = langName(lang)
   const nonEn = lang && lang !== 'en'
-  const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). This is a TALKING-HEAD UGC ad:
-a real-looking creator talks straight to the phone camera and delivers the script out loud. Rules:
-- ONE dense paragraph: subject (the on-camera creator) → they SPEAK to camera → action/product → camera → lighting → mood, then a short beat-by-beat timeline.
-- The creator must be SPEAKING ALOUD to the viewer, lips moving in sync — NOT a silent scene, NOT b-roll with background music. Describe their mouth moving, natural gestures, eye contact with the lens.
-- PRODUCT IS THE HERO — the creator physically HOLDS the user's product (${refList || 'the product'}) in their hand for MOST of the clip: brings it up to the lens, turns it, and actively USES/demonstrates it across several beats (e.g. takes a puff / applies it / shows how it works), then a close-up of it in-hand. Do NOT show a single static product shot — it must be handled and in-use throughout, and match ${refList || 'the product'} exactly.
+  // Product-hero + scale block is PHYSICAL-only. Service ads have no product to hold or scale.
+  const heroScale = isService
+    ? `- NO PHYSICAL PRODUCT — the creator TALKS TO CAMERA about the service the whole time (natural gestures, eye contact). If a screenshot/logo image is provided (${refList || 'none'}) they may hold up their PHONE showing the app/site on screen; otherwise it's a pure talking-head. NEVER show, hold or invent a bottle, box, package or device.`
+    : `- PRODUCT IS THE HERO — the creator physically HOLDS the user's product (${refList || 'the product'}) in their hand for MOST of the clip: brings it up to the lens, turns it, and actively USES/demonstrates it across several beats (e.g. takes a puff / applies it / shows how it works), then a close-up of it in-hand. Do NOT show a single static product shot — it must be handled and in-use throughout, and match ${refList || 'the product'} exactly.
 - REAL PRODUCT SCALE (TOP PRIORITY — video models inflate product size, so fight it hard):
   (a) your paragraph MUST OPEN with a scale sentence BEFORE anything else, e.g. "The product is a slim pen-sized device that fits between two fingers at true real-world scale…" — early words steer the model most;
   (b) anchor the size to a CONCRETE everyday object (pen, lipstick, credit card, soda can, palm of the hand — pick what matches this product) and to the creator's hand ("no taller than her palm");
   (c) repeat the anchor once more in the timeline at the product close-up beat;
-  (d) get it readable by bringing it CLOSE to the camera, never by enlarging it — an oversized, out-of-proportion product looks fake.
-- REPLICATE THE REFERENCE FAITHFULLY — this is a CLONE, not a reinvention. Use the beat sheet's EXACT setting (${(beat && beat.setting) || 'as analysed'}), ${lookClause(beat, look)}, the same camera work, and the same beat timing. The ONLY things you change: swap in the user's product${recast ? ', recast the creator as instructed' : ''} and adapt the spoken words to it. Do NOT change the location${recast ? '' : ', do NOT change the people\'s ethnicity or look'}, do NOT move them to a generic sofa/studio.
-${productTruthRule(product)}
+  (d) get it readable by bringing it CLOSE to the camera, never by enlarging it — an oversized, out-of-proportion product looks fake.`
+  const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). This is a TALKING-HEAD UGC ad:
+a real-looking creator talks straight to the phone camera and delivers the script out loud. Rules:
+- ONE dense paragraph: subject (the on-camera creator) → they SPEAK to camera → action/product → camera → lighting → mood, then a short beat-by-beat timeline.
+- The creator must be SPEAKING ALOUD to the viewer, lips moving in sync — NOT a silent scene, NOT b-roll with background music. Describe their mouth moving, natural gestures, eye contact with the lens.
+${heroScale}
+- REPLICATE THE REFERENCE FAITHFULLY — this is a CLONE, not a reinvention. Use the beat sheet's EXACT setting (${(beat && beat.setting) || 'as analysed'}), ${lookClause(beat, look)}, the same camera work, and the same beat timing. The ONLY things you change: ${isService ? 'adapt the spoken words to the service (no product swap — there is no product)' : "swap in the user's product"}${recast ? ', recast the creator as instructed' : ''} and adapt the spoken words. Do NOT change the location${recast ? '' : ', do NOT change the people\'s ethnicity or look'}, do NOT move them to a generic sofa/studio.
+${productTruthRule(product, isService)}
 - UGC realism: iPhone selfie, arm's length, natural light, authentic handheld, no on-screen captions/subtitles.
 - LANGUAGE: the creator speaks ${L}. ${nonEn ? `TRANSCREATE, never translate — write it the way a real local creator talks (local idioms, rhythm). CRITICAL: write the spoken words in the language's OWN NATIVE SCRIPT (Urdu → اردو, Hindi → हिंदी, Arabic → العربية). Do NOT romanize — never Latin-letter Urdu/Hindi ("aap ne kabhi…"): the voice model reads Latin text as ENGLISH, so the audio comes out English instead of ${L.split(' — ')[0]}. Keep in Latin ONLY real brand/product names (e.g. "AURA") and truly-English product terms; do NOT write whole English sentences — the bulk of the line must be native script.` : `NEVER the reference ad's language if it differs — the clone speaks English.`} Replicate the scene and the people; only the words are ${nonEn ? 'in the chosen language, in its native script' : 'English'}.
 ${forcedScript ? '- CRITICAL — the creator says these EXACT words aloud to camera, lip-synced, word for word: "' + forcedScript.replace(/"/g, "'") + '". Weave "they say to camera: …" into the prompt so the model generates SPOKEN dialogue in that language, not narration.' : '- The creator speaks a natural line to camera; put the exact words in the script field.'}
@@ -285,19 +296,23 @@ function clampScenes(count, secs) {
 // ── gpt-4o: beat sheet → per-scene Seedance prompts for FAITHFUL mode. Each reference scene becomes
 // its own clip prompt (b-roll / lifestyle / product shots allowed — NO forced talking head); clips are
 // stitched afterwards, mirroring the source's edit structure. ──
-async function buildScenePlan(beat, product, nImages, nScenes, look, voiceover) {
+async function buildScenePlan(beat, product, nImages, nScenes, look, voiceover, isService) {
   const refList = Array.from({ length: nImages }, (_, i) => `@Image${i + 1}`).join(', ')
   const recast = look && look !== 'match'
+  // Physical vs service framing for the product beats.
+  const productBlock = isService
+    ? `- NO PHYSICAL PRODUCT — this is a SERVICE / app / website. NEVER show, hold or invent a bottle, box, package or device. Where the reference features its product, instead show the service on a phone/laptop screen (only if a screenshot image is provided), the brand logo, or a relevant lifestyle moment. The action in each scene is a person talking/gesturing or a lifestyle beat — never handling a product.`
+    : `- PRODUCT SWAP — wherever the reference features its product, feature the user's product (${refList || 'the product'}) instead, matching ${refList || 'the product'} exactly.
+- PRODUCT HERO FRAMING (critical for fidelity): whenever the product is the focus of a scene, get it BIG IN FRAME by moving the CAMERA close (a tight macro/close-up shot), NOT by enlarging the product — the exact container, cap/applicator and label clearly readable and in sharp focus. AI video renders a product accurately only when the camera is close; a wide shot of a person holding it far away comes out as a generic blurry bottle. CRUCIAL: keep the product's REAL size and proportion relative to the hand — a small handheld device is small in the hand, never inflated or stretched to fill the frame (that looks fake). The frame fills because the CAMERA is close, not because the product grew. For the product-reveal / product-in-use beats, write a close macro shot of hands + product at true scale, NOT a full-body wide shot. At least half the scenes must feature the product this way.`
   const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). The reference ad is a MULTI-SCENE / B-roll style ad. Clone it FAITHFULLY, scene by scene — this is a CLONE of its edit structure, not a talking-head rewrite.
 Rules:
 - Map the beat sheet's beats (in the "beats" array) onto EXACTLY ${nScenes} scenes, IN ORDER, covering the ad's full arc (hook first). Each scene must RECREATE a specific reference beat — its subject, its action, its shot type — not invent a new one. If there are more beats than scenes, group adjacent beats; if fewer, expand the strongest beats. Each scene = one continuous shot.
 - THE HOOK IS SACRED: scene 1 MUST recreate the reference's OPENING beat and start at src_start=0 — that's the attention hook (often a person / problem moment) and the reason the ad works. NEVER drop or skip the first beats. When there are more beats than scenes, MERGE adjacent beats into one continuous shot; dropping a beat that contains PEOPLE while keeping product-only beats is FORBIDDEN — people beats carry the story.
 - Per scene, write ONE dense Seedance prompt that reproduces THAT reference beat: subject → the exact action from the beat → camera (copy the reference's framing/movement) → lighting → mood. Stay faithful to what the reference actually shows in that beat (e.g. a couple close-up stays a couple close-up; a gym shot stays a gym shot). Cinematic b-roll, lifestyle moments and product close-ups are all allowed — do NOT force anyone to talk to camera, and do NOT drift to a generic studio.
-- ACTION IS MANDATORY: name the SPECIFIC physical action from the reference beat as a continuous on-camera MOTION the subject performs — applying/rolling/massaging the product onto skin or scalp, spraying, pumping, drinking, swatching, demonstrating — never a person merely standing and holding the product still. Write it as an active verb the video model can animate (e.g. "rolls the microneedling applicator across his hairline", not "holds the vial").
-- PRODUCT SWAP — wherever the reference features its product, feature the user's product (${refList || 'the product'}) instead, matching ${refList || 'the product'} exactly.
-- PRODUCT HERO FRAMING (critical for fidelity): whenever the product is the focus of a scene, get it BIG IN FRAME by moving the CAMERA close (a tight macro/close-up shot), NOT by enlarging the product — the exact container, cap/applicator and label clearly readable and in sharp focus. AI video renders a product accurately only when the camera is close; a wide shot of a person holding it far away comes out as a generic blurry bottle. CRUCIAL: keep the product's REAL size and proportion relative to the hand — a small handheld device is small in the hand, never inflated or stretched to fill the frame (that looks fake). The frame fills because the CAMERA is close, not because the product grew. For the product-reveal / product-in-use beats, write a close macro shot of hands + product at true scale, NOT a full-body wide shot. At least half the scenes must feature the product this way.
+- ACTION IS MANDATORY: name a SPECIFIC continuous on-camera MOTION the subject performs from the reference beat — ${isService ? 'talking to camera, gesturing, using a phone/laptop, or a lifestyle action (walking, working, relaxing)' : 'applying/rolling/massaging the product onto skin or scalp, spraying, pumping, drinking, swatching, demonstrating — never a person merely standing and holding the product still'}. Write it as an active verb the video model can animate.
+${productBlock}
 - PEOPLE — when a scene has people, ${recast ? `recast them as ${look} in appearance (user's explicit choice), keeping the reference's age range, wardrobe style and energy` : `copy the reference people EXACTLY — gender, age, ethnicity, hair, wardrobe, energy${beat && beat.avatar ? ` (the reference creator is: ${String(beat.avatar).replace(/"/g, "'")})` : ' (from the beat sheet)'}. Describe them explicitly in the prompt (e.g. 'a woman in her 30s with long red hair and glasses'), never just 'a person' — an undescribed person comes out as a random creator`}.
-${productTruthRule(product)}
+${productTruthRule(product, isService)}
 ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera speech (ambience/music energy only). Design the visuals to fit this voiceover's arc, in order: "${String(voiceover).replace(/"/g, "'")}". Put the chunk each scene covers in its "script" field for reference only — do NOT write spoken dialogue into the prompt.` : '- No dialogue — scenes are music/ambience-driven b-roll. Leave "script" empty.'}
 - Per scene pick "duration": 5 for a quick cut, 10 for a longer beat (numbers only).
 - Per scene also report: "has_people": true if ANY person/face is visible in that reference beat (false = pure product/object/environment b-roll), "has_product": true if the user's product appears (held/used/shown) in that scene, and "src_start"/"src_end": the SECONDS range of the reference footage this scene recreates (derive from the beats' "t" ranges, e.g. "4-9s" → 4 and 9).
@@ -351,15 +366,15 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
 // ── gpt-4o: split the APPROVED script into N contiguous segments for long-form UGC (30/60s).
 // Returns ONE reusable character paragraph + ONE voice description — pasted VERBATIM into every
 // segment prompt so the person/voice can't drift between clips — plus per-segment script + action. ──
-async function buildSegmentPlan(beat, product, nImages, script, nSegments, look) {
+async function buildSegmentPlan(beat, product, nImages, script, nSegments, look, isService) {
   const refList = Array.from({ length: nImages }, (_, i) => `@Image${i + 1}`).join(', ')
   const recast = look && look !== 'match'
   const sys = `You direct a ${nSegments}-segment TALKING-HEAD UGC ad (segments are stitched into one continuous video). Rules:
 - Split the user's voiceover script into EXACTLY ${nSegments} contiguous chunks at natural sentence boundaries — in order, no overlap, no rewriting; together they must be the full script word-for-word.
 - "character": ONE dense reusable paragraph describing the on-camera creator in precise repeatable detail — age, ${recast ? `${look} appearance (user's explicit choice)` : `ethnicity/look copied from the reference avatar (${(beat && beat.avatar) || 'as analysed'})`}, hair, wardrobe, plus the exact setting (${(beat && beat.setting) || 'as analysed'}). The SAME paragraph opens every segment prompt so the person cannot drift.
 - "voice": one short line describing their voice (tone, pace, energy) — reused each segment for audio consistency.
-- Per segment "action": what they physically do with the user's product (${refList || 'the product'}) in that segment — hold it up, demonstrate, close-up — following the reference beats in order.
-${productTruthRule(product)}
+- Per segment "action": ${isService ? 'what the creator does while talking about the service — gesturing, showing the app/site on their phone, a lifestyle beat (never holding a physical product)' : `what they physically do with the user's product (${refList || 'the product'}) in that segment — hold it up, demonstrate, close-up`} — following the reference beats in order.
+${productTruthRule(product, isService)}
 Return ONLY minified JSON: {"character":"","voice":"","segments":[{"script":"","action":""}]}  (exactly ${nSegments} segments).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || {})}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nAPPROVED SCRIPT (split this, verbatim):\n${script}`
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1123,6 +1138,7 @@ Return ONLY minified JSON: {"overlays":[{"t":"","text":""}]}.`
 // ── PHASE A: analyse the competitor video + draft a script → status='review' (awaits approval) ──
 async function analyzeJob(job) {
   const meta = job.clone_meta || {}
+  const isService = meta.product_type === 'service'   // service/app brand → no physical product path
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   try {
     let beat = null
@@ -1131,13 +1147,14 @@ async function analyzeJob(job) {
     // LOOK at the product photo once (vision) so scripts describe what it actually is — capsules vs
     // gummies etc. Persisted into product_details so every later prompt builder gets it too.
     let productDetails = meta.product_details || { name: 'the product' }
-    if (!productDetails.observed && productImages[0]) {
+    // Service brands have no physical product → skip the vision "what is it" + size-anchor steps.
+    if (!isService && !productDetails.observed && productImages[0]) {
       try { const obs = await describeProduct(productImages[0]); if (obs) productDetails = { ...productDetails, observed: obs } }
       catch (e) { console.warn('describeProduct:', e.message) }
     }
     // Vision-measured SIZE ANCHOR (all selected photos — box + product both calibrate it). Grounds the
     // prompts' true-scale sentence in the real photos instead of a text guess. Cached on the job.
-    if (!productDetails.size_anchor && productImages.length) {
+    if (!isService && !productDetails.size_anchor && productImages.length) {
       try {
         const sp = await productSizeProfile(productImages)
         if (sp) { productDetails = { ...productDetails, size_anchor: sp.anchor, hand_relation: sp.hand_relation, approx_cm: sp.approx_cm }; console.log(`📏 ${job.id} size anchor: ${sp.anchor}`) }
@@ -1165,7 +1182,7 @@ async function analyzeJob(job) {
     }
     meta.product_details = productDetails
     meta.source_wps = srcRate || null
-    let { prompt, script, gloss } = await buildSeedancePrompt(beat, productDetails, productImages.length, null, meta.character_look, meta.language)
+    let { prompt, script, gloss } = await buildSeedancePrompt(beat, productDetails, productImages.length, null, meta.character_look, meta.language, isService)
     // Cap the drafted narration to the SOURCE's own talk-time so the clone matches the original length,
     // using the ad's REAL words/sec when we have it (same language) — a fast talker's clone gets more
     // words, a slow one fewer. The user still sees + can edit this before approving.
@@ -1214,6 +1231,7 @@ async function analyzeJob(job) {
 // ── PHASE B: user approved → generate the video with the APPROVED script → status='done' ──
 async function generateJob(job) {
   const meta = job.clone_meta || {}
+  const isService = meta.product_type === 'service'   // service/app brand → no physical product path
   const productImages = Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   // Live progress the modal polls: {label, pct, eta_sec}. fal gives no % for video gen, so WE report
@@ -1237,7 +1255,9 @@ async function generateJob(job) {
     // hand holding the item, which fal's likeness filter rejects on image_urls (→ whole render 422s).
     // Nano Banana re-shoots the product alone on a clean background once (~1-2¢, cached on the row).
     let cleanProduct = meta.clean_product || null
-    if (!cleanProduct && productImages.length) {
+    // Service brands have no product to "re-shoot" cleanly — skip (a logo/screenshot must not be
+    // turned into a fake product still).
+    if (!isService && !cleanProduct && productImages.length) {
       try {
         await prog('Preparing your product…', 5, 0)
         cleanProduct = await composeCleanProduct({ productImageUrls: productImages, jobId: job.id })
@@ -1260,7 +1280,7 @@ async function generateJob(job) {
       // Reuse the stamped plan on resume — a fresh plan would mismatch the checkpointed clips.
       const scenes = (Array.isArray(meta.scene_plan) && meta.scene_plan.length)
         ? meta.scene_plan
-        : await buildScenePlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, nScenes, meta.character_look, finalScript)
+        : await buildScenePlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, nScenes, meta.character_look, finalScript, isService)
       const base = join(tmpdir(), `fj-${job.id}`)
       const tmp = []
       let falCost = 0   // estimated fal spend for this job (checkpoint reuses cost nothing)
@@ -1501,7 +1521,7 @@ async function generateJob(job) {
       // Reuse the stamped plan + clips on resume (see faithful-mode checkpointing note).
       const plan = (meta.segment_plan && Array.isArray(meta.segment_plan.segments) && meta.segment_plan.segments.length)
         ? meta.segment_plan
-        : await buildSegmentPlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, finalScript, nSeg, meta.character_look)
+        : await buildSegmentPlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, finalScript, nSeg, meta.character_look, isService)
       const base = join(tmpdir(), `sj-${job.id}`)
       const tmp = []
       let falCost = 0
@@ -1593,7 +1613,7 @@ async function generateJob(job) {
     const clipSecs = Math.max(5, Math.min(bucketSecs, Math.ceil(Math.min(speechSecs + 1, srcSecs + 0.5))))
     if (clipSecs !== bucketSecs) console.log(`⏱ ${job.id} UGC clip fit to ${clipSecs}s (speech≈${speechSecs.toFixed(1)}s, src≈${srcSecs}s, bucket=${bucketSecs}s) — no dead-air tail`)
     // Rebuild the prompt around the (fitted) approved script so the spoken audio matches exactly.
-    const { prompt, script } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, fitScript, meta.character_look, meta.language)
+    const { prompt, script } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, fitScript, meta.character_look, meta.language, isService)
 
     // Trim the competitor clip to fal's ≤15s / ≤720p reference limits (raw ad videos exceed them).
     let refVideo = null
@@ -1644,7 +1664,7 @@ async function generateJob(job) {
     // the second roll ships regardless (never-fail). Check ~1¢; retry only costs on actual failures. ──
     try {
       const anchor = (meta.product_details && meta.product_details.size_anchor) || null
-      const verdict = await verifyProductScale(singleFile, anchor, job.id)
+      const verdict = isService ? 'skip' : await verifyProductScale(singleFile, anchor, job.id)   // no product to scale-check
       console.log(`📏 ${job.id} scale verdict: ${verdict}`)
       if (verdict === 'oversized') {
         await prog('Product size looked off — auto-fixing…', 80, 120)
@@ -1731,7 +1751,7 @@ async function tweakJob(job) {
       const fix = CHIP_FIX[t.chip] ?? ''
       await prog('Re-rolling your video…', 15, 150)
       console.log(`🔧 ${job.id} tweak: redo UGC clip (chip=${t.chip || 'redo'})`)
-      const { prompt } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, 1, meta.final_script || meta.script || null, meta.character_look, meta.language)
+      const { prompt } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, 1, meta.final_script || meta.script || null, meta.character_look, meta.language, isService)
       const fullPrompt = `${prompt}${fix}`
       const rawFirst = (Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []).slice(0, 1)
       const rungs = [

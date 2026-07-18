@@ -18,7 +18,7 @@ import { refreshCredits, useCredits } from '@/components/credits/CreditCounter'
 import { imagesAreFree } from '@/lib/plans'
 
 type Photo = { id: string; src: string; label?: string } // src = data: URL (upload) or http URL (detected/brand)
-type Brand = { id: string; name: string; website?: string | null; products?: { image_urls?: string[] }[] }
+type Brand = { id: string; name: string; website?: string | null; brand_type?: string; products?: { image_urls?: string[] }[] }
 
 const LIME = '#dffe95'
 const uid = () => Math.random().toString(36).slice(2)
@@ -70,6 +70,10 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [activeIdx, setActiveIdx] = useState(0)                    // which variation is open for edit/download
   const [count, setCount] = useState(1)                            // how many variations to generate
   const [brandId, setBrandId] = useState<string | null>(null)      // selected saved brand (for linking generations)
+  // 'service' brands (app/site/service) have NO physical product — photos are optional and the model
+  // is told never to invent a bottle/box. Set from the picked brand; 'physical' = today's flow.
+  const [brandType, setBrandType] = useState<'physical' | 'service'>('physical')
+  const isService = brandType === 'service'
   const fileRef = useRef<HTMLInputElement>(null)
   const [mounted, setMounted] = useState(false)                    // portal guard (SSR-safe)
   useEffect(() => { setMounted(true) }, [])
@@ -164,6 +168,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const pickBrand = (b: Brand) => {
     setMode('pick')
     setBrandId(b.id)
+    setBrandType(b.brand_type === 'service' ? 'service' : 'physical')
     setBName(b.name); setBSite(b.website || '')
     const imgs = (b.products || []).flatMap((p) => p.image_urls || [])
     const ph = imgs.slice(0, 8).map((u) => ({ id: uid(), src: u, label: 'saved' }))
@@ -209,7 +214,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const generate = async () => {
     setErr(null)
     const chosen = photos.filter((p) => selected.includes(p.id)).map((p) => p.src)
-    if (chosen.length === 0) { setErr('Add and select at least one product photo.'); return }
+    if (chosen.length === 0 && !isService) { setErr('Add and select at least one product photo.'); return }
     setBusy(true); setResults([]); setActiveIdx(0); setHistory([])
     try {
       let useBrandId = brandId
@@ -246,7 +251,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       const body = {
         // Clone from an uploaded ASSET (refImageUrl) or a discovery ad (adId).
         ...(ad.assetImageUrl ? { refImageUrl: ad.assetImageUrl } : { adId: ad.id }),
-        productImages: chosen, tier, brandId: useBrandId || undefined,
+        productImages: chosen, tier, brandId: useBrandId || undefined, productType: brandType,
         brandName: bName.trim() || undefined, colors, newHeadline: headline.trim() || undefined,
         aspectRatio: aspect, logo: logo || undefined, imageSize, palette: palette || undefined, look,
       }
@@ -465,7 +470,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                         {brands.map((b) => (
                           <button key={b.id} onClick={() => pickBrand(b)} style={chip(mode === 'pick' && bName === b.name)}>{b.name}</button>
                         ))}
-                        <button onClick={() => { setMode('new'); setBrandId(null); setBName(''); setBSite(''); setPhotos([]); setSelected([]) }} style={chipDashed(mode === 'new')}>＋ New brand</button>
+                        <button onClick={() => { setMode('new'); setBrandId(null); setBrandType('physical'); setBName(''); setBSite(''); setPhotos([]); setSelected([]) }} style={chipDashed(mode === 'new')}>＋ New brand</button>
                       </div>
                     )}
                     {/* Auto-loaded brand kit (saved brand) — confirmation only; the actual photos are
@@ -517,8 +522,10 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                 {step === 1 && (
                   <section>
                     <Kicker>Step 2 of 5</Kicker>
-                    <H2>Show us your product</H2>
-                    <Lead>These photos are what we place <b>into</b> the ad. Clear photos on a plain background work best. Pick up to 4 — tap to select, ✕ to remove.</Lead>
+                    <H2>{isService ? 'Add a logo or screenshots (optional)' : 'Show us your product'}</H2>
+                    <Lead>{isService
+                      ? <>This is a <b>service</b> brand, so photos are optional. Add your <b>logo or app/site screenshots</b> if you like — we’ll never invent a physical product. You can also skip this and just continue.</>
+                      : <>These photos are what we place <b>into</b> the ad. Clear photos on a plain background work best. Pick up to 4 — tap to select, ✕ to remove.</>}</Lead>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                       {photos.map((p) => {
                         const on = selected.includes(p.id)
@@ -539,7 +546,9 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                       {!assetsPulled && <button onClick={pullAssets} title="Use a file from your Assets library" style={photoAdd}><Library size={16} /> Assets</button>}
                       <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => onUpload(e.target.files)} />
                     </div>
-                    <InfoBar>💡 Selected photos come straight from your brand. The final ad shows <b>your exact product</b> — we never invent a different bottle, label or price.</InfoBar>
+                    <InfoBar>{isService
+                      ? <>💡 Service brand — the ad is about your <b>service/app</b>, shown via your logo, screenshots or people. We never render a made-up physical product.</>
+                      : <>💡 Selected photos come straight from your brand. The final ad shows <b>your exact product</b> — we never invent a different bottle, label or price.</>}</InfoBar>
                   </section>
                 )}
 
