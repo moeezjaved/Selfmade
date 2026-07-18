@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     source_platform,      // 'instagram' | 'facebook' | 'tiktok' | 'web'
     brand,                // page/brand name
     ad_copy,              // caption / primary text
+    was_video,            // true if the original creative was a video (we saved its poster image)
     board_id: reqBoardId, // optional target board
   } = body
 
@@ -103,6 +104,9 @@ export async function POST(request: NextRequest) {
       ad_data: {
         source: source_platform || 'web', source_url: source_url || null,
         ad_copy: ad_copy || null, media_type: isVideo ? 'video' : 'image',
+        // Poster-only video save: media is an image, but the source ad was a video → the app labels
+        // it and points to Discovery for a real video remake (feed videos have no fetchable MP4).
+        was_video: !isVideo && !!was_video,
         original_media_url: media_url || null, external: true,
       },
     }, { onConflict: 'user_id,board_id,ad_id' })
