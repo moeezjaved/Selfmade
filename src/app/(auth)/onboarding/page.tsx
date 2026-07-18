@@ -121,13 +121,19 @@ export default function OnboardingPage() {
   }
 
   // Save the detected brand when leaving step 1 (best-effort — a brand-cap 402 must not block onboarding).
+  // Guarded so back/forward or re-onboarding never creates duplicate brands with the same name.
+  const brandSavedRef = useRef(false)
   const saveBrand = async () => {
-    if (!kit) return
+    if (!kit || brandSavedRef.current) return
+    brandSavedRef.current = true
+    const name = (storeName || kit.brandName || 'My brand').slice(0, 60)
     try {
+      const existing = await fetch('/api/brands').then((r) => r.json()).catch(() => ({ brands: [] }))
+      if ((existing.brands || []).some((b: any) => (b.name || '').trim().toLowerCase() === name.trim().toLowerCase())) return  // already have it
       await fetch('/api/brands', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          name: (storeName || kit.brandName || 'My brand').slice(0, 60),
+          name,
           website: url.trim(),
           description: brandDesc.trim() || null,
           brand_type: isService ? 'service' : 'physical',
@@ -218,10 +224,12 @@ export default function OnboardingPage() {
     setLoadingAds(false)
   }
 
-  const openImageClone = (ad: TopAd) => { setCloned((s) => new Set(s).add(ad.id)); setCloneImageAd(ad) }
+  // Open the remake wizard. We DON'T mark "cloned" on open — only when a generation actually starts
+  // (via the modal's onGenerated), so closing without creating never sends the user to an empty My Creatives.
+  const openImageClone = (ad: TopAd) => setCloneImageAd(ad)
   const onVideoClick = (ad: TopAd) => {
     if (balance !== null && balance < costs.video) { setVideoBuyFor(ad); return }  // low credit → offer the pack
-    setCloned((s) => new Set(s).add(ad.id)); setCloneVideoAd(ad)
+    setCloneVideoAd(ad)
   }
   const buyLaunchPack = async () => {
     setBuying(true)
@@ -249,7 +257,7 @@ export default function OnboardingPage() {
           if (bal.balance >= costs.video) {
             const ad = videoBuyFor
             setVideoBuyFor(null)
-            setCloned((s) => new Set(s).add(ad.id)); setCloneVideoAd(ad)
+            setCloneVideoAd(ad)  // straight into the clone; cloned is marked on real generation via onGenerated
           }
         }
       } catch { /* keep polling */ }
@@ -585,7 +593,10 @@ export default function OnboardingPage() {
             {/* ── Step 5: Make your first ad ── */}
             {step === 4 && <>
               <h2 style={h2}>Make your first ad — this one’s on us 🎁</h2>
-              <p style={lead}>These are your competitors’ <b style={{ color: INK }}>top-performing ads right now</b>. Pick one — we rebuild it around <b style={{ color: INK }}>your</b> product, logo and colors in about a minute. For each brand we grab their top image and their top video (the video plays right here).</p>
+              <p style={lead}>These are your competitors’ <b style={{ color: INK }}>top-performing ads right now</b>. For each brand we grab their top image and their top video (tap ▶ to preview).</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: SELBG, border: '1px solid #d8ebb9', borderRadius: 12, padding: '11px 14px', marginBottom: 18, fontSize: 13, color: SELTEXT, fontWeight: 600, lineHeight: 1.45 }}>
+                <span style={{ fontSize: 18 }}>👇</span><span><b>Tap any ad below to remake it</b> — we open the editor, drop in your product, and build it in ~a minute. Your first image ad is <b>free</b>.</span>
+              </div>
 
               {loadingAds && Object.keys(topAds).length === 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -632,10 +643,12 @@ export default function OnboardingPage() {
               </div>
 
               <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderTop: `1px solid ${LINE}` }}>
-                <div style={{ fontSize: 12.5, color: FAINT }}>You can remake any of the 4.3M ads in Discovery later.</div>
+                <div style={{ fontSize: 12.5, color: cloned.size > 0 ? SELTEXT : FAINT }}>{cloned.size > 0 ? '🎉 Your ad is generating — it’ll be waiting in My Creatives.' : 'Tap an ad above to make your first one — or skip to browse 4.3M ads.'}</div>
                 <div style={{ display: 'flex', gap: 9 }}>
                   <button onClick={() => setStep(3)} style={btnGhost}>← Back</button>
-                  <button onClick={finish} disabled={saving} style={cloned.size > 0 ? btnPrimary : btnGhost}>{saving ? 'Opening…' : cloned.size > 0 ? 'Go to my creatives →' : 'I’ll explore on my own →'}</button>
+                  {cloned.size > 0
+                    ? <button onClick={finish} disabled={saving} style={btnPrimary}>{saving ? 'Opening…' : 'Watch my ad being made →'}</button>
+                    : <button onClick={finish} disabled={saving} style={{ ...btnGhost, opacity: saving ? 0.6 : 1 }}>{saving ? 'Opening…' : 'Skip for now →'}</button>}
                 </div>
               </div>
             </>}
@@ -695,8 +708,8 @@ export default function OnboardingPage() {
       })()}
 
       {/* Clone modals — the real Discovery components, mounted in-wizard. */}
-      {cloneImageAd && <CloneModal ad={{ id: cloneImageAd.id, pageId: cloneImageAd.pageId, pageName: cloneImageAd.pageName, assetImageUrl: cloneImageAd.thumbnailUrl || undefined }} onClose={() => setCloneImageAd(null)} />}
-      {cloneVideoAd && <CloneVideoModal sourceAdId={cloneVideoAd.id} sourcePoster={cloneVideoAd.thumbnailUrl || undefined} onClose={() => setCloneVideoAd(null)} />}
+      {cloneImageAd && <CloneModal ad={{ id: cloneImageAd.id, pageId: cloneImageAd.pageId, pageName: cloneImageAd.pageName, assetImageUrl: cloneImageAd.thumbnailUrl || undefined }} onClose={() => setCloneImageAd(null)} onGenerated={() => setCloned((s) => new Set(s).add(cloneImageAd.id))} />}
+      {cloneVideoAd && <CloneVideoModal sourceAdId={cloneVideoAd.id} sourcePoster={cloneVideoAd.thumbnailUrl || undefined} onClose={() => setCloneVideoAd(null)} onGenerated={() => setCloned((s) => new Set(s).add(cloneVideoAd.id))} />}
 
       {/* Low-credit → Launch Pack sheet (video clone). */}
       {videoBuyFor && (
@@ -764,10 +777,10 @@ function AdCard({ ad, kind, cost, done, lowCredit, onClone }: {
         <span style={{ background: 'rgba(8,16,15,0.78)', color: kind === 'video' ? '#dffe95' : 'white', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.04em' }}>{kind === 'video' ? '🎬 Video' : '🖼 Image'}</span>
       </div>
 
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 10, background: 'linear-gradient(transparent, rgba(8,16,15,0.9))', zIndex: 10, pointerEvents: 'none' }}>
-        <span style={{ background: done ? 'rgba(223,254,149,0.2)' : '#dffe95', color: done ? '#dffe95' : '#17251c', fontSize: 12.5, fontWeight: 800, padding: '7px 12px', borderRadius: 100, border: done ? '1px solid #dffe95' : 'none' }}>
-          {done ? '✓ Remaking' : kind === 'video' ? `Remake · $${Math.round(cost / 100)}` : 'Remake · Free'}
-        </span>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 10, background: 'linear-gradient(transparent, rgba(8,16,15,0.94))', zIndex: 10, pointerEvents: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: done ? 'rgba(223,254,149,0.18)' : '#dffe95', color: done ? '#dffe95' : '#17251c', fontSize: 13, fontWeight: 800, padding: '10px 0', borderRadius: 11, border: done ? '1px solid #dffe95' : 'none' }}>
+          {done ? '✓ Remaking your ad…' : kind === 'video' ? `Remake as video · $${Math.round(cost / 100)}` : '✨ Remake this — Free'}
+        </div>
       </div>
     </div>
   )

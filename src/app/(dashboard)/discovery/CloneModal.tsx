@@ -37,7 +37,7 @@ async function fileToDataUrl(f: File): Promise<string> {
   })
 }
 
-export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: string; pageName: string; assetImageUrl?: string; sourceThumb?: string }; onClose: () => void }) {
+export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: string; pageId: string; pageName: string; assetImageUrl?: string; sourceThumb?: string }; onClose: () => void; onGenerated?: () => void }) {
   const [brands, setBrands] = useState<Brand[]>([])
   const [quota, setQuota] = useState<{ used: number; limit: number } | null>(null)
   const [mode, setMode] = useState<'pick' | 'new'>('pick')
@@ -335,6 +335,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
           : j.error || 'Couldn’t start the remake — try again.')
         return
       }
+      onGenerated?.()    // a real generation started (a row now exists in My Creatives) — tell the host wizard
       refreshCredits()   // reservation already hit the balance
 
       // Poll all jobs in parallel. Each resolves to a url (done), null (failed), or 'timeout'.
