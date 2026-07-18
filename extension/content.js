@@ -245,9 +245,14 @@
     btn.classList.add('sm-busy')
     const m = meta(scope || document)
     const image_data = capturedFrame || (type === 'image' ? await toDataURL(url) : null)
+    // Was the ORIGINAL creative a video? (FB/IG feed videos stream via blob → we can only save the
+    // poster image, so media_type ends up 'image'. Flag it so the app can label it + point the user
+    // to Discovery for a true video remake.)
+    const was_video = (mediaEl instanceof HTMLVideoElement) || type === 'video' || !!capturedFrame ||
+      !!(scope && scope !== document && scope.querySelector && scope.querySelector('video'))
     const payload = {
       media_url: url || m.permalink || location.href, media_type: capturedFrame ? 'image' : type, image_data,
-      source_url: m.permalink || location.href, source_platform: m.platform,
+      source_url: m.permalink || location.href, source_platform: m.platform, was_video,
       brand: m.brand || undefined, ad_copy: m.ad_copy || undefined,
     }
     chrome.runtime.sendMessage({ type: 'saveAd', payload }, (resp) => {

@@ -351,6 +351,9 @@ export default function SavedAdsPage() {
                 const ext = isExternal(saved)
                 const initials = (saved.page_name || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
                 const isVid = fmtOf(saved) === 'video'
+                // A video ad the extension could only save as a POSTER image (FB/IG feed blob videos):
+                // remake works as a picture; for a true video remake the user finds it in Discovery.
+                const posterVideo = ext && !!ad.was_video && !isVid
                 // Extension ads: the R2 snapshot_url IS the creative (image jpg or video mp4). Internal
                 // ads keep a Meta Ad Library page as snapshot_url, so use the stored thumbnail instead.
                 const media = ad.thumbnailUrl || ad.creatives?.[0]?.url || (ext && !isVid ? saved.snapshot_url : null)
@@ -384,7 +387,11 @@ export default function SavedAdsPage() {
                           {tier === 'winning' ? '🏆 Winning' : '⚡ Optimized'}
                         </span>
                       )}
-                      <button onClick={() => (isVid ? setCloneVid(saved) : setCloneImg(saved))} title={isVid ? 'Remake this video ad with your product' : 'Remake this ad with your product'}
+                      {posterVideo && (
+                        <span title="This was a video ad — the extension saved its poster. Remake it as a picture here, or find the ad in Discovery to remake as a full video."
+                          style={{ flexShrink: 0, fontSize: 8.5, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: 100, textTransform: 'uppercase', color: '#3730a3', background: '#e0e7ff', border: '1px solid #c7d2fe' }}>🎬 Video</span>
+                      )}
+                      <button onClick={() => (isVid ? setCloneVid(saved) : setCloneImg(saved))} title={isVid ? 'Remake this video ad with your product' : posterVideo ? 'Remake as a picture (this is a video ad — open it in Discovery to remake as a full video)' : 'Remake this ad with your product'}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1a3a1a', padding: 0, flexShrink: 0, display: 'flex' }}
                         onMouseEnter={e => (e.currentTarget.style.color = '#65a30d')}
                         onMouseLeave={e => (e.currentTarget.style.color = '#1a3a1a')}>
