@@ -29,8 +29,10 @@ export default function BrandsPage() {
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const [form, setForm] = useState<any>({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '', brand_type: 'physical' })
-  const isService = form.brand_type === 'service'
+  // `category` is the plain-language choice shown to the user (physical | app | service); 'app' and
+  // 'service' both mean "no physical product", so they map to brand_type='service' for generation.
+  const [form, setForm] = useState<any>({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '', category: 'physical' })
+  const isService = form.category !== 'physical'
   const [detected, setDetected] = useState<{ images: string[]; name: string } | null>(null)  // preview of URL-detected photos
   const [detecting, setDetecting] = useState(false)
 
@@ -82,7 +84,7 @@ export default function BrandsPage() {
       }
       const r = await fetch('/api/brands', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...form, industry: csv(form.industry), usps: csv(form.usps), product_images: images, product_name: detectedName || undefined }),
+        body: JSON.stringify({ ...form, brand_type: isService ? 'service' : 'physical', brand_kit: { category: form.category }, industry: csv(form.industry), usps: csv(form.usps), product_images: images, product_name: detectedName || undefined }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) {
@@ -92,7 +94,7 @@ export default function BrandsPage() {
           : d.error || 'Could not save the brand. Please try again.') })
         return
       }
-      setForm({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '', brand_type: 'physical' })
+      setForm({ name: '', website: '', description: '', industry: '', usps: '', tone: '', target_audience: '', category: 'physical' })
       setDetected(null); setCreating(false)
       setMsg({ ok: true, text: images.length ? `✓ “${(d.brand?.name || form.name)}” saved with ${images.length} product photo${images.length === 1 ? '' : 's'}.` : `✓ “${(d.brand?.name || form.name)}” saved.` })
       await load()
@@ -129,15 +131,19 @@ export default function BrandsPage() {
           {/* What kind of brand — a physical product (we composite real product photos) or a
               service/app/website (the creator talks about it; we never render a physical product). */}
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3c473e', marginBottom: 7 }}>What does this brand sell?</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3c473e', marginBottom: 7 }}>What are you promoting?</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {[['physical', '🧴 A physical product', 'We place your real product photos into ads'], ['service', '💻 An app, website or service', 'No physical product — the creator talks about it']].map(([v, label, sub]) => {
-                const on = form.brand_type === v
+              {[
+                ['physical', '🧴 A physical product', 'Something you ship — a bottle, box, gadget, apparel. We place your real product photos into ads.'],
+                ['app', '📱 An app or website', 'Software, a SaaS tool, or an online platform. We never render a physical product.'],
+                ['service', '🛠️ A service', 'You do something for people — agency, coaching, salon, clinic. The creator talks about it.'],
+              ].map(([v, label, sub]) => {
+                const on = form.category === v
                 return (
-                  <button key={v} type="button" onClick={() => { setForm({ ...form, brand_type: v }); setDetected(null) }}
-                    style={{ flex: '1 1 220px', textAlign: 'left', border: `1.5px solid ${on ? '#a8cf6f' : '#e2e8f0'}`, background: on ? '#f4fbe6' : '#fff', borderRadius: 12, padding: '10px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <button key={v} type="button" onClick={() => { setForm({ ...form, category: v }); setDetected(null) }}
+                    style={{ flex: '1 1 180px', textAlign: 'left', border: `1.5px solid ${on ? '#a8cf6f' : '#e2e8f0'}`, background: on ? '#f4fbe6' : '#fff', borderRadius: 12, padding: '10px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: on ? '#2c4a1f' : '#111' }}>{label}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{sub}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.4 }}>{sub}</div>
                   </button>
                 )
               })}

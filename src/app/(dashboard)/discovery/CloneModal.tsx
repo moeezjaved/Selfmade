@@ -70,9 +70,12 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const [activeIdx, setActiveIdx] = useState(0)                    // which variation is open for edit/download
   const [count, setCount] = useState(1)                            // how many variations to generate
   const [brandId, setBrandId] = useState<string | null>(null)      // selected saved brand (for linking generations)
-  // 'service' brands (app/site/service) have NO physical product — photos are optional and the model
-  // is told never to invent a bottle/box. Set from the picked brand; 'physical' = today's flow.
-  const [brandType, setBrandType] = useState<'physical' | 'service'>('physical')
+  // What the brand sells — asked in plain language when creating a brand. 'app' and 'service' both
+  // mean "no physical product to render", so they map to brand_type='service' for generation (the
+  // model is told never to invent a bottle/box); the finer category is kept in brand_kit for future
+  // prompt tuning. 'physical' = today's product-hero flow.
+  const [brandCategory, setBrandCategory] = useState<'physical' | 'app' | 'service'>('physical')
+  const brandType: 'physical' | 'service' = brandCategory === 'physical' ? 'physical' : 'service'
   const isService = brandType === 'service'
   const fileRef = useRef<HTMLInputElement>(null)
   const [mounted, setMounted] = useState(false)                    // portal guard (SSR-safe)
@@ -168,7 +171,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const pickBrand = (b: Brand) => {
     setMode('pick')
     setBrandId(b.id)
-    setBrandType(b.brand_type === 'service' ? 'service' : 'physical')
+    setBrandCategory(((b as any).brand_kit?.category as 'physical' | 'app' | 'service') || (b.brand_type === 'service' ? 'service' : 'physical'))
     setBName(b.name); setBSite(b.website || '')
     const imgs = (b.products || []).flatMap((p) => p.image_urls || [])
     const ph = imgs.slice(0, 8).map((u) => ({ id: uid(), src: u, label: 'saved' }))
@@ -225,7 +228,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
         const httpImgs = photos.map((p) => p.src).filter((s) => /^https?:\/\//i.test(s))
         const rb = await fetch('/api/brands', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name: bName.trim(), website: bSite.trim() || null, product_images: httpImgs, brand_kit: { colors, fonts, logo, palette } }),
+          body: JSON.stringify({ name: bName.trim(), website: bSite.trim() || null, product_images: httpImgs, brand_type: brandType, brand_kit: { colors, fonts, logo, palette, category: brandCategory } }),
         })
         const jb = await rb.json()
         if (rb.status === 402 && jb.error === 'brand_limit_reached') {
@@ -470,7 +473,7 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                         {brands.map((b) => (
                           <button key={b.id} onClick={() => pickBrand(b)} style={chip(mode === 'pick' && bName === b.name)}>{b.name}</button>
                         ))}
-                        <button onClick={() => { setMode('new'); setBrandId(null); setBrandType('physical'); setBName(''); setBSite(''); setPhotos([]); setSelected([]) }} style={chipDashed(mode === 'new')}>＋ New brand</button>
+                        <button onClick={() => { setMode('new'); setBrandId(null); setBrandCategory('physical'); setBName(''); setBSite(''); setPhotos([]); setSelected([]) }} style={chipDashed(mode === 'new')}>＋ New brand</button>
                       </div>
                     )}
                     {/* Auto-loaded brand kit (saved brand) — confirmation only; the actual photos are
@@ -483,6 +486,35 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                     )}
                     {mode === 'new' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div className="field">
+                          <FieldLabel>What are you promoting?</FieldLabel>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {([
+                              { key: 'physical', icon: '🧴', title: 'A physical product', ex: 'Something you ship — a bottle, box, gadget, apparel.' },
+                              { key: 'app', icon: '📱', title: 'An app or website', ex: 'Software, a SaaS tool, or an online platform.' },
+                              { key: 'service', icon: '🛠️', title: 'A service', ex: 'You do something for people — agency, coaching, salon, clinic.' },
+                            ] as const).map((o) => {
+                              const on = brandCategory === o.key
+                              return (
+                                <button key={o.key} type="button" onClick={() => setBrandCategory(o.key)}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', padding: '11px 14px', borderRadius: 13, cursor: 'pointer',
+                                    border: on ? `2px solid ${SEL_BORDER}` : `1.5px solid ${L_LINE}`, background: on ? SEL_BG : '#fff' }}>
+                                  <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{o.icon}</span>
+                                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+                                    <span style={{ fontSize: 13.5, fontWeight: 700, color: on ? SEL_TEXT : L_INK }}>{o.title}</span>
+                                    <span style={{ fontSize: 11.5, color: L_MUTED, lineHeight: 1.4 }}>{o.ex}</span>
+                                  </span>
+                                  {on && <Check size={16} color={GREEN} strokeWidth={3} style={{ flexShrink: 0 }} />}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          {brandCategory !== 'physical' && (
+                            <div style={{ marginTop: 7, fontSize: 11.5, color: SEL_TEXT, background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }}>
+                              Got it — we’ll build the ad around your brand, message and people, and <b>never invent a physical product</b>. Photos are optional on the next step.
+                            </div>
+                          )}
+                        </div>
                         <div className="field"><FieldLabel>Brand name</FieldLabel><input value={bName} onChange={(e) => setBName(e.target.value)} placeholder="e.g. AURA" style={input} /></div>
                         <div className="field">
                           <FieldLabel>Your website <i style={{ fontStyle: 'normal', fontWeight: 500, color: L_FAINT }}>· we grab the logo, colors &amp; product photos for you</i></FieldLabel>
