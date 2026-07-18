@@ -60,6 +60,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
 
   const [phase, setPhase] = useState<Phase>('form')
   const [step, setStep] = useState(0)                          // wizard step (form: 0-4 · review: 5-7)
+  const bodyRef = useRef<HTMLDivElement | null>(null)          // scroll container — reset to top on step change
   const [jobId, setJobId] = useState<string | null>(null)
   const [draftScript, setDraftScript] = useState('')
   const [overlays, setOverlays] = useState<{ t: string; text: string }[]>([])  // auto-detected on-screen text callouts (editable)
@@ -76,6 +77,9 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const fileRef = useRef<HTMLInputElement>(null)
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
+  // Jump the modal body back to the top whenever the step/phase changes, so the next step's heading
+  // is always visible (was staying scrolled down → looked like Next did nothing).
+  useEffect(() => { bodyRef.current?.scrollTo({ top: 0, behavior: 'auto' }) }, [step, phase])
 
   // UGC = one clip; Faithful = scene-by-scene + stitch, priced by scene count (credit_pricing
   // video_clone_xN rows — keep these numbers in sync with that table).
@@ -422,7 +426,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
 
             {/* pane */}
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px 12px' }}>
+              <div ref={bodyRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 28px 12px' }}>
 
                 {/* STEP 1 — brand */}
                 {step === 0 && (
@@ -512,7 +516,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                         {VOICES.map((v) => <button key={v.id} onClick={() => setVoice(v.id)} style={chip(voice === v.id)}>{v.label}</button>)}
                       </div>
                     </div>
-                    {phase === 'analyzing' && <div style={{ fontSize: 12.5, color: GREEN, display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}><Loader2 size={14} className="spin" /> Analysing the ad &amp; writing your script… (free — no credits yet)</div>}
+                    {phase === 'analyzing' && <div style={{ fontSize: 14.5, fontWeight: 700, color: GREEN, display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, background: '#f4fbe6', border: '1px solid #d8ebb9', borderRadius: 12, padding: '13px 16px' }}><Loader2 size={18} className="spin" /> <span>Watching the winning ad &amp; writing your script…<br /><span style={{ fontSize: 12, fontWeight: 500, color: '#5a7a5a' }}>This is free — no credits used until you approve it.</span></span></div>}
                   </section>
                 )}
 

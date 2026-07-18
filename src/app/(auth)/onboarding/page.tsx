@@ -565,12 +565,12 @@ export default function OnboardingPage() {
                               <div className="ob-anim" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, transparent 0%, rgba(223,254,149,0.08) 50%, transparent 100%)', backgroundSize: '200% 100%', animation: `ob-shimmer 2.6s linear ${bi * 0.4}s infinite` }} />
                               {/* progress fill */}
                               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: 'linear-gradient(90deg, rgba(63,143,79,0.55), rgba(223,254,149,0.35))', borderRadius: 100, transition: 'width 1.2s cubic-bezier(.22,1,.36,1)' }} />
-                              {/* the deer — always just ahead of the leopard */}
-                              <span className="ob-anim" style={{ position: 'absolute', top: '50%', left: `calc(${Math.min(pct + 8, 97)}% )`, transform: 'translate(-50%,-50%)', fontSize: 20, animation: `ob-flee 0.55s ease-in-out ${bi * 0.2}s infinite`, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))' }}>🦌</span>
-                              {/* the leopard — sprinting at the progress edge */}
-                              <span className="ob-anim" style={{ position: 'absolute', top: '50%', left: `${pct}%`, transform: 'translate(-50%,-50%) scaleX(-1)', fontSize: 24, animation: `ob-pounce 0.55s ease-in-out ${bi * 0.2}s infinite`, transition: 'left 1.2s cubic-bezier(.22,1,.36,1)', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,.55))' }}>🐆</span>
+                              {/* the deer — always just ahead of the leopard (gentle out-of-phase bob) */}
+                              <span className="ob-anim ob-deer" style={{ position: 'absolute', top: '50%', left: `calc(${Math.min(pct + 8, 97)}% )`, fontSize: 20, animationDelay: `${bi * 0.2 + 0.5}s`, transition: 'left 1.2s cubic-bezier(.22,1,.36,1)', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))' }}>🦌</span>
+                              {/* the leopard — glides to the progress edge with a smooth run bob */}
+                              <span className="ob-anim ob-leo" style={{ position: 'absolute', top: '50%', left: `${pct}%`, fontSize: 24, animationDelay: `${bi * 0.2}s`, transition: 'left 1.2s cubic-bezier(.22,1,.36,1)', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,.55))' }}>🐆</span>
                               {/* dust kicked up behind the leopard */}
-                              <span className="ob-anim" style={{ position: 'absolute', top: '62%', left: `calc(${pct}% - 20px)`, transform: 'translate(-50%,-50%)', fontSize: 12, opacity: 0.7, animation: `ob-dust 0.55s linear ${bi * 0.2}s infinite` }}>💨</span>
+                              <span className="ob-anim ob-dustpuff" style={{ position: 'absolute', top: '60%', left: `calc(${pct}% - 20px)`, fontSize: 12, opacity: 0.6, animationDelay: `${bi * 0.2}s`, transition: 'left 1.2s cubic-bezier(.22,1,.36,1)' }}>💨</span>
                             </div>
                           </div>
                         )
@@ -744,10 +744,11 @@ export default function OnboardingPage() {
         @keyframes ob-pulse{0%,100%{opacity:.5}50%{opacity:1}}
         @keyframes ob-spin{to{transform:rotate(360deg)}}
         @keyframes ob-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
-        @keyframes ob-pounce{0%,100%{transform:translate(-50%,-50%) scaleX(-1) translateY(0) rotate(0deg)}30%{transform:translate(-50%,-62%) scaleX(-1) translateY(-3px) rotate(-6deg)}60%{transform:translate(-50%,-44%) scaleX(-1) translateY(2px) rotate(4deg)}}
-        @keyframes ob-flee{0%,100%{transform:translate(-50%,-50%) translateY(0)}45%{transform:translate(-50%,-64%) translateY(-3px)}}
-        @keyframes ob-dust{0%{opacity:.7;transform:translate(-50%,-50%) scale(.7)}100%{opacity:0;transform:translate(-90%,-50%) scale(1.25)}}
-        @media(prefers-reduced-motion:reduce){.ob-anim{animation:none!important}}
+        .ob-leo,.ob-deer{animation:ob-run 1.15s ease-in-out infinite}
+        .ob-dustpuff{animation:ob-dust 1.15s ease-out infinite}
+        @keyframes ob-run{0%,100%{transform:translate(-50%,-50%) scaleX(-1) translateY(0)}50%{transform:translate(-50%,-50%) scaleX(-1) translateY(-3px)}}
+        @keyframes ob-dust{0%{opacity:.5;transform:translate(-50%,-50%) scale(.65)}70%{opacity:.28}100%{opacity:0;transform:translate(-135%,-50%) scale(1.3)}}
+        @media(prefers-reduced-motion:reduce){.ob-anim{animation:none!important}.ob-leo,.ob-deer{transform:translate(-50%,-50%) scaleX(-1)}.ob-dustpuff{display:none}}
         @media(max-width:840px){.ob-rail{display:none!important}}
         @media(max-width:640px){.ob-main{padding:24px 16px 18px!important}.ob-adgrid{grid-template-columns:1fr!important}}
       `}</style>
