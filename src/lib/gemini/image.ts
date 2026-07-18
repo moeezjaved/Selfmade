@@ -18,7 +18,7 @@ export const geminiEnabled = !!KEY
 export function modelFor(tier: 'default' | 'pro') { return tier === 'pro' ? MODEL_PRO : MODEL_DEFAULT }
 
 export type ImageInput = { mimeType: string; dataB64: string }
-export type GenResult = { ok: true; mimeType: string; dataB64: string } | { ok: false; error: string }
+export type GenResult = { ok: true; mimeType: string; dataB64: string; model: string } | { ok: false; error: string }
 
 // Gemini's image models only accept these raster input types. SVG (image/svg+xml) — common for
 // brand logos — and other vector/exotic types 400 the whole generateContent call, so callers must
@@ -92,7 +92,7 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
           if (attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }
           break
         }
-        return { ok: true, mimeType: inline.mime_type || inline.mimeType || 'image/png', dataB64: inline.data }
+        return { ok: true, mimeType: inline.mime_type || inline.mimeType || 'image/png', dataB64: inline.data, model }
       } catch (e: any) {
         lastErr = String(e?.message || e)
         if (attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }

@@ -13,11 +13,15 @@ function KPI({ label, value, sub }: { label: string; value: string | number; sub
   )
 }
 
+interface GenHealth { windowDays: number; done: number; failed: number; busy: number; proModel: string; proCount: number; fallbackCount: number; tracked: number; proPct: number | null }
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
+  const [gen, setGen] = useState<GenHealth | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/stats').then(r => r.json()).then(setStats)
+    fetch('/api/admin/gen-health').then(r => r.json()).then(setGen).catch(() => {})
   }, [])
 
   return (
@@ -34,6 +38,20 @@ export default function AdminDashboard() {
           <KPI label="On Trial" value={stats.trialUsers.toLocaleString()} sub="7-day free trial" />
           <KPI label="Paying Users" value={stats.payingUsers.toLocaleString()} sub="active paid subscriptions" />
           <KPI label="MRR" value={`$${stats.mrr.toLocaleString()}`} sub="paid users × $49" />
+        </div>
+      )}
+
+      {/* Image generation health — how often clones ran on Google's Pro model vs hit "Pro busy". */}
+      <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#111', margin: '34px 0 4px' }}>Image generation health</h2>
+      <p style={{ color: '#888', fontSize: '13px', margin: '0 0 16px' }}>Clone/remake images · last {gen?.windowDays ?? 7} days. We only generate on the Pro model — “Pro busy” = times it was congested and we asked the user to retry (never downgraded).</p>
+      {!gen ? (
+        <div style={{ color: '#aaa', fontSize: '14px' }}>Loading…</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+          <KPI label="On Pro model" value={gen.proPct == null ? '—' : `${gen.proPct}%`} sub={gen.tracked ? `${gen.proCount}/${gen.tracked} tracked` : 'no data yet'} />
+          <KPI label="Pro busy (retried)" value={gen.busy.toLocaleString()} sub="congested → asked to retry" />
+          <KPI label="Clones done" value={gen.done.toLocaleString()} sub={`${gen.failed} failed`} />
+          <KPI label="Fallback used" value={gen.fallbackCount.toLocaleString()} sub="should stay 0 (Pro-only)" />
         </div>
       )}
     </div>
