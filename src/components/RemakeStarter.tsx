@@ -1,18 +1,23 @@
 'use client'
 /**
- * The always-visible "＋ Remake an ad" entry (sidebar, above Ask Mello). After onboarding, this is the
- * one button that restarts the core loop from anywhere. Two doors:
- *   1. Pick a winning ad  → /discovery (the existing library flow)
- *   2. Upload your own video → presign R2 PUT (/api/discovery/remake-upload), then reuse CloneVideoModal
- *      with the uploaded URL as sourceVideoUrl (sourceAdId=""), so a user can remake ANY video they
- *      have — not just ads in our library. Product photo is uploaded inside the modal as usual.
+ * The one "Create an ad" launcher (sidebar CTA, on every dashboard page). It unifies what used to be
+ * two confusing entry points ("Create Ad" = original picture only, "Remake an ad" = video upload only)
+ * into a single, layperson-clear chooser with three doors:
+ *   1. Remake a winning ad → /discovery (pick a proven ad; picture or video, auto-detected on the card)
+ *   2. Remake my own ad     → upload an IMAGE or a VIDEO from your computer → remake it
+ *        • image → presign R2 PUT (/api/discovery/remake-upload) → CloneModal (assetImageUrl = uploaded)
+ *        • video → same presign → CloneVideoModal (sourceVideoUrl = uploaded)
+ *   3. Create a fresh ad    → /creative-studio?studio=1 (AI Studio — design an original from scratch)
  */
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { Upload, Compass, X } from 'lucide-react'
+import { Upload, Trophy, Sparkles, X, Loader2 } from 'lucide-react'
 
 const CloneVideoModal = dynamic(() => import('@/app/(dashboard)/discovery/CloneVideoModal'), { ssr: false })
+const CloneModal = dynamic(() => import('@/app/(dashboard)/discovery/CloneModal'), { ssr: false })
+
+const LIME = '#dffe95', FOREST = '#17251c', L_INK = '#161c17', L_MUTED = '#68756b', L_LINE = '#e7ece7', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f', GREEN = '#3f8f4f'
 
 export default function RemakeStarter() {
   const router = useRouter()
@@ -20,13 +25,16 @@ export default function RemakeStarter() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     e.target.value = ''
     if (!f) return
-    if (f.size > 200e6) { setErr('Video must be under 200 MB.'); return }
+    const isVideo = f.type.startsWith('video/')
+    const cap = isVideo ? 200e6 : 25e6
+    if (f.size > cap) { setErr(`${isVideo ? 'Video' : 'Image'} must be under ${Math.round(cap / 1e6)} MB.`); return }
     setBusy(true); setErr(null)
     try {
       const pres = await fetch('/api/discovery/remake-upload', {
@@ -38,18 +46,13 @@ export default function RemakeStarter() {
       const put = await fetch(pj.uploadUrl, { method: 'PUT', headers: { 'content-type': f.type }, body: f })
       if (!put.ok) throw new Error('Upload failed — please try again.')
       setOpen(false)
-      setVideoUrl(pj.publicUrl)   // opens CloneVideoModal on the uploaded source
+      if (pj.kind === 'image') setImageUrl(pj.publicUrl)   // → CloneModal (picture remake of the upload)
+      else setVideoUrl(pj.publicUrl)                        // → CloneVideoModal (video remake of the upload)
     } catch (e: any) {
       setErr(e?.message || 'Upload failed — please try again.')
     } finally {
       setBusy(false)
     }
-  }
-
-  const opt: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left',
-    padding: '13px 14px', borderRadius: 12, border: '1px solid #e4ece0', background: '#fff',
-    cursor: 'pointer', color: '#16261a',
   }
 
   return (
@@ -59,58 +62,73 @@ export default function RemakeStarter() {
         style={{
           display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
           margin: '0 0 4px', padding: '13px 14px', borderRadius: 14, cursor: 'pointer',
-          // Motion-style pastel gradient — the one loud card on the light sidebar.
           background: 'radial-gradient(120% 140% at 85% 0%, #fdf6c9 0%, transparent 55%), radial-gradient(130% 120% at 0% 100%, #d9f7d0 0%, transparent 60%), linear-gradient(135deg, #eefbd2 0%, #dffe95 55%, #d3f4e2 100%)',
-          border: '1px solid #cfe9a4', color: '#17251c',
+          border: '1px solid #cfe9a4', color: FOREST,
           boxShadow: '0 6px 18px rgba(190,240,90,.25)',
         }}
       >
-        <span style={{
-          width: 30, height: 30, borderRadius: 9, background: '#17251c', color: '#dffe95',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, lineHeight: 1, flexShrink: 0,
-        }}>＋</span>
+        <span style={{ width: 30, height: 30, borderRadius: 9, background: FOREST, color: LIME, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, lineHeight: 1, flexShrink: 0 }}>＋</span>
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 14.5, fontWeight: 800, letterSpacing: '-.01em' }}>Remake an ad</span>
-          <span style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#41543f' }}>A winner, or your own video</span>
+          <span style={{ display: 'block', fontSize: 14.5, fontWeight: 800, letterSpacing: '-.01em' }}>Create an ad</span>
+          <span style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#41543f' }}>Remake a winner, upload your own, or start fresh</span>
         </span>
       </button>
 
       {open && (
-        <div
-          onClick={() => !busy && setOpen(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(8,16,10,.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 18, padding: 20, boxShadow: '0 24px 60px rgba(8,16,10,.4)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <b style={{ fontSize: 17, color: '#16261a' }}>Remake an ad</b>
-              <button onClick={() => !busy && setOpen(false)} aria-label="Close" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7a6b', padding: 4 }}><X size={18} /></button>
-            </div>
-            <p style={{ margin: '0 0 16px', fontSize: 13.5, color: '#6b7a6b' }}>Start from a proven winner, or bring your own.</p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button style={opt} disabled={busy} onClick={() => { setOpen(false); router.push('/discovery') }}>
-                <Compass size={22} color="#16321a" style={{ flexShrink: 0 }} />
-                <span style={{ display: 'flex', flexDirection: 'column' }}>
-                  <b style={{ fontSize: 14 }}>Pick a winning ad</b>
-                  <small style={{ fontSize: 12, color: '#6b7a6b' }}>Browse thousands of live ads and remake one</small>
-                </span>
-              </button>
-              <button style={{ ...opt, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={() => fileRef.current?.click()}>
-                <Upload size={22} color="#16321a" style={{ flexShrink: 0 }} />
-                <span style={{ display: 'flex', flexDirection: 'column' }}>
-                  <b style={{ fontSize: 14 }}>{busy ? 'Uploading…' : 'Upload your own video'}</b>
-                  <small style={{ fontSize: 12, color: '#6b7a6b' }}>Remake any video from your computer</small>
-                </span>
-              </button>
+        <div onClick={() => !busy && setOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(8,16,10,.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: '#fff', borderRadius: 20, border: '1px solid #dfe4de', boxShadow: '0 30px 90px -30px rgba(23,37,28,.4)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderBottom: '1px solid #e0eecb', background: 'radial-gradient(90% 200% at 100% 0%, #fdf3cf 0%, transparent 50%),radial-gradient(80% 160% at 0% 30%, #e3f9d6 0%, transparent 55%),linear-gradient(120deg,#f6fceb,#f0fae2 45%,#edf8ee)' }}>
+              <b style={{ fontSize: 16.5, color: L_INK, letterSpacing: '-.01em' }}>What do you want to make?</b>
+              <button onClick={() => !busy && setOpen(false)} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 9, border: '1px solid #dcebc4', background: 'rgba(255,255,255,.8)', color: '#3c473e', cursor: 'pointer' }}><X size={16} /></button>
             </div>
 
-            {err && <div style={{ marginTop: 12, fontSize: 13, color: '#b42318', background: '#fef3f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px' }}>{err}</div>}
-            <input ref={fileRef} type="file" accept="video/mp4,video/quicktime,video/webm" hidden onChange={onFile} />
+            <div style={{ padding: 18 }}>
+              <p style={{ margin: '0 0 14px', fontSize: 13, color: L_MUTED, lineHeight: 1.5 }}>Pick one — no editing skills needed. We do the work; you approve before anything is charged.</p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button style={opt} disabled={busy} onClick={() => { setOpen(false); router.push('/discovery') }}>
+                  <span style={iconWrap}><Trophy size={20} color={GREEN} /></span>
+                  <span style={{ flex: 1 }}>
+                    <b style={{ fontSize: 14.5, display: 'block' }}>Remake a winning ad</b>
+                    <small style={{ fontSize: 12, color: L_MUTED }}>Copy a proven ad with your product — browse thousands of live winners.</small>
+                  </span>
+                </button>
+
+                <button style={{ ...opt, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={() => fileRef.current?.click()}>
+                  <span style={iconWrap}>{busy ? <Loader2 size={20} color={GREEN} className="spin" /> : <Upload size={20} color={GREEN} />}</span>
+                  <span style={{ flex: 1 }}>
+                    <b style={{ fontSize: 14.5, display: 'block' }}>{busy ? 'Uploading…' : 'Remake my own ad'}</b>
+                    <small style={{ fontSize: 12, color: L_MUTED }}>Upload an image or a video from your computer and we’ll rebuild it.</small>
+                  </span>
+                </button>
+
+                <button style={opt} disabled={busy} onClick={() => { setOpen(false); router.push('/creative-studio?studio=1') }}>
+                  <span style={iconWrap}><Sparkles size={20} color={GREEN} /></span>
+                  <span style={{ flex: 1 }}>
+                    <b style={{ fontSize: 14.5, display: 'block' }}>Create a fresh ad</b>
+                    <small style={{ fontSize: 12, color: L_MUTED }}>No ad in mind? We’ll design an original from scratch with AI.</small>
+                  </span>
+                </button>
+              </div>
+
+              {err && <div style={{ marginTop: 12, fontSize: 13, color: '#b42318', background: '#fef2f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px' }}>{err}</div>}
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" hidden onChange={onFile} />
+            </div>
           </div>
+          <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       )}
 
       {videoUrl && <CloneVideoModal sourceAdId="" sourceVideoUrl={videoUrl} onClose={() => setVideoUrl(null)} />}
+      {imageUrl && <CloneModal ad={{ id: `upload:${Date.now()}`, pageId: '', pageName: 'Your ad', assetImageUrl: imageUrl, sourceThumb: imageUrl }} onClose={() => setImageUrl(null)} />}
     </>
   )
 }
+
+const opt: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 13, width: '100%', textAlign: 'left',
+  padding: '14px 15px', borderRadius: 14, border: `1.5px solid ${L_LINE}`, background: '#fff',
+  cursor: 'pointer', color: L_INK, fontFamily: 'inherit',
+}
+const iconWrap: React.CSSProperties = { width: 40, height: 40, borderRadius: 11, background: SEL_BG, border: `1px solid ${SEL_BORDER}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
