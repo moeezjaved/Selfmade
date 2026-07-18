@@ -178,6 +178,15 @@ export default function HomeLanding() {
       .catch(() => {})
   }, [])
   const marqueeAds = ads.slice(6, 6 + 12)
+  // "Made with Selfmade" showcase — admin-featured creatives (image + video) via /api/showcase.
+  // Falls back to the curated SHOWCASE consts so the section is never empty before anything's featured.
+  type Show = { brand: string | null; source: string | null; made: string; video: boolean }
+  const [showcase, setShowcase] = useState<Show[]>(SHOWCASE.map(s => ({ ...s, video: false })))
+  useEffect(() => {
+    fetch('/api/showcase').then(r => r.json())
+      .then(j => { if (Array.isArray(j.items) && j.items.length) setShowcase(j.items) })
+      .catch(() => {})
+  }, [])
   const [menuOpen, setMenuOpen] = useState(false)
   useScrollReveal()
   return (
@@ -448,22 +457,26 @@ export default function HomeLanding() {
           <p style={{ color: '#6b7280', fontSize: 14.5, margin: '6px 0 0' }}>A real winning ad → remade for the brand, in one click. <span style={{ color: '#9ca3af' }}>Same layout, your product.</span></p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px,100%), 1fr))', gap: 16 }}>
-          {SHOWCASE.map((s) => (
-            <div key={s.brand} className="lift" style={{ background: '#fff', border: '1px solid #e9edf2', borderRadius: 16, padding: 14, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+          {showcase.map((s, i) => (
+            <div key={s.made || i} className="lift" style={{ background: '#fff', border: '1px solid #e9edf2', borderRadius: 16, padding: 14, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ flex: 1, textAlign: 'center' }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.source} alt="source winning ad" loading="lazy" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: '1px solid #eef0ee', background: '#f6f7f5' }} />
+                  {s.source
+                    ? <img src={s.source} alt="source winning ad" loading="lazy" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: '1px solid #eef0ee', background: '#f6f7f5' }} />
+                    : <div style={{ width: '100%', aspectRatio: '1', borderRadius: 10, background: '#f6f7f5', border: '1px solid #eef0ee' }} />}
                   <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.04em', color: '#9ca3af', marginTop: 6, textTransform: 'uppercase' }}>Winning ad</div>
                 </div>
                 <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: '50%', background: LIME, color: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16 }}>→</div>
                 <div style={{ flex: 1, textAlign: 'center' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.made} alt="remade with Selfmade" loading="lazy" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: `2px solid ${LIME}` }} />
-                  <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', color: GREEN, marginTop: 6, textTransform: 'uppercase' }}>Your remake</div>
+                  {s.video
+                    ? <video src={s.made} muted loop autoPlay playsInline style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: `2px solid ${LIME}`, background: '#0d120e' }} />
+                    // eslint-disable-next-line @next/next/no-img-element
+                    : <img src={s.made} alt="remade with Selfmade" loading="lazy" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: `2px solid ${LIME}` }} />}
+                  <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', color: GREEN, marginTop: 6, textTransform: 'uppercase' }}>Your remake{s.video ? ' · video' : ''}</div>
                 </div>
               </div>
-              <div style={{ marginTop: 10, fontSize: 12.5, fontWeight: 700, color: INK, textAlign: 'center' }}>{s.brand}</div>
+              {s.brand && <div style={{ marginTop: 10, fontSize: 12.5, fontWeight: 700, color: INK, textAlign: 'center' }}>{s.brand}</div>}
             </div>
           ))}
         </div>

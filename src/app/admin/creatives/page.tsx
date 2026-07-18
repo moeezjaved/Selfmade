@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 
-type C = { id: string; image_url: string | null; type: string; media_type: string; status: string; tier: string; prompt: string | null; created_at: string; email: string; name: string; brand: string | null; source_ad_id?: string | null; source_thumb?: string | null }
+type C = { id: string; image_url: string | null; type: string; media_type: string; status: string; tier: string; prompt: string | null; created_at: string; email: string; name: string; brand: string | null; source_ad_id?: string | null; source_thumb?: string | null; featured?: boolean }
 const fmt = (d: string) => new Date(d).toLocaleString()
 
 export default function AdminCreatives() {
@@ -9,11 +9,25 @@ export default function AdminCreatives() {
   const [type, setType] = useState('')
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
+  const [featOnly, setFeatOnly] = useState(false)
 
   const load = () => { setLoading(true); fetch(`/api/admin/creatives${type ? `?type=${type}` : ''}`).then(r => r.json()).then(j => setItems(j.creatives || [])).finally(() => setLoading(false)) }
   useEffect(load, [type])
 
-  const shown = items.filter(c => !q || c.email.toLowerCase().includes(q.toLowerCase()) || (c.brand || '').toLowerCase().includes(q.toLowerCase()))
+  // Toggle whether a creative appears in the public "Made with Selfmade" landing showcase.
+  const toggleFeature = async (c: C) => {
+    const next = !c.featured
+    setItems(prev => prev.map(x => x.id === c.id ? { ...x, featured: next } : x))   // optimistic
+    const r = await fetch('/api/admin/creatives', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: c.id, featured: next }) })
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}))
+      alert(j.error || 'Could not update')
+      setItems(prev => prev.map(x => x.id === c.id ? { ...x, featured: !next } : x))   // revert
+    }
+  }
+  const featuredCount = items.filter(c => c.featured).length
+
+  const shown = items.filter(c => (!q || c.email.toLowerCase().includes(q.toLowerCase()) || (c.brand || '').toLowerCase().includes(q.toLowerCase())) && (!featOnly || c.featured))
 
   return (
     <div style={{ padding: 28, color: '#111' }}>
@@ -24,6 +38,7 @@ export default function AdminCreatives() {
         {['', 'clone', 'edit', 'animated', 'inspired'].map(t => (
           <button key={t || 'all'} onClick={() => setType(t)} style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid #e2e8f0', background: type === t ? '#111' : '#fff', color: type === t ? '#fff' : '#111', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, textTransform: 'capitalize' }}>{t || 'all'}</button>
         ))}
+        <button onClick={() => setFeatOnly(v => !v)} title="Ads shown in the public landing showcase" style={{ padding: '6px 14px', borderRadius: 20, border: `1px solid ${featOnly ? '#a16207' : '#e2e8f0'}`, background: featOnly ? '#fef9c3' : '#fff', color: featOnly ? '#854d0e' : '#111', cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }}>★ Featured {featuredCount}/12</button>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search email or brand" style={{ marginLeft: 'auto', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13, minWidth: 220 }} />
         <button onClick={load} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 13 }}>Refresh</button>
       </div>
@@ -52,6 +67,13 @@ export default function AdminCreatives() {
                       : <div style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9aa79a', fontSize: 9 }}>ad ↗</div>}
                     <div style={{ fontSize: 7.5, fontWeight: 800, color: '#fff', textAlign: 'center', letterSpacing: '.05em', padding: '1px 0', background: 'rgba(0,0,0,0.75)' }}>SOURCE</div>
                   </a>
+                )}
+                {/* Feature on the public "Made with Selfmade" landing showcase (image or video). */}
+                {c.image_url && c.status !== 'processing' && c.status !== 'analyzing' && (
+                  <button onClick={() => toggleFeature(c)} title={c.featured ? 'Featured on landing — click to remove' : 'Feature on landing showcase'}
+                    style={{ position: 'absolute', top: 6, right: 6, width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer', background: c.featured ? '#facc15' : 'rgba(0,0,0,0.55)', color: c.featured ? '#7c2d12' : '#fff', fontSize: 15, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }}>
+                    {c.featured ? '★' : '☆'}
+                  </button>
                 )}
               </div>
               <div style={{ padding: '9px 11px' }}>

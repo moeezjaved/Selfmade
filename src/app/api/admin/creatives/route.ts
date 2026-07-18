@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || '300'), 500)
 
   let q = admin.from('creative_generations')
-    .select('id, user_id, brand_id, source_ad_id, type, media_type, status, tier, image_url, prompt, created_at')
+    .select('id, user_id, brand_id, source_ad_id, type, media_type, status, tier, image_url, prompt, created_at, featured_on_landing')
     .order('created_at', { ascending: false }).limit(limit)
   if (type) q = q.eq('type', type)
   const { data: creatives } = await q
@@ -48,6 +48,25 @@ export async function GET(request: NextRequest) {
     email: emailMap[r.user_id] || '', name: nameMap[r.user_id] || '', brand: r.brand_id ? brandMap[r.brand_id] || null : null,
     source_ad_id: r.source_ad_id || null,
     source_thumb: r.source_ad_id ? srcThumb.get(r.source_ad_id) || null : null,
+    featured: !!r.featured_on_landing,
   }))
   return NextResponse.json({ creatives: out, total: out.length })
+}
+
+/** Toggle whether a creative is featured on the public landing showcase. Admin-gated. */
+export async function PATCH(request: NextRequest) {
+  if (!verifyAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const body = await request.json().catch(() => ({}))
+  const id = String(body.id || '')
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+  const featured = !!body.featured
+  const admin = createAdminClient()
+  // Cap the showcase so the landing can't accidentally balloon — only images/videos that finished.
+  if (featured) {
+    const { count } = await admin.from('creative_generations').select('id', { count: 'exact', head: true }).eq('featured_on_landing', true)
+    if ((count ?? 0) >= 12) return NextResponse.json({ error: 'Showcase is full (max 12). Un-feature one first.' }, { status: 400 })
+  }
+  const { error } = await admin.from('creative_generations').update({ featured_on_landing: featured }).eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  return NextResponse.json({ ok: true, id, featured })
 }
