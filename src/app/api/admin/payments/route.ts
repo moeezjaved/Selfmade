@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     for (const t of (topups || []) as any[]) {
       const amount = Number(t.amount_usd) || 0
       rows.push({
-        id: t.id, type: 'topup', amount, currency: 'USD', status: 'success',
+        id: t.id, type: 'topup', amount, currency: 'USD', status: 'paid',   // 'paid' = the string the page counts/greens as Success
         customer_email: (authUsers.get(t.owner_id) as any)?.email || '',
         created: new Date(t.created_at).toISOString(), hosted_invoice_url: '', credits: t.credits,
       })
