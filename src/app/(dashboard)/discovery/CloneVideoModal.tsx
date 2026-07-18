@@ -1,13 +1,17 @@
 'use client'
 /**
- * Clone-this-ad-as-video modal, WITH a script-approval gate (no credits spent until the user approves).
- * Flow: pick brand + product photos → "Analyse & write script" (free) → the pipeline drafts a script →
- * user reviews/edits it → "Approve & generate" (spends credits) → Seedance renders → shows the clip.
- * Async throughout: POST start → poll to status='review' → POST approve → poll to 'done'.
+ * Remake-as-video modal — a step-by-step wizard with a free script-approval gate (no credits spent
+ * until the user approves). The wizard only re-organises the PRESENTATION into light-themed steps;
+ * the phase machine (form → analyse → review → generate → done), every handler, the cost math and
+ * both API payloads (analyse + approve) are unchanged, so rendered videos are identical to before.
+ *
+ * Flow: pick look/brand/photos/details/language/voice → "Write my free script" (free analyse) →
+ * pick length/extras + review & edit the script → "Create video" (spends credits) → render → done
+ * (with per-scene / UGC tweak chips).
  */
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Upload, Loader2, Check, Film, Sparkles, Pencil } from 'lucide-react'
+import { X, Upload, Loader2, Check, Film, Sparkles, Pencil, ChevronLeft, ChevronRight, Trophy } from 'lucide-react'
 import CloneGeneration from '@/components/motion/CloneGeneration'
 import { refreshCredits } from '@/components/credits/CreditCounter'
 
@@ -38,6 +42,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [gloss, setGloss] = useState<string | null>(null)   // English one-liner for non-English scripts
   const [previewing, setPreviewing] = useState(false)
   const [mode, setMode] = useState<'ugc' | 'faithful'>('ugc')
+  const modeTouched = useRef(false)                    // user explicitly picked a look → don't let the auto-suggestion override it
   const [suggestedMode, setSuggestedMode] = useState<'ugc' | 'faithful'>('ugc')
   const [sceneCount, setSceneCount] = useState(2)
   const [durationBucket, setDurationBucket] = useState<'15' | '30' | '60' | 'match'>('15')
@@ -51,6 +56,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [hooksOn, setHooksOn] = useState(false)                // 3 hook variants · +800 cr (faithful)
 
   const [phase, setPhase] = useState<Phase>('form')
+  const [step, setStep] = useState(0)                          // wizard step (form: 0-4 · review: 5-7)
   const [jobId, setJobId] = useState<string | null>(null)
   const [draftScript, setDraftScript] = useState('')
   const [overlays, setOverlays] = useState<{ t: string; text: string }[]>([])  // auto-detected on-screen text callouts (editable)
@@ -206,10 +212,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       setOverlays(Array.isArray(st.overlays) ? st.overlays : [])
       setGloss(st.gloss || null)
       const sug = st.suggestedMode === 'faithful' ? 'faithful' : 'ugc'
-      setSuggestedMode(sug); setMode(sug)
+      setSuggestedMode(sug); if (!modeTouched.current) setMode(sug)   // honour an explicit user pick from step 1
       setSceneCount(Math.min(10, Math.max(2, Number(st.sceneCount) || 2)))
       setSrcSecs(Number(st.sourceSeconds) || null)
-      setPhase('review')
+      setPhase('review'); setStep(5)   // land on the first review step (Length & format)
     } catch (e: any) { setErr(String(e?.message || e)); setPhase('form') }
   }
 
@@ -266,406 +272,482 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     setTwBusy(false)
   }
 
+  // ── wizard plumbing ──
+  const STEPS = [
+    { t: 'Choose your look', s: 'UGC or Cinematic' },
+    { t: 'Your brand', s: 'Logo & product' },
+    { t: 'Product photos', s: 'Up to 4' },
+    { t: 'About your product', s: 'Optional · sharpens it' },
+    { t: 'Words & voice', s: 'Language & narrator' },
+    { t: 'Length & format', s: 'Length · on-screen text' },
+    { t: 'Extras', s: 'Optional add-ons' },
+    { t: 'Script & create', s: 'Review the free script' },
+  ]
+  const pickLook = (m: 'ugc' | 'faithful') => { modeTouched.current = true; setMode(m) }
+  const brandName = brands.find((b) => b.id === brandId)?.name || productName.trim() || 'your brand'
+  const selPhotos = photos.filter((p) => selected.includes(p.id))
+
+  // Footer Next: within the form, step 4 → analyse(); within review, step 7 → approve(); else advance.
+  const goNext = () => {
+    if (phase === 'form') { if (step < 4) setStep(step + 1); else analyse() }
+    else { if (step < 7) setStep(step + 1); else approve() }
+  }
+  const goBack = () => {
+    if (phase === 'review' && step === 5) { setPhase('form'); setStep(4) }   // back across the analysis gate
+    else if (step > 0) setStep(step - 1)
+  }
+  const railClickable = (i: number) => phase === 'form' ? i <= 4 : (i >= 5 && i <= 7)
+
   if (!mounted) return null
+  const wide = phase === 'done'
   return createPortal(
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(3,6,4,.72)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflow: 'auto', padding: '4vh 16px' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: (phase === 'done') ? 900 : 560, background: '#0d130e', border: '1px solid #22331c', borderRadius: 18, overflow: 'hidden', display: (phase === 'done') ? 'grid' : 'block', gridTemplateColumns: (phase === 'done') ? '1fr 1fr' : undefined }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 20px', borderBottom: '1px solid #1c2a17' }}>
-            <Film size={17} color={LIME} /> <span style={{ fontSize: 16, fontWeight: 800, color: '#eaf6e6' }}>Remake as video ad</span>
-            <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#7a8a7e', cursor: 'pointer' }}><X size={18} /></button>
-          </div>
-          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18, maxHeight: '80vh', overflow: 'auto' }}>
-
-            {/* ── GENERATING: the money-moment wait animation + live progress ── */}
-            {phase === 'generating' ? (
-              <>
-                <CloneGeneration helper={genProgress?.label || 'Rendering your video · this can take a few minutes · keep browsing'} />
-                {genProgress && (
-                  <div style={{ padding: '0 20px 18px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#e8f0e8' }}>{genProgress.label}</span>
-                      <span style={{ fontSize: 12, color: '#8aa', fontVariantNumeric: 'tabular-nums' }}>
-                        {genProgress.eta_sec > 0 ? `~${genProgress.eta_sec >= 60 ? `${Math.ceil(genProgress.eta_sec / 60)} min` : `${genProgress.eta_sec}s`} left` : ''}
-                      </span>
-                    </div>
-                    <div style={{ height: 8, borderRadius: 100, background: '#1c2620', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${Math.min(98, Math.max(4, genProgress.pct))}%`, background: LIME, borderRadius: 100, transition: 'width .6s ease' }} />
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : phase === 'review' ? (
-              <>
-                <div style={{ fontSize: 12.5, color: '#8aa', background: '#101b12', border: '1px solid #22331c', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Pencil size={14} color={LIME} /> Review the script before we spend credits. Edit anything — the video says exactly this.
-                </div>
-
-                {/* Clone mode — suggested from the analysis. Faithful = scene-by-scene recreation of a
-                    multi-scene / B-roll ad; UGC = one talking-head creator. */}
-                <section>
-                  <Label>Remake style</Label>
-                  {suggestedMode === 'faithful' && (
-                    <div style={{ fontSize: 11.5, color: '#cfe3b8', background: '#141f10', border: '1px solid #2c4030', borderRadius: 8, padding: '7px 10px', marginBottom: 8 }}>
-                      🎬 This ad is cinematic / B-roll style — a scene-by-scene Cinematic remake will match it much better than a talking head.
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => setMode('faithful')} style={tierBtn(mode === 'faithful')}>
-                      Cinematic · {sceneCount} scenes · {(FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]} cr{suggestedMode === 'faithful' ? ' ★' : ''}
-                    </button>
-                    <button onClick={() => setMode('ugc')} style={tierBtn(mode === 'ugc')}>
-                      UGC creator · 1 clip · {UGC_COST[tier]} cr{suggestedMode === 'ugc' ? ' ★' : ''}
-                    </button>
-                  </div>
-                  <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{mode === 'faithful' ? 'Recreates the ad\'s scenes (b-roll, lifestyle, product shots) with your product, then stitches them — longer render, closest to the original.' : 'One creator speaks your script to camera — fastest and cheapest.'}</p>
-                </section>
-
-                {/* Length buckets (UGC only): 15s = classic single clip; 30/60s = frame-chained
-                    segments stitched into one take. 'Match original' auto-picks the nearest bucket. */}
-                {mode === 'ugc' && (
-                  <section>
-                    <Label>Video length</Label>
-                    {(() => {
-                      // A clone can't be LONGER than the source — cap the offered buckets to the
-                      // source's own length so a 14s ad can't be stretched to 30/60s.
-                      const cap = srcSecs ? (srcSecs <= 22 ? 15 : srcSecs <= 45 ? 30 : 60) : 60
-                      const lenBtn = (v: '15' | '30' | '60', secs: number, label: string) => {
-                        const disabled = secs > cap
-                        return <button key={v} onClick={() => !disabled && setDurationBucket(v)} disabled={disabled}
-                          style={{ ...tierBtn(durationBucket === v), opacity: disabled ? 0.35 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
-                          title={disabled ? `Longer than the ${srcSecs}s source — a remake matches the original length` : ''}>{label}</button>
-                      }
-                      const matchCost = cap === 15 ? UGC_COST[tier] : (FAITHFUL_COST[cap === 60 ? 4 : 2] || FAITHFUL_COST[2])[tier]
-                      return (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {lenBtn('15', 15, `15s · ${UGC_COST[tier]} cr`)}
-                          {lenBtn('30', 30, `30s · ${FAITHFUL_COST[2][tier]} cr`)}
-                          {lenBtn('60', 60, `60s · ${FAITHFUL_COST[4][tier]} cr`)}
-                          {srcSecs ? <button onClick={() => setDurationBucket('match')} style={tierBtn(durationBucket === 'match')}>Match original ({srcSecs}s) · {matchCost} cr</button> : null}
-                        </div>
-                      )
-                    })()}
-                    {srcSecs ? <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>Source is {srcSecs}s — a remake matches the original length (longer options are disabled).{nSegs > 1 ? ` ${nSegs} chained clips stitched into one take.` : ''}</p>
-                      : nSegs > 1 ? <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>{nSegs} chained clips of the same creator, stitched into one take — cuts land at natural pauses, like real UGC.</p> : null}
-                  </section>
-                )}
-
-                <section>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <Label>{mode === 'faithful' ? 'Voiceover (one continuous narration)' : 'Voiceover script'}{language !== 'en' ? ` · ${(LANGS.find(l => l.code === language) || LANGS[0]).label}` : ''}</Label>
-                    {/* 🔊 Audition the narrator on the first sentence — free, before approving. */}
-                    <button onClick={previewVoice} disabled={previewing || !draftScript.trim()} style={{ ...chip(false), padding: '4px 11px', opacity: previewing ? 0.6 : 1 }}>
-                      {previewing ? '🔊 Playing…' : '🔊 Hear the voice'}
-                    </button>
-                  </div>
-                  <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={7} dir={langCfg.rtl ? 'rtl' : 'ltr'}
-                    style={{ ...input, width: '100%', resize: 'vertical', lineHeight: langCfg.rtl ? 1.9 : 1.5, fontSize: langCfg.rtl ? 15 : 13 }} />
-                  {gloss && language !== 'en' && (
-                    <div style={{ fontSize: 11, color: '#8fa596', marginTop: 6, fontStyle: 'italic' }}>In English: “{gloss}”</div>
-                  )}
-                  {/* Speaking-time meter. In FAITHFUL mode the narration is our TTS at a natural pace and
-                      the video extends to fit it (closing shot holds) — so a long script is never
-                      "rushed", it just adds hold time. In UGC mode Seedance crams words into a fixed
-                      clip, so length genuinely matters — that's the only mode that warns about rushing. */}
-                  {words > 0 && (
-                    mode === 'faithful' ? (
-                      <div style={{ fontSize: 11, marginTop: 6, color: '#9fb0a4' }}>
-                        {words} words ≈ {spokenSecs}s of narration · ~{targetSecs}s of scenes{spokenSecs > targetSecs + 4 ? ' — the closing shot holds while the voiceover finishes. Trim for a tighter cut, or leave it.' : ' — fits nicely.'}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 11, marginTop: 6, color: spokenSecs > targetSecs + 4 ? '#ffb4b4' : spokenSecs > targetSecs ? '#f5d78e' : '#9fb0a4' }}>
-                        {words} words ≈ {spokenSecs}s spoken · target ~{targetSecs}s{spokenSecs > targetSecs + 4 ? ' — too long, the delivery will feel rushed. Trim it, or pick a longer length above.' : spokenSecs > targetSecs ? ' — a touch long; consider trimming.' : ' — fits comfortably.'}
-                      </div>
-                    )
-                  )}
-                </section>
-
-                {/* ── On-screen text callouts (OPT-IN — off by default so every video ships clean;
-                    when on, they're auto-detected from the ad + adapted to your product; edit/remove/add) ── */}
-                <section style={{ borderTop: '1px solid #1c2a17', paddingTop: 14 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={overlaysOn} onChange={(e) => setOverlaysOn(e.target.checked)}
-                      style={{ width: 15, height: 15, accentColor: '#7db56a', cursor: 'pointer' }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#cfe3c4' }}>Add on-screen text <span style={{ color: '#5f6f63', fontWeight: 400 }}>· burned onto the video</span></span>
-                  </label>
-                  {!overlaysOn && (
-                    <p style={{ fontSize: 11, color: '#6f7f73', margin: '6px 0 0' }}>Off — your video renders clean, no text. Turn on to add callouts like <b style={{ color: '#9fb0a4' }}>25g PROTEIN</b> (auto-detected from the ad, fully editable).</p>
-                  )}
-                  {overlaysOn && (<>
-                  <p style={{ fontSize: 11, color: '#6f7f73', margin: '8px 0 8px' }}>Auto-detected from the ad and adapted to your product. Edit the words, remove any, or add your own.</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {overlays.map((o, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 10.5, color: '#6f7f73', width: 46, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{o.t || '—'}</span>
-                        <input value={o.text} onChange={(e) => setOverlays((prev) => prev.map((x, j) => j === i ? { ...x, text: e.target.value.slice(0, 60) } : x))}
-                          placeholder="Callout text (e.g. 30g PROTEIN)"
-                          style={{ ...input, flex: 1, padding: '8px 11px', fontSize: 13 }} />
-                        <button onClick={() => setOverlays((prev) => prev.filter((_, j) => j !== i))} title="Remove"
-                          style={{ background: 'none', border: 'none', color: '#8aa', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 4px' }}>×</button>
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={() => setOverlays((prev) => [...prev, { t: '', text: '' }].slice(0, 8))}
-                    style={{ marginTop: 8, background: 'none', border: '1px dashed #2a3a24', color: '#9fb0a4', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    + Add text
-                  </button>
-                  </>)}
-                </section>
-
-                {/* ── Power-ups: each is its own charge; if one fails it refunds itself and the base
-                    video still delivers. ── */}
-                <section style={{ borderTop: '1px solid #1c2a17', paddingTop: 14 }}>
-                  <Label>Power-ups <span style={{ color: '#5f6f63', fontWeight: 400 }}>· optional</span></Label>
-
-                  {mode === 'faithful' && (
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, color: '#9fb0a4', marginBottom: 6 }}>🌍 Also generate in <span style={{ color: '#5f6f63' }}>· +200 cr each · same video, native voiceover</span></div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {LANGS.filter((l) => l.code !== language).slice(0, 6).map((l) => {
-                          const on = extraLangs.includes(l.code)
-                          return <button key={l.code} onClick={() => setExtraLangs((prev) => on ? prev.filter((x) => x !== l.code) : prev.length >= 2 ? prev : [...prev, l.code])} style={chip(on)}>{l.label}</button>
-                        })}
-                      </div>
-                      {extraLangs.length > 0 && <div style={{ fontSize: 10.5, color: '#6f7f73', marginTop: 5 }}>Each arrives as its own ad in My Creatives.</div>}
-                    </div>
-                  )}
-
-                  <div style={{ marginBottom: 12 }}>
-                    <button onClick={() => setEcOn(!ecOn)} style={{ ...chip(ecOn), width: '100%', textAlign: 'left' }}>🏷 Branded end-card · +50 cr {ecOn ? '✓' : ''}</button>
-                    {ecOn && (
-                      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                        <input value={ecOffer} onChange={(e) => setEcOffer(e.target.value)} placeholder="Offer (e.g. Buy 2 Get 1 Free)" style={{ ...input, flex: 2 }} />
-                        <input value={ecCta} onChange={(e) => setEcCta(e.target.value)} placeholder="CTA" style={{ ...input, flex: 1 }} />
-                      </div>
-                    )}
-                  </div>
-
-                  {mode === 'faithful' && (
-                    <button onClick={() => setHooksOn(!hooksOn)} style={{ ...chip(hooksOn), width: '100%', textAlign: 'left' }}>⚡ 3 hook variants · +800 cr {hooksOn ? '✓' : ''} <span style={{ color: hooksOn ? '#14281a' : '#5f6f63', fontWeight: 400 }}>— same ad, 3 different openings to A/B test</span></button>
-                  )}
-                </section>
-
-                {notice && <div style={noticeBox}>{notice} <a href="/creative-studio" style={{ color: LIME, fontWeight: 700 }}>Open My Creatives →</a></div>}
-                {err && <div style={errBox}>{err}</div>}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setPhase('form')} style={{ ...tierBtn(false), flex: '0 0 auto', padding: '11px 14px' }}>← Back</button>
-                  <button onClick={approve} disabled={busy || !draftScript.trim()} style={{ ...btnPrimary, flex: 1, opacity: (busy || !draftScript.trim()) ? 0.7 : 1 }}>
-                    <Sparkles size={16} /> Approve &amp; generate · {cost} cr
-                  </button>
-                </div>
-                <p style={{ fontSize: 11, color: '#6f7f73', margin: 0 }}>Credits are charged now. Takes a few minutes — it also appears in <b style={{ color: '#cfe' }}>My Creatives</b>.</p>
-              </>
-            ) : (
-              <>
-                {sourceVideoUrl && (
-                  <section>
-                    <Label>{sourceAdId ? 'The ad you’re remaking' : 'Your video'}</Label>
-                    <div style={{ display: 'flex', justifyContent: 'center', background: '#0d160f', border: '1px solid #22331c', borderRadius: 12, padding: 10 }}>
-                      <video
-                        src={sourceVideoUrl} poster={sourcePoster || undefined} controls playsInline preload="metadata"
-                        style={{ maxHeight: 260, maxWidth: '100%', borderRadius: 8, background: '#000' }}
-                      />
-                    </div>
-                    {!sourceAdId && <div style={{ fontSize: 12, color: '#7fae72', marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}><Check size={13} /> Uploaded — we’ll remake this with your product.</div>}
-                  </section>
-                )}
-
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 12.5, color: '#8aa', lineHeight: 1.5, background: '#101b12', border: '1px solid #22331c', borderRadius: 10, padding: '10px 12px' }}>
-                  {sourcePoster && /* eslint-disable-next-line @next/next/no-img-element */ <img src={sourcePoster} alt="" style={{ width: 44, height: 56, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
-                  <span>We keep this winning ad’s <b style={{ color: LIME }}>pacing, hook &amp; vibe</b> and swap in <b style={{ color: LIME }}>your product</b> — you approve the script before any credits are spent.</span>
-                </div>
-
-                {brands.length > 0 && (
-                  <section>
-                    <Label>Your brand</Label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {brands.map((b) => <button key={b.id} onClick={() => pickBrand(b)} style={chip(brandId === b.id)}>{b.name}</button>)}
-                    </div>
-                  </section>
-                )}
-
-                <section>
-                  <Label>Product photos · pick up to 4</Label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {photos.map((p) => {
-                      const on = selected.includes(p.id)
-                      return (
-                        <button key={p.id} onClick={() => toggleSel(p.id)} style={{ position: 'relative', width: 74, height: 74, borderRadius: 10, overflow: 'hidden', border: on ? `2px solid ${LIME}` : '2px solid #263', background: '#0a0f0c', cursor: 'pointer', padding: 0 }}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={cdn(p.src)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          {on && <span style={{ position: 'absolute', top: 3, right: 3, background: LIME, color: '#14281a', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={12} strokeWidth={3} /></span>}
-                        </button>
-                      )
-                    })}
-                    <button onClick={() => fileRef.current?.click()} style={{ width: 74, height: 74, borderRadius: 10, border: '2px dashed #2c4030', background: '#0a0f0c', color: '#7a8a7e', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: 10 }}>
-                      <Upload size={16} /> Upload
-                    </button>
-                    <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => onUpload(e.target.files)} />
-                  </div>
-                </section>
-
-                <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <Label>Product details <span style={{ color: '#5f6f63', fontWeight: 400 }}>· optional, sharpens the script</span></Label>
-                  <input value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="Product name" style={input} />
-                  <input value={benefit} onChange={(e) => setBenefit(e.target.value)} placeholder="Key benefit / hook (e.g. removes stains in one wipe)" style={input} />
-                </section>
-
-                <section>
-                  <Label>On-camera creator <span style={{ color: '#5f6f63', fontWeight: 400 }}>· match the ad, or recast</span></Label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {LOOKS.map((l) => (
-                      <button key={l} onClick={() => setLook(l)} style={chip(look === l)}>{l === 'match' ? 'Match original' : l}</button>
-                    ))}
-                  </div>
-                  {/* Pairing nudge: picked Pakistani → offer Urdu, one tap. Suggests, never forces. */}
-                  {PAIR[look] && language === 'en' && (
-                    <button onClick={() => setLanguage(PAIR[look].code)} style={{ ...chip(false), marginTop: 8, border: `1px dashed ${LIME}`, background: '#141f10', color: LIME }}>
-                      {PAIR[look].flag} Speak {PAIR[look].name}?
-                    </button>
-                  )}
-                </section>
-
-                <section>
-                  <Label>Script &amp; voiceover language</Label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {LANGS.map((l) => (
-                      <button key={l.code} onClick={() => setLanguage(l.code)} style={chip(language === l.code)}>{l.label}</button>
-                    ))}
-                  </div>
-                  {language !== 'en' && <p style={{ fontSize: 10.5, color: '#6f7f73', margin: '6px 0 0' }}>Written natively like a local creator would talk — not translated. You review it (with an English summary) before spending credits.</p>}
-                </section>
-
-                <section>
-                  <Label>Narration voice <span style={{ color: '#5f6f63', fontWeight: 400 }}>· you can preview it before approving</span></Label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {VOICES.map((v) => (
-                      <button key={v.id} onClick={() => setVoice(v.id)} style={chip(voice === v.id)}>{v.label}</button>
-                    ))}
-                  </div>
-                </section>
-
-                {err && <div style={errBox}>{err}</div>}
-                {phase === 'analyzing' && <div style={{ fontSize: 12, color: LIME, display: 'flex', alignItems: 'center', gap: 8 }}><Loader2 size={14} className="spin" /> Analysing the ad &amp; writing your script… (free — no credits yet)</div>}
-                <button onClick={analyse} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.7 : 1 }}>
-                  {phase === 'analyzing' ? <><Loader2 size={16} className="spin" /> Writing script…</> : <><Pencil size={16} /> Analyse &amp; write script · free</>}
-                </button>
-                <p style={{ fontSize: 11, color: '#6f7f73', margin: 0 }}>You’ll review &amp; edit the script before any credits are spent.</p>
-              </>
-            )}
-          </div>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(8,16,10,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: wide ? 'min(980px,96vw)' : 'min(940px,96vw)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff', border: '1px solid #dfe4de', borderRadius: 20, color: L_INK, boxShadow: '0 30px 90px -30px rgba(23,37,28,0.4)' }}>
+        {/* header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '15px 22px', borderBottom: '1px solid #e0eecb', background: HEADER_BG }}>
+          <Film size={17} color={GREEN} /> <span style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.01em' }}>Remake as a video ad</span>
+          <button onClick={onClose} aria-label="Close" style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: 9, border: '1px solid #dcebc4', background: 'rgba(255,255,255,0.8)', color: '#3c473e', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={17} /></button>
         </div>
 
-        {phase === 'done' && result && (
-          <div style={{ borderLeft: '1px solid #1c2a17', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1, background: '#080c09', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, minHeight: 320 }}>
-              <video src={result.url} controls autoPlay loop playsInline style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: 8 }} />
+        {phase === 'generating' ? (
+          <div style={{ background: '#f6f7f5' }}>
+            <CloneGeneration helper={genProgress?.label || 'Rendering your video · this can take a few minutes · keep browsing'} />
+            {genProgress && (
+              <div style={{ padding: '0 24px 22px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: L_INK }}>{genProgress.label}</span>
+                  <span style={{ fontSize: 12, color: L_MUTED, fontVariantNumeric: 'tabular-nums' }}>{genProgress.eta_sec > 0 ? `~${genProgress.eta_sec >= 60 ? `${Math.ceil(genProgress.eta_sec / 60)} min` : `${genProgress.eta_sec}s`} left` : ''}</span>
+                </div>
+                <div style={{ height: 8, borderRadius: 100, background: '#e3e9e2', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.min(98, Math.max(4, genProgress.pct))}%`, background: GREEN, borderRadius: 100, transition: 'width .6s ease' }} />
+                </div>
+              </div>
+            )}
+          </div>
+        ) : phase === 'done' && result ? (
+          // ── DONE: video + tweak/fix chips (light) ──
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, overflow: 'auto' }}>
+            <div style={{ background: '#0b100c', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, minHeight: 320 }}>
+              <video src={result.url} controls autoPlay loop playsInline style={{ maxWidth: '100%', maxHeight: '64vh', borderRadius: 8 }} />
             </div>
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {result.script && <div style={{ fontSize: 12, color: '#9fb0a4', background: '#0a0f0c', border: '1px solid #24331d', borderRadius: 9, padding: '10px 12px', maxHeight: 120, overflow: 'auto' }}><b style={{ color: '#cfe' }}>Script:</b> {result.script}</div>}
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, borderLeft: `1px solid ${L_LINE}` }}>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>🎉 Your video is ready</div>
+              {result.script && <div style={{ fontSize: 12, color: L_MUTED, background: '#fcfdfb', border: `1px solid ${L_LINE}`, borderRadius: 9, padding: '10px 12px', maxHeight: 120, overflow: 'auto' }}><b style={{ color: L_INK }}>Script:</b> {result.script}</div>}
               <a href={result.url} download style={{ ...btnPrimary, textDecoration: 'none', justifyContent: 'center' }}>Download</a>
-              <p style={{ fontSize: 11.5, color: '#8aa', margin: 0 }}>Saved in <b style={{ color: '#cfe' }}>My Creatives</b>.</p>
+              <p style={{ fontSize: 11.5, color: L_MUTED, margin: 0 }}>Saved in <b style={{ color: L_INK }}>My Creatives</b>.</p>
 
-              {/* ── TWEAK — fix one scene without a full re-render. Chips map to prompt surgery
-                  server-side; remove/trim are free (ffmpeg-only re-stitch from cached clips). ── */}
               {result.tweakable && (result.tweakScenes?.length || 0) > 0 && (
-                <div style={{ borderTop: '1px solid #1c2a17', paddingTop: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#9fb0a4', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Tweak</div>
-                  <p style={{ fontSize: 11.5, color: '#8aa', margin: '0 0 8px' }}>Something off in one scene? Fix just that scene — the rest stays untouched.</p>
+                <div style={{ borderTop: `1px solid ${L_LINE}`, paddingTop: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: L_MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Tweak a scene</div>
+                  <p style={{ fontSize: 11.5, color: L_MUTED, margin: '0 0 8px' }}>Something off in one scene? Fix just that scene — the rest stays untouched.</p>
                   {twBusy ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: LIME, fontSize: 12.5, padding: '8px 0' }}>
-                      <Loader2 size={14} className="spin" /> {genProgress?.label || 'Tweaking…'}
-                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: GREEN, fontSize: 12.5, padding: '8px 0' }}><Loader2 size={14} className="spin" /> {genProgress?.label || 'Tweaking…'}</div>
                   ) : (<>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                       {result.tweakScenes!.map((s, i) => (
-                        <button key={i} onClick={() => setTwSel(twSel === i ? null : i)}
-                          style={{ ...chip(twSel === i), padding: '6px 11px' }}>
-                          Scene {i + 1} · {s.duration}s{s.hasPeople ? ' · 👤' : ''}
-                        </button>
+                        <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={{ ...chip(twSel === i), padding: '6px 11px', fontSize: 12 }}>Scene {i + 1} · {s.duration}s{s.hasPeople ? ' · 👤' : ''}</button>
                       ))}
                     </div>
                     {twSel != null && (
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                        {[
-                          ['product', 'Product looks wrong'],
-                          ['action', 'Wrong action'],
-                          ['person', 'Person looks off'],
-                          ['closeup', 'Make it a close-up'],
-                          ['redo', 'Just redo it'],
-                        ].map(([k, label]) => (
-                          <button key={k} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: k })}
-                            style={{ ...chip(false), fontSize: 11.5 }}>
-                            {label} · 600 cr
-                          </button>
+                        {[['product', 'Product looks wrong'], ['action', 'Wrong action'], ['person', 'Person looks off'], ['closeup', 'Make it a close-up'], ['redo', 'Just redo it']].map(([k, label]) => (
+                          <button key={k} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: k })} style={{ ...chip(false), fontSize: 11.5 }}>{label} · 600 cr</button>
                         ))}
                         {result.tweakScenes!.length > 2 && (
-                          <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...chip(false), fontSize: 11.5, color: '#9fd39f' }}>
-                            Remove scene · free
-                          </button>
+                          <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...chip(false), fontSize: 11.5, color: GREEN, borderColor: SEL_BORDER }}>Remove scene · free</button>
                         )}
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <button onClick={() => runTweak({ type: 'trim' })} style={{ ...chip(false), fontSize: 11.5, color: '#9fd39f' }}>✂️ Trim dead air · free</button>
+                      <button onClick={() => runTweak({ type: 'trim' })} style={{ ...chip(false), fontSize: 11.5, color: GREEN, borderColor: SEL_BORDER }}>✂️ Trim dead air · free</button>
                       <button onClick={() => { setTwVoOpen((v) => !v); setTwVoText(result.finalScript || '') }} style={{ ...chip(twVoOpen), fontSize: 11.5 }}>🎙 Redo voiceover · 50 cr</button>
                     </div>
                     {twVoOpen && (
                       <div style={{ marginTop: 8 }}>
-                        <textarea value={twVoText} onChange={(e) => setTwVoText(e.target.value.slice(0, 2000))} rows={3}
-                          style={{ ...input, width: '100%', resize: 'vertical', fontSize: 12.5 }} placeholder="Edit the narration…" />
-                        <button onClick={() => twVoText.trim() && runTweak({ type: 'redo_vo', script: twVoText.trim() })}
-                          style={{ ...btnPrimary, marginTop: 6, padding: '8px 14px', fontSize: 12.5 }}>Apply new voiceover · 50 cr</button>
+                        <textarea value={twVoText} onChange={(e) => setTwVoText(e.target.value.slice(0, 2000))} rows={3} style={{ ...input, width: '100%', resize: 'vertical', fontSize: 12.5 }} placeholder="Edit the narration…" />
+                        <button onClick={() => twVoText.trim() && runTweak({ type: 'redo_vo', script: twVoText.trim() })} style={{ ...btnPrimary, marginTop: 6, padding: '8px 14px', fontSize: 12.5 }}>Apply new voiceover · 50 cr</button>
                       </div>
                     )}
                   </>)}
-                  {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? '#9fd39f' : '#ffb4b4', margin: '8px 0 0' }}>{twMsg}</p>}
+                  {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
                 </div>
               )}
 
-              {/* ── UGC fix chips — single-clip re-roll with a corrective prompt. fal moderation +
-                  generation are a fresh roll each time, so "product wrong/too big" usually fixes in
-                  one click (the real product image is re-sent and locks back in). ── */}
               {!result.tweakable && result.ugcTweakable && (
-                <div style={{ borderTop: '1px solid #1c2a17', paddingTop: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#9fb0a4', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Fix it</div>
-                  <p style={{ fontSize: 11.5, color: '#8aa', margin: '0 0 8px' }}>Not quite right? One click re-rolls the clip with a targeted fix — same script, same creator vibe.</p>
+                <div style={{ borderTop: `1px solid ${L_LINE}`, paddingTop: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: L_MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Fix it</div>
+                  <p style={{ fontSize: 11.5, color: L_MUTED, margin: '0 0 8px' }}>Not quite right? One click re-rolls the clip with a targeted fix — same script, same creator vibe.</p>
                   {twBusy ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: LIME, fontSize: 12.5, padding: '8px 0' }}>
-                      <Loader2 size={14} className="spin" /> {genProgress?.label || 'Re-rolling…'}
-                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: GREEN, fontSize: 12.5, padding: '8px 0' }}><Loader2 size={14} className="spin" /> {genProgress?.label || 'Re-rolling…'}</div>
                   ) : (
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {[
-                        ['size', 'Product too big/small'],
-                        ['product', 'Product looks wrong'],
-                        ['person', 'Person looks off'],
-                        ['action', 'Not using the product'],
-                        ['redo', 'Just re-roll it'],
-                      ].map(([k, label]) => (
-                        <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k })}
-                          style={{ ...chip(false), fontSize: 11.5 }}>
-                          {label} · 450 cr
-                        </button>
+                      {[['size', 'Product too big/small'], ['product', 'Product looks wrong'], ['person', 'Person looks off'], ['action', 'Not using the product'], ['redo', 'Just re-roll it']].map(([k, label]) => (
+                        <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k })} style={{ ...chip(false), fontSize: 11.5 }}>{label} · 450 cr</button>
                       ))}
                     </div>
                   )}
-                  {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? '#9fd39f' : '#ffb4b4', margin: '8px 0 0' }}>{twMsg}</p>}
+                  {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
                 </div>
               )}
             </div>
           </div>
+        ) : (
+          // ── SETUP + REVIEW wizard (light) ──
+          <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+            {/* step rail */}
+            <div className="sm-rail" style={{ width: 232, flexShrink: 0, background: L_SIDE, borderRight: `1px solid ${L_LINE}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', color: L_FAINT, margin: '0 6px 10px', textTransform: 'uppercase' }}>8 quick steps</div>
+              {STEPS.map((s, i) => {
+                const clickable = railClickable(i)
+                return (
+                  <button key={i} disabled={!clickable} onClick={() => clickable && setStep(i)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 11, cursor: clickable ? 'pointer' : 'default', opacity: clickable ? 1 : 0.5, border: '1px solid ' + (i === step ? L_LINE : 'transparent'), background: i === step ? '#fff' : 'transparent', textAlign: 'left', fontFamily: 'inherit', width: '100%', boxShadow: i === step ? '0 1px 3px rgba(23,37,28,.07)' : 'none' }}>
+                    <span style={{ width: 23, height: 23, borderRadius: 99, background: i < step ? '#d8efc7' : (i === step ? FOREST : '#e8ede7'), color: i < step ? SEL_TEXT : (i === step ? LIME : L_MUTED), fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i < step ? '✓' : i + 1}</span>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 650, color: i === step ? FOREST : '#3c473e' }}>{s.t}</span>
+                      <span style={{ display: 'block', fontSize: 10, color: L_FAINT }}>{s.s}</span>
+                    </span>
+                  </button>
+                )
+              })}
+              <div style={{ marginTop: 'auto', fontSize: 11, color: L_FAINT, lineHeight: 1.55, padding: '10px 8px 0', borderTop: `1px solid ${L_LINE}` }}>
+                <b style={{ color: '#3c473e' }}>You approve before you pay.</b><br />We write your script free first. Credits are only used when you say go — and refund if a render fails.
+              </div>
+            </div>
+
+            {/* pane */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px 12px' }}>
+
+                {/* STEP 1 — look */}
+                {step === 0 && (
+                  <section>
+                    <SourceCard sourceVideoUrl={sourceVideoUrl} sourcePoster={sourcePoster} hasSource={!!sourceAdId} />
+                    <Kicker>Step 1 of 8</Kicker>
+                    <H2>Choose your look</H2>
+                    <Lead>We turn this winning video into <b>your</b> video. Pick the style — no editing skills needed, and you can switch anytime before you pay.</Lead>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <ChoiceCard on={mode === 'ugc'} onClick={() => pickLook('ugc')} rec="MOST POPULAR" emoji="🤳" title="UGC creator"
+                        body="A real-looking person holds your product and talks to camera — the influencer style that performs best on Instagram & TikTok. Fastest and cheapest."
+                        price={`15s · ${UGC_COST[tier]} cr (~$6)`} />
+                      <ChoiceCard on={mode === 'faithful'} onClick={() => pickLook('faithful')} emoji="🎬" title="Cinematic"
+                        body="We recreate the ad scene-by-scene (b-roll, lifestyle, product shots) with your product, then stitch it into one video. Closest match — takes a little longer."
+                        price={`from ${FAITHFUL_COST[2][tier]} cr · scales with scenes`} />
+                    </div>
+                    <InfoBar>💡 Not sure? Leave it on <b>UGC</b>. After we analyse the ad we’ll suggest Cinematic automatically if it’s a b-roll style video — you can switch on the “Length & format” step.</InfoBar>
+                  </section>
+                )}
+
+                {/* STEP 2 — brand */}
+                {step === 1 && (
+                  <section>
+                    <Kicker>Step 2 of 8</Kicker>
+                    <H2>Whose ad is this going to be?</H2>
+                    <Lead>Pick your brand — we automatically use its <b>product photos</b> so the video features your real product.</Lead>
+                    {brands.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                        {brands.map((b) => <button key={b.id} onClick={() => pickBrand(b)} style={chip(brandId === b.id)}>{b.name}</button>)}
+                      </div>
+                    ) : <Lead>No saved brands yet — upload product photos on the next step.</Lead>}
+                    {brandId && selPhotos.length > 0 && (
+                      <div style={{ background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 14, padding: '13px 15px' }}>
+                        <div style={{ fontSize: 13, fontWeight: 650, color: SEL_TEXT }}>✓ Loaded <b>{brandName}</b>’s product photos</div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                          {selPhotos.slice(0, 4).map((p) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={p.id} src={cdn(p.src)} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', border: `1px solid ${L_LINE}`, background: '#fff' }} />
+                          ))}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: L_MUTED, marginTop: 8 }}>Pulled automatically — add, remove or swap on the next step.</div>
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {/* STEP 3 — photos */}
+                {step === 2 && (
+                  <section>
+                    <Kicker>Step 3 of 8</Kicker>
+                    <H2>Show us your product</H2>
+                    <Lead>These photos are swapped <b>into</b> the video. Clear photos on a plain background work best. Pick up to 4.</Lead>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                      {photos.map((p) => {
+                        const on = selected.includes(p.id)
+                        return (
+                          <button key={p.id} onClick={() => toggleSel(p.id)} style={{ position: 'relative', width: 88, height: 88, borderRadius: 13, overflow: 'hidden', border: on ? `2px solid ${SEL_BORDER}` : `2px solid ${L_LINE}`, background: '#f1f3f0', cursor: 'pointer', padding: 0 }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={cdn(p.src)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: on ? 1 : 0.5 }} />
+                            {on && <span style={{ position: 'absolute', bottom: 4, right: 4, background: LIME, color: FOREST, borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={12} strokeWidth={3} /></span>}
+                          </button>
+                        )
+                      })}
+                      <button onClick={() => fileRef.current?.click()} style={photoAdd}><Upload size={16} /> Upload</button>
+                      <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => onUpload(e.target.files)} />
+                    </div>
+                    <InfoBar>💡 The final video shows <b>your exact product</b> — we never invent a different bottle, label or price.</InfoBar>
+                  </section>
+                )}
+
+                {/* STEP 4 — about */}
+                {step === 3 && (
+                  <section>
+                    <Kicker>Step 4 of 8 · optional</Kicker>
+                    <H2>Tell us about the product</H2>
+                    <Lead>30 seconds here makes the script noticeably better. Skip it if you’re in a hurry — we’ll work it out from your photos.</Lead>
+                    <div className="field" style={{ marginBottom: 14 }}><FieldLabel>Product name</FieldLabel><input value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="e.g. AURA Hair Serum" style={{ ...input, width: '100%' }} /></div>
+                    <div className="field"><FieldLabel>The one thing it does best <i style={{ fontStyle: 'normal', fontWeight: 500, color: L_FAINT }}>· say it like you’d tell a friend</i></FieldLabel><input value={benefit} onChange={(e) => setBenefit(e.target.value)} placeholder="e.g. removes stains in one wipe" style={{ ...input, width: '100%' }} /></div>
+                  </section>
+                )}
+
+                {/* STEP 5 — words & voice (still pre-analysis) */}
+                {step === 4 && (
+                  <section>
+                    <Kicker>Step 5 of 8</Kicker>
+                    <H2>The words &amp; the voice</H2>
+                    <Lead><b>Good news: this part is free.</b> When you press <b>Write my free script</b>, we watch the winning ad and write a script for your product. You’ll read it and change any word before anything is charged.</Lead>
+                    <div className="field" style={{ marginBottom: 16 }}>
+                      <FieldLabel>Who’s on camera <i style={{ fontStyle: 'normal', fontWeight: 500, color: L_FAINT }}>· match the ad, or recast</i></FieldLabel>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {LOOKS.map((l) => <button key={l} onClick={() => setLook(l)} style={chip(look === l)}>{l === 'match' ? 'Match original' : l}</button>)}
+                      </div>
+                      {PAIR[look] && language === 'en' && (
+                        <button onClick={() => setLanguage(PAIR[look].code)} style={{ ...chipDashed(false), marginTop: 8 }}>{PAIR[look].flag} Speak {PAIR[look].name}?</button>
+                      )}
+                    </div>
+                    <div className="field" style={{ marginBottom: 16 }}>
+                      <FieldLabel>Script &amp; voiceover language</FieldLabel>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {LANGS.map((l) => <button key={l.code} onClick={() => setLanguage(l.code)} style={chip(language === l.code)}>{l.label}</button>)}
+                      </div>
+                      {language !== 'en' && <div style={{ fontSize: 11.5, color: L_FAINT, marginTop: 6 }}>Written natively like a local creator would talk — not translated. You review it (with an English summary) before spending credits.</div>}
+                    </div>
+                    <div className="field">
+                      <FieldLabel>Narration voice <i style={{ fontStyle: 'normal', fontWeight: 500, color: L_FAINT }}>· you can preview it before approving</i></FieldLabel>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {VOICES.map((v) => <button key={v.id} onClick={() => setVoice(v.id)} style={chip(voice === v.id)}>{v.label}</button>)}
+                      </div>
+                    </div>
+                    {phase === 'analyzing' && <div style={{ fontSize: 12.5, color: GREEN, display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}><Loader2 size={14} className="spin" /> Analysing the ad &amp; writing your script… (free — no credits yet)</div>}
+                  </section>
+                )}
+
+                {/* STEP 6 — length & format (review phase) */}
+                {step === 5 && (
+                  <section>
+                    <Kicker>Step 6 of 8</Kicker>
+                    <H2>Length &amp; format</H2>
+                    <Lead>How long, and whether to burn text onto the video. {suggestedMode === 'faithful' ? 'This ad is cinematic — we suggest the Cinematic style.' : ''}</Lead>
+                    <div className="field" style={{ marginBottom: 16 }}>
+                      <FieldLabel>Style</FieldLabel>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button onClick={() => pickLook('ugc')} style={chip(mode === 'ugc')}>UGC creator · 1 clip · {UGC_COST[tier]} cr{suggestedMode === 'ugc' ? ' ★' : ''}</button>
+                        <button onClick={() => pickLook('faithful')} style={chip(mode === 'faithful')}>Cinematic · {sceneCount} scenes · {(FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]} cr{suggestedMode === 'faithful' ? ' ★' : ''}</button>
+                      </div>
+                    </div>
+                    {mode === 'ugc' && (
+                      <div className="field" style={{ marginBottom: 16 }}>
+                        <FieldLabel>Video length</FieldLabel>
+                        {(() => {
+                          const cap = srcSecs ? (srcSecs <= 22 ? 15 : srcSecs <= 45 ? 30 : 60) : 60
+                          const lenBtn = (v: '15' | '30' | '60', secs: number, label: string) => {
+                            const disabled = secs > cap
+                            return <button key={v} onClick={() => !disabled && setDurationBucket(v)} disabled={disabled} style={{ ...chip(durationBucket === v), opacity: disabled ? 0.35 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }} title={disabled ? `Longer than the ${srcSecs}s source — a remake matches the original length` : ''}>{label}</button>
+                          }
+                          const matchCost = cap === 15 ? UGC_COST[tier] : (FAITHFUL_COST[cap === 60 ? 4 : 2] || FAITHFUL_COST[2])[tier]
+                          return (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              {lenBtn('15', 15, `15s · ${UGC_COST[tier]} cr`)}
+                              {lenBtn('30', 30, `30s · ${FAITHFUL_COST[2][tier]} cr`)}
+                              {lenBtn('60', 60, `60s · ${FAITHFUL_COST[4][tier]} cr`)}
+                              {srcSecs ? <button onClick={() => setDurationBucket('match')} style={chip(durationBucket === 'match')}>Match the original ({srcSecs}s) · {matchCost} cr</button> : null}
+                            </div>
+                          )
+                        })()}
+                        {srcSecs ? <div style={{ fontSize: 11.5, color: L_FAINT, marginTop: 6 }}>Source is {srcSecs}s — a remake matches the original length (longer options are disabled).{nSegs > 1 ? ` ${nSegs} chained clips stitched into one take.` : ''}</div>
+                          : nSegs > 1 ? <div style={{ fontSize: 11.5, color: L_FAINT, marginTop: 6 }}>{nSegs} chained clips of the same creator, stitched into one take.</div> : null}
+                      </div>
+                    )}
+                    <div onClick={() => setOverlaysOn(!overlaysOn)} style={{ display: 'flex', alignItems: 'center', gap: 10, border: `1.5px solid ${overlaysOn ? SEL_BORDER : L_LINE}`, background: overlaysOn ? SEL_BG : '#fff', borderRadius: 14, padding: '13px 15px', cursor: 'pointer' }}>
+                      <span style={{ flex: 1 }}>
+                        <b style={{ fontSize: 13.5 }}>Add on-screen text</b>
+                        <p style={{ fontSize: 11.5, color: L_MUTED, margin: '2px 0 0', lineHeight: 1.5 }}>Off = clean video. On = callouts like “25g PROTEIN”, copied from the winning ad and rewritten for your product. Edit every line.</p>
+                      </span>
+                      <Switch on={overlaysOn} />
+                    </div>
+                    {overlaysOn && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {overlays.map((o, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 10.5, color: L_FAINT, width: 46, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{o.t || '—'}</span>
+                              <input value={o.text} onChange={(e) => setOverlays((prev) => prev.map((x, j) => j === i ? { ...x, text: e.target.value.slice(0, 60) } : x))} placeholder="Callout text (e.g. 30g PROTEIN)" style={{ ...input, flex: 1, padding: '8px 11px' }} />
+                              <button onClick={() => setOverlays((prev) => prev.filter((_, j) => j !== i))} title="Remove" style={{ background: 'none', border: 'none', color: L_MUTED, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 4px' }}>×</button>
+                            </div>
+                          ))}
+                        </div>
+                        <button onClick={() => setOverlays((prev) => [...prev, { t: '', text: '' }].slice(0, 8))} style={{ marginTop: 8, background: 'none', border: `1px dashed ${SEL_BORDER}`, color: GREEN, borderRadius: 10, padding: '7px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>+ Add text</button>
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {/* STEP 7 — extras */}
+                {step === 6 && (
+                  <section>
+                    <Kicker>Step 7 of 8 · all optional</Kicker>
+                    <H2>Extras that squeeze more out of one video</H2>
+                    <Lead>Each is a separate small charge, and each refunds itself automatically if it fails. Your main video is never at risk.</Lead>
+                    <div onClick={() => setEcOn(!ecOn)} style={toggleRow(ecOn)}>
+                      <span style={{ flex: 1 }}><b style={{ fontSize: 13.5 }}>🏷 Branded end-card</b><p style={{ fontSize: 11.5, color: L_MUTED, margin: '2px 0 0', lineHeight: 1.5 }}>A closing frame with your logo, an offer and a button — the bit that makes people click.</p></span>
+                      <span style={priceTag}>+50 cr</span><Switch on={ecOn} />
+                    </div>
+                    {ecOn && (
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <input value={ecOffer} onChange={(e) => setEcOffer(e.target.value)} placeholder="Offer (e.g. Buy 2 Get 1 Free)" style={{ ...input, flex: 2 }} />
+                        <input value={ecCta} onChange={(e) => setEcCta(e.target.value)} placeholder="CTA" style={{ ...input, flex: 1 }} />
+                      </div>
+                    )}
+                    {mode === 'faithful' && (
+                      <div onClick={() => setHooksOn(!hooksOn)} style={{ ...toggleRow(hooksOn), marginTop: 10 }}>
+                        <span style={{ flex: 1 }}><b style={{ fontSize: 13.5 }}>⚡ 3 different openings</b><p style={{ fontSize: 11.5, color: L_MUTED, margin: '2px 0 0', lineHeight: 1.5 }}>Same video, three different first-3-seconds — run all three and let Meta find the winner.</p></span>
+                        <span style={priceTag}>+800 cr</span><Switch on={hooksOn} />
+                      </div>
+                    )}
+                    {mode === 'faithful' && (
+                      <div style={{ marginTop: 14 }}>
+                        <FieldLabel>🌍 Also generate in <i style={{ fontStyle: 'normal', fontWeight: 500, color: L_FAINT }}>· +200 cr each · same video, native voiceover</i></FieldLabel>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {LANGS.filter((l) => l.code !== language).slice(0, 6).map((l) => {
+                            const on = extraLangs.includes(l.code)
+                            return <button key={l.code} onClick={() => setExtraLangs((prev) => on ? prev.filter((x) => x !== l.code) : prev.length >= 2 ? prev : [...prev, l.code])} style={chip(on)}>{l.label}</button>
+                          })}
+                        </div>
+                        {extraLangs.length > 0 && <div style={{ fontSize: 11, color: L_FAINT, marginTop: 6 }}>Each arrives as its own ad in My Creatives.</div>}
+                      </div>
+                    )}
+                    {mode === 'ugc' && <InfoBar>💡 More openings &amp; extra languages are available on <b>Cinematic</b> remakes — switch style on the previous step.</InfoBar>}
+                  </section>
+                )}
+
+                {/* STEP 8 — script & create */}
+                {step === 7 && (
+                  <section>
+                    <Kicker>Step 8 of 8</Kicker>
+                    <H2>Your script — read it, tweak it, create</H2>
+                    <Lead>This is exactly what the video will say. Edit any word. Nothing is charged until you press create.</Lead>
+                    <div className="field" style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                        <FieldLabel>{mode === 'faithful' ? 'Voiceover (one continuous narration)' : 'Voiceover script'}{language !== 'en' ? ` · ${langCfg.label}` : ''}</FieldLabel>
+                        <button onClick={previewVoice} disabled={previewing || !draftScript.trim()} style={{ ...chip(false), padding: '5px 12px', opacity: previewing ? 0.6 : 1 }}>{previewing ? '🔊 Playing…' : '🔊 Hear the voice'}</button>
+                      </div>
+                      <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={7} dir={langCfg.rtl ? 'rtl' : 'ltr'} style={{ ...input, width: '100%', resize: 'vertical', lineHeight: langCfg.rtl ? 1.9 : 1.5, fontSize: langCfg.rtl ? 15 : 13.5 }} />
+                      {gloss && language !== 'en' && <div style={{ fontSize: 11.5, color: L_MUTED, marginTop: 6, fontStyle: 'italic' }}>In English: “{gloss}”</div>}
+                      {words > 0 && (
+                        mode === 'faithful' ? (
+                          <div style={{ fontSize: 11.5, marginTop: 6, color: L_MUTED }}>{words} words ≈ {spokenSecs}s of narration · ~{targetSecs}s of scenes{spokenSecs > targetSecs + 4 ? ' — the closing shot holds while the voiceover finishes. Trim for a tighter cut, or leave it.' : ' — fits nicely.'}</div>
+                        ) : (
+                          <div style={{ fontSize: 11.5, marginTop: 6, color: spokenSecs > targetSecs + 4 ? '#c2410c' : spokenSecs > targetSecs ? '#a16207' : L_MUTED }}>{words} words ≈ {spokenSecs}s spoken · target ~{targetSecs}s{spokenSecs > targetSecs + 4 ? ' — too long, the delivery will feel rushed. Trim it, or pick a longer length.' : spokenSecs > targetSecs ? ' — a touch long; consider trimming.' : ' — fits comfortably.'}</div>
+                        )
+                      )}
+                    </div>
+                    <div style={{ border: `1px solid ${L_LINE}`, borderRadius: 16, overflow: 'hidden', marginBottom: 14 }}>
+                      <ReviewRow k="Style" v={mode === 'faithful' ? `Cinematic · ${sceneCount} scenes` : 'UGC creator'} onEdit={() => setStep(5)} />
+                      <ReviewRow k="Length" v={mode === 'faithful' ? `~${targetSecs}s` : `${resolvedBucket}s`} onEdit={() => setStep(5)} />
+                      <ReviewRow k="Brand" v={brandName} onEdit={() => setStep(1)} />
+                      <ReviewRow k="Language & voice" v={`${langCfg.label} · ${(VOICES.find(v => v.id === voice) || VOICES[0]).label.split(' · ')[0]}`} onEdit={() => setStep(4)} />
+                      <ReviewRow k="On camera" v={look === 'match' ? 'Match the original' : look} onEdit={() => setStep(4)} />
+                      <ReviewRow k="On-screen text" v={overlaysOn ? 'On' : 'Off — clean video'} onEdit={() => setStep(5)} last />
+                    </div>
+                    {notice && <div style={noticeBox}>{notice} <a href="/creative-studio" style={{ color: GREEN, fontWeight: 700 }}>Open My Creatives →</a></div>}
+                  </section>
+                )}
+
+                {err && <div style={{ ...errBox, marginTop: 16 }}>{err}</div>}
+              </div>
+
+              {/* footer nav */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 22px', borderTop: `1px solid ${L_LINE}`, background: '#fcfdfb' }}>
+                {(step > 0) ? <button onClick={goBack} disabled={busy} style={{ ...btnGhost, opacity: busy ? 0.6 : 1 }}><ChevronLeft size={15} /> Back</button> : <span />}
+                <span style={{ fontSize: 12, color: L_MUTED }}>{phase === 'review' ? <>Total <b style={{ color: L_INK }}>{cost} cr</b> · charged when you create</> : 'Free to preview — charged only after you approve the script'}</span>
+                <button onClick={goNext} disabled={busy} style={{ ...btnPrimary, marginLeft: 'auto', opacity: busy ? 0.7 : 1 }}>
+                  {phase === 'form'
+                    ? (step < 4 ? <>Next <ChevronRight size={15} /></> : <><Pencil size={15} /> Write my free script</>)
+                    : (step < 7 ? <>Next <ChevronRight size={15} /></> : <><Sparkles size={15} /> Create video · {cost} cr</>)}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
+      <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:760px){.sm-rail{display:none!important}}`}</style>
     </div>,
     document.body
   )
 }
 
-function Label({ children }: { children: React.ReactNode }) { return <div style={{ fontSize: 12, fontWeight: 700, color: '#9fb0a4', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.04em' }}>{children}</div> }
-const input: React.CSSProperties = { background: '#0a0f0c', border: '1px solid #24331d', borderRadius: 9, padding: '9px 11px', color: '#e8f0e8', fontSize: 13, fontFamily: 'inherit', outline: 'none' }
-const errBox: React.CSSProperties = { background: '#2a1416', border: '1px solid #5a2a2e', color: '#ffb4b4', borderRadius: 10, padding: '10px 12px', fontSize: 12.5 }
-const noticeBox: React.CSSProperties = { background: '#141f10', border: '1px solid #2c4030', color: '#cfe3b8', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, lineHeight: 1.5 }
-const btnPrimary: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: LIME, color: '#14281a', border: 'none', borderRadius: 10, padding: '11px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
-const chip = (on: boolean): React.CSSProperties => ({ background: on ? LIME : '#16241a', color: on ? '#14281a' : '#cfe', border: `1px solid ${on ? LIME : '#2c4030'}`, borderRadius: 20, padding: '6px 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' })
-const tierBtn = (on: boolean): React.CSSProperties => ({ flex: 1, background: on ? '#1c3322' : '#0a0f0c', color: on ? LIME : '#9fb0a4', border: `1px solid ${on ? LIME : '#24331d'}`, borderRadius: 9, padding: '9px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' })
+// ── The winning ad being remade (top of step 1) ──
+function SourceCard({ sourceVideoUrl, sourcePoster, hasSource }: { sourceVideoUrl?: string | null; sourcePoster?: string | null; hasSource: boolean }) {
+  return (
+    <div style={{ display: 'flex', gap: 14, alignItems: 'center', background: '#fcfdfb', border: `1px solid ${L_LINE}`, borderRadius: 14, padding: '12px 14px', marginBottom: 18 }}>
+      <div style={{ width: 60, height: 74, borderRadius: 10, flexShrink: 0, overflow: 'hidden', position: 'relative', background: 'linear-gradient(160deg,#dfe5dd,#c4cec2)' }}>
+        {sourcePoster
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={cdn(sourcePoster)} alt="source ad" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 22 }}>🎬</span>}
+        <span style={{ position: 'absolute', bottom: 4, left: 4, right: 4, background: 'rgba(23,37,28,0.85)', color: LIME, fontSize: 7.5, fontWeight: 800, textAlign: 'center', borderRadius: 5, padding: '2px 0', letterSpacing: '.04em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}><Trophy size={8} /> WINNING</span>
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 700 }}>{hasSource ? 'The winning ad you’re remaking' : 'Your video'}</div>
+        <div style={{ fontSize: 11.5, color: L_MUTED, marginTop: 2, lineHeight: 1.5 }}>We keep its <b style={{ color: L_INK }}>pacing, hook &amp; vibe</b> and swap in <b style={{ color: L_INK }}>your product</b> — you approve the script before any credits are spent.</div>
+      </div>
+    </div>
+  )
+}
+
+function ChoiceCard({ on, onClick, rec, emoji, title, body, price }: { on: boolean; onClick: () => void; rec?: string; emoji: string; title: string; body: string; price: string }) {
+  return (
+    <div onClick={onClick} style={{ position: 'relative', border: `1.5px solid ${on ? SEL_BORDER : L_LINE}`, borderRadius: 16, padding: 16, cursor: 'pointer', background: on ? SEL_BG : '#fff', boxShadow: on ? '0 4px 16px -6px rgba(95,144,50,.25)' : 'none' }}>
+      {rec && <span style={{ position: 'absolute', top: -9, left: 14, background: FOREST, color: LIME, fontSize: 9.5, fontWeight: 800, letterSpacing: '.05em', padding: '3px 9px', borderRadius: 99 }}>{rec}</span>}
+      <span style={{ fontSize: 22, display: 'block', marginBottom: 8 }}>{emoji}</span>
+      <b style={{ fontSize: 15, display: 'block', marginBottom: 3 }}>{title}</b>
+      <p style={{ fontSize: 12, color: L_MUTED, lineHeight: 1.55, margin: 0 }}>{body}</p>
+      <span style={{ display: 'inline-block', marginTop: 9, fontSize: 11.5, fontWeight: 700, background: on ? FOREST : '#fff', color: on ? LIME : SEL_TEXT, border: `1px solid ${on ? FOREST : L_LINE}`, borderRadius: 99, padding: '3px 10px' }}>{price}</span>
+    </div>
+  )
+}
+
+function Switch({ on }: { on: boolean }) {
+  return (
+    <span style={{ width: 38, height: 22, borderRadius: 99, background: on ? '#5f9032' : '#dfe5dd', position: 'relative', flexShrink: 0, transition: 'background .15s' }}>
+      <span style={{ position: 'absolute', top: 2.5, left: on ? 18 : 3, width: 17, height: 17, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.2)', transition: 'left .15s' }} />
+    </span>
+  )
+}
+
+// ── light-theme tokens + primitives ──
+const L_INK = '#161c17', L_MUTED = '#68756b', L_FAINT = '#94a096', L_LINE = '#e7ece7', L_SIDE = '#f6f8f5'
+const FOREST = '#17251c', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f', SEL_TEXT = '#2c4a1f', GREEN = '#3f8f4f'
+const HEADER_BG = 'radial-gradient(90% 200% at 100% 0%, #fdf3cf 0%, transparent 50%),radial-gradient(80% 160% at 0% 30%, #e3f9d6 0%, transparent 55%),linear-gradient(120deg,#f6fceb,#f0fae2 45%,#edf8ee)'
+
+function Kicker({ children }: { children: React.ReactNode }) { return <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: GREEN, textTransform: 'uppercase', marginBottom: 6 }}>{children}</div> }
+function H2({ children }: { children: React.ReactNode }) { return <h2 style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-.015em', margin: '0 0 6px' }}>{children}</h2> }
+function Lead({ children }: { children: React.ReactNode }) { return <p style={{ fontSize: 13.5, color: L_MUTED, lineHeight: 1.6, maxWidth: 560, margin: '0 0 20px' }}>{children}</p> }
+function FieldLabel({ children }: { children: React.ReactNode }) { return <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3c473e', marginBottom: 6 }}>{children}</div> }
+function InfoBar({ children }: { children: React.ReactNode }) { return <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 12, padding: '11px 13px', fontSize: 12.5, color: SEL_TEXT, lineHeight: 1.55, marginTop: 18 }}>{children}</div> }
+function ReviewRow({ k, v, onEdit, last }: { k: string; v: string; onEdit?: () => void; last?: boolean }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, padding: '11px 16px', fontSize: 13, borderBottom: last ? 'none' : '1px solid #f1f4f0' }}>
+      <span style={{ color: L_MUTED }}>{k}</span>
+      <span style={{ fontWeight: 650, textAlign: 'right' }}>{v}{onEdit && <button onClick={onEdit} style={{ fontSize: 11, color: GREEN, fontWeight: 700, marginLeft: 8, cursor: 'pointer', background: 'none', border: 'none', fontFamily: 'inherit' }}>change</button>}</span>
+    </div>
+  )
+}
+const input: React.CSSProperties = { background: '#fff', border: `1.5px solid ${L_LINE}`, borderRadius: 12, padding: '11px 14px', color: L_INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }
+const btnGhost: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: `1.5px solid ${L_LINE}`, color: '#3c473e', borderRadius: 12, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
+const btnPrimary: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, background: FOREST, color: LIME, border: 'none', borderRadius: 12, padding: '11px 20px', fontSize: 14, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
+const photoAdd: React.CSSProperties = { width: 88, height: 88, borderRadius: 13, border: '1.5px dashed #c4d0c2', background: '#fcfdfb', color: GREEN, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
+const errBox: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#b42318', borderRadius: 10, padding: '10px 12px', fontSize: 12.5 }
+const noticeBox: React.CSSProperties = { background: SEL_BG, border: '1px solid #d8ebb9', color: SEL_TEXT, borderRadius: 10, padding: '10px 12px', fontSize: 12.5, lineHeight: 1.5 }
+const priceTag: React.CSSProperties = { fontSize: 11.5, fontWeight: 700, color: SEL_TEXT, background: '#fff', border: `1px solid ${L_LINE}`, borderRadius: 99, padding: '3px 10px', whiteSpace: 'nowrap' }
+const toggleRow = (on: boolean): React.CSSProperties => ({ display: 'flex', alignItems: 'center', gap: 10, border: `1.5px solid ${on ? SEL_BORDER : L_LINE}`, background: on ? SEL_BG : '#fff', borderRadius: 14, padding: '13px 15px', cursor: 'pointer' })
+const chip = (on: boolean): React.CSSProperties => ({ background: on ? FOREST : '#fff', color: on ? LIME : '#333d35', border: `1.5px solid ${on ? FOREST : L_LINE}`, borderRadius: 99, padding: '9px 15px', fontSize: 13, fontWeight: 650, cursor: 'pointer', fontFamily: 'inherit' })
+const chipDashed = (on: boolean): React.CSSProperties => ({ ...chip(on), borderStyle: 'dashed', color: GREEN, borderColor: SEL_BORDER })
