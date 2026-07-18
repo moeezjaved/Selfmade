@@ -98,7 +98,13 @@ export function newAdBundleEmail({ items }) {
   const nBrands = items.length
   const totalAds = items.reduce((s, i) => s + (i.count || 0), 0)
   const rows = items.slice().sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 25)
-    .map((i) => `<div style="padding:9px 0;border-bottom:1px solid #f0f4ee;font-size:14px"><b style="color:#1a2e1a">${i.brandName || 'A brand you follow'}</b> <span style="color:#5a7a5a">— ${i.count} new ${i.count === 1 ? 'concept' : 'concepts'}</span></div>`).join('')
+    .map((i) => {
+      // Tables (not flex) for image+text alignment — the only layout email clients render reliably.
+      const thumbCell = i.thumb
+        ? `<td width="64" style="padding:8px 12px 8px 0;vertical-align:middle"><img src="${i.thumb}" width="52" height="52" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid #e6ede2;display:block"></td>`
+        : ''
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid #f0f4ee"><tr>${thumbCell}<td style="padding:9px 0;font-size:14px;vertical-align:middle"><b style="color:#1a2e1a">${i.brandName || 'A brand you follow'}</b> <span style="color:#5a7a5a">— ${i.count} new ${i.count === 1 ? 'concept' : 'concepts'}</span></td></tr></table>`
+    }).join('')
   return {
     subject: `${nBrands} ${nBrands === 1 ? 'brand' : 'brands'} you follow launched ${totalAds} new ${totalAds === 1 ? 'ad' : 'ads'}`,
     html: emailShell({

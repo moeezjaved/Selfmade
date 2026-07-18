@@ -60,7 +60,7 @@ async function tick() {
     // Per-brand email opt-in: only bundle brands the user turned email alerts ON for.
     if (emailEnabled && f.email_alerts) {
       if (!emailBundle.has(f.user_id)) emailBundle.set(f.user_id, [])
-      emailBundle.get(f.user_id).push({ brandName: f.brand_name, count: concepts.size, pageId: f.page_id })
+      emailBundle.get(f.user_id).push({ brandName: f.brand_name, count: concepts.size, pageId: f.page_id, sampleAdId: ads[0].ad_id })
     }
     // Advance the watermark to the newest ad we just notified about → no duplicate alerts next run.
     await write('PATCH', `followed_brands?id=eq.${enc(f.id)}`, { last_notified_at: ads[0].created_at })
@@ -73,12 +73,25 @@ async function tick() {
   const confirmedRows = await getJSON('user_profiles?select=id&email_confirmed_at=not.is.null').catch(() => [])
   const confirmed = new Set((confirmedRows || []).map(r => r.id))
 
+  // One thumbnail per brand's sample ad (poster frame for video, R2 image for image ads). R2 URLs
+  // are public (cdn.tryselfmade.ai), so they load directly in the email — no proxy needed.
+  const thumbMap = {}
+  const sampleIds = [...new Set([...emailBundle.values()].flat().map((i) => i.sampleAdId).filter(Boolean))]
+  if (sampleIds.length) {
+    const cres = await getJSON(`discovery_creatives?select=ad_id,asset_type,r2_url,poster_url,position&ad_id=in.(${sampleIds.map(enc).join(',')})&order=position.asc`).catch(() => [])
+    for (const c of (cres || [])) {
+      if (thumbMap[c.ad_id]) continue
+      const t = c.poster_url || (c.asset_type !== 'video' ? c.r2_url : null)
+      if (t) thumbMap[c.ad_id] = t
+    }
+  }
+
   let mailed = 0, noCredits = 0, unconfirmed = 0
   for (const [userId, items] of emailBundle) {
     if (!confirmed.has(userId)) { unconfirmed++; continue }
     const to = await getUserEmail(userId)
     if (!to) continue
-    const { subject, html } = newAdBundleEmail({ items })
+    const { subject, html } = newAdBundleEmail({ items: items.map((i) => ({ ...i, thumb: thumbMap[i.sampleAdId] || null })) })
     const r = await sendPaidEmail({ to, userId, action: 'email_alert', subject, html })
     if (r.sent) mailed++
     else if (r.reason === 'insufficient_credits') noCredits++
