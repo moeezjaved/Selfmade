@@ -375,7 +375,7 @@ function AiPanel({ ad }: { ad: Ad }) {
             <Sparkles size={16} /> Remake ad · {imagesFree ? 'Free' : `from ${cost('image_clone_pro', 15)} cr`}
           </button>
           <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Composite your product onto this winning ad — 2K or 4K.</div>
-          {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName }} onClose={() => setCloneOpen(false)} />}
+          {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName, sourceThumb: ad.creatives?.find(c => c.asset_type === 'image')?.r2_url || ad.thumbnailUrl || undefined }} onClose={() => setCloneOpen(false)} />}
         </>
       )}
       {err && <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626' }}>{err}</div>}

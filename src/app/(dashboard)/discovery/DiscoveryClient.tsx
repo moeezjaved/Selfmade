@@ -907,7 +907,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   const posterSrc = (slide?.type === 'video' && slide.poster) ? cdnSrc(slide.poster) : undefined
   return (
     <>
-    {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName }} onClose={() => setCloneOpen(false)} />}
+    {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName, sourceThumb: slide?.poster || slide?.url }} onClose={() => setCloneOpen(false)} />}
     {videoCloneOpen && <CloneVideoModal sourceAdId={ad.id} sourcePoster={slide?.poster || undefined} onClose={() => setVideoCloneOpen(false)} />}
     <div
       className="ad-card-visual"
