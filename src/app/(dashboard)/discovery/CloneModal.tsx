@@ -188,11 +188,15 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   const pickBrand = (b: Brand) => {
     setMode('pick')
     setBrandId(b.id)
-    setBrandCategory(((b as any).brand_kit?.category as 'physical' | 'app' | 'service') || (b.brand_type === 'service' ? 'service' : 'physical'))
+    const cat = ((b as any).brand_kit?.category as 'physical' | 'app' | 'service') || (b.brand_type === 'service' ? 'service' : 'physical')
+    const isSvc = cat !== 'physical'
+    setBrandCategory(cat)
     setBName(b.name); setBSite(b.website || '')
     const imgs = (b.products || []).flatMap((p) => p.image_urls || [])
-    const ph = imgs.slice(0, 8).map((u) => ({ id: uid(), src: u, label: 'saved' }))
-    setPhotos(ph); setSelected(ph.slice(0, 4).map((p) => p.id))
+    // Service brands store screenshots (not products) — label them 'screenshot' so they survive the
+    // service photo-strip, and leave them unselected so the user opts into what fits.
+    const ph = imgs.slice(0, 8).map((u) => ({ id: uid(), src: u, label: isSvc ? 'screenshot' : 'saved' }))
+    setPhotos(ph); setSelected(isSvc ? [] : ph.slice(0, 4).map((p) => p.id))
   }
 
   const onUpload = async (files: FileList | null) => {
