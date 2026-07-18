@@ -155,7 +155,9 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
   useEffect(() => {
     if (!isService) return
     setPhotos((p) => {
-      const keep = p.filter((x) => x.label === 'upload' || x.id.startsWith('asset:'))
+      // Keep what the user chose (upload / Assets) AND site screenshots we pulled for the service —
+      // strip only product photos (a saved brand's 'saved' shots or a Shopify 'detected' product).
+      const keep = p.filter((x) => x.label === 'upload' || x.label === 'screenshot' || x.id.startsWith('asset:'))
       if (keep.length === p.length) return p
       const keepIds = new Set(keep.map((k) => k.id))
       setSelected((s) => s.filter((id) => keepIds.has(id)))
@@ -163,13 +165,13 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
     })
   }, [isService])
 
-  const addPhotos = (list: Photo[]) => {
+  const addPhotos = (list: Photo[], autoSelect = true) => {
     setPhotos((p) => {
       const seen = new Set(p.map((x) => x.src))
       const fresh = list.filter((x) => !seen.has(x.src))
       const merged = [...p, ...fresh]
-      // auto-select newly added, capped at 4 total
-      setSelected((s) => Array.from(new Set([...s, ...fresh.map((f) => f.id)])).slice(0, 4))
+      // auto-select newly added, capped at 4 total (skip for service site-imagery — let the user choose)
+      if (autoSelect) setSelected((s) => Array.from(new Set([...s, ...fresh.map((f) => f.id)])).slice(0, 4))
       return merged
     })
   }
@@ -214,9 +216,19 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
       if (j.fonts) setFonts(j.fonts)
       if (j.logo) setLogo(j.logo)
       if (j.palette) setPalette(j.palette)
-      const prodSrc = Array.from(new Set([...(j.productImages || []), ...(j.images || [])]))
-      addPhotos(prodSrc.map((u: string) => ({ id: uid(), src: u, label: 'detected' })))
-      if (!j.images?.length) setErr('No product photos found on that page — upload manually.')
+      if (isService) {
+        // Service / app: don't pull Shopify PRODUCT shots (that's the invented-product trap). Pull the
+        // site's own imagery — hero shots, app/product-UI screenshots, the og:image — as OPTIONAL
+        // material the ad can use. Left unselected so the user opts in to what actually fits.
+        const prod = new Set<string>(j.productImages || [])
+        const siteImgs = (j.images || []).filter((u: string) => !prod.has(u)).slice(0, 8)
+        addPhotos(siteImgs.map((u: string) => ({ id: uid(), src: u, label: 'screenshot' })), false)
+        setErr(siteImgs.length ? null : 'Couldn’t find screenshots on that page — add your app/site screenshots below.')
+      } else {
+        const prodSrc = Array.from(new Set([...(j.productImages || []), ...(j.images || [])]))
+        addPhotos(prodSrc.map((u: string) => ({ id: uid(), src: u, label: 'detected' })))
+        if (!j.images?.length) setErr('No product photos found on that page — upload manually.')
+      }
     } catch (e: any) { setErr(String(e?.message || e)) }
     finally { setDetecting(false) }
   }
