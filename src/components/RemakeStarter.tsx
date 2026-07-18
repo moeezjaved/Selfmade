@@ -58,18 +58,20 @@ export default function RemakeStarter() {
         onClick={() => { setErr(null); setOpen(true) }}
         style={{
           display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
-          margin: '0 0 4px', padding: '13px 14px', borderRadius: 14, border: 'none', cursor: 'pointer',
-          background: '#dffe95', color: '#0e1b12',
-          boxShadow: '0 6px 18px rgba(190,240,90,.28)',
+          margin: '0 0 4px', padding: '13px 14px', borderRadius: 14, cursor: 'pointer',
+          // Motion-style pastel gradient — the one loud card on the light sidebar.
+          background: 'radial-gradient(120% 140% at 85% 0%, #fdf6c9 0%, transparent 55%), radial-gradient(130% 120% at 0% 100%, #d9f7d0 0%, transparent 60%), linear-gradient(135deg, #eefbd2 0%, #dffe95 55%, #d3f4e2 100%)',
+          border: '1px solid #cfe9a4', color: '#17251c',
+          boxShadow: '0 6px 18px rgba(190,240,90,.25)',
         }}
       >
         <span style={{
-          width: 30, height: 30, borderRadius: 9, background: '#0e1b12', color: '#dffe95',
+          width: 30, height: 30, borderRadius: 9, background: '#17251c', color: '#dffe95',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, lineHeight: 1, flexShrink: 0,
         }}>＋</span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 14.5, fontWeight: 800, letterSpacing: '-.01em' }}>Remake an ad</span>
-          <span style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#3a5a2a' }}>A winner, or your own video</span>
+          <span style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#41543f' }}>A winner, or your own video</span>
         </span>
       </button>
 

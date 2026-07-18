@@ -26,7 +26,7 @@ class MasonryBoundary extends Component<{ children: ReactNode }, { k: number; er
     return <Fragment key={this.state.k}>{this.props.children}</Fragment>
   }
 }
-import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download, Copy, Film } from 'lucide-react'
+import { Search, ExternalLink, RefreshCw, Bookmark, BookmarkCheck, MoreHorizontal, Info, Link as LinkIcon, Download, Copy, Film, ChevronDown, Gauge, LayoutGrid, MonitorSmartphone, Building2, Clock, Palette } from 'lucide-react'
 import CloneModal from './CloneModal'
 import CloneVideoModal from './CloneVideoModal'
 import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
@@ -273,7 +273,7 @@ const VISUALSTYLE_OPTS = ['Selfie / Handheld', 'Bathroom / Mirror', 'Kitchen / H
 const CTASTYLE_OPTS = [{ value: 'soft', label: 'Soft' }, { value: 'hard', label: 'Hard' }, { value: 'none', label: 'None' }]
 
 // ── FilterDropdown ───────────────────────────────────────────
-function FilterDropdown({ label, options, selected, onToggle, onClear, searchable, comingSoon }: {
+function FilterDropdown({ label, options, selected, onToggle, onClear, searchable, comingSoon, leadIcon }: {
   label: string
   options: { value: string; label: string; icon?: string }[]
   selected: string[]
@@ -281,6 +281,7 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
   onClear: () => void
   searchable?: boolean
   comingSoon?: boolean
+  leadIcon?: ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -316,12 +317,12 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
   if (comingSoon) {
     return (
       <button disabled title="Coming soon" style={{
-        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
-        background: '#f8fafc', border: '1px solid #eef2ee', borderRadius: 8, fontSize: 13, fontWeight: 600,
+        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px',
+        background: '#fafbf8', border: '1px solid #edf0ec', borderRadius: 999, fontSize: 12.5, fontWeight: 600,
         color: '#9aa79a', cursor: 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit',
       }}>
         {label}
-        <span style={{ background: '#eef2ee', color: '#6b7a6b', borderRadius: 100, fontSize: 9, fontWeight: 800, padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '.04em' }}>Soon</span>
+        <span style={{ background: '#eef1ec', color: '#8b978d', borderRadius: 100, fontSize: 8.5, fontWeight: 800, padding: '2px 5px', textTransform: 'uppercase', letterSpacing: '.06em' }}>Soon</span>
       </button>
     )
   }
@@ -336,22 +337,23 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
           setOpen(o => !o)
         }}
         style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '7px 12px',
-          background: selected.length ? '#1a3a1a' : '#fff',
-          border: `1px solid ${selected.length ? '#1a3a1a' : '#e2e8f0'}`,
-          borderRadius: 8, fontSize: 13, fontWeight: 600,
-          color: selected.length ? '#dffe95' : '#374151',
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '7px 13px',
+          background: selected.length ? '#f4fbe6' : '#fff',
+          border: `1px solid ${selected.length ? '#a8cf6f' : '#e7ece7'}`,
+          borderRadius: 999, fontSize: 12.5, fontWeight: 600,
+          color: selected.length ? '#2c4a1f' : '#333d35',
           cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
         }}
       >
+        {leadIcon && <span style={{ display: 'inline-flex', color: selected.length ? '#5f9032' : '#7d8a7f' }}>{leadIcon}</span>}
         {label}
         {selected.length > 0 && (
-          <span style={{ background: '#dffe95', color: '#1a3a1a', borderRadius: 100, fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
+          <span style={{ background: '#17251c', color: '#dffe95', borderRadius: 100, fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
             {selected.length}
           </span>
         )}
-        <span style={{ fontSize: 10, opacity: 0.5 }}>{open ? '▲' : '▼'}</span>
+        <ChevronDown size={12} style={{ opacity: 0.55, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
       </button>
 
       {open && pos && (
@@ -406,8 +408,8 @@ function SortDropdown({ value, onChange }: { value: string; onChange: (v: string
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#374151', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-        Sort: {current.label} <span style={{ fontSize: 10, opacity: 0.5 }}>{open ? '▲' : '▼'}</span>
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#fff', border: '1px solid #e7ece7', borderRadius: 999, fontSize: 12.5, fontWeight: 650, color: '#333d35', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+        <span style={{ color: '#f5b301' }}>✦</span> Sort: <b>{current.label}</b> <ChevronDown size={12} style={{ opacity: 0.55, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
       </button>
       {open && (
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 100, minWidth: 180, padding: '6px 0' }}>
@@ -494,11 +496,11 @@ function NumberInput({ label, value, onChange, placeholder, suffix }: {
     <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        border: `1px solid ${isActive ? '#1a3a1a' : '#e2e8f0'}`,
-        borderRadius: 8, background: isActive ? '#1a3a1a' : '#fff',
-        padding: '0 8px', height: 30,
+        border: `1px solid ${isActive ? '#a8cf6f' : 'transparent'}`,
+        borderRadius: 999, background: isActive ? '#f4fbe6' : 'transparent',
+        padding: '0 8px', height: 28,
       }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#dffe95' : '#6b7280', whiteSpace: 'nowrap' }}>{label}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#2c4a1f' : '#68756b', whiteSpace: 'nowrap' }}>{label}</span>
         <input
           type="number"
           value={value}
@@ -506,15 +508,15 @@ function NumberInput({ label, value, onChange, placeholder, suffix }: {
           placeholder={placeholder}
           min={0}
           style={{
-            width: 36, border: 'none', outline: 'none', fontSize: 12, fontWeight: 600,
-            background: 'transparent', color: isActive ? '#dffe95' : '#111',
-            fontFamily: 'inherit', padding: 0,
+            width: 36, border: 'none', outline: 'none', fontSize: 12, fontWeight: 700,
+            background: 'transparent', color: isActive ? '#2c4a1f' : '#161c17',
+            fontFamily: 'inherit', padding: 0, textAlign: 'center',
           }}
         />
-        {suffix && <span style={{ fontSize: 11, color: isActive ? '#dffe95' : '#9ca3af', whiteSpace: 'nowrap' }}>{suffix}</span>}
+        {suffix && <span style={{ fontSize: 11, color: isActive ? '#2c4a1f' : '#9aa79a', whiteSpace: 'nowrap' }}>{suffix}</span>}
         {isActive && (
           <button onClick={() => onChange('')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dffe95', fontSize: 14, padding: '0 0 0 2px', lineHeight: 1 }}>×</button>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5f9032', fontSize: 14, padding: '0 0 0 2px', lineHeight: 1 }}>×</button>
         )}
       </div>
     </div>
@@ -1906,28 +1908,31 @@ export default function DiscoveryPage() {
       })()}
 
       {/* ── Header ── */}
-      <div style={{ borderBottom: '1px solid #e2e8f0', background: '#fff', padding: '14px 24px', position: 'sticky', top: 0, zIndex: 40 }}>
+      <div style={{ borderBottom: '1px solid #e0eecb', position: 'sticky', top: 0, zIndex: 40,
+        // Motion-style pastel gradient band behind the page title + search.
+        background: 'radial-gradient(90% 160% at 100% 0%, #fdf3cf 0%, transparent 50%), radial-gradient(80% 140% at 0% 20%, #e3f9d6 0%, transparent 55%), linear-gradient(120deg, #f6fceb, #f0fae2 45%, #edf8ee)',
+        padding: '14px 24px' }}>
 
         {/* Row 1: title + nav + search + refresh */}
         <div style={{ display: 'flex', flexWrap: isMobile ? 'wrap' : 'nowrap', alignItems: 'center', gap: 12, marginBottom: 10 }}>
           <div style={{ marginRight: 4, flexShrink: 0 }}>
-            <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>Ad Discovery</div>
-            <div style={{ fontSize: 11, color: '#6b7280' }}>Live creative intelligence from Meta</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: '#161c17', letterSpacing: '-.015em' }}>Ad Discovery</div>
+            <div style={{ fontSize: 11, color: '#5b6a55' }}>Live creative intelligence from Meta</div>
           </div>
 
           {/* Sub-nav tabs */}
-          <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 9, padding: 3, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.75)', border: '1px solid #dcebc4', borderRadius: 12, padding: 3, flexShrink: 0 }}>
             {[
               { label: '🔍 Explore', href: '/discovery' },
               { label: '🏷️ Brands', href: '/discovery/brands' },
             ].map(tab => (
               <a key={tab.href} href={tab.href}
                 style={{
-                  padding: '6px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600,
-                  background: tab.href === '/discovery' ? '#fff' : 'transparent',
-                  color: tab.href === '/discovery' ? '#111' : '#6b7280',
+                  padding: '6px 15px', borderRadius: 9, fontSize: 13, fontWeight: 700,
+                  background: tab.href === '/discovery' ? '#17251c' : 'transparent',
+                  color: tab.href === '/discovery' ? '#dffe95' : '#5b6a55',
                   textDecoration: 'none',
-                  boxShadow: tab.href === '/discovery' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  boxShadow: tab.href === '/discovery' ? '0 2px 6px rgba(23,37,28,0.25)' : 'none',
                 }}>
                 {tab.label}
               </a>
@@ -1944,7 +1949,7 @@ export default function DiscoveryPage() {
                   onFocus={() => { if (searchInput.trim()) setShowDropdown(true) }}
                   onKeyDown={e => { if (e.key === 'Escape') setShowDropdown(false) }}
                   placeholder="Search for ads or brands with AI…"
-                  style={{ width: '100%', padding: '9px 36px', border: `1.5px solid ${showDropdown && searchInput ? '#1a3a1a' : '#e2e8f0'}`, borderRadius: showDropdown && searchInput ? '10px 10px 0 0' : 10, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#f8fafc', color: '#111', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                  style={{ width: '100%', padding: '10px 36px', border: `1.5px solid ${showDropdown && searchInput ? '#17251c' : '#dcebc4'}`, borderRadius: showDropdown && searchInput ? '12px 12px 0 0' : 12, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#fff', color: '#161c17', boxSizing: 'border-box', transition: 'border-color 0.15s', boxShadow: '0 2px 8px rgba(23,37,28,0.05)' }}
                 />
                 {searchInput && (
                   <button type="button" onClick={() => { setSearchInput(''); setQuery(''); setShowDropdown(false) }}
@@ -2055,7 +2060,7 @@ export default function DiscoveryPage() {
           </div>
           <button onClick={() => { if (query.trim()) fetchAds(true) }} disabled={loading || !query.trim()}
             title={query.trim() ? 'Refresh results' : 'Enter a search term first'}
-            style={{ padding: '8px 10px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, cursor: loading || !query.trim() ? 'not-allowed' : 'pointer', color: query.trim() ? '#374151' : '#9ca3af', display: 'flex', alignItems: 'center', flexShrink: 0, opacity: !query.trim() ? 0.5 : 1 }}>
+            style={{ padding: '8px 10px', background: '#fff', border: '1px solid #dcebc4', borderRadius: 10, cursor: loading || !query.trim() ? 'not-allowed' : 'pointer', color: query.trim() ? '#3c473e' : '#9aa79a', display: 'flex', alignItems: 'center', flexShrink: 0, opacity: !query.trim() ? 0.5 : 1 }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
@@ -2075,7 +2080,7 @@ export default function DiscoveryPage() {
             <button key={p.label} onClick={() => { p.apply(); setActiveChip(p.label) }}
               onMouseEnter={p.tip ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setChipTip({ label: p.label, top: r.bottom + 5, left: Math.min(r.left, window.innerWidth - 280) }) } : undefined}
               onMouseLeave={p.tip ? () => setChipTip(null) : undefined}
-              style={{ position: 'relative', padding: '5px 12px', borderRadius: 100, fontSize: 12, fontWeight: on ? 700 : 600, background: on ? '#1a3a1a' : '#fff', color: on ? '#dffe95' : '#374151', border: on ? '1px solid #1a3a1a' : '1px solid #e2e8f0', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+              style={{ position: 'relative', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: on ? 700 : 600, background: on ? '#17251c' : '#fff', color: on ? '#dffe95' : '#333d35', border: on ? '1px solid #17251c' : '1px solid #dcebc4', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
               {p.label}
               {p.tip && chipTip?.label === p.label && (
                 <span style={{ position: 'fixed', top: chipTip.top, left: chipTip.left, width: 270, zIndex: 9999,
@@ -2089,11 +2094,12 @@ export default function DiscoveryPage() {
           )})}
         </div>
 
-        {/* Filter toolbar — every filter visible, uniform + evenly spaced. Wraps to tidy rows on
-            narrower widths (rowGap gives each wrapped row breathing space). Sort pinned right. */}
-        <div style={{ display: 'flex', gap: 8, rowGap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Filter tray — Motion-style: icon pills with chevrons in one soft container, the
+            coming-soon set on a quieter second row, numeric filters as compact pills, Sort right. */}
+        <div style={{ display: 'flex', gap: 8, rowGap: 10, flexWrap: 'wrap', alignItems: 'center',
+          background: '#fcfdfb', border: '1px solid #e7ece7', borderRadius: 16, padding: '10px 12px' }}>
           {/* Time filter (segmented) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '2px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px', background: '#fff', borderRadius: 11, border: '1px solid #e7ece7', flexShrink: 0 }}>
             {[
               { label: 'All time', days: 0 },
               { label: '7d', days: 7 },
@@ -2103,9 +2109,9 @@ export default function DiscoveryPage() {
             ].map(f => (
               <button key={f.days} onClick={() => setTimeDays(f.days)}
                 style={{
-                  padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-                  background: timeDays === f.days ? '#1a3a1a' : 'transparent',
-                  color: timeDays === f.days ? '#dffe95' : '#6b7280',
+                  padding: '5px 11px', borderRadius: 8, fontSize: 11.5, fontWeight: 700,
+                  background: timeDays === f.days ? '#17251c' : 'transparent',
+                  color: timeDays === f.days ? '#dffe95' : '#68756b',
                   border: 'none',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}>
@@ -2114,22 +2120,24 @@ export default function DiscoveryPage() {
             ))}
           </div>
 
-          {/* All filters inline — uniform dropdowns */}
-          <FilterDropdown label="Performance" options={TIER_OPTS} selected={tiers} onToggle={toggle(setTiers)} onClear={() => setTiers([])} />
-          <FilterDropdown label="Format" options={FORMAT_OPTS.map(f => ({ value: f, label: f, icon: f === 'Video' ? '🎬' : f === 'Carousel' ? '🔁' : '🖼' }))} selected={format} onToggle={toggle(setFormat)} onClear={() => setFormat([])} />
-          <FilterDropdown label="Platform" options={PLATFORM_OPTS.map(p => ({ value: p, label: PLATFORM_LABELS[p], icon: PLATFORM_ICONS[p] }))} selected={platforms} onToggle={toggle(setPlatforms)} onClear={() => setPlatforms([])} />
-          <FilterDropdown label="Industry" options={INDUSTRY_LIST.map(i => ({ value: i, label: i }))} selected={industry} onToggle={toggle(setIndustry)} onClear={() => setIndustry([])} searchable />
-          <FilterDropdown label="Status" options={STATUS_OPTS} selected={status !== 'ALL' ? [status] : []} onToggle={v => setStatus(prev => prev === v ? 'ALL' : v)} onClear={() => setStatus('ALL')} />
+          {/* All filters inline — uniform icon pills */}
+          <FilterDropdown label="Performance" leadIcon={<Gauge size={14} />} options={TIER_OPTS} selected={tiers} onToggle={toggle(setTiers)} onClear={() => setTiers([])} />
+          <FilterDropdown label="Format" leadIcon={<LayoutGrid size={14} />} options={FORMAT_OPTS.map(f => ({ value: f, label: f, icon: f === 'Video' ? '🎬' : f === 'Carousel' ? '🔁' : '🖼' }))} selected={format} onToggle={toggle(setFormat)} onClear={() => setFormat([])} />
+          <FilterDropdown label="Platform" leadIcon={<MonitorSmartphone size={14} />} options={PLATFORM_OPTS.map(p => ({ value: p, label: PLATFORM_LABELS[p], icon: PLATFORM_ICONS[p] }))} selected={platforms} onToggle={toggle(setPlatforms)} onClear={() => setPlatforms([])} />
+          <FilterDropdown label="Industry" leadIcon={<Building2 size={14} />} options={INDUSTRY_LIST.map(i => ({ value: i, label: i }))} selected={industry} onToggle={toggle(setIndustry)} onClear={() => setIndustry([])} searchable />
+          <FilterDropdown label="Status" leadIcon={<Clock size={14} />} options={STATUS_OPTS} selected={status !== 'ALL' ? [status] : []} onToggle={v => setStatus(prev => prev === v ? 'ALL' : v)} onClear={() => setStatus('ALL')} />
+          <FilterDropdown label="Theme" leadIcon={<Palette size={14} />} options={THEME_LIST.map(t => ({ value: t, label: t }))} selected={theme} onToggle={toggle(setTheme)} onClear={() => setTheme([])} searchable />
+
+          {/* Coming-soon set — quieter, grouped after the live filters */}
           <FilterDropdown label="Niche" options={NICHE_OPTS} selected={niches} onToggle={toggle(setNiches)} onClear={() => setNiches([])} searchable comingSoon />
           <FilterDropdown label="Hook" options={HOOK_OPTS} selected={hookTypes} onToggle={toggle(setHookTypes)} onClear={() => setHookTypes([])} searchable comingSoon />
           <FilterDropdown label="Emotion" options={EMOTION_OPTS} selected={emotions} onToggle={toggle(setEmotions)} onClear={() => setEmotions([])} comingSoon />
           <FilterDropdown label="Angle" options={ANGLE_OPTS} selected={angles} onToggle={toggle(setAngles)} onClear={() => setAngles([])} comingSoon />
           <FilterDropdown label="UGC / Studio" options={FORMATSTYLE_OPTS} selected={formatStyles} onToggle={toggle(setFormatStyles)} onClear={() => setFormatStyles([])} comingSoon />
           <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable comingSoon />
-          <FilterDropdown label="Theme" options={THEME_LIST.map(t => ({ value: t, label: t }))} selected={theme} onToggle={toggle(setTheme)} onClear={() => setTheme([])} searchable />
 
           {/* Numeric thresholds — grouped in a subtle container so they read as one set, not scattered */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', background: '#fff', border: '1px solid #e7ece7', borderRadius: 999, flexShrink: 0 }}>
             <NumberInput label="Run ≥ days" value={minDaysStr} onChange={setMinDaysStr} placeholder="0" />
             <NumberInput label="Brand ads ≥" value={minBrandAdsStr} onChange={setMinBrandAdsStr} placeholder="0" />
             <NumberInput label="Reuse ≥" value={minReuseStr} onChange={setMinReuseStr} placeholder="0" />
