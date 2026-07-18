@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     if (!cur) { await refund(); return NextResponse.json({ error: 'could not read the current image' }, { status: 422 }) }
 
     const gen = await generateImage(buildEditPrompt(String(instruction).trim()), [cur], useTier)
-    if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
+    if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The Pro image model is busy right now — please try again in a minute. You weren’t charged.' : gen.error }, { status: 502 }) }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 
