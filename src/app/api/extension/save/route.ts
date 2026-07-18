@@ -59,9 +59,11 @@ export async function POST(request: NextRequest) {
     if (ok) boardId = b.id
   }
   if (!boardId) {
+    // Pick the OLDEST existing "Saved from Web" board — NOT .maybeSingle(), which throws when a race
+    // (rapid saves) created duplicate boards and then stranded saves in a phantom empty one.
     const { data: existing } = await admin.from('discovery_boards')
-      .select('id').eq('created_by', userId).eq('name', DEFAULT_BOARD).maybeSingle()
-    if (existing?.id) boardId = existing.id
+      .select('id').eq('created_by', userId).eq('name', DEFAULT_BOARD).order('created_at', { ascending: true }).limit(1)
+    if (existing?.[0]?.id) boardId = existing[0].id
     else {
       const { data: created } = await admin.from('discovery_boards')
         .insert({ user_id: userId, org_id: org.orgId, name: DEFAULT_BOARD, emoji: '🌐', visibility: 'personal', created_by: userId })
