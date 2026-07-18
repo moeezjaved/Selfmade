@@ -28,6 +28,9 @@ export const runtime = 'nodejs'
 
 async function fetchImageB64(url: string): Promise<{ mimeType: string; dataB64: string } | null> {
   try {
+    // Protocol-relative URLs (//host/path, common in Shopify image fields) have no scheme — fetch
+    // needs one, so add https: before requesting.
+    if (/^\/\/[^/]/.test(url)) url = `https:${url}`
     const r = await fetch(url)
     if (!r.ok) return null
     const buf = Buffer.from(await r.arrayBuffer())
@@ -167,8 +170,15 @@ async function runGeneration(input: {
       Promise.all(rawProducts.slice(0, 4).map(async (src) => {
         const m = /^data:([^;]+);base64,([\s\S]*)$/i.exec(src)
         if (m) return { mimeType: m[1] || productMimeType || 'image/png', dataB64: m[2] }
-        if (/^https?:\/\//i.test(src)) return await fetchImageB64(src)
-        return { mimeType: productMimeType || 'image/png', dataB64: src.replace(/^data:[^;]+;base64,/, '') }
+        // Protocol-relative URLs (Shopify stores photos as //host/path with no scheme) must be
+        // fetched, not treated as base64 — prepend https: so they pass the http check below.
+        const url = /^\/\/[^/]/.test(src) ? `https:${src}` : src
+        if (/^https?:\/\//i.test(url)) return await fetchImageB64(url)
+        // A bare token that's neither a data-URL nor http(s): only accept it if it actually looks
+        // like base64 — never forward a raw URL/path string as inline_data (Gemini 400s on decode).
+        return /^[A-Za-z0-9+/=\s]+$/.test(src) && src.length > 100
+          ? { mimeType: productMimeType || 'image/png', dataB64: src.replace(/\s/g, '') }
+          : null
       })).then((xs) => xs.filter(Boolean) as { mimeType: string; dataB64: string }[]),
     ])
     if (!refImg) return await fail('could not load reference image')
@@ -214,7 +224,12 @@ async function runGeneration(input: {
     // Pro model congested (never downgraded) → a clear, retryable message; credits refund in fail().
     if (!best) {
       const raw = (gen && !gen.ok && gen.error) || 'generation failed'
-      return await fail(raw === 'pro_model_busy' ? 'The Pro image model is busy right now — please try again in a minute. You weren’t charged.' : raw, raw === 'pro_model_busy' ? 'pro_model_busy' : undefined)
+      if (raw === 'pro_model_busy') {
+        return await fail('The Pro image model is busy right now — please try again in a minute. You weren’t charged.', 'pro_model_busy')
+      }
+      // Never surface raw Gemini/technical errors (400, base64, INVALID_ARGUMENT…) to the user — they
+      // look alarming and mean nothing to them. Show one friendly line; keep the raw in fail_reason for admin.
+      return await fail("We couldn't finish this remake — please try again. If it keeps happening, tell us. You weren’t charged.", `gen_error: ${String(raw).slice(0, 300)}`)
     }
 
     // Upload to R2 and finalize the SAME job row (no second insert).
