@@ -465,17 +465,12 @@ export default function CloneModal({ ad, onClose }: { ad: { id: string; pageId: 
                         <button onClick={() => { setMode('new'); setBrandId(null); setBName(''); setBSite(''); setPhotos([]); setSelected([]) }} style={chipDashed(mode === 'new')}>＋ New brand</button>
                       </div>
                     )}
-                    {/* Auto-loaded brand kit (saved brand) */}
+                    {/* Auto-loaded brand kit (saved brand) — confirmation only; the actual photos are
+                        managed on the next step, so we don't duplicate the thumbnails here. */}
                     {mode === 'pick' && selectedPhotos.length > 0 && (
-                      <div style={{ background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 14, padding: '13px 15px' }}>
-                        <div style={{ fontSize: 13, fontWeight: 650, color: SEL_TEXT }}>✓ Loaded <b>{bName}</b>’s product photos</div>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                          {selectedPhotos.slice(0, 4).map((p) => (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img key={p.id} src={cdn(p.src)} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', border: `1px solid ${L_LINE}`, background: '#fff' }} />
-                          ))}
-                        </div>
-                        <div style={{ fontSize: 11.5, color: L_MUTED, marginTop: 8 }}>Pulled automatically — add, remove or swap these on the next step.</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 12, padding: '11px 14px' }}>
+                        <Check size={16} color={GREEN} strokeWidth={3} style={{ flexShrink: 0 }} />
+                        <div style={{ fontSize: 12.5, color: SEL_TEXT, lineHeight: 1.5 }}>Loaded <b>{bName}</b>’s logo, colors &amp; {photos.length} product photo{photos.length === 1 ? '' : 's'}. You’ll choose which to use on the next step.</div>
                       </div>
                     )}
                     {mode === 'new' && (

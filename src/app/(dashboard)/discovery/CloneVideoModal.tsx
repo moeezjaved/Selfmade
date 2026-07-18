@@ -449,15 +449,9 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       </div>
                     ) : <Lead>No saved brands yet — upload product photos on the next step.</Lead>}
                     {brandId && selPhotos.length > 0 && (
-                      <div style={{ background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 14, padding: '13px 15px' }}>
-                        <div style={{ fontSize: 13, fontWeight: 650, color: SEL_TEXT }}>✓ Loaded <b>{brandName}</b>’s product photos</div>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                          {selPhotos.slice(0, 4).map((p) => (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img key={p.id} src={cdn(p.src)} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', border: `1px solid ${L_LINE}`, background: '#fff' }} />
-                          ))}
-                        </div>
-                        <div style={{ fontSize: 11.5, color: L_MUTED, marginTop: 8 }}>Pulled automatically — add, remove or swap on the next step.</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 12, padding: '11px 14px' }}>
+                        <Check size={16} color={GREEN} strokeWidth={3} style={{ flexShrink: 0 }} />
+                        <div style={{ fontSize: 12.5, color: SEL_TEXT, lineHeight: 1.5 }}>Loaded <b>{brandName}</b>’s {photos.length} product photo{photos.length === 1 ? '' : 's'}. You’ll choose which to use on the next step.</div>
                       </div>
                     )}
                   </section>
