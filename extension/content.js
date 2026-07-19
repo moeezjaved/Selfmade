@@ -254,6 +254,7 @@
       media_url: url || m.permalink || location.href, media_type: capturedFrame ? 'image' : type, image_data,
       source_url: m.permalink || location.href, source_platform: m.platform, was_video,
       brand: m.brand || undefined, ad_copy: m.ad_copy || undefined,
+      board_id: opts.boardId || undefined,   // chosen in the in-post board picker (else background falls back to the default board)
     }
     chrome.runtime.sendMessage({ type: 'saveAd', payload }, (resp) => {
       busy = false
@@ -316,7 +317,93 @@
     return null
   }
 
+  // ── Instagram in-post board picker (Denote-style) ──────────────────────────
+  // On an open IG post/reel, drop a clean card into the RIGHT column: pick a board → Save, or Download.
+  let BOARDS = null, boardsLoading = false
+  function loadBoards(sel) {
+    if (BOARDS) { fillBoards(sel); return }
+    if (boardsLoading) return
+    boardsLoading = true
+    try {
+      chrome.runtime.sendMessage({ type: 'getBoards' }, (resp) => {
+        boardsLoading = false
+        if (chrome.runtime.lastError) return
+        BOARDS = Array.isArray(resp?.boards) ? resp.boards : []
+        fillBoards(sel)
+      })
+    } catch { boardsLoading = false }
+  }
+  function fillBoards(sel) {
+    if (!sel || !BOARDS) return
+    const last = (() => { try { return localStorage.getItem('sm_board') || '' } catch { return '' } })()
+    sel.innerHTML = '<option value="">Select a board (optional)</option>' +
+      BOARDS.map((b) => `<option value="${b.id}">${(b.emoji ? b.emoji + ' ' : '') + String(b.name || 'Board').replace(/</g, '')}</option>`).join('')
+    if (last && BOARDS.some((b) => b.id === last)) sel.value = last
+    if (!BOARDS.length) sel.innerHTML = '<option value="">No boards yet — saves to your default</option>'
+  }
+
+  // Find the info/right column of an open IG post so the card sits like Denote's (under the header).
+  function igInfoColumn(art) {
+    const userLink = [...art.querySelectorAll('a[href^="/"]')].find((a) => /^\/[A-Za-z0-9._]+\/$/.test(a.getAttribute('href') || '') && (a.textContent || '').trim())
+    if (!userLink) return null
+    let header = userLink
+    for (let i = 0; i < 10 && header.parentElement && header.parentElement !== art; i++) {
+      const p = header.parentElement
+      const pr = p.getBoundingClientRect(), ar = art.getBoundingClientRect()
+      // stop at the header row: a block narrower than the whole article (i.e. inside the right column)
+      if (p.childElementCount >= 1 && pr.width > 180 && pr.width < ar.width * 0.75) { header = p; break }
+      header = p
+    }
+    return { col: header.parentElement || art, header }
+  }
+
+  function mountIgCard() {
+    if (!IS_IG) return
+    for (const art of document.querySelectorAll('article')) {
+      if (art.querySelector('.sm-ig-card')) continue
+      const media = art.querySelector('video, img')
+      const ar = art.getBoundingClientRect()
+      if (!media || ar.width < 520 || ar.height < 300) continue   // only the big opened post, not feed thumbs
+      const info = igInfoColumn(art)
+      if (!info) continue
+
+      const card = document.createElement('div')
+      card.className = 'sm-ig-card'
+      card.innerHTML =
+        '<div class="sm-ig-brandrow"><img class="sm-ig-logo" src="' + chrome.runtime.getURL('icons/icon48.png') + '" alt=""/><span>Save to Selfmade</span></div>' +
+        '<select class="sm-ig-select"><option value="">Loading boards…</option></select>' +
+        '<div class="sm-ig-actions">' +
+        '<button class="sm-ig-save" type="button">＋ Save to Selfmade</button>' +
+        '<button class="sm-ig-dl" type="button" title="Download this media">⤓ Download</button>' +
+        '</div>'
+      const sel = card.querySelector('.sm-ig-select')
+      const saveBtn = card.querySelector('.sm-ig-save')
+      const dlBtn = card.querySelector('.sm-ig-dl')
+      loadBoards(sel)
+      sel.addEventListener('change', () => { try { localStorage.setItem('sm_board', sel.value) } catch {} })
+      saveBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation()
+        const m = biggestMediaIn(art) || media
+        if (m) doSave(m, art, saveBtn, { saving: 'Saving…', done: '✓ Saved' }, { revert: true, boardId: sel.value || undefined })
+        else toast('No media found on this post', false)
+      })
+      dlBtn.addEventListener('click', async (e) => {
+        e.preventDefault(); e.stopPropagation()
+        const m = biggestMediaIn(art) || media
+        let { url } = mediaUrl(m)
+        if (!url || url.startsWith('blob:')) url = findPoster(m) || ''
+        if (!url) { toast('Could not read that media to download', false); return }
+        try {
+          const a = document.createElement('a'); a.href = url; a.download = ''; a.target = '_blank'; a.rel = 'noreferrer'
+          document.body.appendChild(a); a.click(); a.remove()
+        } catch { window.open(url, '_blank') }
+      })
+      try { info.col.insertBefore(card, info.header.nextSibling) } catch { info.col.insertBefore(card, info.col.firstChild) }
+    }
+  }
+
   function scan() {
+    if (IS_IG) mountIgCard()   // Denote-style in-post board picker (works on organic posts too, not just ads)
     if (IS_FB_ADLIB) {
       for (const label of document.querySelectorAll('span, div')) {
         const txt = label.textContent || ''
