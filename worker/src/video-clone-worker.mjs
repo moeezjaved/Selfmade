@@ -1684,7 +1684,21 @@ async function generateJob(job) {
         const cat = `${base}-cat.mp4`
         tmp.push(cat)
         await concatClips(files, cat, segDurs)   // each segment trimmed to its own script-matched length
-        const fin = await withEndCard(cat, meta, job.id, 'main', tmp)
+        // Seedance is now silent (generateAudio:false) — lay a single CLEAN OpenAI TTS voiceover over the
+        // whole stitched video (same as the single-take path). This is the actual voice now: one
+        // continuous narration, no per-segment Seedance babble, far clearer Urdu/Hindi.
+        let voiced = cat
+        if (finalScript && finalScript.trim()) {
+          try {
+            const clipDur = (await probeDuration(cat)) || segDurs.reduce((a, d) => a + d, 0) || 15
+            const vo = await ttsVoiceover(capScriptToSeconds(finalScript, clipDur * 1.25 + 2), `${job.id}-seg`, meta.voice)
+            tmp.push(vo)
+            const mixed = `${base}-vo.mp4`; tmp.push(mixed)
+            await muxVoiceover(cat, vo, mixed)
+            voiced = mixed
+          } catch (e) { console.warn(`seg tts/mux failed for ${job.id} (shipping without VO):`, e.message) }
+        }
+        const fin = await withEndCard(voiced, meta, job.id, 'main', tmp)
         if (meta.end_card && meta.end_card.tx) {
           if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
           else await rpc('refund_credits', { p_tx: meta.end_card.tx })
