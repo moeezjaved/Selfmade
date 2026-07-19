@@ -28,6 +28,7 @@
   const IS_TT_ADLIB = HOST.includes('library.tiktok.com')
   const IS_TT_FEED = HOST.includes('tiktok.com') && !IS_TT_ADLIB
   const IS_IG = HOST.includes('instagram.com')
+  const IS_YT = HOST.includes('youtube.com')   // YouTube Shorts / watch — hover save card (Denote-style)
   // Ad surfaces we actually support. The hover Save button only runs here — otherwise it popped up on
   // EVERY thumbnail on media sites like YouTube ("Save button everywhere when I scroll").
   const SUPPORTED = HOST.includes('facebook.com') || IS_IG || IS_TT_ADLIB || IS_TT_FEED
@@ -241,7 +242,9 @@
   let busy = false
   async function doSave(mediaEl, scope, btn, labels, opts = {}) {
     if (busy) return
-    let { url, type } = mediaUrl(mediaEl)
+    // A caller can force the media URL (e.g. YouTube, where the <video> is a stream but we save the
+    // thumbnail). Otherwise read it off the element.
+    let { url, type } = opts.forceUrl ? { url: opts.forceUrl, type: opts.forceType || 'image' } : mediaUrl(mediaEl)
     // IG reels stream via a blob: MSE URL. Pull the REAL fbcdn MP4 out of the page JSON so we save a
     // TRUE video (shows as video + enables video remake), instead of only the poster frame.
     if (IS_IG && (type === 'video' || mediaEl instanceof HTMLVideoElement) && (!url || url.startsWith('blob:'))) {
@@ -380,6 +383,50 @@
     return { col: header.parentElement || art, header }
   }
 
+  // ── Reusable Denote-style save card (board dropdown + Save + optional Download). Used on IG posts,
+  // the FB/TikTok Ad Libraries, and YouTube Shorts. getMedia() returns the media element to save. ──
+  function buildSaveCard(getMedia, scope, o = {}) {
+    const showDl = o.showDownload !== false
+    const card = document.createElement('div')
+    card.className = 'sm-ig-card' + (o.overlay ? ' sm-ig-overlay' : '')
+    card.innerHTML =
+      '<div class="sm-ig-brandrow"><img class="sm-ig-logo" src="' + chrome.runtime.getURL('icons/icon48.png') + '" alt=""/><span>Save to Selfmade</span></div>' +
+      '<select class="sm-ig-select"><option value="">Loading boards…</option></select>' +
+      '<div class="sm-ig-actions">' +
+      '<button class="sm-ig-save" type="button">＋ Save to Selfmade</button>' +
+      (showDl ? '<button class="sm-ig-dl" type="button" title="Download this media">⤓ Download</button>' : '') +
+      '</div>'
+    const stop = (e) => { e.stopPropagation() }
+    card.addEventListener('click', stop); card.addEventListener('mousedown', stop)
+    const sel = card.querySelector('.sm-ig-select')
+    const saveBtn = card.querySelector('.sm-ig-save')
+    const dlBtn = card.querySelector('.sm-ig-dl')
+    loadBoards(sel)
+    sel.addEventListener('change', () => { try { localStorage.setItem('sm_board', sel.value) } catch {} })
+    saveBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation()
+      const m = getMedia()
+      if (m) doSave(m, scope, saveBtn, { saving: 'Saving…', done: '✓ Saved' }, { revert: true, boardId: sel.value || undefined, forceUrl: o.forceUrl && o.forceUrl(), forceType: o.forceType })
+      else toast('No media found here', false)
+    })
+    if (dlBtn) dlBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation()
+      const m = getMedia()
+      const isVid = (m instanceof HTMLVideoElement) || mediaUrl(m).type === 'video'
+      let url = (isVid && o.resolveVideo) ? o.resolveVideo() : ''
+      if (!url) { const mu = mediaUrl(m); url = (mu.url && !mu.url.startsWith('blob:')) ? mu.url : (findPoster(m) || '') }
+      if (!url) { toast('Couldn’t find a downloadable file here', false); return }
+      const filename = 'selfmade-' + Date.now() + (/\.mp4/i.test(url) ? '.mp4' : '.jpg')
+      const orig = dlBtn.textContent; dlBtn.textContent = '⤓ Saving…'
+      chrome.runtime.sendMessage({ type: 'download', url, filename }, (resp) => {
+        dlBtn.textContent = orig
+        if (chrome.runtime.lastError || !resp?.ok) { try { window.open(url, '_blank') } catch {}; toast('Opened in a new tab — right-click → Save', false) }
+        else toast('✓ Downloaded')
+      })
+    })
+    return card
+  }
+
   function mountIgCard() {
     if (!IS_IG) return
     for (const art of document.querySelectorAll('article')) {
@@ -389,61 +436,60 @@
       if (!media || ar.width < 520 || ar.height < 300) continue   // only the big opened post, not feed thumbs
       const info = igInfoColumn(art)
       if (!info) continue
-
-      const card = document.createElement('div')
-      card.className = 'sm-ig-card'
-      card.innerHTML =
-        '<div class="sm-ig-brandrow"><img class="sm-ig-logo" src="' + chrome.runtime.getURL('icons/icon48.png') + '" alt=""/><span>Save to Selfmade</span></div>' +
-        '<select class="sm-ig-select"><option value="">Loading boards…</option></select>' +
-        '<div class="sm-ig-actions">' +
-        '<button class="sm-ig-save" type="button">＋ Save to Selfmade</button>' +
-        '<button class="sm-ig-dl" type="button" title="Download this media">⤓ Download</button>' +
-        '</div>'
-      const sel = card.querySelector('.sm-ig-select')
-      const saveBtn = card.querySelector('.sm-ig-save')
-      const dlBtn = card.querySelector('.sm-ig-dl')
-      loadBoards(sel)
-      sel.addEventListener('change', () => { try { localStorage.setItem('sm_board', sel.value) } catch {} })
-      saveBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation()
-        const m = biggestMediaIn(art) || media
-        if (m) doSave(m, art, saveBtn, { saving: 'Saving…', done: '✓ Saved' }, { revert: true, boardId: sel.value || undefined })
-        else toast('No media found on this post', false)
-      })
-      dlBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation()
-        const m = biggestMediaIn(art) || media
-        const isVid = (m instanceof HTMLVideoElement) || mediaUrl(m).type === 'video'
-        // Prefer the REAL fbcdn MP4 for videos (downloadable), else the image/poster.
-        let url = isVid ? resolveIgVideoUrl() : ''
-        if (!url) { const mu = mediaUrl(m); url = (mu.url && !mu.url.startsWith('blob:')) ? mu.url : (findPoster(m) || '') }
-        if (!url) { toast('Couldn’t find a downloadable file for this post', false); return }
-        const filename = 'selfmade-' + Date.now() + (/\.mp4/i.test(url) ? '.mp4' : '.jpg')
-        const orig = dlBtn.textContent; dlBtn.textContent = '⤓ Saving…'
-        // chrome.downloads (background) fetches the cross-origin URL properly → a real Downloads entry.
-        chrome.runtime.sendMessage({ type: 'download', url, filename }, (resp) => {
-          dlBtn.textContent = orig
-          if (chrome.runtime.lastError || !resp?.ok) { try { window.open(url, '_blank') } catch {}; toast('Opened in a new tab — right-click → Save', false) }
-          else toast('✓ Downloaded')
-        })
-      })
+      const card = buildSaveCard(() => biggestMediaIn(art) || media, art, { resolveVideo: resolveIgVideoUrl, showDownload: true })
       try { info.col.insertBefore(card, info.header.nextSibling) } catch { info.col.insertBefore(card, info.col.firstChild) }
+    }
+  }
+
+  // FB / TikTok Ad Library: put the full card (board + Save + Download) at the top of each ad card.
+  function mountAdLibCard(cardEl) {
+    if (!cardEl || cardEl.dataset.smFull || cardEl.querySelector('.sm-ig-card')) return
+    if (cardEl.closest('[data-sm-full]')) return
+    cardEl.dataset.smFull = '1'
+    const card = buildSaveCard(() => biggestMediaIn(cardEl), cardEl, { resolveVideo: null, showDownload: true })
+    card.style.margin = '0 0 8px'
+    if (getComputedStyle(cardEl).position === 'static') cardEl.style.position = 'relative'
+    cardEl.insertBefore(card, cardEl.firstChild)
+  }
+
+  // YouTube Shorts / watch: a hover overlay card on the player (Denote-style). Save uses the video's
+  // thumbnail (YT streams the video, so no direct download — matches Denote, which offers Save only).
+  function ytThumb() {
+    const m = location.pathname.match(/\/shorts\/([\w-]{6,})/) || location.search.match(/[?&]v=([\w-]{6,})/)
+    return m ? `https://i.ytimg.com/vi/${m[1]}/maxresdefault.jpg` : (document.querySelector('meta[property="og:image"]')?.getAttribute('content') || '')
+  }
+  function mountYtCard() {
+    if (!IS_YT) return
+    // Active shorts renderer (or the main watch player).
+    const players = document.querySelectorAll('ytd-reel-video-renderer, #shorts-player, ytd-player, #player')
+    for (const p of players) {
+      const r = p.getBoundingClientRect()
+      if (r.width < 200 || r.height < 200) continue
+      if (p.querySelector('.sm-yt-host')) continue
+      const host = document.createElement('div')
+      host.className = 'sm-yt-host'
+      const vid = p.querySelector('video')
+      const card = buildSaveCard(() => vid || p.querySelector('video'), p, { showDownload: false, overlay: true, forceUrl: ytThumb, forceType: 'image' })
+      host.appendChild(card)
+      if (getComputedStyle(p).position === 'static') p.style.position = 'relative'
+      p.appendChild(host)
     }
   }
 
   function scan() {
     if (IS_IG) mountIgCard()   // Denote-style in-post board picker (works on organic posts too, not just ads)
+    if (IS_YT) mountYtCard()   // YouTube Shorts / watch — hover save card
     if (IS_FB_ADLIB) {
       for (const label of document.querySelectorAll('span, div')) {
         const txt = label.textContent || ''
         if (txt.length > 40 || !/Library ID/i.test(txt) || label.children.length > 1) continue
-        addCardButton(cardFromLabel(label), 'prepend')
+        mountAdLibCard(cardFromLabel(label))
       }
     } else if (IS_TT_ADLIB) {
       for (const label of document.querySelectorAll('span, div')) {
         const txt = label.textContent || ''
         if (txt.length > 24 || !/First shown|Last shown/i.test(txt) || label.children.length > 1) continue
-        addCardButton(cardFromLabel(label, 180), 'prepend')
+        mountAdLibCard(cardFromLabel(label, 180))
       }
     } else if (IS_IG) {
       for (const art of document.querySelectorAll('article')) {
@@ -567,7 +613,7 @@
   // plain Facebook feed). On the Ad Library / IG / TikTok the per-card buttons are the UX, so the
   // trailing hover button is suppressed. Nothing at all runs on YouTube/arbitrary sites.
   if (SUPPORTED) setupHover()
-  if (IS_FB_ADLIB || IS_FB_FEED || IS_TT_ADLIB || IS_IG || IS_TT_FEED) {
+  if (IS_FB_ADLIB || IS_FB_FEED || IS_TT_ADLIB || IS_IG || IS_TT_FEED || IS_YT) {
     scan()
     const obs = new MutationObserver(() => { clearTimeout(window.__smT); window.__smT = setTimeout(scan, 350) })
     obs.observe(document.body, { childList: true, subtree: true })
