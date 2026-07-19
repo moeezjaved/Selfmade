@@ -69,3 +69,8 @@
 .sm-ig-save.sm-done{background:#f4fbe6;color:#2c4a1f;border:1px solid #a8cf6f}
 .sm-ig-dl{border:1.5px solid #e7ece7;background:#fff;color:#3c473e;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:750;font-family:inherit;cursor:pointer;white-space:nowrap}
 .sm-ig-dl:hover{background:#f6f8f5}
+
+/* YouTube Shorts / watch — hover overlay save card on the player */
+.sm-yt-host{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:2147483000;width:min(320px,86%);opacity:0;pointer-events:none;transition:opacity .15s}
+ytd-reel-video-renderer:hover .sm-yt-host,#shorts-player:hover .sm-yt-host,ytd-player:hover .sm-yt-host,#player:hover .sm-yt-host,.sm-yt-host:hover{opacity:1;pointer-events:auto}
+.sm-ig-card.sm-ig-overlay{margin:0;box-shadow:0 10px 30px rgba(0,0,0,.35)}
