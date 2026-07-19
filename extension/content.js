@@ -90,6 +90,23 @@
     for (const d of box.querySelectorAll('div, a, span')) { const u = bgUrl(d); if (u) return u }
     return ''
   }
+  // Instagram streams reels/videos via an MSE blob: URL that can't be downloaded. The REAL fbcdn MP4
+  // is embedded in the page's JSON — resolve it so Download + Save get the actual video (this is how
+  // download extensions do it "flawlessly"). Best-effort: returns '' if not found.
+  function resolveIgVideoUrl() {
+    try {
+      const og = document.querySelector('meta[property="og:video"], meta[property="og:video:secure_url"]')?.getAttribute('content') || ''
+      if (/^https?:\/\/.+\.mp4/i.test(og)) return og
+      const unesc = (u) => u.replace(/\\u0026/g, '&').replace(/\\\//g, '/').replace(/\\u003D/gi, '=')
+      for (const s of document.querySelectorAll('script[type="application/json"], script:not([src])')) {
+        const t = s.textContent || ''
+        if (t.indexOf('video_versions') < 0 && t.indexOf('video_url') < 0) continue
+        const m = t.match(/"video_versions":\s*\[\s*\{[^}]*?"url":"([^"]+?\.mp4[^"]*?)"/) || t.match(/"video_url":"([^"]+?\.mp4[^"]*?)"/)
+        if (m && m[1]) return unesc(m[1])
+      }
+    } catch {}
+    return ''
+  }
   function biggestMediaIn(scope) {
     let best = null, bestArea = MIN * MIN
     for (const el of scope.querySelectorAll('img, video')) {
@@ -225,8 +242,14 @@
   async function doSave(mediaEl, scope, btn, labels, opts = {}) {
     if (busy) return
     let { url, type } = mediaUrl(mediaEl)
-    // Blob/again video with no direct src → save its poster frame (image) so the save works and the
-    // card shows the creative. The permalink (below) is how the user watches the real video.
+    // IG reels stream via a blob: MSE URL. Pull the REAL fbcdn MP4 out of the page JSON so we save a
+    // TRUE video (shows as video + enables video remake), instead of only the poster frame.
+    if (IS_IG && (type === 'video' || mediaEl instanceof HTMLVideoElement) && (!url || url.startsWith('blob:'))) {
+      const real = resolveIgVideoUrl()
+      if (real) { url = real; type = 'video' }
+    }
+    // Still a blob/again video with no direct src → save its poster frame (image) so the save works and
+    // the card shows the creative. The permalink (below) is how the user watches the real video.
     if (!url || (type === 'video' && url.startsWith('blob:'))) {
       const poster = findPoster(mediaEl)
       if (poster) { url = poster; type = 'image' }
@@ -387,16 +410,22 @@
         if (m) doSave(m, art, saveBtn, { saving: 'Saving…', done: '✓ Saved' }, { revert: true, boardId: sel.value || undefined })
         else toast('No media found on this post', false)
       })
-      dlBtn.addEventListener('click', async (e) => {
+      dlBtn.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation()
         const m = biggestMediaIn(art) || media
-        let { url } = mediaUrl(m)
-        if (!url || url.startsWith('blob:')) url = findPoster(m) || ''
-        if (!url) { toast('Could not read that media to download', false); return }
-        try {
-          const a = document.createElement('a'); a.href = url; a.download = ''; a.target = '_blank'; a.rel = 'noreferrer'
-          document.body.appendChild(a); a.click(); a.remove()
-        } catch { window.open(url, '_blank') }
+        const isVid = (m instanceof HTMLVideoElement) || mediaUrl(m).type === 'video'
+        // Prefer the REAL fbcdn MP4 for videos (downloadable), else the image/poster.
+        let url = isVid ? resolveIgVideoUrl() : ''
+        if (!url) { const mu = mediaUrl(m); url = (mu.url && !mu.url.startsWith('blob:')) ? mu.url : (findPoster(m) || '') }
+        if (!url) { toast('Couldn’t find a downloadable file for this post', false); return }
+        const filename = 'selfmade-' + Date.now() + (/\.mp4/i.test(url) ? '.mp4' : '.jpg')
+        const orig = dlBtn.textContent; dlBtn.textContent = '⤓ Saving…'
+        // chrome.downloads (background) fetches the cross-origin URL properly → a real Downloads entry.
+        chrome.runtime.sendMessage({ type: 'download', url, filename }, (resp) => {
+          dlBtn.textContent = orig
+          if (chrome.runtime.lastError || !resp?.ok) { try { window.open(url, '_blank') } catch {}; toast('Opened in a new tab — right-click → Save', false) }
+          else toast('✓ Downloaded')
+        })
       })
       try { info.col.insertBefore(card, info.header.nextSibling) } catch { info.col.insertBefore(card, info.col.firstChild) }
     }
