@@ -55,3 +55,17 @@
 .sm-toast.sm-show { opacity: 1; transform: translate(-50%, 0); }
 .sm-toast.sm-err { background: #b3261e; }
 .sm-toast.sm-ok { background: #14261a; }
+
+/* ── Instagram in-post board picker (Denote-style card in the post's right column) ── */
+.sm-ig-card{margin:10px 0 12px;padding:12px 14px;border:1px solid #e7ece7;border-radius:14px;background:#fff;box-shadow:0 6px 20px rgba(23,37,28,.08);font-family:-apple-system,'Segoe UI',Roboto,sans-serif}
+.sm-ig-brandrow{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:#17251c;margin-bottom:9px}
+.sm-ig-logo{width:18px;height:18px;border-radius:5px;display:block}
+.sm-ig-select{width:100%;box-sizing:border-box;padding:9px 11px;border:1.5px solid #e7ece7;border-radius:10px;font-size:13px;color:#17251c;background:#fff;font-family:inherit;outline:none;cursor:pointer}
+.sm-ig-select:focus{border-color:#a8cf6f}
+.sm-ig-actions{display:flex;gap:8px;margin-top:9px}
+.sm-ig-save{flex:1;border:none;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:#17251c;color:#dffe95;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.sm-ig-save:hover{opacity:.93}
+.sm-ig-save.sm-busy{opacity:.6;cursor:default}
+.sm-ig-save.sm-done{background:#f4fbe6;color:#2c4a1f;border:1px solid #a8cf6f}
+.sm-ig-dl{border:1.5px solid #e7ece7;background:#fff;color:#3c473e;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:750;font-family:inherit;cursor:pointer;white-space:nowrap}
+.sm-ig-dl:hover{background:#f6f8f5}
