@@ -73,6 +73,8 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [notice, setNotice] = useState<string | null>(null)   // non-error info (e.g. still rendering)
   const [result, setResult] = useState<{ url: string; script?: string | null; tweakable?: boolean; ugcTweakable?: boolean; segmentTweakable?: boolean; tweakScenes?: { duration: number; hasPeople: boolean }[]; tweakSegments?: { script: string; start?: number; end?: number }[]; finalScript?: string | null } | null>(null)
   const [twNote, setTwNote] = useState('')   // "Fix a moment" free-text — what exactly is wrong
+  const [twFrom, setTwFrom] = useState('')   // cutaway patch window (seconds)
+  const [twTo, setTwTo] = useState('')
   // ── Tweak panel (post-render, per-scene fixes — no full re-render) ──
   const [twSel, setTwSel] = useState<number | null>(null)      // selected scene index
   const [twBusy, setTwBusy] = useState(false)
@@ -429,6 +431,15 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                         <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k, note: twNote.trim() || undefined })} style={{ ...chip(false), fontSize: 11.5, padding: '6px 10px' }}>{label}</button>
                       ))}
                     </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: `1px dashed ${L_LINE}` }}>
+                      <span style={{ fontSize: 12, fontWeight: 700 }}>🩹 Or patch just the flawed seconds</span>
+                      <input value={twFrom} onChange={(e) => setTwFrom(e.target.value.replace(/[^\d.]/g, ''))} placeholder="7" style={{ ...input, width: 58, fontSize: 12.5, padding: '6px 8px' }} inputMode="decimal" />
+                      <span style={{ fontSize: 12, color: L_MUTED }}>to</span>
+                      <input value={twTo} onChange={(e) => setTwTo(e.target.value.replace(/[^\d.]/g, ''))} placeholder="10" style={{ ...input, width: 58, fontSize: 12.5, padding: '6px 8px' }} inputMode="decimal" />
+                      <span style={{ fontSize: 12, color: L_MUTED }}>sec</span>
+                      <button onClick={() => { const f = parseFloat(twFrom || '0'); runTweak({ type: 'patch_broll', from: f, to: parseFloat(twTo || String(f + 4)), note: twNote.trim() || undefined }) }} style={{ ...chip(false), fontSize: 11.5, color: GREEN, borderColor: SEL_BORDER, padding: '6px 12px' }}>Patch it · 150 cr</button>
+                      <span style={{ fontSize: 11, color: L_FAINT, width: '100%' }}>Swaps those seconds for a clean product close-up (max 5s) — the voice keeps playing, the rest is untouched.</span>
+                    </div>
                   </>)}
                   {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
                 </div>
@@ -458,11 +469,27 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                           style={{ ...input, width: '100%', resize: 'vertical', fontSize: 12.5 }}
                           placeholder={'What’s wrong in this section? e.g. “it says Ejad wrong — pronounce it Ee-jaad” or “the pouch has a cap, remove it”'} />
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-                          <button onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={{ ...btnPrimary, padding: '8px 14px', fontSize: 12.5 }}>Fix this section · 600 cr</button>
+                          <button onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={{ ...btnPrimary, padding: '8px 14px', fontSize: 12.5 }}>Re-shoot section · 600 cr</button>
                           <span style={{ fontSize: 11, color: L_MUTED }}>or quick fixes:</span>
                           {[['product', 'Product wrong'], ['size', 'Too big/small'], ['person', 'Person off']].map(([k, label]) => (
                             <button key={k} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: k, note: twNote.trim() || undefined })} style={{ ...chip(false), fontSize: 11.5, padding: '6px 10px' }}>{label}</button>
                           ))}
+                        </div>
+                        {/* Cutaway patch — the cheap scalpel: replaces ONLY these seconds with a product
+                            close-up; the voice keeps playing untouched. Best for a visual flaw (wrong
+                            cap/label) that lasts a couple of seconds. */}
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: `1px dashed ${L_LINE}` }}>
+                          <span style={{ fontSize: 12, fontWeight: 700 }}>🩹 Or patch just the flawed seconds</span>
+                          <input value={twFrom} onChange={(e) => setTwFrom(e.target.value.replace(/[^\d.]/g, ''))} placeholder={String(result.tweakSegments?.[twSel]?.start ?? 0)} style={{ ...input, width: 58, fontSize: 12.5, padding: '6px 8px' }} inputMode="decimal" />
+                          <span style={{ fontSize: 12, color: L_MUTED }}>to</span>
+                          <input value={twTo} onChange={(e) => setTwTo(e.target.value.replace(/[^\d.]/g, ''))} placeholder={String((result.tweakSegments?.[twSel]?.start ?? 0) + 4)} style={{ ...input, width: 58, fontSize: 12.5, padding: '6px 8px' }} inputMode="decimal" />
+                          <span style={{ fontSize: 12, color: L_MUTED }}>sec</span>
+                          <button onClick={() => {
+                            const f = parseFloat(twFrom || String(result.tweakSegments?.[twSel!]?.start ?? 0))
+                            const t2 = parseFloat(twTo || String(f + 4))
+                            runTweak({ type: 'patch_broll', from: f, to: t2, note: twNote.trim() || undefined })
+                          }} style={{ ...chip(false), fontSize: 11.5, color: GREEN, borderColor: SEL_BORDER, padding: '6px 12px' }}>Patch it · 150 cr</button>
+                          <span style={{ fontSize: 11, color: L_FAINT, width: '100%' }}>Swaps those seconds for a clean product close-up (max 5s) — the voice keeps playing, the rest is untouched. Cheapest fix for a wrong cap/label.</span>
                         </div>
                       </div>
                     )}
