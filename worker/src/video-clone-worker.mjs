@@ -1683,10 +1683,16 @@ async function generateJob(job) {
     // ── LONG-FORM UGC (30/60s): the approved script splits into 2/4 segments at sentence
     // boundaries; every segment prompt opens with the SAME character paragraph, and each clip after
     // the first is anchored to the previous clip's final frame (@Image1) so the creator carries
-    // through the cuts. Each segment renders SILENT (generateAudio:false) and is length-matched to its
-    // own script line (min 5s); after stitching we lay ONE continuous OpenAI TTS voiceover over the
-    // whole video — clearer than Seedance's per-segment audio, and no garbled seams. Physical segments
-    // also pass a per-segment product-truth check that re-rolls a clip that invents a part. ──
+    // through the cuts. Physical segments also pass a per-segment product-truth check that re-rolls a
+    // clip that invents a part.
+    //
+    // VOICE (default = Seedance NATIVE audio): Seedance generates the mouth AND the voice together, so
+    // lips actually sync — English (and short Urdu) come out great this way. The tradeoff is that each
+    // segment is a separate generation, so the voice can shift at the SEAM between clips (the garbled
+    // ejad-milk 11-14s). Set meta.tts_overlay=true to instead render segments SILENT + lay ONE
+    // continuous overlay voice (ElevenLabs for non-English, else OpenAI) — one clean voice, no seam
+    // shift, but lips only approximate. Default off per the user's call (native English is excellent). ──
+    const useOverlayVoice = meta.tts_overlay === true
     const nSeg = Math.min(4, Math.max(1, Number(meta.segments) || 1))
     if (nSeg > 1) {
       // Reuse the stamped plan + clips on resume (see faithful-mode checkpointing note).
@@ -1731,16 +1737,16 @@ async function generateJob(job) {
           const imgs = useAnchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages
           console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${useAnchor ? ' (anchored)' : ''}`)
           const segDur = segDurs[i]
-          // generateAudio:false → Seedance produces NO speech. We add the clean TTS voiceover at the end;
-          // leaving Seedance audio on made it babble faux-speech UNDER the narration (the garbled 11-14s
-          // + muddy Urdu). The single-take + faithful paths already pass false — the segment path didn't.
+          // Default (native voice): generateAudio TRUE → Seedance speaks + lip-syncs the segment itself.
+          // Overlay mode (meta.tts_overlay): FALSE → silent clip, one continuous voice added after concat.
+          const genAudio = !useOverlayVoice
           let videoUrl
           const segBlocked = (x) => x.code === 'content_policy_images' || x.code === 'content_policy_video'
           // Ladder: (anchor+products if enabled →) products only → PURE PROMPT. A segment must never kill
           // the whole long-form render on a moderation block (same contract as faithful mode).
           const rungs = [imgs, ...(useAnchor ? [falProductImages] : []), []]
           for (let ri = 0; ri < rungs.length; ri++) {
-            try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: rungs[ri], resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false })); break }
+            try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: rungs[ri], resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })); break }
             catch (e) {
               if (!segBlocked(e) || ri === rungs.length - 1) throw e
               console.warn(`segment ${i + 1} refs blocked — laddering down`)
@@ -1759,7 +1765,7 @@ async function generateJob(job) {
               try {
                 const fix = `${prompt}\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo — same container, shape and parts. Do NOT add, invent or change any part: NO cap, lid, spout, bottle-neck, box or extra packaging that is not visibly present in the attached photo. If the real product is a flat pouch/sachet, keep it a flat pouch with no cap.`
                 console.warn(`↻ ${job.id} re-rolling segment ${i + 1} (invented product part)`)
-                const rr = await falGenerate({ prompt: fix, imageUrls: imgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false })
+                const rr = await falGenerate({ prompt: fix, imageUrls: imgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })
                 falCost += clipCost(meta.tier, segDur)
                 await rm(f, { force: true }).catch(() => {})
                 await downloadToFile(rr.videoUrl, f)
@@ -1776,11 +1782,11 @@ async function generateJob(job) {
         const cat = `${base}-cat.mp4`
         tmp.push(cat)
         await concatClips(files, cat, segDurs)   // each segment trimmed to its own script-matched length
-        // Seedance is now silent (generateAudio:false) — lay a single CLEAN OpenAI TTS voiceover over the
-        // whole stitched video (same as the single-take path). This is the actual voice now: one
-        // continuous narration, no per-segment Seedance babble, far clearer Urdu/Hindi.
+        // Native mode (default): the concatenated clips already carry Seedance's own lip-synced voice —
+        // ship it as-is. Overlay mode (meta.tts_overlay): the clips are silent, so lay ONE continuous
+        // voice over the whole stitched video (ElevenLabs for non-English, else OpenAI).
         let voiced = cat
-        if (finalScript && finalScript.trim()) {
+        if (useOverlayVoice && finalScript && finalScript.trim()) {
           try {
             const clipDur = (await probeDuration(cat)) || segDurs.reduce((a, d) => a + d, 0) || 15
             const vo = await ttsVoiceover(capScriptToSeconds(finalScript, clipDur * 1.25 + 2), `${job.id}-seg`, meta.voice, meta.language)
@@ -2020,6 +2026,7 @@ async function tweakJob(job) {
       && meta.segment_plan && Array.isArray(meta.segment_plan.segments) && meta.segment_plan.segments.length > 0
     if (isSegVideo && (t.type === 'redo_segment' || t.type === 'redo_vo' || t.type === 'trim')) {
       const plan = meta.segment_plan
+      const useOverlayVoice = meta.tts_overlay === true   // native voice by default; overlay only if the render used it
       const segClips = { ...(meta.segment_clips || {}) }
       const segAnchors = { ...(meta.segment_anchors || {}) }
       const segs = plan.segments
@@ -2045,7 +2052,7 @@ async function tweakJob(job) {
         const rungs = [imgs, ...(anchor ? [falProductImages] : []), []]
         let videoUrl = null
         for (let ri = 0; ri < rungs.length; ri++) {
-          try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: rungs[ri], resolution: meta.resolution, duration: segDurs[si], aspect: meta.aspect, tier: meta.tier, generateAudio: false })); break }
+          try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: rungs[ri], resolution: meta.resolution, duration: segDurs[si], aspect: meta.aspect, tier: meta.tier, generateAudio: !useOverlayVoice })); break }
           catch (e) { if (!blocked(e) || ri === rungs.length - 1) throw e }
         }
         if (!videoUrl) return bail('segment re-roll blocked by moderation')
@@ -2065,8 +2072,10 @@ async function tweakJob(job) {
       const cat = `${base}-cat.mp4`; tmp.push(cat)
       await concatClips(files, cat, segDurs)
       let voiced = cat
+      // Native mode keeps the clips' own Seedance voice. Overlay mode re-lays one continuous voice
+      // (and is the only mode where "redo voiceover" means anything).
       const finalScript = t.type === 'redo_vo' ? (t.script || meta.final_script || meta.script || '') : (meta.final_script || meta.script || '')
-      if (finalScript && finalScript.trim()) {
+      if (useOverlayVoice && finalScript && finalScript.trim()) {
         try {
           const clipDur = (await probeDuration(cat)) || segDurs.reduce((a, d) => a + d, 0) || 15
           const vo = await ttsVoiceover(capScriptToSeconds(finalScript, clipDur * 1.25 + 2), `${job.id}-segtw`, meta.voice, meta.language)
