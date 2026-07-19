@@ -205,6 +205,42 @@ async function verifyProductScale(localFile, sizeAnchor, id) {
   } catch { return 'unknown' }
 }
 
+// ── Per-SEGMENT product-truth check. Seedance sometimes INVENTS parts the real product doesn't have
+// (the ejadfarm bug: a cap on a capless pouch). We sample a frame from the rendered segment, put it
+// next to the REAL product photo, and ask gpt-4o-mini "same product, or invented/changed parts?".
+// 'mismatch' → the caller re-rolls that ONE segment once with a hard correction. Returns
+// 'match' | 'mismatch' | 'unknown'. ~1¢. Physical products only (services have no product). ──
+async function verifySegmentProduct(localFile, productDataUri, productName, id, i) {
+  if (!OPENAI_KEY || !productDataUri) return 'unknown'
+  let frame
+  try {
+    const dur = (await probeDuration(localFile)) || 8
+    const f = join(tmpdir(), `pv-${id}-${i}.jpg`)
+    await ff(['-y', '-ss', String(Math.max(0.5, dur * 0.6)), '-i', localFile, '-frames:v', '1', '-q:v', '5', '-vf', 'scale=512:-1', f])
+    const b = await readFile(f)
+    frame = `data:image/jpeg;base64,${b.toString('base64')}`
+    await rm(f, { force: true }).catch(() => {})
+  } catch (e) { console.warn(`seg-verify frame ${id}.${i}:`, e.message); return 'unknown' }
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', max_tokens: 80, temperature: 0, response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: `FIRST image = the REAL product${productName ? ` ("${productName}")` : ''}. SECOND image = a frame from an ad someone made of it. Does the product in the ad frame MATCH the real product's shape, packaging and parts? Flag "mismatch" ONLY if the ad clearly ADDED or CHANGED a physical part the real product does not have — an invented cap/lid/bottle/spout, a different container type, wrong shape. Minor color/lighting/angle differences are fine ("match"). If no product is clearly visible in the frame, "unknown". Return ONLY JSON: {"verdict":"match"|"mismatch"|"unknown","reason":"few words"}` },
+          { type: 'image_url', image_url: { url: productDataUri } },
+          { type: 'image_url', image_url: { url: frame } },
+        ] }],
+      }),
+    })
+    if (!r.ok) return 'unknown'
+    const j = await r.json()
+    const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
+    if (out.verdict === 'mismatch') console.warn(`🔬 ${id} segment ${i + 1} product mismatch: ${out.reason || ''}`)
+    return out.verdict === 'mismatch' || out.verdict === 'match' ? out.verdict : 'unknown'
+  } catch { return 'unknown' }
+}
+
 // ── Creator-look override: the user can recast the on-camera creator(s) to a chosen ethnicity/look
 // (Pakistani / Indian / Arab / …) while keeping everything else from the reference. 'match' (or empty)
 // = today's behavior: copy the reference creator exactly. ──
@@ -1609,8 +1645,10 @@ async function generateJob(job) {
     // ── LONG-FORM UGC (30/60s): the approved script splits into 2/4 segments at sentence
     // boundaries; every segment prompt opens with the SAME character paragraph, and each clip after
     // the first is anchored to the previous clip's final frame (@Image1) so the creator carries
-    // through the cuts. Clips keep Seedance's own lip-synced audio (a TTS overlay would break sync),
-    // with the voice description repeated verbatim to hold tone steady. ──
+    // through the cuts. Each segment renders SILENT (generateAudio:false) and is length-matched to its
+    // own script line (min 5s); after stitching we lay ONE continuous OpenAI TTS voiceover over the
+    // whole video — clearer than Seedance's per-segment audio, and no garbled seams. Physical segments
+    // also pass a per-segment product-truth check that re-rolls a clip that invents a part. ──
     const nSeg = Math.min(4, Math.max(1, Number(meta.segments) || 1))
     if (nSeg > 1) {
       // Reuse the stamped plan + clips on resume (see faithful-mode checkpointing note).
@@ -1675,6 +1713,24 @@ async function generateJob(job) {
           falCost += clipCost(meta.tier, segDur)
           const f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
+          // PER-SEGMENT PRODUCT CHECK (physical only): if Seedance invented a part the real product
+          // doesn't have (a cap on a capless pouch), re-roll THIS segment ONCE with a hard correction.
+          // We only re-roll once per segment — a persistent mismatch ships rather than looping fal spend.
+          if (!isService && meta.reroll_product_check !== false) {
+            const prodRef = falProductImages[0] || productImages[0]
+            const verdict = await verifySegmentProduct(f, prodRef, (meta.product_details && meta.product_details.name) || '', job.id, i)
+            if (verdict === 'mismatch') {
+              try {
+                const fix = `${prompt}\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo — same container, shape and parts. Do NOT add, invent or change any part: NO cap, lid, spout, bottle-neck, box or extra packaging that is not visibly present in the attached photo. If the real product is a flat pouch/sachet, keep it a flat pouch with no cap.`
+                console.warn(`↻ ${job.id} re-rolling segment ${i + 1} (invented product part)`)
+                const rr = await falGenerate({ prompt: fix, imageUrls: imgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false })
+                falCost += clipCost(meta.tier, segDur)
+                await rm(f, { force: true }).catch(() => {})
+                await downloadToFile(rr.videoUrl, f)
+                videoUrl = rr.videoUrl
+              } catch (e) { console.warn(`segment ${i + 1} re-roll failed (keeping first take):`, e.message) }
+            }
+          }
           tmp.push(f); files.push(f)
           if (i < plan.segments.length - 1) anchor = await lastFrameAnchor(f, job.id, i)
           segClips[i] = videoUrl
@@ -1848,6 +1904,7 @@ const CHIP_FIX = {
 async function tweakJob(job) {
   const meta = job.clone_meta || {}
   const t = meta.tweak || {}
+  const isService = meta.product_type === 'service'   // service/app brand → no physical product path
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0) } } }).catch(() => {})
   // Restore the row to its previous DONE state (original video intact) + refund the tweak tx.
@@ -1908,6 +1965,85 @@ async function tweakJob(job) {
       if (t.tx) await rpc('commit_credits', { p_tx: t.tx, p_metadata: { tweak: t.type, chip: t.chip ?? null, actual_cost_usd: +falCost.toFixed(2) } })
       for (const x of tmp) await rm(x, { force: true }).catch(() => {})
       console.log(`🔧 tweaked (redo_ugc) ${job.id} → ${url} ($${falCost.toFixed(2)})`)
+      return
+    }
+
+    // ── LONG-FORM UGC segment re-roll: regenerate ONE segment of a 30/60s video and re-stitch from
+    // the cached segment_clips — only the changed segment costs fal. The rest of the video is reused
+    // byte-for-byte, then a single fresh TTS voiceover is laid over the whole thing (as in the main
+    // long-form path). Continuity: the re-rolled segment reuses its original entry anchor, so its
+    // START still matches the prior cut; its END may differ slightly from the next (reused) segment. ──
+    // redo_segment re-rolls ONE cached segment (fal cost); redo_vo/trim on a long-form video just
+    // re-stitch the cached segments + a fresh voiceover (no fal cost) — either way this segment path
+    // owns any tweak on a multi-segment UGC render (the scene path below has no segment cache).
+    const isSegVideo = Number(meta.segments || 1) > 1 && meta.mode !== 'faithful'
+      && meta.segment_plan && Array.isArray(meta.segment_plan.segments) && meta.segment_plan.segments.length > 0
+    if (isSegVideo && (t.type === 'redo_segment' || t.type === 'redo_vo' || t.type === 'trim')) {
+      const plan = meta.segment_plan
+      const segClips = { ...(meta.segment_clips || {}) }
+      const segAnchors = { ...(meta.segment_anchors || {}) }
+      const segs = plan.segments
+      if (!Object.keys(segClips).length) return bail('no cached segments to tweak (older render)')
+      const segDurs = segs.map((s) => Math.max(5, Math.min(15, Math.round(String(s.script || s.text || '').trim().split(/\s+/).filter(Boolean).length / 2.6) + 1)))
+
+      // Re-roll one segment only for redo_segment; redo_vo/trim reuse every cached clip untouched.
+      const si = Number(t.scene)
+      if (t.type === 'redo_segment') {
+        if (!(Number.isInteger(si) && si >= 0 && si < segs.length)) return bail('bad segment index')
+        await prog(`Re-rolling section ${si + 1}…`, 15, 150)
+        console.log(`🔧 ${job.id} tweak: redo segment ${si + 1}/${segs.length} (chip=${t.chip || 'redo'})`)
+        const falProductImages = [meta.clean_product || (Array.isArray(meta.product_image_urls) ? meta.product_image_urls[0] : null), (Array.isArray(meta.product_image_urls) ? meta.product_image_urls[1] : null)].filter(Boolean).slice(0, 2)
+        const anchor = si > 0 ? segAnchors[si - 1] : null
+        const fix = CHIP_FIX[t.chip] ?? ''
+        const prompt = segmentPrompt(plan, segs[si], si, segs.length, !!anchor, falProductImages.length, meta.language) + fix
+        const imgs = anchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages
+        const blocked = (e) => e.code === 'content_policy_images' || e.code === 'content_policy_video'
+        // Ladder down on moderation blocks (anchor+products → products only → pure prompt), same as the
+        // main long-form path, so one blocked ref never kills the tweak after we've spent fal money.
+        const rungs = [imgs, ...(anchor ? [falProductImages] : []), []]
+        let videoUrl = null
+        for (let ri = 0; ri < rungs.length; ri++) {
+          try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: rungs[ri], resolution: meta.resolution, duration: segDurs[si], aspect: meta.aspect, tier: meta.tier, generateAudio: false })); break }
+          catch (e) { if (!blocked(e) || ri === rungs.length - 1) throw e }
+        }
+        if (!videoUrl) return bail('segment re-roll blocked by moderation')
+        falCost += clipCost(meta.tier, segDurs[si])
+        segClips[si] = videoUrl
+      } else {
+        await prog(t.type === 'redo_vo' ? 'Re-recording the voiceover…' : 'Re-trimming…', 20, 40)
+      }
+
+      // Download every segment (new + cached) in order, re-concat, re-voiceover, finish.
+      await prog('Re-stitching your video…', 55, 60)
+      const files = []
+      for (let i = 0; i < segs.length; i++) {
+        const f = `${base}-${i}.mp4`; tmp.push(f)
+        await downloadToFile(segClips[i], f); files.push(f)
+      }
+      const cat = `${base}-cat.mp4`; tmp.push(cat)
+      await concatClips(files, cat, segDurs)
+      let voiced = cat
+      const finalScript = t.type === 'redo_vo' ? (t.script || meta.final_script || meta.script || '') : (meta.final_script || meta.script || '')
+      if (finalScript && finalScript.trim()) {
+        try {
+          const clipDur = (await probeDuration(cat)) || segDurs.reduce((a, d) => a + d, 0) || 15
+          const vo = await ttsVoiceover(capScriptToSeconds(finalScript, clipDur * 1.25 + 2), `${job.id}-segtw`, meta.voice)
+          tmp.push(vo)
+          const mixed = `${base}-vo.mp4`; tmp.push(mixed)
+          await muxVoiceover(cat, vo, mixed)
+          voiced = mixed
+        } catch (e) { console.warn(`seg-tweak tts/mux failed (shipping without VO):`, e.message) }
+      }
+      const fin = await withEndCard(voiced, meta, job.id, 'tweak', tmp)
+      let ovFin = await burnOverlays(fin.file, meta.overlays, job.id)
+      if (isService) ovFin = await burnAppDemo(ovFin, meta.beat_sheet && meta.beat_sheet.app_demo, meta.product_image_urls, job.id, meta.screencast_url)
+      const ver = Math.random().toString(36).slice(2, 8)
+      const url = await uploadVideo(ovFin, `creatives/${job.user_id}/${job.id}-t${ver}.mp4`)
+      const { tweak, progress, ...rest } = meta
+      await stamp({ status: 'done', image_url: url, clone_meta: { ...rest, segment_clips: segClips, segment_anchors: segAnchors, ...(t.type === 'redo_vo' && t.script ? { final_script: t.script } : {}), last_tweak: { type: t.type, segment: t.type === 'redo_segment' ? si : null, chip: t.chip ?? null } } })
+      if (t.tx) await rpc('commit_credits', { p_tx: t.tx, p_metadata: { tweak: t.type, segment: t.type === 'redo_segment' ? si : null, chip: t.chip ?? null, actual_cost_usd: +falCost.toFixed(2) } })
+      for (const x of tmp) await rm(x, { force: true }).catch(() => {})
+      console.log(`🔧 tweaked (${t.type}, segment video) ${job.id} → ${url} ($${falCost.toFixed(2)})`)
       return
     }
 

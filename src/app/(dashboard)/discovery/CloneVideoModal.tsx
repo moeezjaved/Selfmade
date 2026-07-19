@@ -71,7 +71,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [overlaysOn, setOverlaysOn] = useState(false)  // on-screen text is OPT-IN — clean video by default
   const [err, setErr] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)   // non-error info (e.g. still rendering)
-  const [result, setResult] = useState<{ url: string; script?: string | null; tweakable?: boolean; ugcTweakable?: boolean; tweakScenes?: { duration: number; hasPeople: boolean }[]; finalScript?: string | null } | null>(null)
+  const [result, setResult] = useState<{ url: string; script?: string | null; tweakable?: boolean; ugcTweakable?: boolean; segmentTweakable?: boolean; tweakScenes?: { duration: number; hasPeople: boolean }[]; tweakSegments?: { script: string }[]; finalScript?: string | null } | null>(null)
   // ── Tweak panel (post-render, per-scene fixes — no full re-render) ──
   const [twSel, setTwSel] = useState<number | null>(null)      // selected scene index
   const [twBusy, setTwBusy] = useState(false)
@@ -274,7 +274,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
         setPhase('review'); return
       }
       if (st.error || !st.url) { setErr((st.error || 'generation failed') + ' — credits were refunded.'); setPhase('review'); refreshCredits(); return }
-      setResult({ url: st.url, script: st.script, tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, tweakScenes: st.tweakScenes || [], finalScript: st.finalScript || st.script }); setPhase('done')
+      setResult({ url: st.url, script: st.script, tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, segmentTweakable: !!st.segmentTweakable, tweakScenes: st.tweakScenes || [], tweakSegments: st.tweakSegments || [], finalScript: st.finalScript || st.script }); setPhase('done')
     } catch (e: any) { setErr(String(e?.message || e)); setPhase('review') }
   }
 
@@ -293,7 +293,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       const st = await pollUntil(jobId, 'processing', 900_000)
       if (st.timedOut) { setTwMsg('Still working — the updated video will appear in My Creatives.'); setTwBusy(false); return }
       if (st.tweakError) { setTwMsg(`Tweak failed (${st.tweakError}) — your original video is untouched and any charge was refunded.`); setTwBusy(false); refreshCredits(); return }
-      if (st.url) setResult({ url: st.url, script: st.finalScript || st.script, tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, tweakScenes: st.tweakScenes || [], finalScript: st.finalScript || st.script })
+      if (st.url) setResult({ url: st.url, script: st.finalScript || st.script, tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, segmentTweakable: !!st.segmentTweakable, tweakScenes: st.tweakScenes || [], tweakSegments: st.tweakSegments || [], finalScript: st.finalScript || st.script })
       setTwMsg('Updated ✓'); setTwSel(null); setTwVoOpen(false)
     } catch (e: any) { setTwMsg(String(e?.message || e)) }
     setTwBusy(false)
@@ -415,6 +415,39 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       ))}
                     </div>
                   )}
+                  {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
+                </div>
+              )}
+
+              {!result.tweakable && !result.ugcTweakable && result.segmentTweakable && (result.tweakSegments?.length || 0) > 0 && (
+                <div style={{ borderTop: `1px solid ${L_LINE}`, paddingTop: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: L_MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Fix one section</div>
+                  <p style={{ fontSize: 11.5, color: L_MUTED, margin: '0 0 8px' }}>Only one part of the video looks off? Re-roll just that section — the rest is reused, so it&apos;s fast and cheap.</p>
+                  {twBusy ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: GREEN, fontSize: 12.5, padding: '8px 0' }}><Loader2 size={14} className="spin" /> {genProgress?.label || 'Re-rolling…'}</div>
+                  ) : (<>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                      {result.tweakSegments!.map((s, i) => (
+                        <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={{ ...chip(twSel === i), padding: '6px 11px', fontSize: 12, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.script}>Section {i + 1}{s.script ? ` · “${s.script}”` : ''}</button>
+                      ))}
+                    </div>
+                    {twSel != null && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {[['size', 'Product too big/small'], ['product', 'Product looks wrong'], ['person', 'Person looks off'], ['action', 'Not using the product'], ['redo', 'Just re-roll it']].map(([k, label]) => (
+                          <button key={k} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: k })} style={{ ...chip(false), fontSize: 11.5 }}>{label} · 600 cr</button>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                      <button onClick={() => { setTwVoOpen((v) => !v); setTwVoText(result.finalScript || '') }} style={{ ...chip(twVoOpen), fontSize: 11.5 }}>🎙 Redo voiceover · 50 cr</button>
+                    </div>
+                    {twVoOpen && (
+                      <div style={{ marginTop: 8 }}>
+                        <textarea value={twVoText} onChange={(e) => setTwVoText(e.target.value.slice(0, 2000))} rows={3} style={{ ...input, width: '100%', resize: 'vertical', fontSize: 12.5 }} placeholder="Edit the narration…" />
+                        <button onClick={() => twVoText.trim() && runTweak({ type: 'redo_vo', script: twVoText.trim() })} style={{ ...btnPrimary, marginTop: 6, padding: '8px 14px', fontSize: 12.5 }}>Apply new voiceover · 50 cr</button>
+                      </div>
+                    )}
+                  </>)}
                   {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
                 </div>
               )}
