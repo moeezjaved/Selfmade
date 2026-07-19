@@ -191,12 +191,22 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     if (!file) return
     setCastBusy(true); setErr(null)
     try {
-      const pre = await fetch('/api/assets/upload-url', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fileType: file.type, sizeBytes: file.size }) }).then((r) => r.json())
-      if (!pre.uploadUrl || !pre.key) throw new Error(pre.message || 'Could not start the upload')
+      const preRes = await fetch('/api/assets/upload-url', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fileType: file.type, sizeBytes: file.size }) })
+      const pre = await preRes.json().catch(() => ({}))
+      if (!preRes.ok || !pre.uploadUrl || !pre.key) throw new Error(pre.message || (preRes.status === 413 || pre.error === 'file_too_large' ? 'That recording is too large (max 500 MB).' : 'Could not start the upload — please try again.'))
       const put = await fetch(pre.uploadUrl, { method: 'PUT', headers: { 'content-type': pre.fileType || file.type }, body: file })
-      if (!put.ok) throw new Error('Upload failed — please try again')
+      if (!put.ok) throw new Error('Upload failed — please try again.')
       setScreencastKey(pre.key); setScreencastName(file.name)
-    } catch (e: any) { setErr(e?.message || 'Could not upload the screen recording') }
+    } catch (e: any) {
+      // The screen recording is OPTIONAL — never let a hiccup here block the render. Say so plainly and
+      // let the user skip. "Failed to fetch" = the browser dropped the request (flaky network / a deploy
+      // rollout / an extension); a retry usually works, and screenshots are used if they skip.
+      const raw = String(e?.message || e)
+      const friendly = /failed to fetch|networkerror|load failed/i.test(raw)
+        ? 'Upload didn’t go through (network hiccup). Try once more, or just skip this — your screenshots will be used.'
+        : raw
+      setErr(friendly)
+    }
     finally { setCastBusy(false) }
   }
   const toggleSel = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : (s.length >= 4 ? s : [...s, id]))
