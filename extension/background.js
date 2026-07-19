@@ -71,6 +71,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           sendResponse({ ok: r.status === 200, ...r.json })
           break
         }
+        case 'download': {
+          // Download a resolved media URL (real fbcdn MP4 or image) to the user's Downloads — the
+          // browser can fetch these cross-origin URLs even though the in-page blob: can't be.
+          try {
+            const url = String(msg.url || '')
+            if (!/^https?:\/\//.test(url)) { sendResponse({ ok: false, error: 'no url' }); break }
+            const filename = String(msg.filename || '').replace(/[^\w.\- ]+/g, '').slice(0, 80) || undefined
+            const id = await chrome.downloads.download({ url, filename, saveAs: false })
+            sendResponse({ ok: !!id })
+          } catch (e) { sendResponse({ ok: false, error: e?.message || String(e) }) }
+          break
+        }
         case 'saveAd': {
           const payload = msg.payload || {}
           // Apply the popup's default-board choice unless the caller already set one.
