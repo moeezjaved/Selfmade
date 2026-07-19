@@ -11,6 +11,8 @@ import CloneModal from '../../CloneModal'
 import CloneVideoModal from '../../CloneVideoModal'
 import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 import { openCredits } from '@/components/credits/CreditModal'
+import { showUpsell } from '@/components/UpsellModal'
+import toast from 'react-hot-toast'
 import { useIsMobile } from '@/lib/useIsMobile'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area,
@@ -658,11 +660,9 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
         const r = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId, name: brandName }) })
         const j = await r.json().catch(() => ({}))
         if (r.ok) { setSpied(true) }
-        else if (r.status === 402) {
-          const msg = String(j.error || j.message || '')
-          if (/credit/i.test(msg)) openCredits('buy', msg)                     // insufficient credits → top-up
-          else alert(msg || 'You’ve reached your plan’s Brand Spy limit — upgrade to track more brands.')
-        } else alert(j.error || 'Could not start spying — try again.')
+        else if (showUpsell(j)) { /* plan_limit → in-app upgrade modal (e.g. "your plan tracks 1 brand at a time") */ }
+        else if (r.status === 402 && /credit/i.test(String(j.error || j.message || ''))) openCredits('buy', String(j.message || j.error))
+        else toast.error(String(j.message || j.error || 'Could not start spying — please try again.'))
       } catch { alert('Network error — try again.') } finally { setBusy(false) }
     }
   }

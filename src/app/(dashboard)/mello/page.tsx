@@ -132,9 +132,10 @@ export default function MelloPage() {
           <button onClick={newTask} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid #d3e0cb', background: '#fff', color: '#2d5a27', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
             <Plus size={16} /> New task
           </button>
-          <Link href="/mello/automations" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9, color: '#566550', fontWeight: 600, fontSize: 13.5, marginTop: 6, textDecoration: 'none' }}>
+          <div title="Coming soon" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9, color: '#9aa79a', fontWeight: 600, fontSize: 13.5, marginTop: 6, cursor: 'default' }}>
             <Zap size={15} /> Automations
-          </Link>
+            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#5a7a5a', background: '#eef3e6', border: '1px solid #d8ebb9', borderRadius: 100, padding: '2px 7px' }}>Soon</span>
+          </div>
         </div>
         <div style={{ padding: '4px 14px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', color: '#9aa593', textTransform: 'uppercase' }}>My tasks</div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px' }}>
