@@ -50,6 +50,13 @@ export async function GET(req: NextRequest) {
     tweakScenes: Array.isArray(meta.scene_plan) ? meta.scene_plan.map((s: any) => ({ duration: s.duration, hasPeople: !!s.has_people })) : [],
     // Single-clip UGC renders get whole-clip fix chips (re-roll with a corrective prompt).
     ugcTweakable: (row as any).status === 'done' && meta.mode !== 'faithful' && Number(meta.segments || 1) === 1,
+    // Long-form UGC (30/60s) with cached segment clips can fix ONE section at a time.
+    segmentTweakable: (row as any).status === 'done' && meta.mode !== 'faithful' && Number(meta.segments || 1) > 1
+      && Array.isArray(meta.segment_plan?.segments) && meta.segment_plan.segments.length > 0
+      && !!meta.segment_clips && Object.keys(meta.segment_clips).length > 0,
+    tweakSegments: Array.isArray(meta.segment_plan?.segments)
+      ? meta.segment_plan.segments.map((s: any) => ({ script: String(s.script || s.text || '').slice(0, 90) }))
+      : [],
     tweaking: !!meta.tweak,
     tweakError: meta.tweak_error || null,
     finalScript: meta.final_script || meta.script || null,

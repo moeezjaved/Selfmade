@@ -15,7 +15,8 @@ export const dynamic = 'force-dynamic'
 const CHIPS = new Set(['redo', 'size', 'product', 'action', 'person', 'closeup'])
 const ACTIONS: Record<string, string | null> = {
   redo_scene: 'video_tweak_scene',
-  redo_ugc: 'video_tweak_ugc',    // re-roll the single UGC clip with a corrective prompt
+  redo_ugc: 'video_tweak_ugc',        // re-roll the single UGC clip with a corrective prompt
+  redo_segment: 'video_tweak_scene',  // re-roll ONE segment of a long-form UGC video (same cost as a scene)
   redo_vo: 'video_tweak_vo',
   remove_scene: null,   // ffmpeg-only → free
   trim: null,           // ffmpeg-only → free
@@ -50,6 +51,13 @@ export async function POST(req: NextRequest) {
     if (!(Number.isInteger(idx) && idx >= 0 && idx < scenes.length)) return NextResponse.json({ error: 'bad scene index' }, { status: 400 })
     if (type === 'remove_scene' && scenes.length < 3) return NextResponse.json({ error: 'keep at least 2 scenes' }, { status: 400 })
   }
+  // Long-form UGC segment re-roll: needs cached segment clips + a valid segment index.
+  const segCount = Array.isArray(meta.segment_plan?.segments) ? meta.segment_plan.segments.length : 0
+  const hasSegClips = meta.segment_clips && Object.keys(meta.segment_clips).length > 0
+  if (type === 'redo_segment') {
+    if (!segCount || !hasSegClips) return NextResponse.json({ error: 'this render has no per-section cache (older video) — re-generate instead' }, { status: 409 })
+    if (!(Number.isInteger(idx) && idx >= 0 && idx < segCount)) return NextResponse.json({ error: 'bad section index' }, { status: 400 })
+  }
   // UGC clip re-roll: single-clip UGC renders only (multi-segment 30/60s would need a full re-render).
   if (type === 'redo_ugc' && (meta.mode === 'faithful' || Number(meta.segments) > 1))
     return NextResponse.json({ error: 'this fix applies to single-clip UGC videos' }, { status: 409 })
@@ -68,8 +76,8 @@ export async function POST(req: NextRequest) {
 
   const tweak: Record<string, unknown> = {
     type,
-    ...(type === 'redo_scene' || type === 'remove_scene' ? { scene: idx } : {}),
-    ...(type === 'redo_scene' || type === 'redo_ugc' ? { chip: CHIPS.has(String(chip)) ? String(chip) : 'redo' } : {}),
+    ...(type === 'redo_scene' || type === 'remove_scene' || type === 'redo_segment' ? { scene: idx } : {}),
+    ...(type === 'redo_scene' || type === 'redo_ugc' || type === 'redo_segment' ? { chip: CHIPS.has(String(chip)) ? String(chip) : 'redo' } : {}),
     ...(type === 'redo_vo' && typeof script === 'string' && script.trim() ? { script: script.trim().slice(0, 2000) } : {}),
     ...(txId ? { tx: txId } : {}),
   }
