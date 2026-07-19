@@ -52,7 +52,8 @@ async function rpc(fn, body) { const r = await fetch(`${U}/rest/v1/rpc/${fn}`, {
 
 // ── Gemini: watch the competitor video → structured beat sheet ────────────────
 const BEAT_SCHEMA_PROMPT = `You are a UGC ad director. Watch this video ad and return ONLY minified JSON (no prose, no code fence):
-{"setting":"","avatar":"","camera":"","hook_type":"","beats":[{"t":"0-2s","action":""}],"scene_count":0,"on_screen_text":[{"t":"0-4s","text":""}],"product_role":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
+{"setting":"","avatar":"","camera":"","hook_type":"","beats":[{"t":"0-2s","action":""}],"scene_count":0,"on_screen_text":[{"t":"0-4s","text":""}],"app_demo":[{"t":"0-4s","region":"split_top"}],"product_role":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
+- app_demo: time ranges where the ad shows a SOFTWARE UI / app screen / website / dashboard / phone-or-laptop screen recording (NOT a physical product, NOT a person). region: "split_top" if the screen fills only the TOP portion while a person stays on screen below; "full" if the screen fills the whole frame (a cut to the app). Empty array if the ad never shows a screen/app UI.
 - setting: physical scene. avatar: who's on camera (age, look, wardrobe) or "none". camera: framing + movement.
 - on_screen_text: the BIG designed text CALLOUTS/graphics burned on screen (headlines, stats like "25g PROTEIN", prices, offers, CTAs) with the time range each is visible — NOT the spoken words, NOT tiny legal text. Empty array if the ad has no on-screen text.
 - hook_type: first-3-seconds pattern. beats: 3-8 time-ranged actions. transcript: exact spoken words. Be concrete.
@@ -1049,6 +1050,51 @@ async function burnOverlays(videoIn, overlays, id) {
     return out
   } catch (e) { console.warn(`overlays burn failed for ${id}:`, e.message); return videoIn }
 }
+// App-demo composite (service/app clones only): drop the user's REAL screenshots into the beats where
+// the source showed its app/UI — a top band ("split_top", the creator stays visible below) or a
+// full-frame cut ("full"). Screenshots come from the user's step-2 selection / brand screenshots —
+// never an invented UI. Fully additive & fail-safe: any ffmpeg error ships the un-composited video,
+// exactly like burnOverlays. Never runs for physical brands.
+async function burnAppDemo(videoIn, ranges, imageUrls, id) {
+  const imgs = (Array.isArray(imageUrls) ? imageUrls : []).filter((u) => typeof u === 'string' && (u.startsWith('http') || u.startsWith('data:')))
+  const list = (Array.isArray(ranges) ? ranges : []).filter((r) => r && r.t).slice(0, 5)
+  if (!list.length || !imgs.length) return videoIn
+  const dur = await probeDuration(videoIn) || 30
+  const probe = await probeOut(['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=s=x:p=0', videoIn])
+  const [W0, H0] = String(probe || '').trim().split('x').map((n) => parseInt(n) || 0)
+  const W = W0 > 0 ? W0 : 720, H = H0 > 0 ? H0 : 1280
+  const inputs = ['-i', videoIn]
+  const scaleFilters = []
+  const overlayChain = []
+  let ok = 0
+  for (let i = 0; i < list.length; i++) {
+    const { start, end } = parseOverlayRange(list[i].t, dur)
+    if (!(end > start)) continue
+    const src = imgs[i % imgs.length]
+    const f = join(tmpdir(), `appdemo-${id}-${i}.png`)
+    try {
+      if (src.startsWith('data:')) await writeFile(f, Buffer.from(src.split(',')[1] || '', 'base64'))
+      else await downloadToFile(src, f)
+    } catch { continue }
+    inputs.push('-i', f)
+    const inIdx = 1 + ok
+    const full = String(list[i].region || '').toLowerCase() === 'full'
+    // full → cover the whole frame (a clean cut to the app). split_top → a top band (~top third) that
+    // sits ABOVE a centred talking head so the creator's face stays visible below.
+    const bandH = full ? H : Math.round(H * 0.34)
+    scaleFilters.push(`[${inIdx}:v]scale=${W}:${bandH}:force_original_aspect_ratio=increase,crop=${W}:${bandH},setsar=1[a${ok}]`)
+    const prev = ok === 0 ? '[0:v]' : `[v${ok - 1}]`
+    overlayChain.push(`${prev}[a${ok}]overlay=0:0:enable='between(t\\,${start.toFixed(2)}\\,${Math.min(dur, end).toFixed(2)})'[v${ok}]`)
+    ok++
+  }
+  if (!ok) return videoIn
+  const out = join(tmpdir(), `appdemo-${id}.mp4`)
+  try {
+    await ff(['-y', ...inputs, '-filter_complex', [...scaleFilters, ...overlayChain].join(';'), '-map', `[v${ok - 1}]`, '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out])
+    console.log(`📱 ${id} composited ${ok} app-demo screen(s)`)
+    return out
+  } catch (e) { console.warn(`app-demo composite failed for ${id}:`, e.message); return videoIn }
+}
 async function makeEndCard(meta, dims, out, tmp) {
   const ec = meta.end_card || {}
   const name = ecText((meta.product_details && meta.product_details.name) || 'Your brand', 34)
@@ -1452,7 +1498,9 @@ async function generateJob(job) {
         await prog('Stitching + voiceover…', 86, 30)
         const main = await assemble(files, finalScript, 'main')
         await prog('Finishing up…', 95, 12)
-        const ovMain = await burnOverlays(main.file, meta.overlays, job.id); tmp.push(ovMain);
+        let ovMain = await burnOverlays(main.file, meta.overlays, job.id); tmp.push(ovMain);
+        // Service/app only: drop the user's real screenshots into the app-demo beats (physical untouched).
+        if (isService) { ovMain = await burnAppDemo(ovMain, meta.beat_sheet && meta.beat_sheet.app_demo, meta.product_image_urls, job.id); tmp.push(ovMain) }
         const url = await uploadVideo(ovMain, `creatives/${job.user_id}/${job.id}.mp4`)
         // Settle the end-card tx on the MAIN cut's outcome (applied → commit, failed → refund).
         if (meta.end_card && meta.end_card.tx) {
@@ -1583,7 +1631,9 @@ async function generateJob(job) {
           if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
           else await rpc('refund_credits', { p_tx: meta.end_card.tx })
         }
-        const ovFin = await burnOverlays(fin.file, meta.overlays, job.id); const url = await uploadVideo(ovFin, `creatives/${job.user_id}/${job.id}.mp4`)
+        let ovFin = await burnOverlays(fin.file, meta.overlays, job.id)
+        if (isService) { ovFin = await burnAppDemo(ovFin, meta.beat_sheet && meta.beat_sheet.app_demo, meta.product_image_urls, job.id) }
+        const url = await uploadVideo(ovFin, `creatives/${job.user_id}/${job.id}.mp4`)
         await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'ugc_long', segments: nSeg, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (long UGC, ${nSeg} segments) ${job.id} → ${url}`)
