@@ -33,6 +33,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [brandType, setBrandType] = useState<'physical' | 'service'>('physical')
   const isService = brandType === 'service'
   const [photos, setPhotos] = useState<Photo[]>([])
+  const [screencastKey, setScreencastKey] = useState<string | null>(null)   // uploaded screen-recording (R2 key) for the split-screen top half
+  const [screencastName, setScreencastName] = useState('')
+  const [castBusy, setCastBusy] = useState(false)
+  const castRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<string[]>([])
   const [productName, setProductName] = useState('')
   const [benefit, setBenefit] = useState('')
@@ -180,6 +184,21 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     const arr = await Promise.all(Array.from(files).slice(0, 6).map(async (f) => ({ id: uid(), src: await fileToDataUrl(f) })))
     setPhotos((p) => [...p, ...arr]); setSelected((s) => Array.from(new Set([...s, ...arr.map((a) => a.id)])).slice(0, 4))
   }
+  // Screen recording (service/app): a real mp4 of the user's app/site → shown in the TOP half of the
+  // split-screen (moving UI, not a still). Big file → direct-to-R2 via the presigned Assets pipeline;
+  // we pass the object KEY and the clone-video route resolves it to a public URL.
+  const uploadScreencast = async (file: File | null) => {
+    if (!file) return
+    setCastBusy(true); setErr(null)
+    try {
+      const pre = await fetch('/api/assets/upload-url', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fileType: file.type, sizeBytes: file.size }) }).then((r) => r.json())
+      if (!pre.uploadUrl || !pre.key) throw new Error(pre.message || 'Could not start the upload')
+      const put = await fetch(pre.uploadUrl, { method: 'PUT', headers: { 'content-type': pre.fileType || file.type }, body: file })
+      if (!put.ok) throw new Error('Upload failed — please try again')
+      setScreencastKey(pre.key); setScreencastName(file.name)
+    } catch (e: any) { setErr(e?.message || 'Could not upload the screen recording') }
+    finally { setCastBusy(false) }
+  }
   const toggleSel = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : (s.length >= 4 ? s : [...s, id]))
 
   // Poll a job until it leaves the given "waiting" status. Returns the final payload, or
@@ -207,7 +226,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       const start = await fetch('/api/discovery/clone-video', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages: chosen, tier, productType: brandType,
-          characterLook: look !== 'match' ? look : undefined, language, voice,
+          characterLook: look !== 'match' ? look : undefined, language, voice, screencastKey: screencastKey || undefined,
           productDetails: { name: productName.trim() || undefined, benefit: benefit.trim() || undefined } }),
       }).then(r => r.json())
       if (!start.jobId) { setErr(start.error || 'Could not start.'); setPhase('form'); return }
@@ -471,8 +490,21 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       <button onClick={() => fileRef.current?.click()} style={photoAdd}><Upload size={16} /> Upload</button>
                       <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => onUpload(e.target.files)} />
                     </div>
+                    {isService && (
+                      <div style={{ marginTop: 14, background: '#fbfcfa', border: `1px solid ${L_LINE}`, borderRadius: 13, padding: '13px 15px' }}>
+                        <div style={{ fontSize: 13, fontWeight: 750, color: L_INK, marginBottom: 3 }}>🎥 Screen recording <span style={{ fontWeight: 500, color: L_MUTED }}>· optional, makes it look pro</span></div>
+                        <div style={{ fontSize: 12, color: L_MUTED, lineHeight: 1.5, marginBottom: 10 }}>Upload a short <b>screen recording of your app or website</b> (mp4/mov). We show it — actually moving — in the top half while the creator talks below, just like the winning ad. No recording? Your screenshots above are used instead.</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <button onClick={() => castRef.current?.click()} disabled={castBusy} style={{ ...photoAdd, width: 'auto', height: 'auto', padding: '9px 16px', flexDirection: 'row', gap: 7, opacity: castBusy ? 0.6 : 1 }}>
+                            {castBusy ? <Loader2 size={15} className="spin" /> : <Upload size={15} />} {screencastKey ? 'Replace recording' : 'Upload screen recording'}
+                          </button>
+                          {screencastKey && <span style={{ fontSize: 12, fontWeight: 700, color: GREEN, display: 'inline-flex', alignItems: 'center', gap: 5 }}><Check size={14} strokeWidth={3} /> {screencastName.slice(0, 28) || 'Added'}</span>}
+                          <input ref={castRef} type="file" accept="video/mp4,video/quicktime,video/webm" hidden onChange={(e) => uploadScreencast(e.target.files?.[0] || null)} />
+                        </div>
+                      </div>
+                    )}
                     <InfoBar>{isService
-                      ? <>💡 Service brand — the creator <b>talks about your service/app</b> (and can show it on a phone). We never render a made-up physical product.</>
+                      ? <>💡 Service brand — the creator <b>talks about your service/app</b> (and we can show your app on screen). We never render a made-up physical product.</>
                       : <>💡 The final video shows <b>your exact product</b> — we never invent a different bottle, label or price.</>}</InfoBar>
                   </section>
                 )}
