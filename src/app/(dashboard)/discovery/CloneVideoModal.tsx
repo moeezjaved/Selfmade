@@ -71,7 +71,8 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [overlaysOn, setOverlaysOn] = useState(false)  // on-screen text is OPT-IN — clean video by default
   const [err, setErr] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)   // non-error info (e.g. still rendering)
-  const [result, setResult] = useState<{ url: string; script?: string | null; tweakable?: boolean; ugcTweakable?: boolean; segmentTweakable?: boolean; tweakScenes?: { duration: number; hasPeople: boolean }[]; tweakSegments?: { script: string }[]; finalScript?: string | null } | null>(null)
+  const [result, setResult] = useState<{ url: string; script?: string | null; tweakable?: boolean; ugcTweakable?: boolean; segmentTweakable?: boolean; tweakScenes?: { duration: number; hasPeople: boolean }[]; tweakSegments?: { script: string; start?: number; end?: number }[]; finalScript?: string | null } | null>(null)
+  const [twNote, setTwNote] = useState('')   // "Fix a moment" free-text — what exactly is wrong
   // ── Tweak panel (post-render, per-scene fixes — no full re-render) ──
   const [twSel, setTwSel] = useState<number | null>(null)      // selected scene index
   const [twBusy, setTwBusy] = useState(false)
@@ -414,47 +415,55 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
 
               {!result.tweakable && result.ugcTweakable && (
                 <div style={{ borderTop: `1px solid ${L_LINE}`, paddingTop: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: L_MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Fix it</div>
-                  <p style={{ fontSize: 11.5, color: L_MUTED, margin: '0 0 8px' }}>Not quite right? One click re-rolls the clip with a targeted fix — same script, same creator vibe.</p>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: L_MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>🎯 Fix it</div>
+                  <p style={{ fontSize: 11.5, color: L_MUTED, margin: '0 0 8px' }}>Not quite right? Tell us exactly what&apos;s wrong (a mispronounced word, an invented cap…) or use a one-tap fix — same script, same creator vibe.</p>
                   {twBusy ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: GREEN, fontSize: 12.5, padding: '8px 0' }}><Loader2 size={14} className="spin" /> {genProgress?.label || 'Re-rolling…'}</div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {[['size', 'Product too big/small'], ['product', 'Product looks wrong'], ['person', 'Person looks off'], ['action', 'Not using the product'], ['redo', 'Just re-roll it']].map(([k, label]) => (
-                        <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k })} style={{ ...chip(false), fontSize: 11.5 }}>{label} · 450 cr</button>
+                  ) : (<>
+                    <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2}
+                      style={{ ...input, width: '100%', resize: 'vertical', fontSize: 12.5, marginBottom: 8 }}
+                      placeholder={'e.g. “it says Ejad wrong — pronounce it Ee-jaad” or “the pouch shouldn’t have a cap”'} />
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button onClick={() => runTweak({ type: 'redo_ugc', chip: 'redo', note: twNote.trim() || undefined })} style={{ ...btnPrimary, padding: '8px 14px', fontSize: 12.5 }}>Fix it · 450 cr</button>
+                      {[['size', 'Too big/small'], ['product', 'Product wrong'], ['person', 'Person off'], ['action', 'Not using it']].map(([k, label]) => (
+                        <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k, note: twNote.trim() || undefined })} style={{ ...chip(false), fontSize: 11.5, padding: '6px 10px' }}>{label}</button>
                       ))}
                     </div>
-                  )}
+                  </>)}
                   {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
                 </div>
               )}
 
               {!result.tweakable && !result.ugcTweakable && result.segmentTweakable && (result.tweakSegments?.length || 0) > 0 && (
                 <div style={{ borderTop: `1px solid ${L_LINE}`, paddingTop: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: L_MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Fix one section</div>
-                  <p style={{ fontSize: 11.5, color: L_MUTED, margin: '0 0 8px' }}>Only one part of the video looks off? Re-roll just that section — the rest is reused, so it&apos;s fast and cheap.</p>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: L_MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>🎯 Fix a moment</div>
+                  <p style={{ fontSize: 11.5, color: L_MUTED, margin: '0 0 8px' }}>Spot the second something&apos;s off, pick that section, and tell us what&apos;s wrong — we re-shoot ONLY that part and keep the rest.</p>
                   {twBusy ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: GREEN, fontSize: 12.5, padding: '8px 0' }}><Loader2 size={14} className="spin" /> {genProgress?.label || 'Re-rolling…'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: GREEN, fontSize: 12.5, padding: '8px 0' }}><Loader2 size={14} className="spin" /> {genProgress?.label || 'Re-shooting that section…'}</div>
                   ) : (<>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                      {result.tweakSegments!.map((s, i) => (
-                        <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={{ ...chip(twSel === i), padding: '6px 11px', fontSize: 12, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.script}>Section {i + 1}{s.script ? ` · “${s.script}”` : ''}</button>
-                      ))}
+                      {result.tweakSegments!.map((s, i) => {
+                        const mmss = (t?: number) => t == null ? '' : `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, '0')}`
+                        const range = s.start != null && s.end != null ? `${mmss(s.start)}–${mmss(s.end)}` : `Section ${i + 1}`
+                        return (
+                          <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={{ ...chip(twSel === i), padding: '6px 11px', fontSize: 12, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.script}>
+                            ⏱ {range}{s.script ? ` · “${s.script.slice(0, 34)}${s.script.length > 34 ? '…' : ''}”` : ''}
+                          </button>
+                        )
+                      })}
                     </div>
                     {twSel != null && (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {[['size', 'Product too big/small'], ['product', 'Product looks wrong'], ['person', 'Person looks off'], ['action', 'Not using the product'], ['redo', 'Just re-roll it']].map(([k, label]) => (
-                          <button key={k} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: k })} style={{ ...chip(false), fontSize: 11.5 }}>{label} · 600 cr</button>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                      <button onClick={() => { setTwVoOpen((v) => !v); setTwVoText(result.finalScript || '') }} style={{ ...chip(twVoOpen), fontSize: 11.5 }}>🎙 Redo voiceover · 50 cr</button>
-                    </div>
-                    {twVoOpen && (
-                      <div style={{ marginTop: 8 }}>
-                        <textarea value={twVoText} onChange={(e) => setTwVoText(e.target.value.slice(0, 2000))} rows={3} style={{ ...input, width: '100%', resize: 'vertical', fontSize: 12.5 }} placeholder="Edit the narration…" />
-                        <button onClick={() => twVoText.trim() && runTweak({ type: 'redo_vo', script: twVoText.trim() })} style={{ ...btnPrimary, marginTop: 6, padding: '8px 14px', fontSize: 12.5 }}>Apply new voiceover · 50 cr</button>
+                      <div style={{ background: '#fcfdfb', border: `1px solid ${L_LINE}`, borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+                        <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2}
+                          style={{ ...input, width: '100%', resize: 'vertical', fontSize: 12.5 }}
+                          placeholder={'What’s wrong in this section? e.g. “it says Ejad wrong — pronounce it Ee-jaad” or “the pouch has a cap, remove it”'} />
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+                          <button onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={{ ...btnPrimary, padding: '8px 14px', fontSize: 12.5 }}>Fix this section · 600 cr</button>
+                          <span style={{ fontSize: 11, color: L_MUTED }}>or quick fixes:</span>
+                          {[['product', 'Product wrong'], ['size', 'Too big/small'], ['person', 'Person off']].map(([k, label]) => (
+                            <button key={k} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: k, note: twNote.trim() || undefined })} style={{ ...chip(false), fontSize: 11.5, padding: '6px 10px' }}>{label}</button>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </>)}
@@ -626,6 +635,18 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                               {srcSecs ? <button onClick={() => setDurationBucket('match')} style={chip(durationBucket === 'match')}>Match the original ({srcSecs}s) · {matchCost} cr</button> : null}
                             </div>
                           )
+                        })()}
+                        {(() => {
+                          // Honest length estimate: the render matches YOUR SCRIPT, not the bucket —
+                          // buckets are a MAX. Same words/2.6 fit the worker uses, so "30s" showing
+                          // "≈22s" is exactly what ships (the ejad "why is it 22s?" question).
+                          const words = draftScript.trim().split(/\s+/).filter(Boolean).length
+                          const bucket = durationBucket === 'match' ? (srcSecs || 15) : Number(durationBucket)
+                          if (!words || bucket <= 15) return null
+                          const nS = bucket >= 60 ? 4 : 2
+                          const per = Math.ceil(words / nS)
+                          const est = Math.min(bucket, [...Array(nS)].reduce((a) => a + Math.max(5, Math.min(15, Math.round(per / 2.6) + 1)), 0))
+                          return <div style={{ fontSize: 11.5, color: GREEN, marginTop: 6, fontWeight: 600 }}>⏱ Your script fills ≈{est}s — we render exactly that (no silent padding), so the final video may be shorter than {bucket}s.</div>
                         })()}
                         {srcSecs ? <div style={{ fontSize: 11.5, color: L_FAINT, marginTop: 6 }}>Source is {srcSecs}s — a remake matches the original length (longer options are disabled).{nSegs > 1 ? ` ${nSegs} chained clips stitched into one take.` : ''}</div>
                           : nSegs > 1 ? <div style={{ fontSize: 11.5, color: L_FAINT, marginTop: 6 }}>{nSegs} chained clips of the same creator, stitched into one take.</div> : null}
