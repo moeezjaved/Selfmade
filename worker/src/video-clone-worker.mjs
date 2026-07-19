@@ -401,6 +401,7 @@ function segmentPrompt(plan, seg, i, total, hasAnchor, nImages, lang) {
   else parts.push(`The user's product is ${productRef} and must match it exactly.`)
   parts.push(`They speak to camera in ${langName(lang).split(' — ')[0]} — ${plan.voice} — lips moving in sync, saying these exact words aloud: "${String(seg.script || '').replace(/"/g, "'")}"`)
   if (seg.action) parts.push(String(seg.action))
+  if (nImages) parts.push(`PRODUCT TRUTH: render ${productRef} EXACTLY as the attached photo — same packaging type, shape, cap/closure, label and colours. Do NOT add or invent a cap, lid, bottle or any part that isn't in the photo (e.g. a pouch stays a pouch).`)
   parts.push('UGC realism: iPhone selfie framing at arm\'s length, natural light, authentic handheld, no on-screen captions.')
   return parts.filter(Boolean).join(' ')
 }
@@ -1624,6 +1625,13 @@ async function generateJob(job) {
         const segClips = meta.segment_clips || {}
         const segAnchors = meta.segment_anchors || {}
         let anchor = null
+        // Render each segment to match its SCRIPT length (min 5s — Seedance's floor), not a flat 15s.
+        // Flat 15s meant a 6-word line got ~9s of trailing dead-air (the mid-video "hang") AND we paid
+        // fal for seconds no one hears. ~2.6 words/sec + a 1s tail, clamped 5–15s.
+        const segDurs = plan.segments.map((s) => {
+          const words = String(s.script || s.text || '').trim().split(/\s+/).filter(Boolean).length
+          return Math.max(5, Math.min(15, Math.round(words / 2.6) + 1))
+        })
         for (let i = 0; i < plan.segments.length; i++) {
           if (segClips[i]) {
             const f0 = `${base}-${i}.mp4`
@@ -1643,9 +1651,13 @@ async function generateJob(job) {
           // earlier segments already cost fal money. On that rejection, retry this segment WITHOUT the
           // anchor (product images only) — we lose a little cross-cut continuity but salvage the render
           // and the fal spend. content_policy on the PRODUCT image (no anchor) still surfaces.
+          const segDur = segDurs[i]
+          // generateAudio:false → Seedance produces NO speech. We add the clean TTS voiceover at the end;
+          // leaving Seedance audio on made it babble faux-speech UNDER the narration (the garbled 11-14s
+          // + muddy Urdu). The single-take + faithful paths already pass false — the segment path didn't.
           let videoUrl
           try {
-            ({ videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
+            ({ videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
           } catch (e) {
             const segBlocked = (x) => x.code === 'content_policy_images' || x.code === 'content_policy_video'
             if (!segBlocked(e)) throw e
@@ -1653,14 +1665,14 @@ async function generateJob(job) {
             // kill the whole long-form render on a moderation block (same contract as faithful mode).
             console.warn(`segment ${i + 1} refs blocked (likeness) — laddering down`)
             try {
-              ({ videoUrl } = await falGenerate({ prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
+              ({ videoUrl } = await falGenerate({ prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
             } catch (e2) {
               if (!segBlocked(e2)) throw e2
               console.warn(`segment ${i + 1} product image blocked too — pure prompt`)
-              ;({ videoUrl } = await falGenerate({ prompt, imageUrls: [], resolution: meta.resolution, duration: 15, aspect: meta.aspect, tier: meta.tier }))
+              ;({ videoUrl } = await falGenerate({ prompt, imageUrls: [], resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
             }
           }
-          falCost += clipCost(meta.tier, 15)
+          falCost += clipCost(meta.tier, segDur)
           const f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
           tmp.push(f); files.push(f)
@@ -1671,7 +1683,7 @@ async function generateJob(job) {
         }
         const cat = `${base}-cat.mp4`
         tmp.push(cat)
-        await concatClips(files, cat, plan.segments.map(() => 15))   // long-form segments are 15s each
+        await concatClips(files, cat, segDurs)   // each segment trimmed to its own script-matched length
         const fin = await withEndCard(cat, meta, job.id, 'main', tmp)
         if (meta.end_card && meta.end_card.tx) {
           if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
