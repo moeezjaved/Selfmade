@@ -212,24 +212,30 @@ async function verifyProductScale(localFile, sizeAnchor, id) {
 // 'match' | 'mismatch' | 'unknown'. ~1¢. Physical products only (services have no product). ──
 async function verifySegmentProduct(localFile, productDataUri, productName, id, i) {
   if (!OPENAI_KEY || !productDataUri) return 'unknown'
-  let frame
+  // Sample THREE frames across the clip, not one. The invented part (a spout/cap on a flat pouch) is
+  // often only visible when the product is held up (start) — a single mid-clip frame caught the pour
+  // and read as "match", so the cap slipped through. Any frame flagged → mismatch.
+  const frames = []
   try {
     const dur = (await probeDuration(localFile)) || 8
-    const f = join(tmpdir(), `pv-${id}-${i}.jpg`)
-    await ff(['-y', '-ss', String(Math.max(0.5, dur * 0.6)), '-i', localFile, '-frames:v', '1', '-q:v', '5', '-vf', 'scale=512:-1', f])
-    const b = await readFile(f)
-    frame = `data:image/jpeg;base64,${b.toString('base64')}`
-    await rm(f, { force: true }).catch(() => {})
-  } catch (e) { console.warn(`seg-verify frame ${id}.${i}:`, e.message); return 'unknown' }
+    for (const pct of [0.2, 0.5, 0.8]) {
+      const f = join(tmpdir(), `pv-${id}-${i}-${Math.round(pct * 100)}.jpg`)
+      await ff(['-y', '-ss', String(Math.max(0.4, dur * pct)), '-i', localFile, '-frames:v', '1', '-q:v', '5', '-vf', 'scale=512:-1', f])
+      const b = await readFile(f)
+      frames.push(`data:image/jpeg;base64,${b.toString('base64')}`)
+      await rm(f, { force: true }).catch(() => {})
+    }
+  } catch (e) { console.warn(`seg-verify frames ${id}.${i}:`, e.message); return 'unknown' }
+  if (!frames.length) return 'unknown'
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', max_tokens: 80, temperature: 0, response_format: { type: 'json_object' },
+        model: 'gpt-4o-mini', max_tokens: 90, temperature: 0, response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: [
-          { type: 'text', text: `FIRST image = the REAL product${productName ? ` ("${productName}")` : ''}. SECOND image = a frame from an ad someone made of it. Does the product in the ad frame MATCH the real product's shape, packaging and parts? Flag "mismatch" ONLY if the ad clearly ADDED or CHANGED a physical part the real product does not have — an invented cap/lid/bottle/spout, a different container type, wrong shape. Minor color/lighting/angle differences are fine ("match"). If no product is clearly visible in the frame, "unknown". Return ONLY JSON: {"verdict":"match"|"mismatch"|"unknown","reason":"few words"}` },
+          { type: 'text', text: `The FIRST image is the REAL product${productName ? ` ("${productName}")` : ''}. The remaining images are frames from an ad someone generated of it. In ANY frame, did the generator ADD or CHANGE a physical part the real product does not have? Look especially for: a cap, lid, screw-top, SPOUT or nozzle added to a flat pouch/sachet; a bottle-neck; a box or extra wrapper; a clearly different container shape. If the real product is a flat stand-up pouch, it must stay a flat pouch with NO cap/spout. Flag "mismatch" if ANY frame shows such an invention. Pure color/lighting/angle differences, or a frame where the product is mid-pour/not clearly visible, are NOT a mismatch on their own. Return ONLY JSON: {"verdict":"match"|"mismatch"|"unknown","reason":"few words"}` },
           { type: 'image_url', image_url: { url: productDataUri } },
-          { type: 'image_url', image_url: { url: frame } },
+          ...frames.map((u) => ({ type: 'image_url', image_url: { url: u } })),
         ] }],
       }),
     })
@@ -606,16 +612,48 @@ async function composeCleanProduct({ productImageUrls, jobId }) {
   return `${R2_PUBLIC}/${key}`
 }
 
-// ── Single-voice narration (faithful/b-roll mode): one TTS track for the WHOLE script, muxed over
-// the stitched video. Per-clip generated voices differ audibly between scenes; b-roll needs no lip
-// sync, so one continuous voice is both correct and more professional. OpenAI TTS (key already set).
-async function ttsVoiceover(text, id, voice) {
+// ── Voice mapping: our 4 UI voices (OpenAI names) → an ElevenLabs preset of the same gender/energy,
+// so a user's pick stays consistent across languages. Overridable per-voice via env. ──
+const ELEVEN_VOICE_MAP = {
+  nova: process.env.ELEVEN_VOICE_NOVA || '21m00Tcm4TlvDq8ikWAM',    // Rachel — warm female
+  shimmer: process.env.ELEVEN_VOICE_SHIMMER || 'EXAVITQu4vr4xnSDxMaL', // Sarah — soft female
+  onyx: process.env.ELEVEN_VOICE_ONYX || 'pNInz6obpgDQGcFmaJgB',    // Adam — deep male
+  echo: process.env.ELEVEN_VOICE_ECHO || 'ErXwobaYiN019PkySvjV',    // Antoni — bright male
+}
+async function elevenTts(text, voice, out) {
+  const voiceId = ELEVEN_VOICE_MAP[voice] || ELEVEN_VOICE_MAP.nova
+  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: 'POST',
+    headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+    body: JSON.stringify({
+      text: String(text).slice(0, 4000),
+      model_id: process.env.ELEVEN_TTS_MODEL || 'eleven_multilingual_v2',
+      voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.15, use_speaker_boost: true },
+    }),
+  })
+  if (!r.ok) throw new Error(`eleven ${r.status} ${(await r.text()).slice(0, 120)}`)
+  await writeFile(out, Buffer.from(await r.arrayBuffer()))
+  return out
+}
+// ── Single-voice narration (faithful/b-roll + UGC modes): one TTS track for the WHOLE script, muxed
+// over the stitched video. OpenAI TTS is excellent at English but only mediocre at Urdu/Hindi/Arabic —
+// so for NON-English we route to ElevenLabs Multilingual v2 (near-human Urdu) WHEN a key is set, and
+// fall back to OpenAI if ElevenLabs errors or has no key. English always stays on OpenAI. ──
+async function ttsVoiceover(text, id, voice, lang) {
+  const f = join(tmpdir(), `vo-${id}.mp3`)
+  const nonEn = lang && String(lang).slice(0, 2) !== 'en'
+  if (nonEn && process.env.ELEVENLABS_API_KEY) {
+    try {
+      await elevenTts(text, voice || 'nova', f)
+      console.log(`🎙 vo ${id} via ElevenLabs (${lang})`)
+      return f
+    } catch (e) { console.warn(`ElevenLabs tts failed for ${id} (${e.message}) — falling back to OpenAI`) }
+  }
   const r = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: process.env.CLONE_TTS_MODEL || 'gpt-4o-mini-tts', voice: voice || process.env.CLONE_TTS_VOICE || 'nova', input: String(text).slice(0, 4000), response_format: 'mp3' }),
   })
   if (!r.ok) throw new Error(`tts ${r.status} ${(await r.text()).slice(0, 120)}`)
-  const f = join(tmpdir(), `vo-${id}.mp3`)
   await writeFile(f, Buffer.from(await r.arrayBuffer()))
   return f
 }
@@ -1567,7 +1605,7 @@ async function generateJob(job) {
               // ffprobe can't read the concat (that fallback is why an earlier render still hit 42s).
               const clipDur = (await probeDuration(catX)) || scenes.reduce((a, s) => a + (Number(s.duration) || 5), 0) || 15
               const voForTts = capScriptToSeconds(voText, clipDur * 1.25 + 2)
-              const vo = await ttsVoiceover(voForTts, `${job.id}-${tag}`, meta.voice)
+              const vo = await ttsVoiceover(voForTts, `${job.id}-${tag}`, meta.voice, meta.language)
               tmp.push(vo)
               const mixed = `${base}-${tag}-vo.mp4`
               tmp.push(mixed)
@@ -1681,33 +1719,31 @@ async function generateJob(job) {
               continue
             } catch { delete segClips[i] /* expired url → regenerate */ }
           }
-          const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, !!anchor, productImages.length, meta.language)
-          const imgs = anchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages
-          console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${anchor ? ' (anchored)' : ''}`)
-          // The anchor is the previous clip's last frame — it shows the (AI) creator's face, which
-          // fal's likeness policy rejects (422 content_policy). That was killing the whole job AFTER
-          // earlier segments already cost fal money. On that rejection, retry this segment WITHOUT the
-          // anchor (product images only) — we lose a little cross-cut continuity but salvage the render
-          // and the fal spend. content_policy on the PRODUCT image (no anchor) still surfaces.
+          const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, false, productImages.length, meta.language)
+          // COST FIX: we USED to pass the previous clip's last frame (the creator's face) as an anchor for
+          // cross-cut continuity. But that face frame reliably trips fal's likeness filter at RESULT time —
+          // and fal CHARGES for the rejected clip — after which we fell back to product-only anyway. So a
+          // 2-segment render was paying for ~3 clips (seg1 + doomed anchored seg2 + product-only seg2).
+          // We now go product-only from the start: SAME shipped output, ~30% cheaper. Continuity is held by
+          // the identical character description repeated in every segment prompt. (Set meta.try_anchor=true
+          // to restore the old anchored attempt.)
+          const useAnchor = anchor && meta.try_anchor === true
+          const imgs = useAnchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages
+          console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${useAnchor ? ' (anchored)' : ''}`)
           const segDur = segDurs[i]
           // generateAudio:false → Seedance produces NO speech. We add the clean TTS voiceover at the end;
           // leaving Seedance audio on made it babble faux-speech UNDER the narration (the garbled 11-14s
           // + muddy Urdu). The single-take + faithful paths already pass false — the segment path didn't.
           let videoUrl
-          try {
-            ({ videoUrl } = await falGenerate({ prompt, imageUrls: imgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
-          } catch (e) {
-            const segBlocked = (x) => x.code === 'content_policy_images' || x.code === 'content_policy_video'
-            if (!segBlocked(e)) throw e
-            // Ladder: anchor+products blocked → products only → PURE PROMPT. A segment must never
-            // kill the whole long-form render on a moderation block (same contract as faithful mode).
-            console.warn(`segment ${i + 1} refs blocked (likeness) — laddering down`)
-            try {
-              ({ videoUrl } = await falGenerate({ prompt, imageUrls: falProductImages, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
-            } catch (e2) {
-              if (!segBlocked(e2)) throw e2
-              console.warn(`segment ${i + 1} product image blocked too — pure prompt`)
-              ;({ videoUrl } = await falGenerate({ prompt, imageUrls: [], resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+          const segBlocked = (x) => x.code === 'content_policy_images' || x.code === 'content_policy_video'
+          // Ladder: (anchor+products if enabled →) products only → PURE PROMPT. A segment must never kill
+          // the whole long-form render on a moderation block (same contract as faithful mode).
+          const rungs = [imgs, ...(useAnchor ? [falProductImages] : []), []]
+          for (let ri = 0; ri < rungs.length; ri++) {
+            try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: rungs[ri], resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false })); break }
+            catch (e) {
+              if (!segBlocked(e) || ri === rungs.length - 1) throw e
+              console.warn(`segment ${i + 1} refs blocked — laddering down`)
             }
           }
           falCost += clipCost(meta.tier, segDur)
@@ -1747,7 +1783,7 @@ async function generateJob(job) {
         if (finalScript && finalScript.trim()) {
           try {
             const clipDur = (await probeDuration(cat)) || segDurs.reduce((a, d) => a + d, 0) || 15
-            const vo = await ttsVoiceover(capScriptToSeconds(finalScript, clipDur * 1.25 + 2), `${job.id}-seg`, meta.voice)
+            const vo = await ttsVoiceover(capScriptToSeconds(finalScript, clipDur * 1.25 + 2), `${job.id}-seg`, meta.voice, meta.language)
             tmp.push(vo)
             const mixed = `${base}-vo.mp4`; tmp.push(mixed)
             await muxVoiceover(cat, vo, mixed)
@@ -1762,7 +1798,11 @@ async function generateJob(job) {
         let ovFin = await burnOverlays(fin.file, meta.overlays, job.id)
         if (isService) { ovFin = await burnAppDemo(ovFin, meta.beat_sheet && meta.beat_sheet.app_demo, meta.product_image_urls, job.id, meta.screencast_url) }
         const url = await uploadVideo(ovFin, `creatives/${job.user_id}/${job.id}.mp4`)
-        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
+        // CLOBBER FIX: keep segment_clips/segment_anchors in the FINAL write. `...meta` is the pre-loop
+        // snapshot (no clips); the per-segment stamps wrote clips to the DB but not to this local `meta`,
+        // so spreading `...meta` here wiped them — which killed the "Fix one section" tweak panel
+        // (segmentTweakable needs segment_clips). Persist the accumulated clips + anchors explicitly.
+        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, segment_clips: segClips, segment_anchors: segAnchors, script: finalScript, final_script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'ugc_long', segments: nSeg, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (long UGC, ${nSeg} segments) ${job.id} → ${url}`)
       } finally {
@@ -1993,7 +2033,9 @@ async function tweakJob(job) {
         await prog(`Re-rolling section ${si + 1}…`, 15, 150)
         console.log(`🔧 ${job.id} tweak: redo segment ${si + 1}/${segs.length} (chip=${t.chip || 'redo'})`)
         const falProductImages = [meta.clean_product || (Array.isArray(meta.product_image_urls) ? meta.product_image_urls[0] : null), (Array.isArray(meta.product_image_urls) ? meta.product_image_urls[1] : null)].filter(Boolean).slice(0, 2)
-        const anchor = si > 0 ? segAnchors[si - 1] : null
+        // Product-only by default (the face anchor reliably trips fal's likeness filter + gets charged);
+        // continuity is held by the character description. meta.try_anchor=true restores the anchored attempt.
+        const anchor = si > 0 && meta.try_anchor === true ? segAnchors[si - 1] : null
         const fix = CHIP_FIX[t.chip] ?? ''
         const prompt = segmentPrompt(plan, segs[si], si, segs.length, !!anchor, falProductImages.length, meta.language) + fix
         const imgs = anchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages
@@ -2027,7 +2069,7 @@ async function tweakJob(job) {
       if (finalScript && finalScript.trim()) {
         try {
           const clipDur = (await probeDuration(cat)) || segDurs.reduce((a, d) => a + d, 0) || 15
-          const vo = await ttsVoiceover(capScriptToSeconds(finalScript, clipDur * 1.25 + 2), `${job.id}-segtw`, meta.voice)
+          const vo = await ttsVoiceover(capScriptToSeconds(finalScript, clipDur * 1.25 + 2), `${job.id}-segtw`, meta.voice, meta.language)
           tmp.push(vo)
           const mixed = `${base}-vo.mp4`; tmp.push(mixed)
           await muxVoiceover(cat, vo, mixed)
@@ -2114,7 +2156,7 @@ async function tweakJob(job) {
     if (voText && voText.trim()) {
       try {
         const clipDur = (await probeDuration(cat)) || durs.reduce((a, d) => a + (Number(d) || 5), 0)
-        const vo = await ttsVoiceover(capScriptToSeconds(voText, clipDur * 1.25 + 2), `${job.id}-tweak`, meta.voice)
+        const vo = await ttsVoiceover(capScriptToSeconds(voText, clipDur * 1.25 + 2), `${job.id}-tweak`, meta.voice, meta.language)
         tmp.push(vo)
         const mixed = `${base}-vo.mp4`
         tmp.push(mixed)
