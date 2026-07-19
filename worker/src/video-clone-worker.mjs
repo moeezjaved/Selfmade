@@ -1055,23 +1055,41 @@ async function burnOverlays(videoIn, overlays, id) {
 // full-frame cut ("full"). Screenshots come from the user's step-2 selection / brand screenshots —
 // never an invented UI. Fully additive & fail-safe: any ffmpeg error ships the un-composited video,
 // exactly like burnOverlays. Never runs for physical brands.
-async function burnAppDemo(videoIn, ranges, imageUrls, id) {
+async function burnAppDemo(videoIn, ranges, imageUrls, id, screencastUrl) {
   const imgs = (Array.isArray(imageUrls) ? imageUrls : []).filter((u) => typeof u === 'string' && (u.startsWith('http') || u.startsWith('data:')))
   const list = (Array.isArray(ranges) ? ranges : []).filter((r) => r && r.t).slice(0, 5)
-  if (!list.length || !imgs.length) return videoIn
+  const hasCast = typeof screencastUrl === 'string' && /^https?:\/\//i.test(screencastUrl)
+  if (!list.length && !hasCast) return videoIn
+  if (!imgs.length && !hasCast) return videoIn
   const dur = await probeDuration(videoIn) || 30
   const probe = await probeOut(['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=s=x:p=0', videoIn])
   const [W0, H0] = String(probe || '').trim().split('x').map((n) => parseInt(n) || 0)
   const W = W0 > 0 ? W0 : 720, H = H0 > 0 ? H0 : 1280
   const dl = async (src, f) => { if (src.startsWith('data:')) await writeFile(f, Buffer.from(src.split(',')[1] || '', 'base64')); else await downloadToFile(src, f) }
-  const wantsSplit = list.some((r) => String(r.region || '').toLowerCase() !== 'full')  // any split_top → split-format ad
+  // A screencast forces the split (that's its whole purpose); otherwise any split_top beat → split-format ad.
+  const wantsSplit = hasCast || list.some((r) => String(r.region || '').toLowerCase() !== 'full')
 
-  // ── TRUE 50/50 split (Atria layout): creator shrunk to the BOTTOM half, the user's app screenshot
-  // filling the TOP half — for the whole clip. A permanent vstack is far more robust than time-gating.
-  // Rotates through the user's screenshots across the timeline so the top isn't one frozen image. ──
+  // ── TRUE 50/50 split (Atria layout): creator shrunk to the BOTTOM half; the TOP half is the user's
+  // uploaded screen RECORDING (moving UI) if provided, else their app screenshots (rotating). ──
   if (wantsSplit) {
     const topH = Math.round(H / 2) - (Math.round(H / 2) % 2)   // even heights (yuv420p)
     const botH = H - topH
+    // Motion-UI path: real screen recording looped to cover the clip in the top half.
+    if (hasCast) {
+      const castFile = join(tmpdir(), `cast-${id}.mp4`)
+      try {
+        await downloadToFile(screencastUrl, castFile)
+        const out = join(tmpdir(), `split-${id}.mp4`)
+        const F = [
+          `[0:v]scale=${W}:${botH}:force_original_aspect_ratio=increase,crop=${W}:${botH},setsar=1[btm]`,
+          `[1:v]scale=${W}:${topH}:force_original_aspect_ratio=increase,crop=${W}:${topH},setsar=1,fps=30[top]`,
+          `[top][btm]vstack=inputs=2[v]`,
+        ]
+        await ff(['-y', '-i', videoIn, '-stream_loop', '-1', '-i', castFile, '-filter_complex', F.join(';'), '-map', '[v]', '-map', '0:a?', '-t', String(dur), '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out])
+        console.log(`📱 ${id} built split-screen with MOVING screen recording (app top / creator bottom)`)
+        return out
+      } catch (e) { console.warn(`split-screen (screencast) failed for ${id}:`, e.message); /* fall through to stills */ }
+    }
     const shots = imgs.slice(0, 4)
     const files = []
     for (let i = 0; i < shots.length; i++) { const f = join(tmpdir(), `split-${id}-${i}.png`); try { await dl(shots[i], f); files.push(f) } catch { /* skip */ } }
@@ -1528,7 +1546,7 @@ async function generateJob(job) {
         await prog('Finishing up…', 95, 12)
         let ovMain = await burnOverlays(main.file, meta.overlays, job.id); tmp.push(ovMain);
         // Service/app only: drop the user's real screenshots into the app-demo beats (physical untouched).
-        if (isService) { ovMain = await burnAppDemo(ovMain, meta.beat_sheet && meta.beat_sheet.app_demo, meta.product_image_urls, job.id); tmp.push(ovMain) }
+        if (isService) { ovMain = await burnAppDemo(ovMain, meta.beat_sheet && meta.beat_sheet.app_demo, meta.product_image_urls, job.id, meta.screencast_url); tmp.push(ovMain) }
         const url = await uploadVideo(ovMain, `creatives/${job.user_id}/${job.id}.mp4`)
         // Settle the end-card tx on the MAIN cut's outcome (applied → commit, failed → refund).
         if (meta.end_card && meta.end_card.tx) {
@@ -1660,7 +1678,7 @@ async function generateJob(job) {
           else await rpc('refund_credits', { p_tx: meta.end_card.tx })
         }
         let ovFin = await burnOverlays(fin.file, meta.overlays, job.id)
-        if (isService) { ovFin = await burnAppDemo(ovFin, meta.beat_sheet && meta.beat_sheet.app_demo, meta.product_image_urls, job.id) }
+        if (isService) { ovFin = await burnAppDemo(ovFin, meta.beat_sheet && meta.beat_sheet.app_demo, meta.product_image_urls, job.id, meta.screencast_url) }
         const url = await uploadVideo(ovFin, `creatives/${job.user_id}/${job.id}.mp4`)
         await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'ugc_long', segments: nSeg, actual_cost_usd: +falCost.toFixed(2) } })

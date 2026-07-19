@@ -9,7 +9,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { uploadBufferToR2 } from '@/lib/r2'
+import { uploadBufferToR2, r2PublicUrl } from '@/lib/r2'
 import { isRateLimited } from '@/lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
@@ -104,6 +104,10 @@ export async function POST(req: NextRequest) {
     // 'service' = app/site/service brand → the worker's SERVICE prompt path (creator talks about it,
     // never renders a physical product). Absent/'physical' = today's product-hero flow.
     product_type: body.productType === 'service' ? 'service' : 'physical',
+    // Optional user-uploaded screen recording (R2 key from the presigned Assets upload) → shown in the
+    // split-screen top half as MOVING UI. Resolved server-side to a public URL; ignored for physical.
+    screencast_url: (body.productType === 'service' && typeof body.screencastKey === 'string' && body.screencastKey.trim())
+      ? r2PublicUrl(body.screencastKey.trim()) : null,
   }
 
   const { data: row, error } = await admin.from('creative_generations').insert({
