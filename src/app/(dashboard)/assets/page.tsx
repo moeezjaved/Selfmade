@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { UploadCloud, Trash2, Image as ImageIcon, Film, Music, X, MoreHorizontal, Share2, Download, FolderPlus, Sparkles } from 'lucide-react'
 import CloneModal from '../discovery/CloneModal'
+import CloneVideoModal from '../discovery/CloneVideoModal'
 
 const INK = '#0e1b12'
 type Asset = { id: string; file_url: string; file_type: string; file_name: string; size_bytes: number; width?: number; height?: number; status: string; uploader_name?: string; uploaded_by?: string; created_at?: string; tags?: string[]; scene?: string | null; audio_kind?: string | null; has_captions?: boolean | null; roll?: string | null }
@@ -113,7 +114,8 @@ export default function AssetsPage() {
     setMsg(r.error ? `Could not add to board: ${r.error}` : '✓ Added to board.')
   }
 
-  const [cloneAsset, setCloneAsset] = useState<Asset | null>(null)   // asset being cloned via CloneModal
+  const [cloneAsset, setCloneAsset] = useState<Asset | null>(null)   // image asset being cloned via CloneModal
+  const [cloneVideoAsset, setCloneVideoAsset] = useState<Asset | null>(null)   // video asset being remade via CloneVideoModal
 
   // Video Clone → Assets: animate an image asset into a video (lands in My Creatives).
   const [busyAnimate, setBusyAnimate] = useState<string | null>(null)
@@ -285,6 +287,13 @@ export default function AssetsPage() {
                         </button>
                       </>
                     )}
+                    {/* Video assets: remake into a new video ad with your product (opens the video wizard). */}
+                    {a.file_type === 'video' && a.status !== 'processing' && (
+                      <button onClick={() => setCloneVideoAsset(a)} title="Remake this video with your product"
+                        style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Sparkles size={11} /> Remake
+                      </button>
+                    )}
                     <button onClick={() => downloadAsset(a)} title="Download this asset"
                       style={{ background: 'rgba(255,255,255,0.9)', color: '#14281a', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
                       <Download size={11} />
@@ -344,6 +353,13 @@ export default function AssetsPage() {
         <CloneModal
           ad={{ id: 'asset:' + cloneAsset.id, pageId: '', pageName: cloneAsset.file_name || 'Asset', assetImageUrl: cloneAsset.file_url }}
           onClose={() => setCloneAsset(null)}
+        />
+      )}
+      {cloneVideoAsset && (
+        <CloneVideoModal
+          sourceAdId=""
+          sourceVideoUrl={cloneVideoAsset.file_url}
+          onClose={() => setCloneVideoAsset(null)}
         />
       )}
     </div>
