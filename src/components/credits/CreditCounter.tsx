@@ -96,7 +96,9 @@ export function CreditCounter({ compact = false }: { compact?: boolean }) {
          color: low ? '#b91c1c' : '#17251c', fontSize: 12, fontWeight: 700,
        }}>
       <span style={{ fontSize: 13, color: low ? '#b91c1c' : '#3f8f4f' }}>◆</span>
-      <span>{loading ? '…' : balance.toLocaleString()}</span>
+      {/* Only show '…' when we genuinely have no number yet; once a cached/last balance exists, keep
+          showing it through refetches so it never flashes back to '…' on refresh / page change. */}
+      <span>{loading && !balance ? '…' : balance.toLocaleString()}</span>
       <span style={{ opacity: 0.7, fontWeight: 600 }}>credits</span>
       {low && !loading && <span style={{ marginLeft: 4, fontWeight: 800 }}>· Top&nbsp;up</span>}
     </button>

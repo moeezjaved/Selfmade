@@ -288,7 +288,11 @@ export async function DELETE(req: NextRequest) {
   const pageId = extractPageId(req.nextUrl.searchParams.get('pageId') || req.nextUrl.searchParams.get('page_id') || '')
   if (!pageId) return NextResponse.json({ error: 'pageId required' }, { status: 400 })
   const admin = createAdminClient()
-  await admin.from('followed_brands').delete().eq('user_id', user.id).eq('page_id', pageId)
+  // The spied list is ORG-WIDE (any member's followed_brands with spied=true). A user-scoped delete
+  // left another member's (usually the owner's) row → the brand reappeared on refresh. Stop the spy
+  // across the whole org so it actually persists for everyone.
+  const orgIds = await orgMemberIds(admin, user.id)
+  await admin.from('followed_brands').delete().in('user_id', orgIds).eq('page_id', pageId)
   await logActivity(admin, user.id, 'BRAND_UNSPIED', `Stopped spying ${pageId}`)
   return NextResponse.json({ ok: true, pageId })
 }
