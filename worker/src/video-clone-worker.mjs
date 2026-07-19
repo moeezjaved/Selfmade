@@ -33,9 +33,13 @@ const FAL_KEY = process.env.FAL_KEY
 // job's estimated fal cost is passed to commit_credits as metadata.actual_cost_usd, which the
 // existing /admin/margins dashboard reads → live margin per action, no more guessing. ──
 const SEEDANCE_USD_PER_SEC = Number(process.env.FAL_SEEDANCE_USD_PER_SEC || 0.21)
+// AUDIO-ON clips bill HIGHER at fal. Measured 2026-07-20 (job 3876a200): 3 native-audio generations,
+// ~37s total, real fal spend $11.23 → ≈$0.30/s (vs $0.21/s silent). Underestimating hid a ~45% cost
+// gap from /admin/margins. Overridable as real bills refine it.
+const SEEDANCE_AUDIO_USD_PER_SEC = Number(process.env.FAL_SEEDANCE_AUDIO_USD_PER_SEC || 0.30)
 const SEEDANCE_FAST_USD_PER_SEC = Number(process.env.FAL_SEEDANCE_FAST_USD_PER_SEC || 0.09)
 const VACE_EST_USD_PER_RUN = Number(process.env.FAL_VACE_EST_USD || 0.5)
-const clipCost = (tier, secs) => (tier === 'fast' ? SEEDANCE_FAST_USD_PER_SEC : SEEDANCE_USD_PER_SEC) * (Number(secs) || 10)
+const clipCost = (tier, secs, audio = false) => (tier === 'fast' ? SEEDANCE_FAST_USD_PER_SEC : audio ? SEEDANCE_AUDIO_USD_PER_SEC : SEEDANCE_USD_PER_SEC) * (Number(secs) || 10)
 const EVERY = 8000
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -1333,7 +1337,22 @@ async function analyzeJob(job) {
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   try {
     let beat = null
-    if (job.source_video_url) { try { beat = await analyzeVideo(job.source_video_url) } catch (e) { console.warn('analyze:', e.message) } }
+    // DETERMINISTIC ANALYSIS: the same source ad must quote the same scene count / suggested style
+    // every time. Gemini's talking-head-vs-cinematic judgement flapped between runs on the SAME ad
+    // (3 scenes one open, 10 the next → the Cinematic price jumped 1800→6000cr). Reuse the most
+    // recent analysis of this exact source video — ad-intrinsic fields only (beat sheet, scene count,
+    // suggested mode, speaking rate); brand-specific outputs (script, overlays) are rebuilt fresh.
+    let cachedA = null
+    if (job.source_video_url) {
+      try {
+        const q = await fetch(`${U}/rest/v1/creative_generations?select=clone_meta&source_video_url=eq.${encodeURIComponent(job.source_video_url)}&id=neq.${job.id}&type=eq.video_clone&order=created_at.desc&limit=8`, { headers: H })
+        const rows = q.ok ? await q.json() : []
+        const hit = rows.find((r) => r?.clone_meta?.beat_sheet && Number(r?.clone_meta?.scene_count) > 0)
+        if (hit) { cachedA = hit.clone_meta; console.log(`♻️ ${job.id} reusing analysis (scenes=${cachedA.scene_count}, suggest=${cachedA.suggested_mode})`) }
+      } catch (e) { console.warn('analysis-cache lookup:', e.message) }
+    }
+    if (cachedA) beat = cachedA.beat_sheet
+    else if (job.source_video_url) { try { beat = await analyzeVideo(job.source_video_url) } catch (e) { console.warn('analyze:', e.message) } }
     const productImages = Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []
     // LOOK at the product photo once (vision) so scripts describe what it actually is — capsules vs
     // gummies etc. Persisted into product_details so every later prompt builder gets it too.
@@ -1355,8 +1374,8 @@ async function analyzeJob(job) {
     // calibrated to the actual talker's pace instead of a fixed guess. Cheap (~0.15¢ for a 15s clip).
     // Only apply the source rate when the CLONE language matches the source language — word density
     // doesn't transfer across languages, so a translation keeps the safe default rate.
-    let srcRate = null
-    if (OPENAI_KEY && job.source_video_url) {
+    let srcRate = cachedA ? (Number(cachedA.source_wps) || null) : null
+    if (!cachedA && OPENAI_KEY && job.source_video_url) {
       try {
         const tr = await transcribeSegments(job.source_video_url)
         const w = tr.words || []
@@ -1381,11 +1400,11 @@ async function analyzeJob(job) {
     script = capScriptToSeconds(script, Math.max(8, srcSecs), srcRate || 2.8)
     // Suggest faithful (scene-by-scene) cloning when the source is a multi-scene / B-roll ad —
     // collapsing those into a talking head isn't a clone. The user picks the mode at approve time.
-    const cinematic = detectCinematic(beat)
+    const cinematic = cachedA ? cachedA.suggested_mode === 'faithful' : detectCinematic(beat)
     // Scene count — prefer a DETERMINISTIC ffmpeg cut count (stable price across re-analyses); fall
     // back to Gemini's scene_count / duration when the source can't be probed.
-    let scenes = sceneCountFor(beat)
-    if (job.source_video_url) {
+    let scenes = cachedA ? Number(cachedA.scene_count) : sceneCountFor(beat)
+    if (!cachedA && job.source_video_url) {
       try {
         const tmpSrc = join(tmpdir(), `cut-${job.id}.mp4`)
         await downloadToFile(job.source_video_url, tmpSrc)
@@ -1776,7 +1795,7 @@ async function generateJob(job) {
               console.warn(`segment ${i + 1} refs blocked — laddering down`)
             }
           }
-          falCost += clipCost(meta.tier, segDur)
+          falCost += clipCost(meta.tier, segDur, genAudio)
           const f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
           // PER-SEGMENT PRODUCT CHECK (physical only): if Seedance invented a part the real product
@@ -1798,7 +1817,7 @@ async function generateJob(job) {
                 const anchor2 = (meta.product_details && meta.product_details.size_anchor) ? ` The product's true size: ${meta.product_details.size_anchor}.` : ''
                 const rrImgs = attempt === 0 ? imgs : falProductImages.slice(0, 1)
                 const rr = await falGenerate({ prompt: `${prompt}${fixLine}${attempt === 1 ? anchor2 : ''}`, imageUrls: rrImgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })
-                falCost += clipCost(meta.tier, segDur)
+                falCost += clipCost(meta.tier, segDur, genAudio)
                 await rm(f, { force: true }).catch(() => {})
                 await downloadToFile(rr.videoUrl, f)
                 videoUrl = rr.videoUrl
@@ -1932,7 +1951,7 @@ async function generateJob(job) {
           if (blockedUgc(e)) { try { ({ videoUrl: fixedUrl } = await falGenerate({ ...genArgs, prompt: fixPrompt, imageUrls: [], videoUrl: null })) } catch { /* keep original */ } }
         }
         if (fixedUrl) {
-          falCostUgc += clipCost(meta.tier, clipSecs)
+          falCostUgc += clipCost(meta.tier, clipSecs, true)
           await downloadToFile(fixedUrl, singleFile)
           const v2 = await verifyProductScale(singleFile, anchor, `${job.id}-r2`)
           console.log(`📏 ${job.id} scale after auto-fix: ${v2} (shipping this cut)`)
@@ -1948,7 +1967,7 @@ async function generateJob(job) {
     const ovFin = await burnOverlays(fin.file, meta.overlays, job.id); const url = await uploadVideo(ovFin, `creatives/${job.user_id}/${job.id}.mp4`)
     for (const f of singleTmp) await rm(f, { force: true }).catch(() => {})
 
-    const falCost = clipCost(meta.tier, clipSecs) + falCostUgc
+    const falCost = clipCost(meta.tier, clipSecs, true) + falCostUgc
     await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, seedance_prompt: prompt, script, fal_request_id: requestId, fal_cost_est: +falCost.toFixed(2) } })
     if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { fal_request_id: requestId, actual_cost_usd: +falCost.toFixed(2) } })
     console.log(`🎬 cloned ${job.id} → ${url}`)
@@ -2034,7 +2053,7 @@ async function tweakJob(job) {
           console.warn(`tweak ugc ${job.id}: "${rungs[ri].tag}" blocked — laddering down`)
         }
       }
-      falCost += clipCost(meta.tier, meta.duration || 15)
+      falCost += clipCost(meta.tier, meta.duration || 15, true)
       const f = `${base}-ugc.mp4`
       tmp.push(f)
       await downloadToFile(videoUrl, f)
@@ -2049,6 +2068,59 @@ async function tweakJob(job) {
       if (t.tx) await rpc('commit_credits', { p_tx: t.tx, p_metadata: { tweak: t.type, chip: t.chip ?? null, actual_cost_usd: +falCost.toFixed(2) } })
       for (const x of tmp) await rm(x, { force: true }).catch(() => {})
       console.log(`🔧 tweaked (redo_ugc) ${job.id} → ${url} ($${falCost.toFixed(2)})`)
+      return
+    }
+
+    // ── CUTAWAY PATCH ("fix 2 seconds without paying for the clip"): Seedance can't render under 5s
+    // and can't inpaint mid-clip, so a full segment re-roll (~12s at the audio rate) is the expensive
+    // hammer. This is the scalpel: render ONE 5s SILENT product close-up (silent rate — the cheapest
+    // thing we can buy) and splice it over ONLY the flawed seconds as a b-roll cutaway, keeping the
+    // original video's audio track running underneath. UGC ads cut to product close-ups constantly,
+    // so the patch reads as intentional editing. Works on ANY finished video (single-take, long-form,
+    // faithful). ~$1.05 fal vs ~$3.60 for a segment re-roll. ──
+    if (t.type === 'patch_broll') {
+      if (!job.image_url) return bail('no finished video to patch')
+      const srcV = `${base}-patch-src.mp4`; tmp.push(srcV)
+      await downloadToFile(job.image_url, srcV)
+      const vidDur = (await probeDuration(srcV)) || 15
+      let from = Math.max(0, Math.min(Number(t.from) || 0, vidDur - 2))
+      let len = Math.max(2, Math.min(5, (Number(t.to) || from + 4) - from))
+      if (from + len > vidDur) len = Math.max(2, vidDur - from)
+      await prog(`Patching ${from.toFixed(0)}s–${(from + len).toFixed(0)}s…`, 15, 90)
+      console.log(`🩹 ${job.id} cutaway patch ${from.toFixed(1)}s+${len.toFixed(1)}s`)
+
+      const pd = meta.product_details || {}
+      const note = typeof t.note === 'string' ? t.note.trim().slice(0, 300) : ''
+      const prodRef = [meta.clean_product, ...(Array.isArray(meta.product_image_urls) ? meta.product_image_urls : [])].filter(Boolean).slice(0, 1)
+      const brollPrompt = `Macro close-up b-roll insert for a UGC phone ad: the product${pd.name && pd.name !== 'the product' ? ` (${pd.name})` : ''} shown EXACTLY as the attached photo — same packaging type, shape, closure, label and colours; the photo shows the COMPLETE product, do NOT add or invent a cap, lid, spout or any part not in it.${pd.size_anchor ? ` True size: ${pd.size_anchor}.` : ''} Held naturally in a hand or resting on a clean kitchen counter, slow subtle handheld drift, natural light, sharp label. No faces, no on-screen text.${note ? ` USER'S FIX (top priority): ${note.replace(/"/g, "'")}` : ''}`
+      // Silent + 5s = the cheapest possible generation. Ladder to pure prompt on a moderation block.
+      let brollUrl
+      try { ({ videoUrl: brollUrl } = await falGenerate({ prompt: brollPrompt, imageUrls: prodRef, resolution: meta.resolution, duration: 5, aspect: meta.aspect, tier: meta.tier, generateAudio: false })) }
+      catch (e) {
+        if (e.code !== 'content_policy_images' && e.code !== 'content_policy_video') throw e
+        ;({ videoUrl: brollUrl } = await falGenerate({ prompt: brollPrompt, imageUrls: [], resolution: meta.resolution, duration: 5, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+      }
+      falCost += clipCost(meta.tier, 5, false)
+      const broll = `${base}-patch-broll.mp4`; tmp.push(broll)
+      await downloadToFile(brollUrl, broll)
+
+      // Splice: overlay the b-roll frames over [from, from+len] only; audio is 0:a untouched.
+      await prog('Splicing the patch in…', 70, 30)
+      const dims = await probeOut(['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=s=x:p=0', srcV])
+      const [W, H] = String(dims || '').trim().split('x').map((n) => parseInt(n) || 0)
+      const patched = `${base}-patched.mp4`; tmp.push(patched)
+      await ff(['-y', '-i', srcV, '-i', broll,
+        '-filter_complex',
+        `[1:v]trim=0:${len.toFixed(2)},scale=${W || 720}:${H || 1280}:force_original_aspect_ratio=increase,crop=${W || 720}:${H || 1280},fps=24,setsar=1,setpts=PTS-STARTPTS+${from.toFixed(2)}/TB[b];[0:v][b]overlay=eof_action=pass:enable='between(t,${from.toFixed(2)},${(from + len).toFixed(2)})'[v]`,
+        '-map', '[v]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', patched])
+
+      const ver = Math.random().toString(36).slice(2, 8)
+      const url = await uploadVideo(patched, `creatives/${job.user_id}/${job.id}-t${ver}.mp4`)
+      const { tweak, progress, ...rest } = meta
+      await stamp({ status: 'done', image_url: url, clone_meta: { ...rest, last_tweak: { type: t.type, from: +from.toFixed(1), len: +len.toFixed(1) } } })
+      if (t.tx) await rpc('commit_credits', { p_tx: t.tx, p_metadata: { tweak: t.type, from: +from.toFixed(1), len: +len.toFixed(1), actual_cost_usd: +falCost.toFixed(2) } })
+      for (const x of tmp) await rm(x, { force: true }).catch(() => {})
+      console.log(`🩹 patched ${job.id} → ${url} ($${falCost.toFixed(2)})`)
       return
     }
 
@@ -2100,7 +2172,7 @@ async function tweakJob(job) {
           catch (e) { if (!blocked(e) || ri === rungs.length - 1) throw e }
         }
         if (!videoUrl) return bail('segment re-roll blocked by moderation')
-        falCost += clipCost(meta.tier, segDurs[si])
+        falCost += clipCost(meta.tier, segDurs[si], !useOverlayVoice)
         segClips[si] = videoUrl
       } else {
         await prog(t.type === 'redo_vo' ? 'Re-recording the voiceover…' : 'Re-trimming…', 20, 40)
