@@ -143,13 +143,13 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     if (previewing) return
     const sentence = draftScript.trim().split(/(?<=[.!?۔؟])\s+/)[0]?.slice(0, 200) || draftScript.trim().slice(0, 200)
     if (!sentence) return
-    const cacheKey = `${voice}|${sentence}`
+    const cacheKey = `${voice}|${language}|${sentence}`
     setPreviewing(true); setErr(null)
     try {
       let url = previewCache.current.get(cacheKey)
       if (!url) {
         const r = await fetch('/api/discovery/clone-video/voice-preview', {
-          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: sentence, voice }),
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: sentence, voice, lang: language }),
         })
         if (!r.ok) { setErr('Voice preview is unavailable right now — the render itself is unaffected.'); setPreviewing(false); return }
         url = URL.createObjectURL(await r.blob())
