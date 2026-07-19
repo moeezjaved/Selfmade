@@ -54,9 +54,19 @@ export async function GET(req: NextRequest) {
     segmentTweakable: (row as any).status === 'done' && meta.mode !== 'faithful' && Number(meta.segments || 1) > 1
       && Array.isArray(meta.segment_plan?.segments) && meta.segment_plan.segments.length > 0
       && !!meta.segment_clips && Object.keys(meta.segment_clips).length > 0,
-    tweakSegments: Array.isArray(meta.segment_plan?.segments)
-      ? meta.segment_plan.segments.map((s: any) => ({ script: String(s.script || s.text || '').slice(0, 90) }))
-      : [],
+    // Each section carries its start/end seconds (same words/2.6 formula the worker renders with) so
+    // the UI can label "Section 2 · 0:10–0:19" and the user can point at a MOMENT, not guess.
+    tweakSegments: (() => {
+      const segs = Array.isArray(meta.segment_plan?.segments) ? meta.segment_plan.segments : []
+      let at = 0
+      return segs.map((s: any) => {
+        const words = String(s.script || s.text || '').trim().split(/\s+/).filter(Boolean).length
+        const secs = Math.max(5, Math.min(15, Math.round(words / 2.6) + 1))
+        const out = { script: String(s.script || s.text || '').slice(0, 90), start: at, end: at + secs }
+        at += secs
+        return out
+      })
+    })(),
     tweaking: !!meta.tweak,
     tweakError: meta.tweak_error || null,
     finalScript: meta.final_script || meta.script || null,

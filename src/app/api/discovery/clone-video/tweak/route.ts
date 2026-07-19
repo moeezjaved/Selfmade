@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { jobId, type, scene, chip, script } = await req.json().catch(() => ({}))
+  const { jobId, type, scene, chip, script, note } = await req.json().catch(() => ({}))
   if (!jobId || !(type in ACTIONS)) return NextResponse.json({ error: 'jobId and a valid type required' }, { status: 400 })
 
   const admin = createAdminClient()
@@ -78,6 +78,9 @@ export async function POST(req: NextRequest) {
     type,
     ...(type === 'redo_scene' || type === 'remove_scene' || type === 'redo_segment' ? { scene: idx } : {}),
     ...(type === 'redo_scene' || type === 'redo_ugc' || type === 'redo_segment' ? { chip: CHIPS.has(String(chip)) ? String(chip) : 'redo' } : {}),
+    // "Fix a moment" free-text: the user's own description of what's wrong (pronunciation, invented
+    // cap, …) — worker respells the spoken line if it's about speech + injects it into the prompt.
+    ...((type === 'redo_segment' || type === 'redo_ugc') && typeof note === 'string' && note.trim() ? { note: note.trim().slice(0, 300) } : {}),
     ...(type === 'redo_vo' && typeof script === 'string' && script.trim() ? { script: script.trim().slice(0, 2000) } : {}),
     ...(txId ? { tx: txId } : {}),
   }

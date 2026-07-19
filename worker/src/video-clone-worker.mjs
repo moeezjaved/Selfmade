@@ -247,6 +247,30 @@ async function verifySegmentProduct(localFile, productDataUri, productName, id, 
   } catch { return 'unknown' }
 }
 
+// ── "Fix a moment": apply the user's free-text note to ONE segment's spoken line. If the note is
+// about pronunciation ("it says Ejad wrong"), respell the word PHONETICALLY in the line (Ejad →
+// "Ee-jaad", ras malai → "russ muh-lie") — video/TTS models read text literally, so respelling is how
+// you steer the mouth. If it's about wording, apply the edit. If it's visual-only (product/person),
+// the line comes back unchanged and the note only strengthens the video prompt. ~1¢, fail-open. ──
+async function applyFixNote(script, note, lang) {
+  if (!OPENAI_KEY || !note || !script) return script
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', max_tokens: 300, temperature: 0, response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: `A creator in a video ad speaks this line${lang && lang !== 'en' ? ` (language: ${langName(lang)})` : ''}:\n"${script}"\n\nThe user flagged: "${note}"\n\nIf the note concerns PRONUNCIATION or wording of the SPOKEN line, return the line with the flagged word(s) respelled phonetically in-place (hyphenated syllables, e.g. "Ejad"→"Ee-jaad", "ras malai"→"russ muh-lie") or the wording fixed — keep everything else identical. If the note is purely visual (product looks wrong, person, background), return the line UNCHANGED. Return ONLY JSON: {"script":"..."}` }],
+      }),
+    })
+    if (!r.ok) return script
+    const j = await r.json()
+    const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
+    const s = typeof out.script === 'string' && out.script.trim() ? out.script.trim() : script
+    if (s !== script) console.log(`🗣 fix-note respelled line: "${s.slice(0, 80)}"`)
+    return s
+  } catch { return script }
+}
+
 // ── Creator-look override: the user can recast the on-camera creator(s) to a chosen ethnicity/look
 // (Pakistani / Indian / Arab / …) while keeping everything else from the reference. 'match' (or empty)
 // = today's behavior: copy the reference creator exactly. ──
@@ -1756,21 +1780,29 @@ async function generateJob(job) {
           const f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
           // PER-SEGMENT PRODUCT CHECK (physical only): if Seedance invented a part the real product
-          // doesn't have (a cap on a capless pouch), re-roll THIS segment ONCE with a hard correction.
-          // We only re-roll once per segment — a persistent mismatch ships rather than looping fal spend.
+          // doesn't have (a cap on a capless pouch), re-roll with a hard correction — and VERIFY THE
+          // RE-ROLL TOO (the ejad job's first re-roll ALSO grew a spout and shipped unchecked). Up to
+          // 2 corrective rolls; the 2nd drops the anchor and goes clean-product-only with the size
+          // anchor, the strongest constraint we have. After 2, ship the last take (never-fail).
           if (!isService && meta.reroll_product_check !== false) {
             const prodRef = falProductImages[0] || productImages[0]
-            const verdict = await verifySegmentProduct(f, prodRef, (meta.product_details && meta.product_details.name) || '', job.id, i)
-            if (verdict === 'mismatch') {
+            const pName = (meta.product_details && meta.product_details.name) || ''
+            const fixLine = `\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo — same container, shape and parts. The photo shows the COMPLETE product; its top edge is exactly as pictured. Do NOT add, invent or change any part: NO cap, lid, SPOUT, nozzle, bottle-neck, box or extra packaging that is not visibly present in the attached photo. If the real product is a flat pouch/sachet, keep it a flat pouch with a plain sealed top and no cap.`
+            for (let attempt = 0; attempt < 2; attempt++) {
+              const verdict = await verifySegmentProduct(f, prodRef, pName, job.id, i)
+              if (verdict !== 'mismatch') break
               try {
-                const fix = `${prompt}\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo — same container, shape and parts. Do NOT add, invent or change any part: NO cap, lid, spout, bottle-neck, box or extra packaging that is not visibly present in the attached photo. If the real product is a flat pouch/sachet, keep it a flat pouch with no cap.`
-                console.warn(`↻ ${job.id} re-rolling segment ${i + 1} (invented product part)`)
-                const rr = await falGenerate({ prompt: fix, imageUrls: imgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })
+                console.warn(`↻ ${job.id} re-rolling segment ${i + 1} (invented product part, attempt ${attempt + 1})`)
+                // Attempt 1: same refs + hard fix. Attempt 2: clean product ONLY + size anchor (drop
+                // any anchor frame — fewer references = less for the model to reinterpret).
+                const anchor2 = (meta.product_details && meta.product_details.size_anchor) ? ` The product's true size: ${meta.product_details.size_anchor}.` : ''
+                const rrImgs = attempt === 0 ? imgs : falProductImages.slice(0, 1)
+                const rr = await falGenerate({ prompt: `${prompt}${fixLine}${attempt === 1 ? anchor2 : ''}`, imageUrls: rrImgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })
                 falCost += clipCost(meta.tier, segDur)
                 await rm(f, { force: true }).catch(() => {})
                 await downloadToFile(rr.videoUrl, f)
                 videoUrl = rr.videoUrl
-              } catch (e) { console.warn(`segment ${i + 1} re-roll failed (keeping first take):`, e.message) }
+              } catch (e) { console.warn(`segment ${i + 1} re-roll failed (keeping current take):`, e.message); break }
             }
           }
           tmp.push(f); files.push(f)
@@ -1976,8 +2008,14 @@ async function tweakJob(job) {
       const fix = CHIP_FIX[t.chip] ?? ''
       await prog('Re-rolling your video…', 15, 150)
       console.log(`🔧 ${job.id} tweak: redo UGC clip (chip=${t.chip || 'redo'})`)
-      const { prompt } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, 1, meta.final_script || meta.script || null, meta.character_look, meta.language, isService)
-      const fullPrompt = `${prompt}${fix}`
+      // "Fix a moment" free-text note (same contract as redo_segment): respell the spoken script if
+      // the note is about speech, and append the note to the prompt as the top-priority fix.
+      const note = typeof t.note === 'string' ? t.note.trim().slice(0, 300) : ''
+      let scriptForPrompt = meta.final_script || meta.script || null
+      if (note && scriptForPrompt) scriptForPrompt = await applyFixNote(scriptForPrompt, note, meta.language)
+      const { prompt } = await buildSeedancePrompt(meta.beat_sheet, meta.product_details || { name: 'the product' }, 1, scriptForPrompt, meta.character_look, meta.language, isService)
+      const noteLine = note ? `\n\nUSER'S FIX (top priority — this is exactly what was wrong with the last take): ${note.replace(/"/g, "'")}` : ''
+      const fullPrompt = `${prompt}${fix}${noteLine}`
       const rawFirst = (Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []).slice(0, 1)
       const rungs = [
         { imageUrls: productImages, tag: 'clean product' },
@@ -2044,7 +2082,13 @@ async function tweakJob(job) {
         // continuity is held by the character description. meta.try_anchor=true restores the anchored attempt.
         const anchor = si > 0 && meta.try_anchor === true ? segAnchors[si - 1] : null
         const fix = CHIP_FIX[t.chip] ?? ''
-        const prompt = segmentPrompt(plan, segs[si], si, segs.length, !!anchor, falProductImages.length, meta.language) + fix
+        // "Fix a moment" free-text note: respell/edit the spoken line if the note is about speech
+        // (pronunciation of "Ejad"/"ras malai"), and ALWAYS append it to the video prompt as the
+        // top-priority instruction (covers visual notes like "remove the cap" too).
+        const note = typeof t.note === 'string' ? t.note.trim().slice(0, 300) : ''
+        const segForPrompt = note ? { ...segs[si], script: await applyFixNote(String(segs[si].script || ''), note, meta.language) } : segs[si]
+        const noteLine = note ? `\n\nUSER'S FIX (top priority — this is exactly what was wrong with the last take): ${note.replace(/"/g, "'")}` : ''
+        const prompt = segmentPrompt(plan, segForPrompt, si, segs.length, !!anchor, falProductImages.length, meta.language) + fix + noteLine
         const imgs = anchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages
         const blocked = (e) => e.code === 'content_policy_images' || e.code === 'content_policy_video'
         // Ladder down on moderation blocks (anchor+products → products only → pure prompt), same as the
