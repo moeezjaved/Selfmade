@@ -120,7 +120,7 @@ async function describeProduct(imageUrl) {
     body: JSON.stringify({
       model: 'gpt-4o', max_tokens: 120, temperature: 0.2,
       messages: [{ role: 'user', content: [
-        { type: 'text', text: 'Describe this product for an ad script in ONE dense sentence: exactly what it IS (form factor — capsules / gummies / powder / spray / bottle / device / garment …), its packaging, colors, and any readable label text. State only what is visible — no guesses.' },
+        { type: 'text', text: 'Describe this product for an ad script in ONE dense sentence: exactly what it IS (form factor — capsules / gummies / powder / spray / bottle / device / garment …), its packaging, colors, and any readable label text. ALWAYS end the sentence by stating its TOP EDGE / CLOSURE exactly as visible, e.g. "; closure: plain heat-sealed pillow pouch with NO spout or cap" or "; closure: white screw cap" — video models love inventing spouts/caps, and this clause is what stops them. State only what is visible — no guesses.' },
         { type: 'image_url', image_url: { url: imageUrl } },
       ] }],
     }),
@@ -223,12 +223,22 @@ async function verifySegmentProduct(localFile, productDataUri, productDesc, id, 
   const frames = []
   try {
     const dur = (await probeDuration(localFile)) || 8
-    for (const pct of [0.2, 0.5, 0.8]) {
+    // FULL FRAME + ZOOMED CENTER CROP per sample. Measured on the ejad spout bug (2026-07-20): the
+    // invented spout was so small in a full 720p frame that BOTH gpt-4o-mini and gpt-4o passed it;
+    // the SAME model on a zoomed crop of the same moment caught it instantly ("spout added in ad").
+    // A held product sits in the center ~60% of the frame, so a center crop upscaled to 768 makes a
+    // finger-sized spout ~3× larger — inside the model's resolving power.
+    for (const pct of [0.15, 0.45, 0.75]) {
+      const ts = String(Math.max(0.4, dur * pct))
       const f = join(tmpdir(), `pv-${id}-${i}-${Math.round(pct * 100)}.jpg`)
-      await ff(['-y', '-ss', String(Math.max(0.4, dur * pct)), '-i', localFile, '-frames:v', '1', '-q:v', '5', '-vf', 'scale=512:-1', f])
-      const b = await readFile(f)
-      frames.push(`data:image/jpeg;base64,${b.toString('base64')}`)
-      await rm(f, { force: true }).catch(() => {})
+      const c = join(tmpdir(), `pvz-${id}-${i}-${Math.round(pct * 100)}.jpg`)
+      await ff(['-y', '-ss', ts, '-i', localFile, '-frames:v', '1', '-q:v', '3', '-vf', 'scale=768:-1', f])
+      await ff(['-y', '-ss', ts, '-i', localFile, '-frames:v', '1', '-q:v', '3', '-vf', 'crop=iw*0.62:ih*0.62:iw*0.19:ih*0.14,scale=768:-1', c])
+      for (const p of [f, c]) {
+        const b = await readFile(p)
+        frames.push(`data:image/jpeg;base64,${b.toString('base64')}`)
+        await rm(p, { force: true }).catch(() => {})
+      }
     }
   } catch (e) { console.warn(`seg-verify frames ${id}.${i}:`, e.message); return 'unknown' }
   if (!frames.length) return 'unknown'
@@ -236,18 +246,27 @@ async function verifySegmentProduct(localFile, productDataUri, productDesc, id, 
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', max_tokens: 90, temperature: 0, response_format: { type: 'json_object' },
+        // Full gpt-4o (env-overridable): the ~5¢ check guards a ~$2.50 clip — mini kept missing
+        // small white-on-white closures and let a capped pouch ship TWICE.
+        model: process.env.PRODUCT_VERIFY_MODEL || 'gpt-4o', max_tokens: 220, temperature: 0, response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: [
-          { type: 'text', text: `The FIRST image is the REAL product — the single source of truth for what it looks like${productDesc ? ` (for reference, it is: ${productDesc})` : ''}. The remaining images are frames from an ad someone generated of it. Compare ONLY against the first image. Flag "mismatch" if, in ANY frame, the generated product DIFFERS in its physical build from the real one — a part ADDED, REMOVED, or CHANGED. This applies to EVERY product type, e.g.: a cap/lid/spout/nozzle/pump/straw added to something that has none (or removed from something that has one); a wrong closure type; a different container shape or form factor (pouch↔bottle↔jar↔tube↔box↔can); extra wrapping/box that isn't in the real photo; a clearly different silhouette. Do NOT flag pure colour/lighting/angle/blur differences, a hand covering part of it, or a frame where the product isn't clearly visible. When in doubt, "match". Return ONLY JSON: {"verdict":"match"|"mismatch"|"unknown","reason":"what changed, few words"}` },
+          { type: 'text', text: `You are a strict product-accuracy inspector for AI-generated ads. The FIRST image is the REAL product — the single source of truth${productDesc ? ` (it is: ${productDesc})` : ''}. The remaining images come in PAIRS from a generated ad of it: a full frame, then a ZOOMED CROP of the same moment — invented parts are often only resolvable in the zoomed crop.
+
+Work in TWO steps and put both in the JSON:
+1. "top_edges": look CLOSELY at the TOP EDGE / CLOSURE of the product in the real photo, then in EACH ad image (especially the zoomed crops) — describe each in a few words (e.g. real: "plain heat-sealed pouch top, no spout" / crop 2: "white angled spout on right corner"). Generated videos most often invent a spout, cap, nozzle or knob on the top edge — inspect corners carefully; it may be small, white-on-white, or partly behind a hand.
+2. "verdict": "mismatch" if ANY ad image's product differs in physical build from the real one — a part ADDED, REMOVED or CHANGED (spout/cap/lid/nozzle/pump/straw, wrong closure, different container form pouch↔bottle↔jar↔tube↔box↔can, extra wrapper, different silhouette). Colour/lighting/angle/blur differences or a hand covering part of it are NOT mismatches. "unknown" only if the product is not clearly visible in any image.
+
+Return ONLY JSON: {"top_edges":{"real":"...","frames":["..."]},"verdict":"match"|"mismatch"|"unknown","reason":"what changed, few words"}` },
           { type: 'image_url', image_url: { url: productDataUri } },
-          ...frames.map((u) => ({ type: 'image_url', image_url: { url: u } })),
+          ...frames.map((u) => ({ type: 'image_url', image_url: { url: u, detail: 'high' } })),
         ] }],
       }),
     })
     if (!r.ok) return 'unknown'
     const j = await r.json()
     const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
-    if (out.verdict === 'mismatch') console.warn(`🔬 ${id} segment ${i + 1} product mismatch: ${out.reason || ''}`)
+    if (out.verdict === 'mismatch') console.warn(`🔬 ${id} segment ${i + 1} product mismatch: ${out.reason || ''} · edges=${JSON.stringify(out.top_edges || {}).slice(0, 160)}`)
+    else console.log(`🔎 ${id} seg ${i + 1} product check: ${out.verdict}${out.top_edges ? ` · real="${String(out.top_edges.real || '').slice(0, 60)}"` : ''}`)
     return out.verdict === 'mismatch' || out.verdict === 'match' ? out.verdict : 'unknown'
   } catch { return 'unknown' }
 }
