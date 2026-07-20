@@ -217,14 +217,17 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const [capErr, setCapErr] = useState<string | null>(null)
   // ── Tweak (video remakes): per-scene fixes (faithful) or whole-clip re-roll (UGC), same rail as
   // the post-render modal — so users can come back and fix a video LATER from My Creatives. ──
-  const [tw, setTw] = useState<{ tweakable: boolean; ugcTweakable: boolean; scenes: { duration: number }[] } | null>(null)
+  const [tw, setTw] = useState<{ tweakable: boolean; ugcTweakable: boolean; segmentTweakable: boolean; scenes: { duration: number }[]; segments: { script: string; start?: number; end?: number }[] } | null>(null)
   const [twSel, setTwSel] = useState<number | null>(null)
   const [twBusy, setTwBusy] = useState(false)
   const [twMsg, setTwMsg] = useState<string | null>(null)
+  const [twNote, setTwNote] = useState('')
+  const [twFrom, setTwFrom] = useState('')
+  const [twTo, setTwTo] = useState('')
   useEffect(() => {
     if (gen.type !== 'video_clone' || gen.media_type !== 'video' || !gen.image_url) return
     fetch(`/api/discovery/clone-video/status?id=${gen.id}`).then((r) => r.json())
-      .then((st) => setTw({ tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, scenes: st.tweakScenes || [] }))
+      .then((st) => setTw({ tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, segmentTweakable: !!st.segmentTweakable, scenes: st.tweakScenes || [], segments: st.tweakSegments || [] }))
       .catch(() => {})
   }, [gen.id, gen.type, gen.media_type, gen.image_url])
   const runTweak = async (body: Record<string, unknown>) => {
@@ -322,49 +325,75 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
 
               {/* ── Tweak — fix this remake later, right from My Creatives (same rail as the render
                   modal): per-scene chips for faithful, whole-clip fix chips for single-clip UGC. ── */}
-              {tw && (tw.tweakable || tw.ugcTweakable) && (
+              {tw && (tw.tweakable || tw.ugcTweakable || tw.segmentTweakable) && (() => {
+                const pill = (on: boolean): React.CSSProperties => ({ padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${on ? '#1a3a1a' : '#d1d5db'}`, background: on ? '#f0fdf4' : '#fff', color: '#1a3a1a' })
+                const noteBox = { width: '100%', resize: 'vertical' as const, fontSize: 12.5, fontFamily: 'inherit', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', boxSizing: 'border-box' as const }
+                const mmss = (t?: number) => t == null ? '' : `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, '0')}`
+                const primary = { padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: '#1a3a1a', color: '#dffe95' }
+                const patchRow = (fromDefault: number) => (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: '1px dashed #e5e7eb' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700 }}>🩹 Or patch just the flawed seconds</span>
+                    <input value={twFrom} onChange={(e) => setTwFrom(e.target.value.replace(/[^\d.]/g, ''))} placeholder={String(fromDefault)} inputMode="decimal" style={{ ...noteBox, width: 56, padding: '6px 8px' }} />
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>to</span>
+                    <input value={twTo} onChange={(e) => setTwTo(e.target.value.replace(/[^\d.]/g, ''))} placeholder={String(fromDefault + 4)} inputMode="decimal" style={{ ...noteBox, width: 56, padding: '6px 8px' }} />
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>sec</span>
+                    <button onClick={() => { const f = parseFloat(twFrom || String(fromDefault)); runTweak({ type: 'patch_broll', from: f, to: parseFloat(twTo || String(f + 4)), note: twNote.trim() || undefined }) }} style={{ ...pill(false), color: '#15803d' }}>Patch it · 150cr</button>
+                    <span style={{ fontSize: 11, color: '#9ca3af', width: '100%' }}>Swaps those seconds for a clean product close-up (max 5s) — the voice keeps playing, the rest is untouched.</span>
+                  </div>
+                )
+                return (
                 <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>🔧 Tweak this video</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>🎯 {tw.tweakable ? 'Tweak a scene' : 'Fix a moment'}</div>
                   {twBusy ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1a3a1a', fontSize: 12.5 }}><Loader2 size={14} className="spin" /> Tweaking… (~2–3 min, the video updates here)</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1a3a1a', fontSize: 12.5 }}><Loader2 size={14} className="spin" /> Fixing… (~2–3 min, the video updates here)</div>
                   ) : tw.tweakable ? (<>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {tw.scenes.map((s, i) => (
-                        <button key={i} onClick={() => setTwSel(twSel === i ? null : i)}
-                          style={{ padding: '6px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${twSel === i ? '#1a3a1a' : '#d1d5db'}`, background: twSel === i ? '#f0fdf4' : '#fff', color: '#1a3a1a' }}>
-                          Scene {i + 1} · {s.duration}s
-                        </button>
+                        <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={pill(twSel === i)}>Scene {i + 1} · {s.duration}s</button>
                       ))}
                     </div>
                     {twSel != null && (
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {[['size', 'Product too big/small'], ['product', 'Product wrong'], ['action', 'Wrong action'], ['person', 'Person off'], ['closeup', 'Close-up'], ['redo', 'Redo']].map(([k, label]) => (
-                          <button key={k} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: k })}
-                            style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #d1d5db', background: '#fff', color: '#1a3a1a' }}>
-                            {label} · 600cr
-                          </button>
+                          <button key={k} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: k })} style={pill(false)}>{label} · 600cr</button>
                         ))}
-                        {tw.scenes.length > 2 && (
-                          <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })}
-                            style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #d1d5db', background: '#fff', color: '#15803d' }}>
-                            Remove · free
-                          </button>
-                        )}
+                        {tw.scenes.length > 2 && <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...pill(false), color: '#15803d' }}>Remove · free</button>}
                       </div>
                     )}
-                  </>) : (
+                  </>) : tw.segmentTweakable ? (<>
+                    <div style={{ fontSize: 11.5, color: '#6b7280' }}>Pick the section that&apos;s off, say what&apos;s wrong — we re-shoot only that part.</div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {[['size', 'Product too big/small'], ['product', 'Product looks wrong'], ['person', 'Person looks off'], ['action', 'Not using the product'], ['redo', 'Just re-roll it']].map(([k, label]) => (
-                        <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k })}
-                          style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #d1d5db', background: '#fff', color: '#1a3a1a' }}>
-                          {label} · 450cr
-                        </button>
+                      {tw.segments.map((s, i) => {
+                        const range = s.start != null && s.end != null ? `${mmss(s.start)}–${mmss(s.end)}` : `Section ${i + 1}`
+                        return <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} title={s.script} style={{ ...pill(twSel === i), maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>⏱ {range}{s.script ? ` · “${s.script.slice(0, 30)}${s.script.length > 30 ? '…' : ''}”` : ''}</button>
+                      })}
+                    </div>
+                    {twSel != null && (
+                      <div style={{ background: '#fafcf7', border: '1px solid #eef2f0', borderRadius: 10, padding: '10px 12px' }}>
+                        <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2} style={noteBox} placeholder={'What’s wrong here? e.g. “says Ejad wrong — pronounce Ee-jaad” or “the pouch has a cap, remove it”'} />
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+                          <button onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Re-shoot section · 600cr</button>
+                          {[['product', 'Product wrong'], ['size', 'Too big/small'], ['person', 'Person off']].map(([k, label]) => (
+                            <button key={k} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: k, note: twNote.trim() || undefined })} style={pill(false)}>{label}</button>
+                          ))}
+                        </div>
+                        {patchRow(Math.round(tw.segments[twSel]?.start ?? 0))}
+                      </div>
+                    )}
+                  </>) : (<>
+                    <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2} style={noteBox} placeholder={'What’s wrong? e.g. “says Ejad wrong — pronounce Ee-jaad” or “the pouch shouldn’t have a cap”'} />
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button onClick={() => runTweak({ type: 'redo_ugc', chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Fix it · 450cr</button>
+                      {[['size', 'Too big/small'], ['product', 'Product wrong'], ['person', 'Person off'], ['action', 'Not using it']].map(([k, label]) => (
+                        <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k, note: twNote.trim() || undefined })} style={pill(false)}>{label}</button>
                       ))}
                     </div>
-                  )}
+                    {patchRow(0)}
+                  </>)}
                   {twMsg && <div style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? '#15803d' : '#b91c1c' }}>{twMsg}</div>}
                 </div>
-              )}
+                )
+              })()}
 
               {/* Captions add-on — burn TikTok-style captions (85% of feed watches on mute). */}
               <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
