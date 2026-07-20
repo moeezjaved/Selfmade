@@ -279,8 +279,8 @@ export default function HomeLanding() {
           <Mask>Turn any winning ad</Mask>
           <Mask delay={120}>into <span style={{ fontStyle: 'italic', color: GREEN }}>your</span> ad. In minutes.</Mask>
         </h1>
-        <p style={{ fontSize: 'clamp(16px,2vw,19px)', color: '#4b5563', maxWidth: 640, margin: '22px auto 28px', lineHeight: 1.55 }}>
-          Find a proven Meta ad, swap in your product, and get a scroll-stopping <b>video or image</b> ad — in about two minutes. No filming, no designer, no waiting.
+        <p style={{ fontSize: 'clamp(16px,2vw,19px)', color: '#4b5563', maxWidth: 660, margin: '22px auto 28px', lineHeight: 1.55 }}>
+          We don&rsquo;t guess what works — we start from what&rsquo;s already winning. Pick a proven Meta ad from 3M+, clone it with <b>your product</b> as a scroll-stopping <b>video or image</b>, and launch. <b>$0.15 an ad</b>, not a $1,500 shoot.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/signup" className="btn arrowp" style={btnPrimary}>Start for free <Arrow /></Link>
@@ -297,9 +297,9 @@ export default function HomeLanding() {
       <section style={{ ...wrap, padding: '30px 24px 20px' }}>
         <Reveal>
           <div style={{ textAlign: 'center', maxWidth: 860, margin: '0 auto' }}>
-            <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: GREEN, marginBottom: 12 }}>Built by Meta ad experts</div>
+            <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: GREEN, marginBottom: 12 }}>Not another AI ad generator</div>
             <p style={{ fontSize: 'clamp(22px,3.2vw,32px)', fontWeight: 700, lineHeight: 1.35, letterSpacing: '-.01em', margin: 0, color: INK }}>
-              Our agents know <span style={{ fontStyle: 'italic', color: GREEN }}>what&rsquo;s working</span>, catch <span style={{ fontStyle: 'italic', color: GREEN }}>what&rsquo;s missing</span>, and tell you <span style={{ fontStyle: 'italic', color: GREEN }}>exactly what ads to make next</span>.
+              Generators start from a <span style={{ fontStyle: 'italic', color: '#9ca3af' }}>blank prompt</span> and guess. Selfmade starts from an ad that&rsquo;s <span style={{ fontStyle: 'italic', color: GREEN }}>already winning</span> — real hooks, real pacing, real results — and rebuilds it around <span style={{ fontStyle: 'italic', color: GREEN }}>your product</span>.
             </p>
           </div>
         </Reveal>
@@ -337,7 +337,7 @@ export default function HomeLanding() {
         <h2 style={{ fontSize: 'clamp(28px,4vw,40px)', fontWeight: 800, textAlign: 'center', letterSpacing: '-.02em', margin: '0 0 8px' }}>
           <Mask style={{ display: 'inline-block' }}>Everything, in <span style={{ fontStyle: 'italic', color: GREEN }}>one</span> place.</Mask>
         </h2>
-        <p style={{ textAlign: 'center', color: '#6b7280', margin: '0 0 32px' }}>Others do a slice. Selfmade covers discover → create → launch.</p>
+        <p style={{ textAlign: 'center', color: '#6b7280', margin: '0 0 32px' }}>Others sell one slice — research <i>or</i> analytics <i>or</i> generation — and some tax your ad spend. Selfmade is the whole loop: spy → clone → launch, at one flat price. <b>No spend caps, no spend tax, ever.</b></p>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 14.5 }}>
             <thead><tr>
