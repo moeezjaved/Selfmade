@@ -101,6 +101,10 @@ export async function POST(req: NextRequest) {
     // Script/voiceover language (transcreated natively, never translated) + narration voice.
     language: /^[a-z]{2}$/.test(String(body.language || '')) ? body.language : 'en',
     voice: ['nova', 'shimmer', 'onyx', 'echo'].includes(String(body.voice || '')) ? body.voice : 'nova',
+    // Preview-accurate voice: when true the render uses the SAME overlaid TTS voice the user auditioned
+    // (ElevenLabs non-EN / OpenAI EN) instead of Seedance's own native voice — so "what you heard is what
+    // ships", word-perfect, at the cost of slightly looser lip-sync. Default false = native (best sync).
+    tts_overlay: body.ttsOverlay === true,
     // 'service' = app/site/service brand → the worker's SERVICE prompt path (creator talks about it,
     // never renders a physical product). Absent/'physical' = today's product-hero flow.
     product_type: body.productType === 'service' ? 'service' : 'physical',
