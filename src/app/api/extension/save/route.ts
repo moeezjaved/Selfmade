@@ -94,8 +94,17 @@ export async function POST(request: NextRequest) {
     if (stored) snapshotUrl = stored
   }
 
-  // Deterministic ad_id so the same creative from the same page de-dupes on re-save.
-  const adId = 'ext_' + createHash('sha1').update(`${source_url || ''}|${media_url || key}`).digest('hex').slice(0, 24)
+  // Deterministic ad_id so the SAME creative re-saved de-dupes, but DIFFERENT creatives never collide.
+  // Bug fixed: FB-feed videos have no per-ad media_url or permalink, so (source_url|media_url) was
+  // identical for every feed ad on the same page → each save overwrote the previous. When there's no
+  // distinct media_url we now key on the ad copy + a hash of the captured frame (image_data), which are
+  // unique per creative but stable for the same one. randomUUID `key` is the last-resort tiebreaker.
+  const frameSig = (typeof image_data === 'string' && image_data.startsWith('data:'))
+    ? createHash('sha1').update(image_data).digest('hex').slice(0, 16) : ''
+  const idBasis = media_url
+    ? `${source_url || ''}|${media_url}`
+    : `${source_url || ''}|${(ad_copy || '').trim().slice(0, 200)}|${frameSig || key}`
+  const adId = 'ext_' + createHash('sha1').update(idBasis).digest('hex').slice(0, 24)
 
   const { data, error } = await admin.from('discovery_saved_ads')
     .upsert({
