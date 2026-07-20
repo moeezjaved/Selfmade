@@ -338,6 +338,16 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                 const round1 = (t: number) => Math.round(t * 10) / 10
                 const seek = (t: number) => { if (videoRef.current) { videoRef.current.currentTime = Math.max(0, t); videoRef.current.pause() } }
                 const rangeValid = markFrom != null && markTo != null && markTo > markFrom
+                // Preview just the marked window: play from start, auto-pause at end.
+                const playRange = () => {
+                  const v = videoRef.current
+                  if (!v || markFrom == null) return
+                  const end = markTo != null ? markTo : markFrom + 3
+                  v.currentTime = markFrom
+                  const onTick = () => { if (v.currentTime >= end) { v.pause(); v.removeEventListener('timeupdate', onTick) } }
+                  v.addEventListener('timeupdate', onTick)
+                  v.play()
+                }
                 return (
                 <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>🎯 Fix a moment</div>
@@ -354,10 +364,13 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                           {markFrom != null ? <button onClick={() => seek(markFrom)} title="jump to start" style={{ ...pill(true), padding: '3px 8px' }}>{secLbl(markFrom)}</button> : '—'}
                           <span>→</span>
                           {markTo != null ? <button onClick={() => seek(markTo)} title="jump to end" style={{ ...pill(true), padding: '3px 8px' }}>{secLbl(markTo)}</button> : '…'}
-                          <button onClick={() => { setMarkFrom(null); setMarkTo(null) }} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>×</button>
+                          <button onClick={() => { setMarkFrom(null); setMarkTo(null) }} title="clear" style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>×</button>
                         </span>
                       )}
                     </div>
+                    {rangeValid && (
+                      <button onClick={playRange} style={{ ...pill(false), alignSelf: 'flex-start' }}>▶ Play this part ({secLbl(markFrom!)}–{secLbl(markTo!)})</button>
+                    )}
                     <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2} style={noteBox} placeholder={'What’s wrong in this moment? e.g. “the pouch has a cap — it should be a flat sealed pouch” or “product looks squashed”'} />
                     <button
                       disabled={!rangeValid}
@@ -374,20 +387,24 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                     {tw?.segmentTweakable && (tw.segments?.length || 0) > 0 && (
                       <details style={{ marginTop: 4, borderTop: '1px dashed #e5e7eb', paddingTop: 10 }}>
                         <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#374151' }}>Bigger problem? Re-shoot a whole section</summary>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                        <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 8, lineHeight: 1.5 }}>Your video is built from <b>sections</b> (one spoken part each). This re-films a whole section from scratch — the person, the action <i>and</i> the voice for that part. Use it when the whole part is wrong (not just a moment). It costs more and the creator may look slightly different. <b>1)</b> Pick the section:</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                           {tw.segments.map((s, i) => {
-                            const range = s.start != null && s.end != null ? `${mmss(s.start)}–${mmss(s.end)}` : `Section ${i + 1}`
-                            return <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} title={s.script} style={{ ...pill(twSel === i), maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>⏱ {range}{s.script ? ` · “${s.script.slice(0, 26)}${s.script.length > 26 ? '…' : ''}”` : ''}</button>
+                            const range = s.start != null && s.end != null ? `${mmss(s.start)}–${mmss(s.end)}` : ''
+                            return (
+                              <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} title={s.script} style={{ ...pill(twSel === i), textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 10px', whiteSpace: 'normal' }}>
+                                <span style={{ fontWeight: 700 }}>Section {i + 1}{range ? ` · ${range}` : ''}</span>
+                                {s.script ? <span style={{ fontWeight: 400, color: '#6b7280', fontSize: 11 }}>“{s.script.slice(0, 60)}{s.script.length > 60 ? '…' : ''}”</span> : null}
+                              </button>
+                            )
                           })}
                         </div>
-                        {twSel != null && (
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-                            <button onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Re-shoot section · 600cr</button>
-                            {[['product', 'Product wrong'], ['size', 'Too big/small'], ['person', 'Person off']].map(([k, label]) => (
-                              <button key={k} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: k, note: twNote.trim() || undefined })} style={pill(false)}>{label}</button>
-                            ))}
+                        {twSel != null && (<>
+                          <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 10 }}><b>2)</b> Type what&apos;s wrong above, then:</div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+                            <button onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Re-shoot Section {twSel + 1} · 600 cr</button>
                           </div>
-                        )}
+                        </>)}
                       </details>
                     )}
                     {tw?.ugcTweakable && (
