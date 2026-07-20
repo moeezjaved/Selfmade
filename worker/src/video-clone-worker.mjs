@@ -1255,8 +1255,12 @@ async function burnOverlays(videoIn, overlays, id) {
 // exactly like burnOverlays. Never runs for physical brands.
 async function burnAppDemo(videoIn, ranges, imageUrls, id, screencastUrl) {
   const imgs = (Array.isArray(imageUrls) ? imageUrls : []).filter((u) => typeof u === 'string' && (u.startsWith('http') || u.startsWith('data:')))
-  const list = (Array.isArray(ranges) ? ranges : []).filter((r) => r && r.t).slice(0, 5)
+  let list = (Array.isArray(ranges) ? ranges : []).filter((r) => r && r.t).slice(0, 5)
   const hasCast = typeof screencastUrl === 'string' && /^https?:\/\//i.test(screencastUrl)
+  // FALLBACK (the "my screenshot didn't show" bug): cached/older beat sheets have no app_demo field, so
+  // a service render with uploaded screenshots silently skipped the composite. If the user gave us
+  // screenshots, ALWAYS show them — default to the split layout when analysis didn't provide beats.
+  if (!list.length && imgs.length && !hasCast) list = [{ t: 'full', region: 'split_top' }]
   if (!list.length && !hasCast) return videoIn
   if (!imgs.length && !hasCast) return videoIn
   const dur = await probeDuration(videoIn) || 30

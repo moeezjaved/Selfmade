@@ -74,6 +74,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [notice, setNotice] = useState<string | null>(null)   // non-error info (e.g. still rendering)
   const [result, setResult] = useState<{ url: string; script?: string | null; tweakable?: boolean; ugcTweakable?: boolean; segmentTweakable?: boolean; tweakScenes?: { duration: number; hasPeople: boolean }[]; tweakSegments?: { script: string; start?: number; end?: number }[]; finalScript?: string | null } | null>(null)
   const [twNote, setTwNote] = useState('')   // "Fix a moment" free-text — what exactly is wrong
+  const [twChip, setTwChip] = useState<string | null>(null)   // selected problem chip — selection only, never fires
   const [twFrom, setTwFrom] = useState('')   // cutaway patch window (seconds)
   const [twTo, setTwTo] = useState('')
   // ── Tweak panel (post-render, per-scene fixes — no full re-render) ──
@@ -393,16 +394,23 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                         <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={{ ...chip(twSel === i), padding: '6px 11px', fontSize: 12 }}>Scene {i + 1} · {s.duration}s{s.hasPeople ? ' · 👤' : ''}</button>
                       ))}
                     </div>
-                    {twSel != null && (
+                    {twSel != null && (<>
+                      {/* selection-only chips — the confirm button below is the ONLY thing that charges */}
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                         {[['product', 'Product looks wrong'], ['action', 'Wrong action'], ['person', 'Person looks off'], ['closeup', 'Make it a close-up'], ['redo', 'Just redo it']].map(([k, label]) => (
-                          <button key={k} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: k })} style={{ ...chip(false), fontSize: 11.5 }}>{label} · 600 cr</button>
+                          <button key={k} onClick={() => setTwChip(twChip === k ? null : k)} style={{ ...chip(twChip === k), fontSize: 11.5 }}>{label}</button>
                         ))}
                         {result.tweakScenes!.length > 2 && (
                           <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...chip(false), fontSize: 11.5, color: GREEN, borderColor: SEL_BORDER }}>Remove scene · free</button>
                         )}
                       </div>
-                    )}
+                      <button
+                        disabled={!twChip}
+                        onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: twChip || 'redo' })}
+                        style={{ ...btnPrimary, marginBottom: 8, padding: '9px 16px', fontSize: 12.5, opacity: twChip ? 1 : 0.45, cursor: twChip ? 'pointer' : 'not-allowed' }}>
+                        ✨ Redo scene {twSel + 1} with this fix · 600 cr
+                      </button>
+                    </>)}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <button onClick={() => runTweak({ type: 'trim' })} style={{ ...chip(false), fontSize: 11.5, color: GREEN, borderColor: SEL_BORDER }}>✂️ Trim dead air · free</button>
                       <button onClick={() => { setTwVoOpen((v) => !v); setTwVoText(result.finalScript || '') }} style={{ ...chip(twVoOpen), fontSize: 11.5 }}>🎙 Redo voiceover · 50 cr</button>
@@ -425,15 +433,25 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                   {twBusy ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: GREEN, fontSize: 12.5, padding: '8px 0' }}><Loader2 size={14} className="spin" /> {genProgress?.label || 'Re-rolling…'}</div>
                   ) : (<>
+                    {/* SAFE 2-STEP FLOW: chips + text only DESCRIBE the problem — nothing renders or
+                        charges until the one green button is pressed. (A stray chip tap used to fire a
+                        450cr re-roll instantly, with no instructions given.) */}
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: L_INK, marginBottom: 6 }}>1 · What&apos;s wrong? <span style={{ fontWeight: 400, color: L_MUTED }}>(pick one, type details, or both)</span></div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+                      {[['size', 'Too big/small'], ['product', 'Product wrong'], ['person', 'Person off'], ['action', 'Not using it'], ['redo', 'Just re-roll']].map(([k, label]) => (
+                        <button key={k} onClick={() => setTwChip(twChip === k ? null : k)} style={chip(twChip === k)}>{label}</button>
+                      ))}
+                    </div>
                     <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2}
                       style={{ ...input, width: '100%', resize: 'vertical', fontSize: 12.5, marginBottom: 8 }}
                       placeholder={'e.g. “it says Ejad wrong — pronounce it Ee-jaad” or “the pouch shouldn’t have a cap”'} />
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <button onClick={() => runTweak({ type: 'redo_ugc', chip: 'redo', note: twNote.trim() || undefined })} style={{ ...btnPrimary, padding: '8px 14px', fontSize: 12.5 }}>Fix it · 450 cr</button>
-                      {[['size', 'Too big/small'], ['product', 'Product wrong'], ['person', 'Person off'], ['action', 'Not using it']].map(([k, label]) => (
-                        <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k, note: twNote.trim() || undefined })} style={{ ...chip(false), fontSize: 11.5, padding: '6px 10px' }}>{label}</button>
-                      ))}
-                    </div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: L_INK, marginBottom: 6 }}>2 · Start the fix <span style={{ fontWeight: 400, color: L_MUTED }}>(nothing is charged until you press this)</span></div>
+                    <button
+                      disabled={!twChip && !twNote.trim()}
+                      onClick={() => runTweak({ type: 'redo_ugc', chip: twChip || 'redo', note: twNote.trim() || undefined })}
+                      style={{ ...btnPrimary, padding: '9px 16px', fontSize: 12.5, opacity: (twChip || twNote.trim()) ? 1 : 0.45, cursor: (twChip || twNote.trim()) ? 'pointer' : 'not-allowed' }}>
+                      ✨ Re-roll with this fix · 450 cr
+                    </button>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: `1px dashed ${L_LINE}` }}>
                       <span style={{ fontSize: 12, fontWeight: 700 }}>🩹 Or patch just the flawed seconds</span>
                       <input value={twFrom} onChange={(e) => setTwFrom(e.target.value.replace(/[^\d.]/g, ''))} placeholder="7" style={{ ...input, width: 58, fontSize: 12.5, padding: '6px 8px' }} inputMode="decimal" />
@@ -468,16 +486,21 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                     </div>
                     {twSel != null && (
                       <div style={{ background: '#fcfdfb', border: `1px solid ${L_LINE}`, borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
-                        <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2}
-                          style={{ ...input, width: '100%', resize: 'vertical', fontSize: 12.5 }}
-                          placeholder={'What’s wrong in this section? e.g. “it says Ejad wrong — pronounce it Ee-jaad” or “the pouch has a cap, remove it”'} />
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-                          <button onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={{ ...btnPrimary, padding: '8px 14px', fontSize: 12.5 }}>Re-shoot section · 600 cr</button>
-                          <span style={{ fontSize: 11, color: L_MUTED }}>or quick fixes:</span>
-                          {[['product', 'Product wrong'], ['size', 'Too big/small'], ['person', 'Person off']].map(([k, label]) => (
-                            <button key={k} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: k, note: twNote.trim() || undefined })} style={{ ...chip(false), fontSize: 11.5, padding: '6px 10px' }}>{label}</button>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, color: L_INK, marginBottom: 6 }}>What&apos;s wrong here? <span style={{ fontWeight: 400, color: L_MUTED }}>(pick, type, or both — nothing runs yet)</span></div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                          {[['product', 'Product wrong'], ['size', 'Too big/small'], ['person', 'Person off'], ['redo', 'Just re-shoot']].map(([k, label]) => (
+                            <button key={k} onClick={() => setTwChip(twChip === k ? null : k)} style={{ ...chip(twChip === k), fontSize: 11.5, padding: '6px 10px' }}>{label}</button>
                           ))}
                         </div>
+                        <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2}
+                          style={{ ...input, width: '100%', resize: 'vertical', fontSize: 12.5 }}
+                          placeholder={'e.g. “it says Ejad wrong — pronounce it Ee-jaad” or “the pouch has a cap, remove it”'} />
+                        <button
+                          disabled={!twChip && !twNote.trim()}
+                          onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: twChip || 'redo', note: twNote.trim() || undefined })}
+                          style={{ ...btnPrimary, marginTop: 8, padding: '9px 16px', fontSize: 12.5, opacity: (twChip || twNote.trim()) ? 1 : 0.45, cursor: (twChip || twNote.trim()) ? 'pointer' : 'not-allowed' }}>
+                          ✨ Re-shoot this section with the fix · 600 cr
+                        </button>
                         {/* Cutaway patch — the cheap scalpel: replaces ONLY these seconds with a product
                             close-up; the voice keeps playing untouched. Best for a visual flaw (wrong
                             cap/label) that lasts a couple of seconds. */}
