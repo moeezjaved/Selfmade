@@ -325,7 +325,11 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
 
               {/* ── Tweak — fix this remake later, right from My Creatives (same rail as the render
                   modal): per-scene chips for faithful, whole-clip fix chips for single-clip UGC. ── */}
-              {tw && (tw.tweakable || tw.ugcTweakable || tw.segmentTweakable) && (() => {
+              {gen.type === 'video_clone' && gen.media_type === 'video' && !!img && (() => {
+                // The cutaway PATCH needs only a finished video (+ the product photo in clone_meta), not
+                // a re-roll cache — so it's available on EVERY video, including older ones with no cached
+                // sections. The richer re-shoot options appear only when their cache exists.
+                const hasFix = tw && (tw.tweakable || tw.ugcTweakable || tw.segmentTweakable)
                 const pill = (on: boolean): React.CSSProperties => ({ padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${on ? '#1a3a1a' : '#d1d5db'}`, background: on ? '#f0fdf4' : '#fff', color: '#1a3a1a' })
                 const noteBox = { width: '100%', resize: 'vertical' as const, fontSize: 12.5, fontFamily: 'inherit', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', boxSizing: 'border-box' as const }
                 const mmss = (t?: number) => t == null ? '' : `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, '0')}`
@@ -343,10 +347,10 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                 )
                 return (
                 <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>🎯 {tw.tweakable ? 'Tweak a scene' : 'Fix a moment'}</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>🎯 {tw?.tweakable ? 'Tweak a scene' : 'Fix a moment'}</div>
                   {twBusy ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1a3a1a', fontSize: 12.5 }}><Loader2 size={14} className="spin" /> Fixing… (~2–3 min, the video updates here)</div>
-                  ) : tw.tweakable ? (<>
+                  ) : tw?.tweakable ? (<>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {tw.scenes.map((s, i) => (
                         <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={pill(twSel === i)}>Scene {i + 1} · {s.duration}s</button>
@@ -360,7 +364,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                         {tw.scenes.length > 2 && <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...pill(false), color: '#15803d' }}>Remove · free</button>}
                       </div>
                     )}
-                  </>) : tw.segmentTweakable ? (<>
+                  </>) : tw?.segmentTweakable ? (<>
                     <div style={{ fontSize: 11.5, color: '#6b7280' }}>Pick the section that&apos;s off, say what&apos;s wrong — we re-shoot only that part.</div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {tw.segments.map((s, i) => {
@@ -380,7 +384,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                         {patchRow(Math.round(tw.segments[twSel]?.start ?? 0))}
                       </div>
                     )}
-                  </>) : (<>
+                  </>) : tw?.ugcTweakable ? (<>
                     <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2} style={noteBox} placeholder={'What’s wrong? e.g. “says Ejad wrong — pronounce Ee-jaad” or “the pouch shouldn’t have a cap”'} />
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       <button onClick={() => runTweak({ type: 'redo_ugc', chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Fix it · 450cr</button>
@@ -388,6 +392,12 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                         <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k, note: twNote.trim() || undefined })} style={pill(false)}>{label}</button>
                       ))}
                     </div>
+                    {patchRow(0)}
+                  </>) : (<>
+                    {/* Patch-only fallback: any finished video (incl. older ones with no re-shoot cache)
+                        can still be patched — the cheap, always-available fix. */}
+                    <div style={{ fontSize: 11.5, color: '#6b7280' }}>Spot a flaw for a second or two? Patch just those seconds with a clean product close-up — the voice keeps playing.</div>
+                    <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2} style={noteBox} placeholder={'Optional: what to show instead, e.g. “clean pouch, no cap”'} />
                     {patchRow(0)}
                   </>)}
                   {twMsg && <div style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? '#15803d' : '#b91c1c' }}>{twMsg}</div>}
