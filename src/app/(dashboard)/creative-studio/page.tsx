@@ -229,6 +229,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const [twBusy, setTwBusy] = useState(false)
   const [twMsg, setTwMsg] = useState<string | null>(null)
   const [twNote, setTwNote] = useState('')
+  const [twChip, setTwChip] = useState<string | null>(null)   // selected problem chip — selection only, never fires
   useEffect(() => {
     if (gen.type !== 'video_clone' || gen.media_type !== 'video' || !gen.image_url) return
     fetch(`/api/discovery/clone-video/status?id=${gen.id}`).then((r) => r.json())
@@ -408,9 +409,12 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                           })}
                         </div>
                         {twSel != null && (<>
-                          <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 10 }}><b>2)</b> Type what&apos;s wrong above, then:</div>
+                          {/* SAFE: the button stays disabled until the user actually SAYS what's wrong —
+                              a re-shoot with no instruction was firing on a stray click. */}
+                          <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 10 }}><b>2)</b> Type what&apos;s wrong in the box above, then:</div>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
-                            <button onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Re-shoot Section {twSel + 1} · 600 cr</button>
+                            <button disabled={!twNote.trim()} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={{ ...primary, opacity: twNote.trim() ? 1 : 0.45, cursor: twNote.trim() ? 'pointer' : 'not-allowed' }}>✨ Re-shoot Section {twSel + 1} · 600 cr</button>
+                            {!twNote.trim() && <span style={{ fontSize: 11, color: '#b45309' }}>write what to fix first</span>}
                           </div>
                         </>)}
                       </details>
@@ -419,11 +423,11 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                       <details style={{ marginTop: 4, borderTop: '1px dashed #e5e7eb', paddingTop: 10 }}>
                         <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#374151' }}>Bigger problem? Re-shoot the whole clip</summary>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-                          <button onClick={() => runTweak({ type: 'redo_ugc', chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Re-roll clip · 450cr</button>
-                          {[['size', 'Too big/small'], ['product', 'Product wrong'], ['person', 'Person off'], ['action', 'Not using it']].map(([k, label]) => (
-                            <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k, note: twNote.trim() || undefined })} style={pill(false)}>{label}</button>
+                          {[['size', 'Too big/small'], ['product', 'Product wrong'], ['person', 'Person off'], ['action', 'Not using it'], ['redo', 'Just re-roll']].map(([k, label]) => (
+                            <button key={k} onClick={() => setTwChip(twChip === k ? null : k)} style={pill(twChip === k)}>{label}</button>
                           ))}
                         </div>
+                        <button disabled={!twChip && !twNote.trim()} onClick={() => runTweak({ type: 'redo_ugc', chip: twChip || 'redo', note: twNote.trim() || undefined })} style={{ ...primary, marginTop: 8, opacity: (twChip || twNote.trim()) ? 1 : 0.45, cursor: (twChip || twNote.trim()) ? 'pointer' : 'not-allowed' }}>✨ Re-roll clip with this fix · 450cr</button>
                       </details>
                     )}
                     {tw?.tweakable && (tw.scenes?.length || 0) > 0 && (
@@ -432,14 +436,15 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                           {tw.scenes.map((s, i) => <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={pill(twSel === i)}>Scene {i + 1} · {s.duration}s</button>)}
                         </div>
-                        {twSel != null && (
+                        {twSel != null && (<>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                             {[['size', 'Too big/small'], ['product', 'Product wrong'], ['action', 'Wrong action'], ['person', 'Person off'], ['closeup', 'Close-up'], ['redo', 'Redo']].map(([k, label]) => (
-                              <button key={k} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: k })} style={pill(false)}>{label} · 600cr</button>
+                              <button key={k} onClick={() => setTwChip(twChip === k ? null : k)} style={pill(twChip === k)}>{label}</button>
                             ))}
                             {tw.scenes.length > 2 && <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...pill(false), color: '#15803d' }}>Remove · free</button>}
                           </div>
-                        )}
+                          <button disabled={!twChip} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: twChip || 'redo' })} style={{ ...primary, marginTop: 8, opacity: twChip ? 1 : 0.45, cursor: twChip ? 'pointer' : 'not-allowed' }}>✨ Redo scene {twSel + 1} · 600cr</button>
+                        </>)}
                       </details>
                     )}
                   </>)}
