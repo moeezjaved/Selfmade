@@ -2013,7 +2013,10 @@ async function generateJob(job) {
     // (likeness policy) — which is nearly every UGC ad — so on a content_policy_violation we retry
     // WITHOUT the video: Gemini's beat sheet already grounds the prompt in the ad's structure/hook,
     // and Seedance generates a fresh (non-real) creator. Product-only/no-people videos keep the motion ref.
-    const genArgs = { prompt, resolution: meta.resolution, duration: clipSecs, aspect: meta.aspect, tier: meta.tier }
+    // Preview-accurate voice (meta.tts_overlay): render SILENT + overlay the exact TTS voice the user
+    // auditioned, so "what you heard is what ships". Default = native Seedance voice (tightest lip-sync).
+    const useOverlayVoice = meta.tts_overlay === true
+    const genArgs = { prompt, resolution: meta.resolution, duration: clipSecs, aspect: meta.aspect, tier: meta.tier, ...(useOverlayVoice ? { generateAudio: false } : {}) }
     await prog('Filming your video…', 35, 150)   // the fal render is one long await — keep the bar moving
     // NEVER-FAIL LADDER (same contract as faithful mode): a moderation block on ANY reference must
     // degrade fidelity a step, not kill the render. fal moderation is borderline/non-deterministic —
@@ -2042,7 +2045,7 @@ async function generateJob(job) {
     }
 
     const singleTmp = []
-    const singleFile = join(tmpdir(), `sc-${job.id}.mp4`)
+    let singleFile = join(tmpdir(), `sc-${job.id}.mp4`)
     singleTmp.push(singleFile)
     await downloadToFile(videoUrl, singleFile)
     await prog('Checking product size…', 78, 30)
@@ -2098,6 +2101,19 @@ async function generateJob(job) {
           console.log(`🔬 ${job.id} product-part re-roll ${attempt + 1} applied`)
         }
       } catch (e) { console.warn(`part-verify ${job.id}:`, e.message) }
+    }
+
+    // Preview-accurate voice: the clip is silent (generateAudio:false) — lay the exact TTS voice the
+    // user auditioned over it (ElevenLabs non-EN / OpenAI EN), so the render matches the preview.
+    if (useOverlayVoice && (fitScript || script) && String(fitScript || script).trim()) {
+      try {
+        const vo = await ttsVoiceover(String(fitScript || script), `${job.id}-ov`, meta.voice, meta.language)
+        singleTmp.push(vo)
+        const voiced = join(tmpdir(), `sc-${job.id}-ov.mp4`); singleTmp.push(voiced)
+        await muxVoiceover(singleFile, vo, voiced)
+        singleFile = voiced
+        console.log(`🎙 ${job.id} single-take voiced with overlay TTS (preview-accurate)`)
+      } catch (e) { console.warn(`single-take overlay-voice mux failed for ${job.id} (shipping silent):`, e.message) }
     }
 
     const fin = await withEndCard(singleFile, meta, job.id, 'main', singleTmp)
