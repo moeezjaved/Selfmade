@@ -2013,9 +2013,8 @@ async function generateJob(job) {
     // (likeness policy) — which is nearly every UGC ad — so on a content_policy_violation we retry
     // WITHOUT the video: Gemini's beat sheet already grounds the prompt in the ad's structure/hook,
     // and Seedance generates a fresh (non-real) creator. Product-only/no-people videos keep the motion ref.
-    // Preview-accurate voice (meta.tts_overlay): render SILENT + overlay the exact TTS voice the user
-    // auditioned, so "what you heard is what ships". Default = native Seedance voice (tightest lip-sync).
-    const useOverlayVoice = meta.tts_overlay === true
+    // Preview-accurate voice (meta.tts_overlay, already resolved above as useOverlayVoice): render SILENT
+    // + overlay the exact TTS voice the user auditioned. Default = native Seedance voice (tightest sync).
     const genArgs = { prompt, resolution: meta.resolution, duration: clipSecs, aspect: meta.aspect, tier: meta.tier, ...(useOverlayVoice ? { generateAudio: false } : {}) }
     await prog('Filming your video…', 35, 150)   // the fal render is one long await — keep the bar moving
     // NEVER-FAIL LADDER (same contract as faithful mode): a moderation block on ANY reference must
