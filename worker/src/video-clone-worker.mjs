@@ -40,6 +40,10 @@ const SEEDANCE_AUDIO_USD_PER_SEC = Number(process.env.FAL_SEEDANCE_AUDIO_USD_PER
 const SEEDANCE_FAST_USD_PER_SEC = Number(process.env.FAL_SEEDANCE_FAST_USD_PER_SEC || 0.09)
 const VACE_EST_USD_PER_RUN = Number(process.env.FAL_VACE_EST_USD || 0.5)
 const clipCost = (tier, secs, audio = false) => (tier === 'fast' ? SEEDANCE_FAST_USD_PER_SEC : audio ? SEEDANCE_AUDIO_USD_PER_SEC : SEEDANCE_USD_PER_SEC) * (Number(secs) || 10)
+// HARD PER-JOB FAL CEILING (safety net). No single video may spend more than this on fal, no matter
+// what the logic does — re-rolls stop and the free real-photo cover takes over. A 30s UGC is ~$7 and
+// a 60s ~$14, so $18 leaves headroom for normal work while killing any runaway (the $22 spout loop).
+const MAX_FAL_USD = Number(process.env.MAX_FAL_PER_JOB_USD || 18)
 const EVERY = 8000
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -1904,7 +1908,11 @@ async function generateJob(job) {
             const fixLine = `\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo${prodDesc ? ` (it is: ${prodDesc})` : ''} — same container type, silhouette, closure and parts. The photo shows the COMPLETE product; every edge and closure is exactly as pictured. Do NOT add, remove, invent or change ANY part (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper, sleeve): if the real product doesn't have it, it must not appear; if it does, keep it. Keep the exact form factor shown (a pouch stays a pouch, a bottle stays that bottle, a jar stays that jar).`
             let verdict = await verifySegmentProduct(f, prodRef, prodDesc, job.id, i)
             if (verdict === 'mismatch') {
-              try {
+              // HARD SPEND CAP: never re-roll if this job's fal spend is already at the ceiling — the
+              // persistent mismatch gets the FREE real-photo cover instead of burning another generation.
+              if (falCost >= MAX_FAL_USD) {
+                console.warn(`⛔ ${job.id} seg ${i + 1}: fal cap $${MAX_FAL_USD} reached — skipping re-roll, will cover with real photo`)
+              } else try {
                 console.warn(`↻ ${job.id} re-rolling segment ${i + 1} (invented product part)`)
                 const rr = await falGenerate({ prompt: `${prompt}${fixLine}`, imageUrls: imgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })
                 falCost += clipCost(meta.tier, segDur, genAudio)
@@ -1914,9 +1922,9 @@ async function generateJob(job) {
                 verdict = await verifySegmentProduct(f, prodRef, prodDesc, `${job.id}-r`, i)
               } catch (e) { console.warn(`segment ${i + 1} re-roll failed (keeping current take):`, e.message) }
             }
-            // Still wrong after one corrective roll → Seedance can't render this product (its visual
-            // prior wins). Flag the segment so we cover it with the REAL product photo after stitching.
-            if (verdict === 'mismatch') { productFixWindows.push(i); console.warn(`🖼 ${job.id} segment ${i + 1} still wrong → will composite real product`) }
+            // Still wrong (re-roll failed OR skipped by the cap) → Seedance can't render this product;
+            // flag the segment so we cover it with the REAL product photo (free) after stitching.
+            if (verdict === 'mismatch') { productFixWindows.push(i); console.warn(`🖼 ${job.id} segment ${i + 1} → will composite real product`) }
           }
           tmp.push(f); files.push(f)
           if (i < plan.segments.length - 1) anchor = await lastFrameAnchor(f, job.id, i)
