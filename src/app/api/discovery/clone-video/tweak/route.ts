@@ -28,10 +28,25 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { jobId, type, scene, chip, script, note, from, to } = await req.json().catch(() => ({}))
-  if (!jobId || !(type in ACTIONS)) return NextResponse.json({ error: 'jobId and a valid type required' }, { status: 400 })
+  const { jobId, type, scene, chip, script, note, from, to, prevUrl } = await req.json().catch(() => ({}))
+  if (!jobId) return NextResponse.json({ error: 'jobId required' }, { status: 400 })
 
   const admin = createAdminClient()
+
+  // ── UNDO: restore a previous version of THIS finished video. Synchronous + FREE — the earlier file
+  // still lives on R2 (tweaks upload a new versioned key, they never delete the old). We only accept a
+  // URL that belongs to this user + this job's creatives path, so it can't point anywhere arbitrary.
+  if (type === 'restore') {
+    const url = String(prevUrl || '')
+    if (!url || !url.includes(`creatives/${user.id}/`) || !url.includes(String(jobId)))
+      return NextResponse.json({ error: 'invalid restore target' }, { status: 400 })
+    const { error } = await admin.from('creative_generations')
+      .update({ image_url: url }).eq('id', jobId).eq('user_id', user.id).eq('type', 'video_clone')
+    if (error) return NextResponse.json({ error: 'could not undo' }, { status: 500 })
+    return NextResponse.json({ jobId, status: 'done', url, restored: true, charged: false })
+  }
+
+  if (!(type in ACTIONS)) return NextResponse.json({ error: 'a valid type is required' }, { status: 400 })
   const { data: row } = await admin
     .from('creative_generations')
     .select('id, user_id, status, image_url, clone_meta')

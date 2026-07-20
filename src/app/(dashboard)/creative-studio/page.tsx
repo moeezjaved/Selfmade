@@ -243,9 +243,27 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
     const sc = rootRef.current?.parentElement
     if (sc) sc.scrollTop = 0
   }, [img, twBusy])
+  // Credit price per tweak type — for the "receipt" toast (matches the DB credit_pricing).
+  const tweakCost = (t: string) => ({ redo_ugc: 450, redo_segment: 600, redo_scene: 600, patch_broll: 150, redo_vo: 50 } as Record<string, number>)[t] ?? 0
+  const [receipt, setReceipt] = useState<{ cost: number; prevUrl: string } | null>(null)
+  const undoTweak = async () => {
+    if (!receipt || twBusy) return
+    setTwBusy(true)
+    try {
+      const r = await fetch('/api/discovery/clone-video/tweak', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jobId: gen.id, type: 'restore', prevUrl: receipt.prevUrl }),
+      }).then((x) => x.json())
+      if (r.url) { setImg(r.url); setTwMsg('Reverted to the previous version'); setReceipt(null); onChanged() }
+      else setTwMsg(r.error || 'Could not undo')
+    } catch (e: any) { setTwMsg(String(e?.message || e)) }
+    setTwBusy(false)
+  }
   const runTweak = async (body: Record<string, unknown>) => {
     if (twBusy) return
-    setTwBusy(true); setTwMsg(null)
+    const prevUrl = img   // capture the current video so we can offer a real Undo after the fix
+    const cost = tweakCost(String(body.type || ''))
+    setTwBusy(true); setTwMsg(null); setReceipt(null)
     try {
       const r = await fetch('/api/discovery/clone-video/tweak', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -256,7 +274,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
         await new Promise((res) => setTimeout(res, 4000))
         const st = await fetch(`/api/discovery/clone-video/status?id=${gen.id}`).then((x) => x.json()).catch(() => ({}))
         if (st.tweakError) { setTwMsg(`Tweak failed (${st.tweakError}) — original video untouched, charge refunded.`); break }
-        if (st.status === 'done' && st.url && st.url !== img) { setImg(st.url); setTwMsg('Updated ✓'); setTwSel(null); onChanged(); break }
+        if (st.status === 'done' && st.url && st.url !== img) { setImg(st.url); setTwMsg('Updated ✓'); setTwSel(null); setTwChip(null); setTwNote(''); if (prevUrl) setReceipt({ cost, prevUrl }); onChanged(); break }
         if (st.status === 'done' && i > 2) { setTwMsg('Updated ✓'); setTwSel(null); break }
       }
     } catch (e: any) { setTwMsg(String(e?.message || e)) }
@@ -448,7 +466,13 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                       </details>
                     )}
                   </>)}
-                  {twMsg && <div style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? '#15803d' : '#b91c1c' }}>{twMsg}</div>}
+                  {receipt && !twBusy && (
+                    <div style={{ marginTop: 10, background: '#f0fdf4', border: '0.5px solid #bbf7d0', borderRadius: 8, padding: '9px 11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12, color: '#15803d', fontWeight: 500 }}>✓ Fixed{receipt.cost ? ` · used ${receipt.cost} credits` : ' · free'}</span>
+                      <button onClick={undoTweak} style={{ background: '#fff', border: '0.5px solid #86efac', color: '#15803d', borderRadius: 8, padding: '5px 12px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>↩ Undo (bring back the old version)</button>
+                    </div>
+                  )}
+                  {twMsg && !receipt && <div style={{ fontSize: 11.5, marginTop: 8, color: (twMsg === 'Updated ✓' || twMsg.startsWith('Reverted')) ? '#15803d' : '#b91c1c' }}>{twMsg}</div>}
                 </div>
                 )
               })()}
