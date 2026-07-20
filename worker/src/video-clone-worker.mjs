@@ -615,6 +615,37 @@ async function concatClips(files, out, durs) {
   }
 }
 
+// ── PRODUCT-IMAGE INSERT: composite the user's REAL product photo (Ken-Burns) over one or more time
+// windows of a finished video, keeping the original audio. The reliable fix for a product Seedance
+// can't render (a flat pouch it keeps giving a spout): stop trusting the generator for those beats,
+// show the actual photo. `windows` = [{from,len}] seconds. ffmpeg-only. Returns `out`. ──
+async function coverWindowsWithProduct(videoIn, out, windows, prodUrl, id, tmp) {
+  if (!prodUrl || !windows || !windows.length) return videoIn
+  const dims = await probeOut(['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=s=x:p=0', videoIn])
+  const [W, H] = String(dims || '').trim().split('x').map((n) => parseInt(n) || 0)
+  const w = W || 720, h = H || 1280
+  const total = (await probeDuration(videoIn)) || 25
+  const prodLocal = `${out}.prod.png`; tmp.push(prodLocal)
+  await downloadToFile(prodUrl, prodLocal)
+  const still = `${out}.still.png`; tmp.push(still)
+  await ff(['-y', '-i', prodLocal, '-filter_complex',
+    `[0:v]split=2[a][b];[a]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},boxblur=18:2,eq=brightness=-0.05[bg];[b]scale=-1:${Math.round(h * 0.66)}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[v]`,
+    '-map', '[v]', '-frames:v', '1', still])
+  const card = `${out}.card.mp4`; tmp.push(card)
+  try {
+    await ff(['-y', '-loop', '1', '-i', still, '-vf', `zoompan=z='min(zoom+0.0004,1.10)':d=${Math.round(total * 24)}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${w}x${h}:fps=24,format=yuv420p`, '-t', String(total), '-r', '24', card])
+  } catch (e) {
+    console.warn(`product-insert zoompan failed (${e.message}) — static hold`)
+    await ff(['-y', '-loop', '1', '-t', String(total), '-i', still, '-vf', 'fps=24,format=yuv420p', '-r', '24', card])
+  }
+  const enable = windows.map((x) => `between(t,${(+x.from).toFixed(2)},${(+x.from + +x.len).toFixed(2)})`).join('+')
+  await ff(['-y', '-i', videoIn, '-i', card,
+    '-filter_complex', `[1:v]setpts=PTS-STARTPTS[c];[0:v][c]overlay=eof_action=pass:enable='${enable}'[v]`,
+    '-map', '[v]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out])
+  console.log(`🖼 ${id} composited real product over ${windows.length} window(s)`)
+  return out
+}
+
 // Continuity anchor: extract a clip's final frame and host it on R2, so the NEXT segment can take it
 // as @Image1 ("the exact same creator/room as this frame"). Identity flows through actual pixels,
 // not just a text description — the main defence against character drift across stitched clips.
@@ -1809,6 +1840,7 @@ async function generateJob(job) {
         const files = []
         const segClips = meta.segment_clips || {}
         const segAnchors = meta.segment_anchors || {}
+        const productFixWindows = []   // segment indices Seedance couldn't render → cover with the real photo
         let anchor = null
         // Render each segment to match its SCRIPT length (min 5s — Seedance's floor), not a flat 15s.
         // Flat 15s meant a 6-word line got ~9s of trailing dead-air (the mid-video "hang") AND we paid
@@ -1870,22 +1902,21 @@ async function generateJob(job) {
             // Product-AGNOSTIC correction: anchor to the photo + the product's own detected description,
             // and forbid inventing/removing parts across ALL container types — not just pouches/caps.
             const fixLine = `\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo${prodDesc ? ` (it is: ${prodDesc})` : ''} — same container type, silhouette, closure and parts. The photo shows the COMPLETE product; every edge and closure is exactly as pictured. Do NOT add, remove, invent or change ANY part (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper, sleeve): if the real product doesn't have it, it must not appear; if it does, keep it. Keep the exact form factor shown (a pouch stays a pouch, a bottle stays that bottle, a jar stays that jar).`
-            for (let attempt = 0; attempt < 1; attempt++) {
-              const verdict = await verifySegmentProduct(f, prodRef, prodDesc, job.id, i)
-              if (verdict !== 'mismatch') break
+            let verdict = await verifySegmentProduct(f, prodRef, prodDesc, job.id, i)
+            if (verdict === 'mismatch') {
               try {
-                console.warn(`↻ ${job.id} re-rolling segment ${i + 1} (invented product part, attempt ${attempt + 1})`)
-                // Attempt 1: same refs + hard fix. Attempt 2: clean product ONLY + size anchor (drop
-                // any anchor frame — fewer references = less for the model to reinterpret).
-                const anchor2 = (meta.product_details && meta.product_details.size_anchor) ? ` The product's true size: ${meta.product_details.size_anchor}.` : ''
-                const rrImgs = attempt === 0 ? imgs : falProductImages.slice(0, 1)
-                const rr = await falGenerate({ prompt: `${prompt}${fixLine}${attempt === 1 ? anchor2 : ''}`, imageUrls: rrImgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })
+                console.warn(`↻ ${job.id} re-rolling segment ${i + 1} (invented product part)`)
+                const rr = await falGenerate({ prompt: `${prompt}${fixLine}`, imageUrls: imgs, resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })
                 falCost += clipCost(meta.tier, segDur, genAudio)
                 await rm(f, { force: true }).catch(() => {})
                 await downloadToFile(rr.videoUrl, f)
                 videoUrl = rr.videoUrl
-              } catch (e) { console.warn(`segment ${i + 1} re-roll failed (keeping current take):`, e.message); break }
+                verdict = await verifySegmentProduct(f, prodRef, prodDesc, `${job.id}-r`, i)
+              } catch (e) { console.warn(`segment ${i + 1} re-roll failed (keeping current take):`, e.message) }
             }
+            // Still wrong after one corrective roll → Seedance can't render this product (its visual
+            // prior wins). Flag the segment so we cover it with the REAL product photo after stitching.
+            if (verdict === 'mismatch') { productFixWindows.push(i); console.warn(`🖼 ${job.id} segment ${i + 1} still wrong → will composite real product`) }
           }
           tmp.push(f); files.push(f)
           if (i < plan.segments.length - 1) anchor = await lastFrameAnchor(f, job.id, i)
@@ -1909,6 +1940,19 @@ async function generateJob(job) {
             await muxVoiceover(cat, vo, mixed)
             voiced = mixed
           } catch (e) { console.warn(`seg tts/mux failed for ${job.id} (shipping without VO):`, e.message) }
+        }
+        // SELF-HEALING PRODUCT INSERT: any segment Seedance couldn't render right (spout on a capless
+        // pouch, etc.) gets covered with the user's REAL product photo (Ken-Burns) over its window —
+        // voice keeps playing. Reliable accuracy for products the generator has a wrong visual prior on.
+        if (productFixWindows.length && !isService) {
+          try {
+            const prodUrl = (Array.isArray(meta.product_image_urls) && meta.product_image_urls[0]) || meta.clean_product
+            const starts = []; let acc = 0
+            for (let k = 0; k < segDurs.length; k++) { starts[k] = acc; acc += segDurs[k] }
+            const windows = productFixWindows.map((i) => ({ from: starts[i], len: segDurs[i] }))
+            const covered = `${base}-covered.mp4`; tmp.push(covered)
+            voiced = await coverWindowsWithProduct(voiced, covered, windows, prodUrl, job.id, tmp)
+          } catch (e) { console.warn(`product-insert cover failed for ${job.id} (shipping as-is):`, e.message) }
         }
         const fin = await withEndCard(voiced, meta, job.id, 'main', tmp)
         if (meta.end_card && meta.end_card.tx) {
