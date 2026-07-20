@@ -277,7 +277,11 @@
     const was_video = (mediaEl instanceof HTMLVideoElement) || type === 'video' || !!capturedFrame ||
       !!(scope && scope !== document && scope.querySelector && scope.querySelector('video'))
     const payload = {
-      media_url: url || m.permalink || location.href, media_type: capturedFrame ? 'image' : type, image_data,
+      // media_url = the REAL media file only. Do NOT fall back to the page URL: on the FB feed every ad
+      // shares the same location.href, and the server hashed (source_url|media_url) into the dedup id →
+      // every saved feed video collapsed onto ONE row (each save overwrote the last). Leave it empty for
+      // blob/feed videos; the captured frame (image_data) is what identifies + shows the ad.
+      media_url: (url && !url.startsWith('blob:')) ? url : undefined, media_type: capturedFrame ? 'image' : type, image_data,
       source_url: m.permalink || location.href, source_platform: m.platform, was_video,
       brand: m.brand || undefined, ad_copy: m.ad_copy || undefined,
       board_id: opts.boardId || undefined,   // chosen in the in-post board picker (else background falls back to the default board)
@@ -346,26 +350,35 @@
   // ── Instagram in-post board picker (Denote-style) ──────────────────────────
   // On an open IG post/reel, drop a clean card into the RIGHT column: pick a board → Save, or Download.
   let BOARDS = null, boardsLoading = false
+  // Fill EVERY board <select> on the page once the list arrives — the Ad Library mounts one card per
+  // ad, and the old code filled only the ONE select that triggered the fetch (all the rest stayed stuck
+  // on "Loading boards…"). One fetch, then populate them all; late-mounting cards read the cache.
+  function fillAllBoards() { document.querySelectorAll('.sm-ig-select').forEach((s) => fillBoards(s)) }
   function loadBoards(sel) {
     if (BOARDS) { fillBoards(sel); return }
-    if (boardsLoading) return
+    if (boardsLoading) return   // a fetch is already in flight — it will fill ALL selects (incl. this one) when it lands
     boardsLoading = true
     try {
       chrome.runtime.sendMessage({ type: 'getBoards' }, (resp) => {
         boardsLoading = false
-        if (chrome.runtime.lastError) return
+        // Service worker was asleep / transient error → retry shortly so we don't sit on "Loading…".
+        if (chrome.runtime.lastError) { setTimeout(() => loadBoards(sel), 1500); return }
+        if (resp && resp.ok === false) {   // not signed in — prompt, and let a later card retry
+          document.querySelectorAll('.sm-ig-select').forEach((s) => { s.innerHTML = '<option value="">Sign in to Selfmade first</option>' })
+          return
+        }
         BOARDS = Array.isArray(resp?.boards) ? resp.boards : []
-        fillBoards(sel)
+        fillAllBoards()
       })
-    } catch { boardsLoading = false }
+    } catch { boardsLoading = false; setTimeout(() => loadBoards(sel), 1500) }
   }
   function fillBoards(sel) {
     if (!sel || !BOARDS) return
     const last = (() => { try { return localStorage.getItem('sm_board') || '' } catch { return '' } })()
+    if (!BOARDS.length) { sel.innerHTML = '<option value="">No boards yet — saves to your default</option>'; return }
     sel.innerHTML = '<option value="">Select a board (optional)</option>' +
       BOARDS.map((b) => `<option value="${b.id}">${(b.emoji ? b.emoji + ' ' : '') + String(b.name || 'Board').replace(/</g, '')}</option>`).join('')
     if (last && BOARDS.some((b) => b.id === last)) sel.value = last
-    if (!BOARDS.length) sel.innerHTML = '<option value="">No boards yet — saves to your default</option>'
   }
 
   // Find the info/right column of an open IG post so the card sits like Denote's (under the header).
