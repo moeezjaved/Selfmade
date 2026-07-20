@@ -22,8 +22,10 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { text, voice, lang } = await req.json().catch(() => ({}))
-  const input = String(text || '').trim().slice(0, 200)
+  const { text, voice, lang, full } = await req.json().catch(() => ({}))
+  // `full` = preview the WHOLE script (up to ~1800 chars ≈ a 60s read) so the user can hear every word
+  // — brand names, foreign words — BEFORE spending a credit. Default stays the quick first-sentence clip.
+  const input = String(text || '').trim().slice(0, full ? 1800 : 200)
   if (!input) return NextResponse.json({ error: 'text required' }, { status: 400 })
   const v = VOICES.has(String(voice)) ? String(voice) : 'nova'
   const nonEn = lang && String(lang).slice(0, 2) !== 'en'

@@ -46,6 +46,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [look, setLook] = useState('match')            // creator ethnicity/look override
   const [language, setLanguage] = useState('en')       // script + voiceover language (transcreated)
   const [voice, setVoice] = useState('nova')           // narration voice (faithful mode + preview)
+  const [voiceAccurate, setVoiceAccurate] = useState(false)  // use the previewed TTS voice in the render (word-perfect, looser lip-sync)
   const [gloss, setGloss] = useState<string | null>(null)   // English one-liner for non-English scripts
   const [previewing, setPreviewing] = useState(false)
   const [mode, setMode] = useState<'ugc' | 'faithful'>('ugc')
@@ -142,17 +143,19 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // So: cache the fetched audio keyed by voice+sentence — if play is blocked, we tell the user to tap
   // again, and the second tap plays the CACHED audio instantly (inside a fresh click gesture).
   const previewCache = useRef<Map<string, string>>(new Map())
-  const previewVoice = async () => {
+  const previewVoice = async (full = false) => {
     if (previewing) return
-    const sentence = draftScript.trim().split(/(?<=[.!?۔؟])\s+/)[0]?.slice(0, 200) || draftScript.trim().slice(0, 200)
-    if (!sentence) return
-    const cacheKey = `${voice}|${language}|${sentence}`
+    const text = full
+      ? draftScript.trim().slice(0, 1800)
+      : (draftScript.trim().split(/(?<=[.!?۔؟])\s+/)[0]?.slice(0, 200) || draftScript.trim().slice(0, 200))
+    if (!text) return
+    const cacheKey = `${voice}|${language}|${full ? 'full' : 'one'}|${text}`
     setPreviewing(true); setErr(null)
     try {
       let url = previewCache.current.get(cacheKey)
       if (!url) {
         const r = await fetch('/api/discovery/clone-video/voice-preview', {
-          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: sentence, voice, lang: language }),
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, voice, lang: language, full }),
         })
         if (!r.ok) { setErr('Voice preview is unavailable right now — the render itself is unaffected.'); setPreviewing(false); return }
         url = URL.createObjectURL(await r.blob())
@@ -239,7 +242,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       const start = await fetch('/api/discovery/clone-video', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages: chosen, tier, productType: brandType,
-          characterLook: look !== 'match' ? look : undefined, language, voice, screencastKey: screencastKey || undefined,
+          characterLook: look !== 'match' ? look : undefined, language, voice, ttsOverlay: voiceAccurate, screencastKey: screencastKey || undefined,
           productDetails: { name: productName.trim() || undefined, benefit: benefit.trim() || undefined } }),
       }).then(r => r.json())
       if (!start.jobId) { setErr(start.error || 'Could not start.'); setPhase('form'); return }
@@ -750,10 +753,17 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                     <div className="field" style={{ marginBottom: 14 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
                         <FieldLabel>{mode === 'faithful' ? 'Voiceover (one continuous narration)' : 'Voiceover script'}{language !== 'en' ? ` · ${langCfg.label}` : ''}</FieldLabel>
-                        <button onClick={previewVoice} disabled={previewing || !draftScript.trim()} style={{ ...chip(false), padding: '5px 12px', opacity: previewing ? 0.6 : 1 }}>{previewing ? '🔊 Playing…' : '🔊 Hear the voice'}</button>
+                        <button onClick={() => previewVoice(false)} disabled={previewing || !draftScript.trim()} style={{ ...chip(false), padding: '5px 12px', opacity: previewing ? 0.6 : 1 }}>{previewing ? '🔊 Playing…' : '🔊 Hear a line'}</button>
+                        <button onClick={() => previewVoice(true)} disabled={previewing || !draftScript.trim()} style={{ ...chip(false), padding: '5px 12px', opacity: previewing ? 0.6 : 1 }} title="Hear the entire script in this voice before you spend a credit">{previewing ? '🔊 Playing…' : '🔊 Hear full script'}</button>
                       </div>
                       <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={7} dir={langCfg.rtl ? 'rtl' : 'ltr'} style={{ ...input, width: '100%', resize: 'vertical', lineHeight: langCfg.rtl ? 1.9 : 1.5, fontSize: langCfg.rtl ? 15 : 13.5 }} />
                       {gloss && language !== 'en' && <div style={{ fontSize: 11.5, color: L_MUTED, marginTop: 6, fontStyle: 'italic' }}>In English: “{gloss}”</div>}
+                      {mode !== 'faithful' && (
+                        <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 10, background: '#f4fbe6', border: `1px solid ${SEL_BORDER}`, borderRadius: 10, padding: '9px 11px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={voiceAccurate} onChange={(e) => setVoiceAccurate(e.target.checked)} style={{ marginTop: 2 }} />
+                          <span style={{ fontSize: 12, color: SEL_TEXT, lineHeight: 1.5 }}><b>Use this exact voice in the video</b> — what you hear in “Hear full script” is what ships (best for getting brand names &amp; tricky words right). Trade-off: slightly less-perfect lip-sync. Leave off for the tightest lip-sync (the creator&apos;s own voice).</span>
+                        </label>
+                      )}
                       {words > 0 && (
                         mode === 'faithful' ? (
                           <div style={{ fontSize: 11.5, marginTop: 6, color: L_MUTED }}>{words} words ≈ {spokenSecs}s of narration · ~{targetSecs}s of scenes{spokenSecs > targetSecs + 4 ? ' — the closing shot holds while the voiceover finishes. Trim for a tighter cut, or leave it.' : ' — fits nicely.'}</div>
