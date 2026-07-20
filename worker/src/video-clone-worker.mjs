@@ -1870,7 +1870,7 @@ async function generateJob(job) {
             // Product-AGNOSTIC correction: anchor to the photo + the product's own detected description,
             // and forbid inventing/removing parts across ALL container types — not just pouches/caps.
             const fixLine = `\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo${prodDesc ? ` (it is: ${prodDesc})` : ''} — same container type, silhouette, closure and parts. The photo shows the COMPLETE product; every edge and closure is exactly as pictured. Do NOT add, remove, invent or change ANY part (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper, sleeve): if the real product doesn't have it, it must not appear; if it does, keep it. Keep the exact form factor shown (a pouch stays a pouch, a bottle stays that bottle, a jar stays that jar).`
-            for (let attempt = 0; attempt < 2; attempt++) {
+            for (let attempt = 0; attempt < 1; attempt++) {
               const verdict = await verifySegmentProduct(f, prodRef, prodDesc, job.id, i)
               if (verdict !== 'mismatch') break
               try {
@@ -2031,7 +2031,7 @@ async function generateJob(job) {
         const pd = meta.product_details || {}
         const prodDesc = [pd.name && pd.name !== 'the product' ? pd.name : '', pd.observed].filter(Boolean).join(' — ')
         const fixLine = `\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo${prodDesc ? ` (it is: ${prodDesc})` : ''} — same container type, silhouette, closure and parts. The photo shows the COMPLETE product. Do NOT add, remove, invent or change ANY part (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper). Keep the exact form factor shown.`
-        for (let attempt = 0; attempt < 2 && prodRef; attempt++) {
+        for (let attempt = 0; attempt < 1 && prodRef; attempt++) {
           const verdict = await verifySegmentProduct(singleFile, prodRef, prodDesc, `${job.id}-p${attempt}`, 0)
           if (verdict !== 'mismatch') break
           await prog('Product looked off — auto-fixing…', 82, 100)
@@ -2178,30 +2178,37 @@ async function tweakJob(job) {
       await prog(`Patching ${from.toFixed(0)}s–${(from + len).toFixed(0)}s…`, 15, 90)
       console.log(`🩹 ${job.id} cutaway patch ${from.toFixed(1)}s+${len.toFixed(1)}s`)
 
-      const pd = meta.product_details || {}
-      const note = typeof t.note === 'string' ? t.note.trim().slice(0, 300) : ''
-      const prodRef = [meta.clean_product, ...(Array.isArray(meta.product_image_urls) ? meta.product_image_urls : [])].filter(Boolean).slice(0, 1)
-      const patchDesc = [pd.name && pd.name !== 'the product' ? pd.name : '', pd.observed].filter(Boolean).join(' — ')
-      const brollPrompt = `Macro close-up b-roll insert for a UGC phone ad: the product${patchDesc ? ` (${patchDesc})` : ''} shown EXACTLY as the attached photo — same container type, silhouette, closure, label and colours; the photo shows the COMPLETE product. Do NOT add, remove or change ANY part vs the photo (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper) — keep the exact form factor shown.${pd.size_anchor ? ` True size: ${pd.size_anchor}.` : ''} Held naturally in a hand or resting on a clean kitchen counter, slow subtle handheld drift, natural light, sharp label. No faces, no on-screen text.${note ? ` USER'S FIX (top priority): ${note.replace(/"/g, "'")}` : ''}`
-      // Silent + 5s = the cheapest possible generation. Ladder to pure prompt on a moderation block.
-      let brollUrl
-      try { ({ videoUrl: brollUrl } = await falGenerate({ prompt: brollPrompt, imageUrls: prodRef, resolution: meta.resolution, duration: 5, aspect: meta.aspect, tier: meta.tier, generateAudio: false })) }
-      catch (e) {
-        if (e.code !== 'content_policy_images' && e.code !== 'content_policy_video') throw e
-        ;({ videoUrl: brollUrl } = await falGenerate({ prompt: brollPrompt, imageUrls: [], resolution: meta.resolution, duration: 5, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
-      }
-      falCost += clipCost(meta.tier, 5, false)
-      const broll = `${base}-patch-broll.mp4`; tmp.push(broll)
-      await downloadToFile(brollUrl, broll)
-
-      // Splice: overlay the b-roll frames over [from, from+len] only; audio is 0:a untouched.
-      await prog('Splicing the patch in…', 70, 30)
+      // RELIABLE FIX — composite the user's REAL product photo (Ken Burns) instead of GENERATING a
+      // product close-up. Seedance reliably re-invents a spout/cap on this pouch (proven: 6/6 re-rolls
+      // on job 105ab42a all added one), so any GENERATED insert risks the same error. The real image is
+      // 100% accurate — and it's ffmpeg-only, so the patch costs ~nothing in fal.
+      const prodUrl = (Array.isArray(meta.product_image_urls) && meta.product_image_urls[0]) || meta.clean_product
+      if (!prodUrl) return bail('no product image to composite')
+      const prodLocal = `${base}-prod.png`; tmp.push(prodLocal)
+      await downloadToFile(prodUrl, prodLocal)
       const dims = await probeOut(['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=s=x:p=0', srcV])
       const [W, H] = String(dims || '').trim().split('x').map((n) => parseInt(n) || 0)
+      const w = W || 720, h = H || 1280
+      await prog('Building the product insert…', 45, 25)
+      // 1) still: the real product centered over a soft blurred version of itself (on-brand ambient bg)
+      const still = `${base}-still.png`; tmp.push(still)
+      await ff(['-y', '-i', prodLocal, '-filter_complex',
+        `[0:v]split=2[a][b];[a]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},boxblur=18:2,eq=brightness=-0.05[bg];[b]scale=-1:${Math.round(h * 0.66)}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[v]`,
+        '-map', '[v]', '-frames:v', '1', still])
+      // 2) Ken-Burns the still into a clip of the patch length (fallback to a static hold if zoompan errors)
+      const broll = `${base}-card.mp4`; tmp.push(broll)
+      try {
+        await ff(['-y', '-loop', '1', '-i', still, '-vf', `zoompan=z='min(zoom+0.0006,1.10)':d=${Math.round(len * 24)}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${w}x${h}:fps=24,format=yuv420p`, '-t', String(len), '-r', '24', broll])
+      } catch (e) {
+        console.warn(`patch zoompan failed (${e.message}) — static hold`)
+        await ff(['-y', '-loop', '1', '-t', String(len), '-i', still, '-vf', 'fps=24,format=yuv420p', '-r', '24', broll])
+      }
+      // 3) overlay the insert over ONLY [from, from+len]; original audio (0:a) is untouched
+      await prog('Splicing the patch in…', 70, 20)
       const patched = `${base}-patched.mp4`; tmp.push(patched)
       await ff(['-y', '-i', srcV, '-i', broll,
         '-filter_complex',
-        `[1:v]trim=0:${len.toFixed(2)},scale=${W || 720}:${H || 1280}:force_original_aspect_ratio=increase,crop=${W || 720}:${H || 1280},fps=24,setsar=1,setpts=PTS-STARTPTS+${from.toFixed(2)}/TB[b];[0:v][b]overlay=eof_action=pass:enable='between(t,${from.toFixed(2)},${(from + len).toFixed(2)})'[v]`,
+        `[1:v]setpts=PTS-STARTPTS+${from.toFixed(2)}/TB[b];[0:v][b]overlay=eof_action=pass:enable='between(t,${from.toFixed(2)},${(from + len).toFixed(2)})'[v]`,
         '-map', '[v]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', patched])
 
       const ver = Math.random().toString(36).slice(2, 8)
