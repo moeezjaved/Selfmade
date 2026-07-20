@@ -276,11 +276,11 @@ export default function HomeLanding() {
           <span>🗂️ 3M+ ads indexed</span><span>·</span><span>🏷️ 611K brands tracked</span><span>·</span><span>⭐ 4.9 on G2</span>
         </div>
         <h1 style={{ fontSize: 'clamp(38px,6vw,64px)', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-.03em', margin: '0 auto', maxWidth: 900 }}>
-          <Mask>Turn any winning ad</Mask>
-          <Mask delay={120}>into <span style={{ fontStyle: 'italic', color: GREEN }}>your</span> ad. In minutes.</Mask>
+          <Mask>Know what&rsquo;s winning.</Mask>
+          <Mask delay={120}>Make it <span style={{ fontStyle: 'italic', color: GREEN }}>yours</span>.</Mask>
         </h1>
         <p style={{ fontSize: 'clamp(16px,2vw,19px)', color: '#4b5563', maxWidth: 660, margin: '22px auto 28px', lineHeight: 1.55 }}>
-          We don&rsquo;t guess what works — we start from what&rsquo;s already winning. Pick a proven Meta ad from 3M+, remake it with <b>your product</b> as a scroll-stopping <b>video or image</b>, and launch. <b>$0.15 an ad</b>, not a $1,500 shoot.
+          Selfmade decodes <b>3 million winning Meta ads</b> across 611K brands, refreshed daily — then turns any of them into <b>your ad</b> in minutes. The market intelligence big brands pay agencies for, with a <b>make button</b>.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/signup" className="btn arrowp" style={btnPrimary}>Start for free <Arrow /></Link>
@@ -297,9 +297,9 @@ export default function HomeLanding() {
       <section style={{ ...wrap, padding: '30px 24px 20px' }}>
         <Reveal>
           <div style={{ textAlign: 'center', maxWidth: 860, margin: '0 auto' }}>
-            <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: GREEN, marginBottom: 12 }}>Not another AI ad generator</div>
+            <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: GREEN, marginBottom: 12 }}>The winning-ads intelligence platform</div>
             <p style={{ fontSize: 'clamp(22px,3.2vw,32px)', fontWeight: 700, lineHeight: 1.35, letterSpacing: '-.01em', margin: 0, color: INK }}>
-              Generators start from a <span style={{ fontStyle: 'italic', color: '#9ca3af' }}>blank prompt</span> and guess. Selfmade starts from an ad that&rsquo;s <span style={{ fontStyle: 'italic', color: GREEN }}>already winning</span> — real hooks, real pacing, real results — and rebuilds it around <span style={{ fontStyle: 'italic', color: GREEN }}>your product</span>.
+              Other tools analyze <span style={{ fontStyle: 'italic', color: '#9ca3af' }}>your own ad account</span>. Selfmade reads the <span style={{ fontStyle: 'italic', color: GREEN }}>whole market</span> — every ad winning in your niche right now, decoded, scored, and <span style={{ fontStyle: 'italic', color: GREEN }}>one click from being yours</span>.
             </p>
           </div>
         </Reveal>
