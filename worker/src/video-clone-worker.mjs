@@ -209,12 +209,13 @@ async function verifyProductScale(localFile, sizeAnchor, id) {
   } catch { return 'unknown' }
 }
 
-// ── Per-SEGMENT product-truth check. Seedance sometimes INVENTS parts the real product doesn't have
-// (the ejadfarm bug: a cap on a capless pouch). We sample a frame from the rendered segment, put it
-// next to the REAL product photo, and ask gpt-4o-mini "same product, or invented/changed parts?".
-// 'mismatch' → the caller re-rolls that ONE segment once with a hard correction. Returns
-// 'match' | 'mismatch' | 'unknown'. ~1¢. Physical products only (services have no product). ──
-async function verifySegmentProduct(localFile, productDataUri, productName, id, i) {
+// ── Per-SEGMENT product-truth check — PRODUCT-AGNOSTIC. It never assumes a product type: it compares
+// the rendered frames against the USER'S REAL PHOTO (first image) and flags ANY added/removed/changed
+// physical part, whatever the product is (pouch, bottle, jar, tube, box, can, device…). The pouch/cap
+// case is just one instance. The real product's own description (from describeProduct) is passed in so
+// the model knows what "correct" looks like for THIS product. 'mismatch' → caller re-rolls that clip.
+// Returns 'match' | 'mismatch' | 'unknown'. ~1¢. Physical products only (services have no product). ──
+async function verifySegmentProduct(localFile, productDataUri, productDesc, id, i) {
   if (!OPENAI_KEY || !productDataUri) return 'unknown'
   // Sample THREE frames across the clip, not one. The invented part (a spout/cap on a flat pouch) is
   // often only visible when the product is held up (start) — a single mid-clip frame caught the pour
@@ -237,7 +238,7 @@ async function verifySegmentProduct(localFile, productDataUri, productName, id, 
       body: JSON.stringify({
         model: 'gpt-4o-mini', max_tokens: 90, temperature: 0, response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: [
-          { type: 'text', text: `The FIRST image is the REAL product${productName ? ` ("${productName}")` : ''}. The remaining images are frames from an ad someone generated of it. In ANY frame, did the generator ADD or CHANGE a physical part the real product does not have? Look especially for: a cap, lid, screw-top, SPOUT or nozzle added to a flat pouch/sachet; a bottle-neck; a box or extra wrapper; a clearly different container shape. If the real product is a flat stand-up pouch, it must stay a flat pouch with NO cap/spout. Flag "mismatch" if ANY frame shows such an invention. Pure color/lighting/angle differences, or a frame where the product is mid-pour/not clearly visible, are NOT a mismatch on their own. Return ONLY JSON: {"verdict":"match"|"mismatch"|"unknown","reason":"few words"}` },
+          { type: 'text', text: `The FIRST image is the REAL product — the single source of truth for what it looks like${productDesc ? ` (for reference, it is: ${productDesc})` : ''}. The remaining images are frames from an ad someone generated of it. Compare ONLY against the first image. Flag "mismatch" if, in ANY frame, the generated product DIFFERS in its physical build from the real one — a part ADDED, REMOVED, or CHANGED. This applies to EVERY product type, e.g.: a cap/lid/spout/nozzle/pump/straw added to something that has none (or removed from something that has one); a wrong closure type; a different container shape or form factor (pouch↔bottle↔jar↔tube↔box↔can); extra wrapping/box that isn't in the real photo; a clearly different silhouette. Do NOT flag pure colour/lighting/angle/blur differences, a hand covering part of it, or a frame where the product isn't clearly visible. When in doubt, "match". Return ONLY JSON: {"verdict":"match"|"mismatch"|"unknown","reason":"what changed, few words"}` },
           { type: 'image_url', image_url: { url: productDataUri } },
           ...frames.map((u) => ({ type: 'image_url', image_url: { url: u } })),
         ] }],
@@ -471,7 +472,7 @@ function segmentPrompt(plan, seg, i, total, hasAnchor, nImages, lang) {
   else parts.push(`The user's product is ${productRef} and must match it exactly.`)
   parts.push(`They speak to camera in ${langName(lang).split(' — ')[0]} — ${plan.voice} — lips moving in sync, saying these exact words aloud: "${String(seg.script || '').replace(/"/g, "'")}"`)
   if (seg.action) parts.push(String(seg.action))
-  if (nImages) parts.push(`PRODUCT TRUTH: render ${productRef} EXACTLY as the attached photo — same packaging type, shape, cap/closure, label and colours. Do NOT add or invent a cap, lid, bottle or any part that isn't in the photo (e.g. a pouch stays a pouch).`)
+  if (nImages) parts.push(`PRODUCT TRUTH: render ${productRef} EXACTLY as the attached photo — same container type, silhouette, closure, label and colours. Do NOT add, remove or change ANY part vs the photo (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper): keep the exact form factor shown, whatever it is (a pouch stays a pouch, a bottle stays that bottle, a jar stays that jar).`)
   parts.push('UGC realism: iPhone selfie framing at arm\'s length, natural light, authentic handheld, no on-screen captions.')
   return parts.filter(Boolean).join(' ')
 }
@@ -1805,10 +1806,13 @@ async function generateJob(job) {
           // anchor, the strongest constraint we have. After 2, ship the last take (never-fail).
           if (!isService && meta.reroll_product_check !== false) {
             const prodRef = falProductImages[0] || productImages[0]
-            const pName = (meta.product_details && meta.product_details.name) || ''
-            const fixLine = `\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo — same container, shape and parts. The photo shows the COMPLETE product; its top edge is exactly as pictured. Do NOT add, invent or change any part: NO cap, lid, SPOUT, nozzle, bottle-neck, box or extra packaging that is not visibly present in the attached photo. If the real product is a flat pouch/sachet, keep it a flat pouch with a plain sealed top and no cap.`
+            const pd = meta.product_details || {}
+            const prodDesc = [pd.name && pd.name !== 'the product' ? pd.name : '', pd.observed].filter(Boolean).join(' — ')
+            // Product-AGNOSTIC correction: anchor to the photo + the product's own detected description,
+            // and forbid inventing/removing parts across ALL container types — not just pouches/caps.
+            const fixLine = `\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo${prodDesc ? ` (it is: ${prodDesc})` : ''} — same container type, silhouette, closure and parts. The photo shows the COMPLETE product; every edge and closure is exactly as pictured. Do NOT add, remove, invent or change ANY part (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper, sleeve): if the real product doesn't have it, it must not appear; if it does, keep it. Keep the exact form factor shown (a pouch stays a pouch, a bottle stays that bottle, a jar stays that jar).`
             for (let attempt = 0; attempt < 2; attempt++) {
-              const verdict = await verifySegmentProduct(f, prodRef, pName, job.id, i)
+              const verdict = await verifySegmentProduct(f, prodRef, prodDesc, job.id, i)
               if (verdict !== 'mismatch') break
               try {
                 console.warn(`↻ ${job.id} re-rolling segment ${i + 1} (invented product part, attempt ${attempt + 1})`)
@@ -1959,6 +1963,32 @@ async function generateJob(job) {
       }
     } catch (e) { console.warn(`scale-verify ${job.id}:`, e.message) }
 
+    // PRODUCT-PART CHECK on the single clip too (same product-agnostic verifier as the segment path):
+    // catch an invented/removed part on ANY product/format — a 15s clip can grow a wrong cap just like
+    // a long-form segment. Up to 2 verified corrective rolls; then ship (never-fail). Physical only.
+    if (!isService && meta.reroll_product_check !== false) {
+      try {
+        const prodRef = falProductImages[0] || productImages[0]
+        const pd = meta.product_details || {}
+        const prodDesc = [pd.name && pd.name !== 'the product' ? pd.name : '', pd.observed].filter(Boolean).join(' — ')
+        const fixLine = `\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo${prodDesc ? ` (it is: ${prodDesc})` : ''} — same container type, silhouette, closure and parts. The photo shows the COMPLETE product. Do NOT add, remove, invent or change ANY part (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper). Keep the exact form factor shown.`
+        for (let attempt = 0; attempt < 2 && prodRef; attempt++) {
+          const verdict = await verifySegmentProduct(singleFile, prodRef, prodDesc, `${job.id}-p${attempt}`, 0)
+          if (verdict !== 'mismatch') break
+          await prog('Product looked off — auto-fixing…', 82, 100)
+          const anchor2 = (meta.product_details && meta.product_details.size_anchor) ? ` The product's true size: ${meta.product_details.size_anchor}.` : ''
+          let fixedUrl = null
+          const rrImgs = attempt === 0 ? falProductImages : falProductImages.slice(0, 1)
+          try { ({ videoUrl: fixedUrl } = await falGenerate({ ...genArgs, prompt: `${prompt}${fixLine}${attempt === 1 ? anchor2 : ''}`, imageUrls: rrImgs, videoUrl: null })) }
+          catch (e) { if (blockedUgc(e)) { try { ({ videoUrl: fixedUrl } = await falGenerate({ ...genArgs, prompt: `${prompt}${fixLine}`, imageUrls: [], videoUrl: null })) } catch { /* keep current */ } } }
+          if (!fixedUrl) break
+          falCostUgc += clipCost(meta.tier, clipSecs, true)
+          await downloadToFile(fixedUrl, singleFile)
+          console.log(`🔬 ${job.id} product-part re-roll ${attempt + 1} applied`)
+        }
+      } catch (e) { console.warn(`part-verify ${job.id}:`, e.message) }
+    }
+
     const fin = await withEndCard(singleFile, meta, job.id, 'main', singleTmp)
     if (meta.end_card && meta.end_card.tx) {
       if (fin.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
@@ -2092,7 +2122,8 @@ async function tweakJob(job) {
       const pd = meta.product_details || {}
       const note = typeof t.note === 'string' ? t.note.trim().slice(0, 300) : ''
       const prodRef = [meta.clean_product, ...(Array.isArray(meta.product_image_urls) ? meta.product_image_urls : [])].filter(Boolean).slice(0, 1)
-      const brollPrompt = `Macro close-up b-roll insert for a UGC phone ad: the product${pd.name && pd.name !== 'the product' ? ` (${pd.name})` : ''} shown EXACTLY as the attached photo — same packaging type, shape, closure, label and colours; the photo shows the COMPLETE product, do NOT add or invent a cap, lid, spout or any part not in it.${pd.size_anchor ? ` True size: ${pd.size_anchor}.` : ''} Held naturally in a hand or resting on a clean kitchen counter, slow subtle handheld drift, natural light, sharp label. No faces, no on-screen text.${note ? ` USER'S FIX (top priority): ${note.replace(/"/g, "'")}` : ''}`
+      const patchDesc = [pd.name && pd.name !== 'the product' ? pd.name : '', pd.observed].filter(Boolean).join(' — ')
+      const brollPrompt = `Macro close-up b-roll insert for a UGC phone ad: the product${patchDesc ? ` (${patchDesc})` : ''} shown EXACTLY as the attached photo — same container type, silhouette, closure, label and colours; the photo shows the COMPLETE product. Do NOT add, remove or change ANY part vs the photo (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper) — keep the exact form factor shown.${pd.size_anchor ? ` True size: ${pd.size_anchor}.` : ''} Held naturally in a hand or resting on a clean kitchen counter, slow subtle handheld drift, natural light, sharp label. No faces, no on-screen text.${note ? ` USER'S FIX (top priority): ${note.replace(/"/g, "'")}` : ''}`
       // Silent + 5s = the cheapest possible generation. Ladder to pure prompt on a moderation block.
       let brollUrl
       try { ({ videoUrl: brollUrl } = await falGenerate({ prompt: brollPrompt, imageUrls: prodRef, resolution: meta.resolution, duration: 5, aspect: meta.aspect, tier: meta.tier, generateAudio: false })) }
