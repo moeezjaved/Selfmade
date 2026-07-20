@@ -75,6 +75,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [result, setResult] = useState<{ url: string; script?: string | null; tweakable?: boolean; ugcTweakable?: boolean; segmentTweakable?: boolean; tweakScenes?: { duration: number; hasPeople: boolean }[]; tweakSegments?: { script: string; start?: number; end?: number }[]; finalScript?: string | null } | null>(null)
   const [twNote, setTwNote] = useState('')   // "Fix a moment" free-text — what exactly is wrong
   const [twChip, setTwChip] = useState<string | null>(null)   // selected problem chip — selection only, never fires
+  const [receipt, setReceipt] = useState<{ cost: number; prevUrl: string } | null>(null)   // "used X cr · Undo" after a fix
   const [twFrom, setTwFrom] = useState('')   // cutaway patch window (seconds)
   const [twTo, setTwTo] = useState('')
   // ── Tweak panel (post-render, per-scene fixes — no full re-render) ──
@@ -297,9 +298,25 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
 
   // ── Tweak: fix ONE scene (chip → server-side prompt surgery) or a whole-video op, then re-stitch
   // from the cached clips. The original video stays live until the new cut lands; failures refund. ──
+  const tweakCost = (t: string) => ({ redo_ugc: 450, redo_segment: 600, redo_scene: 600, patch_broll: 150, redo_vo: 50 } as Record<string, number>)[t] ?? 0
+  const undoTweak = async () => {
+    if (!jobId || !receipt || twBusy) return
+    setTwBusy(true)
+    try {
+      const r = await fetch('/api/discovery/clone-video/tweak', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jobId, type: 'restore', prevUrl: receipt.prevUrl }),
+      }).then((x) => x.json())
+      if (r.url) { setResult((cur) => cur ? { ...cur, url: r.url } : cur); setTwMsg('Reverted to the previous version'); setReceipt(null) }
+      else setTwMsg(r.error || 'Could not undo')
+    } catch (e: any) { setTwMsg(String(e?.message || e)) }
+    setTwBusy(false)
+  }
   const runTweak = async (body: Record<string, unknown>) => {
     if (!jobId || twBusy) return
-    setTwBusy(true); setTwMsg(null)
+    const prevUrl = result?.url || ''   // capture the current video so we can offer a real Undo
+    const cost = tweakCost(String(body.type || ''))
+    setTwBusy(true); setTwMsg(null); setReceipt(null)
     try {
       const r = await fetch('/api/discovery/clone-video/tweak', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -310,8 +327,8 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       const st = await pollUntil(jobId, 'processing', 900_000)
       if (st.timedOut) { setTwMsg('Still working — the updated video will appear in My Creatives.'); setTwBusy(false); return }
       if (st.tweakError) { setTwMsg(`Tweak failed (${st.tweakError}) — your original video is untouched and any charge was refunded.`); setTwBusy(false); refreshCredits(); return }
-      if (st.url) setResult({ url: st.url, script: st.finalScript || st.script, tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, segmentTweakable: !!st.segmentTweakable, tweakScenes: st.tweakScenes || [], tweakSegments: st.tweakSegments || [], finalScript: st.finalScript || st.script })
-      setTwMsg('Updated ✓'); setTwSel(null); setTwVoOpen(false)
+      if (st.url) { setResult({ url: st.url, script: st.finalScript || st.script, tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, segmentTweakable: !!st.segmentTweakable, tweakScenes: st.tweakScenes || [], tweakSegments: st.tweakSegments || [], finalScript: st.finalScript || st.script }); if (prevUrl && st.url !== prevUrl) setReceipt({ cost, prevUrl }) }
+      setTwMsg('Updated ✓'); setTwSel(null); setTwVoOpen(false); setTwChip(null); setTwNote('')
     } catch (e: any) { setTwMsg(String(e?.message || e)) }
     setTwBusy(false)
   }
@@ -382,6 +399,14 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
               <a href={result.url} download style={{ ...btnPrimary, textDecoration: 'none', justifyContent: 'center' }}>Download</a>
               <p style={{ fontSize: 11.5, color: L_MUTED, margin: 0 }}>Saved in <b style={{ color: L_INK }}>My Creatives</b>.</p>
 
+              {/* RECEIPT — appears after any paid fix: what it cost + a real Undo (restores the prior cut). */}
+              {receipt && !twBusy && (
+                <div style={{ background: '#f0fdf4', border: `0.5px solid ${SEL_BORDER}`, borderRadius: 9, padding: '9px 11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: GREEN, fontWeight: 700 }}>✓ Fixed{receipt.cost ? ` · used ${receipt.cost} credits` : ' · free'}</span>
+                  <button onClick={undoTweak} style={{ background: '#fff', border: `1px solid ${SEL_BORDER}`, color: GREEN, borderRadius: 8, padding: '5px 12px', fontSize: 11.5, fontWeight: 650, cursor: 'pointer', fontFamily: 'inherit' }}>↩ Undo — bring back the old version</button>
+                </div>
+              )}
+
               {result.tweakable && (result.tweakScenes?.length || 0) > 0 && (
                 <div style={{ borderTop: `1px solid ${L_LINE}`, paddingTop: 12 }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: L_MUTED, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Tweak a scene</div>
@@ -422,7 +447,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       </div>
                     )}
                   </>)}
-                  {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
+                  {twMsg && <p style={{ fontSize: 11.5, color: (twMsg === 'Updated ✓' || twMsg?.startsWith('Reverted')) ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
                 </div>
               )}
 
@@ -462,7 +487,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       <span style={{ fontSize: 11, color: L_FAINT, width: '100%' }}>Swaps those seconds for a clean product close-up (max 5s) — the voice keeps playing, the rest is untouched.</span>
                     </div>
                   </>)}
-                  {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
+                  {twMsg && <p style={{ fontSize: 11.5, color: (twMsg === 'Updated ✓' || twMsg?.startsWith('Reverted')) ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
                 </div>
               )}
 
@@ -520,7 +545,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       </div>
                     )}
                   </>)}
-                  {twMsg && <p style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
+                  {twMsg && <p style={{ fontSize: 11.5, color: (twMsg === 'Updated ✓' || twMsg?.startsWith('Reverted')) ? GREEN : '#b42318', margin: '8px 0 0' }}>{twMsg}</p>}
                 </div>
               )}
             </div>
