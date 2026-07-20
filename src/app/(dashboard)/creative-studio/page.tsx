@@ -211,6 +211,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   // Fix a moment — precise timeline selection. The user scrubs the video, marks a start + end second
   // (or types them), writes what's wrong, and we patch/re-shoot ONLY that window.
   const videoRef = useRef<HTMLVideoElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const [nowSec, setNowSec] = useState(0)          // live playhead, for the "Set to 0:03" buttons
   const [markFrom, setMarkFrom] = useState<number | null>(null)
   const [markTo, setMarkTo] = useState<number | null>(null)
@@ -234,6 +235,13 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
       .then((st) => setTw({ tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, segmentTweakable: !!st.segmentTweakable, scenes: st.tweakScenes || [], segments: st.tweakSegments || [] }))
       .catch(() => {})
   }, [gen.id, gen.type, gen.media_type, gen.image_url])
+  // Keep the modal scrolled to the TOP so the video is always fully visible — on open and after a
+  // tweak swaps the video in (the panel is taller than the viewport, so it otherwise stayed scrolled
+  // down and cut off the video). rootRef's parent is the Overlay's scroll container.
+  useEffect(() => {
+    const sc = rootRef.current?.parentElement
+    if (sc) sc.scrollTop = 0
+  }, [img, twBusy])
   const runTweak = async (body: Record<string, unknown>) => {
     if (twBusy) return
     setTwBusy(true); setTwMsg(null)
@@ -312,8 +320,8 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
 
   return (
     <Overlay onClose={onClose}>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', maxWidth: 900 }}>
-        <div style={{ background: '#0d120e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'relative' }}>
+      <div ref={rootRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', maxWidth: 900, alignItems: 'start' }}>
+        <div style={{ background: '#0d120e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: isMobile ? 'relative' : 'sticky', top: 0, alignSelf: 'start' }}>
           {isVideo
             ? <video ref={videoRef} src={img || ''} controls autoPlay loop onTimeUpdate={(e) => setNowSec((e.target as HTMLVideoElement).currentTime)} style={{ maxWidth: '100%', maxHeight: '78vh', borderRadius: 8 }} />
             // eslint-disable-next-line @next/next/no-img-element
