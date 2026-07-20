@@ -208,6 +208,12 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
     setVersions((vs) => vs.map((x, j) => (j === i && cur != null ? { img: cur, genId } : x)))
     setImg(v.img); setGenId(v.genId)
   }
+  // Fix a moment — precise timeline selection. The user scrubs the video, marks a start + end second
+  // (or types them), writes what's wrong, and we patch/re-shoot ONLY that window.
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [nowSec, setNowSec] = useState(0)          // live playhead, for the "Set to 0:03" buttons
+  const [markFrom, setMarkFrom] = useState<number | null>(null)
+  const [markTo, setMarkTo] = useState<number | null>(null)
   // Captions add-on (high-margin blade). Burns TikTok-style captions onto this finished video.
   const [capStyle, setCapStyle] = useState<'bold' | 'minimal' | 'boxed'>('bold')
   const [capLang, setCapLang] = useState('en')
@@ -222,8 +228,6 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const [twBusy, setTwBusy] = useState(false)
   const [twMsg, setTwMsg] = useState<string | null>(null)
   const [twNote, setTwNote] = useState('')
-  const [twFrom, setTwFrom] = useState('')
-  const [twTo, setTwTo] = useState('')
   useEffect(() => {
     if (gen.type !== 'video_clone' || gen.media_type !== 'video' || !gen.image_url) return
     fetch(`/api/discovery/clone-video/status?id=${gen.id}`).then((r) => r.json())
@@ -311,7 +315,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', maxWidth: 900 }}>
         <div style={{ background: '#0d120e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'relative' }}>
           {isVideo
-            ? <video src={img || ''} controls autoPlay loop style={{ maxWidth: '100%', maxHeight: '78vh', borderRadius: 8 }} />
+            ? <video ref={videoRef} src={img || ''} controls autoPlay loop onTimeUpdate={(e) => setNowSec((e.target as HTMLVideoElement).currentTime)} style={{ maxWidth: '100%', maxHeight: '78vh', borderRadius: 8 }} />
             // eslint-disable-next-line @next/next/no-img-element
             : <img src={img || ''} alt="" style={{ maxWidth: '100%', maxHeight: '78vh', borderRadius: 8, opacity: busy ? 0.5 : 1 }} />}
           {busy && !isVideo && <div style={{ position: 'absolute', color: LIME, display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}><Loader2 size={18} className="spin" /> Working…</div>}
@@ -323,82 +327,96 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
               <button onClick={() => downloadCreative(creativeFilename({ brand: gen.brand_name, ext: 'mp4', kind: gen.type, date: new Date(gen.created_at) }))} disabled={downloading} style={{ ...btn, justifyContent: 'center' }}><Download size={15} /> {downloading ? 'Downloading…' : 'Download MP4'}</button>
               <button onClick={copyUrl} style={{ ...btnGhost, justifyContent: 'center' }}><Link2 size={15} /> {copied ? 'Copied ✓' : 'Copy URL'}</button>
 
-              {/* ── Tweak — fix this remake later, right from My Creatives (same rail as the render
-                  modal): per-scene chips for faithful, whole-clip fix chips for single-clip UGC. ── */}
+              {/* ── Fix a moment — POINT at the exact seconds on the video, say what's wrong, fix just
+                  that. Precise patch is the hero; whole-section/clip re-shoots are the secondary path. ── */}
               {gen.type === 'video_clone' && gen.media_type === 'video' && !!img && (() => {
-                // The cutaway PATCH needs only a finished video (+ the product photo in clone_meta), not
-                // a re-roll cache — so it's available on EVERY video, including older ones with no cached
-                // sections. The richer re-shoot options appear only when their cache exists.
-                const hasFix = tw && (tw.tweakable || tw.ugcTweakable || tw.segmentTweakable)
                 const pill = (on: boolean): React.CSSProperties => ({ padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${on ? '#1a3a1a' : '#d1d5db'}`, background: on ? '#f0fdf4' : '#fff', color: '#1a3a1a' })
                 const noteBox = { width: '100%', resize: 'vertical' as const, fontSize: 12.5, fontFamily: 'inherit', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', boxSizing: 'border-box' as const }
-                const mmss = (t?: number) => t == null ? '' : `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, '0')}`
+                const mmss = (t?: number) => t == null ? '' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`
+                const secLbl = (t: number) => `${mmss(t)}.${Math.floor((t % 1) * 10)}`   // 0:03.4
                 const primary = { padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: '#1a3a1a', color: '#dffe95' }
-                const patchRow = (fromDefault: number) => (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: '1px dashed #e5e7eb' }}>
-                    <span style={{ fontSize: 12, fontWeight: 700 }}>🩹 Or patch just the flawed seconds</span>
-                    <input value={twFrom} onChange={(e) => setTwFrom(e.target.value.replace(/[^\d.]/g, ''))} placeholder={String(fromDefault)} inputMode="decimal" style={{ ...noteBox, width: 56, padding: '6px 8px' }} />
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>to</span>
-                    <input value={twTo} onChange={(e) => setTwTo(e.target.value.replace(/[^\d.]/g, ''))} placeholder={String(fromDefault + 4)} inputMode="decimal" style={{ ...noteBox, width: 56, padding: '6px 8px' }} />
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>sec</span>
-                    <button onClick={() => { const f = parseFloat(twFrom || String(fromDefault)); runTweak({ type: 'patch_broll', from: f, to: parseFloat(twTo || String(f + 4)), note: twNote.trim() || undefined }) }} style={{ ...pill(false), color: '#15803d' }}>Patch it · 150cr</button>
-                    <span style={{ fontSize: 11, color: '#9ca3af', width: '100%' }}>Swaps those seconds for a clean product close-up (max 5s) — the voice keeps playing, the rest is untouched.</span>
-                  </div>
-                )
+                const round1 = (t: number) => Math.round(t * 10) / 10
+                const seek = (t: number) => { if (videoRef.current) { videoRef.current.currentTime = Math.max(0, t); videoRef.current.pause() } }
+                const rangeValid = markFrom != null && markTo != null && markTo > markFrom
                 return (
                 <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>🎯 {tw?.tweakable ? 'Tweak a scene' : 'Fix a moment'}</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>🎯 Fix a moment</div>
                   {twBusy ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1a3a1a', fontSize: 12.5 }}><Loader2 size={14} className="spin" /> Fixing… (~2–3 min, the video updates here)</div>
-                  ) : tw?.tweakable ? (<>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {tw.scenes.map((s, i) => (
-                        <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={pill(twSel === i)}>Scene {i + 1} · {s.duration}s</button>
-                      ))}
+                  ) : (<>
+                    {/* PRECISE MOMENT PICKER — the hero interaction */}
+                    <div style={{ fontSize: 11.5, color: '#6b7280' }}>Play the video to where it&apos;s wrong, mark the <b>start</b> and <b>end</b>, then tell us what to fix — we fix only those seconds.</div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <button onClick={() => { const t = round1(nowSec); setMarkFrom(t); if (markTo != null && markTo <= t) setMarkTo(null) }} style={pill(false)}>⚑ Set start<span style={{ color: '#6b7280', fontWeight: 500 }}> · now {secLbl(nowSec)}</span></button>
+                      <button onClick={() => { const t = round1(nowSec); if (markFrom == null || t > markFrom) setMarkTo(t) }} style={pill(false)}>⚑ Set end<span style={{ color: '#6b7280', fontWeight: 500 }}> · now {secLbl(nowSec)}</span></button>
+                      {(markFrom != null || markTo != null) && (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: rangeValid ? '#15803d' : '#b45309', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {markFrom != null ? <button onClick={() => seek(markFrom)} title="jump to start" style={{ ...pill(true), padding: '3px 8px' }}>{secLbl(markFrom)}</button> : '—'}
+                          <span>→</span>
+                          {markTo != null ? <button onClick={() => seek(markTo)} title="jump to end" style={{ ...pill(true), padding: '3px 8px' }}>{secLbl(markTo)}</button> : '…'}
+                          <button onClick={() => { setMarkFrom(null); setMarkTo(null) }} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>×</button>
+                        </span>
+                      )}
                     </div>
-                    {twSel != null && (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {[['size', 'Product too big/small'], ['product', 'Product wrong'], ['action', 'Wrong action'], ['person', 'Person off'], ['closeup', 'Close-up'], ['redo', 'Redo']].map(([k, label]) => (
-                          <button key={k} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: k })} style={pill(false)}>{label} · 600cr</button>
-                        ))}
-                        {tw.scenes.length > 2 && <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...pill(false), color: '#15803d' }}>Remove · free</button>}
-                      </div>
+                    <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2} style={noteBox} placeholder={'What’s wrong in this moment? e.g. “the pouch has a cap — it should be a flat sealed pouch” or “product looks squashed”'} />
+                    <button
+                      disabled={!rangeValid}
+                      onClick={() => runTweak({ type: 'patch_broll', from: markFrom, to: markTo, note: twNote.trim() || undefined })}
+                      style={{ ...primary, opacity: rangeValid ? 1 : 0.45, cursor: rangeValid ? 'pointer' : 'not-allowed' }}>
+                      🩹 Fix this moment{rangeValid ? ` (${secLbl(markFrom!)}–${secLbl(markTo!)})` : ''} · 150 cr
+                    </button>
+                    {rangeValid && (markTo! - markFrom!) > 5 && (
+                      <div style={{ fontSize: 11, color: '#b45309' }}>That&apos;s {secLbl(markTo! - markFrom!)}s — a patch covers up to 5s, so we&apos;ll patch the first 5s ({secLbl(markFrom!)}–{secLbl(markFrom! + 5)}). For a longer stretch, use &quot;Re-shoot a whole section&quot; below.</div>
                     )}
-                  </>) : tw?.segmentTweakable ? (<>
-                    <div style={{ fontSize: 11.5, color: '#6b7280' }}>Pick the section that&apos;s off, say what&apos;s wrong — we re-shoot only that part.</div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {tw.segments.map((s, i) => {
-                        const range = s.start != null && s.end != null ? `${mmss(s.start)}–${mmss(s.end)}` : `Section ${i + 1}`
-                        return <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} title={s.script} style={{ ...pill(twSel === i), maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>⏱ {range}{s.script ? ` · “${s.script.slice(0, 30)}${s.script.length > 30 ? '…' : ''}”` : ''}</button>
-                      })}
-                    </div>
-                    {twSel != null && (
-                      <div style={{ background: '#fafcf7', border: '1px solid #eef2f0', borderRadius: 10, padding: '10px 12px' }}>
-                        <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2} style={noteBox} placeholder={'What’s wrong here? e.g. “says Ejad wrong — pronounce Ee-jaad” or “the pouch has a cap, remove it”'} />
+                    <div style={{ fontSize: 11, color: '#9ca3af' }}>Replaces those seconds with a clean product close-up (up to 5s) — the voiceover keeps playing, the rest is untouched. Best for a wrong cap/label/look for a moment.</div>
+
+                    {/* SECONDARY — bigger fixes (whole section / whole clip) */}
+                    {tw?.segmentTweakable && (tw.segments?.length || 0) > 0 && (
+                      <details style={{ marginTop: 4, borderTop: '1px dashed #e5e7eb', paddingTop: 10 }}>
+                        <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#374151' }}>Bigger problem? Re-shoot a whole section</summary>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                          {tw.segments.map((s, i) => {
+                            const range = s.start != null && s.end != null ? `${mmss(s.start)}–${mmss(s.end)}` : `Section ${i + 1}`
+                            return <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} title={s.script} style={{ ...pill(twSel === i), maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>⏱ {range}{s.script ? ` · “${s.script.slice(0, 26)}${s.script.length > 26 ? '…' : ''}”` : ''}</button>
+                          })}
+                        </div>
+                        {twSel != null && (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+                            <button onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Re-shoot section · 600cr</button>
+                            {[['product', 'Product wrong'], ['size', 'Too big/small'], ['person', 'Person off']].map(([k, label]) => (
+                              <button key={k} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: k, note: twNote.trim() || undefined })} style={pill(false)}>{label}</button>
+                            ))}
+                          </div>
+                        )}
+                      </details>
+                    )}
+                    {tw?.ugcTweakable && (
+                      <details style={{ marginTop: 4, borderTop: '1px dashed #e5e7eb', paddingTop: 10 }}>
+                        <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#374151' }}>Bigger problem? Re-shoot the whole clip</summary>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-                          <button onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Re-shoot section · 600cr</button>
-                          {[['product', 'Product wrong'], ['size', 'Too big/small'], ['person', 'Person off']].map(([k, label]) => (
-                            <button key={k} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: k, note: twNote.trim() || undefined })} style={pill(false)}>{label}</button>
+                          <button onClick={() => runTweak({ type: 'redo_ugc', chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Re-roll clip · 450cr</button>
+                          {[['size', 'Too big/small'], ['product', 'Product wrong'], ['person', 'Person off'], ['action', 'Not using it']].map(([k, label]) => (
+                            <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k, note: twNote.trim() || undefined })} style={pill(false)}>{label}</button>
                           ))}
                         </div>
-                        {patchRow(Math.round(tw.segments[twSel]?.start ?? 0))}
-                      </div>
+                      </details>
                     )}
-                  </>) : tw?.ugcTweakable ? (<>
-                    <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2} style={noteBox} placeholder={'What’s wrong? e.g. “says Ejad wrong — pronounce Ee-jaad” or “the pouch shouldn’t have a cap”'} />
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <button onClick={() => runTweak({ type: 'redo_ugc', chip: 'redo', note: twNote.trim() || undefined })} style={primary}>Fix it · 450cr</button>
-                      {[['size', 'Too big/small'], ['product', 'Product wrong'], ['person', 'Person off'], ['action', 'Not using it']].map(([k, label]) => (
-                        <button key={k} onClick={() => runTweak({ type: 'redo_ugc', chip: k, note: twNote.trim() || undefined })} style={pill(false)}>{label}</button>
-                      ))}
-                    </div>
-                    {patchRow(0)}
-                  </>) : (<>
-                    {/* Patch-only fallback: any finished video (incl. older ones with no re-shoot cache)
-                        can still be patched — the cheap, always-available fix. */}
-                    <div style={{ fontSize: 11.5, color: '#6b7280' }}>Spot a flaw for a second or two? Patch just those seconds with a clean product close-up — the voice keeps playing.</div>
-                    <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2} style={noteBox} placeholder={'Optional: what to show instead, e.g. “clean pouch, no cap”'} />
-                    {patchRow(0)}
+                    {tw?.tweakable && (tw.scenes?.length || 0) > 0 && (
+                      <details style={{ marginTop: 4, borderTop: '1px dashed #e5e7eb', paddingTop: 10 }}>
+                        <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#374151' }}>Re-shoot a whole scene</summary>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                          {tw.scenes.map((s, i) => <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={pill(twSel === i)}>Scene {i + 1} · {s.duration}s</button>)}
+                        </div>
+                        {twSel != null && (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                            {[['size', 'Too big/small'], ['product', 'Product wrong'], ['action', 'Wrong action'], ['person', 'Person off'], ['closeup', 'Close-up'], ['redo', 'Redo']].map(([k, label]) => (
+                              <button key={k} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: k })} style={pill(false)}>{label} · 600cr</button>
+                            ))}
+                            {tw.scenes.length > 2 && <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...pill(false), color: '#15803d' }}>Remove · free</button>}
+                          </div>
+                        )}
+                      </details>
+                    )}
                   </>)}
                   {twMsg && <div style={{ fontSize: 11.5, color: twMsg === 'Updated ✓' ? '#15803d' : '#b91c1c' }}>{twMsg}</div>}
                 </div>
