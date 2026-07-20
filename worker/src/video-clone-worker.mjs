@@ -130,6 +130,40 @@ async function describeProduct(imageUrl) {
   const text = (j.choices?.[0]?.message?.content || '').trim()
   return text || null
 }
+// ── Creator lock for a SEGMENT re-shoot: grab a frame from a KEPT part of the finished video and
+// describe the on-camera person precisely, so the re-rolled segment renders the SAME creator instead
+// of a random new face (text-to-video drifts hard without this). Returns a dense description or null.
+// ~2¢. We describe (not image-anchor) because fal's likeness filter rejects a real-looking face image. ──
+async function describeCreator(videoUrl, atSec, id) {
+  if (!OPENAI_KEY || !videoUrl) return null
+  let frame
+  try {
+    const local = join(tmpdir(), `cl-src-${id}.mp4`)
+    await downloadToFile(videoUrl, local)
+    const f = join(tmpdir(), `cl-${id}.jpg`)
+    await ff(['-y', '-ss', String(Math.max(0.3, atSec || 1)), '-i', local, '-frames:v', '1', '-q:v', '3', '-vf', 'scale=640:-1', f])
+    frame = `data:image/jpeg;base64,${(await readFile(f)).toString('base64')}`
+    await rm(local, { force: true }).catch(() => {})
+    await rm(f, { force: true }).catch(() => {})
+  } catch (e) { console.warn(`describeCreator frame ${id}:`, e.message); return null }
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', max_tokens: 120, temperature: 0.2,
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: 'Describe the ON-CAMERA PERSON in ONE dense sentence so another video can recreate the SAME person exactly: gender, apparent age, skin tone, face shape, hair (colour/length/style), any facial hair or glasses, and their exact outfit (garment type, colour, pattern). Then add the setting in a few words. Only what is visible.' },
+          { type: 'image_url', image_url: { url: frame } },
+        ] }],
+      }),
+    })
+    if (!r.ok) return null
+    const j = await r.json()
+    const t = (j.choices?.[0]?.message?.content || '').trim()
+    if (t) console.log(`🧍 ${id} creator lock: ${t.slice(0, 90)}`)
+    return t || null
+  } catch { return null }
+}
 function productTruthRule(product, isService) {
   // SERVICE / app brand → there is NO physical product. This overrides any "product hero / hold /
   // swap" language elsewhere in the prompt. Never render an invented object.
@@ -482,16 +516,22 @@ Return ONLY minified JSON: {"character":"","voice":"","segments":[{"script":"","
 }
 
 // Compose one segment's Seedance prompt: verbatim character block + continuity anchor + exact words.
-function segmentPrompt(plan, seg, i, total, hasAnchor, nImages, lang) {
+function segmentPrompt(plan, seg, i, total, hasAnchor, nImages, lang, opts = {}) {
+  const { sizeAnchor, creatorLock } = opts
   const productRef = hasAnchor
     ? (nImages ? `@Image2${nImages > 1 ? `–@Image${nImages + 1}` : ''}` : 'the product')
     : (nImages ? `@Image1${nImages > 1 ? `–@Image${nImages}` : ''}` : 'the product')
   const parts = [plan.character]
+  // CREATOR LOCK (segment re-shoot): an exact appearance captured from a KEPT part of THIS video, so
+  // a re-rolled segment keeps the SAME person instead of a new random face. Overrides drift.
+  if (creatorLock) parts.push(`CRITICAL — SAME PERSON: the on-camera creator MUST look EXACTLY like this (they already appear in the rest of this video): ${creatorLock}. Match the face, age, skin tone, hair and outfit precisely — do NOT change the person.`)
   if (hasAnchor) parts.push(`This is segment ${i + 1} of ${total} of ONE continuous selfie take. @Image1 shows this exact creator one moment ago — treat it as ground truth: the SAME face, hair, outfit, room and lighting, continuing seamlessly. The user's product is ${productRef} and must match it exactly.`)
   else parts.push(`The user's product is ${productRef} and must match it exactly.`)
   parts.push(`They speak to camera in ${langName(lang).split(' — ')[0]} — ${plan.voice} — lips moving in sync, saying these exact words aloud: "${String(seg.script || '').replace(/"/g, "'")}"`)
   if (seg.action) parts.push(String(seg.action))
-  if (nImages) parts.push(`PRODUCT TRUTH: render ${productRef} EXACTLY as the attached photo — same container type, silhouette, closure, label and colours. Do NOT add, remove or change ANY part vs the photo (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper): keep the exact form factor shown, whatever it is (a pouch stays a pouch, a bottle stays that bottle, a jar stays that jar).`)
+  if (nImages) parts.push(`PRODUCT TRUTH: render ${productRef} EXACTLY as the attached photo — same container type, silhouette, closure, label and colours. Do NOT add, remove or change ANY part vs the photo (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper): keep the exact form factor shown, whatever it is (a pouch stays a pouch, a bottle stays that bottle, a jar stays that jar). NEVER replace the product with a courier/delivery box, a generic carton or any other object — it is always ${productRef}.`)
+  // TRUE SCALE — video models inflate held products; anchor the size so a re-shoot doesn't balloon it.
+  if (nImages && sizeAnchor) parts.push(`REAL SIZE: the product is ${sizeAnchor}. Render it at that true real-world scale relative to the hand and face — get it readable by bringing the CAMERA closer, NEVER by enlarging the product. An oversized, out-of-proportion product looks fake.`)
   parts.push('UGC realism: iPhone selfie framing at arm\'s length, natural light, authentic handheld, no on-screen captions.')
   return parts.filter(Boolean).join(' ')
 }
@@ -1788,7 +1828,7 @@ async function generateJob(job) {
               continue
             } catch { delete segClips[i] /* expired url → regenerate */ }
           }
-          const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, false, productImages.length, meta.language)
+          const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, false, productImages.length, meta.language, { sizeAnchor: meta.product_details && meta.product_details.size_anchor })
           // COST FIX: we USED to pass the previous clip's last frame (the creator's face) as an anchor for
           // cross-cut continuity. But that face frame reliably trips fal's likeness filter at RESULT time —
           // and fal CHARGES for the rejected clip — after which we fell back to product-only anyway. So a
@@ -2210,7 +2250,17 @@ async function tweakJob(job) {
         const note = typeof t.note === 'string' ? t.note.trim().slice(0, 300) : ''
         const segForPrompt = note ? { ...segs[si], script: await applyFixNote(String(segs[si].script || ''), note, meta.language) } : segs[si]
         const noteLine = note ? `\n\nUSER'S FIX (top priority — this is exactly what was wrong with the last take): ${note.replace(/"/g, "'")}` : ''
-        const prompt = segmentPrompt(plan, segForPrompt, si, segs.length, !!anchor, falProductImages.length, meta.language) + fix + noteLine
+        // CREATOR LOCK: describe the person from a KEPT neighbouring segment of the finished video so
+        // the re-shoot keeps the SAME model (the "it changed the model looks" bug). Best-effort.
+        let creatorLock = null
+        try {
+          const kept = si > 0 ? si - 1 : (segs.length > 1 ? si + 1 : -1)
+          if (kept >= 0 && job.image_url) {
+            const at = segDurs.slice(0, kept).reduce((a, d) => a + d, 0) + segDurs[kept] / 2
+            creatorLock = await describeCreator(job.image_url, at, job.id)
+          }
+        } catch (e) { console.warn(`creator-lock ${job.id}:`, e.message) }
+        const prompt = segmentPrompt(plan, segForPrompt, si, segs.length, !!anchor, falProductImages.length, meta.language, { sizeAnchor: meta.product_details && meta.product_details.size_anchor, creatorLock }) + fix + noteLine
         const imgs = anchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages
         const blocked = (e) => e.code === 'content_policy_images' || e.code === 'content_policy_video'
         // Ladder down on moderation blocks (anchor+products → products only → pure prompt), same as the
