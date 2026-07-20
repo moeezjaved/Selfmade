@@ -8,9 +8,9 @@ import type { Metadata } from 'next'
 import HomeLanding from '@/components/HomeLanding'
 
 const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
-const TITLE = 'Selfmade — Clone Winning Meta Ads With Your Product'
-const DESC = 'Selfmade finds the Meta ads already winning in your niche and remakes them with your product — in minutes, for $0.15 an ad instead of a $1,500 shoot. Spy on 3M+ proven ads, clone the winners, launch. No spend tax, ever.'
-const OG_DESC = 'Clone any winning Meta ad with your product — $0.15. Spy on 3M+ proven ads, remake the winners, launch in minutes.'
+const TITLE = 'Selfmade — Remake Winning Meta Ads With Your Product'
+const DESC = 'Selfmade finds the Meta ads already winning in your niche and remakes them with your product — in minutes, for $0.15 an ad instead of a $1,500 shoot. Spy on 3M+ proven ads, remake the winners, launch. No spend tax, ever.'
+const OG_DESC = 'Remake any winning Meta ad with your product — $0.15. Spy on 3M+ proven ads, remake the winners, launch in minutes.'
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
