@@ -38,21 +38,25 @@ async function patch(path, body) {
   if (!r.ok) console.warn(`PATCH ${path} → ${r.status} ${(await r.text()).slice(0, 120)}`)
 }
 
-// Pick a fresh competitor winner to clone — same niche as the enrollment's source ad when possible,
-// never one we've already used for this enrollment, never the source ad itself.
+// Pick a fresh competitor winner to clone — STRICTLY same niche as the enrollment's source ad.
+// CATEGORY-SAFE (fixes the HairResQ bug): we only do a "fresh competitor" clone when we can anchor the
+// category to the user's own source ad's niche. Without that anchor the old code fell through to "any
+// winning ad" and cloned a TANNING-OIL ad (Shine Brown) for a HAIR brand — a totally off-category ad
+// emailed + charged. Better to skip a day than to send the wrong product category. Returns null to skip.
 async function pickFreshAd(sourceAdId, usedIds) {
+  if (!sourceAdId) { console.warn('autopilot fresh: no source ad → no niche anchor, skipping (avoids cross-category clone)'); return null }
   let niche = null
-  if (sourceAdId) {
-    try { niche = (await getJSON(`discovery_ads_index?select=niche&ad_id=eq.${enc(sourceAdId)}`))?.[0]?.niche || null } catch { /* best-effort */ }
-  }
+  try { niche = (await getJSON(`discovery_ads_index?select=niche&ad_id=eq.${enc(sourceAdId)}`))?.[0]?.niche || null } catch { /* best-effort */ }
+  if (!niche) { console.warn(`autopilot fresh: source ad ${sourceAdId} has no niche → skipping (can't guarantee same category)`); return null }
   const exclude = [...new Set([sourceAdId, ...(usedIds || [])].filter(Boolean))]
   const notIn = exclude.length ? `&ad_id=not.in.(${exclude.map(enc).join(',')})` : ''
-  const nicheF = niche ? `&niche=eq.${enc(niche)}` : ''
   const base = 'discovery_ads_index?select=ad_id&performance_tier=eq.winning&has_creative=is.true&is_active=is.true'
-  for (const q of [`${base}${nicheF}${notIn}&order=days_running.desc&limit=25`, `${base}${notIn}&order=days_running.desc&limit=25`]) {
-    try { const rows = await getJSON(q); if (Array.isArray(rows) && rows.length) return rows[0].ad_id } catch { /* try next */ }
-    if (!nicheF) break
-  }
+  // ONLY the in-niche query — NO cross-category fallback.
+  try {
+    const rows = await getJSON(`${base}&niche=eq.${enc(niche)}${notIn}&order=days_running.desc&limit=25`)
+    if (Array.isArray(rows) && rows.length) return rows[0].ad_id
+  } catch { /* fall through to skip */ }
+  console.warn(`autopilot fresh: no unused winner left in niche "${niche}" → skipping today`)
   return null
 }
 
