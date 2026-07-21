@@ -290,14 +290,23 @@ async function runGeneration(input: {
     let recastApplied: 'yes' | 'failed' | 'no' = wantsRecast ? 'failed' : 'no'
     if (wantsRecast && best) {
       try {
-        // EXACT proven wording from the tweak-box person edit (edit-image), which recasts reliably on Pro.
+        // Nationality looks read as GENERIC South-Asian unless we (a) push distinctly-that-nationality
+        // features and (b) change the WARDROBE to culturally-appropriate dress — otherwise the model keeps
+        // the original (Western) outfit. Ethnicity-only chips (Black/White/… ) keep the outfit.
+        const DRESS: Record<string, string> = {
+          pakistani: `Also change their outfit to modest traditional Pakistani attire — a shalwar kameez or kurta with a dupatta, in a colour that suits the scene.`,
+          indian: `Also change their outfit to traditional Indian attire — a kurta, salwar suit or saree as fits the scene.`,
+          arab: `Also change their outfit to modest Middle-Eastern attire — an abaya or modest long dress, optionally with a hijab.`,
+        }
+        const dressClause = DRESS[look.toLowerCase()] || ''
         const recastPrompt = [
-          `Edit this advertising image by RECASTING the person shown. Apply this change to the person: "make the person ${/^[aeiou]/i.test(look) ? 'an' : 'a'} ${look} person".`,
-          `You MUST change the person's appearance accordingly — their ethnicity, skin tone, facial features and hair. Fully replace the model; do NOT keep the original person's face or features.`,
+          `Edit this advertising image by RECASTING the person shown. Apply this change to the person: "make the person ${/^[aeiou]/i.test(look) ? 'an' : 'a'} ${look} person with clearly, distinctly ${look} facial features".`,
+          `You MUST change the person's appearance accordingly — their ethnicity, skin tone, facial features and hair so they unmistakably read as ${look} (not a generic look). Fully replace the model; do NOT keep the original person's face or features.`,
+          dressClause,
           `Keep IDENTICAL: the pose and body position, camera framing and crop, the product (its exact shape, packaging, label and colours and how it is held), the background, all headline/subhead/logo text, and the overall lighting and style.`,
           `The result must look like the same ad reshot with a new ${look} model — natural and photorealistic, not a face swap.`,
           `Output ONE photorealistic, ad-ready image at the exact same aspect ratio, with legible text.`,
-        ].join(' ')
+        ].filter(Boolean).join(' ')
         const recast = await generateImage(recastPrompt, [{ mimeType: best.mimeType, dataB64: best.dataB64 }], 'pro', { aspectRatio: resolvedAspect, imageSize })
         if (recast.ok && recast.dataB64) {
           best = { mimeType: recast.mimeType, dataB64: recast.dataB64 }; usedModel = recast.model || usedModel; recastApplied = 'yes'
