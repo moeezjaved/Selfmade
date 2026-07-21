@@ -33,6 +33,8 @@ async function loadBoards() {
 
 $('board').addEventListener('change', (e) => chrome.storage.local.set({ sm_board: e.target.value }))
 
+$('viewSaved').addEventListener('click', () => chrome.tabs.create({ url: `${APP}/discovery/saved` }))
+
 $('signIn').addEventListener('click', async () => {
   $('signIn').textContent = 'Opening…'
   const r = await msg('signIn')
