@@ -109,10 +109,11 @@ function Panel({ children, grad, style, className }: { children: React.ReactNode
   return <div className={`panel ${className || ''}`} style={{ background: grad, borderRadius: 32, padding: '48px 40px', ...style }}>{children}</div>
 }
 
-/** Browser mockup showing the REAL discovery grid + floating stat cards. */
-function HeroMock({ ads }: { ads: string[] }) {
+/** Browser mockup of the REAL discovery grid — images + playable videos (Discovery-style player) and
+ * a Remake button on every card that sends visitors to sign up. */
+function HeroMock({ slots }: { slots: ({ image: string; video: string | null } | null)[] }) {
   const fallback = [['#c7f0a3', '#a8e63d'], ['#bfe0ff', '#7fb8f5'], ['#f7c9e8', '#ec8fd0'], ['#ffe6b0', '#f5c15c'], ['#d7c9ff', '#a98ff0'], ['#c7f0a3', '#8fd66a']]
-  const slots = Array.from({ length: 6 }, (_, i) => ads[i] || null)
+  const cells = Array.from({ length: 6 }, (_, i) => slots[i] || null)
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 30px 80px rgba(14,27,18,.18)', overflow: 'hidden', border: '1px solid #eef0ee' }}>
@@ -121,11 +122,17 @@ function HeroMock({ ads }: { ads: string[] }) {
           <span style={{ marginLeft: 12, fontSize: 11, color: '#9ca3af', background: '#fff', border: '1px solid #eef0ee', borderRadius: 6, padding: '3px 12px' }}>tryselfmade.ai/discovery</span>
         </div>
         <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, background: '#fbfdfa' }}>
-          {slots.map((u, i) => (
-            <div key={i} style={{ aspectRatio: '3/4', borderRadius: 10, overflow: 'hidden', background: u ? '#0d120e' : `linear-gradient(160deg, ${fallback[i][0]}, ${fallback[i][1]})`, position: 'relative' }}>
-              {u && /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={adImg(u, 300)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-              <span style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(14,27,18,.78)', color: '#fff', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 10 }}>🔥 9{i}</span>
+          {cells.map((s, i) => (
+            <div key={i} className="hm-cell" style={{ aspectRatio: '3/4', borderRadius: 10, overflow: 'hidden', background: s ? '#0d120e' : `linear-gradient(160deg, ${fallback[i][0]}, ${fallback[i][1]})`, position: 'relative' }}>
+              {s?.video
+                ? <HoverScrubVideo src={s.video} poster={adImg(s.image, 300)} />
+                : s?.image
+                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={adImg(s.image, 300)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : null}
+              <span style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(14,27,18,.78)', color: '#fff', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 10, zIndex: 10 }}>🔥 9{i}</span>
+              {s && (
+                <Link href="/signup" aria-label="Remake this ad" className="hm-remake" style={{ position: 'absolute', bottom: 6, right: 6, zIndex: 10, background: LIME, color: INK, fontSize: 10, fontWeight: 800, padding: '4px 9px', borderRadius: 100, textDecoration: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Remake</Link>
+              )}
             </div>
           ))}
         </div>
@@ -181,27 +188,44 @@ function ShowMedia({ url, poster, isVideo, ring, alt }: { url: string | null; po
 
 export default function HomeLanding() {
   const marqueeGrad = ['#c7f0a3', '#bfe0ff', '#f7c9e8', '#ffe6b0', '#d7c9ff', '#a8e63d', '#7fb8f5', '#ec8fd0', '#f5c15c', '#a98ff0']
-  const [ads, setAds] = useState<string[]>([])
+  type Feed = { image: string; video: string | null }
+  const [feed, setFeed] = useState<Feed[]>([])
   useEffect(() => {
-    // Dedupe by image AND by brand → the hero grid shows DISTINCT, visually-varied ads (it was
-    // repeating the same creative + same brand twice, which looked cheap). Bigger pool so the 6-card
-    // grid + 12-card marquee stay diverse. Skip near-square/UI-looking thumbs for a cleaner grid.
+    // Dedupe by image AND by brand → distinct, varied cards (was repeating the same creative/brand,
+    // which looked cheap). Keep the video URL too so the hero grid can show real playable ads.
     fetch('/api/discovery/trending?limit=60')
       .then(r => r.json())
       .then(j => {
-        const seenImg = new Set<string>(), seenBrand = new Set<string>(), out: string[] = []
+        const seenImg = new Set<string>(), seenBrand = new Set<string>(), out: Feed[] = []
         for (const a of (j.ads || [])) {
           const img: string = a.image
           if (!img || seenImg.has(img)) continue
           const brand = String(a.pageName || '').trim().toLowerCase()
           if (brand && seenBrand.has(brand)) continue   // one card per brand → diverse, not repetitive
-          seenImg.add(img); if (brand) seenBrand.add(brand); out.push(img)
+          seenImg.add(img); if (brand) seenBrand.add(brand)
+          out.push({ image: img, video: (a.isVideo && a.videoUrl) ? a.videoUrl : null })
         }
-        setAds(out)
+        setFeed(out)
       })
       .catch(() => {})
   }, [])
+  const ads = feed.map(f => f.image)   // image-only list for the marquee rows
   const marqueeAds = ads.slice(6, 6 + 12)
+  // Hero grid = 6 cards with ~3 real videos mixed in (video in every other slot), so it mirrors
+  // Discovery: playable ads + a Remake button. Falls back to whatever's available.
+  const heroSlots: (Feed | null)[] = (() => {
+    const vids = feed.filter(f => f.video).slice(0, 3)
+    const imgs = feed.filter(f => !f.video)
+    const out: (Feed | null)[] = []
+    let vi = 0, ii = 0
+    for (let k = 0; k < 6; k++) {
+      if (k % 2 === 1 && vi < vids.length) out.push(vids[vi++])
+      else if (ii < imgs.length) out.push(imgs[ii++])
+      else if (vi < vids.length) out.push(vids[vi++])
+      else out.push(null)
+    }
+    return out
+  })()
   // "Made with Selfmade" showcase — admin-featured creatives (image + video) via /api/showcase.
   // Falls back to the curated SHOWCASE consts so the section is never empty before anything's featured.
   type Show = { brand: string | null; source: string | null; made: string; video: boolean; sourceVideo?: string | null }
@@ -314,7 +338,7 @@ export default function HomeLanding() {
           {['No card to start', '5 image ads free', 'Cancel anytime'].map(t => <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check /> {t}</span>)}
         </div>
         <div style={{ maxWidth: 720, margin: '48px auto 0', display: 'flex', justifyContent: 'center' }}><LandingHero /></div>
-        <div style={{ maxWidth: 720, margin: '28px auto 0' }}><HeroMock ads={ads} /></div>
+        <div style={{ maxWidth: 720, margin: '28px auto 0' }}><HeroMock slots={heroSlots} /></div>
       </header>
 
       {/* META-EXPERTS positioning band */}
