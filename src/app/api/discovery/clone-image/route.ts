@@ -293,8 +293,12 @@ async function runGeneration(input: {
       prompt: newHeadline || null,
       // ref_url = the exact image we cloned from (discovery poster OR uploaded/asset reference), so the
       // "cloned from" thumbnail shows for EVERY clone — including Brand-Spy/asset/upload ones with no source_ad_id.
-      clone_meta: { tx_id: txId, image_size: imageSize, model: usedModel, ref_url: refUrl },
+      // Persist the recast request + which model actually ran, so we can tell whether "make the person X"
+      // is (a) reaching the server and (b) which model rendered it — no more guessing from the output.
+      clone_meta: { tx_id: txId, image_size: imageSize, model: usedModel, ref_url: refUrl,
+        look: typeof look === 'string' && look ? look : 'match', recast: wantsRecast, model_tier: useTier },
     }).eq('id', jobId)
+    console.log(`🖼 clone ${String(jobId).slice(0, 8)} look=${look || 'match'} recast=${wantsRecast} tier=${useTier} model=${usedModel}`)
 
     if (userEmail) await sendFirstAdEmail(userId, userEmail, url).catch(() => {})
   } catch (e: any) {
