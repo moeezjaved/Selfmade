@@ -299,7 +299,7 @@ async function runGeneration(input: {
         if (recast.ok && recast.dataB64) {
           best = { mimeType: recast.mimeType, dataB64: recast.dataB64 }; usedModel = recast.model || usedModel
           console.log(`🎭 clone ${String(jobId).slice(0, 8)} auto-recast → ${look} (model=${recast.model})`)
-        } else console.warn(`clone ${String(jobId).slice(0, 8)} recast pass failed (${recast.error}) — shipping un-recast clone`)
+        } else console.warn(`clone ${String(jobId).slice(0, 8)} recast pass failed (${recast.ok ? 'no image' : recast.error}) — shipping un-recast clone`)
       } catch (e: any) { console.warn(`clone recast pass error: ${e?.message} — shipping un-recast clone`) }
     }
 
