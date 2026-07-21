@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
     ...(type === 'redo_scene' || type === 'redo_ugc' || type === 'redo_segment' ? { chip: CHIPS.has(String(chip)) ? String(chip) : 'redo' } : {}),
     // "Fix a moment" free-text: the user's own description of what's wrong (pronunciation, invented
     // cap, …) — worker respells the spoken line if it's about speech + injects it into the prompt.
-    ...((type === 'redo_segment' || type === 'redo_ugc' || type === 'patch_broll') && typeof note === 'string' && note.trim() ? { note: note.trim().slice(0, 300) } : {}),
+    ...((type === 'redo_segment' || type === 'redo_ugc' || type === 'patch_broll' || type === 'redo_scene') && typeof note === 'string' && note.trim() ? { note: note.trim().slice(0, 400) } : {}),
     ...(type === 'patch_broll' ? { from: Math.max(0, pFrom), to: pTo } : {}),
     ...(type === 'redo_vo' && typeof script === 'string' && script.trim() ? { script: script.trim().slice(0, 2000) } : {}),
     ...(txId ? { tx: txId } : {}),
