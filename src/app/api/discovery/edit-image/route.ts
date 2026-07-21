@@ -75,9 +75,9 @@ export async function POST(req: NextRequest) {
   // it locks the input face. The standard Nano Banana reshoots the person reliably. So person edits
   // render on the standard model; billing/action still follow the requested tier.
   const requestedTier: 'default' | 'pro' = tier === 'pro' ? 'pro' : 'default'
-  // TEST (2026-07-21): person edits stay on Pro with the strengthened recast prompt, to see if Pro will
-  // now recast. If it refuses, flip back to `isPersonEdit(String(instruction)) ? 'default' : requestedTier`.
-  const useTier: 'default' | 'pro' = requestedTier
+  // TESTED 2026-07-21: Pro won't recast the person even with the strong prompt — so person edits render
+  // on the STANDARD model (reliable recast); billing/action still follow the requested tier.
+  const useTier: 'default' | 'pro' = isPersonEdit(String(instruction)) ? 'default' : requestedTier
   const action = requestedTier === 'pro' ? 'image_edit_pro' : 'image_edit'
 
   const admin = createAdminClient()
