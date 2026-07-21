@@ -126,11 +126,11 @@ async function runGeneration(input: {
     // the standard Nano Banana, which reshoots the person reliably (that's why recasts worked on 16 Jul
     // and stopped after). So route recast jobs to the standard model; keep Pro for everything else. The
     // user is still billed at Pro (the row is stamped 'pro') — only the render model differs.
+    // TESTED 2026-07-21: Pro (gemini-3-pro-image) still would NOT recast the person even with the
+    // strengthened 'fully replace the person' prompt — confirmed on a live Co Natural remake. So recast
+    // jobs render on the STANDARD model (proven to recast reliably); everything else stays on Pro.
     const wantsRecast = typeof look === 'string' && !!look.trim() && look.toLowerCase() !== 'match'
-    // TEST (2026-07-21): recasts run on Pro WITH the strengthened 'fully replace the person' prompt to
-    // see if Pro will now comply. If it still refuses, flip this back to `wantsRecast ? 'default' : 'pro'`.
-    void wantsRecast
-    const useTier: 'default' | 'pro' = 'pro'
+    const useTier: 'default' | 'pro' = wantsRecast ? 'default' : 'pro'
     const rawProducts: string[] = Array.isArray(productImages) && productImages.length
       ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
       : (productImageB64 ? [String(productImageB64)] : [])
