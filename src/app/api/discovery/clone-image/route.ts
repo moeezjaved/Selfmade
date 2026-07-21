@@ -287,17 +287,20 @@ async function runGeneration(input: {
     // FINISHED clone works incredibly on Pro (verified). So when a recast is requested, chain that proven
     // second pass automatically: the user picks "Pakistani/Indian/…" once and receives the recast image
     // in one step — no manual tweak. Falls back to the un-recast clone if the pass fails.
+    let recastApplied: 'yes' | 'failed' | 'no' = wantsRecast ? 'failed' : 'no'
     if (wantsRecast && best) {
       try {
+        // EXACT proven wording from the tweak-box person edit (edit-image), which recasts reliably on Pro.
         const recastPrompt = [
-          `Edit this finished advertising image by RECASTING the person shown as a ${look} person.`,
-          `Fully replace the person — do NOT keep the original face or features. Keep IDENTICAL: their exact pose and body position, the camera framing and crop, the product (its exact container, label, colours and how it is held/placed), the background, ALL headline/subhead/logo text, and the lighting and overall style.`,
+          `Edit this advertising image by RECASTING the person shown. Apply this change to the person: "make the person ${/^[aeiou]/i.test(look) ? 'an' : 'a'} ${look} person".`,
+          `You MUST change the person's appearance accordingly — their ethnicity, skin tone, facial features and hair. Fully replace the model; do NOT keep the original person's face or features.`,
+          `Keep IDENTICAL: the pose and body position, camera framing and crop, the product (its exact shape, packaging, label and colours and how it is held), the background, all headline/subhead/logo text, and the overall lighting and style.`,
           `The result must look like the same ad reshot with a new ${look} model — natural and photorealistic, not a face swap.`,
-          `Output ONE photorealistic image at the same aspect ratio.`,
+          `Output ONE photorealistic, ad-ready image at the exact same aspect ratio, with legible text.`,
         ].join(' ')
         const recast = await generateImage(recastPrompt, [{ mimeType: best.mimeType, dataB64: best.dataB64 }], 'pro', { aspectRatio: resolvedAspect, imageSize })
         if (recast.ok && recast.dataB64) {
-          best = { mimeType: recast.mimeType, dataB64: recast.dataB64 }; usedModel = recast.model || usedModel
+          best = { mimeType: recast.mimeType, dataB64: recast.dataB64 }; usedModel = recast.model || usedModel; recastApplied = 'yes'
           console.log(`🎭 clone ${String(jobId).slice(0, 8)} auto-recast → ${look} (model=${recast.model})`)
         } else console.warn(`clone ${String(jobId).slice(0, 8)} recast pass failed (${recast.ok ? 'no image' : recast.error}) — shipping un-recast clone`)
       } catch (e: any) { console.warn(`clone recast pass error: ${e?.message} — shipping un-recast clone`) }
@@ -318,9 +321,9 @@ async function runGeneration(input: {
       // Persist the recast request + which model actually ran, so we can tell whether "make the person X"
       // is (a) reaching the server and (b) which model rendered it — no more guessing from the output.
       clone_meta: { tx_id: txId, image_size: imageSize, model: usedModel, ref_url: refUrl,
-        look: typeof look === 'string' && look ? look : 'match', recast: wantsRecast, model_tier: useTier },
+        look: typeof look === 'string' && look ? look : 'match', recast: wantsRecast, recast_applied: recastApplied, model_tier: useTier },
     }).eq('id', jobId)
-    console.log(`🖼 clone ${String(jobId).slice(0, 8)} look=${look || 'match'} recast=${wantsRecast} tier=${useTier} model=${usedModel}`)
+    console.log(`🖼 clone ${String(jobId).slice(0, 8)} look=${look || 'match'} recast=${wantsRecast} recast_applied=${recastApplied} tier=${useTier} model=${usedModel}`)
 
     if (userEmail) await sendFirstAdEmail(userId, userEmail, url).catch(() => {})
   } catch (e: any) {
