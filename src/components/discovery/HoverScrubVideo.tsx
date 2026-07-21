@@ -18,7 +18,6 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const vidRef = useRef<HTMLVideoElement>(null)
-  const pendingPlay = useRef(false)   // Play was clicked before the <video> mounted → play once it's ready
   const [hover, setHover] = useState(false)
   const [ready, setReady] = useState(false)      // metadata loaded → scrub + play available
   const [playing, setPlaying] = useState(false)
@@ -39,20 +38,11 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
     if (v && v.duration && isFinite(v.duration)) { try { v.currentTime = ratio * v.duration } catch { /* not seekable yet */ } }
   }
 
-  const doPlay = () => {
+  const play = (e: React.MouseEvent) => {
+    e.stopPropagation()
     const v = vidRef.current; if (!v) return
     setLoading(true); v.muted = false; v.currentTime = 0
     v.play().then(() => setPlay(true)).catch(() => { v.muted = true; v.play().then(() => setPlay(true)).catch(() => {}) })
-  }
-  const play = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    // The <video> mounts lazily (on hover). If Play is clicked before it mounts/loads — a quick click, or
-    // a trackpad where hover never fired — vidRef is null and the click was silently dropped ("won't
-    // play"). Mount it now and play the moment its metadata is ready (see onLoadedMetadata).
-    if (vidRef.current && ready) { doPlay(); return }
-    pendingPlay.current = true
-    setHover(true)      // mountVideo = hover || playing → forces the <video> into the DOM
-    setLoading(true)
   }
   const pause = (e: React.MouseEvent) => { e.stopPropagation(); vidRef.current?.pause(); setPlay(false) }
 
@@ -79,7 +69,7 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
       {/* lazily-mounted video */}
       {mountVideo && (
         <video ref={vidRef} key={src} src={src} muted playsInline preload="metadata"
-          onLoadedMetadata={() => { setReady(true); if (pendingPlay.current) { pendingPlay.current = false; doPlay() } }} onCanPlay={() => setLoading(false)} onWaiting={() => setLoading(true)} onError={() => { pendingPlay.current = false; onError?.() }}
+          onLoadedMetadata={() => setReady(true)} onCanPlay={() => setLoading(false)} onWaiting={() => setLoading(true)} onError={() => onError?.()}
           onPlaying={() => setLoading(false)} onTimeUpdate={() => { if (playing) { const v = vidRef.current!; setProgress(v.duration ? v.currentTime / v.duration : 0) } }}
           onEnded={() => { setPlay(false); setProgress(0) }}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000', opacity: ready ? 1 : 0, transition: 'opacity .15s', zIndex: 2 }} />
