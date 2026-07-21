@@ -601,6 +601,12 @@ async function trimReference(url, id, opts = {}) {
     await ff(['-y', '-ss', String(start), '-i', inFile, '-t', String(dur),
       '-vf', "scale='if(gt(iw,ih),1280,-2)':'if(gt(iw,ih),-2,1280)'",
       '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', outFile])
+    // fal rejects reference videos under 2.0s ("video_duration_too_short", a 422 that fails the WHOLE
+    // job). When src_start sits near the end of the ad, ffmpeg produces a clip shorter than requested
+    // (e.g. 0.75s) even though we asked for more. Probe the real output length and bail (return null) so
+    // the caller falls back to prompt-only for that scene instead of crashing the entire render.
+    const outSecs = await probeDuration(outFile)
+    if (outSecs != null && outSecs < 2.1) { console.warn(`ref ${tag} only ${outSecs.toFixed(2)}s (<2.1s) — skipping motion-ref, prompt-only`); return null }
     const mp4 = await readFile(outFile)
     const key = `creatives/tmp/${id}-${tag}.mp4`
     await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: mp4, ContentType: 'video/mp4', CacheControl: 'public, max-age=86400' }))
