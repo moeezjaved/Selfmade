@@ -392,6 +392,36 @@ async function rewriteScenePrompt(originalPrompt, note, productDesc) {
   } catch { return `${originalPrompt} ${note}` }
 }
 
+// ── Make Cinematic behave like UGC: the VOICE must cover the whole video. The drafted faithful script
+// was paced to the SOURCE creator's slow rate (~1 word/sec — long silent b-roll), but our TTS reads
+// ~2.6 wps, so it finished at ~1/3 and the dead-air guard chopped the rest of the (paid-for) footage.
+// Expand the script to ~targetSecs of natural narration at the TTS rate so VO ≈ video length: no trim,
+// full narration, cost matches output. Only expands when it's >15% too short. Fail-open. ──
+const TTS_WPS = 2.6
+async function fillScriptToLength(script, targetSecs, lang, productName) {
+  if (!OPENAI_KEY || !script) return script
+  const secs = Math.max(8, Math.min(60, Number(targetSecs) || 0))
+  const words = String(script).trim().split(/\s+/).filter(Boolean).length
+  const needWords = Math.round(secs * TTS_WPS)
+  if (words >= needWords * 0.85) return script   // already fills the video
+  try {
+    const L = langName(lang)
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OPENAI_MODEL, max_tokens: 600, temperature: 0.6, response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: `You are scripting a ~${Math.round(secs)}-second social-ad voiceover${lang && lang !== 'en' ? ` in ${L} (natural native ad copy, code-switch English product words where a real creator would)` : ''} for ${productName || 'the product'}.\n\nCurrent script (too short — it only fills ~${Math.round(words / TTS_WPS)}s):\n"${String(script).replace(/"/g, "'")}"\n\nRewrite it to about ${needWords} words so it fills ~${Math.round(secs)} seconds of natural spoken narration. Keep the SAME product, the same core message and any claims, in the same order — but develop it into a complete ad arc: hook → the problem → introduce the product → how you use it → the benefit → a short call to action. Punchy, real, creator/UGC tone. No filler, no repetition, no stage directions or on-screen-text. Return ONLY JSON: {"script":"..."}` }],
+      }),
+    })
+    if (!r.ok) return script
+    const j = await r.json()
+    const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
+    const s = typeof out.script === 'string' && out.script.trim() ? out.script.trim() : script
+    if (s !== script) console.log(`📝 ${productName || ''} script paced ${words}→${s.trim().split(/\s+/).filter(Boolean).length} words for ~${Math.round(secs)}s VO`)
+    return s
+  } catch { return script }
+}
+
 // ── Creator-look override: the user can recast the on-camera creator(s) to a chosen ethnicity/look
 // (Pakistani / Indian / Arab / …) while keeping everything else from the reference. 'match' (or empty)
 // = today's behavior: copy the reference creator exactly. ──
@@ -495,11 +525,13 @@ async function buildScenePlan(beat, product, nImages, nScenes, look, voiceover, 
   const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). The reference ad is a MULTI-SCENE / B-roll style ad. Clone it FAITHFULLY, scene by scene — this is a CLONE of its edit structure, not a talking-head rewrite.
 Rules:
 - Map the beat sheet's beats (in the "beats" array) onto EXACTLY ${nScenes} scenes, IN ORDER, covering the ad's full arc (hook first). Each scene must RECREATE a specific reference beat — its subject, its action, its shot type — not invent a new one. If there are more beats than scenes, group adjacent beats; if fewer, expand the strongest beats. Each scene = one continuous shot.
-- THE HOOK IS SACRED: scene 1 MUST recreate the reference's OPENING beat and start at src_start=0 — that's the attention hook (often a person / problem moment) and the reason the ad works. NEVER drop or skip the first beats. When there are more beats than scenes, MERGE adjacent beats into one continuous shot; dropping a beat that contains PEOPLE while keeping product-only beats is FORBIDDEN — people beats carry the story.
+- THE HOOK IS SACRED: scene 1 MUST recreate the reference's OPENING beat and start at src_start=0 — that's the attention hook (often a person / problem moment) and the reason the ad works. NEVER drop or skip the first beats. When there are more beats than scenes, MERGE adjacent beats into one continuous shot; dropping a beat that contains PEOPLE while keeping product-only beats is FORBIDDEN — people beats carry the story. If scene 1 shows a person, they FACE the camera with a clear expression/reaction (the reaction IS the hook) — never shot from behind or faceless.
 - Per scene, write ONE dense Seedance prompt that reproduces THAT reference beat: subject → the exact action from the beat → camera (copy the reference's framing/movement) → lighting → mood. Stay faithful to what the reference actually shows in that beat (e.g. a couple close-up stays a couple close-up; a gym shot stays a gym shot). Cinematic b-roll, lifestyle moments and product close-ups are all allowed — do NOT force anyone to talk to camera, and do NOT drift to a generic studio.
 - ACTION IS MANDATORY: name a SPECIFIC continuous on-camera MOTION the subject performs from the reference beat — ${isService ? 'talking to camera, gesturing, using a phone/laptop, or a lifestyle action (walking, working, relaxing)' : 'applying/rolling/massaging the product onto skin or scalp, spraying, pumping, drinking, swatching, demonstrating — never a person merely standing and holding the product still'}. Write it as an active verb the video model can animate.
 ${productBlock}
 - PEOPLE — when a scene has people, ${recast ? `recast them as ${look} in appearance (user's explicit choice), keeping the reference's age range, wardrobe style and energy` : `copy the reference people EXACTLY — gender, age, ethnicity, hair, wardrobe, energy${beat && beat.avatar ? ` (the reference creator is: ${String(beat.avatar).replace(/"/g, "'")})` : ' (from the beat sheet)'}. Describe them explicitly in the prompt (e.g. 'a woman in her 30s with long red hair and glasses'), never just 'a person' — an undescribed person comes out as a random creator`}.
+- CREATURE/SPECIES LOCK: if the ad features a specific animal or pest (lizard/gecko, cockroach, rat, mosquito, ant…), every scene must show the EXACT same common species at its real size — a small house gecko (7–12cm, slender, grey/tan) stays a small house gecko, NEVER a large pet reptile (bearded dragon, iguana, chameleon). Same for any creature: match the reference's species and scale, never a bigger or exotic look-alike.
+- CLEAN ENVIRONMENT: keep the home/room/surfaces clean, bright and tidy — the PEST or problem is the only thing wrong. Do NOT add dirt, grime, stains, spilled food, smears or squalor unless the reference explicitly shows a filthy scene. A gross-looking home undercuts a product that promises a clean, protected home.
 ${productTruthRule(product, isService)}
 ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera speech (ambience/music energy only). Design the visuals to fit this voiceover's arc, in order: "${String(voiceover).replace(/"/g, "'")}". Put the chunk each scene covers in its "script" field for reference only — do NOT write spoken dialogue into the prompt.` : '- No dialogue — scenes are music/ambience-driven b-roll. Leave "script" empty.'}
 - Per scene pick "duration": 5 for a quick cut, 10 for a longer beat (numbers only).
@@ -1823,8 +1855,12 @@ async function generateJob(job) {
           return withEndCard(cut, meta, job.id, tag, tmp)
         }
 
+        // Pace the voiceover to the FULL stitched length so the voice covers the whole ad (UGC-style)
+        // instead of finishing early and getting the tail trimmed. Expanded once, reused by every cut.
+        const vidSecs = scenes.reduce((a, s) => a + (Number(s.duration) || 5), 0)
+        const voScript = await fillScriptToLength(finalScript, vidSecs, meta.language, meta.product_details?.name)
         await prog('Stitching + voiceover…', 86, 30)
-        const main = await assemble(files, finalScript, 'main')
+        const main = await assemble(files, voScript, 'main')
         await prog('Finishing up…', 95, 12)
         let ovMain = await burnOverlays(main.file, meta.overlays, job.id); tmp.push(ovMain);
         // Service/app only: drop the user's real screenshots into the app-demo beats (physical untouched).
@@ -1835,14 +1871,14 @@ async function generateJob(job) {
           if (main.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
           else await rpc('refund_credits', { p_tx: meta.end_card.tx })
         }
-        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: finalScript, fal_cost_est: +falCost.toFixed(2), ...(meta.hook_variants_tx ? { hook_label: 'Original hook' } : {}) } })
+        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: voScript, final_script: voScript, fal_cost_est: +falCost.toFixed(2), ...(meta.hook_variants_tx ? { hook_label: 'Original hook' } : {}) } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'faithful', scenes: scenes.length, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (faithful, ${scenes.length} scenes) ${job.id} → ${url}`)
 
         // ── EXTRA LANGUAGES: transcreate + new TTS over the SAME rendered visuals → own creative. ──
         for (const ex of (Array.isArray(meta.extra_langs) ? meta.extra_langs : [])) {
           try {
-            const script2 = await transcreateScript(finalScript || meta.script || '', ex.lang)
+            const script2 = await transcreateScript(voScript || meta.script || '', ex.lang)
             const cut = await assemble(files, script2, `lang-${ex.lang}`)
             const url2 = await uploadVideo(cut.file, `creatives/${job.user_id}/${job.id}-${ex.lang}.mp4`)
             await insertRow({ user_id: job.user_id, parent_id: job.id, type: 'video_clone', media_type: 'video', status: 'done', tier: job.tier || 'pro', prompt: `clone · ${ex.lang}`, image_url: url2, clone_meta: { language: ex.lang, script: script2, variant_of: job.id, variant: `lang-${ex.lang}` } })

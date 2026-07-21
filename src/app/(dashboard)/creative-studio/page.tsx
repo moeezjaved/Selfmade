@@ -413,7 +413,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                     {rangeValid && (markTo! - markFrom!) > 5 && (
                       <div style={{ fontSize: 11, color: '#b45309' }}>That&apos;s {secLbl(markTo! - markFrom!)}s — a patch covers up to 5s, so we&apos;ll patch the first 5s ({secLbl(markFrom!)}–{secLbl(markFrom! + 5)}). For a longer stretch, use &quot;Re-shoot a whole section&quot; below.</div>
                     )}
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>Replaces those seconds with a clean product close-up (up to 5s) — the voiceover keeps playing, the rest is untouched. Best for a wrong cap/label/look for a moment.</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af' }}>Quick patch: replaces those seconds with a clean product close-up (up to 5s), voiceover keeps playing. Best for a wrong cap/label for a moment. To change what actually happens in a scene, use <b>“Change a scene”</b> below.</div>
 
                     {/* SECONDARY — bigger fixes (whole section / whole clip) */}
                     {tw?.segmentTweakable && (tw.segments?.length || 0) > 0 && (
@@ -454,24 +454,26 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                       </details>
                     )}
                     {tw?.tweakable && (tw.scenes?.length || 0) > 0 && (
-                      <details style={{ marginTop: 4, borderTop: '1px dashed #e5e7eb', paddingTop: 10 }}>
-                        <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#374151' }}>Re-shoot a whole scene</summary>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                      <details open style={{ marginTop: 4, borderTop: '2px solid #eef5eb', paddingTop: 12 }}>
+                        <summary style={{ fontSize: 13, fontWeight: 800, cursor: 'pointer', color: '#1a3a1a' }}>✏️ Change a scene — just describe it</summary>
+                        <div style={{ fontSize: 11.5, color: '#6b7280', margin: '8px 0 6px', lineHeight: 1.5 }}>Pick the scene, type what you want in plain words, and we turn it into a great edit. This re-films the whole scene — best for a wrong action, setting or look.</div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
                           {tw.scenes.map((s, i) => <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={pill(twSel === i)}>Scene {i + 1} · {s.duration}s</button>)}
                         </div>
                         {twSel != null && (<>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                            {[['size', 'Too big/small'], ['product', 'Product wrong'], ['action', 'Wrong action'], ['person', 'Person off'], ['closeup', 'Close-up'], ['redo', 'Redo']].map(([k, label]) => (
-                              <button key={k} onClick={() => setTwChip(twChip === k ? null : k)} style={pill(twChip === k)}>{label}</button>
-                            ))}
-                            {tw.scenes.length > 2 && <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...pill(false), color: '#15803d' }}>Remove · free</button>}
-                          </div>
-                          {/* Free-text: describe the new scene in plain words — we rewrite it into a clean
-                              instruction for the video model. Optional; pairs with a chip above. */}
-                          <textarea value={twNote} onChange={(e) => setTwNote(e.target.value)} rows={2}
-                            placeholder="Describe the change in plain words — e.g. “she sprays it at the gecko on the wall and it drops off”. We turn this into a great edit."
-                            style={{ ...input, width: '100%', resize: 'vertical', marginTop: 8, fontSize: 12.5 }} />
-                          <button disabled={!twChip && !twNote.trim()} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: twChip || 'redo', note: twNote.trim() || undefined })} style={{ ...primary, marginTop: 8, opacity: (twChip || twNote.trim()) ? 1 : 0.45, cursor: (twChip || twNote.trim()) ? 'pointer' : 'not-allowed' }}>✨ Redo scene {twSel + 1} · 600cr</button>
+                          <textarea value={twNote} onChange={(e) => setTwNote(e.target.value)} rows={3}
+                            placeholder="Describe the new scene in plain words — e.g. “she sprays it at the gecko on the wall from arm’s length and it drops off the wall”. We rewrite it into a great edit."
+                            style={{ ...input, width: '100%', resize: 'vertical', marginTop: 10, fontSize: 13 }} />
+                          <details style={{ marginTop: 6 }}>
+                            <summary style={{ fontSize: 11.5, color: '#6b7280', cursor: 'pointer' }}>…or tap a quick fix instead of typing</summary>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                              {[['size', 'Too big/small'], ['product', 'Product wrong'], ['action', 'Wrong action'], ['person', 'Person off'], ['closeup', 'Close-up'], ['redo', 'Redo']].map(([k, label]) => (
+                                <button key={k} onClick={() => setTwChip(twChip === k ? null : k)} style={pill(twChip === k)}>{label}</button>
+                              ))}
+                              {tw.scenes.length > 2 && <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...pill(false), color: '#15803d' }}>Remove · free</button>}
+                            </div>
+                          </details>
+                          <button disabled={!twChip && !twNote.trim()} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: twChip || 'redo', note: twNote.trim() || undefined })} style={{ ...primary, marginTop: 8, opacity: (twChip || twNote.trim()) ? 1 : 0.45, cursor: (twChip || twNote.trim()) ? 'pointer' : 'not-allowed' }}>✨ Redo scene {twSel + 1} · 600 cr</button>
                         </>)}
                       </details>
                     )}
