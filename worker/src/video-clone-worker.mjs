@@ -1623,6 +1623,15 @@ async function analyzeJob(job) {
         }
       } catch (e) { console.warn(`cut-detect ${job.id}:`, e.message) }
     }
+    // FAITHFUL/Cinematic only: the video length matches the source (~srcSecs across `scenes` shots), but
+    // the drafted script was paced to the source creator's SLOW speaking rate → too short to cover it
+    // (e.g. 31s of words under 50s of scenes). Pace it to the video length NOW so the REVIEW screen shows
+    // the real full-length script the user reads/edits/approves — WYSIWYG, no surprise expansion at render
+    // (the generate-time fill sees it already fits and leaves it alone). UGC keeps its short script.
+    if (cinematic) {
+      const paced = await fillScriptToLength(script, srcSecs, meta.language, meta.product_details?.name)
+      if (paced && paced.trim()) script = paced
+    }
     // Auto-detect + adapt the ad's on-screen text callouts (25g PROTEIN, price, CTA…) for the user's
     // product — shown editable in the review UI, burned on after the render (best-effort, never blocks).
     const overlays = await adaptOverlays(beat && beat.on_screen_text, productDetails, meta.brand_name).catch(() => [])
