@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { jobId, script, mode, durationBucket, extraLangs, endCard, hookVariants, overlays } = await req.json().catch(() => ({}))
+  const { jobId, script, mode, durationBucket, sceneCount, extraLangs, endCard, hookVariants, overlays } = await req.json().catch(() => ({}))
   if (!jobId) return NextResponse.json({ error: 'jobId required' }, { status: 400 })
 
   const admin = createAdminClient()
@@ -31,7 +31,13 @@ export async function POST(req: NextRequest) {
   // scene count via the video_clone_xN credit_pricing rows). Scene count is server-side (worker's
   // analysis), clamped 2-4, so the client can't pick a cheaper row than the work costs.
   const chosenMode = mode === 'faithful' ? 'faithful' : 'ugc'
-  const nScenes = Math.max(2, Math.min(10, Number(meta.scene_count) || 2))
+  // Cinematic length follows the user's script: the client sends how many scenes cover the narration.
+  // Clamp to [2, the source ad's analysed cut count] — the client can pick FEWER (shorter/cheaper, less
+  // work) but never MORE than the source has (that ceiling keeps pricing honest). Stored back into
+  // scene_count so the worker renders exactly this many.
+  const srcMaxScenes = Math.max(2, Math.min(10, Number(meta.scene_count) || 2))
+  const reqScenes = Number(sceneCount)
+  const nScenes = Number.isFinite(reqScenes) ? Math.max(2, Math.min(srcMaxScenes, Math.round(reqScenes))) : srcMaxScenes
 
   // UGC length buckets: 15s = 1 clip (classic), 30s = 2 chained segments, 60s = 4. 'match' auto-picks
   // the nearest bucket from the source ad's analysed duration. Segments are priced by the same
