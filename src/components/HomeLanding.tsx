@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import PricingSection from '@/components/pricing/PricingSection'
 import LandingHero from '@/components/motion/LandingHero'
+import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
 const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
 
@@ -168,6 +169,16 @@ const SHOWCASE: { brand: string; source: string; made: string }[] = [
   { brand: 'ZIBAL — apparel', source: `${R2_}/thumbs/ff81fe1fe01fe00fe00fe007e007e003e443e003e003e003e013e003e003e003.webp`, made: `${R2_}/creatives/1e0d60d8-1d9b-4f23-b507-0accd2c3782f/00077381-6b5a-4c3b-ac6f-25e39ea76752.jpg` },
 ]
 
+/** One showcase cell — a Discovery-style player (lime play button + white scrub line) for videos, an
+ * image otherwise. Fills its square; blank placeholder only if there's genuinely nothing to show. */
+function ShowMedia({ url, poster, isVideo, ring, alt }: { url: string | null; poster: string | null; isVideo: boolean; ring: boolean; alt: string }) {
+  const box: React.CSSProperties = { position: 'relative', width: '100%', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', border: ring ? `2px solid ${LIME}` : '1px solid #eef0ee', background: '#0d120e' }
+  if (isVideo && url) return <div style={box}><HoverScrubVideo src={url} poster={poster || undefined} /></div>
+  const img = poster || url
+  if (img) return <div style={box}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={img} alt={alt} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+  return <div style={{ ...box, background: '#f6f7f5' }} />
+}
+
 export default function HomeLanding() {
   const marqueeGrad = ['#c7f0a3', '#bfe0ff', '#f7c9e8', '#ffe6b0', '#d7c9ff', '#a8e63d', '#7fb8f5', '#ec8fd0', '#f5c15c', '#a98ff0']
   const [ads, setAds] = useState<string[]>([])
@@ -193,7 +204,7 @@ export default function HomeLanding() {
   const marqueeAds = ads.slice(6, 6 + 12)
   // "Made with Selfmade" showcase — admin-featured creatives (image + video) via /api/showcase.
   // Falls back to the curated SHOWCASE consts so the section is never empty before anything's featured.
-  type Show = { brand: string | null; source: string | null; made: string; video: boolean }
+  type Show = { brand: string | null; source: string | null; made: string; video: boolean; sourceVideo?: string | null }
   const [showcase, setShowcase] = useState<Show[]>(SHOWCASE.map(s => ({ ...s, video: false })))
   useEffect(() => {
     fetch('/api/showcase').then(r => r.json())
@@ -469,18 +480,12 @@ export default function HomeLanding() {
             <div key={s.made || i} className="lift" style={{ background: '#fff', border: '1px solid #e9edf2', borderRadius: 16, padding: 14, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ flex: 1, textAlign: 'center' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {s.source
-                    ? <img src={s.source} alt="source winning ad" loading="lazy" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: '1px solid #eef0ee', background: '#f6f7f5' }} />
-                    : <div style={{ width: '100%', aspectRatio: '1', borderRadius: 10, background: '#f6f7f5', border: '1px solid #eef0ee' }} />}
+                  <ShowMedia url={s.sourceVideo || null} poster={s.source} isVideo={!!s.sourceVideo} ring={false} alt="source winning ad" />
                   <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.04em', color: '#9ca3af', marginTop: 6, textTransform: 'uppercase' }}>Winning ad</div>
                 </div>
                 <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: '50%', background: LIME, color: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16 }}>→</div>
                 <div style={{ flex: 1, textAlign: 'center' }}>
-                  {s.video
-                    ? <video src={s.made} muted loop autoPlay playsInline style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: `2px solid ${LIME}`, background: '#0d120e' }} />
-                    // eslint-disable-next-line @next/next/no-img-element
-                    : <img src={s.made} alt="remade with Selfmade" loading="lazy" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: `2px solid ${LIME}` }} />}
+                  <ShowMedia url={s.made} poster={s.video ? null : s.made} isVideo={s.video} ring alt="remade with Selfmade" />
                   <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', color: GREEN, marginTop: 6, textTransform: 'uppercase' }}>Your remake{s.video ? ' · video' : ''}</div>
                 </div>
               </div>

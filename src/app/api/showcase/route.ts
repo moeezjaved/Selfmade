@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const admin = createAdminClient()
     const { data: rows } = await admin.from('creative_generations')
-      .select('id, image_url, media_type, source_ad_id, brand_id, created_at')
+      .select('id, image_url, media_type, source_ad_id, source_video_url, brand_id, created_at, clone_meta')
       .eq('featured_on_landing', true).eq('status', 'done').not('image_url', 'is', null)
       .order('created_at', { ascending: false }).limit(12)
     const list = (rows || []) as any[]
@@ -32,13 +32,23 @@ export async function GET() {
       if (t) srcThumb.set(c.ad_id, t)
     }
 
-    const items = list.map((r) => ({
-      id: r.id,
-      made: r.image_url as string,
-      video: (r.media_type || 'image') === 'video',
-      source: r.source_ad_id ? srcThumb.get(r.source_ad_id) || null : null,
-      brand: r.brand_id ? brandMap[r.brand_id] || null : null,
-    }))
+    const items = list.map((r) => {
+      const meta = (r.clone_meta || {}) as any
+      // Source (the WINNING AD): video clones store the real competitor video in source_video_url;
+      // image clones store the source ad IMAGE in clone_meta.ref_url. Fall back to the discovery
+      // thumbnail. This is why the left tile was blank — none of these were being used.
+      const sourceVideo = typeof r.source_video_url === 'string' && /^https?:/.test(r.source_video_url) ? r.source_video_url : null
+      const sourcePoster = (r.source_ad_id ? srcThumb.get(r.source_ad_id) : null)
+        || (typeof meta.ref_url === 'string' && /^https?:/.test(meta.ref_url) ? meta.ref_url : null) || null
+      return {
+        id: r.id,
+        made: r.image_url as string,
+        video: (r.media_type || 'image') === 'video',   // the remake is a video
+        source: sourcePoster,                            // poster/image for the winning ad
+        sourceVideo,                                     // real winning-ad video (if the source was video)
+        brand: r.brand_id ? brandMap[r.brand_id] || null : null,
+      }
+    })
     return NextResponse.json({ items })
   } catch {
     return NextResponse.json({ items: [] })
