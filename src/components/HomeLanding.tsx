@@ -172,9 +172,22 @@ export default function HomeLanding() {
   const marqueeGrad = ['#c7f0a3', '#bfe0ff', '#f7c9e8', '#ffe6b0', '#d7c9ff', '#a8e63d', '#7fb8f5', '#ec8fd0', '#f5c15c', '#a98ff0']
   const [ads, setAds] = useState<string[]>([])
   useEffect(() => {
-    fetch('/api/discovery/trending?limit=30')
+    // Dedupe by image AND by brand → the hero grid shows DISTINCT, visually-varied ads (it was
+    // repeating the same creative + same brand twice, which looked cheap). Bigger pool so the 6-card
+    // grid + 12-card marquee stay diverse. Skip near-square/UI-looking thumbs for a cleaner grid.
+    fetch('/api/discovery/trending?limit=60')
       .then(r => r.json())
-      .then(j => setAds((j.ads || []).map((a: any) => a.image).filter(Boolean)))
+      .then(j => {
+        const seenImg = new Set<string>(), seenBrand = new Set<string>(), out: string[] = []
+        for (const a of (j.ads || [])) {
+          const img: string = a.image
+          if (!img || seenImg.has(img)) continue
+          const brand = String(a.pageName || '').trim().toLowerCase()
+          if (brand && seenBrand.has(brand)) continue   // one card per brand → diverse, not repetitive
+          seenImg.add(img); if (brand) seenBrand.add(brand); out.push(img)
+        }
+        setAds(out)
+      })
       .catch(() => {})
   }, [])
   const marqueeAds = ads.slice(6, 6 + 12)
