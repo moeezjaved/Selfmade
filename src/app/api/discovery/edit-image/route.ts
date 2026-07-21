@@ -29,12 +29,35 @@ async function toB64(src: string, fallbackMime = 'image/png'): Promise<{ mimeTyp
   return null
 }
 
+// Does the instruction ask to change the PERSON/model (ethnicity, skin tone, age, gender, hair,
+// wardrobe, "make them look…")? If so we must NOT tell the model to keep the person identical — the
+// image model preserves faces aggressively, so a generic "keep everything identical" silently cancels
+// the recast. We instead give it explicit permission to recast the model while locking pose/product.
+function isPersonEdit(instruction: string): boolean {
+  const s = instruction.toLowerCase()
+  const re = /\b(person|people|model|man|men|woman|women|lady|ladies|guy|guys|girl|boy|male|female|actor|actress|talent|human|face|skin|ethnicit|ethnic|race|nationality|complexion|age|older|younger|elderly|teen|hair|beard|hijab|wardrobe|outfit|clothes|clothing|dress|desi|south\s?asian|pakistan|indian|asian|african|black|white|caucasian|arab|middle\s?eastern|latin|hispanic|europ|brown|dark\s?skin|light\s?skin)\b/i
+  return re.test(s)
+}
+
 function buildEditPrompt(instruction: string): string {
+  const common = [
+    `Output ONE photorealistic, ad-ready image at the exact same aspect ratio, with legible text.`,
+  ]
+  if (isPersonEdit(instruction)) {
+    // Recast the talent. Lock everything that must stay, but explicitly ALLOW the person to change.
+    return [
+      `Edit this advertising image by RECASTING the person shown. Apply this change to the person: "${instruction}".`,
+      `You MUST change the person's appearance accordingly — this may include their ethnicity, skin tone, facial features, age, hair, and wardrobe. Fully replace the model; do NOT keep the original person's face or features if the instruction calls for a different look.`,
+      `Keep IDENTICAL: the pose and body position, camera framing and crop, the product (its exact shape, packaging, label, and colors and how it is held/placed), the background, all headline/subhead/logo text, and the overall lighting and style.`,
+      `The result must look like the same ad reshot with a new model — natural and photorealistic, not a face swap.`,
+      ...common,
+    ].join(' ')
+  }
   return [
     `Edit this advertising image. Apply ONLY this change: "${instruction}".`,
-    `Keep EVERYTHING else identical — the layout, composition, product (its exact shape, packaging, label, and colors), all other text, and the overall style.`,
+    `Keep EVERYTHING else identical — the person, layout, composition, product (its exact shape, packaging, label, and colors), all other text, and the overall style.`,
     `Do not redesign or restyle anything that the instruction did not ask to change.`,
-    `Output ONE photorealistic, ad-ready image at the same aspect ratio, with legible text.`,
+    ...common,
   ].join(' ')
 }
 
