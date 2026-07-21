@@ -11,6 +11,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2 } from 'lucide-react'
 import { creativeFilename } from '@/lib/filename'
+import toast from 'react-hot-toast'
 import { refreshCredits, useCredits } from '@/components/credits/CreditCounter'
 import { imagesAreFree } from '@/lib/plans'
 import StudioModal from '../discovery/StudioModal'
@@ -86,8 +87,12 @@ function Generations() {
   // A draft has no output yet — clicking it should take the user back to the source ad to finish the
   // remake (drafts can't be generated from here). Falls back to Discovery if we don't have the source id.
   const openGen = (g: Gen) => {
-    if (g.status === 'processing') return
+    // Silent no-ops felt like "can't open the clone". Tell the user what's actually happening.
+    if (g.status === 'processing' || g.status === 'analyzing') { toast('Still generating — it’ll open here the moment it’s ready.'); return }
+    if (g.status === 'failed') { toast.error('This one failed to generate — you weren’t charged. Try remaking it again.'); return }
     if (g.image_url) { setOpen(g); return }
+    // No output yet (a video draft you started but never approved) → go finish it in Discovery.
+    toast('This is a draft — opening it in Discovery to finish the remake.')
     router.push(g.source_ad_id ? `/discovery/${g.source_ad_id}` : '/discovery')
   }
 
