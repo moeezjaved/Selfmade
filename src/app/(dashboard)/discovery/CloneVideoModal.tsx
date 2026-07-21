@@ -49,6 +49,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [voiceAccurate, setVoiceAccurate] = useState(false)  // use the previewed TTS voice in the render (word-perfect, looser lip-sync)
   const [gloss, setGloss] = useState<string | null>(null)   // English one-liner for non-English scripts
   const [previewing, setPreviewing] = useState(false)
+  const [rescripting, setRescripting] = useState(false)   // one-tap length picker re-pacing the script
   const [mode, setMode] = useState<'ugc' | 'faithful'>('ugc')
   const modeTouched = useRef(false)                    // user explicitly picked a look → don't let the auto-suggestion override it
   const [suggestedMode, setSuggestedMode] = useState<'ugc' | 'faithful'>('ugc')
@@ -146,6 +147,20 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // The TTS fetch can outlive Chrome's click-activation window, making audio.play() reject silently.
   // So: cache the fetched audio keyed by voice+sentence — if play is blocked, we tell the user to tap
   // again, and the second tap plays the CACHED audio instantly (inside a fresh click gesture).
+  // One-tap length picker (Cinematic): re-pace the script to a target seconds. Scene count + price then
+  // follow the new script automatically. Free — it's a pre-render helper like the draft script.
+  const setLength = async (secs: number) => {
+    if (rescripting || !draftScript.trim()) return
+    setRescripting(true)
+    try {
+      const r = await fetch('/api/discovery/clone-video/rescript', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ script: draftScript, targetSecs: secs, language, productName: productName.trim() || undefined }),
+      }).then((x) => x.json())
+      if (r.script) setDraftScript(r.script)
+    } catch { /* keep the current script */ } finally { setRescripting(false) }
+  }
+
   const previewCache = useRef<Map<string, string>>(new Map())
   const previewVoice = async (full = false) => {
     if (previewing) return
@@ -818,6 +833,17 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                           <input type="checkbox" checked={voiceAccurate} onChange={(e) => setVoiceAccurate(e.target.checked)} style={{ marginTop: 2 }} />
                           <span style={{ fontSize: 12, color: SEL_TEXT, lineHeight: 1.5 }}><b>Use this exact voice in the video</b> — what you hear in “Hear full script” is what ships (best for getting brand names &amp; tricky words right). Trade-off: slightly less-perfect lip-sync. Leave off for the tightest lip-sync (the creator&apos;s own voice).</span>
                         </label>
+                      )}
+                      {/* One-tap length picker (Cinematic): re-paces the script → scene count + price follow. */}
+                      {mode === 'faithful' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                          <span style={{ fontSize: 11.5, color: L_MUTED, fontWeight: 700 }}>Make it:</span>
+                          {[15, 30, 45, 60].filter((s) => s <= srcScenes * 5.5).map((s) => (
+                            <button key={s} onClick={() => setLength(s)} disabled={rescripting} style={{ ...chip(Math.abs(targetSecs - s) <= 3), padding: '5px 12px', fontSize: 12, opacity: rescripting ? 0.5 : 1, cursor: rescripting ? 'wait' : 'pointer' }}>{s}s</button>
+                          ))}
+                          {rescripting && <span style={{ fontSize: 11.5, color: GREEN, fontWeight: 700 }}>✍️ re-pacing…</span>}
+                          <span style={{ fontSize: 11, color: L_MUTED }}>· or just edit the script</span>
+                        </div>
                       )}
                       {words > 0 && (
                         mode === 'faithful' ? (
