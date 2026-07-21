@@ -74,11 +74,11 @@ export async function POST(req: NextRequest) {
   // Recasting the person (ethnicity/look) is the one edit the Pro model (gemini-3-pro-image) refuses —
   // it locks the input face. The standard Nano Banana reshoots the person reliably. So person edits
   // render on the standard model; billing/action still follow the requested tier.
-  const requestedTier: 'default' | 'pro' = tier === 'pro' ? 'pro' : 'default'
-  // TESTED 2026-07-21: Pro won't recast the person even with the strong prompt — so person edits render
-  // on the STANDARD model (reliable recast); billing/action still follow the requested tier.
-  const useTier: 'default' | 'pro' = isPersonEdit(String(instruction)) ? 'default' : requestedTier
-  const action = requestedTier === 'pro' ? 'image_edit_pro' : 'image_edit'
+  // DECISION 2026-07-21: everything renders on the requested (Pro) model — no standard-model fallback
+  // anywhere. Pro won't recast a person's ethnicity, but the user prefers Pro's fidelity over that one
+  // capability. isPersonEdit is kept only for the prompt wording (recast phrasing), not model routing.
+  const useTier: 'default' | 'pro' = tier === 'pro' ? 'pro' : 'default'
+  const action = useTier === 'pro' ? 'image_edit_pro' : 'image_edit'
 
   const admin = createAdminClient()
   const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: action })
