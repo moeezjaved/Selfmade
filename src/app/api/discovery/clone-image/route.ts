@@ -282,6 +282,27 @@ async function runGeneration(input: {
       return await fail("We couldn't finish this remake — please try again. If it keeps happening, tell us. You weren’t charged.", `gen_error: ${String(raw).slice(0, 300)}`)
     }
 
+    // AUTO-RECAST PIPELINE: clone-time recast fails on Pro — the clone prompt says "replicate the
+    // reference faithfully", so Pro clings to the original person. But a FOCUSED person-edit on the
+    // FINISHED clone works incredibly on Pro (verified). So when a recast is requested, chain that proven
+    // second pass automatically: the user picks "Pakistani/Indian/…" once and receives the recast image
+    // in one step — no manual tweak. Falls back to the un-recast clone if the pass fails.
+    if (wantsRecast && best) {
+      try {
+        const recastPrompt = [
+          `Edit this finished advertising image by RECASTING the person shown as a ${look} person.`,
+          `Fully replace the person — do NOT keep the original face or features. Keep IDENTICAL: their exact pose and body position, the camera framing and crop, the product (its exact container, label, colours and how it is held/placed), the background, ALL headline/subhead/logo text, and the lighting and overall style.`,
+          `The result must look like the same ad reshot with a new ${look} model — natural and photorealistic, not a face swap.`,
+          `Output ONE photorealistic image at the same aspect ratio.`,
+        ].join(' ')
+        const recast = await generateImage(recastPrompt, [{ mimeType: best.mimeType, dataB64: best.dataB64 }], 'pro', { aspectRatio: resolvedAspect, imageSize })
+        if (recast.ok && recast.dataB64) {
+          best = { mimeType: recast.mimeType, dataB64: recast.dataB64 }; usedModel = recast.model || usedModel
+          console.log(`🎭 clone ${String(jobId).slice(0, 8)} auto-recast → ${look} (model=${recast.model})`)
+        } else console.warn(`clone ${String(jobId).slice(0, 8)} recast pass failed (${recast.error}) — shipping un-recast clone`)
+      } catch (e: any) { console.warn(`clone recast pass error: ${e?.message} — shipping un-recast clone`) }
+    }
+
     // Upload to R2 and finalize the SAME job row (no second insert).
     const buf = Buffer.from(best.dataB64, 'base64')
     const ext = best.mimeType.includes('png') ? 'png' : best.mimeType.includes('webp') ? 'webp' : 'jpg'
