@@ -665,14 +665,9 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
                       <input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. 3-week hair fall challenge" style={{ ...input, width: '100%' }} />
                       <div style={{ fontSize: 11.5, color: L_FAINT, marginTop: 6 }}>💡 Your exact words = accurate on-image text. Otherwise the model writes (and sometimes misspells) its own.</div>
                     </div>
-                    <div className="field">
-                      <FieldLabel>If the ad shows a person <i style={{ fontStyle: 'normal', fontWeight: 500, color: L_FAINT }}>· keep them, or recast</i></FieldLabel>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {(['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic'] as const).map((v) => (
-                          <button key={v} onClick={() => setLook(v)} style={chip(look === v)}>{v === 'match' ? 'Match original' : v}</button>
-                        ))}
-                      </div>
-                    </div>
+                    {/* Recast chips removed: clone runs on Pro (product-accurate) and Pro won't reliably
+                        recast a person. Changing the person is a separate step in the tweak box on the
+                        finished ad. `look` stays 'match' so the clone keeps the original person. */}
                   </section>
                 )}
 
@@ -727,7 +722,6 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
                       <ReviewRow k="Brand" v={brandName} onEdit={() => setStep(0)} />
                       <ReviewRow k="Product photos" v={`${selectedPhotos.length} selected`} onEdit={() => setStep(1)} />
                       <ReviewRow k="Headline" v={headline.trim() || 'Auto-written'} onEdit={() => setStep(2)} />
-                      <ReviewRow k="On the image" v={look === 'match' ? 'Match the original' : look} onEdit={() => setStep(2)} />
                       <ReviewRow k="Shape & quality" v={`${aspect === 'original' ? 'Original' : aspect} · ${imageSize}`} onEdit={() => setStep(3)} last />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 14, padding: '14px 18px' }}>
