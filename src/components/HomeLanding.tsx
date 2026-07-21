@@ -437,12 +437,7 @@ export default function HomeLanding() {
       {/* ONE PLATFORM + testimonial */}
       <section style={{ ...wrap, padding: '20px 24px 40px' }}>
         <Panel grad="linear-gradient(135deg,#0e1b12,#12331f)" style={{ color: '#fff', textAlign: 'center', padding: '56px 40px' }}>
-          <svg width="220" height="70" viewBox="0 0 220 70" style={{ marginBottom: 8 }}>
-            {[15, 35, 55].map((y, i) => <path key={i} d={`M0 ${y}Q80 ${y} 110 35`} stroke={LIME} strokeWidth="2" fill="none" opacity=".5" />)}
-            {[15, 35, 55].map((y, i) => <path key={'r' + i} d={`M220 ${y}Q140 ${y} 110 35`} stroke={LIME} strokeWidth="2" fill="none" opacity=".5" />)}
-            <circle cx="110" cy="35" r="16" fill={LIME} className="soft-pulse" />
-          </svg>
-          <h2 style={{ fontSize: 'clamp(26px,4vw,40px)', fontWeight: 800, letterSpacing: '-.02em', margin: '4px auto 12px', maxWidth: 640 }}><Mask style={{ display: 'inline-block' }}>One platform for your <span style={{ fontStyle: 'italic', color: LIME }}>whole</span> ad workflow.</Mask></h2>
+          <h2 style={{ fontSize: 'clamp(26px,4vw,40px)', fontWeight: 800, letterSpacing: '-.02em', margin: '4px auto 12px', maxWidth: 640, color: '#fff' }}>One platform for your <span style={{ fontStyle: 'italic', color: LIME }}>whole</span> ad workflow.</h2>
           <p style={{ color: 'rgba(255,255,255,.72)', maxWidth: 560, margin: '0 auto 22px', fontSize: 16 }}>Stop stitching together a spy tool, a designer, and a launcher. Selfmade is all three — talking to each other.</p>
           <Link href="/signup" style={btnPrimary}>Start for free <Arrow /></Link>
           <div style={{ marginTop: 40, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 20, padding: 26, maxWidth: 620, margin: '40px auto 0', display: 'flex', gap: 16, alignItems: 'center', textAlign: 'left' }}>
