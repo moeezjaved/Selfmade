@@ -34,14 +34,26 @@ export async function GET(req: NextRequest) {
     for (const b of (bs || []) as any[]) names.set(b.id, b.name)
   }
 
-  // Attach a small "cloned from" thumbnail: the source ad's R2 poster/image. One batched lookup on
-  // discovery_creatives (permanent R2 urls) keyed by source_ad_id, so the gallery can show — subtly —
-  // which competitor ad each generation was cloned from, next to the output.
-  const srcIds = Array.from(new Set((data || []).map((g: any) => g.source_ad_id).filter(Boolean)))
+  // "Cloned from" thumbnail: the source ad's R2 poster/image. Edits (tweak-box results) have no source
+  // of their own — they're derived from a parent — so they showed a BLANK "Remade from". We resolve an
+  // edit's reference by walking up its parent chain to the original clone's source.
+  const rows: any[] = data || []
+  const byId = new Map<string, any>(rows.map((g) => [g.id, g]))
+  // Pull in any parent rows outside the recent window so an edit can still inherit its ancestor's source.
+  const missingParents = Array.from(new Set(rows.map((g) => g.parent_id).filter((pid: any) => pid && !byId.has(pid))))
+  if (missingParents.length) {
+    const { data: par } = await admin.from('creative_generations')
+      .select('id, source_ad_id, image_url, parent_id, clone_meta').in('id', missingParents as string[])
+    for (const p of (par || []) as any[]) if (!byId.has(p.id)) byId.set(p.id, p)
+  }
+
+  // One batched lookup on discovery_creatives (permanent R2 urls) keyed by source_ad_id, across every
+  // row we now hold (originals + fetched parents).
+  const srcIds = Array.from(new Set(Array.from(byId.values()).map((g: any) => g.source_ad_id).filter(Boolean)))
   const srcThumb = new Map<string, string>()
   if (srcIds.length) {
     const { data: cr } = await admin.from('discovery_creatives')
-      .select('ad_id, asset_type, r2_url, poster_url, position').in('ad_id', srcIds).order('position', { ascending: true })
+      .select('ad_id, asset_type, r2_url, poster_url, position').in('ad_id', srcIds as string[]).order('position', { ascending: true })
     for (const c of (cr || []) as any[]) {
       if (srcThumb.has(c.ad_id)) continue   // first (lowest-position) creative per ad
       const t = c.poster_url || (c.asset_type !== 'video' ? c.r2_url : null)
@@ -49,14 +61,28 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const creatives = (data || []).map((g: any) => {
+  // A generation's OWN source (discovery ad thumb, else the stored reference image).
+  const ownThumb = (g: any): string | null => (g.source_ad_id ? srcThumb.get(g.source_ad_id) || null : null) || g.clone_meta?.ref_url || null
+  // Resolve including the parent chain: an edit inherits the original ad it ultimately came from. If the
+  // chain has no discovery source at all (e.g. edit of an upload), fall back to the root ancestor's image.
+  const resolveThumb = (g: any): string | null => {
+    let cur = g
+    for (let depth = 0; cur && depth < 8; depth++) {
+      const own = ownThumb(cur)
+      if (own) return own
+      const parent = cur.parent_id ? byId.get(cur.parent_id) : null
+      if (!parent) return cur !== g ? cur.image_url || null : null
+      cur = parent
+    }
+    return null
+  }
+
+  const creatives = rows.map((g: any) => {
     const { clone_meta, ...rest } = g
     return {
       ...rest,
       brand_name: g.brand_id ? names.get(g.brand_id) || null : null,
-      // "Cloned from" thumbnail: the discovery source ad, else the stored reference image
-      // (asset/upload/Brand-Spy clones that have no source_ad_id).
-      source_thumb: (g.source_ad_id ? srcThumb.get(g.source_ad_id) : null) || clone_meta?.ref_url || null,
+      source_thumb: resolveThumb(g),
     }
   })
   return NextResponse.json({ creatives })
