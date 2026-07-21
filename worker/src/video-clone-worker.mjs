@@ -69,15 +69,47 @@ const BEAT_SCHEMA_PROMPT = `You are a UGC ad director. Watch this video ad and r
 - duration_seconds: the ad's real total length in seconds.
 - is_talking_head: true ONLY if a person ON CAMERA speaks the main audio to the viewer (lips visibly delivering it). A narrator VOICEOVER over b-roll/lifestyle/montage footage = false. Multiple scene cuts with no consistent on-camera speaker = false.`
 
+// Gemini's inline-video limit is ~20MB. Raw user uploads (phone video) routinely blow past it — and
+// returning null here silently gutted the whole remake: no beat sheet → generic 15s UGC script + the
+// real Whisper transcript discarded (that's the "14-second script" bug). So instead of skipping a big
+// video, downscale it with ffmpeg (720p / 15fps / first 90s — plenty for beats + talking-head + text)
+// until it fits, then analyse THAT. ffmpeg is already on the worker image.
+const GEMINI_INLINE_CAP = 19 * 1024 * 1024
+async function compressForAnalysis(buf, id) {
+  const inF = join(tmpdir(), `an-${id}.in.mp4`), outF = join(tmpdir(), `an-${id}.out.mp4`)
+  try {
+    await writeFile(inF, buf)
+    await ff(['-y', '-i', inF, '-t', '90', '-r', '15',
+      '-vf', "scale='if(gt(iw,ih),720,-2)':'if(gt(iw,ih),-2,720)'",
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '32', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-ac', '1', '-b:a', '48k', '-movflags', '+faststart', outF])
+    return await readFile(outF)
+  } finally {
+    await rm(inF, { force: true }).catch(() => {}); await rm(outF, { force: true }).catch(() => {})
+  }
+}
 async function analyzeVideo(videoUrl) {
   if (!GEMINI_KEY) return null
   const vr = await fetch(videoUrl)
   if (!vr.ok) throw new Error(`fetch source video ${vr.status}`)
-  const buf = Buffer.from(await vr.arrayBuffer())
-  if (buf.length > 19 * 1024 * 1024) { console.warn('video >19MB, skipping Gemini analysis'); return null }
+  let buf = Buffer.from(await vr.arrayBuffer())
+  let mime = vr.headers.get('content-type') || 'video/mp4'
+  if (buf.length > GEMINI_INLINE_CAP) {
+    const orig = buf.length
+    try {
+      const small = await compressForAnalysis(buf, `${Date.now()}`)
+      if (small && small.length <= GEMINI_INLINE_CAP) {
+        buf = small; mime = 'video/mp4'
+        console.log(`🗜 analyze: downscaled ${(orig / 1e6).toFixed(1)}MB → ${(small.length / 1e6).toFixed(1)}MB for Gemini`)
+      } else {
+        console.warn(`analyze: still ${((small?.length || orig) / 1e6).toFixed(1)}MB after downscale — skipping Gemini`)
+        return null
+      }
+    } catch (e) { console.warn('analyze downscale failed:', e.message); return null }
+  }
   const body = {
     contents: [{ parts: [
-      { inline_data: { mime_type: vr.headers.get('content-type') || 'video/mp4', data: buf.toString('base64') } },
+      { inline_data: { mime_type: mime, data: buf.toString('base64') } },
       { text: BEAT_SCHEMA_PROMPT },
     ] }],
     generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
