@@ -429,10 +429,15 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                           <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...chip(false), fontSize: 11.5, color: GREEN, borderColor: SEL_BORDER }}>Remove scene · free</button>
                         )}
                       </div>
+                      {/* Free-text: describe the new scene in plain words — we rewrite it into a clean
+                          instruction the video model executes well. Optional; pairs with a chip. */}
+                      <textarea value={twNote} onChange={(e) => setTwNote(e.target.value)} rows={2}
+                        placeholder="Or describe it in plain words — e.g. “she sprays it at the gecko on the wall and it drops off”. We turn this into a great edit."
+                        style={{ ...input, width: '100%', resize: 'vertical', marginBottom: 8, fontSize: 12.5 }} />
                       <button
-                        disabled={!twChip}
-                        onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: twChip || 'redo' })}
-                        style={{ ...btnPrimary, marginBottom: 8, padding: '9px 16px', fontSize: 12.5, opacity: twChip ? 1 : 0.45, cursor: twChip ? 'pointer' : 'not-allowed' }}>
+                        disabled={!twChip && !twNote.trim()}
+                        onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: twChip || 'redo', note: twNote.trim() || undefined })}
+                        style={{ ...btnPrimary, marginBottom: 8, padding: '9px 16px', fontSize: 12.5, opacity: (twChip || twNote.trim()) ? 1 : 0.45, cursor: (twChip || twNote.trim()) ? 'pointer' : 'not-allowed' }}>
                         ✨ Redo scene {twSel + 1} with this fix · 600 cr
                       </button>
                     </>)}

@@ -466,7 +466,12 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
                             ))}
                             {tw.scenes.length > 2 && <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...pill(false), color: '#15803d' }}>Remove · free</button>}
                           </div>
-                          <button disabled={!twChip} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: twChip || 'redo' })} style={{ ...primary, marginTop: 8, opacity: twChip ? 1 : 0.45, cursor: twChip ? 'pointer' : 'not-allowed' }}>✨ Redo scene {twSel + 1} · 600cr</button>
+                          {/* Free-text: describe the new scene in plain words — we rewrite it into a clean
+                              instruction for the video model. Optional; pairs with a chip above. */}
+                          <textarea value={twNote} onChange={(e) => setTwNote(e.target.value)} rows={2}
+                            placeholder="Describe the change in plain words — e.g. “she sprays it at the gecko on the wall and it drops off”. We turn this into a great edit."
+                            style={{ ...input, width: '100%', resize: 'vertical', marginTop: 8, fontSize: 12.5 }} />
+                          <button disabled={!twChip && !twNote.trim()} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: twChip || 'redo', note: twNote.trim() || undefined })} style={{ ...primary, marginTop: 8, opacity: (twChip || twNote.trim()) ? 1 : 0.45, cursor: (twChip || twNote.trim()) ? 'pointer' : 'not-allowed' }}>✨ Redo scene {twSel + 1} · 600cr</button>
                         </>)}
                       </details>
                     )}

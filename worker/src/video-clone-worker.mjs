@@ -365,6 +365,33 @@ async function applyFixNote(script, note, lang) {
   } catch { return script }
 }
 
+// ── Intelligent scene re-shoot: turn the user's PLAIN-LANGUAGE fix into a clean, filmable Seedance
+// prompt. Pasting the user's words raw gives mushy output; instead gpt-4o REWRITES the scene's video
+// prompt to incorporate exactly what they asked — as concrete visible action + camera language a video
+// model executes well — while keeping the same creator, setting, framing and product. Things video
+// models render badly (a clearly dead animal, gore, on-screen text) are translated to the closest
+// achievable visible action (recoils, loses grip, drops out of frame). ~1¢, fail-open. ──
+async function rewriteScenePrompt(originalPrompt, note, productDesc) {
+  if (!OPENAI_KEY || !note || !originalPrompt) return note ? `${originalPrompt} ${note}` : originalPrompt
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OPENAI_MODEL, max_tokens: 400, temperature: 0.4,
+        messages: [
+          { role: 'system', content: `You rewrite ONE scene's text-to-video prompt for an ad remake. The user describes, in plain everyday words, what they want changed about this scene. Rewrite the prompt so it STILL recreates the same creator, setting, framing style and product (${productDesc || "the user's product"}), but incorporates the user's change as CONCRETE, FILMABLE action and camera language a video model can actually execute. Rules: ONE dense paragraph; describe visible motion literally (what moves, how fast, and where the camera is); keep the product EXACTLY as-is (same container, label and real-world size — never enlarge it); NO on-screen text. If the user asks for something video models render badly (a clearly dead animal, gore, readable text), translate it into the closest achievable VISIBLE action (e.g. "the gecko recoils, loses its grip and drops off the wall out of frame"). Return ONLY the rewritten prompt text, nothing else.` },
+          { role: 'user', content: `CURRENT SCENE PROMPT:\n${originalPrompt}\n\nUSER'S REQUESTED CHANGE (plain language):\n${note}` },
+        ],
+      }),
+    })
+    if (!r.ok) return `${originalPrompt} ${note}`
+    const j = await r.json()
+    const txt = String(j.choices?.[0]?.message?.content || '').trim()
+    if (txt.length > 20) { console.log(`🎬 scene re-shoot rewritten from note → "${txt.slice(0, 90)}…"`); return txt }
+    return `${originalPrompt} ${note}`
+  } catch { return `${originalPrompt} ${note}` }
+}
+
 // ── Creator-look override: the user can recast the on-camera creator(s) to a chosen ethnicity/look
 // (Pakistani / Indian / Arab / …) while keeping everything else from the reference. 'match' (or empty)
 // = today's behavior: copy the reference creator exactly. ──
@@ -2446,9 +2473,14 @@ async function tweakJob(job) {
       const i = Number(t.scene)
       if (!(i >= 0 && i < scenes.length)) return bail('bad scene index')
       const fix = CHIP_FIX[t.chip] ?? ''
-      const prompt = `${scenes[i].prompt}${fix}`
+      // Free-text fix → gpt-4o rewrites the scene prompt into filmable action; chip (if any) still
+      // appends its corrective clause. Persist the new prompt so a re-tweak / expired-clip regen uses it.
+      const note = typeof t.note === 'string' ? t.note.trim().slice(0, 400) : ''
+      const basePrompt = note ? await rewriteScenePrompt(scenes[i].prompt, note, meta.product_details?.name) : scenes[i].prompt
+      const prompt = `${basePrompt}${fix}`
+      scenes[i] = { ...scenes[i], prompt }
       await prog(`Redoing scene ${i + 1}…`, 15, 90)
-      console.log(`🔧 ${job.id} tweak: redo scene ${i + 1} (chip=${t.chip || 'redo'})`)
+      console.log(`🔧 ${job.id} tweak: redo scene ${i + 1} (chip=${t.chip || 'redo'}${note ? ', +note' : ''})`)
       // Mini-ladder: product refs → no refs (pure prompt). Same never-fail contract as the main render.
       let videoUrl = null
       try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: productImages, resolution: meta.resolution, duration: scenes[i].duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })) }
