@@ -56,10 +56,12 @@ export default function AdminCreatives() {
                     // Click the image to open it full-size in a new tab.
                     // eslint-disable-next-line @next/next/no-img-element
                     : <a href={c.image_url} target="_blank" rel="noreferrer" style={{ width: '100%', height: '100%', display: 'block' }}><img src={c.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></a>}
-                {/* "Cloned from" — the source ad this creative was made from. Click to open it in Discovery. */}
+                {/* "Cloned from" — the source ad this creative was made from. Prefer the Discovery ad
+                    page (when we have an ad_id); otherwise (uploads / Brand-Spy / edits store only a
+                    ref image) open the source IMAGE itself so the tile is never a dead link. */}
                 {(c.source_thumb || c.source_ad_id) && (
-                  <a href={c.source_ad_id ? `/discovery/${c.source_ad_id}` : undefined} target="_blank" rel="noreferrer"
-                    title="Cloned from this ad — click to open the source" onClick={e => e.stopPropagation()}
+                  <a href={c.source_ad_id ? `/discovery/${c.source_ad_id}` : (c.source_thumb || undefined)} target="_blank" rel="noreferrer"
+                    title={c.source_ad_id ? 'Cloned from this ad — click to open it in Discovery' : 'Cloned from this reference — click to open the source image'} onClick={e => e.stopPropagation()}
                     style={{ position: 'absolute', top: 6, left: 6, width: 40, borderRadius: 6, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.85)', boxShadow: '0 2px 8px rgba(0,0,0,0.5)', textDecoration: 'none', background: '#000', display: 'block' }}>
                     {c.source_thumb
                       // eslint-disable-next-line @next/next/no-img-element
