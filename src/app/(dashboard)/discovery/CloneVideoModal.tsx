@@ -52,7 +52,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [mode, setMode] = useState<'ugc' | 'faithful'>('ugc')
   const modeTouched = useRef(false)                    // user explicitly picked a look → don't let the auto-suggestion override it
   const [suggestedMode, setSuggestedMode] = useState<'ugc' | 'faithful'>('ugc')
-  const [sceneCount, setSceneCount] = useState(2)
+  const [srcScenes, setSrcScenes] = useState(2)   // the source ad's analysed cut count (the MAX scenes)
   const [durationBucket, setDurationBucket] = useState<'15' | '30' | '60' | 'match'>('15')
   const [srcSecs, setSrcSecs] = useState<number | null>(null)
   const [genProgress, setGenProgress] = useState<{ label: string; pct: number; eta_sec: number } | null>(null)  // live render progress
@@ -104,11 +104,6 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // 'match' resolves to the nearest bucket from the source ad's analysed duration.
   const resolvedBucket = durationBucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(durationBucket)
   const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1
-  const baseCost = mode === 'faithful'
-    ? (FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]
-    : nSegs > 1 ? (FAITHFUL_COST[nSegs] || FAITHFUL_COST[2])[tier] : UGC_COST[tier]
-  const addonCost = (mode === 'faithful' ? extraLangs.length * 200 : 0) + (ecOn ? 50 : 0) + (hooksOn && mode === 'faithful' ? 800 : 0)
-  const cost = baseCost + addonCost
   // Languages breathe differently — per-language speaking rates keep the meter honest.
   const LANGS: { code: string; label: string; rate: number; rtl?: boolean }[] = [
     { code: 'en', label: 'English', rate: 2.3 },
@@ -119,24 +114,31 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     { code: 'fr', label: 'Français', rate: 2.4 },
     { code: 'de', label: 'Deutsch', rate: 2.2 },
   ]
+  const langCfg = LANGS.find((l) => l.code === language) || LANGS[0]
+  // Speaking-time meter: per-language rate. Longer than the target → the render talks fast.
+  const words = draftScript.trim() ? draftScript.trim().split(/\s+/).length : 0
+  const spokenSecs = Math.round(words / langCfg.rate)
+  // CINEMATIC LENGTH FOLLOWS YOUR SCRIPT: render just enough scenes to cover the narration (~5.2s per
+  // scene), capped at the source ad's real cut count. A short script → fewer scenes → a shorter, cheaper
+  // video; a full-length script → the full set. (UGC is unaffected — it uses its chosen bucket length.)
+  const sceneCount = mode === 'faithful' ? Math.min(srcScenes, Math.max(2, Math.ceil((spokenSecs || 5) / 5.2))) : srcScenes
+  const baseCost = mode === 'faithful'
+    ? (FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]
+    : nSegs > 1 ? (FAITHFUL_COST[nSegs] || FAITHFUL_COST[2])[tier] : UGC_COST[tier]
+  const addonCost = (mode === 'faithful' ? extraLangs.length * 200 : 0) + (ecOn ? 50 : 0) + (hooksOn && mode === 'faithful' ? 800 : 0)
+  const cost = baseCost + addonCost
   // Look → language pairing nudge ("picked Pakistani → speak Urdu?"). Suggests, never forces.
   const PAIR: Record<string, { code: string; flag: string; name: string }> = {
     Pakistani: { code: 'ur', flag: '🇵🇰', name: 'Urdu' },
     Indian: { code: 'hi', flag: '🇮🇳', name: 'Hindi' },
     Arab: { code: 'ar', flag: '🇦🇪', name: 'Arabic' },
   }
-  const langCfg = LANGS.find((l) => l.code === language) || LANGS[0]
   const VOICES = [
     { id: 'nova', label: 'Nova · warm female' }, { id: 'shimmer', label: 'Shimmer · bright female' },
     { id: 'onyx', label: 'Onyx · deep male' }, { id: 'echo', label: 'Echo · calm male' },
   ]
-  // Speaking-time meter: per-language rate. Longer than the target → the render talks fast.
-  const words = draftScript.trim() ? draftScript.trim().split(/\s+/).length : 0
-  const spokenSecs = Math.round(words / langCfg.rate)
-  // Faithful scenes split the SOURCE length (each clip ≥5s on Seedance), so the video ≈ the source
-  // duration, floored at sceneCount×5 — NOT sceneCount×8 (that overstated it as ~24s and made a
-  // correctly-sized ~12s script look "too small" against a video that's really ~15s).
-  const targetSecs = mode === 'faithful' ? Math.max(srcSecs || 0, sceneCount * 5) : resolvedBucket
+  // Faithful length now follows sceneCount (which follows the script); UGC uses its chosen bucket.
+  const targetSecs = mode === 'faithful' ? Math.max(8, Math.round(sceneCount * 5.2)) : resolvedBucket
   const busy = phase === 'analyzing' || phase === 'generating'
   const LOOKS = ['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic']
 
@@ -258,7 +260,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       setGloss(st.gloss || null)
       const sug = st.suggestedMode === 'faithful' ? 'faithful' : 'ugc'
       setSuggestedMode(sug); if (!modeTouched.current) setMode(sug)   // honour an explicit user pick from step 1
-      setSceneCount(Math.min(10, Math.max(2, Number(st.sceneCount) || 2)))
+      setSrcScenes(Math.min(10, Math.max(2, Number(st.sceneCount) || 2)))
       setSrcSecs(Number(st.sourceSeconds) || null)
       setPhase('review'); setStep(4)   // land on the first review step (Length & format)
     } catch (e: any) { setErr(String(e?.message || e)); setPhase('form') }
@@ -272,7 +274,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          jobId, script: draftScript, mode, durationBucket,
+          jobId, script: draftScript, mode, durationBucket, sceneCount,
           overlays: overlaysOn ? overlays.filter((o) => o.text.trim()) : [],
           extraLangs: mode === 'faithful' ? extraLangs : [],
           endCard: ecOn ? { offer: ecOffer.trim(), cta: ecCta.trim() || 'Shop now' } : null,
