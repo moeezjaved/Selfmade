@@ -120,7 +120,14 @@ async function runGeneration(input: {
   }
   try {
     const { adId, refImageUrl, productImageB64, productImages, productMimeType, newHeadline, brandName, colors, brandId, aspectRatio, look } = body || {}
-    const useTier: 'default' | 'pro' = 'pro'
+    // Recast (change the person's ethnicity/look) is the ONE case where the STANDARD model beats Pro:
+    // gemini-3-pro-image locks the reference face and refuses the recast — a regression introduced when
+    // clone became Pro-only + never-downgrade (23477b8). Before that, Pro 503s silently downgraded to
+    // the standard Nano Banana, which reshoots the person reliably (that's why recasts worked on 16 Jul
+    // and stopped after). So route recast jobs to the standard model; keep Pro for everything else. The
+    // user is still billed at Pro (the row is stamped 'pro') — only the render model differs.
+    const wantsRecast = typeof look === 'string' && !!look.trim() && look.toLowerCase() !== 'match'
+    const useTier: 'default' | 'pro' = wantsRecast ? 'default' : 'pro'
     const rawProducts: string[] = Array.isArray(productImages) && productImages.length
       ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
       : (productImageB64 ? [String(productImageB64)] : [])
