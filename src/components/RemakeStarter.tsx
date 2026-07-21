@@ -43,8 +43,13 @@ export default function RemakeStarter() {
       })
       const pj = await pres.json().catch(() => ({}))
       if (!pres.ok) throw new Error(pj?.message || 'Upload is temporarily unavailable.')
-      const put = await fetch(pj.uploadUrl, { method: 'PUT', headers: { 'content-type': f.type }, body: f })
-      if (!put.ok) throw new Error('Upload failed — please try again.')
+      // Direct browser→R2 PUT. A dropped connection / transient block throws "Failed to fetch" — retry
+      // once before giving up, and translate the raw network error into something actionable.
+      const putOnce = () => fetch(pj.uploadUrl, { method: 'PUT', headers: { 'content-type': f.type }, body: f })
+      let put: Response
+      try { put = await putOnce() }
+      catch { try { put = await putOnce() } catch { throw new Error(`Couldn't upload the ${isVideo ? 'video' : 'image'} to storage — check your connection and try again. If it keeps failing on a large video, try a smaller file.`) } }
+      if (!put.ok) throw new Error(`Upload failed (${put.status}) — please try again.`)
       setOpen(false)
       if (pj.kind === 'image') setImageUrl(pj.publicUrl)   // → CloneModal (picture remake of the upload)
       else setVideoUrl(pj.publicUrl)                        // → CloneVideoModal (video remake of the upload)

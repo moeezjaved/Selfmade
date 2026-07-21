@@ -46,9 +46,10 @@ export async function POST(req: NextRequest) {
   if (size > cap) return NextResponse.json({ error: 'file_too_large', message: `${kind === 'video' ? 'Videos' : 'Images'} must be under ${Math.round(cap / 1e6)} MB.` }, { status: 400 })
 
   const key = `remake-uploads/${user.id}/${randomUUID()}.${spec.ext}`
-  const uploadUrl = await presignPut(key, String(fileType), size)
+  // 1h window (was 5m) so a large phone video on a slow connection can't outrun the presigned URL.
+  const uploadUrl = await presignPut(key, String(fileType), size, 3600)
   const publicUrl = r2PublicUrl(key)
   if (!uploadUrl || !publicUrl) return NextResponse.json({ error: 'presign_failed' }, { status: 500 })
 
-  return NextResponse.json({ uploadUrl, publicUrl, kind, expiresIn: 300 })
+  return NextResponse.json({ uploadUrl, publicUrl, kind, expiresIn: 3600 })
 }
