@@ -446,7 +446,7 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
             <div style={{ padding: 22, borderRight: `1px solid ${L_LINE}` }}>
               <SourceCard ad={ad} brandName={brandName} />
               <div style={{ marginTop: 16, fontSize: 13, color: L_MUTED, lineHeight: 1.6 }}>
-                Your remake is ready. Keep editing it by just typing on the right — “make the background pink”, “move the logo up” — with full undo. Everything is saved in <b style={{ color: L_INK }}>My Creatives</b>.
+                Your remake is ready. Keep editing it by just typing on the right — “make the background pink”, “move the logo up”, or <b style={{ color: L_INK }}>“make the person Pakistani”</b> to change who’s on the image — with full undo. Everything is saved in <b style={{ color: L_INK }}>My Creatives</b>.
               </div>
               <button onClick={() => { setResults([]); setActiveIdx(0); setHistory([]); setStep(0) }}
                 style={{ ...btnGhost, marginTop: 18 }}>← Make another</button>
