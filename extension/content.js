@@ -24,7 +24,8 @@
   if (IS_FB_TOOLS) return
 
   const IS_FB_ADLIB = HOST.includes('facebook.com') && location.pathname.includes('/ads/library')
-  const IS_FB_FEED = HOST.includes('facebook.com') && !IS_FB_ADLIB   // the plain FB feed (sponsored posts)
+  const IS_FB_REEL = HOST.includes('facebook.com') && location.pathname.startsWith('/reel/')  // full-screen reel viewer
+  const IS_FB_FEED = HOST.includes('facebook.com') && !IS_FB_ADLIB && !IS_FB_REEL   // the plain FB feed (sponsored posts)
   const IS_TT_ADLIB = HOST.includes('library.tiktok.com')
   const IS_TT_FEED = HOST.includes('tiktok.com') && !IS_TT_ADLIB
   const IS_IG = HOST.includes('instagram.com')
@@ -471,27 +472,70 @@
     const m = location.pathname.match(/\/shorts\/([\w-]{6,})/) || location.search.match(/[?&]v=([\w-]{6,})/)
     return m ? `https://i.ytimg.com/vi/${m[1]}/maxresdefault.jpg` : (document.querySelector('meta[property="og:image"]')?.getAttribute('content') || '')
   }
+  const ytIsShorts = () => /\/shorts\//.test(location.pathname)
+  // YouTube flags an in-stream (pre/mid/post-roll) AD by adding `ad-showing` to the player element.
+  // That's the ONLY way to tell an ad from organic content — the URL still holds the main video's id.
+  const ytAdPlayer = () => document.querySelector('#movie_player.ad-showing, .html5-video-player.ad-showing')
   function mountYtCard() {
     if (!IS_YT) return
-    // Active shorts renderer (or the main watch player).
-    const players = document.querySelectorAll('ytd-reel-video-renderer, #shorts-player, ytd-player, #player')
-    for (const p of players) {
-      const r = p.getBoundingClientRect()
-      if (r.width < 200 || r.height < 200) continue
-      if (p.querySelector('.sm-yt-host')) continue
-      const host = document.createElement('div')
-      host.className = 'sm-yt-host'
-      const vid = p.querySelector('video')
-      const card = buildSaveCard(() => vid || p.querySelector('video'), p, { showDownload: false, overlay: true, forceUrl: ytThumb, forceType: 'image' })
-      host.appendChild(card)
-      if (getComputedStyle(p).position === 'static') p.style.position = 'relative'
-      p.appendChild(host)
+    // ONLY Shorts + real YouTube ads — never organic watch pages (a 28-min video is not an ad).
+    if (ytIsShorts()) {
+      for (const p of document.querySelectorAll('ytd-reel-video-renderer, #shorts-player')) {
+        const r = p.getBoundingClientRect()
+        if (r.width < 200 || r.height < 200) continue
+        if (p.querySelector('.sm-yt-host')) continue
+        const host = document.createElement('div'); host.className = 'sm-yt-host'
+        const card = buildSaveCard(() => p.querySelector('video'), p, { showDownload: false, overlay: true, forceUrl: ytThumb, forceType: 'image' })
+        host.appendChild(card)
+        if (getComputedStyle(p).position === 'static') p.style.position = 'relative'
+        p.appendChild(host)
+      }
+      return
     }
+    // Watch page: show ONLY while an ad is actually playing; remove it the instant the ad ends. The ad's
+    // own thumbnail isn't in the URL (that's the main video), so we capture the current frame instead.
+    const adPlayer = ytAdPlayer()
+    if (!adPlayer) { document.querySelectorAll('.sm-yt-host').forEach((h) => h.remove()); return }
+    const r = adPlayer.getBoundingClientRect()
+    if (r.width < 200 || r.height < 200 || adPlayer.querySelector('.sm-yt-host')) return
+    const host = document.createElement('div'); host.className = 'sm-yt-host'
+    const card = buildSaveCard(() => adPlayer.querySelector('video'), adPlayer, { showDownload: false, overlay: true, forceType: 'image' })
+    host.appendChild(card)
+    if (getComputedStyle(adPlayer).position === 'static') adPlayer.style.position = 'relative'
+    adPlayer.appendChild(host)
+  }
+
+  // Facebook Reels viewer (facebook.com/reel/…): a full-screen player, no feed articles — so the feed
+  // scan never mounts here (only Denote's card showed). Drop an overlay save card on the reel's own
+  // video, the same way we do for YouTube Shorts. Captures the current frame (reel MP4s aren't fetchable).
+  function mountFbReelCard() {
+    if (!IS_FB_REEL) return
+    let best = null, bestArea = 0
+    for (const v of document.querySelectorAll('video')) {
+      const r = v.getBoundingClientRect()
+      const a = r.width * r.height
+      if (a > bestArea && r.width > 200 && r.height > 260) { best = v; bestArea = a }   // reels are tall
+    }
+    if (!best) return
+    // Walk up to a container roughly the video's size (a stable overlay anchor, not a tiny wrapper).
+    let holder = best
+    for (let i = 0; i < 4 && holder.parentElement; i++) {
+      const pr = holder.parentElement.getBoundingClientRect()
+      if (pr.width >= best.getBoundingClientRect().width * 0.9) { holder = holder.parentElement; break }
+      holder = holder.parentElement
+    }
+    if (holder.querySelector('.sm-yt-host')) return
+    const host = document.createElement('div'); host.className = 'sm-yt-host'
+    const card = buildSaveCard(() => best, holder, { showDownload: false, overlay: true, forceType: 'image' })
+    host.appendChild(card)
+    if (getComputedStyle(holder).position === 'static') holder.style.position = 'relative'
+    holder.appendChild(host)
   }
 
   function scan() {
     if (IS_IG) mountIgCard()   // Denote-style in-post board picker (works on organic posts too, not just ads)
-    if (IS_YT) mountYtCard()   // YouTube Shorts / watch — hover save card
+    if (IS_YT) mountYtCard()   // YouTube Shorts + ads only
+    if (IS_FB_REEL) mountFbReelCard()   // FB Reels viewer — overlay save card on the reel
     if (IS_FB_ADLIB) {
       for (const label of document.querySelectorAll('span, div')) {
         const txt = label.textContent || ''
@@ -626,9 +670,14 @@
   // plain Facebook feed). On the Ad Library / IG / TikTok the per-card buttons are the UX, so the
   // trailing hover button is suppressed. Nothing at all runs on YouTube/arbitrary sites.
   if (SUPPORTED) setupHover()
-  if (IS_FB_ADLIB || IS_FB_FEED || IS_TT_ADLIB || IS_IG || IS_TT_FEED || IS_YT) {
+  if (IS_FB_ADLIB || IS_FB_FEED || IS_FB_REEL || IS_TT_ADLIB || IS_IG || IS_TT_FEED || IS_YT) {
     scan()
     const obs = new MutationObserver(() => { clearTimeout(window.__smT); window.__smT = setTimeout(scan, 350) })
     obs.observe(document.body, { childList: true, subtree: true })
+    // YouTube ad start/end toggles a CLASS (attribute), which childList observation can miss — and during
+    // playback the DOM is quiet. A 1s poll reliably shows the card when an ad starts and removes it when
+    // it ends. Cheap: mountYtCard is one querySelector when there's no ad.
+    if (IS_YT) setInterval(mountYtCard, 1000)
+    if (IS_FB_REEL) setInterval(mountFbReelCard, 1000)   // reels swap via SPA nav — poll to re-mount
   }
 })()
