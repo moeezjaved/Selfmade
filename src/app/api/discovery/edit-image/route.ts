@@ -71,8 +71,12 @@ export async function POST(req: NextRequest) {
 
   const { image, instruction, tier, parentId, brandId } = await req.json().catch(() => ({}))
   if (!image || !instruction?.trim()) return NextResponse.json({ error: 'image and instruction required' }, { status: 400 })
-  const useTier: 'default' | 'pro' = tier === 'pro' ? 'pro' : 'default'
-  const action = useTier === 'pro' ? 'image_edit_pro' : 'image_edit'
+  // Recasting the person (ethnicity/look) is the one edit the Pro model (gemini-3-pro-image) refuses —
+  // it locks the input face. The standard Nano Banana reshoots the person reliably. So person edits
+  // render on the standard model; billing/action still follow the requested tier.
+  const requestedTier: 'default' | 'pro' = tier === 'pro' ? 'pro' : 'default'
+  const useTier: 'default' | 'pro' = isPersonEdit(String(instruction)) ? 'default' : requestedTier
+  const action = requestedTier === 'pro' ? 'image_edit_pro' : 'image_edit'
 
   const admin = createAdminClient()
   const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: action })

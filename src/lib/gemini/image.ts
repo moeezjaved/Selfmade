@@ -241,7 +241,7 @@ export function buildClonePrompt(opts: {
     const dS = opts.dna || {}
     const keepS = [dS.hook_type && `hook style (${dS.hook_type})`, dS.format_style && `visual format (${dS.format_style})`, dS.angle && `angle (${dS.angle})`].filter(Boolean).join(', ')
     const recastS = opts.look && opts.look.toLowerCase() !== 'match'
-      ? `• Any person shown: recast as ${opts.look} — same pose, framing, expression and lighting; only their look changes.` : ''
+      ? `• RECAST the person shown: fully replace them with a ${opts.look} model — do NOT keep the original person's face or features. Keep the EXACT same pose, framing, expression, hand position and lighting; only the person changes. It must look like the same ad reshot with a new ${opts.look} model.` : ''
     const brandStyleS = [
       opts.palette?.accent || opts.palette?.background ? `brand colors: ${[opts.palette?.background && `bg ${opts.palette.background}`, opts.palette?.accent && `accent ${opts.palette.accent}`].filter(Boolean).join(', ')}` : (opts.colors?.length ? `brand colors ${opts.colors.join(', ')}` : ''),
     ].filter(Boolean).join(' ')
@@ -303,7 +303,7 @@ export function buildClonePrompt(opts: {
   const brand = opts.brandName ? `"${opts.brandName}"` : "the user's brand"
   // Recast the person (optional). Default 'match' keeps image 1's model — same pose/framing/lighting.
   const recast = opts.look && opts.look.toLowerCase() !== 'match'
-    ? `• Person: recast the model as ${opts.look} in appearance — keep the EXACT same pose, framing, hand position, expression, lighting and composition; only the person's ethnicity/look changes.`
+    ? `• Person: RECAST the model as ${opts.look} — fully replace the person, do NOT keep the original face or features. Keep the EXACT same pose, framing, hand position, expression, lighting and composition; only the person changes. It must read as the same ad reshot with a new ${opts.look} model, photorealistic and natural.`
     : ''
   // Price/number rule — NEVER invent. Use the user's real price if given; otherwise drop the price.
   const priceRule = opts.productPrice
