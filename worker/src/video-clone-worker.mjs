@@ -2568,7 +2568,9 @@ let anActive = 0
 let genActive = 0
 
 async function pump() {
-  const sel = 'select=id,user_id,tier,source_video_url,clone_meta,credit_tx&type=eq.video_clone&order=created_at.asc&limit=6'
+  // image_url is REQUIRED by the tweak branch — patch_broll downloads the finished video from it; without
+  // it, job.image_url was undefined and every patch bailed "no finished video to patch".
+  const sel = 'select=id,user_id,tier,source_video_url,image_url,clone_meta,credit_tx&type=eq.video_clone&order=created_at.asc&limit=6'
   if (anActive < MAX_ANALYZE) {
     const analyzing = await getJSON(`creative_generations?${sel}&status=eq.analyzing`).catch(() => [])
     for (const j of analyzing || []) {
