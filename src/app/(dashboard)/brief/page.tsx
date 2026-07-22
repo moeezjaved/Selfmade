@@ -44,6 +44,23 @@ function MelloFace({ size = 36 }: { size?: number }) {
   )
 }
 
+/** A creative thumbnail that quietly handles video (Mello's video creatives are .mp4) — shows the
+ *  first frame with a play glyph instead of a broken <img>. */
+function Thumb({ src, w = 78, h = 96 }: { src: string; w?: number; h?: number }) {
+  const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(src)
+  const box: React.CSSProperties = { width: w, height: h, borderRadius: 12, objectFit: 'cover', border: `1px solid ${LINE}`, background: '#0d120e', display: 'block' }
+  if (isVideo) {
+    return (
+      <span style={{ position: 'relative', display: 'inline-block' }}>
+        <video src={src} muted playsInline preload="metadata" style={box} />
+        <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 18, textShadow: '0 2px 8px rgba(0,0,0,.5)', pointerEvents: 'none' }}>▶</span>
+      </span>
+    )
+  }
+  /* eslint-disable-next-line @next/next/no-img-element */
+  return <img src={src} alt="" style={box} />
+}
+
 /** A line Mello speaks — appears with a gentle rise so the standup has a spoken rhythm on first load. */
 function Say({ children, delay = 0, big = false }: { children: React.ReactNode; delay?: number; big?: boolean }) {
   const [shown, setShown] = useState(false)
@@ -145,10 +162,7 @@ export default function StandupPage() {
                 {/* work arrives finished — headline carries the creative + the approve action */}
                 {isHeadline && !!it.thumbs?.length && (
                   <div style={{ display: 'flex', gap: 9, margin: '-4px 0 14px' }}>
-                    {it.thumbs.slice(0, 3).map((t, k) => (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img key={k} src={t} alt="" style={{ width: 78, height: 96, borderRadius: 12, objectFit: 'cover', border: `1px solid ${LINE}` }} />
-                    ))}
+                    {it.thumbs.slice(0, 3).map((t, k) => <Thumb key={k} src={t} />)}
                   </div>
                 )}
 
