@@ -29,6 +29,7 @@
   const IS_TT_ADLIB = HOST.includes('library.tiktok.com')
   const IS_TT_FEED = HOST.includes('tiktok.com') && !IS_TT_ADLIB
   const IS_IG = HOST.includes('instagram.com')
+  const IS_IG_REELS = IS_IG && location.pathname.startsWith('/reels/')   // the full-screen reels FEED (no article wrapper)
   const IS_YT = HOST.includes('youtube.com')   // YouTube Shorts / watch — hover save card (Denote-style)
   // Ad surfaces we actually support. The hover Save button only runs here — otherwise it popped up on
   // EVERY thumbnail on media sites like YouTube ("Save button everywhere when I scroll").
@@ -513,15 +514,18 @@
   // Facebook Reels viewer (facebook.com/reel/…): a full-screen player, no feed articles — so the feed
   // scan never mounts here (only Denote's card showed). Drop an overlay save card on the reel's own
   // video, the same way we do for YouTube Shorts. Captures the current frame (reel MP4s aren't fetchable).
-  function mountFbReelCard() {
-    if (!IS_FB_REEL) return
+  // Facebook / Instagram REELS feeds: full-screen players with no per-post article, so the feed scans
+  // never mount here. Drop a compact Save pill (same as YouTube Shorts) on the reel's own video. Captures
+  // the current frame (reel MP4s aren't fetchable).
+  function mountReelPill() {
+    if (!IS_FB_REEL && !IS_IG_REELS) return
     let best = null, bestArea = 0
     for (const v of document.querySelectorAll('video')) {
       const r = v.getBoundingClientRect()
       const a = r.width * r.height
       if (a > bestArea && r.width > 200 && r.height > 260) { best = v; bestArea = a }   // reels are tall
     }
-    if (!best) return
+    if (!best) { document.querySelectorAll('.sm-reel-host').forEach((h) => h.remove()); return }
     // Walk up to a container roughly the video's size (a stable overlay anchor, not a tiny wrapper).
     let holder = best
     for (let i = 0; i < 4 && holder.parentElement; i++) {
@@ -529,18 +533,19 @@
       if (pr.width >= best.getBoundingClientRect().width * 0.9) { holder = holder.parentElement; break }
       holder = holder.parentElement
     }
-    if (holder.querySelector('.sm-yt-host')) return
-    const host = document.createElement('div'); host.className = 'sm-yt-host'
-    const card = buildSaveCard(() => best, holder, { showDownload: false, overlay: true, forceType: 'image' })
-    host.appendChild(card)
+    if (holder.querySelector('.sm-reel-host')) return
+    // one pill per view — clear any stale one from the previous reel
+    document.querySelectorAll('.sm-reel-host').forEach((h) => h.remove())
+    const host = document.createElement('div'); host.className = 'sm-reel-host'
+    host.appendChild(ytPill(() => holder.querySelector('video') || best, holder, { forceType: 'image' }))
     if (getComputedStyle(holder).position === 'static') holder.style.position = 'relative'
     holder.appendChild(host)
   }
 
   function scan() {
     if (IS_IG) mountIgCard()   // Denote-style in-post board picker (works on organic posts too, not just ads)
-    if (IS_YT) mountYtCard()   // YouTube Shorts + ads only
-    if (IS_FB_REEL) mountFbReelCard()   // FB Reels viewer — overlay save card on the reel
+    if (IS_YT) mountYtCard()   // YouTube Shorts only
+    if (IS_FB_REEL || IS_IG_REELS) mountReelPill()   // FB / IG Reels — compact pill on the reel
     if (IS_FB_ADLIB) {
       for (const label of document.querySelectorAll('span, div')) {
         const txt = label.textContent || ''
@@ -683,6 +688,6 @@
     // playback the DOM is quiet. A 1s poll reliably shows the card when an ad starts and removes it when
     // it ends. Cheap: mountYtCard is one querySelector when there's no ad.
     if (IS_YT) setInterval(mountYtCard, 1000)
-    if (IS_FB_REEL) setInterval(mountFbReelCard, 1000)   // reels swap via SPA nav — poll to re-mount
+    if (IS_FB_REEL || IS_IG_REELS) setInterval(mountReelPill, 1000)   // reels swap via SPA nav — poll to re-mount
   }
 })()

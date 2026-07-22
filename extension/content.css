@@ -78,4 +78,7 @@ ytd-reel-video-renderer:hover .sm-yt-host,#shorts-player:hover .sm-yt-host,ytd-p
 .sm-yt-pill img{width:15px;height:15px;border-radius:4px}
 .sm-yt-pill.sm-busy{opacity:.7;cursor:default}
 .sm-yt-pill.sm-done{background:#bff06a}
+/* FB / IG reels: compact pill top-right, always visible (their players use obfuscated classes, so a
+   CSS :hover reveal can't target them reliably). Small enough to stay out of the way. */
+.sm-reel-host{position:absolute;top:12px;right:12px;z-index:2147483000}
 .sm-ig-card.sm-ig-overlay{margin:0;box-shadow:0 10px 30px rgba(0,0,0,.35)}
