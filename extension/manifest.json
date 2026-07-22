@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Selfmade — Save Winning Ads",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "Save ads from Instagram, the Facebook Ad Library, TikTok and any page straight into your Selfmade boards.",
   "permissions": ["storage", "identity", "downloads"],
   "host_permissions": [

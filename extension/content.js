@@ -493,36 +493,21 @@
     return m ? `https://i.ytimg.com/vi/${m[1]}/maxresdefault.jpg` : (document.querySelector('meta[property="og:image"]')?.getAttribute('content') || '')
   }
   const ytIsShorts = () => /\/shorts\//.test(location.pathname)
-  // YouTube flags an in-stream (pre/mid/post-roll) AD by adding `ad-showing` to the player element.
-  // That's the ONLY way to tell an ad from organic content — the URL still holds the main video's id.
-  const ytAdPlayer = () => document.querySelector('#movie_player.ad-showing, .html5-video-player.ad-showing')
   function mountYtCard() {
     if (!IS_YT) return
-    // ONLY Shorts + real YouTube ads — never organic watch pages (a 28-min video is not an ad).
-    if (ytIsShorts()) {
-      for (const p of document.querySelectorAll('ytd-reel-video-renderer, #shorts-player')) {
-        const r = p.getBoundingClientRect()
-        if (r.width < 200 || r.height < 200) continue
-        if (p.querySelector('.sm-yt-host')) continue
-        const host = document.createElement('div'); host.className = 'sm-yt-host'
-        const card = ytPill(() => p.querySelector('video'), p, { forceUrl: ytThumb, forceType: 'image' })
-        host.appendChild(card)
-        if (getComputedStyle(p).position === 'static') p.style.position = 'relative'
-        p.appendChild(host)
-      }
-      return
+    // SHORTS ONLY — never on a regular/long watch page, and NOT during pre-roll ads on a long video
+    // (Denote doesn't show there either, and the pill over a video you're watching is intrusive).
+    if (!ytIsShorts()) { document.querySelectorAll('.sm-yt-host').forEach((h) => h.remove()); return }
+    for (const p of document.querySelectorAll('ytd-reel-video-renderer, #shorts-player')) {
+      const r = p.getBoundingClientRect()
+      if (r.width < 200 || r.height < 200) continue
+      if (p.querySelector('.sm-yt-host')) continue
+      const host = document.createElement('div'); host.className = 'sm-yt-host'
+      const card = ytPill(() => p.querySelector('video'), p, { forceUrl: ytThumb, forceType: 'image' })
+      host.appendChild(card)
+      if (getComputedStyle(p).position === 'static') p.style.position = 'relative'
+      p.appendChild(host)
     }
-    // Watch page: show ONLY while an ad is actually playing; remove it the instant the ad ends. The ad's
-    // own thumbnail isn't in the URL (that's the main video), so we capture the current frame instead.
-    const adPlayer = ytAdPlayer()
-    if (!adPlayer) { document.querySelectorAll('.sm-yt-host').forEach((h) => h.remove()); return }
-    const r = adPlayer.getBoundingClientRect()
-    if (r.width < 200 || r.height < 200 || adPlayer.querySelector('.sm-yt-host')) return
-    const host = document.createElement('div'); host.className = 'sm-yt-host'
-    const card = ytPill(() => adPlayer.querySelector('video'), adPlayer, { forceType: 'image' })
-    host.appendChild(card)
-    if (getComputedStyle(adPlayer).position === 'static') adPlayer.style.position = 'relative'
-    adPlayer.appendChild(host)
   }
 
   // Facebook Reels viewer (facebook.com/reel/…): a full-screen player, no feed articles — so the feed
