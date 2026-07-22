@@ -29,7 +29,9 @@
   const IS_TT_ADLIB = HOST.includes('library.tiktok.com')
   const IS_TT_FEED = HOST.includes('tiktok.com') && !IS_TT_ADLIB
   const IS_IG = HOST.includes('instagram.com')
-  const IS_IG_REELS = IS_IG && location.pathname.startsWith('/reels/')   // the full-screen reels FEED (no article wrapper)
+  // Catch BOTH the reels FEED (/reels/, plural) AND a single reel permalink (/reel/<id>/, singular) —
+  // the singular case was missed, so a single Instagram reel showed no Save pill (only Denote's did).
+  const IS_IG_REELS = IS_IG && (location.pathname.startsWith('/reels/') || location.pathname.startsWith('/reel/'))
   const IS_YT = HOST.includes('youtube.com')   // YouTube Shorts / watch — hover save card (Denote-style)
   // Ad surfaces we actually support. The hover Save button only runs here — otherwise it popped up on
   // EVERY thumbnail on media sites like YouTube ("Save button everywhere when I scroll").

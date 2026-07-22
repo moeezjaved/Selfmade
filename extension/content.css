@@ -71,8 +71,9 @@
 .sm-ig-dl:hover{background:#f6f8f5}
 
 /* YouTube Shorts / watch — hover overlay save card on the player */
-/* Compact pill in the TOP-RIGHT corner — small like Denote's, never covers the video or Denote's button. */
-.sm-yt-host{position:absolute;top:12px;right:12px;left:auto;transform:none;z-index:2147483000;width:auto;opacity:0;pointer-events:none;transition:opacity .15s}
+/* Compact pill in the TOP-RIGHT corner — pushed DOWN so it clears YouTube's own full-screen / more
+   button (which sits at the very top-right of the Shorts player). Small like Denote's, never covers the video. */
+.sm-yt-host{position:absolute;top:64px;right:12px;left:auto;transform:none;z-index:2147483000;width:auto;opacity:0;pointer-events:none;transition:opacity .15s}
 ytd-reel-video-renderer:hover .sm-yt-host,#shorts-player:hover .sm-yt-host,ytd-player:hover .sm-yt-host,#player:hover .sm-yt-host,#movie_player:hover .sm-yt-host,.html5-video-player:hover .sm-yt-host,.sm-yt-host:hover{opacity:1;pointer-events:auto}
 /* Compact like Denote, but always readable + visible: bold dark text on lime, a hairline outline and a
    strong drop shadow so it pops on both bright and dark video frames. */
