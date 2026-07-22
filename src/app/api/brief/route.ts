@@ -38,6 +38,9 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
+  // First name for the greeting — metadata full_name, else the email local-part. Never a wrong guess.
+  const rawName = String((user.user_metadata as any)?.full_name || (user.user_metadata as any)?.name || '').trim()
+  const firstName = rawName ? rawName.split(/\s+/)[0] : (user.email ? user.email.split('@')[0].replace(/[._-].*$/, '') : '')
   const items: BriefItem[] = []
   const H48 = new Date(Date.now() - 48 * 3600e3).toISOString()
   const H36 = new Date(Date.now() - 36 * 3600e3).toISOString()
@@ -155,6 +158,7 @@ export async function GET() {
       spiedBrands: follows.filter((f: any) => f.spied).length,
       creativesReady: creatives.length,
     },
+    firstName: firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1) : null,
     headline,                                     // today's ONE decision (or null — quiet is honest)
     items: items.slice(0, 6),                     // finite by design
     learning,
