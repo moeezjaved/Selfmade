@@ -23,7 +23,8 @@ type BriefItem = {
   kind: string                // competitor_ads | creative_ready | trend | insight | system
   importance: number          // 0-100
   title: string               // Mello-voiced one-liner
-  body?: string
+  body?: string               // the evidence (expanded state)
+  why?: string                // "why you care" — every card must answer it
   cta_label?: string
   cta_href?: string
   thumbs?: string[]           // small image urls for a visual row
@@ -72,52 +73,79 @@ export async function GET() {
   // best-effort: stamp surfaced_at on what we're about to show
   if (spine.length) admin.from('brief_events').update({ surfaced_at: new Date().toISOString() }).in('id', spine.map((e: any) => e.id)).is('surfaced_at', null).then(() => {}, () => {})
 
-  // ── 2. Competitor drops → one item per brand ──
+  // ── 2. Competitor drops → one item per brand, each with a "why you care" ──
   for (const n of notifs) {
     const brand = n.brand_name || 'A brand you watch'
     const c = Math.max(1, Number(n.ad_count) || 1)
     items.push({
       kind: 'competitor_ads', importance: Math.min(85, 55 + c * 5), at: n.created_at,
       title: `${brand} launched ${c === 1 ? 'a new ad' : `${c} new ads`}.`,
-      body: c > 2 ? `That's a real push — worth reading what angle they're betting on.` : undefined,
+      body: c > 2 ? `That's a real push, not routine rotation — worth reading what angle they're betting on before it compounds.` : `A single fresh creative — I'll flag if it turns into a burst.`,
+      why: `You watch ${brand} — a launch like this usually means they found something working.`,
       cta_label: 'See the ads', cta_href: `/discovery/brand-spy`,
     })
   }
 
-  // ── 3. Creatives ready ──
+  // ── 3. Creatives ready → this is the HEADLINE (today's one decision), not a list item.
+  //       0 or 1 decision per brief, never more: a forced daily "decision" manufactures urgency and
+  //       burns trust. No numeric confidence until we have real outcome data — evidence, not theater. ──
+  let headline: BriefItem | null = null
   if (creatives.length) {
-    items.push({
-      kind: 'creative_ready', importance: 80, at: creatives[0].created_at,
-      title: `I finished ${creatives.length === 1 ? 'a new creative' : `${creatives.length} new creatives`} for you.`,
-      body: 'Ready for your review — nothing goes anywhere without your approval.',
-      cta_label: 'Review my work', cta_href: '/creative-studio',
+    headline = {
+      kind: 'creative_ready', importance: 100, at: creatives[0].created_at,
+      title: creatives.length === 1 ? `I finished a new creative for you.` : `I finished ${creatives.length} new creatives — this is the strongest.`,
+      body: `Built from what's currently winning in your market. Strong signal — the format and angle match this week's top performers in your niche. Nothing launches without your approval.`,
+      why: `Fresh work waiting on your call — approving or killing it today keeps your pipeline moving.`,
+      cta_label: 'Review & approve', cta_href: '/creative-studio',
       thumbs: creatives.map((c: any) => c.image_url).filter(Boolean).slice(0, 4),
-    })
+    }
   }
 
   // ── 4. Market trend: top topics among the freshest ads from the pages the user watches;
   //       if they watch nothing yet, fall back to the newest slice of the whole market. ──
   const pageIds = follows.map((f: any) => f.page_id).filter(Boolean).slice(0, 60)
-  const trendAds = await soft((async () => {
-    let q = admin.from('discovery_ads_index').select('topics').gte('created_at', D7).order('created_at', { ascending: false }).limit(300)
-    if (pageIds.length) q = q.in('page_id', pageIds)
-    const { data } = await q
-    return data || []
-  })(), [] as any[])
-  const counts = new Map<string, number>()
-  for (const a of trendAds) for (const t of (a.topics || [])) counts.set(t, (counts.get(t) || 0) + 1)
-  const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3).filter(([, n]) => n >= 3)
+  const [trendAds, globalAds] = await Promise.all([
+    soft((async () => {
+      let q = admin.from('discovery_ads_index').select('topics').gte('created_at', D7).order('created_at', { ascending: false }).limit(300)
+      if (pageIds.length) q = q.in('page_id', pageIds)
+      const { data } = await q
+      return data || []
+    })(), [] as any[]),
+    // Global slice powers the daily lesson (kept separate from the user-scoped trend).
+    soft((async () => {
+      const { data } = await admin.from('discovery_ads_index').select('topics').gte('created_at', H48).order('created_at', { ascending: false }).limit(200)
+      return data || []
+    })(), [] as any[]),
+  ])
+  const tally = (rows: any[]) => {
+    const m = new Map<string, number>()
+    for (const a of rows) for (const t of (a.topics || [])) m.set(t, (m.get(t) || 0) + 1)
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1])
+  }
+  const top = tally(trendAds).slice(0, 3).filter(([, n]) => n >= 3)
   if (top.length) {
     const scope = pageIds.length ? 'across the brands you watch' : 'across the market'
     items.push({
       kind: 'trend', importance: 65,
       title: `The angle gaining ground ${scope}: “${top[0][0]}”.`,
-      body: top.length > 1 ? `Also rising: ${top.slice(1).map(([t]) => `“${t}”`).join(' and ')}. Worth testing before it saturates.` : 'Worth testing before it saturates.',
+      body: `${top[0][1]} fresh ads lean on it this week${top.length > 1 ? `; also rising: ${top.slice(1).map(([t]) => `“${t}”`).join(' and ')}` : ''}.`,
+      why: pageIds.length ? `Your competitors are converging on it — early movers get the cheap clicks.` : `When a whole market converges on one angle, testing it early is the discount window.`,
       cta_label: 'Explore these ads', cta_href: `/discovery?q=${encodeURIComponent(top[0][0])}`,
     })
   }
 
-  // ── 5. Nothing urgent? Say so — an employee who sometimes says "no action needed" earns trust. ──
+  // ── 5. One lesson a day (Learning slot): the market-wide angle of the day + where to study it.
+  //       Cheap, real, and habit-forming — the brief should make you slightly smarter every morning. ──
+  const gTop = tally(globalAds).filter(([t]) => !top.length || t !== top[0][0]).slice(0, 1)
+  const learning: BriefItem | null = gTop.length ? {
+    kind: 'learning', importance: 30,
+    title: `Today's lesson: study “${gTop[0][0]}”.`,
+    body: `${gTop[0][1]} of the freshest ads market-wide use this angle right now. Read five of them and you'll see the pattern — then you own it.`,
+    cta_label: 'Open the examples', cta_href: `/discovery?q=${encodeURIComponent(gTop[0][0])}`,
+  } : null
+
+  // ── 6. The brief is a DOCUMENT, not a feed: hard cap, heaviest first, and it ENDS (sign-off).
+  //       Quiet days say so out loud — an employee who can say "do nothing" is one you trust. ──
   items.sort((a, b) => b.importance - a.importance)
 
   return NextResponse.json({
@@ -127,8 +155,10 @@ export async function GET() {
       spiedBrands: follows.filter((f: any) => f.spied).length,
       creativesReady: creatives.length,
     },
-    items: items.slice(0, 12),
-    quiet: items.length === 0,
+    headline,                                     // today's ONE decision (or null — quiet is honest)
+    items: items.slice(0, 6),                     // finite by design
+    learning,
+    quiet: items.length === 0 && !headline,
   })
 }
 
