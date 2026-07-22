@@ -27,10 +27,6 @@ export async function POST(request: NextRequest) {
     const origin = request.nextUrl.origin
     const priceId = plan === 'annual' ? annualPrice : monthlyPrice
 
-    if (!priceId) {
-      return NextResponse.json({ error: `STRIPE_PRICE_ID_${plan.toUpperCase()} is not set` }, { status: 500 })
-    }
-
     if (action === 'portal') {
       const admin = createAdminClient()
       const { data: profile } = await admin
@@ -47,6 +43,11 @@ export async function POST(request: NextRequest) {
       }
       const session = await stripe.billingPortal.sessions.create({ customer: customerId, return_url: `${origin}/billing` })
       return NextResponse.json({ url: session.url })
+    }
+
+    // Checkout (new subscription) — this is the ONLY path that needs a configured price.
+    if (!priceId) {
+      return NextResponse.json({ error: `STRIPE_PRICE_ID_${plan.toUpperCase()} is not set` }, { status: 500 })
     }
 
     // Create checkout session

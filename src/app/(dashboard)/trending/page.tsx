@@ -154,8 +154,9 @@ export default function TrendingPage() {
                     <Flame size={11} /> {Math.round(ad.score * 100)}
                   </span>
                   {ad.format && <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,.92)', color: '#374151', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '3px 7px', textTransform: 'capitalize' }}>{ad.format}</span>}
-                  {/* Clone CTA on hover-ish (always visible bottom-right for discoverability) */}
-                  <button onClick={() => setCloneAd(ad)} style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 12, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: DARK, border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>
+                  {/* Clone CTA — bottom-LEFT so it never sits over the video's play/pause control (which is
+                      on the bottom-right). Rank badge is top-left, format top-right, so bottom-left is clear. */}
+                  <button onClick={() => setCloneAd(ad)} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 12, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: DARK, border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>
                     <Sparkles size={12} /> Remake
                   </button>
                 </div>
