@@ -77,9 +77,9 @@
 ytd-reel-video-renderer:hover .sm-yt-host,#shorts-player:hover .sm-yt-host,ytd-player:hover .sm-yt-host,#player:hover .sm-yt-host,#movie_player:hover .sm-yt-host,.html5-video-player:hover .sm-yt-host,.sm-yt-host:hover{opacity:1;pointer-events:auto}
 /* Compact like Denote, but always readable + visible: bold dark text on lime, a hairline outline and a
    strong drop shadow so it pops on both bright and dark video frames. */
-.sm-yt-pill{display:inline-flex;align-items:center;gap:6px;background:#dffe95;color:#0e1b12;border:1px solid rgba(0,0,0,.18);border-radius:20px;padding:8px 14px;font:800 13px/1 'Inter',-apple-system,system-ui,sans-serif;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.12);white-space:nowrap;letter-spacing:.01em}
+.sm-yt-pill{display:inline-flex;align-items:center;gap:5px;background:#dffe95;color:#0e1b12;border:1px solid rgba(0,0,0,.18);border-radius:14px;padding:4px 9px;font:800 11px/1 'Inter',-apple-system,system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.42),0 0 0 1px rgba(255,255,255,.1);white-space:nowrap;letter-spacing:.01em}
 .sm-yt-pill:hover{background:#e9ffab}
-.sm-yt-pill img{width:16px;height:16px;border-radius:4px}
+.sm-yt-pill img{width:13px;height:13px;border-radius:3px}
 .sm-yt-pill.sm-busy{opacity:.7;cursor:default}
 .sm-yt-pill.sm-done{background:#bff06a}
 /* FB / IG reels: compact pill top-right, always visible (their players use obfuscated classes, so a

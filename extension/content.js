@@ -540,7 +540,7 @@
   // never mount here. Drop a compact Save pill (same as YouTube Shorts) on the reel's own video. Captures
   // the current frame (reel MP4s aren't fetchable).
   function mountReelPill() {
-    if (!IS_FB_REEL && !IS_IG_REELS) return
+    if (!IS_FB_REEL && !IS_IG_REELS && !IS_TT_FEED) return
     // Pick the on-screen PORTRAIT reel video (skip square/landscape autoplay previews that have a bigger
     // area but aren't the reel), so the pill lands on the actual reel.
     let best = null, bestArea = 0
@@ -567,12 +567,17 @@
     host.appendChild(ytPill(() => holder.querySelector('video') || best, holder, { forceType: 'image' }))
     if (getComputedStyle(holder).position === 'static') holder.style.position = 'relative'
     holder.appendChild(host)
+    // Denote-style: hide when the cursor leaves the video. These players (FB/IG/TikTok) use obfuscated
+    // classes so CSS :hover can't target them — toggle opacity via JS on the holder we mounted onto.
+    host.style.opacity = '0'; host.style.pointerEvents = 'none'; host.style.transition = 'opacity .15s'
+    holder.addEventListener('mouseenter', () => { host.style.opacity = '1'; host.style.pointerEvents = 'auto' })
+    holder.addEventListener('mouseleave', () => { host.style.opacity = '0'; host.style.pointerEvents = 'none' })
   }
 
   function scan() {
     if (IS_IG) mountIgCard()   // Denote-style in-post board picker (works on organic posts too, not just ads)
     if (IS_YT) mountYtCard()   // YouTube Shorts only
-    if (IS_FB_REEL || IS_IG_REELS) mountReelPill()   // FB / IG Reels — compact pill on the reel
+    if (IS_FB_REEL || IS_IG_REELS || IS_TT_FEED) mountReelPill()   // FB / IG Reels + TikTok — compact pill on the video
     if (IS_FB_ADLIB) {
       for (const label of document.querySelectorAll('span, div')) {
         const txt = label.textContent || ''
@@ -599,12 +604,9 @@
         const r = art.getBoundingClientRect()
         if (r.width > 260 && r.height > 180 && (art.querySelector('img') || art.querySelector('video') || biggestMediaIn(art)) && looksLikeAd(art)) addCardButton(art, 'append')
       }
-    } else if (IS_TT_FEED) {
-      for (const v of document.querySelectorAll('video')) {
-        const container = v.closest('[class*="DivItemContainer"], [class*="DivContainer"], article, div[data-e2e]') || v.parentElement
-        if (container) { const r = container.getBoundingClientRect(); if (r.width > 200 && r.height > 200 && looksLikeAd(container)) addCardButton(container, 'prepend') }
-      }
     }
+    // TikTok feed now uses the compact reel pill (mountReelPill above), matching FB/IG/YouTube — not the
+    // old full-width card button.
   }
 
   // ── Hover button + floating button ──────────────────────────────────────────

@@ -2137,7 +2137,7 @@ export default function DiscoveryPage() {
           <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable comingSoon />
 
           {/* Numeric thresholds — grouped in a subtle container so they read as one set, not scattered */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', background: '#fff', border: '1px solid #e7ece7', borderRadius: 999, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, rowGap: 6, flexWrap: 'wrap', maxWidth: '100%', padding: '4px 8px', background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, flexShrink: 1 }}>
             <NumberInput label="Run ≥ days" value={minDaysStr} onChange={setMinDaysStr} placeholder="0" />
             <NumberInput label="Brand ads ≥" value={minBrandAdsStr} onChange={setMinBrandAdsStr} placeholder="0" />
             <NumberInput label="Reuse ≥" value={minReuseStr} onChange={setMinReuseStr} placeholder="0" />

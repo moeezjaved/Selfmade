@@ -85,7 +85,7 @@ export default function RemakeStarter() {
           <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: '#fff', borderRadius: 20, border: '1px solid #dfe4de', boxShadow: '0 30px 90px -30px rgba(23,37,28,.4)', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderBottom: '1px solid #e0eecb', background: 'radial-gradient(90% 200% at 100% 0%, #fdf3cf 0%, transparent 50%),radial-gradient(80% 160% at 0% 30%, #e3f9d6 0%, transparent 55%),linear-gradient(120deg,#f6fceb,#f0fae2 45%,#edf8ee)' }}>
               <b style={{ fontSize: 16.5, color: L_INK, letterSpacing: '-.01em' }}>What do you want to make?</b>
-              <button onClick={() => !busy && setOpen(false)} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 9, border: '1px solid #dcebc4', background: 'rgba(255,255,255,.8)', color: '#3c473e', cursor: 'pointer' }}><X size={16} /></button>
+              <button onClick={() => !busy && setOpen(false)} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 9, border: '1px solid #dcebc4', background: 'rgba(255,255,255,.8)', color: '#3c473e', cursor: 'pointer', display: 'grid', placeItems: 'center', flex: '0 0 auto', padding: 0 }}><X size={16} /></button>
             </div>
 
             <div style={{ padding: 18 }}>
