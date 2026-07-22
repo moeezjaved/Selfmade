@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') || '/discovery'
+  const next = searchParams.get('next') || '/brief'   // land on Mello's Morning Brief, not a tool page
   const err = searchParams.get('error_description') || searchParams.get('error')
 
   if (err) return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(err)}`)
@@ -54,12 +54,12 @@ export async function GET(request: NextRequest) {
   // lookup hiccup falls through to the normal destination rather than blocking login.
   try {
     const uid = data?.user?.id
-    if (uid && (!next || next === '/discovery')) {
+    if (uid && (!next || next === '/discovery' || next === '/brief')) {
       const { data: prof } = await supabase.from('user_profiles').select('onboarding_completed').eq('user_id', uid).maybeSingle()
       if (!(prof as any)?.onboarding_completed) return NextResponse.redirect(`${origin}/onboarding`)
     }
   } catch { /* fall through */ }
 
-  const dest = next.startsWith('/') ? next : '/discovery'
+  const dest = next.startsWith('/') ? next : '/brief'
   return NextResponse.redirect(`${origin}${dest}`)
 }
