@@ -848,11 +848,21 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                           <span style={{ fontSize: 11, color: L_MUTED }}>· or just edit the script</span>
                         </div>
                       )}
+                      {/* UGC: the length bucket you picked at Step 5 sets the price, but your script sets the actual
+                          video length — a short script = a short video. If the script is well under the picked
+                          length, offer a one-tap expand to fill it (same rescript engine as Cinematic). */}
+                      {mode !== 'faithful' && words > 0 && spokenSecs < resolvedBucket - 5 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '9px 11px' }}>
+                          <span style={{ fontSize: 11.5, color: '#9a3412', fontWeight: 700 }}>Your script fills ~{spokenSecs}s of the {resolvedBucket}s you picked.</span>
+                          <button onClick={() => setLength(resolvedBucket)} disabled={rescripting} style={{ ...chip(false), padding: '5px 12px', fontSize: 12, fontWeight: 800, opacity: rescripting ? 0.5 : 1, cursor: rescripting ? 'wait' : 'pointer' }}>{rescripting ? '✍️ writing…' : `✨ Fill it to ~${resolvedBucket}s`}</button>
+                          <span style={{ fontSize: 11, color: L_MUTED }}>· or leave it short & edit yourself</span>
+                        </div>
+                      )}
                       {words > 0 && (
                         mode === 'faithful' ? (
                           <div style={{ fontSize: 11.5, marginTop: 6, color: L_MUTED }}>{words} words ≈ {spokenSecs}s of narration · ~{targetSecs}s of scenes{spokenSecs > targetSecs + 4 ? ' — the closing shot holds while the voiceover finishes. Trim for a tighter cut, or leave it.' : ' — fits nicely.'}</div>
                         ) : (
-                          <div style={{ fontSize: 11.5, marginTop: 6, color: spokenSecs > targetSecs + 4 ? '#c2410c' : spokenSecs > targetSecs ? '#a16207' : L_MUTED }}>{words} words ≈ {spokenSecs}s spoken · target ~{targetSecs}s{spokenSecs > targetSecs + 4 ? ' — too long, the delivery will feel rushed. Trim it, or pick a longer length.' : spokenSecs > targetSecs ? ' — a touch long; consider trimming.' : ' — fits comfortably.'}</div>
+                          <div style={{ fontSize: 11.5, marginTop: 6, color: spokenSecs > targetSecs + 4 ? '#c2410c' : spokenSecs > targetSecs ? '#a16207' : spokenSecs < targetSecs - 5 ? '#9a3412' : L_MUTED }}>{words} words ≈ {spokenSecs}s spoken · you picked ~{targetSecs}s{spokenSecs > targetSecs + 4 ? ' — too long, the delivery will feel rushed. Trim it, or pick a longer length.' : spokenSecs > targetSecs ? ' — a touch long; consider trimming.' : spokenSecs < targetSecs - 5 ? ` — the video will run ~${spokenSecs}s, not ${targetSecs}s. Expand the script to fill the length, or you’re paying for time you won’t use.` : ' — fits nicely.'}</div>
                         )
                       )}
                     </div>
