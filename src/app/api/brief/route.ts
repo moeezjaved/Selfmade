@@ -14,6 +14,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { resolveBrandNames } from '@/lib/discovery/brandNames'
+
+// The alert-worker sometimes stores a page_id (or nothing) as brand_name → resolve to a real name at
+// read time so the brief says "Country Delight" not "1544270769212882". All-digits counts as blank.
+const isBlankName = (b: unknown) => { const t = String(b ?? '').trim(); return !t || /^\d+$/.test(t) }
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -76,9 +81,16 @@ export async function GET() {
   // best-effort: stamp surfaced_at on what we're about to show
   if (spine.length) admin.from('brief_events').update({ surfaced_at: new Date().toISOString() }).in('id', spine.map((e: any) => e.id)).is('surfaced_at', null).then(() => {}, () => {})
 
+  // Resolve any page-id-as-name into a real brand name (shared helper, same as the notifications bell).
+  const needIds = notifs.filter((n: any) => isBlankName(n.brand_name)).map((n: any) => n.page_id).filter(Boolean)
+  if (needIds.length) {
+    const names = await soft(resolveBrandNames(admin, needIds), new Map<string, string>())
+    for (const n of notifs as any[]) if (isBlankName(n.brand_name)) n.brand_name = names.get(String(n.page_id)) || null
+  }
+
   // ── 2. Competitor drops → one item per brand, each with a "why you care" ──
   for (const n of notifs) {
-    const brand = n.brand_name || 'A brand you watch'
+    const brand = (!isBlankName(n.brand_name) && n.brand_name) || 'A brand you watch'
     const c = Math.max(1, Number(n.ad_count) || 1)
     items.push({
       kind: 'competitor_ads', importance: Math.min(85, 55 + c * 5), at: n.created_at,
