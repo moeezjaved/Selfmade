@@ -536,7 +536,8 @@ ${productTruthRule(product, isService)}
 ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera speech (ambience/music energy only). Design the visuals to fit this voiceover's arc, in order: "${String(voiceover).replace(/"/g, "'")}". Put the chunk each scene covers in its "script" field for reference only — do NOT write spoken dialogue into the prompt.` : '- No dialogue — scenes are music/ambience-driven b-roll. Leave "script" empty.'}
 - Per scene pick "duration": 5 for a quick cut, 10 for a longer beat (numbers only).
 - Per scene also report: "has_people": true if ANY person/face is visible in that reference beat (false = pure product/object/environment b-roll), "has_product": true if the user's product appears (held/used/shown) in that scene, and "src_start"/"src_end": the SECONDS range of the reference footage this scene recreates (derive from the beats' "t" ranges, e.g. "4-9s" → 4 and 9).
-Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has_people":false,"has_product":true,"src_start":0,"src_end":5}]}  (exactly ${nScenes} scenes, in order).`
+- CAST: label each distinct person "A", "B"… and use the SAME letter for the same person across every scene (A = the main character). Per scene report "cast": the letters visible in that scene ([] when no people). Most ads have ONE character — only use B when the reference clearly shows a second distinct person.
+Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has_people":false,"has_product":true,"cast":["A"],"src_start":0,"src_end":5}]}  (exactly ${nScenes} scenes, in order).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || { note: 'analysis unavailable — infer a natural multi-scene structure' })}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nProduct image tokens: ${refList || '(none)'}.`
   // VERIFIER (hook-drop): when beats > scenes, gpt has been seen "grouping" by DELETING the opening
   // person/hook beats and keeping only product b-roll (a FÜM clone opened at src 5s — the coughing-man
@@ -577,6 +578,8 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
       duration: dur,
       has_people: s.has_people !== false,   // default TRUE (safe: no ref video unless surely people-free)
       has_product: s.has_product !== false, // default TRUE (safe: route to the high-fidelity generator)
+      // Cast letters (A/B…) — same letter = same person across scenes; drives per-character anchors.
+      cast: Array.isArray(s.cast) ? s.cast.map(String).slice(0, 2) : (s.has_people !== false ? ['A'] : []),
       src_start: Number.isFinite(+s.src_start) ? Math.max(0, +s.src_start) : null,
       src_end: Number.isFinite(+s.src_end) ? +s.src_end : null,
     }
@@ -759,6 +762,28 @@ async function lastFrameAnchor(file, id, idx) {
     await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: buf, ContentType: 'image/jpeg', CacheControl: 'public, max-age=86400' }))
     return `${R2_PUBLIC}/${key}`
   } finally { await rm(jpg, { force: true }).catch(() => {}) }
+}
+
+// One consistent grade across every Cinematic scene — kills the random black-and-white / moody drift
+// that made stitched scenes read as three different ads.
+const STYLE_LOCK = ' STYLE LOCK: full colour, bright natural lighting, one consistent realistic colour grade across the whole ad — never black-and-white, never a different mood or film look from the other scenes.'
+
+// Composition still for people-free b-roll: the middle frame of the trimmed source beat, hosted on R2,
+// passed as an @Image so the shot matches the source's framing/subject placement even when the motion
+// reference is unavailable or rejected. Faceless by construction (people-free scenes only) → no
+// likeness-filter risk.
+async function stillFromClip(clipUrl, id, tag) {
+  const f = join(tmpdir(), `still-${id}-${tag}.mp4`)
+  const jpg = join(tmpdir(), `still-${id}-${tag}.jpg`)
+  try {
+    await downloadToFile(clipUrl, f)
+    const dur = (await probeDuration(f)) || 4
+    await ff(['-y', '-ss', String(Math.max(0.2, dur / 2)), '-i', f, '-frames:v', '1', '-q:v', '3', jpg])
+    const buf = await readFile(jpg)
+    const key = `creatives/tmp/${id}-${tag}-still.jpg`
+    await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: buf, ContentType: 'image/jpeg', CacheControl: 'public, max-age=86400' }))
+    return `${R2_PUBLIC}/${key}`
+  } finally { await rm(f, { force: true }).catch(() => {}); await rm(jpg, { force: true }).catch(() => {}) }
 }
 
 // ── PRODUCT-PERFECT KEYFRAME (people-scenes) ─────────────────────────────────
@@ -1705,6 +1730,11 @@ async function generateJob(job) {
         // restart (deploy/crash) RESUMES from the last completed scene instead of re-rendering —
         // and re-billing fal for — the whole job.
         const clipsDone = meta.scene_clips || {}
+        // CAST ANCHORS — the long-form-UGC identity mechanism, applied to Cinematic. The first time a
+        // character (A/B) appears in a RENDERED scene we grab a frame of them; every later scene that
+        // features them passes that frame as an @Image ref ("the SAME person as this frame"). Identity
+        // flows through pixels, not adjectives — the fix for "a different person in every scene".
+        const charAnchors = { ...(meta.scene_char_anchors || {}) }
         const N = scenes.length
         const PER_SCENE = 75   // ~seconds a scene render takes → drives the ETA
         for (let i = 0; i < scenes.length; i++) {
@@ -1751,10 +1781,23 @@ async function generateJob(job) {
               if (keyframe) console.log(`🖼 ${job.id} scene ${i + 1} keyframe composed (product-locked)`)
             } catch (e) { console.warn(`scene ${i + 1} keyframe failed (${e.message}) — continuing without`) }
           }
-          const sceneImages = keyframe ? [keyframe, ...falProductImages].slice(0, 9) : falProductImages
-          const scenePrompt = keyframe
+          // Cast for this scene (letters from the plan; default: one main character on people scenes).
+          const cast = Array.isArray(s.cast) && s.cast.length ? s.cast.map(String) : (s.has_people ? ['A'] : [])
+          const anchorRefs = [...new Set(cast.map((c) => charAnchors[c]).filter(Boolean))].slice(0, 2)
+          // People-free b-roll: a composition still from the source's same beat (faceless → likeness-safe).
+          let compStill = null
+          if (!s.has_people && sceneRef) { try { compStill = await stillFromClip(sceneRef, job.id, `sc${i}`) } catch (e) { console.warn(`scene ${i + 1} comp still:`, e.message) } }
+
+          const baseImgs = keyframe ? [keyframe, ...falProductImages] : [...falProductImages]
+          const anchorIdx = baseImgs.length + 1                       // 1-based @Image index of the first cast anchor
+          const compIdx = baseImgs.length + anchorRefs.length + 1     // …and of the composition still
+          const sceneImages = [...baseImgs, ...anchorRefs, ...(compStill ? [compStill] : [])].slice(0, 9)
+          let scenePrompt = keyframe
             ? `${s.prompt} IMPORTANT — the creator PERFORMS this action fully and visibly on camera (e.g. applies/rolls/sprays/uses the product on themselves as described) — real, continuous movement, NOT just holding the product still. The product in their hands is EXACTLY @Image1 — identical container, cap/applicator, colour and label — kept sharp and identical throughout the motion.`
             : s.prompt
+          if (anchorRefs.length) scenePrompt += ` CHARACTER LOCK: @Image${anchorIdx}${anchorRefs.length > 1 ? ` and @Image${anchorIdx + 1}` : ''} show this ad's cast one moment ago — treat ${anchorRefs.length > 1 ? 'them' : 'it'} as ground truth: the person${cast.length > 1 ? 's' : ''} in this scene ${cast.length > 1 ? 'are' : 'is'} EXACTLY the same — same face, hair, outfit and styling, continuing seamlessly. Do NOT invent a different person.`
+          if (compStill) scenePrompt += ` COMPOSITION: match the framing, subject placement and camera feel of @Image${compIdx} (a frame from the reference ad's same beat). Do NOT copy any brand text or logos from it — any product shown must be the user's product, exactly as its reference photo.`
+          scenePrompt += STYLE_LOCK
 
           let videoUrl = null
           // GENERATOR ROUTING BY CONTENT — the general fidelity rule (any product, not one vial):
@@ -1799,7 +1842,7 @@ async function generateJob(job) {
             // PEOPLE-FREE b-roll → source segment straight into Seedance as a motion reference
             // (no faces → no likeness block); prompt-only retry if fal objects anyway.
             console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, motion-ref)`)
-            try { ({ videoUrl } = await falGenerate({ prompt: s.prompt, imageUrls: falProductImages, videoUrl: sceneRef, resolution: meta.resolution, duration: renderDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false })); falCost += clipCost(meta.tier, renderDur) }
+            try { ({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, videoUrl: sceneRef, resolution: meta.resolution, duration: renderDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false })); falCost += clipCost(meta.tier, renderDur) }
             catch (e) {
               // ANY content-policy block (video ref OR image — fal mislabels which) → drop the refs and
               // let the bulletproof ladder below salvage. Real errors still surface.
@@ -1831,13 +1874,22 @@ async function generateJob(job) {
           let f = `${base}-${i}.mp4`
           await downloadToFile(videoUrl, f)
           tmp.push(f)
+          // Debuting cast member(s) in this scene → capture their identity anchor from the rendered clip
+          // (a frame near the end, same helper the UGC segment chain uses). Later scenes lock to it.
+          for (const c of cast) {
+            if (charAnchors[c]) continue
+            try {
+              const a = await lastFrameAnchor(f, job.id, `cast${c}-${i}`)
+              if (a) { charAnchors[c] = a; console.log(`🎭 ${job.id} cast anchor "${c}" captured from scene ${i + 1}`) }
+            } catch (e) { console.warn(`cast anchor ${c} (scene ${i + 1}):`, e.message) }
+          }
           f = await ensureAudio(f)          // VACE clips are silent → pad a silent track for concat
           if (!tmp.includes(f)) tmp.push(f)
           files.push(f)
           // Checkpoint this scene so a restart never re-renders (or re-bills fal for) it.
           clipsDone[i] = videoUrl
-          await stamp({ clone_meta: { ...meta, scene_plan: scenes, scene_clips: clipsDone } })
-          meta.scene_plan = scenes; meta.scene_clips = clipsDone   // keep meta current so progress writes don't clobber checkpoints
+          await stamp({ clone_meta: { ...meta, scene_plan: scenes, scene_clips: clipsDone, scene_char_anchors: charAnchors } })
+          meta.scene_plan = scenes; meta.scene_clips = clipsDone; meta.scene_char_anchors = charAnchors   // keep meta current so progress writes don't clobber checkpoints
         }
         // Assemble a full cut from a clip list: concat → VO mux → end-card. Reused by the main cut,
         // the hook variants (different scene 1) and the extra-language outputs (different VO).
@@ -2522,13 +2574,21 @@ async function tweakJob(job) {
       // appends its corrective clause. Persist the new prompt so a re-tweak / expired-clip regen uses it.
       const note = typeof t.note === 'string' ? t.note.trim().slice(0, 400) : ''
       const basePrompt = note ? await rewriteScenePrompt(scenes[i].prompt, note, meta.product_details?.name) : scenes[i].prompt
-      const prompt = `${basePrompt}${fix}`
-      scenes[i] = { ...scenes[i], prompt }
+      let prompt = `${basePrompt}${fix}`
+      // Keep the SAME cast + grade on a re-shoot: pass the character anchor(s) captured at render time
+      // and the style lock, so fixing one scene doesn't swap the person or the look.
+      const castAnchors = scenes[i].has_people !== false
+        ? [...new Set((Array.isArray(scenes[i].cast) && scenes[i].cast.length ? scenes[i].cast : ['A']).map((c) => (meta.scene_char_anchors || {})[c]).filter(Boolean))].slice(0, 2)
+        : []
+      const tweakImgs = [...productImages, ...castAnchors].slice(0, 9)
+      if (castAnchors.length) prompt += ` CHARACTER LOCK: @Image${productImages.length + 1}${castAnchors.length > 1 ? ` and @Image${productImages.length + 2}` : ''} show this ad's cast — the person${castAnchors.length > 1 ? 's' : ''} in this scene must be EXACTLY the same: same face, hair, outfit and styling.`
+      prompt += STYLE_LOCK
+      scenes[i] = { ...scenes[i], prompt: `${basePrompt}${fix}` }
       await prog(`Redoing scene ${i + 1}…`, 15, 90)
-      console.log(`🔧 ${job.id} tweak: redo scene ${i + 1} (chip=${t.chip || 'redo'}${note ? ', +note' : ''})`)
-      // Mini-ladder: product refs → no refs (pure prompt). Same never-fail contract as the main render.
+      console.log(`🔧 ${job.id} tweak: redo scene ${i + 1} (chip=${t.chip || 'redo'}${note ? ', +note' : ''}${castAnchors.length ? ', +anchor' : ''})`)
+      // Mini-ladder: product+anchor refs → no refs (pure prompt). Same never-fail contract as the main render.
       let videoUrl = null
-      try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: productImages, resolution: meta.resolution, duration: scenes[i].duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })) }
+      try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: tweakImgs, resolution: meta.resolution, duration: scenes[i].duration, aspect: meta.aspect, tier: meta.tier, generateAudio: false })) }
       catch (e) {
         if (e.code === 'content_policy_images' || e.code === 'content_policy_video') {
           console.warn(`tweak scene ${i + 1} refs blocked — pure prompt`)
