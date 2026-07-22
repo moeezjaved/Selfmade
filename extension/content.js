@@ -441,6 +441,26 @@
     return card
   }
 
+  // Compact YouTube pill (Denote-style): a small "Save" button in the top-right corner instead of the big
+  // board-picker card, so it doesn't cover the video or Denote's own small button. Saves to the last-used
+  // default board (change the board from the extension popup).
+  function ytPill(getMedia, scope, o = {}) {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'sm-yt-pill'
+    btn.innerHTML = '<img src="' + chrome.runtime.getURL('icons/icon48.png') + '" alt=""/><span>Save</span>'
+    const stop = (e) => e.stopPropagation()
+    btn.addEventListener('mousedown', stop)
+    btn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation()
+      const m = getMedia()
+      if (!m) { toast('No media found here', false); return }
+      let boardId; try { boardId = localStorage.getItem('sm_board') || undefined } catch {}
+      doSave(m, scope, btn, { saving: 'Saving…', done: '✓ Saved' }, { revert: true, boardId, forceUrl: o.forceUrl && o.forceUrl(), forceType: o.forceType })
+    })
+    return btn
+  }
+
   function mountIgCard() {
     if (!IS_IG) return
     for (const art of document.querySelectorAll('article')) {
@@ -485,7 +505,7 @@
         if (r.width < 200 || r.height < 200) continue
         if (p.querySelector('.sm-yt-host')) continue
         const host = document.createElement('div'); host.className = 'sm-yt-host'
-        const card = buildSaveCard(() => p.querySelector('video'), p, { showDownload: false, overlay: true, forceUrl: ytThumb, forceType: 'image' })
+        const card = ytPill(() => p.querySelector('video'), p, { forceUrl: ytThumb, forceType: 'image' })
         host.appendChild(card)
         if (getComputedStyle(p).position === 'static') p.style.position = 'relative'
         p.appendChild(host)
@@ -499,7 +519,7 @@
     const r = adPlayer.getBoundingClientRect()
     if (r.width < 200 || r.height < 200 || adPlayer.querySelector('.sm-yt-host')) return
     const host = document.createElement('div'); host.className = 'sm-yt-host'
-    const card = buildSaveCard(() => adPlayer.querySelector('video'), adPlayer, { showDownload: false, overlay: true, forceType: 'image' })
+    const card = ytPill(() => adPlayer.querySelector('video'), adPlayer, { forceType: 'image' })
     host.appendChild(card)
     if (getComputedStyle(adPlayer).position === 'static') adPlayer.style.position = 'relative'
     adPlayer.appendChild(host)
