@@ -122,7 +122,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   // CINEMATIC LENGTH FOLLOWS YOUR SCRIPT: render just enough scenes to cover the narration (~5.2s per
   // scene), capped at the source ad's real cut count. A short script → fewer scenes → a shorter, cheaper
   // video; a full-length script → the full set. (UGC is unaffected — it uses its chosen bucket length.)
-  const sceneCount = mode === 'faithful' ? Math.min(srcScenes, Math.max(2, Math.ceil((spokenSecs || 5) / 5.2))) : srcScenes
+  // Always the script-derived count (NOT gated on the current mode) so the Cinematic chip shows the same
+  // number whether or not it's selected — it was jumping 10→5 on click (10 = source max shown while UGC
+  // was active, 5 = the real script-length count once Cinematic was picked).
+  const sceneCount = Math.min(srcScenes, Math.max(2, Math.ceil((spokenSecs || 5) / 5.2)))
   const baseCost = mode === 'faithful'
     ? (FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]
     : nSegs > 1 ? (FAITHFUL_COST[nSegs] || FAITHFUL_COST[2])[tier] : UGC_COST[tier]
