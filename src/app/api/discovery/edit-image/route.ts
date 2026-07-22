@@ -39,19 +39,29 @@ function isPersonEdit(instruction: string): boolean {
   return re.test(s)
 }
 
+// Does the instruction explicitly ask to change what the person is WEARING? If not, an ethnicity/age
+// edit must KEEP the outfit — otherwise apparel/fashion ads (where the outfit IS the product) get wrecked.
+function mentionsOutfit(instruction: string): boolean {
+  return /\b(outfit|wardrobe|clothes|clothing|dress|dressed|attire|wear|wearing|shirt|kameez|shalwar|saree|sari|abaya|kurta|hijab|jacket|coat|pants|trousers|leggings|jeans|top|suit|uniform|costume|shorts|skirt|gown)\b/i.test(instruction)
+}
+
 function buildEditPrompt(instruction: string): string {
   const common = [
     `Output ONE photorealistic, ad-ready image at the exact same aspect ratio, with legible text.`,
   ]
   if (isPersonEdit(instruction)) {
     // Recast the talent. Lock everything that must stay, but explicitly ALLOW the person to change.
+    // Only touch the wardrobe when the instruction explicitly asks about clothing — an ethnicity/age
+    // edit alone must keep the outfit (else apparel ads, where the outfit is the product, break).
+    const keepsOutfit = !mentionsOutfit(instruction)
     return [
       `Edit this advertising image by RECASTING the person shown. Apply this change to the person: "${instruction}".`,
-      `You MUST change the person's appearance accordingly — this may include their ethnicity, skin tone, facial features, age, hair, and wardrobe. Fully replace the model; do NOT keep the original person's face or features if the instruction calls for a different look.`,
-      `Keep IDENTICAL: the pose and body position, camera framing and crop, the product (its exact shape, packaging, label, and colors and how it is held/placed), the background, all headline/subhead/logo text, and the overall lighting and style.`,
+      `You MUST change the person's appearance accordingly — this may include their ethnicity, skin tone, facial features, age${keepsOutfit ? '' : ', wardrobe'} and hair. Fully replace the model; do NOT keep the original person's face or features if the instruction calls for a different look.`,
+      keepsOutfit ? `KEEP their clothing and outfit exactly as worn — do NOT change, cover or replace what they are wearing (in apparel/fashion ads the outfit is the product being sold).` : '',
+      `Keep IDENTICAL: ${keepsOutfit ? 'the outfit and clothing, ' : ''}the pose and body position, camera framing and crop, the product (its exact shape, packaging, label, and colors and how it is held/placed), the background, all headline/subhead/logo text, and the overall lighting and style.`,
       `The result must look like the same ad reshot with a new model — natural and photorealistic, not a face swap.`,
       ...common,
-    ].join(' ')
+    ].filter(Boolean).join(' ')
   }
   return [
     `Edit this advertising image. Apply ONLY this change: "${instruction}".`,
