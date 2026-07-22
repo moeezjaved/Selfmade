@@ -304,7 +304,7 @@ export default function HomeLanding() {
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <Link href="/login" className="navlink nav-hide-sm" style={{ fontSize: 14.5, fontWeight: 700, color: INK, textDecoration: 'none' }}>Log in</Link>
-            <Link href="/signup" className="btn arrowp" style={{ ...btnPrimary, padding: '9px 18px', fontSize: 14 }}>Start for free <Arrow /></Link>
+            <Link href="/signup" className="btn arrowp" style={{ ...btnPrimary, padding: '9px 18px', fontSize: 14 }}>Hire Mello <Arrow /></Link>
             <button className="nav-burger" aria-label="Menu" onClick={() => setMenuOpen(o => !o)} style={{ background: 'none', border: 'none', fontSize: 25, lineHeight: 1, cursor: 'pointer', color: INK, padding: '4px 2px' }}>{menuOpen ? '✕' : '☰'}</button>
           </div>
         </div>
@@ -318,28 +318,93 @@ export default function HomeLanding() {
         )}
       </nav>
 
-      {/* HERO */}
-      <header style={{ ...wrap, textAlign: 'center', padding: '64px 24px 40px' }}>
-        <div style={{ display: 'inline-flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: '#6b7280', marginBottom: 26 }}>
-          <span>🗂️ 3M+ ads indexed</span><span>·</span><span>🏷️ 611K brands tracked</span><span>·</span><span>⭐ 4.9 on G2</span>
+      {/* HERO — meet your employee, not a software pitch */}
+      <header style={{ ...wrap, textAlign: 'center', padding: '58px 24px 40px' }}>
+        <div style={{ display: 'inline-flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: '#6b7280', marginBottom: 22 }}>
+          <span>🗂️ 3M+ ads studied</span><span>·</span><span>🏷️ 611K brands watched</span><span>·</span><span>🔄 refreshed daily</span>
         </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}><Mello size={120} /></div>
         <h1 style={{ fontSize: 'clamp(38px,6vw,64px)', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-.03em', margin: '0 auto', maxWidth: 900 }}>
-          <Mask>Know what&rsquo;s winning.</Mask>
-          <Mask delay={120}>Make it <span style={{ fontStyle: 'italic', color: GREEN }}>yours</span>.</Mask>
+          <Mask>Meet Mello.</Mask>
+          <Mask delay={120}>Your <span style={{ fontStyle: 'italic', color: GREEN }}>AI marketer</span>.</Mask>
         </h1>
-        <p style={{ fontSize: 'clamp(16px,2vw,19px)', color: '#4b5563', maxWidth: 660, margin: '22px auto 28px', lineHeight: 1.55 }}>
-          Selfmade decodes <b>3 million winning Meta ads</b> across 611K brands, refreshed daily — then turns any of them into <b>your ad</b> in minutes. The market intelligence big brands pay agencies for, with a <b>make button</b>.
+        <p style={{ fontSize: 'clamp(16px,2vw,19px)', color: '#4b5563', maxWidth: 640, margin: '22px auto 28px', lineHeight: 1.55 }}>
+          Mello works around the clock — <b>studies your competitors</b>, learns from <b>3 million winning ads</b>, <b>creates your creatives</b>, and reports back every morning. One employee. Never sleeps.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/signup" className="btn arrowp" style={btnPrimary}>Start for free <Arrow /></Link>
-          <a href="#how" className="btn arrowp" style={btnDark}>See how it works <Arrow c="#fff" /></a>
+          <Link href="/signup" className="btn arrowp" style={btnPrimary}>Hire Mello — it&rsquo;s free <Arrow /></Link>
+          <a href="#mello-live" className="btn arrowp" style={btnDark}>Watch Mello working <Arrow c="#fff" /></a>
         </div>
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center', flexWrap: 'wrap', marginTop: 20, fontSize: 13.5, color: '#6b7280', fontWeight: 600 }}>
           {['No card to start', '5 image ads free', 'Cancel anytime'].map(t => <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check /> {t}</span>)}
         </div>
+
+        {/* ── MELLO LIVE — today's activity, like a Slack thread from your employee ── */}
+        <div id="mello-live" style={{ maxWidth: 560, margin: '54px auto 0', textAlign: 'left' }}>
+          <div className="reveal" style={{ background: '#fff', border: '1px solid #eef0ee', borderRadius: 20, boxShadow: '0 24px 70px rgba(14,27,18,.12)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid #f0f2ef', background: '#fbfdfa' }}>
+              <span style={{ position: 'relative', display: 'inline-flex' }}>
+                <Mello size={34} />
+                <span className="soft-pulse" style={{ position: 'absolute', right: -1, bottom: 2, width: 9, height: 9, borderRadius: '50%', background: GREEN, border: '2px solid #fff' }} />
+              </span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: INK }}>Mello</div>
+                <div style={{ fontSize: 11.5, color: '#9ca3af', fontWeight: 600 }}>your AI marketer · working now</div>
+              </div>
+            </div>
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[
+                ['9:12 AM', <>Good morning 👋 While you were sleeping I scanned <b>4,183 new ads</b> across your market.</>],
+                ['9:14 AM', <>Gymshark launched <b>5 new ads</b>. Their new angle: <i>&ldquo;Discipline over motivation.&rdquo;</i></>],
+                ['9:18 AM', <>I created <b>3 creatives</b> for your brand using what&rsquo;s winning. One looks strong.</>],
+                ['9:20 AM', <>It&rsquo;s ready when you are. <b>Approve?</b></>],
+              ].map(([t, msg], i) => (
+                <Reveal key={i} delay={i * 140}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: 10.5, color: '#b7beb6', fontWeight: 700, marginTop: 5, flexShrink: 0, width: 48 }}>{t as string}</span>
+                    <div style={{ background: '#f6f8f5', borderRadius: '4px 14px 14px 14px', padding: '9px 13px', fontSize: 13.5, color: INK, lineHeight: 1.5 }}>{msg}</div>
+                  </div>
+                </Reveal>
+              ))}
+              <Reveal delay={620}>
+                <div style={{ display: 'flex', gap: 8, paddingLeft: 58 }}>
+                  <Link href="/signup" className="btn" style={{ background: INK, color: LIME, fontSize: 12.5, fontWeight: 800, padding: '9px 16px', borderRadius: 100, textDecoration: 'none' }}>✓ Review my work</Link>
+                  <Link href="/signup" className="btn" style={{ background: '#fff', color: INK, border: '1.5px solid #e7ece7', fontSize: 12.5, fontWeight: 800, padding: '9px 16px', borderRadius: 100, textDecoration: 'none' }}>See the ads</Link>
+                </div>
+              </Reveal>
+            </div>
+          </div>
+        </div>
+
         <div style={{ maxWidth: 720, margin: '48px auto 0', display: 'flex', justifyContent: 'center' }}><LandingHero /></div>
         <div style={{ maxWidth: 720, margin: '28px auto 0' }}><HeroMock slots={heroSlots} /></div>
       </header>
+
+      {/* RESPONSIBILITIES — what your employee does, not what the software has */}
+      <section style={{ ...wrap, padding: '54px 24px 20px' }}>
+        <h2 style={{ fontSize: 'clamp(28px,4vw,40px)', fontWeight: 800, textAlign: 'center', letterSpacing: '-.02em', margin: '0 0 10px' }}>
+          <Mask style={{ display: 'inline-block' }}>What your AI marketer does <span style={{ fontStyle: 'italic', color: GREEN }}>every day</span></Mask>
+        </h2>
+        <p style={{ textAlign: 'center', color: '#6b7280', margin: '0 0 34px', fontSize: 16 }}>Not features. Responsibilities — like any great hire.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
+          {[
+            ['👀', 'Watches your competitors', 'Every new campaign from the brands you care about — found before you’d ever see it.'],
+            ['🧠', 'Learns what works', 'Studies 3M+ winning ads across 611K brands, decoded into hooks, angles and formats.'],
+            ['🎨', 'Creates your creatives', 'Images, videos, UGC, hooks — built from what’s already winning in your niche.'],
+            ['🚀', 'Ships with your approval', 'Nothing goes out without you. Review, tweak a line, approve — Mello does the rest.'],
+            ['📈', 'Learns from results', 'Remembers what won and what flopped for your brand, and stops repeating mistakes.'],
+            ['💬', 'Reports back every morning', 'A daily brief of what happened and what to do about it — like a standup with your marketer.'],
+          ].map(([ic, t, d], i) => (
+            <Reveal key={t as string} delay={i * 70}>
+              <div className="lift" style={{ border: '1px solid #eef0ee', borderRadius: 20, padding: '24px 22px', background: '#fff', height: '100%' }}>
+                <div style={{ fontSize: 28, marginBottom: 10 }}>{ic}</div>
+                <div style={{ fontSize: 16.5, fontWeight: 800, color: INK, marginBottom: 6 }}>{t}</div>
+                <p style={{ fontSize: 14, color: '#6b7280', margin: 0, lineHeight: 1.55 }}>{d}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
 
       {/* META-EXPERTS positioning band */}
       <section style={{ ...wrap, padding: '30px 24px 20px' }}>

@@ -7,6 +7,7 @@ import { isFreeEmail } from '@/lib/email-domains'
 const BIZ_EMAIL_CUTOFF = Date.parse('2026-07-04T00:00:00Z')
 
 const PROTECTED = [
+  '/brief',
   '/dashboard',
   '/recommendations',
   '/campaigns',
@@ -117,8 +118,8 @@ export async function middleware(request: NextRequest) {
     }
 
     if ((pathname === '/login' || pathname === '/signup') && user) {
-      // Land in Discovery (the make-an-ad hub), not the empty Meta-analytics dashboard.
-      return NextResponse.redirect(new URL('/discovery', request.url))
+      // Land on the Morning Brief — Mello's report — not a dashboard or an empty canvas.
+      return NextResponse.redirect(new URL('/brief', request.url))
     }
 
     // ── Subscription gate ────────────────────────────────────────

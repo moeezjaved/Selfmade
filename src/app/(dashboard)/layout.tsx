@@ -16,7 +16,7 @@ import type { UserProfile } from '@/types'
 import {
   Settings, LogOut, Menu, X, Check, LifeBuoy, ChevronsUpDown, Zap, Sparkles, CreditCard, Users,
   Eye, TrendingUp, Star, Bookmark, Image as ImageIcon, Heart, Radar,
-  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, Trophy, Camera,
+  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, Trophy, Camera, Sun,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -26,9 +26,10 @@ import SavedReportsNav from '@/components/reports/SavedReportsNav'
 // Two-rail nav: each AREA is one icon in the thin rail; its `items` fill the panel. Outline icons.
 const AREAS = [
   {
-    key: 'discover', label: 'Ad Discovery', railLabel: 'Discovery', railIcon: Radar, defaultHref: '/discovery',
+    key: 'discover', label: 'Ad Discovery', railLabel: 'Discovery', railIcon: Radar, defaultHref: '/brief',
     items: [
-      { href: '/discovery',            icon: Radar,        label: 'Discovery',  badge: 'NEW' },
+      { href: '/brief',                icon: Sun,          label: 'Morning Brief', badge: 'NEW' },
+      { href: '/discovery',            icon: Radar,        label: 'Discovery',  badge: null },
       { href: '/discovery/brand-spy',  icon: Eye,          label: 'Brand Spy',  badge: 'NEW' },
       { href: '/trending',             icon: TrendingUp,   label: 'Trending',   badge: 'NEW' },
       { href: '/discovery/top-picks',  icon: Star,         label: 'Top Picks',  badge: null },
