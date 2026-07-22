@@ -5,7 +5,7 @@
   <style>
     :root { --lime: #dffe95; --ink: #14261a; }
     * { box-sizing: border-box; }
-    body { width: 340px; margin: 0; font-family: 'Inter', -apple-system, system-ui, sans-serif; background: #f6f7f5; color: #14261a; }
+    body { width: 372px; margin: 0; font-family: 'Inter', -apple-system, system-ui, sans-serif; background: #f6f7f5; color: #14261a; }
     .head { display: flex; align-items: center; gap: 9px; padding: 15px 16px 10px; }
     .head img { width: 26px; height: 26px; border-radius: 7px; }
     .head b { font-size: 15px; flex: 1; }
@@ -24,11 +24,12 @@
     .hide { display: none; }
     /* Launcher grid */
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .tile { display: flex; align-items: center; gap: 8px; padding: 10px 11px; border-radius: 10px; border: 1px solid #e2e6e1; background: #fff; font-size: 12.5px; font-weight: 700; color: #14261a; text-decoration: none; transition: border-color .12s, transform .05s; }
+    .tile { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 10px 10px; border-radius: 10px; border: 1px solid #e2e6e1; background: #fff; font-size: 12px; font-weight: 700; color: #14261a; text-decoration: none; transition: border-color .12s, transform .05s; overflow: hidden; }
     .tile:hover { border-color: #b7d98a; }
     .tile:active { transform: scale(.98); }
     .tile .ic { width: 18px; height: 18px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: #fff; flex: 0 0 auto; }
-    .tile .lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tile .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tile .new { flex: 0 0 auto; }
     .tile .new { font-size: 8.5px; font-weight: 900; color: #fff; background: #16a34a; border-radius: 20px; padding: 1px 5px; letter-spacing: .03em; }
     .fb { background: #1877f2; } .ig { background: linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888); } .tt { background: #010101; } .yt { background: #ff0000; }
     .save { margin-top: 12px; }

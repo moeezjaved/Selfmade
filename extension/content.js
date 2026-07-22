@@ -332,7 +332,9 @@
       const art = scope.closest?.('article') || scope
       const txt = (art.innerText || '').slice(0, 4000)
       if (/\bSponsored\b/i.test(txt)) return true
-      if (art.querySelector('[aria-label*="Sponsored" i], a[href*="l.facebook.com"], a[href*="l.instagram.com"], a[href*="/ads/"]')) return true
+      // Some FB ad formats label it "Ad" (not "Sponsored") — catch that in the header, plus paid-partnership.
+      if (/(^|\n)\s*(Ad|Paid partnership|Suggested for you)\b/i.test(txt.slice(0, 300))) return true
+      if (art.querySelector('[aria-label*="Sponsored" i], [aria-label="Ad" i], a[href*="l.facebook.com"], a[href*="l.instagram.com"], a[href*="/ads/"]')) return true
       if (CTA_RE.test(txt)) return true
       return false
     } catch { return false }
@@ -427,11 +429,21 @@
     if (dlBtn) dlBtn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation()
       const m = getMedia()
-      const isVid = (m instanceof HTMLVideoElement) || mediaUrl(m).type === 'video'
+      const vidEl = (m instanceof HTMLVideoElement) ? m : (m && m.querySelector ? m.querySelector('video') : null)
+      const isVid = !!vidEl || mediaUrl(m).type === 'video'
       let url = (isVid && o.resolveVideo) ? o.resolveVideo() : ''
+      // Try the REAL video source (currentSrc / <source>) before giving up — TikTok etc. stream via
+      // blob: (unfetchable), but some ad-library players expose a direct MP4.
+      if (!url && vidEl) {
+        const cand = vidEl.currentSrc || vidEl.getAttribute('src') || (vidEl.querySelector('source') && vidEl.querySelector('source').src) || ''
+        if (cand && !cand.startsWith('blob:')) url = cand
+      }
+      const gotVideo = /\.mp4|\.webm|\/video\//i.test(url)
       if (!url) { const mu = mediaUrl(m); url = (mu.url && !mu.url.startsWith('blob:')) ? mu.url : (findPoster(m) || '') }
       if (!url) { toast('Couldn’t find a downloadable file here', false); return }
-      const filename = 'selfmade-' + Date.now() + (/\.mp4/i.test(url) ? '.mp4' : '.jpg')
+      // Honest: if it's a video but we could only reach the cover frame, say so instead of a silent .jpg.
+      if (isVid && !gotVideo) { toast('This platform streams its video — saved the cover image. Use ＋Save to remake the video.', false) }
+      const filename = 'selfmade-' + Date.now() + (/\.mp4|\.webm/i.test(url) ? '.mp4' : '.jpg')
       const orig = dlBtn.textContent; dlBtn.textContent = '⤓ Saving…'
       chrome.runtime.sendMessage({ type: 'download', url, filename }, (resp) => {
         dlBtn.textContent = orig
@@ -499,16 +511,24 @@
     // SHORTS ONLY — never on a regular/long watch page, and NOT during pre-roll ads on a long video
     // (Denote doesn't show there either, and the pill over a video you're watching is intrusive).
     if (!ytIsShorts()) { document.querySelectorAll('.sm-yt-host').forEach((h) => h.remove()); return }
+    // EXACTLY ONE pill: the shorts DOM has both a #shorts-player and a wrapping ytd-reel-video-renderer
+    // (and off-screen next/prev reels), so mounting per-match produced 2+ pills. Pick the single LARGEST
+    // VISIBLE player and drop everyone else.
+    let best = null, bestArea = 0
     for (const p of document.querySelectorAll('ytd-reel-video-renderer, #shorts-player')) {
       const r = p.getBoundingClientRect()
       if (r.width < 200 || r.height < 200) continue
-      if (p.querySelector('.sm-yt-host')) continue
-      const host = document.createElement('div'); host.className = 'sm-yt-host'
-      const card = ytPill(() => p.querySelector('video'), p, { forceUrl: ytThumb, forceType: 'image' })
-      host.appendChild(card)
-      if (getComputedStyle(p).position === 'static') p.style.position = 'relative'
-      p.appendChild(host)
+      if (r.top > innerHeight * 0.6 || r.bottom < innerHeight * 0.4) continue   // only the on-screen reel
+      const a = r.width * r.height
+      if (a > bestArea) { best = p; bestArea = a }
     }
+    // remove any pill that isn't on the chosen player
+    document.querySelectorAll('.sm-yt-host').forEach((h) => { if (!best || !best.contains(h)) h.remove() })
+    if (!best || best.querySelector('.sm-yt-host')) return
+    const host = document.createElement('div'); host.className = 'sm-yt-host'
+    host.appendChild(ytPill(() => best.querySelector('video'), best, { forceUrl: ytThumb, forceType: 'image' }))
+    if (getComputedStyle(best).position === 'static') best.style.position = 'relative'
+    best.appendChild(host)
   }
 
   // Facebook Reels viewer (facebook.com/reel/…): a full-screen player, no feed articles — so the feed
@@ -519,11 +539,16 @@
   // the current frame (reel MP4s aren't fetchable).
   function mountReelPill() {
     if (!IS_FB_REEL && !IS_IG_REELS) return
+    // Pick the on-screen PORTRAIT reel video (skip square/landscape autoplay previews that have a bigger
+    // area but aren't the reel), so the pill lands on the actual reel.
     let best = null, bestArea = 0
     for (const v of document.querySelectorAll('video')) {
       const r = v.getBoundingClientRect()
+      if (r.width < 180 || r.height < 320 || r.height < r.width) continue   // reels are TALL (portrait)
+      const cy = r.top + r.height / 2
+      if (cy < innerHeight * 0.1 || cy > innerHeight * 0.95) continue        // roughly centred on screen
       const a = r.width * r.height
-      if (a > bestArea && r.width > 200 && r.height > 260) { best = v; bestArea = a }   // reels are tall
+      if (a > bestArea) { best = v; bestArea = a }
     }
     if (!best) { document.querySelectorAll('.sm-reel-host').forEach((h) => h.remove()); return }
     // Walk up to a container roughly the video's size (a stable overlay anchor, not a tiny wrapper).
