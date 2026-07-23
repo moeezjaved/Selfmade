@@ -9,7 +9,7 @@
  */
 import { createAdminClient } from '@/lib/supabase/server'
 
-export interface Memory { kind: string; content: string; category?: string | null }
+export interface Memory { kind: string; content: string; category?: string | null; created_at?: string | null; source?: string | null }
 
 const EMB_MODEL = 'text-embedding-3-small'
 
@@ -36,7 +36,7 @@ export async function getMemories(userId: string, limit = 40): Promise<Memory[]>
   try {
     const admin = createAdminClient() as any
     const { data } = await admin.from('mello_memory')
-      .select('kind, content, category').eq('user_id', userId).is('retired_at', null)
+      .select('kind, content, category, created_at, source').eq('user_id', userId).is('retired_at', null)
       .order('created_at', { ascending: false }).limit(limit)
     return (data || []) as Memory[]
   } catch { return [] }
@@ -50,7 +50,7 @@ export async function recallMemories(userId: string, query: string, limit = 8): 
     if (!vec) return []
     const admin = createAdminClient() as any
     const { data } = await admin.rpc('match_mello_memory', { p_user: userId, p_embedding: vec, p_limit: limit })
-    return (data || []).map((r: any) => ({ kind: r.kind, content: r.content, category: r.category })) as Memory[]
+    return (data || []).map((r: any) => ({ kind: r.kind, content: r.content, category: r.category, created_at: r.created_at, source: r.source })) as Memory[]
   } catch { return [] }
 }
 
@@ -75,8 +75,14 @@ export async function addMemory(
   } catch { /* best-effort */ }
 }
 
-/** Render memories as a compact system-prompt block. */
+/** Render memories as a compact system-prompt block, each stamped with WHEN and HOW it was learned so
+ *  Mello can cite it ("as you told me on Jul 2" / "you decided this on…") — the day-30 trust device. */
 export function renderMemories(mem: Memory[]): string {
   if (!mem.length) return '  (nothing remembered yet — use the `remember` tool when the user shares durable facts about their business, goals, or preferences)'
-  return mem.map(m => `  - [${m.category || m.kind}] ${m.content}`).join('\n')
+  const when = (iso?: string | null) => {
+    if (!iso) return ''
+    try { return `, learned ${new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` } catch { return '' }
+  }
+  const how = (s?: string | null) => s && s !== 'chat' ? ` via ${s === 'interview' ? 'the hiring interview' : s}` : ''
+  return mem.map(m => `  - [${m.category || m.kind}${when(m.created_at)}${how(m.source)}] ${m.content}`).join('\n')
 }
