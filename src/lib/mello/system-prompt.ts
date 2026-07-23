@@ -4,9 +4,9 @@
  * data" — it's a well-structured context window, not a fine-tune.
  */
 import { listAdAccounts } from './meta-data'
-import { getMemories, renderMemories } from './memory'
+import { getMemories, recallMemories, renderMemories, type Memory } from './memory'
 
-export async function buildSystemPrompt(userId: string): Promise<string> {
+export async function buildSystemPrompt(userId: string, query?: string): Promise<string> {
   let accountsBlock = '  (no ad accounts connected yet — tell the user to connect Meta in Settings before pulling performance)'
   try {
     const accounts = await listAdAccounts(userId)
@@ -17,7 +17,15 @@ export async function buildSystemPrompt(userId: string): Promise<string> {
     }
   } catch { /* leave default */ }
 
-  const memoryBlock = renderMemories(await getMemories(userId))
+  // Recent memories are always injected; when we have the user's message, also pull the memories most
+  // SEMANTICALLY relevant to it (so "what did I say about discounts" surfaces that rule even if it's
+  // hundreds of notes back) and float them to the top, deduped.
+  const recent = await getMemories(userId)
+  const relevant = query ? await recallMemories(userId, query, 8) : []
+  const seen = new Set<string>()
+  const merged: Memory[] = []
+  for (const m of [...relevant, ...recent]) { if (seen.has(m.content)) continue; seen.add(m.content); merged.push(m) }
+  const memoryBlock = renderMemories(merged.slice(0, 48))
   const today = new Date().toISOString().slice(0, 10)
 
   return `You are Mello, an AI marketing analyst embedded in Selfmade. You help marketing teams diagnose ad performance, find patterns, generate creative, and get inspiration from top-performing ads. You are trained on insights from billions in ad spend across Selfmade's ad-intelligence library.
