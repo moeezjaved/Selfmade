@@ -14,7 +14,7 @@ import { ArrowRight, ArrowUp } from 'lucide-react'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
-type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; at?: string }
+type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null }[]; at?: string }
 type Brief = {
   summary: { adsScanned: number; brandsWatched: number; spiedBrands: number; creativesReady: number }
   firstName: string | null
@@ -59,6 +59,24 @@ function Thumb({ src, w = 78, h = 96 }: { src: string; w?: number; h?: number })
   }
   /* eslint-disable-next-line @next/next/no-img-element */
   return <img src={src} alt="" style={box} />
+}
+
+/** A competitor-ad preview: poster image, and if it's a video, hover to play a few seconds inline. */
+function AdPreview({ image, videoUrl, w = 62, h = 78 }: { image: string | null; videoUrl: string | null; w?: number; h?: number }) {
+  const ref = useRef<HTMLVideoElement | null>(null)
+  const box: React.CSSProperties = { width: w, height: h, borderRadius: 10, objectFit: 'cover', border: `1px solid ${LINE}`, background: '#0d120e', display: 'block' }
+  if (videoUrl) {
+    return (
+      <span style={{ position: 'relative', display: 'inline-block' }}
+        onMouseEnter={() => { const v = ref.current; if (v) { v.currentTime = 0; v.play().catch(() => {}) } }}
+        onMouseLeave={() => { const v = ref.current; if (v) { v.pause() } }}>
+        <video ref={ref} src={videoUrl} poster={image || undefined} muted loop playsInline preload="metadata" style={box} />
+        <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 15, textShadow: '0 2px 8px rgba(0,0,0,.55)', pointerEvents: 'none' }}>▶</span>
+      </span>
+    )
+  }
+  if (image) /* eslint-disable-next-line @next/next/no-img-element */ return <img src={image} alt="" style={box} />
+  return <span style={box} />
 }
 
 /** A line Mello speaks — appears with a gentle rise so the standup has a spoken rhythm on first load. */
@@ -166,6 +184,13 @@ export default function StandupPage() {
                 {isHeadline && !!it.thumbs?.length && (
                   <div style={{ display: 'flex', gap: 9, margin: '-4px 0 14px' }}>
                     {it.thumbs.slice(0, 3).map((t, k) => <Thumb key={k} src={t} />)}
+                  </div>
+                )}
+
+                {/* competitor ads — show the actual creatives, hover a video to preview it */}
+                {!isHeadline && !!it.media?.length && (
+                  <div style={{ display: 'flex', gap: 8, margin: '-2px 0 14px' }}>
+                    {it.media.slice(0, 3).map((m, k) => <AdPreview key={k} image={m.image} videoUrl={m.videoUrl} />)}
                   </div>
                 )}
 
