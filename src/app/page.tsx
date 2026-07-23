@@ -5,7 +5,7 @@
  * (The previous root landing was moved to src/legacy/old-root-landing.tsx.bak — kept, not deleted.)
  */
 import type { Metadata } from 'next'
-import HomeLanding from '@/components/HomeLanding'
+import HireKeynote from './hire/HireKeynote'
 
 const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
 const TITLE = 'Selfmade — Hire Your First AI Marketer'
@@ -39,7 +39,7 @@ export default function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <HomeLanding />
+      <HireKeynote />
     </>
   )
 }

@@ -32,6 +32,7 @@ export default function HireKeynote() {
     // covers the whole scroll — the keynote is a black stage regardless of the surrounding app theme.
     <div ref={rvRoot} style={{ background: '#0a0d0a', minHeight: '100vh', color: '#f2f5ef' }}>
       <span className="brand">Selfmade</span>
+      <a className="toplogin" href="/login">Log in</a>
 
       <section className="beat">
         <p className="rv">Every morning, marketers wake&nbsp;up already behind.</p>
@@ -94,11 +95,14 @@ export default function HireKeynote() {
 
       <div className="after">
         <p>{hired ? `Welcome aboard${name.trim() ? ', ' + name.trim().split(' ')[0] : ''} — your first brief arrives tomorrow morning.` : 'Your first brief arrives tomorrow morning.'}</p>
+        <a className="afterlink" href="/home">How Mello works &amp; pricing →</a>
       </div>
 
       <style>{`
         html,body{background:#0a0d0a}
-        .brand{position:fixed;top:26px;left:30px;font-size:14px;font-weight:800;letter-spacing:-.02em;color:#f2f5ef;z-index:10;mix-blend-mode:difference}
+        .brand{position:fixed;top:24px;left:32px;font-size:22px;font-weight:850;letter-spacing:-.03em;color:#f2f5ef;z-index:10;mix-blend-mode:difference}
+        .toplogin{position:fixed;top:28px;right:32px;font-size:14px;font-weight:700;letter-spacing:-.01em;color:#8b978a;text-decoration:none;z-index:10;transition:color .2s}
+        .toplogin:hover{color:#f2f5ef}
         .beat{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;position:relative;font-family:'Inter',-apple-system,system-ui,sans-serif}
         .beat p{font-size:clamp(30px,5.6vw,64px);font-weight:800;letter-spacing:-.04em;line-height:1.12;max-width:20ch;text-wrap:balance;color:#f2f5ef}
         .beat .small{font-size:clamp(16px,2vw,20px);font-weight:600;color:#8b978a!important;letter-spacing:-.01em;max-width:44ch;line-height:1.6;margin-top:22px}
@@ -145,6 +149,8 @@ export default function HireKeynote() {
         .p-fine{text-align:center;font-size:11.5px;color:#8a927f;margin-top:16px}
         .after{min-height:46vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;padding:0 24px;font-family:'Inter',-apple-system,system-ui,sans-serif}
         .after p{font-size:15px;color:#5d675c;font-weight:600}
+        .afterlink{font-size:13px;color:#8b978a;font-weight:700;text-decoration:none;border-bottom:1px solid #2a332a;padding-bottom:2px;transition:color .2s}
+        .afterlink:hover{color:#dffe95}
       `}</style>
     </div>
   )
