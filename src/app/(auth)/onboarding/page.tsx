@@ -31,6 +31,16 @@ const COUNTRIES = [
   ['CA', 'Canada'], ['AU', 'Australia'], ['DE', 'Germany'], ['IN', 'India'], ['FR', 'France'],
 ] as const
 
+// Pull a Meta page id out of a Facebook Ad Library link (view_all_page_id=…) or a bare numeric id, so
+// a founder can add any competitor by pasting the link — even one not yet in our index.
+function extractPageId(s: string): string | null {
+  const t = (s || '').trim()
+  const m = t.match(/(?:view_all_page_id|page_id|[?&]id)=(\d{5,})/i) || t.match(/\/(\d{7,})(?:[/?]|$)/)
+  if (m) return m[1]
+  if (/^\d{7,}$/.test(t)) return t
+  return null
+}
+
 function Mello({ size = 54 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 160 160">
@@ -346,7 +356,20 @@ export default function InterviewPage() {
                     </button>
                   )
                 })}
-                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search any brand…" style={{ ...inputCss, marginTop: 8 }} />
+                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by name, or paste a Facebook Ad Library link…" style={{ ...inputCss, marginTop: 8 }} />
+                {/* Manual add: if they pasted a Facebook Ad Library URL (or a page id), let them add that
+                    brand directly even if it isn't in our index yet — extractPageId reads view_all_page_id. */}
+                {(() => {
+                  const id = extractPageId(q)
+                  if (!id || picks.some(p => p.pageId === id) || results.some(r => r.pageId === id)) return null
+                  return (
+                    <button onClick={() => { togglePick({ pageId: id, name: `Facebook page ${id}` }); setQ('') }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', background: SELBG, border: `1.5px solid ${SELBORDER}`, borderRadius: 11, padding: '9px 11px', marginTop: 6, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <span style={{ fontSize: 15 }}>📘</span>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 750, color: INK }}>Add this brand from the Ad Library <span style={{ color: MUTED, fontWeight: 600 }}>· page {id}</span></span>
+                      <span style={{ fontSize: 13, fontWeight: 900, color: GREEN }}>+</span>
+                    </button>
+                  )
+                })()}
                 {results.filter(r => !picks.some(p => p.pageId === r.pageId) && !suggested.some(s => s.pageId === r.pageId)).slice(0, 4).map(c => (
                   <button key={c.pageId} onClick={() => { togglePick(c); setQ('') }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderRadius: 11, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}

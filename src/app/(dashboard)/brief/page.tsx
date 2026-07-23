@@ -108,6 +108,9 @@ export default function StandupPage() {
   }
 
   const markActed = (it: Item) => { if (it.id) fetch('/api/brief', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: it.id }) }).catch(() => {}) }
+  // Day-30 memory: log approve/kill decisions so Mello can cite them later ("you passed on this on Jul 23").
+  const logDecision = (content: string) =>
+    fetch('/api/interview/notebook', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entries: [{ kind: 'decision', content }], source: 'standup' }) }).catch(() => {})
 
   return (
     <div style={{ maxWidth: 620, margin: '0 auto', padding: '26px 20px 150px', fontFamily: "'Inter', -apple-system, sans-serif" }}>
@@ -169,7 +172,7 @@ export default function StandupPage() {
                 {/* interrupt in plain language — contextual quick replies + the real action */}
                 <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', margin: '-4px 0 22px' }}>
                   {isHeadline && it.cta_href && headlineState !== 'passed' && (
-                    <Link href={it.cta_href} onClick={() => { markActed(it); setHeadlineState('approved') }} style={{ background: FOREST, color: LIME, fontSize: 12.5, fontWeight: 800, padding: '9px 15px', borderRadius: 100, textDecoration: 'none' }}>
+                    <Link href={it.cta_href} onClick={() => { markActed(it); setHeadlineState('approved'); logDecision(`Approved a creative from the brief: "${it.title}" (${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`) }} style={{ background: FOREST, color: LIME, fontSize: 12.5, fontWeight: 800, padding: '9px 15px', borderRadius: 100, textDecoration: 'none' }}>
                       ✓ {headlineState === 'approved' ? 'Opening…' : (it.cta_label || 'Review & approve')}
                     </Link>
                   )}
@@ -179,7 +182,11 @@ export default function StandupPage() {
                     </Link>
                   )}
                   {quick.map(qr => (
-                    <button key={qr} onClick={() => { setFocusItem(it); say(qr, it) }} disabled={busy} style={{ background: 'transparent', border: `1.5px solid ${LINE}`, color: INK, fontSize: 12.5, fontWeight: 750, padding: '9px 14px', borderRadius: 100, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, fontFamily: 'inherit' }}>
+                    <button key={qr} onClick={() => {
+                      setFocusItem(it); say(qr, it)
+                      if (isHeadline && qr === 'Not today') { setHeadlineState('passed'); logDecision(`Passed on a suggested creative: "${it.title}" (${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`) }
+                      if (isHeadline && qr === 'Ship it') logDecision(`Shipped a creative from the brief: "${it.title}" (${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`)
+                    }} disabled={busy} style={{ background: 'transparent', border: `1.5px solid ${LINE}`, color: INK, fontSize: 12.5, fontWeight: 750, padding: '9px 14px', borderRadius: 100, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, fontFamily: 'inherit' }}>
                       {qr}
                     </button>
                   ))}
