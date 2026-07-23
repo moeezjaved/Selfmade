@@ -8,6 +8,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import TrailRecorder from '@/components/knowledge/TrailRecorder'
+import Understand from '@/components/knowledge/Understand'
 
 export const revalidate = 3600
 
@@ -73,7 +74,8 @@ export default async function AdKnowledgePage({ params }: { params: { adId: stri
         {/* media */}
         <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#0d120e', border: `1px solid ${LINE}` }}>
           {m?.videoUrl
-            ? <video src={m.videoUrl} poster={m.image || undefined} controls playsInline style={{ width: '100%', display: 'block' }} />
+            /* WATCH — plays the moment you arrive (muted, per platform rules); controls for sound */
+            ? <video src={m.videoUrl} poster={m.image || undefined} controls playsInline autoPlay muted loop style={{ width: '100%', display: 'block' }} />
             /* eslint-disable-next-line @next/next/no-img-element */
             : m?.image ? <img src={m.image} alt={`${ad.page_name} ad`} style={{ width: '100%', display: 'block' }} /> : <div style={{ aspectRatio: '3/4' }} />}
         </div>
@@ -99,11 +101,15 @@ export default async function AdKnowledgePage({ params }: { params: { adId: stri
           )}
 
           {countries.length > 0 && (
-            <div style={{ marginBottom: 18, fontSize: 13, color: MUTED }}><b style={{ color: INK }}>Where it runs:</b> {countries.join(', ')}{(ad.targeted_countries || []).length > 8 ? ` +${(ad.targeted_countries || []).length - 8} more` : ''}</div>
+            <div style={{ marginBottom: 4, fontSize: 13, color: MUTED }}><b style={{ color: INK }}>Where it runs:</b> {countries.join(', ')}{(ad.targeted_countries || []).length > 8 ? ` +${(ad.targeted_countries || []).length - 8} more` : ''}</div>
           )}
 
-          <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
-            <Link href={`/signup`} style={{ background: FOREST, color: LIME, fontSize: 13, fontWeight: 800, padding: '11px 18px', borderRadius: 100, textDecoration: 'none' }}>✨ Remake this with my product</Link>
+          {/* UNDERSTAND — Mello's why-this-works, generated on first visit, cached forever */}
+          <Understand adId={params.adId} />
+
+          {/* REMAKE — the entire business in one button; routes into the logged-in remake flow */}
+          <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Link href={`/discovery/${params.adId}`} style={{ background: LIME, color: FOREST, fontSize: 14.5, fontWeight: 850, padding: '13px 24px', borderRadius: 100, textDecoration: 'none', boxShadow: '0 14px 30px -14px rgba(23,37,28,.45)' }}>✨ Remake for my brand</Link>
             <Link href={`/knowledge/brand/${ad.page_id}`} style={{ background: '#fff', border: `1.5px solid ${LINE}`, color: INK, fontSize: 13, fontWeight: 800, padding: '11px 18px', borderRadius: 100, textDecoration: 'none' }}>The brand&rsquo;s full file →</Link>
           </div>
         </div>
