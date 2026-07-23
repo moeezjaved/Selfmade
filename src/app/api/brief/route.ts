@@ -176,9 +176,11 @@ export async function GET() {
     })
   }
 
-  // ── 4b. THE SYNTHESIS (our whole concept): don't just list drops — read the market. Across the
-  //        freshest competitor ads, what FORMAT is winning, what HOOK is common, what's the split. ──
-  if (marketAds.length >= 6) {
+  // ── 4b. THE SYNTHESIS (our whole concept): don't just list drops — READ the market. The format
+  //        split (video vs image) is always available from the media; hook/format come from the
+  //        pre-classified DNA. We always speak the read we have, and say plainly when the deeper
+  //        pattern is still decoding — visible progress beats silence. ──
+  if (marketAds.length >= 5) {
     let video = 0, imageN = 0
     const hookM = new Map<string, number>(), fmtM = new Map<string, number>()
     for (const a of marketAds) {
@@ -190,19 +192,22 @@ export async function GET() {
     const total = video + imageN
     const topHook = Array.from(hookM.entries()).sort((a, b) => b[1] - a[1])[0]
     const topFmt = Array.from(fmtM.entries()).sort((a, b) => b[1] - a[1])[0]
+    const classified = hookM.size + fmtM.size
     const vidPct = total ? Math.round((video / total) * 100) : 0
-    const parts: string[] = []
-    if (total) parts.push(`${vidPct >= 50 ? `video is winning — ${vidPct}% of new ads` : `still image-led — only ${vidPct}% video`}`)
-    if (topFmt) parts.push(`the format they keep reaching for is “${topFmt[0]}”`)
-    if (topHook) parts.push(`the common hook is “${topHook[0]}”`)
-    if (parts.length >= 2) {
+    if (total >= 5) {
+      const parts: string[] = [vidPct >= 50 ? `video is winning — ${vidPct}% of their new ads` : `it's still image-led — only ${vidPct}% are video`]
+      if (topFmt) parts.push(`the format they keep reaching for is “${topFmt[0]}”`)
+      if (topHook) parts.push(`the common hook is “${topHook[0]}”`)
+      const stillDecoding = !topFmt && !topHook
       items.push({
         kind: 'market_read', importance: 78,
         title: `What's working across your competitors this week: ${parts.join(', ')}.`,
-        body: `Read from ${marketAds.length} fresh ads across the brands you watch — ${video} video, ${imageN} image. ${vidPct >= 50 ? 'If you’re still shipping static, that’s the gap.' : 'Static still holds here — don’t over-rotate to video yet.'}`,
+        body: stillDecoding
+          ? `Read from ${total} fresh ads — ${video} video, ${imageN} image. I'm still decoding the hooks and formats on the newest ones — the finer pattern read lands in tomorrow's brief.`
+          : `Read from ${total} fresh ads across the brands you watch — ${video} video, ${imageN} image. ${vidPct >= 50 ? 'If you’re still shipping static, that’s the gap.' : 'Static still holds here — don’t over-rotate to video yet.'}`,
         why: `This is the pattern to copy before it saturates — I can build you one in this format.`,
-        cta_label: topHook ? `Make one like this` : 'Explore the winners',
-        cta_href: `/discovery?q=${encodeURIComponent((topHook?.[0] || top[0]?.[0] || '') as string)}`,
+        cta_label: stillDecoding ? 'See the ads' : 'Make one like this',
+        cta_href: topHook ? `/discovery?q=${encodeURIComponent(topHook[0] as string)}` : '/discovery/brand-spy',
       })
     }
   }
