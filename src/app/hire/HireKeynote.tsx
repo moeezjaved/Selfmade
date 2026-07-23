@@ -28,7 +28,9 @@ export default function HireKeynote() {
   }
 
   return (
-    <div ref={rvRoot}>
+    // Inline black background wins over the app's global body.bg-dark (class > element selector) and
+    // covers the whole scroll — the keynote is a black stage regardless of the surrounding app theme.
+    <div ref={rvRoot} style={{ background: '#0a0d0a', minHeight: '100vh', color: '#f2f5ef' }}>
       <span className="brand">Selfmade</span>
 
       <section className="beat">
