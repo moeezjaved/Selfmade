@@ -24,7 +24,6 @@ type Card = { id: string; icon: any; badge: string; tone: Tone; title: string; d
 export default function TryMello() {
   const router = useRouter()
   const [dismissed, setDismissed] = useState<string[]>([])
-  const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [makeAds, setMakeAds] = useState(false)
@@ -32,9 +31,10 @@ export default function TryMello() {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Cards render immediately (SSR + first paint show all 5, dismissed=[]); after mount
+  // we hide any the user already dismissed — no flash, no hydration mismatch.
   useEffect(() => {
     try { setDismissed(JSON.parse(localStorage.getItem(DISMISS_KEY) || '[]')) } catch {}
-    setReady(true)
   }, [])
   const dismiss = (id: string) => {
     const next = Array.from(new Set([...dismissed, id]))
@@ -71,7 +71,7 @@ export default function TryMello() {
     { id: 'daily', icon: CalendarClock, badge: 'Opportunity', tone: 'opp', title: 'Let Mello make ads for you daily', desc: 'Pick how many per day — see the credit cost first, then Mello delivers them to your brief every morning.', cta: 'Set it up', run: () => setMakeAds(true) },
   ]
   const visible = cards.filter(c => !dismissed.includes(c.id))
-  if (!ready || visible.length === 0) return null
+  if (visible.length === 0) return null
 
   return (
     <div style={{ marginBottom: 26 }}>
