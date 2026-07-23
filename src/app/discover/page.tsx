@@ -16,6 +16,7 @@ import ForYou from './ForYou'
 import AdMedia from './AdMedia'
 import Reveal from './Reveal'
 import TrailRecorder from '@/components/knowledge/TrailRecorder'
+import KnowledgeChrome from '@/components/app/KnowledgeChrome'
 
 export const revalidate = 1800
 
@@ -115,19 +116,11 @@ export default async function DiscoverPage() {
   const resolveBy = new Date(Date.now() + 14 * 86400e3).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
 
   return (
+    <KnowledgeChrome>
     <div className="disc-root" style={{ minHeight: '100vh', background: '#fff', fontFamily: "'Inter', -apple-system, sans-serif", color: INK }}>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <TrailRecorder node="edition" />
       <Reveal />
-
-      {/* whisper-quiet entrance */}
-      <div className="wrap w-wide" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 26px' }}>
-        <Link href="/" style={{ fontWeight: 850, fontSize: 17, letterSpacing: '-.02em', color: INK, textDecoration: 'none' }}>Selfmade</Link>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <Link href="/search" style={{ fontSize: 12.5, color: MUTED, textDecoration: 'none', border: `1px solid ${LINE}`, borderRadius: 100, padding: '7px 16px', fontWeight: 600 }}>Search knowledge…</Link>
-          <Link href="/brief" style={{ fontSize: 12.5, fontWeight: 800, color: INK, textDecoration: 'none' }}>Open app →</Link>
-        </div>
-      </div>
 
       {/* ══ ROOM 1 · MORNING NOTE — opening the newspaper. Narrow, airy, nothing competes. ══ */}
       <section data-reveal className="wrap w-narrow" style={{ padding: '70px 26px 20px' }}>
@@ -330,5 +323,6 @@ export default async function DiscoverPage() {
         — End of today&rsquo;s edition. Tomorrow&rsquo;s is already being hung. —
       </div>
     </div>
+    </KnowledgeChrome>
   )
 }

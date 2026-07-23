@@ -11,6 +11,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import AdMedia from '@/app/discover/AdMedia'
 import TrailRecorder from '@/components/knowledge/TrailRecorder'
 import { agoLabel } from '@/lib/playbooks/featured'
+import KnowledgeChrome from '@/components/app/KnowledgeChrome'
 
 export const revalidate = 900
 
@@ -124,16 +125,10 @@ export default async function PlaybookPage({ params }: { params: { slug: string 
   )
 
   return (
+    <KnowledgeChrome>
     <div style={{ minHeight: '100vh', background: '#fff', fontFamily: "'Inter', -apple-system, sans-serif", color: INK }}>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <TrailRecorder node={`playbook:${params.slug}`} />
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 28px', maxWidth: 1200, margin: '0 auto' }}>
-        <Link href="/" style={{ fontWeight: 850, fontSize: 17, letterSpacing: '-.02em', color: INK, textDecoration: 'none' }}>Selfmade</Link>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <Link href="/playbooks" style={{ fontSize: 12.5, color: MUTED, textDecoration: 'none', fontWeight: 700 }}>All playbooks</Link>
-          <Link href="/brief" style={{ fontSize: 12.5, fontWeight: 800, color: INK, textDecoration: 'none' }}>Open app →</Link>
-        </div>
-      </div>
 
       {/* hero */}
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 26px 8px' }}>
@@ -184,5 +179,6 @@ export default async function PlaybookPage({ params }: { params: { slug: string 
         </div>
       </div>
     </div>
+    </KnowledgeChrome>
   )
 }

@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import KnowledgeChrome from '@/components/app/KnowledgeChrome'
 
 type Item = { label: string; sub?: string; href: string; kind: string }
 type Section = { title: string; items: Item[] }
@@ -33,14 +34,8 @@ export default function SearchPage() {
   }, [q])
 
   return (
+    <KnowledgeChrome>
     <div style={{ minHeight: '100vh', background: '#fff', fontFamily: "'Inter', -apple-system, sans-serif", color: INK }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 28px', maxWidth: 860, margin: '0 auto' }}>
-        <Link href="/" style={{ fontWeight: 850, fontSize: 17, letterSpacing: '-.02em', color: INK, textDecoration: 'none' }}>Selfmade</Link>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <Link href="/discover" style={{ fontSize: 12.5, color: MUTED, textDecoration: 'none', fontWeight: 700 }}>Today&rsquo;s Edition</Link>
-          <Link href="/brief" style={{ fontSize: 12.5, fontWeight: 800, color: INK, textDecoration: 'none' }}>Open app →</Link>
-        </div>
-      </div>
 
       <div style={{ maxWidth: 620, margin: '0 auto', padding: '40px 24px 100px' }}>
         <h1 style={{ fontSize: 'clamp(24px,4vw,32px)', fontWeight: 800, letterSpacing: '-.028em', margin: '0 0 18px' }}>Search marketing knowledge</h1>
@@ -67,5 +62,6 @@ export default function SearchPage() {
         </div>
       </div>
     </div>
+    </KnowledgeChrome>
   )
 }
