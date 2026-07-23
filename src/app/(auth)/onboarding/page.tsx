@@ -1,788 +1,473 @@
 'use client'
 /**
- * Onboarding — competitor-first setup, in the light wizard style (matches the Remake wizard):
- *   1. Your brand    — physical / app / service + paste URL → detect-product builds the brand kit.
- *   2. What you sell — niche chips (competitor-suggestion seed + benchmarking).
- *   3. Competitors   — pick up to 3 (search 4.3M crawled brands + the 605K directory);
- *                      on continue we fire crawlOnly express pulls + follow each brand.
- *   4. Where ads come from — the 3 remake sources (Discovery / Chrome extension / Assets) while
- *                      the pulls stream in live.
- *   5. Make your first ad — each competitor's top image + top video, remade with the user's product.
- * Finish → user_profiles.onboarding_completed = true → /discovery (or My Creatives if they cloned).
+ * THE INTERVIEW — onboarding rebuilt as the first meeting between a founder and their AI marketer.
+ * (The old 5-step wizard is preserved at src/legacy/old-onboarding-wizard.tsx.bak.)
  *
- * NOTE: presentation only was reskinned from the old dark survey. Every handler / API call / effect
- * below is unchanged; step 1 additionally captures brand_type + a one-line description so the first
- * ad's copy is grounded (esp. for app/service brands).
+ * Beats: welcome → homework (real crawl, live log) → smart guess ("correct me if I'm wrong") →
+ *        markets + competitors (country-aware) → the questions only a human can answer (each with
+ *        its WHY) → integrations (honest SOON while the Meta app is in review) → the employment
+ *        agreement (countersigned) → "I'm starting work now" night screen → /brief (first standup).
+ *
+ * Two rules from the design room, enforced in code:
+ *  · never ask what we can infer — the site is read for real (detect-product + interview/analyze)
+ *    and presented as observations with a tiny [fix], not questions
+ *  · no fake ticks — every work-log line corresponds to a real request resolving
+ * Everything learned lands in mello_memory (the notebook) — the same table the Mello agent injects
+ * into every conversation, so the standup can cite day-one answers forever.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import CloneModal from '@/app/(dashboard)/discovery/CloneModal'
-import CloneVideoModal from '@/app/(dashboard)/discovery/CloneVideoModal'
-import RadarSearch from '@/components/motion/RadarSearch'
-import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
-// ── Light theme tokens (same palette as the Remake wizard) ──
-const SHELL = '#f6f8f5', CARD = '#ffffff', INK = '#161c17', MUTED = '#68756b', FAINT = '#94a096'
-const LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f'
-const SELTEXT = '#2c4a1f', GREEN = '#3f8f4f'
+const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95'
+const GREEN = '#3f8f4f', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f', PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
 
-const STEPS = [
-  { t: 'Your brand', s: 'Logo, colors & what you do' },
-  { t: 'What you sell', s: 'Pick your category' },
-  { t: 'Your competitors', s: 'Choose up to 3 to spy on' },
-  { t: 'Where ads come from', s: 'Three sources, one click' },
-  { t: 'Make your first ad', s: 'On us' },
-]
-const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/selfmade-save-ads/eekbcgdoonpmhoojoaggpfmfgcplaefi'
-const NICHES = ['Beauty & Skincare', 'Supplements', 'Apparel & Fashion', 'Fitness', 'Home & Kitchen', 'Pets', 'Baby & Kids', 'Electronics', 'SaaS', 'Jewelry']
-const PROMOS: { key: 'physical' | 'app' | 'service'; icon: string; title: string; desc: string }[] = [
-  { key: 'physical', icon: '🧴', title: 'A physical product', desc: 'Something you ship — a bottle, box, gadget, apparel.' },
-  { key: 'app', icon: '📱', title: 'An app or website', desc: 'Software, a SaaS tool, or an online platform.' },
-  { key: 'service', icon: '🛠️', title: 'A service', desc: 'You do something for people — agency, coaching, salon, clinic.' },
-]
+type Phase = 'welcome' | 'homework' | 'guess' | 'competitors' | 'questions' | 'integrations' | 'offer' | 'night'
+type Note = { kind: string; content: string }
+type Comp = { pageId: string; name: string; avatar?: string | null; adCount?: number | null; country?: string | null }
 
-type Kit = { brandName?: string; logo?: string | null; colors?: string[]; productImages?: string[] }
-type BrandPick = { pageId: string; name: string; picture: string | null; adCount: number | string }
+const COUNTRIES = [
+  ['PK', 'Pakistan'], ['US', 'United States'], ['GB', 'United Kingdom'], ['AE', 'UAE'], ['SA', 'Saudi Arabia'],
+  ['CA', 'Canada'], ['AU', 'Australia'], ['DE', 'Germany'], ['IN', 'India'], ['FR', 'France'],
+] as const
 
-export default function OnboardingPage() {
-  const router = useRouter()
-  const supabase = createClient()
-  const [step, setStep] = useState(0)
-  const [saving, setSaving] = useState(false)
-
-  // Step 1 — store
-  const [url, setUrl] = useState('')
-  const [detecting, setDetecting] = useState(false)
-  const [kit, setKit] = useState<Kit | null>(null)
-  const [storeName, setStoreName] = useState('')
-  const [detectErr, setDetectErr] = useState('')
-  // Brand type + one-line description — what powers the FIRST ad's quality (esp. app/service copy).
-  const [promo, setPromo] = useState<'physical' | 'app' | 'service'>('physical')
-  const [brandDesc, setBrandDesc] = useState('')
-  const isService = promo !== 'physical'
-
-  // Step 2 — niche
-  const [niche, setNiche] = useState('')
-
-  // Step 3 — competitors
-  const [search, setSearch] = useState('')
-  const [results, setResults] = useState<BrandPick[]>([])
-  const [searching, setSearching] = useState(false)
-  const [picked, setPicked] = useState<BrandPick[]>([])
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Manual add — for a competitor not in our list (paste their Meta Ad Library / Facebook link).
-  const [showManual, setShowManual] = useState(false)
-  const [manualName, setManualName] = useState('')
-  const [manualLink, setManualLink] = useState('')
-  const [manualErr, setManualErr] = useState('')
-
-  // Step 4 — pulls
-  const [pullCounts, setPullCounts] = useState<Record<string, number>>({})
-  const pullsFiredRef = useRef(false)
-
-  // Step 5 — clone your first ad. Per competitor: their top-performing image + video ad.
-  type TopAd = { id: string; pageId: string; pageName: string; thumbnailUrl: string | null; videoUrl: string | null; format: string | null; performanceScore?: number | null }
-  const [topAds, setTopAds] = useState<Record<string, { image?: TopAd; video?: TopAd }>>({})
-  const [loadingAds, setLoadingAds] = useState(false)
-  const adsLoadedRef = useRef(false)
-  const [balance, setBalance] = useState<number | null>(null)
-  const [costs, setCosts] = useState<{ image: number; video: number }>({ image: 100, video: 600 })
-  const [cloneImageAd, setCloneImageAd] = useState<TopAd | null>(null)
-  const [cloneVideoAd, setCloneVideoAd] = useState<TopAd | null>(null)
-  const [videoBuyFor, setVideoBuyFor] = useState<TopAd | null>(null)
-  const [buying, setBuying] = useState(false)
-  const [showCloneIntro, setShowCloneIntro] = useState(false)   // "how the clone works" explainer (once)
-  const cloneIntroShownRef = useRef(false)
-  const [cloned, setCloned] = useState<Set<string>>(new Set())  // ad ids the user has kicked off a clone for
-
-  // ── Step 1: detect the store ──
-  const detect = async () => {
-    const u = url.trim()
-    if (!u) return
-    setDetecting(true); setDetectErr('')
-    try {
-      const r = await fetch('/api/discovery/detect-product', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url: u.startsWith('http') ? u : `https://${u}` }),
-      })
-      const d = await r.json()
-      if (!r.ok) throw new Error(d.error || 'Could not read that site')
-      // Service/app brands: use the site's own imagery (screenshots/hero), never Shopify product shots.
-      const svcImgs = (d.images || []).filter((x: string) => !(d.productImages || []).includes(x))
-      const k: Kit = {
-        brandName: d.brandName, logo: d.logo || null, colors: d.colors || [],
-        productImages: (isService ? svcImgs : (d.productImages?.length ? d.productImages : d.images)) || [],
-      }
-      setKit(k); setStoreName(d.brandName || '')
-    } catch (e: any) {
-      setDetectErr('Could not read that site — you can still continue and add your brand later.')
-    } finally { setDetecting(false) }
-  }
-
-  // Save the detected brand when leaving step 1 (best-effort — a brand-cap 402 must not block onboarding).
-  // Guarded so back/forward or re-onboarding never creates duplicate brands with the same name.
-  const brandSavedRef = useRef(false)
-  const saveBrand = async () => {
-    if (!kit || brandSavedRef.current) return
-    brandSavedRef.current = true
-    const name = (storeName || kit.brandName || 'My brand').slice(0, 60)
-    try {
-      const existing = await fetch('/api/brands').then((r) => r.json()).catch(() => ({ brands: [] }))
-      if ((existing.brands || []).some((b: any) => (b.name || '').trim().toLowerCase() === name.trim().toLowerCase())) return  // already have it
-      await fetch('/api/brands', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          website: url.trim(),
-          description: brandDesc.trim() || null,
-          brand_type: isService ? 'service' : 'physical',
-          product_images: (kit.productImages || []).slice(0, 6),
-          brand_kit: { colors: kit.colors || [], logo: kit.logo || null, category: promo },
-        }),
-      })
-    } catch { /* best-effort */ }
-  }
-
-  // ── Step 3: brand search (crawled pages + 605K directory, merged like the Discovery bar) ──
-  useEffect(() => {
-    const term = search.trim()
-    if (searchTimer.current) clearTimeout(searchTimer.current)
-    if (term.length < 2) { setResults([]); return }
-    searchTimer.current = setTimeout(async () => {
-      setSearching(true)
-      try {
-        const [pagesData, dirData] = await Promise.all([
-          fetch(`/api/discovery/pages?q=${encodeURIComponent(term)}`).then(r => r.json()).catch(() => ({ pages: [] })),
-          fetch(`/api/discovery/brands?q=${encodeURIComponent(term)}`).then(r => r.json()).catch(() => ({ brands: [] })),
-        ])
-        const crawled = (pagesData.pages || []) as any[]
-        const seen = new Set(crawled.map((p) => String(p.pageId)))
-        const dir = ((dirData.brands || []) as any[])
-          .filter((b) => !seen.has(String(b.pageId)))
-          .map((b) => ({ pageId: b.pageId, name: b.name, picture: b.avatar || null, adCount: b.adCount || '—' }))
-        setResults([...crawled.map((p) => ({ pageId: p.pageId, name: p.name, picture: p.picture || null, adCount: p.adCount || 0 })), ...dir].slice(0, 8))
-      } catch { setResults([]) } finally { setSearching(false) }
-    }, 300)
-    return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
-  }, [search])
-
-  const togglePick = (b: BrandPick) => setPicked((prev) => {
-    if (prev.some((p) => p.pageId === b.pageId)) return prev.filter((p) => p.pageId !== b.pageId)
-    if (prev.length >= 3) return prev
-    return [...prev, b]
-  })
-
-  // Pull the numeric Meta page-id out of a pasted link (Ad Library / page URL) or accept a raw id.
-  const extractPageId = (s: string): string | null => {
-    const t = s.trim()
-    const m = t.match(/view_all_page_id=(\d+)/) || t.match(/page_id=(\d+)/) || t.match(/facebook\.com\/(\d{6,})/) || t.match(/^(\d{6,})$/)
-    return m ? m[1] : null
-  }
-  const addManual = () => {
-    setManualErr('')
-    const id = extractPageId(manualLink)
-    if (!id) { setManualErr('Paste their Meta Ad Library link (it contains the page ID) or the numeric page ID.'); return }
-    if (picked.length >= 3) { setManualErr('You can pick up to 3.'); return }
-    if (picked.some((p) => p.pageId === id)) { setManualErr('Already added.'); return }
-    setPicked((prev) => [...prev, { pageId: id, name: manualName.trim() || `Brand ${id.slice(-4)}`, picture: null, adCount: '—' }])
-    setManualName(''); setManualLink(''); setShowManual(false)
-  }
-
-  // ── Fire the express pulls + follows when entering step 4 (once) ──
-  const firePulls = async () => {
-    if (pullsFiredRef.current) return
-    pullsFiredRef.current = true
-    await Promise.allSettled(picked.flatMap((b) => [
-      fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: b.pageId, name: b.name, crawlOnly: true }) }),
-      fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: b.pageId, brandName: b.name, action: 'toggle' }) }),
-    ]))
-  }
-
-  // ── Step 5: load each competitor's top image + top video ad (performance-ranked) + the balance ──
-  const loadTopAds = async () => {
-    if (adsLoadedRef.current) return
-    adsLoadedRef.current = true
-    setLoadingAds(true)
-    try {
-      const bal = await fetch('/api/credits/balance').then((r) => r.json())
-      if (typeof bal?.balance === 'number') setBalance(bal.balance)
-      const img = bal?.pricing?.image_clone_pro?.credits, vid = bal?.pricing?.video_clone?.credits
-      setCosts({ image: img || 100, video: vid || 600 })
-    } catch { /* defaults stand */ }
-    await Promise.all(picked.map(async (b) => {
-      const pick = async (format: string): Promise<TopAd | undefined> => {
-        try {
-          const j = await fetch(`/api/discovery/db-search?q=${encodeURIComponent(b.pageId)}&mode=brand&pageId=${encodeURIComponent(b.pageId)}&format=${format}&sort=performance&status=ALL`).then((r) => r.json())
-          const a = (j?.ads || []).find((x: any) => (format === 'Video' ? x.videoUrl || x.format === 'Video' : x.thumbnailUrl))
-          return a ? { id: a.id, pageId: a.pageId, pageName: a.pageName || b.name, thumbnailUrl: a.thumbnailUrl, videoUrl: a.videoUrl, format: a.format, performanceScore: a.performanceScore } : undefined
-        } catch { return undefined }
-      }
-      const [image, video] = await Promise.all([pick('Image'), pick('Video')])
-      setTopAds((prev) => ({ ...prev, [b.pageId]: { image, video } }))
-    }))
-    setLoadingAds(false)
-  }
-
-  // Open the remake wizard. We DON'T mark "cloned" on open — only when a generation actually starts
-  // (via the modal's onGenerated), so closing without creating never sends the user to an empty My Creatives.
-  const openImageClone = (ad: TopAd) => setCloneImageAd(ad)
-  const onVideoClick = (ad: TopAd) => {
-    if (balance !== null && balance < costs.video) { setVideoBuyFor(ad); return }  // low credit → offer the pack
-    setCloneVideoAd(ad)
-  }
-  const buyLaunchPack = async () => {
-    setBuying(true)
-    try {
-      const r = await fetch('/api/billing/topup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pack: 'launch' }) })
-      const d = await r.json()
-      if (d?.url) window.open(d.url, '_blank')
-    } catch { /* noop */ } finally { setBuying(false) }
-  }
-  const subscribeCreator = async () => {
-    setBuying(true)
-    try {
-      const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: 'starter', cycle: 'monthly' }) })
-      const d = await r.json()
-      if (d?.url) window.open(d.url, '_blank')
-    } catch { /* noop */ } finally { setBuying(false) }
-  }
-  useEffect(() => {
-    if (!videoBuyFor) return
-    const t = setInterval(async () => {
-      try {
-        const bal = await fetch('/api/credits/balance').then((r) => r.json())
-        if (typeof bal?.balance === 'number') {
-          setBalance(bal.balance)
-          if (bal.balance >= costs.video) {
-            const ad = videoBuyFor
-            setVideoBuyFor(null)
-            setCloneVideoAd(ad)  // straight into the clone; cloned is marked on real generation via onGenerated
-          }
-        }
-      } catch { /* keep polling */ }
-    }, 4000)
-    return () => clearInterval(t)
-  }, [videoBuyFor, costs.video])
-
-  // Live pull progress — poll each picked brand's catalog total while on step 4.
-  useEffect(() => {
-    if (step !== 3 || picked.length === 0) return
-    const t = setInterval(async () => {
-      await Promise.all(picked.map(async (b) => {
-        try {
-          const j = await fetch(`/api/discovery/brand-spy/${b.pageId}`).then((r) => r.json())
-          const total = j?.summary?.total || 0
-          if (total > 0) setPullCounts((prev) => (prev[b.pageId] === total ? prev : { ...prev, [b.pageId]: total }))
-        } catch { /* keep polling */ }
-      }))
-    }, 5000)
-    return () => clearInterval(t)
-  }, [step, picked])
-
-  const finish = async () => {
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-    await supabase.from('user_profiles').update({ niche: niche || null, onboarding_completed: true }).eq('user_id', user.id)
-    if (cloned.size > 0) router.push('/creative-studio')
-    else router.push(picked[0] ? `/discovery/brand-spy/${picked[0].pageId}` : '/discovery')
-  }
-
-  const seeAllAds = async (pageId: string) => {
-    setSaving(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) await supabase.from('user_profiles').update({ niche: niche || null, onboarding_completed: true }).eq('user_id', user.id)
-    } catch { /* best-effort */ }
-    router.push(`/discovery/brand-spy/${pageId}`)
-  }
-
-  const skipAll = async () => {
-    setSaving(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) await supabase.from('user_profiles').update({ onboarding_completed: true }).eq('user_id', user.id)
-    } catch { /* best-effort */ }
-    router.push('/discovery')
-  }
-
-  const next = async () => {
-    if (step === 0 && kit) saveBrand()               // fire-and-forget
-    if (step === 2) firePulls()                       // pulls stream while they read step 4
-    if (step === 3) {                                 // entering the clone step
-      loadTopAds()                                    // fetch each competitor's top ads
-      if (!cloneIntroShownRef.current) { cloneIntroShownRef.current = true; setShowCloneIntro(true) }  // "how it works" once
-    }
-    setStep((s) => Math.min(s + 1, STEPS.length - 1))
-  }
-
-  const canNext = [true, true, picked.length > 0, true, true][step]  // steps 1-2 skippable; ≥1 competitor to advance
-
-  // ── shared styles ──
-  const input: React.CSSProperties = { width: '100%', background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '12px 14px', fontSize: 14, color: INK, outline: 'none', fontFamily: 'inherit' }
-  const chip = (on: boolean): React.CSSProperties => ({
-    background: on ? SELBG : '#fff', border: `1.5px solid ${on ? SELBORDER : LINE}`, color: on ? SELTEXT : '#3c473e',
-    borderRadius: 100, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-  })
-  const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: FOREST, color: LIME, border: 'none', borderRadius: 12, padding: '12px 24px', fontSize: 14, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
-  const btnGhost: React.CSSProperties = { background: '#fff', border: `1.5px solid ${LINE}`, color: '#3c473e', borderRadius: 12, padding: '11px 18px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
-  const kicker: React.CSSProperties = { fontSize: 11.5, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: GREEN, marginBottom: 10 }
-  const h2: React.CSSProperties = { fontSize: 27, fontWeight: 800, color: INK, letterSpacing: '-.025em', lineHeight: 1.14, marginBottom: 10 }
-  const lead: React.CSSProperties = { fontSize: 14, color: MUTED, lineHeight: 1.6, marginBottom: 20, maxWidth: 600 }
-  const fieldLabel: React.CSSProperties = { display: 'block', fontSize: 12.5, fontWeight: 700, color: '#3c473e', marginBottom: 6 }
-
+function Mello({ size = 54 }: { size?: number }) {
   return (
-    <div style={{ minHeight: '100vh', background: SHELL, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '26px 18px 60px' }}>
-      <div style={{ width: '100%', maxWidth: 1240, background: CARD, border: `1px solid ${LINE}`, borderRadius: 24, overflow: 'hidden', boxShadow: '0 30px 90px rgba(23,37,28,.16), 0 2px 8px rgba(23,37,28,.05)' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 28px', borderBottom: `1px solid ${LINE}`, background: 'linear-gradient(100deg,#eef7e2 0%,#f2f6ff 55%,#fdf1f6 100%)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 18, fontWeight: 800, letterSpacing: '-.02em', color: INK }}><span style={{ color: GREEN }}>✦</span> Welcome to Selfmade — let’s set you up</div>
-          <button onClick={skipAll} style={{ fontSize: 12.5, color: FAINT, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Skip for now ›</button>
-        </div>
-
-        <div style={{ display: 'flex', minHeight: 640 }}>
-          {/* Rail */}
-          <aside className="ob-rail" style={{ width: 288, flexShrink: 0, borderRight: `1px solid ${LINE}`, padding: '26px 18px', background: '#fbfcfa', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.12em', color: FAINT, textTransform: 'uppercase', margin: '2px 6px 14px' }}>5 quick steps · ~2 minutes</div>
-            {STEPS.map((s, i) => {
-              const active = i === step, done = i < step
-              return (
-                <div key={s.t} onClick={() => { if (i <= step) setStep(i) }}
-                  style={{ display: 'flex', gap: 11, alignItems: 'flex-start', padding: '11px 12px', borderRadius: 14, cursor: i <= step ? 'pointer' : 'default', border: `1.5px solid ${active ? LINE : 'transparent'}`, background: active ? '#fff' : 'transparent', boxShadow: active ? '0 2px 10px rgba(23,37,28,.05)' : 'none' }}>
-                  <span style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: 800, background: active ? FOREST : done ? SELBG : '#eef1ed', color: active ? LIME : done ? GREEN : FAINT, border: done ? '1.5px solid #d8ebb9' : 'none' }}>{done ? '✓' : i + 1}</span>
-                  <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: active ? INK : MUTED }}>{s.t}</div>
-                    <div style={{ fontSize: 11.5, color: FAINT, marginTop: 1, lineHeight: 1.35 }}>{s.s}</div>
-                  </div>
-                </div>
-              )
-            })}
-            <div style={{ marginTop: 'auto', padding: '14px 8px 2px', borderTop: `1px solid ${LINE}` }}>
-              <div style={{ fontSize: 12.5, fontWeight: 800, color: INK }}>Why we ask</div>
-              <div style={{ fontSize: 11.5, color: FAINT, lineHeight: 1.5, marginTop: 3 }}>Everything here powers your remakes — your logo &amp; colors go on every ad, and your competitors feed you winning ideas daily.</div>
-            </div>
-          </aside>
-
-          {/* Main */}
-          <main className="ob-main" style={{ flex: 1, padding: '36px 44px 26px', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <div style={kicker}>Step {step + 1} of {STEPS.length}</div>
-
-            {/* ── Step 1: Your brand ── */}
-            {step === 0 && <>
-              <h2 style={h2}>First, your brand — paste your link and we do the rest</h2>
-              <p style={lead}>We grab your <b style={{ color: INK }}>logo, brand colors and product photos</b> automatically, so every ad we make already looks like yours. No design work, ever.</p>
-
-              <div style={{ marginBottom: 14 }}>
-                <label style={fieldLabel}>What are you promoting?</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {PROMOS.map((o) => {
-                    const on = promo === o.key
-                    return (
-                      <button key={o.key} type="button" onClick={() => { setPromo(o.key); setKit(null) }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', padding: '12px 14px', borderRadius: 14, cursor: 'pointer', border: on ? `2px solid ${SELBORDER}` : `1.5px solid ${LINE}`, background: on ? SELBG : '#fff', fontFamily: 'inherit' }}>
-                        <span style={{ fontSize: 21, flexShrink: 0 }}>{o.icon}</span>
-                        <span style={{ flex: 1 }}>
-                          <span style={{ display: 'block', fontSize: 13.5, fontWeight: 750, color: on ? SELTEXT : INK }}>{o.title}</span>
-                          <span style={{ display: 'block', fontSize: 11.5, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>{o.desc}</span>
-                        </span>
-                        {on && <span style={{ color: GREEN, fontWeight: 900 }}>✓</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {isService && (
-                <div style={{ marginBottom: 14 }}>
-                  <label style={fieldLabel}>What does it do? <i style={{ fontStyle: 'normal', fontWeight: 500, color: FAINT }}>· one line — your first ad’s words come from this</i></label>
-                  <input style={input} placeholder={promo === 'app' ? 'e.g. AI platform that finds winning Facebook ads and remakes them for your brand' : 'e.g. Meta-ads agency for DTC skincare brands'} value={brandDesc} onChange={(e) => setBrandDesc(e.target.value)} />
-                </div>
-              )}
-
-              <div style={{ marginBottom: 6 }}>
-                <label style={fieldLabel}>Your website {isService && <i style={{ fontStyle: 'normal', fontWeight: 500, color: FAINT }}>· optional — for your logo, colors &amp; screenshots</i>}</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input style={{ ...input, flex: 1 }} placeholder="yourstore.com" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && detect()} />
-                  <button onClick={detect} disabled={detecting || !url.trim()} style={{ ...btnGhost, whiteSpace: 'nowrap', opacity: detecting || !url.trim() ? 0.55 : 1 }}>{detecting ? 'Reading…' : '🔗 Detect'}</button>
-                </div>
-              </div>
-              {detectErr && <div style={{ marginTop: 8, fontSize: 12.5, color: '#b45309' }}>{detectErr}</div>}
-              {kit && (
-                <div style={{ marginTop: 14, background: SELBG, border: '1px solid #d8ebb9', borderRadius: 14, padding: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: SELTEXT, marginBottom: 10 }}>🎨 Found your brand kit — used on every ad</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: (kit.productImages || []).length ? 12 : 0 }}>
-                    {kit.logo
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={kit.logo} alt="" style={{ width: 38, height: 38, borderRadius: 9, objectFit: 'contain', background: '#fff', border: `1px solid ${LINE}` }} />
-                      : <div style={{ width: 38, height: 38, borderRadius: 9, background: FOREST, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 16 }}>{(storeName || '?')[0]?.toUpperCase()}</div>}
-                    <input value={storeName} onChange={(e) => setStoreName(e.target.value)} style={{ ...input, padding: '8px 11px', fontWeight: 700, flex: 1 }} />
-                    {(kit.colors || []).slice(0, 4).map((c) => <span key={c} style={{ width: 18, height: 18, borderRadius: 5, background: c, border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />)}
-                  </div>
-                  {(kit.productImages || []).length > 0 && (
-                    <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
-                      {(kit.productImages || []).slice(0, 6).map((p) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={p} src={p} alt="" style={{ width: 58, height: 58, borderRadius: 9, objectFit: 'cover', flexShrink: 0, border: `1px solid ${LINE}` }} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderTop: `1px solid ${LINE}` }}>
-                <div style={{ fontSize: 12.5, color: FAINT }}>No website yet? Just press <b style={{ color: SELTEXT }}>Next</b> — you can add it later.</div>
-                <button onClick={next} style={btnPrimary}>Next →</button>
-              </div>
-            </>}
-
-            {/* ── Step 2: Niche ── */}
-            {step === 1 && <>
-              <h2 style={h2}>What do you sell?</h2>
-              <p style={lead}>One tap. We use this to show you <b style={{ color: INK }}>winning ads from your world</b> — not random ones — and to suggest the right competitors.</p>
-              <input style={input} placeholder="e.g. Women’s activewear, hair supplements…" value={niche} onChange={(e) => setNiche(e.target.value)} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-                {NICHES.map((n) => <button key={n} onClick={() => setNiche(n)} style={chip(niche === n)}>{n}</button>)}
-              </div>
-              <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderTop: `1px solid ${LINE}` }}>
-                <div style={{ fontSize: 12.5, color: FAINT }}>Not sure? Pick the closest — you can change it anytime.</div>
-                <div style={{ display: 'flex', gap: 9 }}><button onClick={() => setStep(0)} style={btnGhost}>← Back</button><button onClick={next} style={btnPrimary}>Next →</button></div>
-              </div>
-            </>}
-
-            {/* ── Step 3: Competitors ── */}
-            {step === 2 && <>
-              <h2 style={h2}>Pick up to 3 competitors to spy on</h2>
-              <p style={lead}>We watch them <b style={{ color: INK }}>24/7</b> — every new ad they launch, which ones are winning, and what you should remake next. Search any brand in the world.</p>
-              <input style={input} placeholder={`Search 4.3M ads & 600K brands… ${niche ? `try “${niche.split(' ')[0].toLowerCase()}”` : 'e.g. Gymshark, Hims, AG1'}`} value={search} onChange={(e) => setSearch(e.target.value)} />
-              {searching && <div style={{ marginTop: 10, fontSize: 12.5, color: MUTED }}>Searching…</div>}
-              {results.length > 0 && (
-                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 280, overflowY: 'auto' }}>
-                  {results.map((b) => {
-                    const on = picked.some((p) => p.pageId === b.pageId)
-                    return (
-                      <button key={b.pageId} onClick={() => togglePick(b)} style={{ display: 'flex', alignItems: 'center', gap: 11, background: on ? SELBG : '#fff', border: on ? `2px solid ${SELBORDER}` : `1.5px solid ${LINE}`, borderRadius: 13, padding: '10px 13px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', width: '100%' }}>
-                        {b.picture
-                          // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={b.picture} alt="" style={{ width: 34, height: 34, borderRadius: 9, objectFit: 'cover', flexShrink: 0 }} />
-                          : <span style={{ width: 34, height: 34, borderRadius: 9, background: '#eef1ed', color: MUTED, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{b.name[0]?.toUpperCase()}</span>}
-                        <span style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ display: 'block', color: INK, fontSize: 13.5, fontWeight: 750, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
-                          <span style={{ display: 'block', fontSize: 11.5, color: FAINT }}>{typeof b.adCount === 'number' && b.adCount > 0 ? `${b.adCount} ads on Meta right now` : 'in our directory'}</span>
-                        </span>
-                        <span style={{ fontSize: 11, fontWeight: 800, background: on ? SELBG : '#fff', color: on ? SELTEXT : FAINT, border: `1px solid ${on ? '#d8ebb9' : LINE}`, borderRadius: 100, padding: '3px 10px', flexShrink: 0 }}>{on ? '✓ Spying' : '+ Spy'}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-              {picked.length > 0 && (
-                <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {picked.map((b) => (
-                    <span key={b.pageId} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: SELBG, border: `1px solid ${SELBORDER}`, color: SELTEXT, borderRadius: 100, padding: '6px 12px', fontSize: 13, fontWeight: 700 }}>
-                      {b.name}
-                      <button onClick={() => togglePick(b)} style={{ background: 'none', border: 'none', color: SELTEXT, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 0 }}>×</button>
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Manual add — competitor not in our list. */}
-              <div style={{ marginTop: 16 }}>
-                {!showManual ? (
-                  <button onClick={() => setShowManual(true)} style={{ background: 'none', border: 'none', color: GREEN, fontSize: 13, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
-                    + Can’t find them? Add a competitor manually
-                  </button>
-                ) : (
-                  <div style={{ background: '#fbfcfa', border: `1px solid ${LINE}`, borderRadius: 14, padding: 14 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 8 }}>Add a competitor manually</div>
-                    <input style={{ ...input, marginBottom: 8 }} placeholder="Brand name (e.g. Nike)" value={manualName} onChange={(e) => setManualName(e.target.value)} />
-                    <input style={input} placeholder="Their Meta Ad Library link, or page ID" value={manualLink} onChange={(e) => setManualLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addManual()} />
-                    <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Open their <a href="https://www.facebook.com/ads/library" target="_blank" rel="noreferrer" style={{ color: GREEN }}>Ad Library</a> page and paste the URL — it has the page ID.</div>
-                    {manualErr && <div style={{ fontSize: 12, color: '#b45309', marginTop: 6 }}>{manualErr}</div>}
-                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                      <button onClick={addManual} style={{ ...btnPrimary, padding: '9px 18px' }}>Add</button>
-                      <button onClick={() => { setShowManual(false); setManualErr('') }} style={btnGhost}>Cancel</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderTop: `1px solid ${LINE}` }}>
-                <div style={{ fontSize: 12.5, color: FAINT }}><b style={{ color: SELTEXT }}>{picked.length}/3 picked.</b> Can’t find one? Paste their Facebook link above.</div>
-                <div style={{ display: 'flex', gap: 9 }}>
-                  <button onClick={() => setStep(1)} style={btnGhost}>← Back</button>
-                  <button onClick={next} disabled={!canNext} style={{ ...btnPrimary, opacity: canNext ? 1 : 0.4, cursor: canNext ? 'pointer' : 'not-allowed' }}>{picked.length > 0 ? `Pull ${picked.length} brand${picked.length > 1 ? 's' : ''} →` : 'Pick a competitor'}</button>
-                </div>
-              </div>
-            </>}
-
-            {/* ── Step 4: Remake sources + live pulls ── */}
-            {step === 3 && <>
-              <h2 style={h2}>Great ads to remake come from three places</h2>
-              <p style={lead}>Any ad you can see, you can remake with your product. While you read this, we’re already <b style={{ color: INK }}>pulling your competitors’ ads</b> in the background.</p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {[
-                  { icon: '🔎', title: 'Discovery — 4.3M live ads', desc: <>Search every live Meta ad in the world. See one you love? Hover it → <b>Remake</b>.</>, cta: null as any },
-                  { icon: '🧩', title: 'Chrome extension — save from anywhere', desc: <>On Instagram, TikTok or the Ad Library and spot a gem? One click saves it to your boards.</>, cta: { label: 'Get the extension', href: CHROME_STORE_URL } },
-                  { icon: '📁', title: 'Your own files', desc: <>Upload images or videos you already have — we remake them with your product and branding.</>, cta: null as any },
-                ].map((c) => (
-                  <div key={c.title} style={{ display: 'flex', gap: 13, alignItems: 'flex-start', padding: '15px 16px', borderRadius: 15, border: `1.5px solid ${LINE}`, background: '#fff' }}>
-                    <span style={{ width: 38, height: 38, borderRadius: 11, background: SELBG, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0 }}>{c.icon}</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 750, color: INK }}>{c.title}</div>
-                      <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, marginTop: 2 }}>{c.desc}</div>
-                      {c.cta && <a href={c.cta.href} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 7, fontSize: 12, fontWeight: 750, color: GREEN }}>{c.cta.label} →</a>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {picked.length > 0 && (
-                // ── THE HUNT — the money moment of this step. Dark spy-radar panel: the radar sweeps
-                // for competitor ads while each brand is a chase track (🐆 sprinting after 🦌); every
-                // ad found = prey caught. Reduced-motion users get a calm static version (RadarSearch
-                // + the animations are all gated on prefers-reduced-motion).
-                <div style={{ marginTop: 16, background: 'radial-gradient(120% 160% at 20% 0%, #16301c 0%, #0e1b12 60%, #0b1610 100%)', border: '1px solid rgba(223,254,149,0.25)', borderRadius: 18, padding: '18px 20px', overflow: 'hidden', position: 'relative' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                    <div style={{ flexShrink: 0, transform: 'scale(0.82)', margin: -18 }}><RadarSearch caption="" /></div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: '-.01em' }}>🐆 On the hunt — grabbing their winning ads…</div>
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 3, marginBottom: 14 }}>Every ad they’ve ever run on Meta, pulled straight into your feed. This keeps running — no need to wait.</div>
-                      {picked.map((b, bi) => {
-                        const n = pullCounts[b.pageId] || 0
-                        const pct = n ? Math.min(92, 18 + (n % 400) / 4.6) : 8
-                        return (
-                          <div key={b.pageId} style={{ padding: '7px 0' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
-                              <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{b.name}</span>
-                              <span style={{ fontSize: 12, fontWeight: 800, color: n ? LIME : 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>{n ? `${n} ads caught` : 'stalking…'}</span>
-                            </div>
-                            {/* chase track */}
-                            <div style={{ position: 'relative', height: 34, borderRadius: 100, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(223,254,149,0.12)', overflow: 'hidden' }}>
-                              {/* savanna ground shimmer */}
-                              <div className="ob-anim" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, transparent 0%, rgba(223,254,149,0.08) 50%, transparent 100%)', backgroundSize: '200% 100%', animation: `ob-shimmer 2.6s linear ${bi * 0.4}s infinite` }} />
-                              {/* progress fill */}
-                              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: 'linear-gradient(90deg, rgba(63,143,79,0.55), rgba(223,254,149,0.35))', borderRadius: 100, transition: 'width 1.2s cubic-bezier(.22,1,.36,1)' }} />
-                              {/* the deer — always just ahead of the leopard (gentle out-of-phase bob) */}
-                              <span className="ob-anim ob-deer" style={{ position: 'absolute', top: '50%', left: `calc(${Math.min(pct + 8, 97)}% )`, fontSize: 20, animationDelay: `${bi * 0.2 + 0.5}s`, transition: 'left 1.2s cubic-bezier(.22,1,.36,1)', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.5))' }}>🦌</span>
-                              {/* the leopard — glides to the progress edge with a smooth run bob */}
-                              <span className="ob-anim ob-leo" style={{ position: 'absolute', top: '50%', left: `${pct}%`, fontSize: 24, animationDelay: `${bi * 0.2}s`, transition: 'left 1.2s cubic-bezier(.22,1,.36,1)', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,.55))' }}>🐆</span>
-                              {/* dust kicked up behind the leopard */}
-                              <span className="ob-anim ob-dustpuff" style={{ position: 'absolute', top: '60%', left: `calc(${pct}% - 20px)`, fontSize: 12, opacity: 0.6, animationDelay: `${bi * 0.2}s`, transition: 'left 1.2s cubic-bezier(.22,1,.36,1)' }}>💨</span>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ marginTop: 16, background: SELBG, border: '1px solid #d8ebb9', borderRadius: 12, padding: '12px 15px', fontSize: 13, color: SELTEXT, lineHeight: 1.5 }}>
-                🎁 <b>Your first image ads are free.</b> Want a video ad? Just <b>$6</b> each — or go <b>Creator ($49/mo)</b> for unlimited image ads + 10 videos a month.
-              </div>
-
-              <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderTop: `1px solid ${LINE}` }}>
-                <div style={{ fontSize: 12.5, color: FAINT }}>This keeps running — no need to wait for it.</div>
-                <div style={{ display: 'flex', gap: 9 }}><button onClick={() => setStep(2)} style={btnGhost}>← Back</button><button onClick={next} style={btnPrimary}>Show me their best ads →</button></div>
-              </div>
-            </>}
-
-            {/* ── Step 5: Make your first ad ── */}
-            {step === 4 && <>
-              <h2 style={h2}>Make your first ad — this one’s on us 🎁</h2>
-              <p style={lead}>These are your competitors’ <b style={{ color: INK }}>top-performing ads right now</b>. For each brand we grab their top image and their top video (tap ▶ to preview).</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: SELBG, border: '1px solid #d8ebb9', borderRadius: 12, padding: '11px 14px', marginBottom: 18, fontSize: 13, color: SELTEXT, fontWeight: 600, lineHeight: 1.45 }}>
-                <span style={{ fontSize: 18 }}>👇</span><span><b>Tap any ad below to remake it</b> — we open the editor, drop in your product, and build it in ~a minute. Your first image ad is <b>free</b>.</span>
-              </div>
-
-              {loadingAds && Object.keys(topAds).length === 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {picked.map((b) => (
-                    <div key={b.pageId} style={{ display: 'flex', gap: 12 }}>
-                      {[0, 1].map((i) => <div key={i} style={{ flex: 1, aspectRatio: '16/10', borderRadius: 15, background: '#eef1ed', animation: 'ob-pulse 1.2s infinite' }} />)}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                {picked.map((b) => {
-                  const t = topAds[b.pageId]
-                  const hasAny = t && (t.image || t.video)
-                  return (
-                    <div key={b.pageId}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
-                        {b.picture
-                          // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={b.picture} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} />
-                          : <span style={{ width: 24, height: 24, borderRadius: '50%', background: '#eef1ed', color: MUTED, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11 }}>{b.name[0]?.toUpperCase()}</span>}
-                        <span style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>{b.name}</span>
-                        <span style={{ fontSize: 11.5, color: FAINT }}>top ads</span>
-                      </div>
-                      {!hasAny ? (
-                        <div style={{ background: '#fbfcfa', border: `1px dashed ${LINE}`, borderRadius: 14, padding: 16, fontSize: 12.5, color: MUTED }}>
-                          {loadingAds ? 'Finding their best ads…' : `Still pulling ${b.name}’s ads — they’ll be in your feed shortly. Remake another competitor for now.`}
-                        </div>
-                      ) : (
-                        <>
-                          <div className="ob-adgrid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 12 }}>
-                            {t?.image && <AdCard ad={t.image} kind="image" cost={costs.image} done={cloned.has(t.image.id)} onClone={() => openImageClone(t.image!)} />}
-                            {t?.video && <AdCard ad={t.video} kind="video" cost={costs.video} done={cloned.has(t.video.id)} lowCredit={balance !== null && balance < costs.video} onClone={() => onVideoClick(t.video!)} />}
-                          </div>
-                          <button onClick={() => seeAllAds(b.pageId)} disabled={saving} style={{ marginTop: 9, background: 'none', border: 'none', color: GREEN, fontSize: 12.5, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
-                            Not these? See all {pullCounts[b.pageId] ? `${pullCounts[b.pageId]} ` : ''}{b.name} ads →
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderTop: `1px solid ${LINE}` }}>
-                <div style={{ fontSize: 12.5, color: cloned.size > 0 ? SELTEXT : FAINT }}>{cloned.size > 0 ? '🎉 Your ad is generating — it’ll be waiting in My Creatives.' : 'Tap an ad above to make your first one — or skip to browse 4.3M ads.'}</div>
-                <div style={{ display: 'flex', gap: 9 }}>
-                  <button onClick={() => setStep(3)} style={btnGhost}>← Back</button>
-                  {cloned.size > 0
-                    ? <button onClick={finish} disabled={saving} style={btnPrimary}>{saving ? 'Opening…' : 'Watch my ad being made →'}</button>
-                    : <button onClick={finish} disabled={saving} style={{ ...btnGhost, opacity: saving ? 0.6 : 1 }}>{saving ? 'Opening…' : 'Skip for now →'}</button>}
-                </div>
-              </div>
-            </>}
-          </main>
-        </div>
-      </div>
-
-      {/* "How the remake works" explainer — overlays the clone step on first arrival. */}
-      {showCloneIntro && step === 4 && (() => {
-        const refThumb = picked.map((p) => topAds[p.pageId]?.image?.thumbnailUrl || topAds[p.pageId]?.video?.thumbnailUrl).find(Boolean) || null
-        const productImg = (kit?.productImages || [])[0] || kit?.logo || null
-        const Panel = ({ src, label, badge, glow }: { src: string | null; label: string; badge?: string; glow?: boolean }) => (
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ position: 'relative', aspectRatio: '3/4', borderRadius: 13, overflow: 'hidden', background: '#f1f3f0', border: glow ? `2px solid ${SELBORDER}` : `1px solid ${LINE}` }}>
-              {src
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, background: glow ? SELBG : '#f1f3f0' }}>{glow ? '✨' : label === 'Your product' ? '📦' : '🎬'}</div>}
-              {badge && <span style={{ position: 'absolute', top: 6, left: 6, background: FOREST, color: LIME, fontSize: 9, fontWeight: 900, padding: '2px 7px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.04em' }}>{badge}</span>}
-            </div>
-            <div style={{ textAlign: 'center', fontSize: 11.5, fontWeight: 700, color: label === 'Your product' || glow ? INK : FAINT, marginTop: 6 }}>{label}</div>
-          </div>
-        )
-        return (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(23,37,28,0.35)', backdropFilter: 'blur(5px)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-            <div style={{ width: '100%', maxWidth: 620, maxHeight: '92vh', overflowY: 'auto', background: CARD, border: `1px solid ${LINE}`, borderRadius: 22, padding: 30, position: 'relative', boxShadow: '0 30px 90px rgba(23,37,28,.25)' }}>
-              <button onClick={() => setShowCloneIntro(false)} style={{ position: 'absolute', top: 16, right: 16, width: 30, height: 30, borderRadius: '50%', background: '#f1f3f0', border: `1px solid ${LINE}`, color: MUTED, cursor: 'pointer', fontSize: 15, zIndex: 2 }}>×</button>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: SELBG, border: `1px solid ${SELBORDER}`, color: SELTEXT, fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 100, marginBottom: 16 }}>✦ How it works</span>
-              <h2 style={{ fontSize: 24, fontWeight: 800, color: INK, letterSpacing: '-.02em', margin: '0 0 8px' }}>Turn any ad into your ad.</h2>
-              <p style={{ fontSize: 14, color: MUTED, margin: '0 0 18px', lineHeight: 1.5 }}>Take any competitor ad and rebuild it as a brand-new ad for <b style={{ color: INK }}>your</b> product — same winning structure, your brand.</p>
-
-              {/* Big visual: reference + your product → your new ad (each panel gets full width now) */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20 }}>
-                <Panel src={refThumb} label="Reference" />
-                <span style={{ alignSelf: 'center', color: FAINT, fontSize: 22, fontWeight: 300 }}>+</span>
-                <Panel src={productImg} label="Your product" />
-                <span style={{ alignSelf: 'center', color: GREEN, fontSize: 22 }}>→</span>
-                <Panel src={productImg} label="Your new ad" badge="AI" glow />
-              </div>
-
-              {/* The 3 steps as a clean row underneath */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                {['Pick a competitor ad you love', 'We drop in your product', 'Get a fresh ad in one click'].map((t, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, flex: '1 1 160px', background: '#fbfcfa', border: `1px solid ${LINE}`, borderRadius: 12, padding: '10px 12px' }}>
-                    <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', background: FOREST, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 12 }}>{i + 1}</span>
-                    <span style={{ fontSize: 12.5, color: INK, lineHeight: 1.3 }}>{t}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 22 }}>
-                <button onClick={() => setShowCloneIntro(false)} style={btnPrimary}>Show me their top ads →</button>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* Clone modals — the real Discovery components, mounted in-wizard. */}
-      {cloneImageAd && <CloneModal ad={{ id: cloneImageAd.id, pageId: cloneImageAd.pageId, pageName: cloneImageAd.pageName, assetImageUrl: cloneImageAd.thumbnailUrl || undefined }} onClose={() => setCloneImageAd(null)} onGenerated={() => setCloned((s) => new Set(s).add(cloneImageAd.id))} />}
-      {cloneVideoAd && <CloneVideoModal sourceAdId={cloneVideoAd.id} sourcePoster={cloneVideoAd.thumbnailUrl || undefined} onClose={() => setCloneVideoAd(null)} onGenerated={() => setCloned((s) => new Set(s).add(cloneVideoAd.id))} />}
-
-      {/* Low-credit → Launch Pack sheet (video clone). */}
-      {videoBuyFor && (
-        <div onClick={() => setVideoBuyFor(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(23,37,28,0.35)', backdropFilter: 'blur(4px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: CARD, border: `1px solid ${LINE}`, borderRadius: 22, padding: 28, textAlign: 'center', boxShadow: '0 30px 90px rgba(23,37,28,.25)' }}>
-            <div style={{ fontSize: 34, marginBottom: 10 }}>🎬</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: INK, letterSpacing: '-.01em' }}>Make it a video</div>
-            <p style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.55, margin: '10px 0 18px' }}>
-              Image ads are free — a <b style={{ color: SELTEXT }}>video ad is $6</b>. Pick how you want it, and we’ll open your remake the moment it’s ready.
-            </p>
-            <button onClick={buyLaunchPack} disabled={buying} style={{ width: '100%', textAlign: 'left', background: '#fbfcfa', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 16px', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: 'inherit', opacity: buying ? 0.6 : 1 }}>
-              <span>
-                <span style={{ display: 'block', fontSize: 15, fontWeight: 800, color: INK }}>Pay as you go</span>
-                <span style={{ display: 'block', fontSize: 12, color: MUTED }}>$9 → this video + a few more. No subscription.</span>
-              </span>
-              <span style={{ fontSize: 20, fontWeight: 900, color: GREEN, flexShrink: 0 }}>$9</span>
-            </button>
-            <button onClick={subscribeCreator} disabled={buying} style={{ width: '100%', textAlign: 'left', background: FOREST, border: 'none', borderRadius: 14, padding: '13px 16px', marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: 'inherit', opacity: buying ? 0.6 : 1 }}>
-              <span>
-                <span style={{ display: 'block', fontSize: 15, fontWeight: 800, color: LIME }}>Go Creator</span>
-                <span style={{ display: 'block', fontSize: 12, color: 'rgba(223,254,149,0.75)' }}>Unlimited image ads + 10 videos / month</span>
-              </span>
-              <span style={{ fontSize: 20, fontWeight: 900, color: LIME, flexShrink: 0 }}>$49<span style={{ fontSize: 11, fontWeight: 700 }}>/mo</span></span>
-            </button>
-            <button onClick={() => setVideoBuyFor(null)} style={{ marginTop: 8, background: 'none', border: 'none', color: FAINT, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Skip for now</button>
-            {buying && <div style={{ marginTop: 12, fontSize: 11.5, color: FAINT }}>Complete checkout in the new tab — this page updates automatically.</div>}
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes ob-pulse{0%,100%{opacity:.5}50%{opacity:1}}
-        @keyframes ob-spin{to{transform:rotate(360deg)}}
-        @keyframes ob-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
-        .ob-leo,.ob-deer{animation:ob-run 1.15s ease-in-out infinite}
-        .ob-dustpuff{animation:ob-dust 1.15s ease-out infinite}
-        @keyframes ob-run{0%,100%{transform:translate(-50%,-50%) scaleX(-1) translateY(0)}50%{transform:translate(-50%,-50%) scaleX(-1) translateY(-3px)}}
-        @keyframes ob-dust{0%{opacity:.5;transform:translate(-50%,-50%) scale(.65)}70%{opacity:.28}100%{opacity:0;transform:translate(-135%,-50%) scale(1.3)}}
-        @media(prefers-reduced-motion:reduce){.ob-anim{animation:none!important}.ob-leo,.ob-deer{transform:translate(-50%,-50%) scaleX(-1)}.ob-dustpuff{display:none}}
-        @media(max-width:840px){.ob-rail{display:none!important}}
-        @media(max-width:640px){.ob-main{padding:24px 16px 18px!important}.ob-adgrid{grid-template-columns:1fr!important}}
-      `}</style>
-    </div>
+    <svg width={size} height={size} viewBox="0 0 160 160">
+      <rect x="34" y="30" width="92" height="96" rx="34" fill={LIME} stroke={FOREST} strokeWidth="5" />
+      <path d="M60 30v-12M100 30v-12" stroke={FOREST} strokeWidth="5" strokeLinecap="round" />
+      <circle cx="60" cy="16" r="5" fill="#7be0a0" stroke={FOREST} strokeWidth="5" />
+      <circle cx="100" cy="16" r="5" fill="#7be0a0" stroke={FOREST} strokeWidth="5" />
+      <rect x="52" y="60" width="56" height="34" rx="17" fill="#fff" stroke={FOREST} strokeWidth="5" />
+      <circle cx="70" cy="77" r="7" fill={FOREST} /><circle cx="90" cy="77" r="7" fill={FOREST} />
+      <circle cx="72" cy="75" r="2.4" fill="#fff" /><circle cx="92" cy="75" r="2.4" fill="#fff" />
+      <path d="M70 104q10 8 20 0" stroke={FOREST} strokeWidth="5" fill="none" strokeLinecap="round" />
+    </svg>
   )
 }
 
-/** One competitor ad tile. Video reuses the SAME Discovery component (HoverScrubVideo) — hover-scrub
- * white line + lime play button + progress ring — so it's identical to the grid everywhere. */
-function AdCard({ ad, kind, cost, done, lowCredit, onClone }: {
-  ad: { id: string; thumbnailUrl: string | null; videoUrl: string | null }
-  kind: 'image' | 'video'; cost: number; done?: boolean; lowCredit?: boolean; onClone: () => void
-}) {
-  const [videoDead, setVideoDead] = useState(false)
-  const showVideo = kind === 'video' && !!ad.videoUrl && !videoDead
-  return (
-    <div onClick={onClone}
-      style={{ position: 'relative', aspectRatio: '4/5', borderRadius: 15, overflow: 'hidden', background: '#0f1a12', border: `1.5px solid ${LINE}`, cursor: 'pointer' }}>
-      {showVideo
-        ? <HoverScrubVideo src={ad.videoUrl!} poster={ad.thumbnailUrl || undefined} onError={() => setVideoDead(true)} />
-        : ad.thumbnailUrl
-          // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={ad.thumbnailUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>No preview</div>}
+const say: React.CSSProperties = { fontSize: 21, fontWeight: 750, letterSpacing: '-.02em', lineHeight: 1.4, color: INK, textAlign: 'center', maxWidth: 460, margin: '0 auto' }
+const sub: React.CSSProperties = { fontSize: 14, color: MUTED, textAlign: 'center', maxWidth: 420, margin: '10px auto 0', lineHeight: 1.6 }
+const btnMain: React.CSSProperties = { background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }
+const btnGhost: React.CSSProperties = { background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '12px 22px', fontSize: 13.5, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
+const chip = (on: boolean): React.CSSProperties => ({ border: `1.5px solid ${on ? FOREST : LINE}`, background: on ? FOREST : '#fff', color: on ? LIME : INK, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' })
+const inputCss: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', fontSize: 14, fontFamily: 'inherit', color: INK, background: '#fff', outline: 'none', width: '100%' }
 
-      <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10 }}>
-        <span style={{ background: 'rgba(8,16,15,0.78)', color: kind === 'video' ? '#dffe95' : 'white', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.04em' }}>{kind === 'video' ? '🎬 Video' : '🖼 Image'}</span>
+export default function InterviewPage() {
+  const router = useRouter()
+  const supabase = createClient()
+  const [phase, setPhase] = useState<Phase>('welcome')
+  const [url, setUrl] = useState('')
+  const [log, setLog] = useState<{ t: string; done: boolean }[]>([])
+  const [detect, setDetect] = useState<any>(null)
+  const [analysis, setAnalysis] = useState<any>(null)
+  // smart-guess editable fields
+  const [gName, setGName] = useState(''), [gSells, setGSells] = useState(''), [gBuyer, setGBuyer] = useState(''), [gVoice, setGVoice] = useState(''), [gDiff, setGDiff] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  // markets + competitors
+  const [markets, setMarkets] = useState<string[]>([])
+  const [suggested, setSuggested] = useState<Comp[]>([])
+  const [picks, setPicks] = useState<Comp[]>([])
+  const [q, setQ] = useState(''); const [results, setResults] = useState<Comp[]>([])
+  const [loadingComp, setLoadingComp] = useState(false)
+  // questions
+  const [qi, setQi] = useState(0)
+  const [redline, setRedline] = useState('')
+  const [freeText, setFreeText] = useState('')
+  // notebook
+  const [notes, setNotes] = useState<Note[]>([])
+  const [nbOpen, setNbOpen] = useState(false)
+  // offer + night
+  const [signName, setSignName] = useState('')
+  const [nightLog, setNightLog] = useState<{ t: string; done: boolean }[]>([])
+  const [nightDone, setNightDone] = useState(false)
+  const brandIdRef = useRef<string | null>(null)
+  const homeworkFired = useRef(false)
+  const nightFired = useRef(false)
+
+  const addLog = (t: string, done = false) => setLog(l => [...l.map(x => ({ ...x, done: true })), { t, done }])
+  const note = (kind: string, content: string) => {
+    const c = content.trim(); if (!c) return
+    setNotes(n => n.some(x => x.content === c) ? n : [...n, { kind, content: c }])
+    fetch('/api/interview/notebook', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entries: [{ kind, content: c }], brandId: brandIdRef.current }) }).catch(() => {})
+  }
+
+  // ── Beat 2: the homework — real crawl + real analysis, log lines tied to real completions ──
+  const startHomework = async () => {
+    const u = url.trim(); if (!u || homeworkFired.current) return
+    homeworkFired.current = true
+    addLog(`opening ${u.replace(/^https?:\/\//, '')} …`)
+    const detP = fetch('/api/discovery/detect-product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: u }) }).then(r => r.json()).catch(() => null)
+    const anaP = fetch('/api/interview/analyze', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: u }) }).then(r => r.json()).catch(() => null)
+    const d = await detP
+    if (d?.brandName) addLog(`found the brand — ${d.brandName}${d.productImages?.length ? ` · ${d.productImages.length} product shots` : ''}`)
+    else addLog('read the homepage')
+    setDetect(d)
+    const a = await anaP
+    if (a?.sells) addLog('I think I understand the positioning')
+    setAnalysis(a)
+    addLog('done — here’s what I think I know', true)
+    setGName(d?.brandName || ''); setGSells(a?.sells || ''); setGBuyer(a?.buyer || ''); setGVoice(a?.voice || ''); setGDiff(a?.differentiator || '')
+    setTimeout(() => setPhase('guess'), 900)
+  }
+
+  const confirmGuesses = () => {
+    if (gName) note('brand', `Works at ${gName}${url ? ` (${url.trim()})` : ''}.`)
+    if (gSells) note('fact', `They sell: ${gSells}.`)
+    if (gBuyer) note('fact', `The buyer: ${gBuyer}.`)
+    if (gVoice) note('preference', `Brand voice: ${gVoice}.`)
+    if (gDiff) note('fact', `What makes them different: ${gDiff}.`)
+    setPhase('competitors')
+  }
+
+  // ── Markets picked → country-aware competitor suggestions from the live directory + crawled index ──
+  useEffect(() => {
+    if (phase !== 'competitors') return
+    const kws: string[] = (analysis?.keywords?.length ? analysis.keywords : [analysis?.niche]).filter(Boolean).slice(0, 3)
+    if (!kws.length) return
+    setLoadingComp(true)
+    Promise.all(kws.flatMap(k => [
+      fetch(`/api/discovery/pages?q=${encodeURIComponent(k)}`).then(r => r.json()).catch(() => null),
+      fetch(`/api/discovery/brands?q=${encodeURIComponent(k)}&sort=ads`).then(r => r.json()).catch(() => null),
+    ])).then(all => {
+      const seen = new Set<string>(); const out: Comp[] = []
+      for (const j of all) for (const b of ([...(j?.pages || []), ...(j?.brands || [])])) {
+        const id = String(b.pageId || ''); if (!id || seen.has(id)) continue
+        seen.add(id)
+        out.push({ pageId: id, name: b.name, avatar: b.picture || b.avatar || null, adCount: b.adCount ?? null, country: b.country || null })
+      }
+      // country-aware ranking: brands from the founder's markets float up, then by ad volume
+      out.sort((a, b) => (Number(markets.includes(String(b.country))) - Number(markets.includes(String(a.country)))) || ((b.adCount || 0) - (a.adCount || 0)))
+      setSuggested(out.slice(0, 8))
+    }).finally(() => setLoadingComp(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, markets.join(',')])
+
+  // manual competitor search (same two sources as suggestions)
+  useEffect(() => {
+    if (!q.trim()) { setResults([]); return }
+    const t = setTimeout(() => {
+      Promise.all([
+        fetch(`/api/discovery/pages?q=${encodeURIComponent(q)}`).then(r => r.json()).catch(() => null),
+        fetch(`/api/discovery/brands?q=${encodeURIComponent(q)}`).then(r => r.json()).catch(() => null),
+      ]).then(([p, b]) => {
+        const seen = new Set<string>(); const out: Comp[] = []
+        for (const x of ([...(p?.pages || []), ...(b?.brands || [])])) {
+          const id = String(x.pageId || ''); if (!id || seen.has(id)) continue
+          seen.add(id); out.push({ pageId: id, name: x.name, avatar: x.picture || x.avatar || null, adCount: x.adCount ?? null, country: x.country || null })
+        }
+        setResults(out.slice(0, 6))
+      })
+    }, 300)
+    return () => clearTimeout(t)
+  }, [q])
+
+  const togglePick = (c: Comp) => setPicks(p => p.some(x => x.pageId === c.pageId) ? p.filter(x => x.pageId !== c.pageId) : p.length >= 5 ? p : [...p, c])
+
+  const confirmCompetitors = () => {
+    if (markets.length) note('fact', `Markets: ${markets.map(m => COUNTRIES.find(c => c[0] === m)?.[1] || m).join(', ')}.`)
+    if (picks.length) note('fact', `Competitors to watch: ${picks.map(p => p.name).join(', ')}.`)
+    setPhase('questions'); setQi(0); setFreeText('')
+  }
+
+  // ── Beat 4: the questions only a human can answer — each with its WHY ──
+  const QUESTIONS: { key: string; q: string; why: string; chips: string[] }[] = [
+    {
+      key: 'goal', q: 'If I worked here for the next 90 days — what would success look like?',
+      why: 'I’ll optimize every recommendation around this.',
+      chips: ['More sales', 'Lower cost per sale', 'A steady stream of creatives', 'Launch a new product', 'Build the brand'],
+    },
+    {
+      key: 'scar', q: 'What marketing mistake should I never repeat?',
+      why: 'I’d rather learn from your scars than make them again.',
+      chips: ['Discounting cheapened us', 'Ads felt fake', 'Wrong audience', 'Spent with nothing to show', 'None yet — we’re new'],
+    },
+    {
+      key: 'redline', q: 'If I wrote an ad tomorrow, what would make you say “that’s not us”?',
+      why: 'I’ll remember this forever.',
+      chips: ['Hype or shouting', 'Discount framing', 'Humor that tries too hard', 'Stock-photo feel'],
+    },
+    {
+      key: 'worry', q: 'Of everyone out there — who worries you the most?',
+      why: 'I’ll watch them the closest.',
+      chips: picks.map(p => p.name).slice(0, 5),
+    },
+  ]
+
+  const answerQ = (val: string) => {
+    const v = val.trim(); if (!v) return
+    const cur = QUESTIONS[qi]
+    if (cur.key === 'goal') note('goal', `90-day success: ${v}.`)
+    if (cur.key === 'scar') note('scar', `Never repeat: ${v}.`)
+    if (cur.key === 'redline') { setRedline(v); note('rule', `"That's not us": ${v}. Retired before I started.`) }
+    if (cur.key === 'worry') note('fact', `Worries them most: ${v} — watch closest.`)
+    setFreeText('')
+    if (qi < QUESTIONS.length - 1) setQi(qi + 1)
+    else setPhase('integrations')
+  }
+
+  // ── Beat 7 → 9: sign → create the brand, enroll the watch, start the night. All real work. ──
+  const sign = async () => {
+    if (signName.trim().length < 2 || nightFired.current) return
+    nightFired.current = true
+    setPhase('night')
+    setNightLog([{ t: 'filing our agreement', done: false }])
+    try {
+      const body = {
+        name: gName || detect?.brandName || 'My brand', website: url.trim(), description: gSells || undefined,
+        tone: gVoice || undefined, target_audience: gBuyer || undefined,
+        usps: gDiff ? [gDiff] : undefined, avoid_words: redline ? [redline] : undefined,
+        product_images: (detect?.productImages?.length ? detect.productImages : detect?.images || []).slice(0, 4),
+        brand_kit: detect?.brandKit || undefined,
+      }
+      const r = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(x => x.json()).catch(() => null)
+      if (r?.brand?.id) brandIdRef.current = r.brand.id
+    } catch { /* brand save is best-effort — the interview notes survive regardless */ }
+    note('fact', `Hired on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} — agreement signed by ${signName.trim()}.`)
+    setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: 'agreement filed', done: false }])
+
+    // real work: enqueue each competitor's full-archive crawl + follow them (feeds the alert pipeline → the brief)
+    for (const p of picks) {
+      setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: `starting on ${p.name} — pulling their live ads`, done: false }])
+      await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, name: p.name, crawlOnly: true }) }).catch(() => {})
+      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow' }) }).catch(() => {})
+    }
+    setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: 'studying what wins in your market', done: false }])
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) await supabase.from('user_profiles').update({ niche: analysis?.niche || null, onboarding_completed: true }).eq('user_id', user.id)
+    } catch { /* non-blocking */ }
+    setNightLog(l => l.map(x => ({ ...x, done: true })))
+    setNightDone(true)
+  }
+
+  const kindLabel: Record<string, string> = { brand: 'THE COMPANY', fact: 'NOTED', preference: 'VOICE', goal: 'THE GOAL', scar: 'NEVER AGAIN', rule: 'RED LINE' }
+  const night = phase === 'night'
+
+  return (
+    <div style={{ minHeight: '100vh', background: night ? '#0b100c' : '#f6f8f5', fontFamily: "'Inter', -apple-system, sans-serif", transition: 'background .8s ease', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px' }}>
+        <span style={{ fontWeight: 850, fontSize: 17, letterSpacing: '-.02em', color: night ? '#eaf1e8' : INK }}>Selfmade</span>
+        {!night && phase !== 'welcome' && (
+          <button onClick={() => setNbOpen(o => !o)} style={{ ...btnGhost, padding: '8px 15px', fontSize: 12 }}>
+            📓 Mello’s notebook{notes.length ? ` · ${notes.length}` : ''}
+          </button>
+        )}
       </div>
 
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 10, background: 'linear-gradient(transparent, rgba(8,16,15,0.94))', zIndex: 10, pointerEvents: 'none' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: done ? 'rgba(223,254,149,0.18)' : '#dffe95', color: done ? '#dffe95' : '#17251c', fontSize: 13, fontWeight: 800, padding: '10px 0', borderRadius: 11, border: done ? '1px solid #dffe95' : 'none' }}>
-          {done ? '✓ Remaking your ad…' : kind === 'video' ? `Remake as video · $${Math.round(cost / 100)}` : '✨ Remake this — Free'}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 20px 60px' }}>
+        <div style={{ width: '100%', maxWidth: 560 }}>
+
+          {/* ── BEAT 1 · WELCOME ── */}
+          {phase === 'welcome' && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}><Mello /></div>
+              <div style={say}>Hi. I’m Mello.<br />Thanks for inviting me.</div>
+              <p style={sub}>Before I can become your marketer, I’d like to learn about your business. This takes about four minutes — and I’ll be taking notes.</p>
+              <button style={{ ...btnMain, marginTop: 26 }} onClick={() => setPhase('homework')}>Begin the interview</button>
+            </div>
+          )}
+
+          {/* ── BEAT 2 · HOMEWORK ── */}
+          {phase === 'homework' && (
+            <div>
+              <div style={say}>Where should I begin learning about your business?</div>
+              {!log.length && (
+                <>
+                  <p style={sub}>Give me your website — I’d rather do my homework than ask you things I can read.</p>
+                  <div style={{ display: 'flex', gap: 8, maxWidth: 420, margin: '22px auto 0' }}>
+                    <input value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && startHomework()} placeholder="yourcompany.com" style={{ ...inputCss, borderRadius: 100, padding: '13px 20px' }} autoFocus />
+                    <button style={btnMain} onClick={startHomework}>→</button>
+                  </div>
+                </>
+              )}
+              {!!log.length && (
+                <div style={{ maxWidth: 420, margin: '24px auto 0', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 18px', font: '600 13px/2.1 ui-monospace, Menlo, monospace', color: MUTED }}>
+                  {log.map((l, i) => <div key={i}>{l.done || i < log.length - 1 ? <span style={{ color: GREEN }}>✓</span> : <span className="spin-dot">›</span>} {l.t}</div>)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── BEAT 3 · SMART GUESS ── */}
+          {phase === 'guess' && (
+            <div>
+              <div style={say}>Here’s what I think I know.<br />Correct me where I’m wrong.</div>
+              <div style={{ marginTop: 22 }}>
+                {[
+                  { k: 'name', label: 'The company', val: gName, set: setGName },
+                  { k: 'sells', label: 'You sell', val: gSells, set: setGSells },
+                  { k: 'buyer', label: 'Your buyer', val: gBuyer, set: setGBuyer },
+                  { k: 'voice', label: 'Your voice', val: gVoice, set: setGVoice },
+                  { k: 'diff', label: 'Your edge', val: gDiff, set: setGDiff },
+                ].filter(r => r.val || editing === r.k).map(r => (
+                  <div key={r.k} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: '12px 16px', marginBottom: 9, display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', color: MUTED, textTransform: 'uppercase', width: 92, flexShrink: 0 }}>{r.label}</span>
+                    {editing === r.k
+                      ? <input value={r.val} onChange={e => r.set(e.target.value)} onKeyDown={e => e.key === 'Enter' && setEditing(null)} onBlur={() => setEditing(null)} style={{ ...inputCss, padding: '7px 10px', fontSize: 13.5 }} autoFocus />
+                      : <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: INK }}>{r.val}</span>}
+                    {editing !== r.k && <button onClick={() => setEditing(r.k)} style={{ background: 'none', border: 'none', color: GREEN, fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>fix</button>}
+                  </div>
+                ))}
+                {!gSells && !gBuyer && (
+                  <div style={{ ...sub, marginTop: 4 }}>Your site kept its secrets — tell me in a line what you sell and I’ll note it:
+                    <input value={gSells} onChange={e => setGSells(e.target.value)} style={{ ...inputCss, marginTop: 10 }} placeholder="e.g. farm-fresh dairy, delivered — Lahore" /></div>
+                )}
+              </div>
+              <div style={{ textAlign: 'center', marginTop: 18 }}>
+                <button style={btnMain} onClick={confirmGuesses}>✓ That’s us</button>
+                <div style={{ fontSize: 11.5, color: MUTED, marginTop: 10, fontStyle: 'italic' }}>Everything you confirm goes in my notebook — I’ll hold myself to it.</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── COMPETITORS — markets first (country-aware), then who to watch ── */}
+          {phase === 'competitors' && (
+            <div>
+              <div style={say}>Where do you sell — and who should I be watching?</div>
+              <p style={sub}>Markets first: they change which competitors matter. <i>I’m asking because I’ll pick rivals and trends from the right countries.</i></p>
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', justifyContent: 'center', margin: '16px 0 22px' }}>
+                {COUNTRIES.map(([code, label]) => (
+                  <button key={code} style={chip(markets.includes(code))} onClick={() => setMarkets(m => m.includes(code) ? m.filter(x => x !== code) : [...m, code])}>{label}</button>
+                ))}
+              </div>
+              <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '16px 18px' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.09em', color: MUTED, textTransform: 'uppercase', marginBottom: 10 }}>{loadingComp ? 'Scanning my index…' : 'I already know these — recognize anyone?'}</div>
+                {!loadingComp && ![...picks, ...suggested].length && <div style={{ fontSize: 13, color: MUTED }}>Search below — I’ll find them.</div>}
+                {[...picks, ...suggested.filter(s => !picks.some(p => p.pageId === s.pageId))].slice(0, 7).map(c => {
+                  const on = picks.some(p => p.pageId === c.pageId)
+                  return (
+                    <button key={c.pageId} onClick={() => togglePick(c)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', background: on ? SELBG : 'transparent', border: `1.5px solid ${on ? SELBORDER : 'transparent'}`, borderRadius: 11, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 4 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {c.avatar ? <img src={c.avatar} alt="" style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'cover' }} /> : <span style={{ width: 28, height: 28, borderRadius: 8, background: '#eef2ec', display: 'inline-block' }} />}
+                      <span style={{ flex: 1, fontSize: 13.5, fontWeight: 750, color: INK }}>{c.name}</span>
+                      {!!c.adCount && <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>{c.adCount} ads</span>}
+                      <span style={{ fontSize: 13, fontWeight: 900, color: on ? GREEN : '#c6cfc4' }}>{on ? '✓' : '+'}</span>
+                    </button>
+                  )
+                })}
+                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search any brand…" style={{ ...inputCss, marginTop: 8 }} />
+                {results.filter(r => !picks.some(p => p.pageId === r.pageId) && !suggested.some(s => s.pageId === r.pageId)).slice(0, 4).map(c => (
+                  <button key={c.pageId} onClick={() => { togglePick(c); setQ('') }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderRadius: 11, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {c.avatar ? <img src={c.avatar} alt="" style={{ width: 26, height: 26, borderRadius: 8, objectFit: 'cover' }} /> : <span style={{ width: 26, height: 26, borderRadius: 8, background: '#eef2ec', display: 'inline-block' }} />}
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: INK }}>{c.name}</span>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: '#c6cfc4' }}>+</span>
+                  </button>
+                ))}
+              </div>
+              <div style={{ textAlign: 'center', marginTop: 18 }}>
+                <button style={{ ...btnMain, opacity: picks.length ? 1 : 0.5 }} disabled={!picks.length} onClick={confirmCompetitors}>
+                  Watch {picks.length ? `these ${picks.length}` : 'them'} for me →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── BEAT 4 · THE QUESTIONS ── */}
+          {phase === 'questions' && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.12em', color: MUTED, textTransform: 'uppercase', textAlign: 'center', marginBottom: 14 }}>Question {qi + 1} of {QUESTIONS.length} — only you can answer these</div>
+              <div style={say}>{QUESTIONS[qi].q}</div>
+              <p style={{ ...sub, fontStyle: 'italic' }}>{QUESTIONS[qi].why}</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', margin: '20px 0 14px' }}>
+                {QUESTIONS[qi].chips.filter(Boolean).map(c => <button key={c} style={chip(false)} onClick={() => answerQ(c)}>{c}</button>)}
+              </div>
+              <div style={{ display: 'flex', gap: 8, maxWidth: 430, margin: '0 auto' }}>
+                <input value={freeText} onChange={e => setFreeText(e.target.value)} onKeyDown={e => e.key === 'Enter' && answerQ(freeText)} placeholder="…or say it your way" style={{ ...inputCss, borderRadius: 100, padding: '11px 18px' }} />
+                <button style={{ ...btnGhost, padding: '10px 16px' }} onClick={() => answerQ(freeText)}>↵</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── BEAT 5 · INTEGRATIONS (honest SOON — Meta app in review) ── */}
+          {phase === 'integrations' && (
+            <div>
+              <div style={say}>I’ve learned enough to start.<br />One day soon, I’d like to see your past work too.</div>
+              <p style={sub}>I learn faster from your previous campaigns than from zero. These connections are almost ready — when they are, I’ll ask again and tell you exactly what I’d learn from each.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, margin: '20px 0 4px' }}>
+                {[['Meta Ads', 'your past campaigns — what already worked'], ['Shopify', 'your products and what actually sells'], ['TikTok', 'your short-video performance'], ['Google', 'what people search to find you']].map(([n, d]) => (
+                  <div key={n} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: '13px 15px', opacity: .75 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <b style={{ fontSize: 13.5, color: INK }}>{n}</b>
+                      <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '.08em', background: '#f1f4f0', color: MUTED, borderRadius: 6, padding: '3px 7px' }}>SOON</span>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>{d}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ textAlign: 'center', marginTop: 18 }}>
+                <button style={btnMain} onClick={() => setPhase('offer')}>I’ll start from the market →</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── BEAT 7 · THE AGREEMENT ── */}
+          {phase === 'offer' && (
+            <div style={{ background: PAPER, border: `1px solid ${PAPERLINE}`, borderRadius: 18, padding: '30px 30px 26px', boxShadow: '0 30px 70px -30px rgba(23,37,28,.25)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, background: LIME }} />
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', color: '#8a927f', marginBottom: 18 }}>MARKETING EMPLOYEE AGREEMENT</div>
+              {[['Employee', 'Mello'], ['Employer', gName || 'Your company'], ['Department', 'Marketing'], ['Working hours', '24 / 7'], ['Start date', 'Today'], ['Mission', 'Help grow this business']].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #ecebe0', fontSize: 13.5 }}>
+                  <span style={{ color: '#8a927f' }}>{k}</span><b style={{ fontWeight: 750, color: INK }}>{v}</b>
+                </div>
+              ))}
+              <div style={{ fontSize: 12.5, lineHeight: 1.9, color: '#4c5347', margin: '16px 0 20px' }}>
+                <b style={{ color: INK }}>My promises:</b> I’ll remember every marketing decision. I’ll explain every recommendation. I’ll tell you when I don’t know. I’ll watch your competitors every day. I’ll protect your brand — {redline ? <i>“{redline}” is already retired</i> : 'your red lines are law'}. I’ll never stop improving.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, alignItems: 'end' }}>
+                <div>
+                  <div style={{ borderBottom: `1.5px solid ${INK}`, height: 38, display: 'flex', alignItems: 'flex-end', paddingBottom: 3, fontFamily: "'Snell Roundhand','Segoe Script',cursive", fontSize: 23, color: '#1f2a1c' }}>Mello</div>
+                  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.12em', color: '#8a927f', marginTop: 6 }}>MELLO · YOUR MARKETER</div>
+                </div>
+                <div>
+                  <input value={signName} onChange={e => setSignName(e.target.value)} placeholder="Type your name to sign"
+                    style={{ width: '100%', border: 'none', borderBottom: `1.5px solid ${INK}`, background: 'transparent', outline: 'none', height: 38, fontFamily: "'Snell Roundhand','Segoe Script',cursive", fontSize: 23, color: '#1f2a1c' }} />
+                  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.12em', color: '#8a927f', marginTop: 6 }}>YOU · THE FOUNDER</div>
+                </div>
+              </div>
+              <button style={{ ...btnMain, width: '100%', marginTop: 22, opacity: signName.trim().length < 2 ? .45 : 1 }} disabled={signName.trim().length < 2} onClick={sign}>
+                Countersign &amp; hire Mello
+              </button>
+            </div>
+          )}
+
+          {/* ── BEAT 9 · THE NIGHT ── */}
+          {phase === 'night' && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}><Mello /></div>
+              <div style={{ ...say, color: '#fff' }}>I’m starting work now.</div>
+              <div style={{ maxWidth: 380, margin: '22px auto 0', textAlign: 'left', font: '600 13px/2.3 ui-monospace, Menlo, monospace', color: '#7d8a7c' }}>
+                {nightLog.map((l, i) => <div key={i}>{l.done ? <span style={{ color: '#a9d96a' }}>✓</span> : <span className="spin-dot">›</span>} {l.t}</div>)}
+              </div>
+              {nightDone && (
+                <>
+                  <p style={{ ...sub, color: '#7d8a7c', marginTop: 24 }}>The deep study takes me all night — competitors, angles, everything that wins in your market. But I already have a first read for you.</p>
+                  <button style={{ ...btnMain, background: LIME, color: FOREST, marginTop: 18 }} onClick={() => router.push('/brief')}>Read my first briefing →</button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── BEAT 6 · THE NOTEBOOK — never disappears; this is the memory being born ── */}
+      {nbOpen && !night && (
+        <div onClick={() => setNbOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(10,16,11,.35)', zIndex: 50, display: 'flex', justifyContent: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 340, maxWidth: '88vw', background: PAPER, borderLeft: `1px solid ${PAPERLINE}`, padding: '26px 24px', overflowY: 'auto' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', color: '#b3ab7e', marginBottom: 14 }}>WHAT I’M LEARNING</div>
+            {!notes.length && <div style={{ fontSize: 13, color: '#8a927f', fontStyle: 'italic' }}>Empty for now — I write things down as you talk.</div>}
+            {notes.map((n, i) => (
+              <div key={i} style={{ marginBottom: 13, paddingBottom: 12, borderBottom: '1px dashed #e8e2c4' }}>
+                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.14em', color: '#b3ab7e' }}>{kindLabel[n.kind] || n.kind.toUpperCase()}</div>
+                <div style={{ fontSize: 13, color: '#3c4437', lineHeight: 1.6, marginTop: 3 }}>{n.content}</div>
+              </div>
+            ))}
+            <div style={{ fontSize: 11, color: '#b3ab7e', fontStyle: 'italic', marginTop: 6 }}>This notebook never disappears — it becomes my long-term memory of your business.</div>
+          </div>
+        </div>
+      )}
+      <style>{`@keyframes nb-pulse{50%{opacity:.35}} .spin-dot{display:inline-block;animation:nb-pulse 1s infinite}`}</style>
     </div>
   )
 }
