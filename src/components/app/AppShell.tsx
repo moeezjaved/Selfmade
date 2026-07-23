@@ -1,5 +1,12 @@
 'use client'
-
+/**
+ * THE QUIET SHELL (Ploy-inspired, 2026-07-24). One slim 72px icon rail — the content
+ * owns the screen. No permanent panel, no badges, no promos: sub-pages appear as a
+ * hover flyout per destination; credits + account + extension live in the avatar
+ * menu; the bell sits at the rail's foot. Five destinations: Home · Discover ·
+ * Playbooks · Library · Workspace (+ Mello pinned, Settings + avatar at bottom).
+ * Every pre-existing route is still reachable — regrouped, never deleted.
+ */
 import { useEffect, useState } from 'react'
 import { CreditCounter, useCredits } from '@/components/credits/CreditCounter'
 import { PLANS, normalizePlan } from '@/lib/plans'
@@ -14,61 +21,50 @@ import { META_LIVE } from '@/lib/flags'
 import type { User } from '@supabase/supabase-js'
 import type { UserProfile } from '@/types'
 import {
-  Settings, LogOut, Menu, X, Check, LifeBuoy, ChevronsUpDown, Zap, Sparkles, CreditCard, Users,
+  Settings, LogOut, Menu, X, LifeBuoy, Zap, Sparkles, CreditCard, Users, Plus,
   Eye, TrendingUp, Star, Bookmark, Image as ImageIcon, Heart, Radar,
-  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, Trophy, Camera, Sun, Newspaper, BookOpen,
+  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, ClipboardList, Trophy, Camera, Sun, Newspaper, BookOpen,
 } from 'lucide-react'
 import SearchPalette from '@/components/SearchPalette'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
 import BootMotion from '@/components/motion/BootMotion'
-import SavedReportsNav from '@/components/reports/SavedReportsNav'
 
-// Two-rail nav: each AREA is one icon in the thin rail; its `items` fill the panel. Outline icons.
-// FIVE destinations (the Ploy-inspired calm-shell collapse, 2026-07-23). Every route
-// that existed before is still reachable — nothing deleted, only regrouped:
-// Home · Discover · Playbooks · Library · Workspace (+ Mello pinned, Settings bottom,
-// account pages in the avatar dropdown). Section rows ({section}) render as quiet
-// dividers inside a panel. NEW/AI badges removed as visual noise; SOON kept (honest).
 type NavItem = { href?: string; icon?: React.ElementType; label?: string; badge?: string | null; section?: string }
-const AREAS: { key: string; label: string; railLabel?: string; railIcon: React.ElementType; defaultHref: string; items: NavItem[] }[] = [
+const AREAS: { key: string; label: string; railLabel: string; railIcon: React.ElementType; defaultHref: string; items: NavItem[] }[] = [
   {
     key: 'home', label: 'Home', railLabel: 'Home', railIcon: Sun, defaultHref: '/brief',
-    items: [
-      { href: '/brief', icon: Sun, label: 'Morning Brief', badge: null },
-    ],
+    items: [{ href: '/brief', icon: Sun, label: 'Morning Brief' }],
   },
   {
     key: 'discover', label: 'Discover', railLabel: 'Discover', railIcon: Newspaper, defaultHref: '/discover',
     items: [
-      { href: '/discover',            icon: Newspaper,  label: 'Today’s Edition', badge: null },
-      { href: '/trending',            icon: TrendingUp, label: 'Trending',        badge: null },
-      { href: '/discovery/top-picks', icon: Star,       label: 'Top Picks',       badge: null },
+      { href: '/discover',            icon: Newspaper,  label: 'Today’s Edition' },
+      { href: '/trending',            icon: TrendingUp, label: 'Trending' },
+      { href: '/discovery/top-picks', icon: Star,       label: 'Top Picks' },
     ],
   },
   {
     key: 'playbooks', label: 'Playbooks', railLabel: 'Playbooks', railIcon: BookOpen, defaultHref: '/playbooks',
-    items: [
-      { href: '/playbooks', icon: BookOpen, label: 'All playbooks', badge: null },
-    ],
+    items: [{ href: '/playbooks', icon: BookOpen, label: 'All playbooks' }],
   },
   {
     key: 'library', label: 'Ad Library', railLabel: 'Library', railIcon: Radar, defaultHref: '/discovery',
     items: [
-      { href: '/discovery',           icon: Radar,    label: 'All ads',   badge: null },
-      { href: '/discovery/brand-spy', icon: Eye,      label: 'Brand Spy', badge: null },
-      { href: '/discovery/following', icon: Heart,    label: 'Following', badge: null },
-      { href: '/discovery/saved',     icon: Bookmark, label: 'Boards',    badge: null },
+      { href: '/discovery',           icon: Radar,    label: 'All ads' },
+      { href: '/discovery/brand-spy', icon: Eye,      label: 'Brand Spy' },
+      { href: '/discovery/following', icon: Heart,    label: 'Following' },
+      { href: '/discovery/saved',     icon: Bookmark, label: 'Boards' },
     ],
   },
   {
-    key: 'workspace', label: 'Workspace', railLabel: 'Workspace', railIcon: LayoutDashboard, defaultHref: '/creative-studio',
+    key: 'workspace', label: 'Workspace', railLabel: 'Work', railIcon: LayoutDashboard, defaultHref: '/creative-studio',
     items: [
       { section: 'Create' },
-      { href: '/creative-studio?studio=1', icon: Wand2,    label: 'Create Ad',    badge: null },
-      { href: '/creative-studio',          icon: Sparkles, label: 'My Creatives', badge: null },
-      { href: '/brands',                   icon: Store,    label: 'My Brands',    badge: null },
-      { href: '/assets',                   icon: ImageIcon,label: 'Assets',       badge: null },
+      { href: '/creative-studio?studio=1', icon: Wand2,    label: 'Create Ad' },
+      { href: '/creative-studio',          icon: Sparkles, label: 'My Creatives' },
+      { href: '/brands',                   icon: Store,    label: 'My Brands' },
+      { href: '/assets',                   icon: ImageIcon,label: 'Assets' },
       { section: 'Launch' },
       { href: '/m4',          icon: Rocket,    label: 'Launch Ads',       badge: META_LIVE ? null : 'SOON' },
       { href: '/campaigns',   icon: Megaphone, label: 'Campaigns',        badge: META_LIVE ? null : 'SOON' },
@@ -80,7 +76,8 @@ const AREAS: { key: string; label: string; railLabel?: string; railIcon: React.E
   },
 ]
 
-// Thin-rail icon button (icon-only, tooltip on hover).
+const RAIL_W = 72
+
 function RailIcon({ href, active, title, accent, label, children }: {
   href: string; active: boolean; title: string; accent?: boolean; label?: string; children: React.ReactNode
 }) {
@@ -93,296 +90,220 @@ function RailIcon({ href, active, title, accent, label, children }: {
   )
 }
 
-// Shared row style + item for the account dropdown.
 const ACCT_ITEM: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, textDecoration: 'none' }
-function AcctItem({ href, icon: Icon, label, accent }: { href: string; icon: React.ElementType; label: string; accent?: boolean }) {
-  return (
-    <Link href={href} className="sm-acct-item" style={{ ...ACCT_ITEM, color: accent ? '#3f8f4f' : '#333d35', fontSize: 13, fontWeight: accent ? 700 : 500 }}>
-      <Icon size={16} style={{ flexShrink: 0 }} />
-      <span>{label}</span>
-    </Link>
-  )
+function AcctItem({ href, icon: Icon, label, accent, external }: { href: string; icon: React.ElementType; label: string; accent?: boolean; external?: boolean }) {
+  const style = { ...ACCT_ITEM, color: accent ? '#3f8f4f' : '#333d35', fontSize: 13, fontWeight: accent ? 700 : 500 }
+  if (external) return <a href={href} target="_blank" rel="noopener noreferrer" className="sm-acct-item" style={style}><Icon size={16} style={{ flexShrink: 0 }} /><span>{label}</span></a>
+  return <Link href={href} className="sm-acct-item" style={style}><Icon size={16} style={{ flexShrink: 0 }} /><span>{label}</span></Link>
 }
 
-interface DashboardLayoutProps {
-  children: React.ReactNode
+// One nav row (flyout + mobile drawer share it)
+function ItemLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {
+  if (!item.href || !item.icon) return null
+  const Icon = item.icon
+  return (
+    <Link href={item.href} onClick={onClick} className={cn('sidebar-link', active && 'active')}
+      data-nav={item.href === '/creative-studio' ? 'creatives' : undefined}>
+      <Icon size={18} strokeWidth={1.9} className="flex-shrink-0" />
+      <span style={{ flex: 1, minWidth: 0 }}>{item.label}</span>
+      {item.badge === 'SOON' && <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.04em', padding: '2px 6px', borderRadius: 99, background: '#eef1ec', color: '#8b978d', flexShrink: 0 }}>SOON</span>}
+    </Link>
+  )
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  // The single active nav item = the longest href that prefixes the current path.
   const activeHref = AREAS.flatMap(s => s.items.map(i => i.href).filter((h): h is string => !!h))
     .filter(h => pathname === h || pathname.startsWith(h + '/'))
     .sort((a, b) => b.length - a.length)[0]
   const melloActive = pathname === '/mello' || pathname.startsWith('/mello/')
-  // Which AREA the panel shows: the one containing the active item (fall back to first, e.g. on /mello).
-  const activeArea = AREAS.find(a => a.items.some(i => i.href === activeHref)) || AREAS[0]
+  const activeArea = AREAS.find(a => a.items.some(i => i.href === activeHref))
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const { plan: effectivePlan } = useCredits()   // org-resolved plan (team members see the team's plan)
+  const { plan: effectivePlan } = useCredits()
   const isMobile = useIsMobile()
   const [navOpen, setNavOpen] = useState(false)
   const [acctOpen, setAcctOpen] = useState(false)
-  // Close the mobile drawer + account menu whenever the route changes.
-  useEffect(() => { setNavOpen(false); setAcctOpen(false) }, [pathname])
-  // Esc closes the account dropdown (previously only re-clicking the avatar or an outside-click closed it).
+  const [flyout, setFlyout] = useState<string | null>(null)
+
+  useEffect(() => { setNavOpen(false); setAcctOpen(false); setFlyout(null) }, [pathname])
   useEffect(() => {
     if (!acctOpen) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAcctOpen(false) }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [acctOpen])
-  // NOTE: this layout used to be gated behind a whole-layout `mounted` flag (returned a blank
-  // placeholder until a post-mount effect flipped it). That was meant to dodge hydration #418/#423/
-  // #425 — but those turned out to be browser EXTENSIONS injecting into <html>/<body>, not our code,
-  // so the gate fixed nothing. Worse, it DEADLOCKED: on a direct load of a route whose page uses
-  // next/dynamic(ssr:false) (e.g. /discovery), the layout's setMounted effect never committed and
-  // the page rendered a permanent blank-green screen. Rendering the layout unconditionally fixes it —
-  // the sidebar SSRs immediately; user-dependent bits (avatar/initials) are null→'A' on both server
-  // and first client render, so there's no real mismatch, just a post-load update.
+
   useEffect(() => {
     let mounted = true
-    // getSession() reads the session from LOCAL STORAGE (no network round-trip), so the
-    // user's name/initials/plan render on first paint. getUser() POSTs to the auth
-    // server to validate the JWT — that network wait was the blank "User / … credits"
-    // cold-start delay. Page-level auth is still enforced server-side by the API routes
-    // and middleware; this is display only. The profile (plan badge) loads in the
-    // background and never blocks the name from showing.
+    // getSession() reads local storage (no network) so the shell paints instantly;
+    // real auth is enforced server-side by APIs + middleware. Display only.
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return
       if (!session?.user) { router.push('/login'); return }
       setUser(session.user)
-      supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single()
+      supabase.from('user_profiles').select('*').eq('user_id', session.user.id).single()
         .then(({ data }) => { if (mounted) setProfile(data) })
     })
     return () => { mounted = false }
   }, [])
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
+  const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/login') }
 
   const initials = user?.user_metadata?.full_name
     ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.[0].toUpperCase() || 'A'
   const displayName = user?.user_metadata?.full_name || user?.email || 'User'
-  // Show the EFFECTIVE plan (org-resolved) so team members see the team's plan (e.g. "Agency"),
-  // not their individual 'free' profile — matching the Billing page. useCredits().plan comes from
-  // /api/credits/balance which resolves to the org owner.
-  const planLabel = profile?.subscription_status === 'trialing'
-    ? 'Trial'
-    : PLANS[normalizePlan(effectivePlan)]?.label || 'Free'
-  const statusLabel = (profile?.subscription_status === 'canceled' || profile?.subscription_status === 'past_due') ? 'Inactive' : 'Active'
+  const planLabel = profile?.subscription_status === 'trialing' ? 'Trial' : PLANS[normalizePlan(effectivePlan)]?.label || 'Free'
+
+  // ── the account menu (desktop + mobile): credits live HERE now, not in a panel ──
+  const AcctMenu = ({ style }: { style: React.CSSProperties }) => (
+    <>
+      <div onClick={() => setAcctOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 59 }} />
+      <div style={{ ...style, width: 264, background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, boxShadow: '0 14px 44px rgba(23,37,28,0.16)', zIndex: 60, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 14px 12px', borderBottom: '1px solid #eef1ec' }}>
+          <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">{initials}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#161c17', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
+            <div style={{ fontSize: 11, color: '#7d877e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{planLabel} plan · {user?.email}</div>
+          </div>
+        </div>
+        <div style={{ padding: '10px 12px 4px' }}><CreditCounter /></div>
+        <div style={{ padding: '4px 8px 8px' }}>
+          <AcctItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+          <AcctItem href="/activity" icon={ClipboardList} label="Activity log" />
+          <AcctItem href="/mcp" icon={Sparkles} label="API & MCP" />
+          <AcctItem href="/team" icon={Users} label="Team & members" />
+          <AcctItem href="/billing" icon={CreditCard} label="Billing & plan" />
+          <AcctItem href="/billing" icon={Zap} label="Upgrade plan" accent />
+          <AcctItem href="https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi" icon={Bookmark} label="Chrome extension" external />
+          <AcctItem href="/contact" icon={LifeBuoy} label="Support & feedback" />
+          <div style={{ height: 1, background: '#eef1ec', margin: '6px 0' }} />
+          <button onClick={handleSignOut} className="sm-acct-item" style={{ ...ACCT_ITEM, width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', color: '#d64545', fontFamily: 'inherit' }}>
+            <LogOut size={16} style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Log out</span>
+          </button>
+        </div>
+      </div>
+    </>
+  )
 
   return (
-    <div className="flex min-h-screen" style={{background:"#f6f8f5"}}>
+    <div className="flex min-h-screen" style={{ background: '#f7f8f6' }}>
       <BootMotion />
-      <SearchPalette />{/* ⌘K — universal knowledge search, available everywhere in the app */}
+      <SearchPalette />
 
-      {/* ── MOBILE TOP BAR (hamburger) — only < 768px ── */}
+      {/* ── MOBILE TOP BAR ── */}
       {isMobile && (
-        <div style={{position:"fixed",top:0,left:0,right:0,height:52,zIndex:45,background:"#f6f8f5",borderBottom:"1px solid #e7ece7",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 12px"}}>
-          <button onClick={() => setNavOpen(true)} aria-label="Open menu" style={{width:38,height:38,display:"flex",alignItems:"center",justifyContent:"center",color:"#17251c",background:"transparent",border:"none",borderRadius:9}}>
-            <Menu size={22}/>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 52, zIndex: 45, background: '#f7f8f6', borderBottom: '1px solid #e9ece8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px' }}>
+          <button onClick={() => setNavOpen(true)} aria-label="Open menu" style={{ width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#17251c', background: 'transparent', border: 'none', borderRadius: 9 }}>
+            <Menu size={22} />
           </button>
-          <Link href="/dashboard" style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:28,height:28,borderRadius:8,background:"#17251c",color:"#dffe95",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:16,fontStyle:"italic",fontFamily:"Georgia,serif"}}>S</div>
+          <Link href="/brief" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#17251c', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 16, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</div>
           </Link>
-          <div style={{display:"flex",alignItems:"center"}}><NotificationBell /></div>
+          <div style={{ display: 'flex', alignItems: 'center' }}><NotificationBell /></div>
         </div>
       )}
-
-      {/* Backdrop behind the open drawer on mobile */}
       {isMobile && navOpen && (
-        <div onClick={() => setNavOpen(false)} style={{position:"fixed",inset:0,background:"rgba(23,37,28,0.35)",backdropFilter:"blur(2px)",zIndex:49}}/>
+        <div onClick={() => setNavOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(23,37,28,0.35)', backdropFilter: 'blur(2px)', zIndex: 49 }} />
       )}
 
-      {/* ── SIDEBAR (two-rail: thin icon rail + contextual panel) ── */}
-      <aside style={{width:320,flexShrink:0,display:"flex",position:"fixed",top:0,left:0,bottom:0,zIndex:50,
-        transform: isMobile && !navOpen ? "translateX(-100%)" : "translateX(0)",
-        transition:"transform 0.25s ease",
-        boxShadow: isMobile && navOpen ? "0 0 40px rgba(0,0,0,0.4)" : "none"}}>
-
-        {/* Close button inside the drawer — only when open, else it peeks past the off-screen edge */}
-        {isMobile && navOpen && (
-          <button onClick={() => setNavOpen(false)} aria-label="Close menu" style={{position:"absolute",top:10,right:-1,transform:"translateX(100%)",width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",color:"#17251c",background:"#f6f8f5",border:"1px solid #e7ece7",borderLeft:"none",borderRadius:"0 9px 9px 0"}}>
-            <X size={18}/>
-          </button>
-        )}
-
-        {/* Rail 1 — icon rail with labels below */}
-        <div style={{width:70,flexShrink:0,background:"#f6f8f5",borderRight:"1px solid #e7ece7",display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 0",gap:3}}>
-          <Link href="/dashboard" title="Home" style={{marginBottom:10}}>
-            <div style={{width:34,height:34,borderRadius:11,background:"#17251c",color:"#dffe95",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:18,fontStyle:"italic",fontFamily:"Georgia,serif"}}>S</div>
+      {isMobile ? (
+        /* ── MOBILE DRAWER: one flat list of everything ── */
+        <aside style={{ width: 290, position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50, background: '#f7f8f6', borderRight: '1px solid #e9ece8', display: 'flex', flexDirection: 'column', transform: navOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease', boxShadow: navOpen ? '0 0 40px rgba(0,0,0,0.4)' : 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 8px' }}>
+            <div style={{ fontWeight: 850, fontSize: 16, letterSpacing: '-.02em', color: '#161c17' }}>Selfmade</div>
+            <button onClick={() => setNavOpen(false)} aria-label="Close menu" style={{ background: 'transparent', border: 'none', color: '#17251c', padding: 6 }}><X size={18} /></button>
+          </div>
+          <div style={{ padding: '0 16px 6px' }}><RemakeStarter /></div>
+          <nav className="flex-1 overflow-y-auto" style={{ padding: '2px 10px 12px' }}>
+            <ItemLink item={{ href: '/mello', icon: Sparkles, label: 'Ask Mello' }} active={melloActive} onClick={() => setNavOpen(false)} />
+            {AREAS.map(a => (
+              <div key={a.key}>
+                <div style={{ padding: '14px 8px 4px', fontSize: 9.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#a2aca2' }}>{a.label}</div>
+                {a.items.map((item, i) => item.section
+                  ? <div key={`s:${item.section}`} style={{ padding: '8px 8px 2px', fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#b8c0b6' }}>{item.section}</div>
+                  : <ItemLink key={item.href || i} item={item} active={item.href === activeHref} onClick={() => setNavOpen(false)} />)}
+              </div>
+            ))}
+          </nav>
+          <div style={{ padding: 12, borderTop: '1px solid #e9ece8', position: 'relative' }}>
+            <button onClick={() => setAcctOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'transparent', border: 'none', borderRadius: 10, padding: 6, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+              <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">{initials}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#161c17', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
+                <div style={{ fontSize: 11, color: '#7d877e' }}>{planLabel}</div>
+              </div>
+            </button>
+            {acctOpen && <AcctMenu style={{ position: 'absolute', bottom: '100%', left: 8, marginBottom: 8 }} />}
+          </div>
+        </aside>
+      ) : (
+        /* ── DESKTOP: the quiet rail — 72px, nothing else ── */
+        <aside
+          onMouseLeave={() => setFlyout(null)}
+          style={{ width: RAIL_W, position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50, background: '#f7f8f6', borderRight: '1px solid #e9ece8', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 0 12px', gap: 3 }}>
+          <Link href="/brief" title="Home" style={{ marginBottom: 8 }} onMouseEnter={() => setFlyout(null)}>
+            <div style={{ width: 34, height: 34, borderRadius: 11, background: '#17251c', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 18, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</div>
           </Link>
 
-          {/* Mello — the AI, pinned top */}
-          <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent label="Mello">
-            <Sparkles size={20}/>
-          </RailIcon>
+          {/* Create — the ONE bold thing on the rail */}
+          <Link href="/creative-studio?studio=1" title="Create an ad" aria-label="Create an ad" onMouseEnter={() => setFlyout(null)}
+            style={{ width: 38, height: 38, borderRadius: 12, background: '#dffe95', color: '#17251c', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 6, boxShadow: '0 8px 18px -8px rgba(23,37,28,.4)' }}>
+            <Plus size={20} strokeWidth={2.4} />
+          </Link>
 
-          <div style={{width:30,height:1,background:"#e3e9e2",margin:"5px 0"}}/>
-
-          {/* Top areas — outline icon + label below */}
-          {AREAS.filter(a => a.key !== 'account').map(a => (
-            <RailIcon key={a.key} href={a.defaultHref} title={a.label} label={(a as any).railLabel} active={!melloActive && activeArea.key === a.key}>
-              <a.railIcon size={20}/>
-            </RailIcon>
-          ))}
-
-          <div style={{flex:1}}/>
-
-          {/* Settings pinned bottom */}
-          <RailIcon href="/settings" title="Settings" label="Settings" active={!melloActive && pathname === '/settings'}>
-            <Settings size={20}/>
-          </RailIcon>
-        </div>
-
-        {/* Rail 2 — contextual panel */}
-        <div style={{width:250,flexShrink:0,background:"#f6f8f5",borderRight:"1px solid #e7ece7",display:"flex",flexDirection:"column"}}>
-
-          {/* Panel header: area title + workspace + bell */}
-          <div style={{padding:"18px 16px 14px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
-            <div style={{minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:800,color:"#161c17",letterSpacing:"-.01em"}}>{melloActive ? 'Ask Mello' : activeArea.label}</div>
-              <div style={{fontSize:11.5,fontWeight:500,color:"#94a096",marginTop:1}}>Selfmade workspace</div>
-            </div>
-            <NotificationBell />
+          <div onMouseEnter={() => setFlyout(null)}>
+            <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent label="Mello"><Sparkles size={20} /></RailIcon>
           </div>
 
-          {/* Primary action — the bold, always-there entry to the core remake loop (replaces the Ask
-              Mello card here; Mello stays reachable from the rail icon on the left). */}
-          <div style={{ padding: '0 20px' }}><RemakeStarter /></div>
+          <div style={{ width: 30, height: 1, background: '#e6eae4', margin: '5px 0' }} />
 
-          <div style={{padding:"10px 20px 6px",fontSize:10,fontWeight:800,letterSpacing:".1em",textTransform:"uppercase",color:"#94a096"}}>Workspace</div>
-
-          {/* Nav items — outline icon + label; active = solid lime pill; lime dot for updates */}
-          <nav className="flex-1 overflow-y-auto" style={{padding:"2px 12px"}}>
-            {activeArea.items.map((item, idx) => {
-              // Quiet section divider inside a panel (e.g. Workspace → Create / Launch)
-              if (item.section) return (
-                <div key={`s:${item.section}`} style={{padding: idx === 0 ? "6px 8px 4px" : "16px 8px 4px", fontSize:9.5, fontWeight:800, letterSpacing:".09em", textTransform:"uppercase", color:"#a2aca2"}}>{item.section}</div>
-              )
-              if (!item.href || !item.icon) return null
-              const Icon = item.icon
-              const isActive = item.href === activeHref
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  data-nav={item.href === '/creative-studio' ? 'creatives' : undefined}
-                  className={cn('sidebar-link', isActive && 'active')}
-                >
-                  <Icon size={19} strokeWidth={1.9} className="flex-shrink-0"/>
-                  <span style={{flex:1,minWidth:0}}>{item.label}</span>
-                  {/* NEW/AI badges retired (visual noise); SOON kept — it sets honest expectations */}
-                  {item.badge === 'SOON' && (
-                    <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 6px",borderRadius:99,background:"#eef1ec",color:"#8b978d",flexShrink:0}}>SOON</span>
-                  )}
-                </Link>
-              )
-            })}
-            {/* Saved reports live under the Reports item in the Analytics area. Hidden while META_LIVE
-                is off — Reports is a Coming-soon (Meta-connected) surface, so its "Create report" +
-                saved list would be dead. */}
-            {META_LIVE && !melloActive && activeArea.key === 'workspace' && <SavedReportsNav />}
-          </nav>
-
-          {/* Save ads from — extension / IG-mobile entry points (Atria-style) */}
-          <div style={{padding:"10px 14px",borderTop:"1px solid #e7ece7"}}>
-            <div style={{fontSize:9.5,fontWeight:800,letterSpacing:".07em",textTransform:"uppercase",color:"#94a096",marginBottom:7}}>Save ads from</div>
-            <div style={{display:"flex",gap:6}}>
-              {/* Neutral resting style (matches the IG entry point) — the lime fill read as a
-                  permanently-"selected" toggle. Both are just entry points, not a picked state. */}
-              <a href="https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi" target="_blank" rel="noopener noreferrer" title="Install the Chrome extension" style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"6px 8px",borderRadius:8,background:"#fff",border:"1px solid #e7ece7",color:"#3c473e",fontSize:11.5,fontWeight:700,textDecoration:"none"}}>🧩 Extension</a>
-              {/* IG saving isn't wired yet — show it as coming soon rather than linking to nothing. */}
-              <span title="Save from Instagram — coming soon" style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"6px 8px",borderRadius:8,background:"#fbfcfa",border:"1px solid #edf0ec",color:"#9aa79a",fontSize:11.5,fontWeight:700,cursor:"default"}}>📱 IG <span style={{fontSize:8.5,fontWeight:800,letterSpacing:".04em",padding:"1px 5px",borderRadius:20,background:"#eef1ec",color:"#8b978d",textTransform:"uppercase"}}>Soon</span></span>
-            </div>
-          </div>
-
-          {/* Credits + Account menu */}
-          <div style={{padding:14,borderTop:"1px solid #e7ece7",position:"relative"}}>
-            <div style={{marginBottom:12}}><CreditCounter /></div>
-
-            {/* Account button → opens the dropdown */}
-            <button onClick={() => setAcctOpen(o => !o)}
-              style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:acctOpen?"rgba(23,37,28,0.06)":"transparent",border:"none",borderRadius:10,padding:6,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
-              <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">{initials}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#161c17",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayName}</div>
-                <div style={{fontSize:11,color:"#7d877e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{planLabel} · {statusLabel}</div>
-              </div>
-              <ChevronsUpDown size={15} color="#9aa79a" style={{flexShrink:0}}/>
-            </button>
-
-            {/* Dropdown (pops up above the button) */}
-            {acctOpen && (
-              <>
-                <div onClick={() => setAcctOpen(false)} style={{position:"fixed",inset:0,zIndex:59}}/>
-                <div style={{position:"absolute",bottom:"100%",left:8,right:8,marginBottom:8,minWidth:236,background:"#fff",border:"1px solid #e7ece7",borderRadius:14,boxShadow:"0 14px 44px rgba(23,37,28,0.16)",zIndex:60,overflow:"hidden"}}>
-                  {/* header */}
-                  <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 14px 12px",borderBottom:"1px solid #eef1ec"}}>
-                    <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">{initials}</div>
-                    <div style={{minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:700,color:"#161c17",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayName}</div>
-                      <div style={{fontSize:11,color:"#7d877e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user?.email}</div>
+          {AREAS.map(a => {
+            const hasFlyout = a.items.filter(i => i.href).length > 1
+            return (
+              <div key={a.key} style={{ position: 'relative' }} onMouseEnter={() => setFlyout(hasFlyout ? a.key : null)}>
+                <RailIcon href={a.defaultHref} title={a.label} label={a.railLabel} active={!melloActive && activeArea?.key === a.key}>
+                  <a.railIcon size={20} />
+                </RailIcon>
+                {/* hover flyout — the old permanent panel, now on demand */}
+                {flyout === a.key && hasFlyout && (
+                  <div style={{ position: 'absolute', left: '100%', top: -6, paddingLeft: 10, zIndex: 70 }}>
+                    <div style={{ width: 226, background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, boxShadow: '0 18px 50px rgba(23,37,28,0.16)', padding: '10px 8px' }}>
+                      <div style={{ padding: '2px 10px 7px', fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#a2aca2' }}>{a.label}</div>
+                      {a.items.map((item, i) => item.section
+                        ? <div key={`s:${item.section}`} style={{ padding: '9px 10px 3px', fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#b8c0b6' }}>{item.section}</div>
+                        : <ItemLink key={item.href || i} item={item} active={item.href === activeHref} />)}
                     </div>
                   </div>
-                  {/* workspace */}
-                  <div style={{padding:"8px 8px 2px"}}>
-                    <div style={{fontSize:9.5,fontWeight:800,letterSpacing:".07em",textTransform:"uppercase",color:"#94a096",padding:"2px 8px 6px"}}>Workspace</div>
-                    <Link href="/team" className="sm-acct-item" style={ACCT_ITEM}>
-                      <div style={{width:26,height:26,borderRadius:7,background:"#17251c",color:"#dffe95",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:12,flexShrink:0}}>{initials}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12.5,fontWeight:700,color:"#161c17",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayName.split(' ')[0]}’s Workspace</div>
-                        <div style={{fontSize:10.5,color:"#7d877e"}}>{planLabel} plan</div>
-                      </div>
-                      <Check size={16} color="#3f8f4f" style={{flexShrink:0}}/>
-                    </Link>
-                  </div>
-                  <div style={{height:1,background:"#eef1ec",margin:"4px 0"}}/>
-                  {/* items */}
-                  <div style={{padding:"4px 8px 8px"}}>
-                    <AcctItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
-                    <AcctItem href="/activity" icon={ClipboardList} label="Activity log" />
-                    <AcctItem href="/mcp" icon={Sparkles} label="API & MCP" />
-                    <AcctItem href="/settings" icon={Settings} label="Settings" />
-                    <AcctItem href="/team" icon={Users} label="Team & members" />
-                    <AcctItem href="/billing" icon={CreditCard} label="Billing & plan" />
-                    <AcctItem href="/billing" icon={Zap} label="Upgrade plan" accent />
-                    <AcctItem href="/contact" icon={LifeBuoy} label="Support & feedback" />
-                    <div style={{height:1,background:"#eef1ec",margin:"6px 0"}}/>
-                    <button onClick={handleSignOut} className="sm-acct-item" style={{...ACCT_ITEM,width:"100%",border:"none",background:"transparent",cursor:"pointer",color:"#d64545",fontFamily:"inherit"}}>
-                      <LogOut size={16} style={{flexShrink:0}}/>
-                      <span style={{fontSize:13,fontWeight:600}}>Log out</span>
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </aside>
+                )}
+              </div>
+            )
+          })}
 
-      {/* ── MAIN ── */}
-      <div style={{flex:1,
-        marginLeft: isMobile ? 0 : 320,
-        marginTop: isMobile ? 52 : 0,
-        display:"flex",flexDirection:"column",minHeight:"100vh",background:"#fbfcfa",minWidth:0,
-        maxWidth: isMobile ? "100vw" : "calc(100vw - 320px)",
-        overflowX:"hidden"}}>
-        <div id="topbar-portal"/>
-        <main className="flex-1" style={{minWidth:0,overflowX:"hidden"}}>
-          {children}
-        </main>
+          <div style={{ flex: 1 }} onMouseEnter={() => setFlyout(null)} />
+
+          <div onMouseEnter={() => setFlyout(null)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <NotificationBell />
+            <RailIcon href="/settings" title="Settings" active={!melloActive && pathname === '/settings'}><Settings size={19} /></RailIcon>
+            <div style={{ position: 'relative', marginTop: 4 }}>
+              <button onClick={() => setAcctOpen(o => !o)} aria-label="Account" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}>
+                <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black">{initials}</div>
+              </button>
+              {acctOpen && <AcctMenu style={{ position: 'fixed', bottom: 14, left: RAIL_W + 10 }} />}
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* ── MAIN — the content owns the screen ── */}
+      <div style={{ flex: 1, marginLeft: isMobile ? 0 : RAIL_W, marginTop: isMobile ? 52 : 0, display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#fbfcfa', minWidth: 0, maxWidth: isMobile ? '100vw' : `calc(100vw - ${RAIL_W}px)`, overflowX: 'hidden' }}>
+        <div id="topbar-portal" />
+        <main className="flex-1" style={{ minWidth: 0, overflowX: 'hidden' }}>{children}</main>
         <UpsellModalHost />
         <CreditModal />
       </div>
