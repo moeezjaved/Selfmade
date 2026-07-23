@@ -10,6 +10,7 @@ const NAV = [
   { href: '/admin/subscriptions', label: 'Subscriptions', icon: '💳' },
   { href: '/admin/creatives', label: 'Creatives', icon: '🎨' },
   { href: '/admin/inspirations', label: 'Inspirations', icon: '✨' },
+  { href: '/admin/playbooks', label: 'Playbooks', icon: '📚' },
   { href: '/admin/payments', label: 'Payments', icon: '◎' },
   { href: '/admin/credit-pricing', label: 'Credit Pricing', icon: '◆' },
   { href: '/admin/experts', label: 'Experts', icon: '⭐' },
