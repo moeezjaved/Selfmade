@@ -8,6 +8,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
+import KnowledgeChrome from '@/components/app/KnowledgeChrome'
 
 export const revalidate = 1800
 
@@ -58,14 +59,8 @@ async function getPlaybooks() {
 export default async function PlaybooksPage() {
   const books = await getPlaybooks()
   return (
+    <KnowledgeChrome>
     <div style={{ minHeight: '100vh', background: '#fff', fontFamily: "'Inter', -apple-system, sans-serif", color: INK }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 28px', maxWidth: 1060, margin: '0 auto' }}>
-        <Link href="/" style={{ fontWeight: 850, fontSize: 17, letterSpacing: '-.02em', color: INK, textDecoration: 'none' }}>Selfmade</Link>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <Link href="/discover" style={{ fontSize: 12.5, color: MUTED, textDecoration: 'none', fontWeight: 700 }}>Today&rsquo;s Edition</Link>
-          <Link href="/brief" style={{ fontSize: 12.5, fontWeight: 800, color: INK, textDecoration: 'none' }}>Open app →</Link>
-        </div>
-      </div>
 
       <div style={{ maxWidth: 1060, margin: '0 auto', padding: '48px 26px 120px' }}>
         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color: FAINT }}>The library, curated</div>
@@ -102,5 +97,6 @@ export default async function PlaybooksPage() {
         </div>
       </div>
     </div>
+    </KnowledgeChrome>
   )
 }

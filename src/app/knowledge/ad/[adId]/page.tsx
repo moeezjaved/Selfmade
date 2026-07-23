@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import TrailRecorder from '@/components/knowledge/TrailRecorder'
 import Understand from '@/components/knowledge/Understand'
+import KnowledgeChrome from '@/components/app/KnowledgeChrome'
 
 export const revalidate = 3600
 
@@ -79,17 +80,14 @@ export default async function AdKnowledgePage({ params, searchParams }: { params
   const countries: string[] = (ad.targeted_countries || []).slice(0, 8)
 
   return (
+    <KnowledgeChrome>
     <div style={{ minHeight: '100vh', background: '#f6f8f5', fontFamily: "'Inter', -apple-system, sans-serif", color: INK }}>
       <TrailRecorder node={`ad:${params.adId}`} />
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 26px', borderBottom: `1px solid ${LINE}`, background: '#fff' }}>
-        <Link href="/" style={{ fontWeight: 850, fontSize: 18, letterSpacing: '-.02em', color: INK, textDecoration: 'none' }}>Selfmade</Link>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          {pbNext?.book
-            ? <Link href={`/playbooks/${pbNext.book.slug}`} style={{ fontSize: 12, fontWeight: 700, color: MUTED, textDecoration: 'none' }}>← {pbNext.book.emoji || ''} {pbNext.book.title}</Link>
-            : <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: MUTED }}>KNOWLEDGE</span>}
-          <Link href="/signup" style={{ background: FOREST, color: LIME, fontSize: 12.5, fontWeight: 800, padding: '8px 15px', borderRadius: 100, textDecoration: 'none' }}>Hire Mello</Link>
+      {pbNext?.book && (
+        <div style={{ maxWidth: 880, margin: '0 auto', padding: '14px 22px 0' }}>
+          <Link href={`/playbooks/${pbNext.book.slug}`} style={{ fontSize: 12.5, fontWeight: 700, color: MUTED, textDecoration: 'none' }}>← {pbNext.book.emoji || ''} {pbNext.book.title}</Link>
         </div>
-      </div>
+      )}
 
       <div style={{ maxWidth: 880, margin: '0 auto', padding: '30px 22px 90px', display: 'grid', gridTemplateColumns: 'minmax(240px, 340px) 1fr', gap: 30, alignItems: 'start' }}>
         {/* media */}
@@ -173,5 +171,6 @@ export default async function AdKnowledgePage({ params, searchParams }: { params
         </div>
       )}
     </div>
+    </KnowledgeChrome>
   )
 }
