@@ -11,6 +11,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { computeEdition, editionNumber } from '@/lib/edition/compute'
+import { getFeaturedPlaybooks, agoLabel } from '@/lib/playbooks/featured'
 import ForYou from './ForYou'
 import AdMedia from './AdMedia'
 import Reveal from './Reveal'
@@ -101,7 +102,7 @@ const Eyebrow = ({ children, color = FAINT }: { children: React.ReactNode; color
 )
 
 export default async function DiscoverPage() {
-  const ed = await computeEdition()
+  const [ed, playbooks] = await Promise.all([computeEdition(), getFeaturedPlaybooks({ featuredOnly: true, limit: 8 })])
   const isLead = (m: any) => ed.lead && m.kind === ed.lead.kind && m.name === ed.lead.name
   const strips = ed.movers.filter((m) => m.kind !== 'BRAND' && !isLead(m))
   const brands = ed.movers.filter((m) => m.kind === 'BRAND' && !isLead(m))
@@ -142,6 +143,34 @@ export default async function DiscoverPage() {
         </div>
         <ForYou />
       </section>
+
+      {/* ══ RECOMMENDED BY MELLO — the playbooks shelf, the doorway into the workflow ══ */}
+      {playbooks.length > 0 && (
+        <section data-reveal className="wrap w-wide" style={{ padding: '52px 26px 8px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 16 }}>
+            <Eyebrow color={GREEN}>Recommended by Mello</Eyebrow>
+            <Link href="/playbooks" style={{ fontSize: 12.5, color: MUTED, fontWeight: 700, textDecoration: 'none', marginLeft: 'auto' }}>All playbooks →</Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
+            {playbooks.map((p) => (
+              <Link key={p.id} href={`/playbooks/${p.slug}`} style={{ display: 'block', textDecoration: 'none', color: INK, borderRadius: 16, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#fff', boxShadow: '0 30px 60px -44px rgba(10,20,12,.5)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridAutoRows: 78, gap: 3, padding: 3 }}>
+                  {p.covers.slice(0, 5).map((u, i) => (
+                    <span key={i} style={{ position: 'relative', overflow: 'hidden', borderRadius: 7, background: '#20241f', display: 'block', gridRow: i === 0 ? 'span 2' : undefined }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={u} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </span>
+                  ))}
+                </div>
+                <div style={{ padding: '13px 16px 15px' }}>
+                  <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.017em' }}>{p.emoji ? `${p.emoji} ` : ''}{p.title}</div>
+                  <div style={{ fontSize: 12, color: MUTED, fontWeight: 650, marginTop: 3 }}>{p.count} winning ads · {agoLabel(p.updated_at).replace('updated ', '')}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ══ ROOM 2 · HERO EXHIBITION — dominant creative beside a towering headline, masonry surrounds ══ */}
       {ed.lead && (

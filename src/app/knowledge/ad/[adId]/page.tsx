@@ -28,6 +28,24 @@ async function getAd(adId: string) {
   return { ad, similar }
 }
 
+// "Next in this Playbook" — keep users inside the exhibition (YouTube/Netflix physics).
+async function getPlaybookNext(slug: string, adId: string) {
+  const admin = createAdminClient() as any
+  const book = await admin.from('playbooks').select('id, title, slug, emoji').eq('slug', slug).maybeSingle().then((r: any) => r.data)
+  if (!book) return null
+  const { data: links } = await admin.from('playbook_ads').select('ad_id, position').eq('playbook_id', book.id).order('position').limit(200)
+  const ids = (links || []).map((l: any) => l.ad_id).filter((id: string) => id !== adId)
+  if (!ids.length) return { book, ads: [] }
+  const idx = (links || []).findIndex((l: any) => l.ad_id === adId)
+  const nextIds = [...ids.slice(Math.max(0, idx)), ...ids.slice(0, Math.max(0, idx))].slice(0, 8)
+  const { data: rows } = await admin.from('discovery_ads_index')
+    .select('ad_id, page_name, days_running, discovery_creatives(asset_type, r2_url, poster_url)')
+    .in('ad_id', nextIds)
+  const byId = new Map((rows || []).map((r: any) => [r.ad_id, r]))
+  const ads = nextIds.map((id: string) => byId.get(id)).filter(Boolean)
+  return { book, ads }
+}
+
 const mediaOf = (a: any) => {
   const cres = Array.isArray(a.discovery_creatives) ? a.discovery_creatives : (a.discovery_creatives ? [a.discovery_creatives] : [])
   const cre = cres.find((c: any) => (c.asset_type === 'video' ? c.poster_url : c.r2_url)) || cres[0]
@@ -46,8 +64,9 @@ export async function generateMetadata({ params }: { params: { adId: string } })
   }
 }
 
-export default async function AdKnowledgePage({ params }: { params: { adId: string } }) {
+export default async function AdKnowledgePage({ params, searchParams }: { params: { adId: string }; searchParams: { pb?: string } }) {
   const { ad, similar } = await getAd(params.adId)
+  const pbNext = searchParams?.pb ? await getPlaybookNext(searchParams.pb, params.adId) : null
   if (!ad) {
     return (
       <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f6f8f5', fontFamily: "'Inter',sans-serif", color: MUTED }}>
@@ -65,7 +84,9 @@ export default async function AdKnowledgePage({ params }: { params: { adId: stri
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 26px', borderBottom: `1px solid ${LINE}`, background: '#fff' }}>
         <Link href="/" style={{ fontWeight: 850, fontSize: 18, letterSpacing: '-.02em', color: INK, textDecoration: 'none' }}>Selfmade</Link>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: MUTED }}>KNOWLEDGE</span>
+          {pbNext?.book
+            ? <Link href={`/playbooks/${pbNext.book.slug}`} style={{ fontSize: 12, fontWeight: 700, color: MUTED, textDecoration: 'none' }}>← {pbNext.book.emoji || ''} {pbNext.book.title}</Link>
+            : <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: MUTED }}>KNOWLEDGE</span>}
           <Link href="/signup" style={{ background: FOREST, color: LIME, fontSize: 12.5, fontWeight: 800, padding: '8px 15px', borderRadius: 100, textDecoration: 'none' }}>Hire Mello</Link>
         </div>
       </div>
@@ -114,6 +135,26 @@ export default async function AdKnowledgePage({ params }: { params: { adId: stri
           </div>
         </div>
       </div>
+
+      {/* Next in this playbook — keep exploring inside the exhibition */}
+      {pbNext?.book && pbNext.ads.length > 0 && (
+        <div style={{ maxWidth: 880, margin: '0 auto', padding: '0 22px 40px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.14em', color: MUTED, textTransform: 'uppercase' }}>Next in {pbNext.book.emoji || ''} {pbNext.book.title}</div>
+            <Link href={`/playbooks/${pbNext.book.slug}`} style={{ fontSize: 12, color: '#2f7a3f', fontWeight: 750, textDecoration: 'none', marginLeft: 'auto' }}>See all →</Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
+            {pbNext.ads.map((s: any) => { const sm = mediaOf(s); if (!sm?.image) return null
+              return (
+                <Link key={s.ad_id} href={`/knowledge/ad/${s.ad_id}?pb=${pbNext.book.slug}`} style={{ display: 'block', position: 'relative', aspectRatio: '3/4', borderRadius: 12, overflow: 'hidden', background: '#0d120e', border: `1px solid ${LINE}` }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={sm.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {sm.isVideo && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 17, textShadow: '0 2px 8px rgba(0,0,0,.5)' }}>▶</span>}
+                </Link>
+              )})}
+          </div>
+        </div>
+      )}
 
       {/* similar — a taste */}
       {similar.length > 0 && (

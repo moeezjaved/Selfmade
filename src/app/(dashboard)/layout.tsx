@@ -16,7 +16,7 @@ import type { UserProfile } from '@/types'
 import {
   Settings, LogOut, Menu, X, Check, LifeBuoy, ChevronsUpDown, Zap, Sparkles, CreditCard, Users,
   Eye, TrendingUp, Star, Bookmark, Image as ImageIcon, Heart, Radar,
-  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, Trophy, Camera, Sun, Newspaper,
+  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, Trophy, Camera, Sun, Newspaper, BookOpen,
 } from 'lucide-react'
 import SearchPalette from '@/components/SearchPalette'
 import { cn } from '@/lib/utils'
@@ -31,6 +31,7 @@ const AREAS = [
     items: [
       { href: '/brief',                icon: Sun,          label: 'Morning Brief', badge: 'NEW' },
       { href: '/discover',             icon: Newspaper,    label: 'Discover',   badge: 'NEW' },   // the Edition — today's market intelligence
+      { href: '/playbooks',            icon: BookOpen,     label: 'Playbooks',  badge: 'NEW' },   // curated walls of winners — Watch·Understand·Remake
       { href: '/discovery',            icon: Radar,        label: 'Discovery',  badge: null },
       { href: '/discovery/brand-spy',  icon: Eye,          label: 'Brand Spy',  badge: 'NEW' },
       { href: '/trending',             icon: TrendingUp,   label: 'Trending',   badge: 'NEW' },
