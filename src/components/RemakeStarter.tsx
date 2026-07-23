@@ -118,11 +118,11 @@ export default function RemakeStarter({ variant = 'pill' }: { variant?: 'pill' |
                   </span>
                 </button>
 
-                <button style={opt} disabled={busy} onClick={() => { setOpen(false); router.push('/creative-studio?studio=1') }}>
+                <button style={opt} disabled={busy} onClick={() => { setOpen(false); router.push('/studio') }}>
                   <span style={iconWrap}><Sparkles size={20} color={GREEN} /></span>
                   <span style={{ flex: 1 }}>
                     <b style={{ fontSize: 14.5, display: 'block' }}>Create a fresh ad</b>
-                    <small style={{ fontSize: 12, color: L_MUTED }}>No ad in mind? We’ll design an original from scratch with AI.</small>
+                    <small style={{ fontSize: 12, color: L_MUTED }}>No ad in mind? Design one with Mello in the two-pane studio.</small>
                   </span>
                 </button>
 
