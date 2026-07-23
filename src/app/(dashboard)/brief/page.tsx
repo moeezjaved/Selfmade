@@ -14,7 +14,7 @@ import { ArrowRight, ArrowUp } from 'lucide-react'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
-type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null }[]; at?: string }
+type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; at?: string }
 type Brief = {
   summary: { adsScanned: number; brandsWatched: number; spiedBrands: number; creativesReady: number }
   firstName: string | null
@@ -290,10 +290,12 @@ export default function StandupPage() {
                   </div>
                 )}
 
-                {/* competitor ads — show the actual creatives, hover a video to preview it */}
+                {/* competitor ads — the actual creatives; hover a video to preview, click into its knowledge page */}
                 {!isHeadline && !!it.media?.length && (
                   <div style={{ display: 'flex', gap: 8, margin: '-2px 0 14px' }}>
-                    {it.media.slice(0, 3).map((m, k) => <AdPreview key={k} image={m.image} videoUrl={m.videoUrl} />)}
+                    {it.media.slice(0, 3).map((m, k) => m.adId
+                      ? <Link key={k} href={`/knowledge/ad/${m.adId}`}><AdPreview image={m.image} videoUrl={m.videoUrl} /></Link>
+                      : <AdPreview key={k} image={m.image} videoUrl={m.videoUrl} />)}
                   </div>
                 )}
 

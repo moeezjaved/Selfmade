@@ -33,7 +33,7 @@ type BriefItem = {
   cta_label?: string
   cta_href?: string
   thumbs?: string[]           // small image urls for a visual row (creatives headline)
-  media?: { image: string | null; videoUrl: string | null }[]  // playable competitor-ad previews
+  media?: { image: string | null; videoUrl: string | null; adId?: string }[]  // playable previews → /knowledge/ad/[adId]
   at?: string                 // ISO timestamp of the underlying event
 }
 
@@ -104,7 +104,8 @@ export async function GET() {
       title: `${brand} launched ${c === 1 ? 'a new ad' : `${c} new ads`}.`,
       body: c > 2 ? `That's a real push, not routine rotation — worth reading what angle they're betting on before it compounds.` : `A single fresh creative — I'll flag if it turns into a burst.`,
       why: `You watch ${brand} — a launch like this usually means they found something working.`,
-      cta_label: 'See the ads', cta_href: `/discovery/brand-spy`,
+      // the brief links INTO the knowledge graph: the brand's living entity page
+      cta_label: 'Open the brand file', cta_href: n.page_id ? `/knowledge/brand/${n.page_id}` : `/discovery/brand-spy`,
     }
     items.push(it)
     if (n.page_id) compByPage.set(String(n.page_id), it)
@@ -133,7 +134,7 @@ export async function GET() {
   const [marketAds, globalAds] = await Promise.all([
     soft((async () => {
       let q = admin.from('discovery_ads_index')
-        .select('page_id, hook_type, format_style, topics, created_at, discovery_creatives(asset_type, r2_url, poster_url)')
+        .select('ad_id, page_id, hook_type, format_style, topics, created_at, discovery_creatives(asset_type, r2_url, poster_url)')
         .gte('created_at', D7).order('created_at', { ascending: false }).limit(240)
       if (pageIds.length) q = q.in('page_id', pageIds)
       const { data } = await q
@@ -150,12 +151,12 @@ export async function GET() {
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1])
   }
   // Resolve one ad's media the same way the Discovery grid does.
-  const mediaOf = (a: any): { image: string | null; videoUrl: string | null } | null => {
+  const mediaOf = (a: any): { image: string | null; videoUrl: string | null; adId?: string } | null => {
     const cres = Array.isArray(a.discovery_creatives) ? a.discovery_creatives : (a.discovery_creatives ? [a.discovery_creatives] : [])
     const cre = cres.find((c: any) => (c.asset_type === 'video' ? c.poster_url : c.r2_url)) || cres[0]
     if (!cre) return null
     const isVid = cre.asset_type === 'video'
-    return { image: isVid ? cre.poster_url : cre.r2_url, videoUrl: isVid ? (cre.r2_url || null) : null }
+    return { image: isVid ? cre.poster_url : cre.r2_url, videoUrl: isVid ? (cre.r2_url || null) : null, adId: a.ad_id ? String(a.ad_id) : undefined }
   }
 
   // Attach up to 3 playable thumbnails to each competitor item, from that page's freshest ads.
