@@ -96,8 +96,7 @@ export default function HireKeynote() {
         <p>{hired ? `Welcome aboard${name.trim() ? ', ' + name.trim().split(' ')[0] : ''} — your first brief arrives tomorrow morning.` : 'Your first brief arrives tomorrow morning.'}</p>
       </div>
 
-      <style jsx global>{`
-        :root{ --paper:#fbfcfa; --night:#0a0d0a; }
+      <style>{`
         html,body{background:#0a0d0a}
         .brand{position:fixed;top:26px;left:30px;font-size:14px;font-weight:800;letter-spacing:-.02em;color:#f2f5ef;z-index:10;mix-blend-mode:difference}
         .beat{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;position:relative;color:#f2f5ef;font-family:'Inter',-apple-system,system-ui,sans-serif}
