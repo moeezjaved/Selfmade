@@ -12,25 +12,30 @@ export async function getFeaturedPlaybooks(opts: { featuredOnly?: boolean; limit
   let q = admin.from('playbooks').select('*')
   if (opts.featuredOnly) q = q.eq('featured', true)
   const { data: books } = await q.order('featured', { ascending: false }).order('sort_order').order('created_at').limit(opts.limit || 24)
-  const out: FeaturedBook[] = []
-  for (const b of books || []) {
-    const [{ data: links }, { count }] = await Promise.all([
-      admin.from('playbook_ads').select('ad_id').eq('playbook_id', b.id).order('position').limit(5),
-      admin.from('playbook_ads').select('ad_id', { count: 'exact', head: true }).eq('playbook_id', b.id),
-    ])
-    const ids = (links || []).map((l: any) => l.ad_id)
-    if (!ids.length) continue
-    const { data: rows } = await admin.from('discovery_ads_index').select('ad_id, discovery_creatives(asset_type, r2_url, poster_url)').in('ad_id', ids)
-    const byId = new Map((rows || []).map((r: any) => [r.ad_id, r]))
-    const covers = ids.map((id: string) => {
-      const r: any = byId.get(id); if (!r) return null
-      const cres = Array.isArray(r.discovery_creatives) ? r.discovery_creatives : (r.discovery_creatives ? [r.discovery_creatives] : [])
-      const cre = cres.find((c: any) => (c.asset_type === 'video' ? c.poster_url : c.r2_url)) || cres[0]
-      return cre ? (cre.asset_type === 'video' ? cre.poster_url : cre.r2_url) : null
-    }).filter(Boolean) as string[]
-    if (covers.length >= 3) out.push({ id: b.id, title: b.title, slug: b.slug, description: b.description, emoji: b.emoji, updated_at: b.updated_at, covers, count: count || ids.length })
-  }
-  return out
+  // All books resolved in PARALLEL — the sequential per-book loop was ~3 round-trips
+  // × N books stacked on top of the edition compute, which pushed /discover past the
+  // function limit. Same queries, one wave.
+  const resolved = await Promise.all((books || []).map(async (b: any) => {
+    try {
+      const [{ data: links }, { count }] = await Promise.all([
+        admin.from('playbook_ads').select('ad_id').eq('playbook_id', b.id).order('position').limit(5),
+        admin.from('playbook_ads').select('ad_id', { count: 'exact', head: true }).eq('playbook_id', b.id),
+      ])
+      const ids = (links || []).map((l: any) => l.ad_id)
+      if (!ids.length) return null
+      const { data: rows } = await admin.from('discovery_ads_index').select('ad_id, discovery_creatives(asset_type, r2_url, poster_url)').in('ad_id', ids)
+      const byId = new Map((rows || []).map((r: any) => [r.ad_id, r]))
+      const covers = ids.map((id: string) => {
+        const r: any = byId.get(id); if (!r) return null
+        const cres = Array.isArray(r.discovery_creatives) ? r.discovery_creatives : (r.discovery_creatives ? [r.discovery_creatives] : [])
+        const cre = cres.find((c: any) => (c.asset_type === 'video' ? c.poster_url : c.r2_url)) || cres[0]
+        return cre ? (cre.asset_type === 'video' ? cre.poster_url : cre.r2_url) : null
+      }).filter(Boolean) as string[]
+      if (covers.length < 3) return null
+      return { id: b.id, title: b.title, slug: b.slug, description: b.description, emoji: b.emoji, updated_at: b.updated_at, covers, count: count || ids.length } as FeaturedBook
+    } catch { return null }
+  }))
+  return resolved.filter(Boolean) as FeaturedBook[]
 }
 
 export const agoLabel = (iso: string) => {

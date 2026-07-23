@@ -67,13 +67,16 @@ export async function computeEdition(): Promise<Edition> {
   const iso = (msAgo: number) => new Date(now - msAgo).toISOString()
   const D1 = iso(24 * 3600e3), D2 = iso(48 * 3600e3), D7 = iso(7 * 86400e3), D14 = iso(14 * 86400e3), D30 = iso(30 * 86400e3)
 
-  // One bounded fetch covers the arithmetic: 14 days of newly-indexed ads, minimal columns.
+  // One bounded fetch covers the arithmetic: 14 days of newly-indexed ads, minimal
+  // columns. Capped at 6k — a bulk backfill once stamped 200k+ rows into a 14d window
+  // and the 20k fetch made the whole page hang past Vercel's limit. 6k of the newest
+  // rows keeps the movers honest for a spy-only crawl while rendering in seconds.
   const { data: rows14 } = await admin
     .from('discovery_ads_index')
     .select('ad_id, page_id, page_name, hook_type, format_style, niche, created_at')
     .gte('created_at', D14)
     .order('created_at', { ascending: false })
-    .limit(20000)
+    .limit(6000)
   const all: any[] = rows14 || []
 
   const within = (a: any, since: string) => String(a.created_at) >= since

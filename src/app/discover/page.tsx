@@ -102,8 +102,31 @@ const Eyebrow = ({ children, color = FAINT }: { children: React.ReactNode; color
   <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color }}>{children}</div>
 )
 
+// The page must NEVER hang: heavy data work races a hard timeout and falls back
+// gracefully. A slow corpus morning renders a short edition; it never renders nothing.
+const withTimeout = <T,>(p: Promise<T>, ms: number, fb: T): Promise<T> =>
+  Promise.race([p.catch(() => fb), new Promise<T>((res) => setTimeout(() => res(fb), ms))])
+
 export default async function DiscoverPage() {
-  const [ed, playbooks] = await Promise.all([computeEdition(), getFeaturedPlaybooks({ featuredOnly: true, limit: 8 })])
+  const [ed, playbooks] = await Promise.all([
+    withTimeout(computeEdition(), 25000, null as any),
+    withTimeout(getFeaturedPlaybooks({ featuredOnly: true, limit: 8 }), 12000, []),
+  ])
+
+  // Edition compute timed out → serve the doorway (playbooks) + a graceful note
+  // instead of a hung request. ISR retries on the next visitor.
+  if (!ed) {
+    return (
+      <div className="disc-root" style={{ minHeight: '100vh', background: '#fff', fontFamily: "'Inter', -apple-system, sans-serif", color: INK }}>
+        <div style={{ maxWidth: 660, margin: '0 auto', padding: '90px 26px' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase', color: FAINT }}>Edition №{editionNumber()}</div>
+          <h1 style={{ fontSize: 'clamp(26px,4.5vw,36px)', fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1.1, margin: '12px 0 10px' }}>Today&rsquo;s edition is still being hung.</h1>
+          <p style={{ fontSize: 15, color: MUTED, maxWidth: '48ch', lineHeight: 1.65 }}>Mello is mid-read on the overnight ads. Give it a minute and refresh — or browse the playbooks meanwhile.</p>
+          <Link href="/playbooks" style={{ display: 'inline-block', marginTop: 14, fontSize: 13.5, fontWeight: 800, color: INK, textDecoration: 'none', borderBottom: `2px solid ${LIME}`, paddingBottom: 2 }}>Explore playbooks →</Link>
+        </div>
+      </div>
+    )
+  }
   const isLead = (m: any) => ed.lead && m.kind === ed.lead.kind && m.name === ed.lead.name
   const strips = ed.movers.filter((m) => m.kind !== 'BRAND' && !isLead(m))
   const brands = ed.movers.filter((m) => m.kind === 'BRAND' && !isLead(m))
