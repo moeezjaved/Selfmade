@@ -75,12 +75,19 @@ export default async function DiscoverPage() {
             <div style={{ fontSize: 'clamp(26px,4.4vw,34px)', fontWeight: 800, letterSpacing: '-.028em', lineHeight: 1.1, margin: '10px 0 12px' }}>
               {ed.lead.name} {ed.lead.dir === 'up' ? 'is accelerating.' : 'is cooling off.'}
             </div>
-            {/* the delta — knowledge that visibly changed today */}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, fontSize: 13.5, fontWeight: 700, flexWrap: 'wrap' }}>
-              <span style={{ color: FAINT }}>last week {ed.lead.prev} new ads</span>
-              <span style={{ color: FAINT }}>→</span>
-              <span style={{ color: ed.lead.dir === 'up' ? GREEN : AMBER, fontSize: 17, fontWeight: 800 }}>this week {ed.lead.now}</span>
-            </div>
+            {/* the delta — knowledge that visibly changed today (brand moves are a 48h burst, not a week compare) */}
+            {ed.lead.kind === 'BRAND' ? (
+              <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                <span style={{ color: GREEN, fontSize: 17, fontWeight: 800 }}>{ed.lead.now} new ads</span>
+                <span style={{ color: FAINT }}> in the last 48 hours</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, fontSize: 13.5, fontWeight: 700, flexWrap: 'wrap' }}>
+                <span style={{ color: FAINT }}>last week {ed.lead.prev} new ads</span>
+                <span style={{ color: FAINT }}>→</span>
+                <span style={{ color: ed.lead.dir === 'up' ? GREEN : AMBER, fontSize: 17, fontWeight: 800 }}>this week {ed.lead.now}</span>
+              </div>
+            )}
             <p style={{ fontSize: 15.5, lineHeight: 1.65, color: '#3a423c', maxWidth: '54ch', margin: '12px 0 16px' }}>{ed.leadBody}</p>
             <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
               <Link href={ed.lead.href} style={{ fontSize: 13.5, fontWeight: 800, color: INK, textDecoration: 'none', borderBottom: `2px solid ${LIME}`, paddingBottom: 2 }}>
