@@ -1,14 +1,16 @@
 'use client'
 /**
  * STUDIO — the two-pane creation surface (Ploy's editor, applied to ads).
- * LEFT: talk to Mello (reuses useChatStream + the real Mello agent) for angles,
- * hooks, ideas. RIGHT: the canvas — pick a brand + product photos, Generate, and the
- * ad renders inline; tweak it in plain language; Approve & download (the Publish
- * moment). Reuses the existing generation engine verbatim (/api/discovery/generate-ad
- * sync + /api/discovery/edit-image) — the working modals are untouched.
+ * LEFT: talk to Mello (reuses useChatStream + the real agent) for angles/hooks.
+ * RIGHT: the canvas — the SAME inputs the AI Ad Studio already gathers so the ad is
+ * actually good: analyze the brand's website (colors/fonts/logo/palette + product
+ * photos via /api/discovery/detect-product), pick product photos, set an angle and
+ * niche, then Create → the ad renders inline; tweak in plain language; Approve &
+ * download. Reuses the existing engine verbatim (generate-ad sync + edit-image);
+ * the working modals are untouched.
  */
 import { useEffect, useRef, useState } from 'react'
-import { Sparkles, Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon } from 'lucide-react'
+import { Sparkles, Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 import { useChatStream } from '@/components/mello/useChatStream'
 
@@ -16,74 +18,104 @@ const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FO
 
 type Brand = { id: string; name: string; website?: string; brand_type?: string; brand_kit?: any; products?: { image_urls?: string[] }[] }
 type Photo = { id: string; src: string }
+type Kit = { colors: string[]; fonts: any; logo: string | null; palette: string | null }
 const uid = () => Math.random().toString(36).slice(2)
 const fileToDataUrl = (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
+const emptyKit = (): Kit => ({ colors: [], fonts: null, logo: null, palette: null })
+
+const label: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED, marginBottom: 8 }
+const field: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '10px 13px', fontSize: 13.5, color: INK, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
 
 export default function StudioPage() {
   const { balance } = useCredits()
-  // ── chat (left) ──
   const chat = useChatStream()
   const [convId, setConvId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat.messages])
 
-  // ── canvas (right) ──
+  // brand + site
   const [brands, setBrands] = useState<Brand[]>([])
+  const [mode, setMode] = useState<'pick' | 'new'>('pick')
   const [brandId, setBrandId] = useState<string>('')
+  const [brandName, setBrandName] = useState('')
+  const [website, setWebsite] = useState('')
+  const [kit, setKit] = useState<Kit>(emptyKit())
+  const [detecting, setDetecting] = useState(false)
+
+  // creative inputs
   const [photos, setPhotos] = useState<Photo[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [headline, setHeadline] = useState('')
+  const [angle, setAngle] = useState('')
+  const [niches, setNiches] = useState<string[]>([])
+  const [niche, setNiche] = useState('')
   const [aspect, setAspect] = useState<'4:5' | '1:1' | '9:16' | '16:9'>('4:5')
+
+  // gen
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ url: string; genId: string | null } | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
-  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState(''); const [editing, setEditing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const cost = 15
 
   useEffect(() => {
-    fetch('/api/brands').then(r => r.json()).then(j => {
-      const bs: Brand[] = j.brands || []; setBrands(bs)
-      if (bs[0]) pickBrand(bs[0])
-    }).catch(() => {})
-    // open a Mello conversation for the left pane + a warm greeting
-    fetch('/api/mello/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
-      .then(r => r.json()).then(j => { if (j?.conversation?.id) setConvId(j.conversation.id) }).catch(() => {})
-    chat.setHistory([{ role: 'assistant', content: 'This is your studio. Pick a product on the right and hit Create — or tell me what you’re selling and I’ll suggest an angle and a hook first.' }])
+    fetch('/api/brands').then(r => r.json()).then(j => { const bs: Brand[] = j.brands || []; setBrands(bs); if (bs[0]) pickBrand(bs[0]); else setMode('new') }).catch(() => setMode('new'))
+    fetch('/api/discovery/niches').then(r => r.json()).then(j => setNiches(j.niches || [])).catch(() => {})
+    fetch('/api/mello/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).then(r => r.json()).then(j => { if (j?.conversation?.id) setConvId(j.conversation.id) }).catch(() => {})
+    chat.setHistory([{ role: 'assistant', content: 'This is your studio. On the right, analyze your website so I know your brand — then pick product photos, tell me the angle, and hit Create. Or ask me here for an angle and a hook first.' }])
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const pickBrand = (b: Brand) => {
-    setBrandId(b.id)
-    const imgs = (b.products || []).flatMap(p => p.image_urls || []).slice(0, 8)
-    const ph = imgs.map(u => ({ id: uid(), src: u }))
-    setPhotos(ph); setSelected(ph.slice(0, 2).map(p => p.id))
+    setMode('pick'); setBrandId(b.id); setBrandName(b.name); setWebsite(b.website || '')
+    const k = b.brand_kit || {}
+    setKit({ colors: k.colors || [], fonts: k.fonts || null, logo: k.logo || null, palette: k.palette || null })
+    const imgs = (b.products || []).flatMap(p => p.image_urls || []).slice(0, 10)
+    const ph = imgs.map(u => ({ id: uid(), src: u })); setPhotos(ph); setSelected(ph.slice(0, 2).map(p => p.id))
   }
+  const newBrand = () => { setMode('new'); setBrandId(''); setBrandName(''); setWebsite(''); setKit(emptyKit()); setPhotos([]); setSelected([]) }
+
+  const analyze = async () => {
+    if (!website.trim()) return
+    setDetecting(true); setErr(null)
+    try {
+      const j = await fetch('/api/discovery/detect-product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: website.trim() }) }).then(r => r.json())
+      if (j.brandName && !brandName.trim()) setBrandName(j.brandName)
+      setKit({ colors: Array.isArray(j.colors) ? j.colors : [], fonts: j.fonts || null, logo: j.logo || null, palette: j.palette || null })
+      const found = Array.from(new Set([...(j.productImages || []), ...(j.images || [])])) as string[]
+      if (found.length) { const ph = found.slice(0, 10).map(u => ({ id: uid(), src: u })); setPhotos(p => [...ph, ...p]); setSelected(s => Array.from(new Set([...ph.slice(0, 2).map(p => p.id), ...s])).slice(0, 3)) }
+      else setErr('Analyzed the site, but found no product photos — upload a couple below.')
+    } catch (e: any) { setErr('Couldn’t analyze that site — check the URL or upload photos manually.') } finally { setDetecting(false) }
+  }
+
   const onUpload = async (files: FileList | null) => {
     if (!files?.length) return
     const arr = await Promise.all(Array.from(files).slice(0, 6).map(async f => ({ id: uid(), src: await fileToDataUrl(f) })))
     setPhotos(p => [...arr, ...p]); setSelected(s => Array.from(new Set([...arr.map(a => a.id), ...s])).slice(0, 3))
   }
   const toggle = (id: string) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : (s.length >= 3 ? s : [...s, id]))
-
-  const send = () => {
-    const t = draft.trim(); if (!t || !convId || chat.streaming) return
-    setDraft(''); chat.sendMessage(convId, t)
-  }
+  const send = () => { const t = draft.trim(); if (!t || !convId || chat.streaming) return; setDraft(''); chat.sendMessage(convId, t) }
 
   const generate = async () => {
     setErr(null)
     const chosen = photos.filter(p => selected.includes(p.id)).map(p => p.src)
-    if (!chosen.length) { setErr('Select at least one product photo.'); return }
+    if (!chosen.length) { setErr('Select at least one product photo (analyze your site or upload).'); return }
     if (!confirmCredits('create an ad', cost, balance)) return
-    const brand = brands.find(b => b.id === brandId)
     setBusy(true); setResult(null)
     try {
+      // A brand-new brand: save it first so the kit sticks and future ads reuse it.
+      let useBrandId = brandId
+      if (mode === 'new' && brandName.trim()) {
+        const httpImgs = chosen.filter(s => /^https?:\/\//i.test(s))
+        const jb = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: brandName.trim(), website: website.trim() || null, product_images: httpImgs, brand_kit: kit }) }).then(r => r.json()).catch(() => ({}))
+        if (jb?.brand?.id) { useBrandId = jb.brand.id; setBrandId(jb.brand.id) }
+      }
       const body = {
-        brandId: brandId || undefined, productImages: chosen, brandName: brand?.name || undefined,
-        colors: brand?.brand_kit?.colors, palette: brand?.brand_kit?.palette, fonts: brand?.brand_kit?.fonts, logo: brand?.brand_kit?.logo,
-        newHeadline: headline.trim() || undefined, aspectRatio: aspect, imageSize: '2K',
+        brandId: useBrandId || undefined, productImages: chosen, brandName: brandName.trim() || undefined,
+        colors: kit.colors, palette: kit.palette || undefined, fonts: kit.fonts, logo: kit.logo || undefined,
+        newHeadline: headline.trim() || undefined, angle: angle.trim() || undefined, niche: niche || undefined,
+        aspectRatio: aspect, imageSize: '2K',
       }
       const r = await fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       const t = await r.text(); let j: any; try { j = JSON.parse(t) } catch { j = { error: `HTTP ${r.status}` } }
@@ -102,13 +134,14 @@ export default function StudioPage() {
       setResult({ url: newUrl, genId: j.generationId || result.genId }); setEditText(''); refreshCredits()
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setEditing(false) }
   }
-
   const download = () => { if (result) { const a = document.createElement('a'); a.href = result.url; a.download = 'selfmade-ad.png'; a.target = '_blank'; a.click() } }
 
+  const kitReady = kit.colors.length > 0 || kit.logo || kit.palette
+
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 0px)', fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    <div style={{ display: 'flex', height: '100vh', fontFamily: "'Inter', -apple-system, sans-serif" }}>
       {/* ── LEFT · Mello ── */}
-      <div style={{ width: 380, flexShrink: 0, borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      <div style={{ width: 360, flexShrink: 0, borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', background: '#fff' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '16px 18px', borderBottom: `1px solid ${LINE}` }}>
           <span style={{ width: 30, height: 30, borderRadius: 9, background: FOREST, color: LIME, display: 'grid', placeItems: 'center' }}><Sparkles size={16} /></span>
           <div style={{ fontSize: 14, fontWeight: 800, color: INK }}>Mello</div>
@@ -126,8 +159,7 @@ export default function StudioPage() {
         </div>
         <div style={{ padding: 12, borderTop: `1px solid ${LINE}` }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, background: '#f6f8f5', border: `1px solid ${LINE}`, borderRadius: 14, padding: '8px 10px' }}>
-            <textarea value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-              rows={1} placeholder="Ask Mello for an angle, a hook…" style={{ flex: 1, resize: 'none', border: 'none', background: 'transparent', outline: 'none', fontSize: 13.5, color: INK, fontFamily: 'inherit', maxHeight: 120 }} />
+            <textarea value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} rows={1} placeholder="Ask Mello for an angle, a hook…" style={{ flex: 1, resize: 'none', border: 'none', background: 'transparent', outline: 'none', fontSize: 13.5, color: INK, fontFamily: 'inherit', maxHeight: 120 }} />
             <button onClick={send} disabled={!draft.trim() || chat.streaming} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: draft.trim() ? FOREST : '#dfe4de', color: draft.trim() ? LIME : '#9aa79a', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }}><ArrowUp size={16} /></button>
           </div>
         </div>
@@ -135,26 +167,42 @@ export default function StudioPage() {
 
       {/* ── RIGHT · the canvas ── */}
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', background: '#fbfcfa' }}>
-        <div style={{ maxWidth: 860, margin: '0 auto', padding: '26px 26px 80px' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', padding: '26px 26px 90px' }}>
           <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>Create an ad</div>
-          <div style={{ fontSize: 13, color: MUTED, marginTop: 3, marginBottom: 22 }}>Pick a product, and Mello designs an on-brand ad. Approve when you love it.</div>
+          <div style={{ fontSize: 13, color: MUTED, marginTop: 3, marginBottom: 22 }}>The more Mello knows about your brand, the better the ad. Start with your website.</div>
 
-          {/* brand */}
-          {brands.length > 0 && (
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED, marginBottom: 8 }}>Brand</div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {brands.map(b => (
-                  <button key={b.id} onClick={() => pickBrand(b)} style={{ border: `1.5px solid ${brandId === b.id ? GREEN : LINE}`, background: brandId === b.id ? '#f4fbe6' : '#fff', color: INK, borderRadius: 100, padding: '7px 14px', fontSize: 12.5, fontWeight: 750, cursor: 'pointer' }}>{b.name}</button>
-                ))}
-              </div>
+          {/* Brand */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={label}>Brand</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: brands.length ? 12 : 0 }}>
+              {brands.map(b => (
+                <button key={b.id} onClick={() => pickBrand(b)} style={{ border: `1.5px solid ${mode === 'pick' && brandId === b.id ? GREEN : LINE}`, background: mode === 'pick' && brandId === b.id ? '#f4fbe6' : '#fff', color: INK, borderRadius: 100, padding: '7px 14px', fontSize: 12.5, fontWeight: 750, cursor: 'pointer' }}>{b.name}</button>
+              ))}
+              <button onClick={newBrand} style={{ border: `1.5px dashed ${mode === 'new' ? GREEN : LINE}`, background: mode === 'new' ? '#f4fbe6' : '#fff', color: mode === 'new' ? GREEN : MUTED, borderRadius: 100, padding: '7px 14px', fontSize: 12.5, fontWeight: 750, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Plus size={13} /> New brand</button>
             </div>
-          )}
+            {mode === 'new' && <input value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Brand name" style={{ ...field, maxWidth: 320, marginBottom: 10 }} />}
+
+            {/* Website analyze — the key step for a good ad */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
+                <Globe size={15} color={MUTED} style={{ position: 'absolute', left: 12, top: 12 }} />
+                <input value={website} onChange={e => setWebsite(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') analyze() }} placeholder="yourbrand.com — I’ll pull your colors, logo & products" style={{ ...field, paddingLeft: 34 }} />
+              </div>
+              <button onClick={analyze} disabled={detecting || !website.trim()} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 10, padding: '11px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>{detecting ? <><Loader2 size={14} className="spin" /> Analyzing…</> : 'Analyze site'}</button>
+            </div>
+            {kitReady && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, fontSize: 12, color: MUTED, fontWeight: 600 }}>
+                <Check size={14} color={GREEN} /> Brand kit loaded
+                <span style={{ display: 'inline-flex', gap: 4 }}>{(kit.colors || []).slice(0, 5).map((c, i) => <span key={i} style={{ width: 16, height: 16, borderRadius: 4, background: c, border: '1px solid rgba(0,0,0,.08)' }} />)}</span>
+                {kit.logo && /* eslint-disable-next-line @next/next/no-img-element */ <img src={kit.logo} alt="logo" style={{ height: 18, borderRadius: 3 }} />}
+              </div>
+            )}
+          </div>
 
           {/* product photos */}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED, marginBottom: 8 }}>Product photos <span style={{ color: '#aab0a6', fontWeight: 600 }}>· pick up to 3</span></div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 9 }}>
+          <div style={{ marginBottom: 20 }}>
+            <div style={label}>Product photos <span style={{ color: '#aab0a6', fontWeight: 600 }}>· pick up to 3</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(82px, 1fr))', gap: 9 }}>
               {photos.map(p => {
                 const on = selected.includes(p.id)
                 return (
@@ -166,51 +214,62 @@ export default function StudioPage() {
                 )
               })}
               <button onClick={() => fileRef.current?.click()} style={{ aspectRatio: '1', borderRadius: 12, border: `2px dashed ${LINE}`, background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', color: MUTED }}>
-                <span style={{ display: 'grid', placeItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 700 }}><Upload size={16} />Upload</span>
+                <span style={{ display: 'grid', placeItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 700, justifyItems: 'center' }}><Upload size={16} />Upload</span>
               </button>
             </div>
             <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={e => onUpload(e.target.files)} />
+            {photos.length === 0 && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>Analyze your site above, or upload product photos.</div>}
           </div>
 
-          {/* headline + aspect */}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20, alignItems: 'center' }}>
-            <input value={headline} onChange={e => setHeadline(e.target.value)} placeholder="Optional headline (or let Mello write it)" style={{ flex: 1, minWidth: 220, border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '10px 13px', fontSize: 13.5, color: INK, outline: 'none', fontFamily: 'inherit' }} />
+          {/* angle + niche + headline */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div><div style={label}>Angle</div><input value={angle} onChange={e => setAngle(e.target.value)} placeholder="e.g. founder story, problem/solution" style={field} /></div>
+            <div><div style={label}>Niche</div>
+              <select value={niche} onChange={e => setNiche(e.target.value)} style={{ ...field, appearance: 'auto' as any }}>
+                <option value="">Auto-detect</option>
+                {niches.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 20 }}><div style={label}>Headline <span style={{ color: '#aab0a6', fontWeight: 600 }}>· optional</span></div>
+            <input value={headline} onChange={e => setHeadline(e.target.value)} placeholder="Leave blank and Mello writes it" style={field} />
+          </div>
+
+          {/* aspect */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={label}>Format</div>
             <div style={{ display: 'inline-flex', background: '#eef2ec', borderRadius: 100, padding: 3 }}>
               {(['4:5', '1:1', '9:16', '16:9'] as const).map(a => (
-                <button key={a} onClick={() => setAspect(a)} style={{ border: 'none', borderRadius: 100, padding: '6px 11px', fontSize: 11.5, fontWeight: 800, cursor: 'pointer', background: aspect === a ? '#fff' : 'transparent', color: aspect === a ? INK : MUTED }}>{a}</button>
+                <button key={a} onClick={() => setAspect(a)} style={{ border: 'none', borderRadius: 100, padding: '7px 14px', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: aspect === a ? '#fff' : 'transparent', color: aspect === a ? INK : MUTED }}>{a}</button>
               ))}
             </div>
           </div>
 
           {/* generate */}
           {!result && (
-            <button onClick={generate} disabled={busy} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: busy ? '#dfe4de' : LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 15, fontWeight: 850, cursor: busy ? 'default' : 'pointer' }}>
+            <button onClick={generate} disabled={busy} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: busy ? '#dfe4de' : LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '14px 28px', fontSize: 15, fontWeight: 850, cursor: busy ? 'default' : 'pointer' }}>
               {busy ? <><Loader2 size={17} className="spin" /> Designing your ad… ~30s</> : <><Wand2 size={17} /> Create ad · {cost} credits</>}
             </button>
           )}
           {err && <div style={{ marginTop: 12, fontSize: 13, color: '#b42318', background: '#fef2f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px', maxWidth: 460 }}>{err}</div>}
 
-          {/* result canvas */}
+          {/* result */}
           {result && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={result.url} alt="Your ad" style={{ width: 340, maxWidth: '100%', borderRadius: 16, border: `1px solid ${LINE}`, boxShadow: '0 30px 60px -30px rgba(23,37,28,.4)', display: 'block' }} />
-                <div style={{ flex: 1, minWidth: 240 }}>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>Here’s your ad.</div>
-                  <div style={{ fontSize: 13, color: MUTED, margin: '5px 0 16px', lineHeight: 1.55 }}>Love it? Approve and download. Want a change? Tell Mello below and she’ll tweak this exact image.</div>
-                  <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
-                    <button onClick={download} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><Download size={15} /> Approve &amp; download</button>
-                    <button onClick={() => { setResult(null); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><ImageIcon size={15} /> New one</button>
-                  </div>
-
-                  {/* tweak */}
-                  <div style={{ marginTop: 18 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED, marginBottom: 7 }}>Tweak it</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyEdit() }} placeholder="e.g. make the background darker, bigger logo" style={{ flex: 1, border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '10px 13px', fontSize: 13, color: INK, outline: 'none', fontFamily: 'inherit' }} />
-                      <button onClick={applyEdit} disabled={editing || !editText.trim()} style={{ background: LIME, color: FOREST, border: 'none', borderRadius: 10, padding: '0 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>{editing ? <Loader2 size={14} className="spin" /> : <Wand2 size={14} />}{editing ? '' : 'Tweak'}</button>
-                    </div>
+            <div style={{ marginTop: 8, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={result.url} alt="Your ad" style={{ width: 340, maxWidth: '100%', borderRadius: 16, border: `1px solid ${LINE}`, boxShadow: '0 30px 60px -30px rgba(23,37,28,.4)', display: 'block' }} />
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>Here’s your ad.</div>
+                <div style={{ fontSize: 13, color: MUTED, margin: '5px 0 16px', lineHeight: 1.55 }}>Love it? Approve and download. Want a change? Tell Mello and she’ll tweak this exact image.</div>
+                <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
+                  <button onClick={download} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><Download size={15} /> Approve &amp; download</button>
+                  <button onClick={() => { setResult(null); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><ImageIcon size={15} /> Another</button>
+                </div>
+                <div style={{ marginTop: 18 }}>
+                  <div style={label}>Tweak it</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyEdit() }} placeholder="e.g. darker background, bigger logo" style={field} />
+                    <button onClick={applyEdit} disabled={editing || !editText.trim()} style={{ background: LIME, color: FOREST, border: 'none', borderRadius: 10, padding: '0 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>{editing ? <Loader2 size={14} className="spin" /> : <Wand2 size={14} />}{editing ? '' : 'Tweak'}</button>
                   </div>
                 </div>
               </div>
