@@ -19,13 +19,13 @@ export async function GET() {
   const admin = createAdminClient()
   const { data } = await admin
     .from('ad_autopilot')
-    .select('id, brand_id, source_ad_id, media_type, active, runs, last_sent_at, brands(name)')
+    .select('id, brand_id, source_ad_id, media_type, active, runs, last_sent_at, ads_per_day, brands(name)')
     .eq('user_id', user.id).eq('active', true)
     .order('created_at', { ascending: false })
   const items = (data || []).map((r: any) => ({
     id: r.id, brand_id: r.brand_id, brand_name: r.brands?.name || null,
     source_ad_id: r.source_ad_id, media_type: r.media_type, active: r.active,
-    runs: r.runs, last_sent_at: r.last_sent_at,
+    runs: r.runs, last_sent_at: r.last_sent_at, ads_per_day: r.ads_per_day ?? 1,
   }))
   return NextResponse.json({ items })
 }
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
   if (!brandId) return NextResponse.json({ error: 'brandId required — save a brand to run autopilot' }, { status: 400 })
 
   const settings = (body.settings && typeof body.settings === 'object') ? body.settings : {}
+  const adsPerDay = Math.max(1, Math.min(10, Math.round(Number(body.adsPerDay) || 1)))  // how many ads/day Mello makes
   const admin = createAdminClient()
 
   // Upsert on the unique (user, brand, source ad, media) — re-enrolling flips active back on.
@@ -59,12 +60,12 @@ export async function POST(req: NextRequest) {
     .from('ad_autopilot')
     .upsert({
       user_id: userId, brand_id: brandId, source_ad_id: sourceAdId, media_type: mediaType,
-      settings, active: true,
+      settings, active: true, ads_per_day: adsPerDay,
     }, { onConflict: 'user_id,brand_id,source_ad_id,media_type' })
     .select('id')
     .single()
   if (error || !data) return NextResponse.json({ error: 'could not turn on autopilot' }, { status: 500 })
-  return NextResponse.json({ id: (data as any).id, active: true })
+  return NextResponse.json({ id: (data as any).id, active: true, adsPerDay })
 }
 
 export async function DELETE(req: NextRequest) {

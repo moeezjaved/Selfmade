@@ -12,10 +12,11 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { Upload, Trophy, Sparkles, X, Loader2 } from 'lucide-react'
+import { Upload, Trophy, Sparkles, X, Loader2, CalendarClock } from 'lucide-react'
 
 const CloneVideoModal = dynamic(() => import('@/app/(dashboard)/discovery/CloneVideoModal'), { ssr: false })
 const CloneModal = dynamic(() => import('@/app/(dashboard)/discovery/CloneModal'), { ssr: false })
+const MakeAdsModal = dynamic(() => import('@/components/MakeAdsModal'), { ssr: false })
 
 const LIME = '#dffe95', FOREST = '#17251c', L_INK = '#161c17', L_MUTED = '#68756b', L_LINE = '#e7ece7', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f', GREEN = '#3f8f4f'
 
@@ -26,6 +27,7 @@ export default function RemakeStarter() {
   const [err, setErr] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [makeAds, setMakeAds] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -115,6 +117,14 @@ export default function RemakeStarter() {
                     <small style={{ fontSize: 12, color: L_MUTED }}>No ad in mind? We’ll design an original from scratch with AI.</small>
                   </span>
                 </button>
+
+                <button style={opt} disabled={busy} onClick={() => { setOpen(false); setMakeAds(true) }}>
+                  <span style={iconWrap}><CalendarClock size={20} color={GREEN} /></span>
+                  <span style={{ flex: 1 }}>
+                    <b style={{ fontSize: 14.5, display: 'block' }}>Let Mello make ads daily</b>
+                    <small style={{ fontSize: 12, color: L_MUTED }}>Pick how many per day — see the credit cost first, then Mello brings them to your brief.</small>
+                  </span>
+                </button>
               </div>
 
               {err && <div style={{ marginTop: 12, fontSize: 13, color: '#b42318', background: '#fef2f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px' }}>{err}</div>}
@@ -127,6 +137,7 @@ export default function RemakeStarter() {
 
       {videoUrl && <CloneVideoModal sourceAdId="" sourceVideoUrl={videoUrl} onClose={() => setVideoUrl(null)} />}
       {imageUrl && <CloneModal ad={{ id: `upload:${Date.now()}`, pageId: '', pageName: 'Your ad', assetImageUrl: imageUrl, sourceThumb: imageUrl }} onClose={() => setImageUrl(null)} />}
+      {makeAds && <MakeAdsModal brandId={null} onClose={() => setMakeAds(false)} />}
     </>
   )
 }
