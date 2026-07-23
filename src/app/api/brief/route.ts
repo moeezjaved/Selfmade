@@ -32,7 +32,8 @@ type BriefItem = {
   why?: string                // "why you care" — every card must answer it
   cta_label?: string
   cta_href?: string
-  thumbs?: string[]           // small image urls for a visual row
+  thumbs?: string[]           // small image urls for a visual row (creatives headline)
+  media?: { image: string | null; videoUrl: string | null }[]  // playable competitor-ad previews
   at?: string                 // ISO timestamp of the underlying event
 }
 
@@ -92,17 +93,21 @@ export async function GET() {
     for (const n of notifs as any[]) if (isBlankName(n.brand_name)) n.brand_name = names.get(String(n.page_id)) || null
   }
 
-  // ── 2. Competitor drops → one item per brand, each with a "why you care" ──
+  // ── 2. Competitor drops → one item per brand, each with a "why you care". We attach the actual ad
+  //       thumbnails (playable) after the media fetch below, keyed by page_id. ──
+  const compByPage = new Map<string, BriefItem>()
   for (const n of notifs) {
     const brand = (!isBlankName(n.brand_name) && n.brand_name) || 'A brand you watch'
     const c = Math.max(1, Number(n.ad_count) || 1)
-    items.push({
+    const it: BriefItem = {
       kind: 'competitor_ads', importance: Math.min(85, 55 + c * 5), at: n.created_at,
       title: `${brand} launched ${c === 1 ? 'a new ad' : `${c} new ads`}.`,
       body: c > 2 ? `That's a real push, not routine rotation — worth reading what angle they're betting on before it compounds.` : `A single fresh creative — I'll flag if it turns into a burst.`,
       why: `You watch ${brand} — a launch like this usually means they found something working.`,
       cta_label: 'See the ads', cta_href: `/discovery/brand-spy`,
-    })
+    }
+    items.push(it)
+    if (n.page_id) compByPage.set(String(n.page_id), it)
   }
 
   // ── 3. Creatives ready → this is the HEADLINE (today's one decision), not a list item.
@@ -123,14 +128,17 @@ export async function GET() {
   // ── 4. Market trend: top topics among the freshest ads from the pages the user watches;
   //       if they watch nothing yet, fall back to the newest slice of the whole market. ──
   const pageIds = follows.map((f: any) => f.page_id).filter(Boolean).slice(0, 60)
-  const [trendAds, globalAds] = await Promise.all([
+  // Rich fetch: the freshest ads from watched pages carry the DNA (hook_type, format_style, topics)
+  // AND the real media (via discovery_creatives) — one query powers thumbnails + trend + synthesis.
+  const [marketAds, globalAds] = await Promise.all([
     soft((async () => {
-      let q = admin.from('discovery_ads_index').select('topics').gte('created_at', D7).order('created_at', { ascending: false }).limit(300)
+      let q = admin.from('discovery_ads_index')
+        .select('page_id, hook_type, format_style, topics, created_at, discovery_creatives(asset_type, r2_url, poster_url)')
+        .gte('created_at', D7).order('created_at', { ascending: false }).limit(240)
       if (pageIds.length) q = q.in('page_id', pageIds)
       const { data } = await q
       return data || []
     })(), [] as any[]),
-    // Global slice powers the daily lesson (kept separate from the user-scoped trend).
     soft((async () => {
       const { data } = await admin.from('discovery_ads_index').select('topics').gte('created_at', H48).order('created_at', { ascending: false }).limit(200)
       return data || []
@@ -141,16 +149,62 @@ export async function GET() {
     for (const a of rows) for (const t of (a.topics || [])) m.set(t, (m.get(t) || 0) + 1)
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1])
   }
-  const top = tally(trendAds).slice(0, 3).filter(([, n]) => n >= 3)
+  // Resolve one ad's media the same way the Discovery grid does.
+  const mediaOf = (a: any): { image: string | null; videoUrl: string | null } | null => {
+    const cres = Array.isArray(a.discovery_creatives) ? a.discovery_creatives : (a.discovery_creatives ? [a.discovery_creatives] : [])
+    const cre = cres.find((c: any) => (c.asset_type === 'video' ? c.poster_url : c.r2_url)) || cres[0]
+    if (!cre) return null
+    const isVid = cre.asset_type === 'video'
+    return { image: isVid ? cre.poster_url : cre.r2_url, videoUrl: isVid ? (cre.r2_url || null) : null }
+  }
+
+  // Attach up to 3 playable thumbnails to each competitor item, from that page's freshest ads.
+  for (const [pid, it] of Array.from(compByPage.entries())) {
+    const m = marketAds.filter((a: any) => String(a.page_id) === pid).map(mediaOf).filter(Boolean).slice(0, 3) as any[]
+    if (m.length) it.media = m
+  }
+
+  const top = tally(marketAds).slice(0, 3).filter(([, n]) => n >= 3)
   if (top.length) {
     const scope = pageIds.length ? 'across the brands you watch' : 'across the market'
     items.push({
-      kind: 'trend', importance: 65,
+      kind: 'trend', importance: 60,
       title: `The angle gaining ground ${scope}: “${top[0][0]}”.`,
       body: `${top[0][1]} fresh ads lean on it this week${top.length > 1 ? `; also rising: ${top.slice(1).map(([t]) => `“${t}”`).join(' and ')}` : ''}.`,
       why: pageIds.length ? `Your competitors are converging on it — early movers get the cheap clicks.` : `When a whole market converges on one angle, testing it early is the discount window.`,
       cta_label: 'Explore these ads', cta_href: `/discovery?q=${encodeURIComponent(top[0][0])}`,
     })
+  }
+
+  // ── 4b. THE SYNTHESIS (our whole concept): don't just list drops — read the market. Across the
+  //        freshest competitor ads, what FORMAT is winning, what HOOK is common, what's the split. ──
+  if (marketAds.length >= 6) {
+    let video = 0, imageN = 0
+    const hookM = new Map<string, number>(), fmtM = new Map<string, number>()
+    for (const a of marketAds) {
+      const m = mediaOf(a)
+      if (m?.videoUrl) video++; else if (m?.image) imageN++
+      if (a.hook_type) hookM.set(a.hook_type, (hookM.get(a.hook_type) || 0) + 1)
+      if (a.format_style) fmtM.set(a.format_style, (fmtM.get(a.format_style) || 0) + 1)
+    }
+    const total = video + imageN
+    const topHook = Array.from(hookM.entries()).sort((a, b) => b[1] - a[1])[0]
+    const topFmt = Array.from(fmtM.entries()).sort((a, b) => b[1] - a[1])[0]
+    const vidPct = total ? Math.round((video / total) * 100) : 0
+    const parts: string[] = []
+    if (total) parts.push(`${vidPct >= 50 ? `video is winning — ${vidPct}% of new ads` : `still image-led — only ${vidPct}% video`}`)
+    if (topFmt) parts.push(`the format they keep reaching for is “${topFmt[0]}”`)
+    if (topHook) parts.push(`the common hook is “${topHook[0]}”`)
+    if (parts.length >= 2) {
+      items.push({
+        kind: 'market_read', importance: 78,
+        title: `What's working across your competitors this week: ${parts.join(', ')}.`,
+        body: `Read from ${marketAds.length} fresh ads across the brands you watch — ${video} video, ${imageN} image. ${vidPct >= 50 ? 'If you’re still shipping static, that’s the gap.' : 'Static still holds here — don’t over-rotate to video yet.'}`,
+        why: `This is the pattern to copy before it saturates — I can build you one in this format.`,
+        cta_label: topHook ? `Make one like this` : 'Explore the winners',
+        cta_href: `/discovery?q=${encodeURIComponent((topHook?.[0] || top[0]?.[0] || '') as string)}`,
+      })
+    }
   }
 
   // ── 5. One lesson a day (Learning slot): the market-wide angle of the day + where to study it.
