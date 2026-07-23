@@ -25,52 +25,57 @@ import BootMotion from '@/components/motion/BootMotion'
 import SavedReportsNav from '@/components/reports/SavedReportsNav'
 
 // Two-rail nav: each AREA is one icon in the thin rail; its `items` fill the panel. Outline icons.
-const AREAS = [
+// FIVE destinations (the Ploy-inspired calm-shell collapse, 2026-07-23). Every route
+// that existed before is still reachable — nothing deleted, only regrouped:
+// Home · Discover · Playbooks · Library · Workspace (+ Mello pinned, Settings bottom,
+// account pages in the avatar dropdown). Section rows ({section}) render as quiet
+// dividers inside a panel. NEW/AI badges removed as visual noise; SOON kept (honest).
+type NavItem = { href?: string; icon?: React.ElementType; label?: string; badge?: string | null; section?: string }
+const AREAS: { key: string; label: string; railLabel?: string; railIcon: React.ElementType; defaultHref: string; items: NavItem[] }[] = [
   {
-    key: 'discover', label: 'Ad Discovery', railLabel: 'Discovery', railIcon: Radar, defaultHref: '/brief',
+    key: 'home', label: 'Home', railLabel: 'Home', railIcon: Sun, defaultHref: '/brief',
     items: [
-      { href: '/brief',                icon: Sun,          label: 'Morning Brief', badge: 'NEW' },
-      { href: '/discover',             icon: Newspaper,    label: 'Discover',   badge: 'NEW' },   // the Edition — today's market intelligence
-      { href: '/playbooks',            icon: BookOpen,     label: 'Playbooks',  badge: 'NEW' },   // curated walls of winners — Watch·Understand·Remake
-      { href: '/discovery',            icon: Radar,        label: 'Discovery',  badge: null },
-      { href: '/discovery/brand-spy',  icon: Eye,          label: 'Brand Spy',  badge: 'NEW' },
-      { href: '/trending',             icon: TrendingUp,   label: 'Trending',   badge: 'NEW' },
-      { href: '/discovery/top-picks',  icon: Star,         label: 'Top Picks',  badge: null },
-      { href: '/discovery/saved',      icon: Bookmark,     label: 'Boards',     badge: null },
-      { href: '/assets',               icon: ImageIcon,    label: 'Assets',     badge: 'NEW' },
-      { href: '/discovery/following',  icon: Heart,        label: 'Following',  badge: null },
+      { href: '/brief', icon: Sun, label: 'Morning Brief', badge: null },
     ],
   },
   {
-    key: 'analytics', label: 'Analytics & Launch', railLabel: 'Launch', railIcon: Rocket, defaultHref: '/m4',
-    // While META_LIVE is off (new Facebook app in review) these pages show a coming-soon teaser,
-    // so badge them SOON here to set expectations before the click.
+    key: 'discover', label: 'Discover', railLabel: 'Discover', railIcon: Newspaper, defaultHref: '/discover',
     items: [
-      { href: '/m4',         icon: Rocket,      label: 'Launch Ads',       badge: META_LIVE ? 'AI' : 'SOON' },
-      { href: '/campaigns',  icon: Megaphone,   label: 'Campaigns',        badge: META_LIVE ? null : 'SOON' },
-      { href: '/insights',   icon: LineChart,   label: 'Scale & Insights', badge: META_LIVE ? 'NEW' : 'SOON' },
-      { href: '/reports',    icon: BarChart2,   label: 'Reports',          badge: META_LIVE ? 'NEW' : 'SOON' },
-      { href: '/leaderboard',icon: Trophy,      label: 'Leaderboard',      badge: META_LIVE ? 'NEW' : 'SOON' },
-      { href: '/snapshots',  icon: Camera,      label: 'Snapshots',        badge: META_LIVE ? null : 'SOON' },
+      { href: '/discover',            icon: Newspaper,  label: 'Today’s Edition', badge: null },
+      { href: '/trending',            icon: TrendingUp, label: 'Trending',        badge: null },
+      { href: '/discovery/top-picks', icon: Star,       label: 'Top Picks',       badge: null },
     ],
   },
   {
-    key: 'create', label: 'AI Gen', railLabel: 'AI Gen', railIcon: Wand2, defaultHref: '/creative-studio',
+    key: 'playbooks', label: 'Playbooks', railLabel: 'Playbooks', railIcon: BookOpen, defaultHref: '/playbooks',
     items: [
-      { href: '/creative-studio?studio=1', icon: Wand2,     label: 'Create Ad',    badge: 'NEW' },
-      { href: '/creative-studio', icon: Sparkles,           label: 'My Creatives', badge: null },
-      { href: '/brands',          icon: Store,              label: 'Brands',       badge: null },
+      { href: '/playbooks', icon: BookOpen, label: 'All playbooks', badge: null },
     ],
   },
   {
-    key: 'account', label: 'Account', railIcon: Settings, defaultHref: '/dashboard',
+    key: 'library', label: 'Ad Library', railLabel: 'Library', railIcon: Radar, defaultHref: '/discovery',
     items: [
-      { href: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',       badge: null },
-      { href: '/mcp',        icon: Terminal,        label: 'API & MCP',       badge: 'NEW' },
-      { href: '/team',       icon: Users,           label: 'Team',            badge: 'NEW' },
-      { href: '/activity',   icon: ClipboardList,   label: 'Activity Log',    badge: null },
-      { href: '/settings',   icon: Settings,        label: 'Settings',        badge: null },
-      { href: '/billing',    icon: CreditCard,      label: 'Billing & plans', badge: null },
+      { href: '/discovery',           icon: Radar,    label: 'All ads',   badge: null },
+      { href: '/discovery/brand-spy', icon: Eye,      label: 'Brand Spy', badge: null },
+      { href: '/discovery/following', icon: Heart,    label: 'Following', badge: null },
+      { href: '/discovery/saved',     icon: Bookmark, label: 'Boards',    badge: null },
+    ],
+  },
+  {
+    key: 'workspace', label: 'Workspace', railLabel: 'Workspace', railIcon: LayoutDashboard, defaultHref: '/creative-studio',
+    items: [
+      { section: 'Create' },
+      { href: '/creative-studio?studio=1', icon: Wand2,    label: 'Create Ad',    badge: null },
+      { href: '/creative-studio',          icon: Sparkles, label: 'My Creatives', badge: null },
+      { href: '/brands',                   icon: Store,    label: 'My Brands',    badge: null },
+      { href: '/assets',                   icon: ImageIcon,label: 'Assets',       badge: null },
+      { section: 'Launch' },
+      { href: '/m4',          icon: Rocket,    label: 'Launch Ads',       badge: META_LIVE ? null : 'SOON' },
+      { href: '/campaigns',   icon: Megaphone, label: 'Campaigns',        badge: META_LIVE ? null : 'SOON' },
+      { href: '/insights',    icon: LineChart, label: 'Scale & Insights', badge: META_LIVE ? null : 'SOON' },
+      { href: '/reports',     icon: BarChart2, label: 'Reports',          badge: META_LIVE ? null : 'SOON' },
+      { href: '/leaderboard', icon: Trophy,    label: 'Leaderboard',      badge: META_LIVE ? null : 'SOON' },
+      { href: '/snapshots',   icon: Camera,    label: 'Snapshots',        badge: META_LIVE ? null : 'SOON' },
     ],
   },
 ]
@@ -108,7 +113,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const supabase = createClient()
   // The single active nav item = the longest href that prefixes the current path.
-  const activeHref = AREAS.flatMap(s => s.items.map(i => i.href))
+  const activeHref = AREAS.flatMap(s => s.items.map(i => i.href).filter((h): h is string => !!h))
     .filter(h => pathname === h || pathname.startsWith(h + '/'))
     .sort((a, b) => b.length - a.length)[0]
   const melloActive = pathname === '/mello' || pathname.startsWith('/mello/')
@@ -261,7 +266,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           {/* Nav items — outline icon + label; active = solid lime pill; lime dot for updates */}
           <nav className="flex-1 overflow-y-auto" style={{padding:"2px 12px"}}>
-            {activeArea.items.map(item => {
+            {activeArea.items.map((item, idx) => {
+              // Quiet section divider inside a panel (e.g. Workspace → Create / Launch)
+              if (item.section) return (
+                <div key={`s:${item.section}`} style={{padding: idx === 0 ? "6px 8px 4px" : "16px 8px 4px", fontSize:9.5, fontWeight:800, letterSpacing:".09em", textTransform:"uppercase", color:"#a2aca2"}}>{item.section}</div>
+              )
+              if (!item.href || !item.icon) return null
+              const Icon = item.icon
               const isActive = item.href === activeHref
               return (
                 <Link
@@ -270,16 +281,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   data-nav={item.href === '/creative-studio' ? 'creatives' : undefined}
                   className={cn('sidebar-link', isActive && 'active')}
                 >
-                  <item.icon size={19} strokeWidth={1.9} className="flex-shrink-0"/>
+                  <Icon size={19} strokeWidth={1.9} className="flex-shrink-0"/>
                   <span style={{flex:1,minWidth:0}}>{item.label}</span>
-                  {item.badge === 'AI' && (
-                    <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 6px",borderRadius:99,background:"#17251c",color:"#dffe95",flexShrink:0}}>AI</span>
-                  )}
-                  {(item.badge === 'NEW' || item.badge === 'New') && (
-                    <span title="New" style={{width:7,height:7,borderRadius:99,background:"#5fc26d",flexShrink:0}}/>
-                  )}
+                  {/* NEW/AI badges retired (visual noise); SOON kept — it sets honest expectations */}
                   {item.badge === 'SOON' && (
-                    <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 6px",borderRadius:99,background:"#eef1ec",color:"#8b978d",border:"1px solid #e2e8e1",flexShrink:0}}>SOON</span>
+                    <span style={{fontSize:9,fontWeight:800,letterSpacing:".04em",padding:"2px 6px",borderRadius:99,background:"#eef1ec",color:"#8b978d",flexShrink:0}}>SOON</span>
                   )}
                 </Link>
               )
@@ -287,7 +293,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {/* Saved reports live under the Reports item in the Analytics area. Hidden while META_LIVE
                 is off — Reports is a Coming-soon (Meta-connected) surface, so its "Create report" +
                 saved list would be dead. */}
-            {META_LIVE && !melloActive && activeArea.key === 'analytics' && <SavedReportsNav />}
+            {META_LIVE && !melloActive && activeArea.key === 'workspace' && <SavedReportsNav />}
           </nav>
 
           {/* Save ads from — extension / IG-mobile entry points (Atria-style) */}
@@ -345,6 +351,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <div style={{height:1,background:"#eef1ec",margin:"4px 0"}}/>
                   {/* items */}
                   <div style={{padding:"4px 8px 8px"}}>
+                    <AcctItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+                    <AcctItem href="/activity" icon={ClipboardList} label="Activity log" />
                     <AcctItem href="/mcp" icon={Sparkles} label="API & MCP" />
                     <AcctItem href="/settings" icon={Settings} label="Settings" />
                     <AcctItem href="/team" icon={Users} label="Team & members" />
