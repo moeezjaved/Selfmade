@@ -11,6 +11,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, ArrowUp } from 'lucide-react'
+import TryMello from './TryMello'
+import BriefAlerts from './BriefAlerts'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
@@ -245,6 +247,12 @@ export default function StandupPage() {
         </div>
         <style>{`@keyframes mp{50%{opacity:.35}}`}</style>
       </div>
+
+      {/* competitor new-ad alerts (the bell), surfaced right on the brief */}
+      <BriefAlerts />
+
+      {/* feature-discovery deck — what Mello can do (spy, remake, upload-clone, create, daily) */}
+      <TryMello />
 
       {/* loading / error */}
       {!brief && !err && <div style={{ color: MUTED, fontSize: 15 }}><span style={{ opacity: .7 }}>Mello is pulling the room together…</span></div>}

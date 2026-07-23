@@ -37,22 +37,11 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     items: [{ href: '/brief', icon: Sun, label: 'Morning Brief' }],
   },
   {
-    key: 'discover', label: 'Discover', railLabel: 'Discover', railIcon: Newspaper, defaultHref: '/discover',
-    items: [
-      { href: '/discover',            icon: Newspaper,  label: 'Today’s Edition' },
-      { href: '/trending',            icon: TrendingUp, label: 'Trending' },
-      { href: '/discovery/top-picks', icon: Star,       label: 'Top Picks' },
-    ],
-  },
-  {
-    key: 'playbooks', label: 'Playbooks', railLabel: 'Playbooks', railIcon: BookOpen, defaultHref: '/playbooks',
-    items: [{ href: '/playbooks', icon: BookOpen, label: 'All playbooks' }],
-  },
-  {
-    key: 'library', label: 'Ad Library', railLabel: 'Library', railIcon: Radar, defaultHref: '/discovery',
+    // The competitor ad library — where you spy brands and find ads to remake.
+    key: 'library', label: 'Competitor Ads', railLabel: 'Ads', railIcon: Radar, defaultHref: '/discovery',
     items: [
       { href: '/discovery',           icon: Radar,    label: 'All ads' },
-      { href: '/discovery/brand-spy', icon: Eye,      label: 'Brand Spy' },
+      { href: '/discovery/brand-spy', icon: Eye,      label: 'Spy a brand' },
       { href: '/discovery/following', icon: Heart,    label: 'Following' },
       { href: '/discovery/saved',     icon: Bookmark, label: 'Boards' },
     ],
@@ -251,11 +240,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div style={{ width: 34, height: 34, borderRadius: 11, background: '#17251c', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 18, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</div>
           </Link>
 
-          {/* Create — the ONE bold thing on the rail */}
-          <Link href="/creative-studio?studio=1" title="Create an ad" aria-label="Create an ad" onMouseEnter={() => setFlyout(null)}
-            style={{ width: 38, height: 38, borderRadius: 12, background: '#dffe95', color: '#17251c', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 6, boxShadow: '0 8px 18px -8px rgba(23,37,28,.4)' }}>
-            <Plus size={20} strokeWidth={2.4} />
-          </Link>
+          {/* Create — the ONE bold thing on the rail; opens the full 3-way chooser */}
+          <div onMouseEnter={() => setFlyout(null)} style={{ marginBottom: 6 }}>
+            <RemakeStarter variant="icon" />
+          </div>
 
           <div onMouseEnter={() => setFlyout(null)}>
             <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent label="Mello"><Sparkles size={20} /></RailIcon>
