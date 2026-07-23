@@ -10,7 +10,7 @@
  */
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { computeEdition, editionNumber } from '@/lib/edition/compute'
+import { computeEdition, editionNumber, type Edition } from '@/lib/edition/compute'
 import { getFeaturedPlaybooks, agoLabel } from '@/lib/playbooks/featured'
 import ForYou from './ForYou'
 import AdMedia from './AdMedia'
@@ -109,7 +109,7 @@ const withTimeout = <T,>(p: Promise<T>, ms: number, fb: T): Promise<T> =>
 
 export default async function DiscoverPage() {
   const [ed, playbooks] = await Promise.all([
-    withTimeout(computeEdition(), 25000, null as any),
+    withTimeout<Edition | null>(computeEdition(), 25000, null),
     withTimeout(getFeaturedPlaybooks({ featuredOnly: true, limit: 8 }), 12000, []),
   ])
 
