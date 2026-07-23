@@ -91,7 +91,7 @@ async function processOne(e) {
   if (gen.status === 402 || gen.j?.error === 'insufficient_credits') {
     await patch(`ad_autopilot?id=eq.${enc(e.id)}`, { last_run_at: nowIso() })
     console.log(`autopilot ${e.id}: skipped (no credits)`)
-    return
+    return 'no_credits'   // stop this enrollment's daily batch — the "not enough credits" gate, worker-side
   }
   const jobId = gen.j?.jobId
   if (!jobId) { await patch(`ad_autopilot?id=eq.${enc(e.id)}`, { last_run_at: nowIso() }); console.warn(`autopilot ${e.id}: enqueue failed ${JSON.stringify(gen.j).slice(0, 120)}`); return }
@@ -128,6 +128,7 @@ async function processOne(e) {
     last_run_at: nowIso(), last_sent_at: nowIso(), last_kind: actualKind, runs: (e.runs || 0) + 1, used_ad_ids: used,
   })
   console.log(`autopilot ${e.id}: sent ${actualKind} ad for ${brandName || e.brand_id}${to ? '' : ' (no email address)'}`)
+  return 'ok'
 }
 
 async function tick() {
@@ -138,8 +139,18 @@ async function tick() {
   } catch (err) { console.warn('fetch enrollments failed:', err.message); return }
   if (!Array.isArray(rows) || !rows.length) return
   console.log(`🚀 autopilot: ${rows.length} due`)
-  for (const e of rows) {
-    try { await processOne(e) } catch (err) { console.warn(`autopilot ${e.id} error:`, err?.message || err) }
+  for (const row of rows) {
+    // Make up to ads_per_day for this enrollment; stop early the moment credits run out (the gate).
+    const n = Math.max(1, Math.min(10, row.ads_per_day || 1))
+    let e = row
+    for (let i = 0; i < n; i++) {
+      try {
+        const status = await processOne(e)
+        if (status === 'no_credits') break
+      } catch (err) { console.warn(`autopilot ${e.id} error:`, err?.message || err); break }
+      // refresh the row so the next ad alternates kind + avoids repeating the same source ad
+      if (i < n - 1) { try { const fresh = await getJSON(`ad_autopilot?select=*&id=eq.${enc(e.id)}`); if (fresh?.[0]) e = fresh[0] } catch { /* keep stale */ } }
+    }
   }
 }
 
