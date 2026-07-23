@@ -99,16 +99,19 @@ export default function HireKeynote() {
       <style>{`
         html,body{background:#0a0d0a}
         .brand{position:fixed;top:26px;left:30px;font-size:14px;font-weight:800;letter-spacing:-.02em;color:#f2f5ef;z-index:10;mix-blend-mode:difference}
-        .beat{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;position:relative;color:#f2f5ef;font-family:'Inter',-apple-system,system-ui,sans-serif}
-        .beat p{font-size:clamp(30px,5.6vw,64px);font-weight:800;letter-spacing:-.04em;line-height:1.12;max-width:20ch;text-wrap:balance}
-        .beat .small{font-size:clamp(16px,2vw,20px);font-weight:600;color:#8b978a;letter-spacing:-.01em;max-width:44ch;line-height:1.6;margin-top:22px}
+        .beat{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;position:relative;font-family:'Inter',-apple-system,system-ui,sans-serif}
+        .beat p{font-size:clamp(30px,5.6vw,64px);font-weight:800;letter-spacing:-.04em;line-height:1.12;max-width:20ch;text-wrap:balance;color:#f2f5ef}
+        .beat .small{font-size:clamp(16px,2vw,20px);font-weight:600;color:#8b978a!important;letter-spacing:-.01em;max-width:44ch;line-height:1.6;margin-top:22px}
         .lime{color:#dffe95}
         .brt{color:#f2f5ef}
         .num{font-variant-numeric:tabular-nums}
-        .rv{opacity:0;transform:translateY(30px);transition:opacity .9s cubic-bezier(0,0,.2,1),transform .9s cubic-bezier(0,0,.2,1)}
-        .rv.in{opacity:1;transform:none}
-        .rv.d2{transition-delay:.25s}.rv.d3{transition-delay:.5s}
-        @media (prefers-reduced-motion: reduce){.rv{opacity:1!important;transform:none!important;transition:none!important}}
+        /* reveal is a pure enhancement: content is ALWAYS visible (opacity 1); when the observer
+           marks an element .in it replays a gentle rise. No JS / no observer → still fully visible. */
+        .rv{opacity:1;transform:none}
+        .rv.in{animation:riseIn .9s cubic-bezier(0,0,.2,1) both}
+        .rv.in.d2{animation-delay:.2s}.rv.in.d3{animation-delay:.4s}
+        @keyframes riseIn{from{opacity:.001;transform:translateY(28px)}to{opacity:1;transform:none}}
+        @media (prefers-reduced-motion: reduce){.rv.in{animation:none}}
         .hint{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;letter-spacing:.22em;color:#4a544a;text-transform:uppercase}
         .hint:after{content:'';display:block;width:1px;height:34px;background:linear-gradient(#4a544a,transparent);margin:10px auto 0}
         .mello{width:88px;height:88px;border-radius:28px;background:#dffe95;border:3px solid #10180f;position:relative;margin-bottom:38px;animation:floaty 4.5s ease-in-out infinite}
