@@ -615,7 +615,19 @@ Return ONLY minified JSON: {"character":"","voice":"","segments":[{"script":"","
 
 // Compose one segment's Seedance prompt: verbatim character block + continuity anchor + exact words.
 function segmentPrompt(plan, seg, i, total, hasAnchor, nImages, lang, opts = {}) {
-  const { sizeAnchor, creatorLock } = opts
+  const { sizeAnchor, creatorLock, productFree } = opts
+  // PRODUCT-FREE variant: once we know Seedance can't render THIS product, later segments must NOT hold
+  // it (a wrong product on a moving hand can't be patched cleanly). The creator talks to camera with
+  // empty/gesturing hands; the real product is shown separately via accurate real-photo cutaways.
+  if (productFree) {
+    const pf = [plan.character]
+    if (creatorLock) pf.push(`CRITICAL — SAME PERSON: the on-camera creator MUST look EXACTLY like this: ${creatorLock}. Match face, age, skin tone, hair and outfit precisely.`)
+    pf.push(`The creator speaks directly to camera at arm's length with natural hand gestures — hands are EMPTY or gesturing. NO product is held or shown in this shot.`)
+    pf.push(`They speak in ${langName(lang).split(' — ')[0]} — ${plan.voice} — lips moving in sync, saying these exact words aloud: "${String(seg.script || '').replace(/"/g, "'")}"`)
+    if (seg.action) pf.push(String(seg.action).replace(/\b(hold|holds|holding|show|shows|showing|grab|grabs|grip|grips|lift|lifts|raise|raises)\b[^.]*/gi, 'gestures naturally'))
+    pf.push('UGC realism: iPhone selfie framing at arm\'s length, natural light, authentic handheld, no on-screen captions.')
+    return pf.filter(Boolean).join(' ')
+  }
   const productRef = hasAnchor
     ? (nImages ? `@Image2${nImages > 1 ? `–@Image${nImages + 1}` : ''}` : 'the product')
     : (nImages ? `@Image1${nImages > 1 ? `–@Image${nImages}` : ''}` : 'the product')
@@ -749,6 +761,7 @@ async function coverWindowsWithProduct(videoIn, out, windows, prodUrl, id, tmp) 
   console.log(`🖼 ${id} composited real product over ${windows.length} window(s)`)
   return out
 }
+
 
 // Continuity anchor: extract a clip's final frame and host it on R2, so the NEXT segment can take it
 // as @Image1 ("the exact same creator/room as this frame"). Identity flows through actual pixels,
@@ -2010,7 +2023,12 @@ async function generateJob(job) {
         const files = []
         const segClips = meta.segment_clips || {}
         const segAnchors = meta.segment_anchors || {}
-        const productFixWindows = []   // segment indices Seedance couldn't render → cover with the real photo
+        const productFixWindows = []   // segment indices we cover with a FULL real-photo shot (fal-cap fallback)
+        const cutawaySegs = []         // segments re-shot product-FREE → weave a short real-photo cutaway in
+        // Once Seedance proves it can't render THIS product, every LATER segment is shot product-free (the
+        // creator talks, hands empty) and the product is shown only via accurate real-photo cutaways —
+        // so no wrong product is ever on screen and nothing is pasted onto a moving hand. Persisted for resume.
+        let productBroken = meta.product_broken === true
         let anchor = null
         // Render each segment to match its SCRIPT length (min 5s — Seedance's floor), not a flat 15s.
         // Flat 15s meant a 6-word line got ~9s of trailing dead-air (the mid-video "hang") AND we paid
@@ -2030,7 +2048,11 @@ async function generateJob(job) {
               continue
             } catch { delete segClips[i] /* expired url → regenerate */ }
           }
-          const prompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, false, productImages.length, meta.language, { sizeAnchor: meta.product_details && meta.product_details.size_anchor })
+          // Product-free once Seedance has proven it can't render this product (see productBroken).
+          const productFree = !isService && productBroken
+          const prompt = productFree
+            ? segmentPrompt(plan, plan.segments[i], i, plan.segments.length, false, 0, meta.language, { productFree: true })
+            : segmentPrompt(plan, plan.segments[i], i, plan.segments.length, false, productImages.length, meta.language, { sizeAnchor: meta.product_details && meta.product_details.size_anchor })
           // COST FIX: we USED to pass the previous clip's last frame (the creator's face) as an anchor for
           // cross-cut continuity. But that face frame reliably trips fal's likeness filter at RESULT time —
           // and fal CHARGES for the rejected clip — after which we fell back to product-only anyway. So a
@@ -2038,9 +2060,9 @@ async function generateJob(job) {
           // We now go product-only from the start: SAME shipped output, ~30% cheaper. Continuity is held by
           // the identical character description repeated in every segment prompt. (Set meta.try_anchor=true
           // to restore the old anchored attempt.)
-          const useAnchor = anchor && meta.try_anchor === true
-          const imgs = useAnchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages
-          console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${useAnchor ? ' (anchored)' : ''}`)
+          const useAnchor = !productFree && anchor && meta.try_anchor === true
+          const imgs = productFree ? [] : (useAnchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages)
+          console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${productFree ? ' (product-free)' : useAnchor ? ' (anchored)' : ''}`)
           const segDur = segDurs[i]
           // Default (native voice): generateAudio TRUE → Seedance speaks + lip-syncs the segment itself.
           // Overlay mode (meta.tts_overlay): FALSE → silent clip, one continuous voice added after concat.
@@ -2049,7 +2071,7 @@ async function generateJob(job) {
           const segBlocked = (x) => x.code === 'content_policy_images' || x.code === 'content_policy_video'
           // Ladder: (anchor+products if enabled →) products only → PURE PROMPT. A segment must never kill
           // the whole long-form render on a moderation block (same contract as faithful mode).
-          const rungs = [imgs, ...(useAnchor ? [falProductImages] : []), []]
+          const rungs = productFree ? [[]] : [imgs, ...(useAnchor ? [falProductImages] : []), []]
           for (let ri = 0; ri < rungs.length; ri++) {
             try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: rungs[ri], resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })); break }
             catch (e) {
@@ -2065,7 +2087,7 @@ async function generateJob(job) {
           // RE-ROLL TOO (the ejad job's first re-roll ALSO grew a spout and shipped unchecked). Up to
           // 2 corrective rolls; the 2nd drops the anchor and goes clean-product-only with the size
           // anchor, the strongest constraint we have. After 2, ship the last take (never-fail).
-          if (!isService && meta.reroll_product_check !== false) {
+          if (!isService && !productFree && meta.reroll_product_check !== false) {
             const prodRef = falProductImages[0] || productImages[0]
             const pd = meta.product_details || {}
             const prodDesc = [pd.name && pd.name !== 'the product' ? pd.name : '', pd.observed].filter(Boolean).join(' — ')
@@ -2088,26 +2110,64 @@ async function generateJob(job) {
                 verdict = await verifySegmentProduct(f, prodRef, prodDesc, `${job.id}-r`, i)
               } catch (e) { console.warn(`segment ${i + 1} re-roll failed (keeping current take):`, e.message) }
             }
-            // Still wrong (re-roll failed OR skipped by the cap) → Seedance can't render this product;
-            // flag the segment so we cover it with the REAL product photo (free) after stitching.
-            if (verdict === 'mismatch') { productFixWindows.push(i); console.warn(`🖼 ${job.id} segment ${i + 1} → will composite real product`) }
+            // Still wrong after the corrective re-roll → Seedance genuinely can't render this product.
+            // From here on we stop asking it to: mark productBroken so every LATER segment is shot
+            // product-free. For THIS segment, RE-SHOOT it product-free too (a clean talking-head, nothing
+            // to mis-render) and weave in a short real-photo CUTAWAY — the "2s product close-up then back
+            // to the creator" pattern. If we're at the fal cap, fall back to covering the whole segment.
+            if (verdict === 'mismatch') {
+              productBroken = true
+              if (falCost < MAX_FAL_USD) {
+                try {
+                  console.warn(`🎬 ${job.id} segment ${i + 1} → product-free re-shoot + real-photo cutaway (Seedance can't render this product)`)
+                  const pfPrompt = segmentPrompt(plan, plan.segments[i], i, plan.segments.length, false, 0, meta.language, { productFree: true })
+                  const pf = await falGenerate({ prompt: pfPrompt, imageUrls: [], resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })
+                  falCost += clipCost(meta.tier, segDur, genAudio)
+                  await rm(f, { force: true }).catch(() => {})
+                  await downloadToFile(pf.videoUrl, f)
+                  videoUrl = pf.videoUrl
+                  cutawaySegs.push(i)
+                } catch (e) {
+                  console.warn(`segment ${i + 1} product-free re-shoot failed (${e.message}) — covering full segment`)
+                  productFixWindows.push(i)
+                }
+              } else {
+                console.warn(`⛔ ${job.id} seg ${i + 1}: fal cap — covering full segment with real photo`)
+                productFixWindows.push(i)
+              }
+            }
           }
           tmp.push(f); files.push(f)
           if (i < plan.segments.length - 1) anchor = await lastFrameAnchor(f, job.id, i)
           segClips[i] = videoUrl
           if (anchor) segAnchors[i] = anchor
-          await stamp({ clone_meta: { ...meta, segment_plan: plan, segment_clips: segClips, segment_anchors: segAnchors } })
+          await stamp({ clone_meta: { ...meta, segment_plan: plan, segment_clips: segClips, segment_anchors: segAnchors, product_broken: productBroken } })
         }
+        // FREEZE GUARD: if Seedance couldn't render the product for a CONTIGUOUS RUN OF TRAILING
+        // segments, do NOT paste a 20s+ static product photo over the whole tail — that's the "frozen
+        // second half" the ejad-milk 60s hit (segments 3+4 both failed → 24s still image). Drop those
+        // trailing segments and ship a shorter, fully-LIVE cut instead: a clean 26s ad beats a 52s ad
+        // whose back half is a frozen photo. Always keep ≥1 segment. Middle failures still get a
+        // bounded real-photo cover (below).
+        const flaggedSet = new Set(productFixWindows)
+        let keepN = files.length
+        while (keepN > 1 && flaggedSet.has(keepN - 1)) keepN--
+        const droppedTail = files.length - keepN
+        if (droppedTail) console.warn(`✂️ ${job.id} dropping ${droppedTail} trailing segment(s) Seedance couldn't render — shipping a live ${keepN}-segment cut instead of a frozen product hold`)
+        const keptFiles = files.slice(0, keepN)
+        const keptDurs = segDurs.slice(0, keepN)
+        // Only segments that FAILED but sit INSIDE the kept range still need the (bounded) real-photo cover.
+        const midFails = productFixWindows.filter((i) => i < keepN)
         const cat = `${base}-cat.mp4`
         tmp.push(cat)
-        await concatClips(files, cat, segDurs)   // each segment trimmed to its own script-matched length
+        await concatClips(keptFiles, cat, keptDurs)   // each segment trimmed to its own script-matched length
         // Native mode (default): the concatenated clips already carry Seedance's own lip-synced voice —
         // ship it as-is. Overlay mode (meta.tts_overlay): the clips are silent, so lay ONE continuous
         // voice over the whole stitched video (ElevenLabs for non-English, else OpenAI).
         let voiced = cat
         if (useOverlayVoice && finalScript && finalScript.trim()) {
           try {
-            const clipDur = (await probeDuration(cat)) || segDurs.reduce((a, d) => a + d, 0) || 15
+            const clipDur = (await probeDuration(cat)) || keptDurs.reduce((a, d) => a + d, 0) || 15
             const vo = await ttsVoiceover(capScriptToSeconds(finalScript, clipDur * 1.25 + 2), `${job.id}-seg`, meta.voice, meta.language)
             tmp.push(vo)
             const mixed = `${base}-vo.mp4`; tmp.push(mixed)
@@ -2115,18 +2175,30 @@ async function generateJob(job) {
             voiced = mixed
           } catch (e) { console.warn(`seg tts/mux failed for ${job.id} (shipping without VO):`, e.message) }
         }
-        // SELF-HEALING PRODUCT INSERT: any segment Seedance couldn't render right (spout on a capless
-        // pouch, etc.) gets covered with the user's REAL product photo (Ken-Burns) over its window —
-        // voice keeps playing. Reliable accuracy for products the generator has a wrong visual prior on.
-        if (productFixWindows.length && !isService) {
+        // PRODUCT B-ROLL CUTAWAYS: for products Seedance can't render, the failed segment was re-shot
+        // product-free (a clean talking-head) and we now CUT AWAY to the REAL product photo for ~2.5s
+        // within it — the "product close-up, then back to the creator" pattern real editors use. No hand
+        // sticker, no frozen half. Cap-fallback segments (productFixWindows) instead get a longer real-
+        // photo cover of their whole window. Voice keeps playing throughout.
+        if ((cutawaySegs.length || midFails.length) && !isService) {
           try {
             const prodUrl = (Array.isArray(meta.product_image_urls) && meta.product_image_urls[0]) || meta.clean_product
             const starts = []; let acc = 0
-            for (let k = 0; k < segDurs.length; k++) { starts[k] = acc; acc += segDurs[k] }
-            const windows = productFixWindows.map((i) => ({ from: starts[i], len: segDurs[i] }))
-            const covered = `${base}-covered.mp4`; tmp.push(covered)
-            voiced = await coverWindowsWithProduct(voiced, covered, windows, prodUrl, job.id, tmp)
-          } catch (e) { console.warn(`product-insert cover failed for ${job.id} (shipping as-is):`, e.message) }
+            for (let k = 0; k < keptDurs.length; k++) { starts[k] = acc; acc += keptDurs[k] }
+            const windows = []
+            // Short cutaway (~2.5s, but ≤ half the segment) placed a beat into each product-free re-shoot.
+            for (const i of cutawaySegs) {
+              if (i >= keepN) continue
+              const len = Math.min(2.5, Math.max(1.5, keptDurs[i] * 0.5))
+              windows.push({ from: starts[i] + Math.min(1.2, keptDurs[i] * 0.25), len })
+            }
+            // Cap-fallback: cover the whole failed segment (we couldn't re-shoot it product-free).
+            for (const i of midFixWindows) windows.push({ from: starts[i], len: keptDurs[i] })
+            if (windows.length) {
+              const covered = `${base}-covered.mp4`; tmp.push(covered)
+              voiced = await coverWindowsWithProduct(voiced, covered, windows, prodUrl, job.id, tmp)
+            }
+          } catch (e) { console.warn(`product cutaway/cover failed for ${job.id} (shipping as-is):`, e.message) }
         }
         const fin = await withEndCard(voiced, meta, job.id, 'main', tmp)
         if (meta.end_card && meta.end_card.tx) {
@@ -2140,7 +2212,7 @@ async function generateJob(job) {
         // snapshot (no clips); the per-segment stamps wrote clips to the DB but not to this local `meta`,
         // so spreading `...meta` here wiped them — which killed the "Fix one section" tweak panel
         // (segmentTweakable needs segment_clips). Persist the accumulated clips + anchors explicitly.
-        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, segment_clips: segClips, segment_anchors: segAnchors, script: finalScript, final_script: finalScript, fal_cost_est: +falCost.toFixed(2) } })
+        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, segment_plan: plan, segment_clips: segClips, segment_anchors: segAnchors, script: finalScript, final_script: finalScript, fal_cost_est: +falCost.toFixed(2), dropped_segments: droppedTail, shipped_segments: keepN, product_broken: productBroken, cutaway_segments: cutawaySegs.length } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'ugc_long', segments: nSeg, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (long UGC, ${nSeg} segments) ${job.id} → ${url}`)
       } finally {
