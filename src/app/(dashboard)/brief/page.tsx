@@ -90,6 +90,96 @@ function Say({ children, delay = 0, big = false }: { children: React.ReactNode; 
   )
 }
 
+/** THE DESK — the same brief, but as a prepared workspace: a signed morning memo, the finished work
+ *  laid out as prints, the rest of the news as sticky notes, and a "desk is clear" close. Calm,
+ *  finite, editorial. Same data as the standup; the composer below stays so it's still talkable. */
+const PAPER = '#fffdf4', PAPERLINE = '#efe9c8', STICKY = '#fff8c4'
+function DeskView({ brief, greet, onAct, onDecision }: { brief: Brief; greet: string; onAct: (it: Item) => void; onDecision: (s: string) => void }) {
+  const [passed, setPassed] = useState(false)
+  const hl = brief.headline
+  const competitors = brief.items.filter(i => i.kind === 'competitor_ads')
+  const notes = brief.items.filter(i => i.kind !== 'competitor_ads')   // trend / market_read / insight → sticky notes
+  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  const today = () => new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+  return (
+    <div>
+      <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 600, marginBottom: 16 }}>{dateStr} — <b style={{ color: INK }}>Mello was here.</b> {brief.quiet ? 'A quiet desk today.' : 'A few things left for you.'}</div>
+
+      {/* the morning memo */}
+      <div style={{ background: PAPER, border: `1px solid ${PAPERLINE}`, borderRadius: 6, padding: '24px 26px 20px', boxShadow: '0 24px 50px -22px rgba(43,42,34,.28)', position: 'relative', marginBottom: 22 }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: LIME, borderRadius: '6px 6px 0 0' }} />
+        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: '#98937f', marginBottom: 14 }}>THE MORNING MEMO</div>
+        <p style={{ fontSize: 15, lineHeight: 1.8, color: '#2b2a22', margin: '0 0 12px' }}>
+          {greet}{brief.firstName ? `, ${brief.firstName}` : ''} — last night I read <b>{brief.summary.adsScanned.toLocaleString()} ads</b>{brief.summary.brandsWatched ? <> and checked your <b>{brief.summary.brandsWatched} competitors</b></> : ''}. {brief.quiet ? 'Nothing needs you today — my honest read is don’t spend.' : 'Here’s what’s on your desk.'}
+        </p>
+        {hl && <p style={{ fontSize: 15, lineHeight: 1.8, color: '#2b2a22', margin: '0 0 12px' }}>{hl.title} {hl.why}</p>}
+        <div style={{ fontFamily: "'Snell Roundhand','Segoe Script',cursive", fontSize: 21, color: '#1f2a1c', marginTop: 8 }}>Mello</div>
+      </div>
+
+      {/* the work — headline creative as prints, with the decision */}
+      {hl && !passed && (
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.18em', color: MUTED, textTransform: 'uppercase', marginBottom: 10 }}>On your desk — ready</div>
+          {!!hl.thumbs?.length && (
+            <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+              {hl.thumbs.slice(0, 3).map((t, k) => (
+                <span key={k} style={{ position: 'relative', display: 'inline-block', transform: k === 0 ? 'rotate(-1.5deg)' : k === 1 ? 'rotate(1.5deg)' : 'rotate(-.5deg)', padding: 5, background: '#fff', border: `1px solid ${PAPERLINE}`, boxShadow: '0 14px 30px -14px rgba(43,42,34,.4)', borderRadius: 3 }}>
+                  <Thumb src={t} w={88} h={110} />
+                  {k === 0 && <span style={{ position: 'absolute', bottom: -9, left: '50%', transform: 'translateX(-50%)', background: '#2b2a22', color: '#fff', fontSize: 8, fontWeight: 800, letterSpacing: '.06em', padding: '3px 8px', borderRadius: 100, whiteSpace: 'nowrap' }}>MY PICK</span>}
+                </span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            {hl.cta_href && <Link href={hl.cta_href} onClick={() => { onAct(hl); onDecision(`Approved a creative from the desk: "${hl.title}" (${today()}).`) }} style={{ background: FOREST, color: LIME, fontSize: 12.5, fontWeight: 800, padding: '10px 16px', borderRadius: 100, textDecoration: 'none' }}>✓ {hl.cta_label || 'Review & approve'}</Link>}
+            <button onClick={() => { onAct(hl); onDecision(`Passed on a suggested creative: "${hl.title}" (${today()}).`); setPassed(true) }} style={{ background: '#fff', border: `1.5px solid ${PAPERLINE}`, color: '#2b2a22', fontSize: 12.5, fontWeight: 750, padding: '10px 16px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit' }}>Not today</button>
+          </div>
+        </div>
+      )}
+
+      {/* competitor prints */}
+      {competitors.length > 0 && (
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.18em', color: MUTED, textTransform: 'uppercase', marginBottom: 10 }}>What your competitors shipped</div>
+          {competitors.map((it, i) => (
+            <div key={it.id || i} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 750, color: INK }}>{it.title}</div>
+              {!!it.media?.length && (
+                <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                  {it.media.slice(0, 3).map((m, k) => (
+                    <span key={k} style={{ padding: 4, background: '#fff', border: `1px solid ${PAPERLINE}`, boxShadow: '0 10px 22px -12px rgba(43,42,34,.35)', borderRadius: 3, transform: k % 2 ? 'rotate(1deg)' : 'rotate(-1deg)' }}>
+                      <AdPreview image={m.image} videoUrl={m.videoUrl} w={58} h={72} />
+                    </span>
+                  ))}
+                </div>
+              )}
+              {it.cta_href && <Link href={it.cta_href} onClick={() => onAct(it)} style={{ display: 'inline-block', fontSize: 12, fontWeight: 800, color: GREEN, textDecoration: 'none', marginTop: 8 }}>{it.cta_label || 'See the ads'} →</Link>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* sticky notes — synthesis, trend, insights, learning */}
+      {(notes.length > 0 || brief.learning) && (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 22 }}>
+          {[...notes, ...(brief.learning ? [brief.learning] : [])].slice(0, 4).map((it, i) => (
+            <div key={it.id || `n${i}`} style={{ width: 200, background: STICKY, padding: '14px 15px', borderRadius: 2, boxShadow: '0 12px 26px -12px rgba(43,42,34,.3)', transform: i % 2 ? 'rotate(1.2deg)' : 'rotate(-1.2deg)' }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5a5433', lineHeight: 1.5 }}>{it.title}</div>
+              {it.cta_href && <Link href={it.cta_href} onClick={() => onAct(it)} style={{ display: 'inline-block', fontSize: 11, fontWeight: 800, color: '#7a6a1f', textDecoration: 'none', marginTop: 8 }}>{it.cta_label || 'Open'} →</Link>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* desk is clear */}
+      <div style={{ borderTop: `1px dashed ${PAPERLINE}`, paddingTop: 16, fontSize: 12.5, color: MUTED, fontWeight: 600 }}>
+        {brief.quiet ? 'Your desk is clear. Enjoy the quiet — I’ll set out anything that matters. — Mello' : 'When you’ve handled these, the desk is clear. That’s the whole app. — Mello'}
+      </div>
+    </div>
+  )
+}
+
 export default function StandupPage() {
   const [brief, setBrief] = useState<Brief | null>(null)
   const [err, setErr] = useState(false)
@@ -98,8 +188,11 @@ export default function StandupPage() {
   const [draft, setDraft] = useState('')
   const [focusItem, setFocusItem] = useState<Item | null>(null)   // what the composer is "about"
   const [headlineState, setHeadlineState] = useState<null | 'approved' | 'passed'>(null)
+  const [view, setView] = useState<'standup' | 'desk'>('standup')   // Mello's report as a conversation, or as a prepared desk
   const endRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => { try { const v = localStorage.getItem('brief_view'); if (v === 'desk' || v === 'standup') setView(v) } catch {} }, [])
+  const pickView = (v: 'standup' | 'desk') => { setView(v); try { localStorage.setItem('brief_view', v) } catch {} }
   useEffect(() => { fetch('/api/brief').then(r => r.ok ? r.json() : Promise.reject()).then((b: Brief) => { setBrief(b); setFocusItem(b.headline || b.items[0] || null) }).catch(() => setErr(true)) }, [])
   useEffect(() => { if (thread.length) endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [thread])
 
@@ -140,7 +233,15 @@ export default function StandupPage() {
         </span>
         <div>
           <div style={{ fontSize: 14, fontWeight: 800, color: INK, letterSpacing: '-.01em' }}>Mello</div>
-          <div style={{ fontSize: 11.5, color: MUTED }}>Daily standup · {new Date().toLocaleDateString('en-US', { weekday: 'long' })}</div>
+          <div style={{ fontSize: 11.5, color: MUTED }}>{view === 'desk' ? 'Your desk' : 'Daily standup'} · {new Date().toLocaleDateString('en-US', { weekday: 'long' })}</div>
+        </div>
+        {/* view toggle — the same brief as a conversation (Standup) or a prepared desk (Desk) */}
+        <div style={{ marginLeft: 'auto', display: 'inline-flex', background: '#eef2ec', border: `1px solid ${LINE}`, borderRadius: 100, padding: 3 }}>
+          {(['standup', 'desk'] as const).map(v => (
+            <button key={v} onClick={() => pickView(v)} style={{ border: 'none', borderRadius: 100, padding: '6px 13px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', background: view === v ? '#fff' : 'transparent', color: view === v ? INK : MUTED, boxShadow: view === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
+              {v === 'standup' ? 'Standup' : 'Desk'}
+            </button>
+          ))}
         </div>
         <style>{`@keyframes mp{50%{opacity:.35}}`}</style>
       </div>
@@ -149,7 +250,9 @@ export default function StandupPage() {
       {!brief && !err && <div style={{ color: MUTED, fontSize: 15 }}><span style={{ opacity: .7 }}>Mello is pulling the room together…</span></div>}
       {err && <div style={{ color: MUTED, fontSize: 15 }}>I couldn&rsquo;t start the standup — refresh in a moment.</div>}
 
-      {brief && (
+      {brief && view === 'desk' && <DeskView brief={brief} greet={greet} onAct={markActed} onDecision={logDecision} />}
+
+      {brief && view === 'standup' && (
         <>
           {/* ── Mello opens: greeting + agenda count ── */}
           <Say delay={80} big>{greet}{brief.firstName ? `, ${brief.firstName}` : ''}.{' '}
