@@ -53,7 +53,7 @@ export async function GET() {
   const D7 = new Date(Date.now() - 7 * 86400e3).toISOString()
 
   // Fire everything in parallel; each source degrades to "absent", never breaks the brief.
-  const [spine, notifs, creatives, follows, adsScanned] = await Promise.all([
+  const [spine, notifs, creatives, follows, adsScanned, observations] = await Promise.all([
     // 1. Spine rows (mig 108) — the durable event feed workers write into.
     soft<any[]>(admin.from('brief_events').select('id, kind, importance, title, body, cta_label, cta_href, payload, created_at')
       .eq('user_id', user.id).gte('created_at', H48).order('importance', { ascending: false }).limit(20)
@@ -72,6 +72,10 @@ export async function GET() {
     // 5. Mello's overnight sweep: ads indexed in the last 24h (dai_created_at_idx → fast).
     soft<number>(admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true })
       .gte('created_at', H24).then((r: any) => r.count || 0), 0),
+    // 6. Mello's nightly observations (mig 110, L7) — his own notes about the business.
+    soft<any[]>(admin.from('daily_observations').select('id, observation, action, confidence, created_at')
+      .eq('user_id', user.id).gte('created_at', H48).order('created_at', { ascending: false }).limit(3)
+      .then((r: any) => r.data || []), []),
   ])
 
   // ── 1. Spine rows pass straight through (already Mello-voiced by their writers) ──
@@ -158,6 +162,16 @@ export async function GET() {
     body: `${gTop[0][1]} of the freshest ads market-wide use this angle right now. Read five of them and you'll see the pattern — then you own it.`,
     cta_label: 'Open the examples', cta_href: `/discovery?q=${encodeURIComponent(gTop[0][0])}`,
   } : null
+
+  // ── 5b. Mello's own nightly observations (mig 110, L7) → spoken as insights in the standup. ──
+  for (const o of observations) {
+    items.push({
+      kind: 'insight', importance: 55, at: o.created_at,
+      title: o.observation,
+      why: o.action || undefined,
+      ...(o.action ? { cta_label: 'Act on this', cta_href: '/discovery' } : {}),
+    })
+  }
 
   // ── 6. The brief is a DOCUMENT, not a feed: hard cap, heaviest first, and it ENDS (sign-off).
   //       Quiet days say so out loud — an employee who can say "do nothing" is one you trust. ──

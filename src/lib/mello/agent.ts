@@ -71,7 +71,7 @@ export async function runAgent(opts: {
   send: Emit
 }): Promise<AgentResult> {
   const { userId, history, userMessage, send } = opts
-  const system = await buildSystemPrompt(userId)
+  const system = await buildSystemPrompt(userId, userMessage)
 
   const messages: any[] = [
     { role: 'system', content: system },
