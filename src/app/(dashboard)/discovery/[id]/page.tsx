@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import CloneModal from '../CloneModal'
 import CloneVideoModal from '../CloneVideoModal'
+import RemakeAdaptation from '../RemakeAdaptation'
 import { useParams, useRouter } from 'next/navigation'
 import { X, Bookmark, Link as LinkIcon, Download, Sparkles, ExternalLink } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
@@ -162,8 +163,11 @@ export default function AdDetailPage() {
         </div>
       </div>
 
+      {/* Mello's pre-adaptation — the winning ad, already rewritten for the user's brand */}
+      <RemakeAdaptation adId={ad.id} />
+
       {/* 3-column layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px 360px', gap: 18, alignItems: 'start' }}>
+      <div id="remake-cta" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px 360px', gap: 18, alignItems: 'start' }}>
         {/* ── LEFT: ad preview ── */}
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
