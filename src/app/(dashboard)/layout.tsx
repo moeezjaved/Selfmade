@@ -16,8 +16,9 @@ import type { UserProfile } from '@/types'
 import {
   Settings, LogOut, Menu, X, Check, LifeBuoy, ChevronsUpDown, Zap, Sparkles, CreditCard, Users,
   Eye, TrendingUp, Star, Bookmark, Image as ImageIcon, Heart, Radar,
-  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, Trophy, Camera, Sun,
+  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, Terminal, ClipboardList, Trophy, Camera, Sun, Newspaper,
 } from 'lucide-react'
+import SearchPalette from '@/components/SearchPalette'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
 import BootMotion from '@/components/motion/BootMotion'
@@ -29,6 +30,7 @@ const AREAS = [
     key: 'discover', label: 'Ad Discovery', railLabel: 'Discovery', railIcon: Radar, defaultHref: '/brief',
     items: [
       { href: '/brief',                icon: Sun,          label: 'Morning Brief', badge: 'NEW' },
+      { href: '/discover',             icon: Newspaper,    label: 'Discover',   badge: 'NEW' },   // the Edition — today's market intelligence
       { href: '/discovery',            icon: Radar,        label: 'Discovery',  badge: null },
       { href: '/discovery/brand-spy',  icon: Eye,          label: 'Brand Spy',  badge: 'NEW' },
       { href: '/trending',             icon: TrendingUp,   label: 'Trending',   badge: 'NEW' },
@@ -177,6 +179,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="flex min-h-screen" style={{background:"#f6f8f5"}}>
       <BootMotion />
+      <SearchPalette />{/* ⌘K — universal knowledge search, available everywhere in the app */}
 
       {/* ── MOBILE TOP BAR (hamburger) — only < 768px ── */}
       {isMobile && (

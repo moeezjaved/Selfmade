@@ -8,6 +8,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
+import TrailRecorder from '@/components/knowledge/TrailRecorder'
 
 export const revalidate = 3600   // pages stay fresh-ish without hammering the DB
 
@@ -63,6 +64,7 @@ export default async function BrandKnowledgePage({ params }: { params: { pageId:
 
   return (
     <div style={{ minHeight: '100vh', background: '#f6f8f5', fontFamily: "'Inter', -apple-system, sans-serif", color: INK }}>
+      <TrailRecorder node={`brand:${params.pageId}`} />
       {/* slim public nav */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 26px', borderBottom: `1px solid ${LINE}`, background: '#fff' }}>
         <Link href="/" style={{ fontWeight: 850, fontSize: 18, letterSpacing: '-.02em', color: INK, textDecoration: 'none' }}>Selfmade</Link>

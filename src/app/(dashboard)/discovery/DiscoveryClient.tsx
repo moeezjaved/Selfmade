@@ -1318,6 +1318,33 @@ function readDiscoSnap(): any {
     return s
   } catch { return null }
 }
+// ── Deep links: the Edition (/discover), Search and knowledge pages open the grid
+// PRE-FILTERED via URL params (?hook=, ?format_style=, ?niche=, ?q=, ?days=, ?run_time=,
+// ?sort=). A deep link is an explicit intent for a fresh scoped view, so when any
+// recognized param is present it REPLACES the sessionStorage snapshot (shape-compatible:
+// the returned object seeds the same `snap?.X` initializers). ──
+function readDeepLink(): any {
+  try {
+    const p = new URLSearchParams(window.location.search)
+    const csv = (k: string) => (p.get(k) || '').split(',').map((s) => s.trim()).filter(Boolean)
+    const dl: any = {}
+    const q = (p.get('q') || '').trim()
+    if (q) { dl.query = q; dl.searchInput = q }
+    if (csv('hook').length) dl.hookTypes = csv('hook')
+    if (csv('format_style').length) dl.formatStyles = csv('format_style')
+    if (csv('visual_style').length) dl.visualStyles = csv('visual_style')
+    if (csv('emotion').length) dl.emotions = csv('emotion')
+    if (csv('angle').length) dl.angles = csv('angle')
+    if ((p.get('niche') || '').trim()) dl.niches = (p.get('niche') || '').split('|').map((s) => s.trim()).filter(Boolean)
+    const days = parseInt(p.get('days') || '')
+    if (Number.isFinite(days) && days > 0) dl.timeDays = days
+    const runTime = parseInt(p.get('run_time') || '')
+    if (Number.isFinite(runTime) && runTime > 0) dl.minDaysStr = String(runTime)
+    const sort = (p.get('sort') || '').trim()
+    if (sort) dl.sort = sort
+    return Object.keys(dl).length ? dl : null
+  } catch { return null }
+}
 
 export default function DiscoveryPage() {
   const router = useRouter()
@@ -1325,7 +1352,7 @@ export default function DiscoveryPage() {
   // Read the saved feed state ONCE (client only). The component renders a static skeleton until
   // `mounted`, so lazy-initializing state from this can't cause an SSR/hydration mismatch.
   const snapReadRef = useRef<any>(undefined)
-  if (snapReadRef.current === undefined) snapReadRef.current = (typeof window !== 'undefined' ? readDiscoSnap() : null)
+  if (snapReadRef.current === undefined) snapReadRef.current = (typeof window !== 'undefined' ? (readDeepLink() ?? readDiscoSnap()) : null)
   const snap = snapReadRef.current as any
   // When restoring loaded cards, skip the one initial fetchAds(true) that would clobber them.
   const skipInitialFetchRef = useRef(!!(snap && Array.isArray(snap.rawAds) && snap.rawAds.length))
