@@ -30,7 +30,7 @@ export default function HireKeynote() {
   return (
     // Inline black background wins over the app's global body.bg-dark (class > element selector) and
     // covers the whole scroll — the keynote is a black stage regardless of the surrounding app theme.
-    <div ref={rvRoot} style={{ background: '#0a0d0a', minHeight: '100vh', color: '#f2f5ef' }}>
+    <div ref={rvRoot} style={{ background: '#0b1220', minHeight: '100vh', color: '#f2f5ef' }}>
       {/* Persistent glassmorphic nav — Instrument Serif wordmark, liquid-glass CTA. */}
       <nav className="glassnav">
         <a href="/" className="gn-logo">Selfmade</a>
@@ -44,8 +44,8 @@ export default function HireKeynote() {
       <section className="beat beat--hero">
         <video className="hero-vid" autoPlay muted loop playsInline preload="auto"
           src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" />
-        <h1 className="hero-h1 fr">The market moves <em>all night.</em></h1>
-        <p className="hero-sub fr fr-d1">Marketers wake up already behind. Nobody was watching.</p>
+        <h1 className="hero-h1 fr">Every morning, marketers wake up <em>already behind.</em></h1>
+        <p className="hero-sub fr fr-d1">The market moved all night. Nobody was watching.</p>
         <a href="#offer" className="liquid-glass hero-cta fr fr-d2">Hire Mello</a>
         <div className="hint">Scroll</div>
       </section>
@@ -109,7 +109,7 @@ export default function HireKeynote() {
       </div>
 
       <style>{`
-        html,body{background:#0a0d0a}
+        html,body{background:#0b1220}
         /* Glassmorphic nav — persistent, centered, Instrument Serif wordmark. */
         .glassnav{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:1220px;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 32px;font-family:'Inter',sans-serif}
         .gn-logo{font-family:'Inter',-apple-system,system-ui,sans-serif;font-size:22px;font-weight:850;letter-spacing:-.03em;color:#fff;text-decoration:none;text-shadow:0 2px 18px rgba(0,0,0,.55)}
@@ -127,7 +127,9 @@ export default function HireKeynote() {
         .beat{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;position:relative;font-family:'Inter',-apple-system,system-ui,sans-serif}
         /* HERO — full-bright reel, cinematic serif, glass CTA. No dimming overlay. */
         .beat--hero{overflow:hidden;justify-content:flex-start;padding-top:clamp(132px,23vh,240px)}
-        .hero-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#0a0d0a}
+        .hero-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#0b1220}
+        /* gentle fade at the base of the hero so the night video melts into the navy scroll below */
+        .beat--hero:after{content:'';position:absolute;left:0;right:0;bottom:0;height:16%;z-index:1;background:linear-gradient(to bottom,rgba(11,18,32,0),rgba(11,18,32,.92));pointer-events:none}
         .beat--hero>*:not(.hero-vid){position:relative;z-index:2}
         .beat--hero .hero-h1{font-family:'Instrument Serif',serif;font-weight:400;font-size:clamp(34px,5.4vw,66px);line-height:1.04;letter-spacing:-.015em;max-width:24ch;color:#fff;text-shadow:0 1px 22px rgba(0,0,0,.26)}
         .beat--hero .hero-h1 em{font-style:normal;color:#c4ccc0}
