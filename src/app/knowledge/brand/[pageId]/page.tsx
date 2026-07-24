@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import TrailRecorder from '@/components/knowledge/TrailRecorder'
 import KnowledgeChrome from '@/components/app/KnowledgeChrome'
+import WatchBrandButton from './WatchBrandButton'
 
 export const revalidate = 3600   // pages stay fresh-ish without hammering the DB
 
@@ -122,7 +123,7 @@ export default async function BrandKnowledgePage({ params }: { params: { pageId:
             <div style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>The full file goes deeper.</div>
             <div style={{ fontSize: 13, color: '#b9c6b6', marginTop: 4 }}>Every ad {name} has run, the full timeline, hook-by-hook breakdowns — and Mello watching them for you every night.</div>
           </div>
-          <Link href="/signup" style={{ background: LIME, color: FOREST, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Watch this brand →</Link>
+          <WatchBrandButton pageId={params.pageId} name={name} />
         </div>
       </div>
     </div>
