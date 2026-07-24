@@ -201,7 +201,17 @@ export default function StandupPage() {
 
   // One calm default — no toggle, fewer decisions. The Desk variant stays reachable via ?view=desk.
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get('view') === 'desk') setView('desk') } catch {} }, [])
-  useEffect(() => { fetch('/api/brief').then(r => r.ok ? r.json() : Promise.reject()).then((b: Brief) => { setBrief(b); setFocusItem(b.headline || b.items[0] || null) }).catch(() => setErr(true)) }, [])
+  // Time-box the fetch: if /api/brief ever stalls, show the retry state instead of an endless
+  // "pulling the room together…". The API itself is now time-boxed too (each source ≤6s).
+  useEffect(() => {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 22000)
+    fetch('/api/brief', { signal: ctrl.signal }).then(r => r.ok ? r.json() : Promise.reject())
+      .then((b: Brief) => { setBrief(b); setFocusItem(b.headline || b.items[0] || null) })
+      .catch(() => setErr(true))
+      .finally(() => clearTimeout(t))
+    return () => clearTimeout(t)
+  }, [])
   // Keep the newest turn just above the composer — block:'end' so it never yanks the page to the top.
   useEffect(() => { if (thread.length) setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 40) }, [thread])
 
