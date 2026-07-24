@@ -24,7 +24,7 @@ export async function GET() {
   // Resolve emails best-effort (auth.users via admin API).
   const emails = new Map<string, string>()
   try {
-    const ids = Array.from(new Set(list.map((r: any) => r.user_id).filter(Boolean)))
+    const ids = Array.from(new Set(list.map((r: any) => r.user_id).filter(Boolean))) as string[]
     for (const id of ids) {
       try { const { data } = await admin.auth.admin.getUserById(id); if (data?.user?.email) emails.set(id, data.user.email) } catch {}
     }
