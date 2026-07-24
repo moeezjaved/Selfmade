@@ -1,17 +1,20 @@
 'use client'
 /**
- * The Standup — Mello's daily briefing as a CONVERSATION, not a document.
- * The four laws it runs on (see the design doc):
- *   1. The machine speaks first — Mello opens with an agenda ("Three things — ninety seconds").
- *   2. Meetings end — the standup has a sign-off; it is finite.
- *   3. Work arrives finished — the headline is a decision with the creative already made.
- *   4. Memory is spoken — replies run through the real Mello agent, which can cite live data.
- * You can interrupt any turn in plain language; Mello answers inline (/api/brief/reply).
+ * The Brief — redesigned as a THINKING experience, not a dashboard (2026-07-24).
+ * A founder over coffee should know in <10s: what happened, why care, what to do.
+ * Hierarchy (strict, top → bottom, progressive disclosure):
+ *   1. WHAT HAPPENED — one sentence, one number, one visual, one action.
+ *   2. WHY IT MATTERS — three one-line insights.
+ *   3. TODAY — three recommendations. Never leave the founder thinking.
+ *   4. THE EVIDENCE — only now, the ads. Evidence supports decisions; it isn't the decision.
+ * Whitespace + typography carry the hierarchy — no boxes, no competing CTAs.
+ * Replies still run through the real Mello agent (/api/brief/reply); the old Desk view
+ * is preserved behind ?view=desk.
  */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, ArrowUp } from 'lucide-react'
+import { ArrowUp } from 'lucide-react'
 import TryMello from './TryMello'
 import BriefAlerts from './BriefAlerts'
 import BriefWishlist from './BriefWishlist'
@@ -196,16 +199,13 @@ export default function StandupPage() {
   const endRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
-  useEffect(() => { try { const v = localStorage.getItem('brief_view'); if (v === 'desk' || v === 'standup') setView(v) } catch {} }, [])
-  const pickView = (v: 'standup' | 'desk') => { setView(v); try { localStorage.setItem('brief_view', v) } catch {} }
+  // One calm default — no toggle, fewer decisions. The Desk variant stays reachable via ?view=desk.
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get('view') === 'desk') setView('desk') } catch {} }, [])
   useEffect(() => { fetch('/api/brief').then(r => r.ok ? r.json() : Promise.reject()).then((b: Brief) => { setBrief(b); setFocusItem(b.headline || b.items[0] || null) }).catch(() => setErr(true)) }, [])
   useEffect(() => { if (thread.length) endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [thread])
 
   const h = new Date().getHours()
   const greet = h < 5 ? 'Late one' : h < 12 ? 'Morning' : h < 18 ? 'Afternoon' : 'Evening'
-  const agendaItems = brief ? [...(brief.headline ? [brief.headline] : []), ...brief.items] : []
-  const count = agendaItems.length
-  const numword = (i: number) => ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'][i] || `${i + 1}`
 
   // Send a reply to Mello (grounded by the real agent). `about` = the item being discussed, for context.
   async function say(text: string, about?: Item | null) {
@@ -238,25 +238,14 @@ export default function StandupPage() {
 
   return (
     <div style={{ maxWidth: 620, margin: '0 auto', padding: '26px 20px 150px', fontFamily: "'Inter', -apple-system, sans-serif" }}>
-      {/* header — Mello is present, not a page title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 11, paddingBottom: 20, marginBottom: 22, borderBottom: `1px solid ${LINE}` }}>
+      {/* header — a quiet presence, not chrome. No toggle, no competing decisions. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         <span style={{ position: 'relative', display: 'inline-flex' }}>
-          <MelloFace />
-          <span style={{ position: 'absolute', right: -2, bottom: 0, width: 9, height: 9, borderRadius: '50%', background: GREEN, border: '2px solid #fff', animation: 'mp 2s infinite' }} />
+          <MelloFace size={28} />
+          <span style={{ position: 'absolute', right: -2, bottom: 0, width: 8, height: 8, borderRadius: '50%', background: GREEN, border: '2px solid #f6f8f5', animation: 'mp 2s infinite' }} />
         </span>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: INK, letterSpacing: '-.01em' }}>Mello</div>
-          <div style={{ fontSize: 11.5, color: MUTED }}>{view === 'desk' ? 'Your desk' : 'Daily standup'} · {new Date().toLocaleDateString('en-US', { weekday: 'long' })}</div>
-        </div>
-        {/* view toggle — the same brief as a conversation (Standup) or a prepared desk (Desk) */}
-        <div style={{ marginLeft: 'auto', display: 'inline-flex', background: '#eef2ec', border: `1px solid ${LINE}`, borderRadius: 100, padding: 3 }}>
-          {(['standup', 'desk'] as const).map(v => (
-            <button key={v} onClick={() => pickView(v)} style={{ border: 'none', borderRadius: 100, padding: '6px 13px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', background: view === v ? '#fff' : 'transparent', color: view === v ? INK : MUTED, boxShadow: view === v ? '0 1px 3px rgba(0,0,0,.08)' : 'none' }}>
-              {v === 'standup' ? 'Standup' : 'Desk'}
-            </button>
-          ))}
-        </div>
-        <style>{`@keyframes mp{50%{opacity:.35}}`}</style>
+        <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 650 }}>Mello · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+        <style>{`@keyframes mp{50%{opacity:.35}} details.more-mello>summary::-webkit-details-marker{display:none}`}</style>
       </div>
 
       {/* loading / error */}
@@ -265,92 +254,142 @@ export default function StandupPage() {
 
       {brief && view === 'desk' && <DeskView brief={brief} greet={greet} onAct={markActed} onDecision={logDecision} />}
 
-      {brief && view === 'standup' && (
+      {brief && view === 'standup' && (() => {
+        // ── The hierarchy: 1 what happened · 2 why it matters · 3 what to do · 4 evidence ──
+        const hero = brief.headline || brief.items[0] || null
+        const isHeadlineHero = !!(brief.headline && hero === brief.headline)
+        const rest = brief.items.filter(it => it !== hero)
+        const insights = rest.slice(0, 3)
+        const evidence = rest.filter(it => !!it.media?.length)
+        const compItem = [hero, ...rest].find(it => it?.kind === 'competitor_ads') || null
+        const compBrand = compItem ? compItem.title.replace(/\s+launched.*$/i, '').replace(/\.$/, '') : null
+        const today = () => new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        const recs: { text: string; href?: string }[] = brief.quiet
+          ? [
+              { text: 'Don’t spend today — save the budget for a real signal.' },
+              { text: 'Tell me what to make next — I’ll build it with you in the studio.', href: '/studio' },
+            ]
+          : [
+              ...(isHeadlineHero ? [{ text: 'Approve or kill the creative I made — it keeps your pipeline moving.', href: brief.headline!.cta_href }] : []),
+              ...(compItem ? [{ text: `Answer ${compBrand} — remake one of their new ads for your brand.`, href: compItem.cta_href }] : []),
+              { text: 'Tell me what to make next — I’ll build it with you in the studio.', href: '/studio' },
+            ]
+        const label: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '.16em', color: MUTED, textTransform: 'uppercase', marginBottom: 14 }
+        return (
         <>
-          {/* ── Mello opens: greeting + agenda count ── */}
-          <Say delay={80} big>{greet}{brief.firstName ? `, ${brief.firstName}` : ''}.{' '}
-            {brief.quiet ? 'Quiet night — nothing needs you today.' : count === 1 ? 'One thing, then you&rsquo;re done.' : `${count} things — ninety seconds.`}
-          </Say>
-
-          {/* ── the overnight report, spoken in one line ── */}
-          <Say delay={260}>
-            <span style={{ color: MUTED }}>
-              Last night I read <b style={{ color: INK }}>{brief.summary.adsScanned.toLocaleString()} ads</b>
-              {brief.summary.brandsWatched > 0 && <> and checked your <b style={{ color: INK }}>{brief.summary.brandsWatched} competitor{brief.summary.brandsWatched === 1 ? '' : 's'}</b></>}.
-              {brief.quiet ? ' Routine rotation only — my recommendation is don’t spend today.' : ' Here’s what matters.'}
-            </span>
-          </Say>
-
-          {/* ── agenda: each item spoken as a numbered turn ── */}
-          {agendaItems.map((it, i) => {
-            const isHeadline = brief.headline && it === brief.headline
-            const quick = isHeadline
-              ? ['Ship it', 'Why this one?', 'Not today']
-              : it.kind === 'competitor_ads' ? ['Respond to this', 'Why does it matter?']
-              : it.kind === 'trend' ? ['Draft one for me', 'Show me the ads']
-              : ['Tell me more', 'Why?']
-            return (
-              <div key={it.id || i}>
-                <Say delay={420 + i * 200}>
-                  <b style={{ fontWeight: 800 }}>{numword(i)}.</b>{' '}{it.title}
-                  {it.why && <span style={{ display: 'block', fontSize: 13, color: GREEN, fontWeight: 600, marginTop: 5 }}>{it.why}</span>}
-                </Say>
-
-                {/* work arrives finished — headline carries the creative + the approve action */}
-                {isHeadline && !!it.thumbs?.length && (
-                  <div style={{ display: 'flex', gap: 9, margin: '-4px 0 14px' }}>
-                    {it.thumbs.slice(0, 3).map((t, k) => <Thumb key={k} src={t} />)}
-                  </div>
-                )}
-
-                {/* competitor ads — the actual creatives; hover a video to preview, click into its knowledge page */}
-                {!isHeadline && !!it.media?.length && (
-                  <div style={{ display: 'flex', gap: 8, margin: '-2px 0 14px' }}>
-                    {it.media.slice(0, 3).map((m, k) => m.adId
-                      ? <Link key={k} href={`/knowledge/ad/${m.adId}`}><AdPreview image={m.image} videoUrl={m.videoUrl} /></Link>
-                      : <AdPreview key={k} image={m.image} videoUrl={m.videoUrl} />)}
-                  </div>
-                )}
-
-                {/* interrupt in plain language — contextual quick replies + the real action */}
-                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', margin: '-4px 0 22px' }}>
-                  {isHeadline && it.cta_href && headlineState !== 'passed' && (
-                    <Link href={it.cta_href} onClick={() => { markActed(it); setHeadlineState('approved'); logDecision(`Approved a creative from the brief: "${it.title}" (${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`) }} style={{ background: FOREST, color: LIME, fontSize: 12.5, fontWeight: 800, padding: '9px 15px', borderRadius: 100, textDecoration: 'none' }}>
-                      ✓ {headlineState === 'approved' ? 'Opening…' : (it.cta_label || 'Review & approve')}
-                    </Link>
-                  )}
-                  {!isHeadline && it.cta_href && (
-                    <Link href={it.cta_href} onClick={() => markActed(it)} style={{ background: '#fff', border: `1.5px solid ${LINE}`, color: INK, fontSize: 12.5, fontWeight: 800, padding: '9px 15px', borderRadius: 100, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                      {it.cta_label || 'Open'} <ArrowRight size={13} />
-                    </Link>
-                  )}
-                  {quick.map(qr => (
-                    <button key={qr} onClick={() => {
-                      setFocusItem(it); say(qr, it)
-                      if (isHeadline && qr === 'Not today') { setHeadlineState('passed'); logDecision(`Passed on a suggested creative: "${it.title}" (${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`) }
-                      if (isHeadline && qr === 'Ship it') logDecision(`Shipped a creative from the brief: "${it.title}" (${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`)
-                    }} disabled={busy} style={{ background: 'transparent', border: `1.5px solid ${LINE}`, color: INK, fontSize: 12.5, fontWeight: 750, padding: '9px 14px', borderRadius: 100, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, fontFamily: 'inherit' }}>
-                      {qr}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-
-          {/* ── one lesson, then the meeting ends ── */}
-          {brief.learning && (
-            <Say delay={480 + count * 200}>
-              <span style={{ color: MUTED }}>Before you go — worth learning today: {brief.learning.title.replace(/^Today's lesson:\s*/i, '')}{' '}
-                {brief.learning.cta_href && <Link href={brief.learning.cta_href} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>Open the examples →</Link>}
+          {/* ── 1 · WHAT HAPPENED — one sentence, one number, one visual, one action ── */}
+          <div style={{ marginTop: 44 }}>
+            <Say delay={60}>
+              <span style={{ fontSize: 13.5, color: MUTED, fontWeight: 600 }}>
+                {greet}{brief.firstName ? `, ${brief.firstName}` : ''} — overnight I read <b style={{ color: INK, fontWeight: 750 }}>{brief.summary.adsScanned.toLocaleString()} ads</b>{brief.summary.brandsWatched > 0 ? <> across your <b style={{ color: INK, fontWeight: 750 }}>{brief.summary.brandsWatched} competitor{brief.summary.brandsWatched === 1 ? '' : 's'}</b></> : null}.
               </span>
             </Say>
+            <Say delay={200}>
+              <h1 style={{ fontSize: 33, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1.18, color: INK, margin: '2px 0 0', textWrap: 'balance' as any }}>
+                {brief.quiet || !hero ? 'Nothing needs you today.' : hero.title.replace(/\.+$/, '') + '.'}
+              </h1>
+            </Say>
+            {!brief.quiet && hero && (
+              <Say delay={340}>
+                <div>
+                  {hero.why && <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: '12px 0 0', maxWidth: 480 }}>{hero.why}</p>}
+                  {/* one visual — never a wall of thumbnails */}
+                  {isHeadlineHero && hero.thumbs?.[0] && (
+                    <div style={{ marginTop: 24 }}><Thumb src={hero.thumbs[0]} w={158} h={198} /></div>
+                  )}
+                  {!isHeadlineHero && hero.media?.[0] && (
+                    <div style={{ marginTop: 24 }}>
+                      {hero.media[0].adId
+                        ? <Link href={`/knowledge/ad/${hero.media[0].adId}`}><AdPreview image={hero.media[0].image} videoUrl={hero.media[0].videoUrl} w={158} h={198} /></Link>
+                        : <AdPreview image={hero.media[0].image} videoUrl={hero.media[0].videoUrl} w={158} h={198} />}
+                    </div>
+                  )}
+                  {/* one primary action; the alternatives whisper */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 24 }}>
+                    {hero.cta_href && headlineState !== 'passed' && (
+                      <Link href={hero.cta_href} onClick={() => { markActed(hero); if (isHeadlineHero) { setHeadlineState('approved'); logDecision(`Approved a creative from the brief: "${hero.title}" (${today()}).`) } }}
+                        style={{ background: FOREST, color: LIME, fontSize: 13.5, fontWeight: 800, padding: '12px 22px', borderRadius: 100, textDecoration: 'none' }}>
+                        {isHeadlineHero ? (headlineState === 'approved' ? 'Opening…' : `✓ ${hero.cta_label || 'Review & approve'}`) : (hero.cta_label || 'Open')}
+                      </Link>
+                    )}
+                    {isHeadlineHero && headlineState !== 'passed' && (
+                      <button onClick={() => { setFocusItem(hero); setHeadlineState('passed'); logDecision(`Passed on a suggested creative: "${hero.title}" (${today()}).`) }}
+                        style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Not today</button>
+                    )}
+                    <button onClick={() => { setFocusItem(hero); say(isHeadlineHero ? 'Why this one?' : 'Why does it matter?', hero) }} disabled={busy}
+                      style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', padding: 0 }}>Why?</button>
+                  </div>
+                </div>
+              </Say>
+            )}
+            {brief.quiet && (
+              <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: '12px 0 0', maxWidth: 480 }}>Routine rotation only — my honest read is don’t spend today. I’ll break the quiet the moment something moves.</p>
+            )}
+          </div>
+
+          {/* ── 2 · WHY IT MATTERS — three one-line insights, nothing else ── */}
+          {!brief.quiet && insights.length > 0 && (
+            <div style={{ marginTop: 58 }}>
+              <div style={label}>Why it matters</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                {insights.map((it, i) => (
+                  <div key={it.id || i} style={{ fontSize: 16.5, fontWeight: 650, letterSpacing: '-.01em', color: INK, lineHeight: 1.45 }}>
+                    {it.cta_href
+                      ? <Link href={it.cta_href} onClick={() => markActed(it)} style={{ color: INK, textDecoration: 'none' }}>{it.title} <span style={{ color: GREEN }}>→</span></Link>
+                      : it.title}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
-          {/* ── sign-off: the standup is finite ── */}
-          <div style={{ opacity: .9, marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, color: MUTED, fontSize: 13.5, fontWeight: 600 }}>
+          {/* ── 3 · WHAT TO DO — three recommendations. Never leave the founder thinking. ── */}
+          <div style={{ marginTop: 58 }}>
+            <div style={label}>Today, I’d do three things</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {recs.slice(0, 3).map((r, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 15.5, color: INK, lineHeight: 1.5 }}>
+                  <span style={{ color: GREEN, fontWeight: 800 }}>✓</span>
+                  {r.href ? <Link href={r.href} style={{ color: INK, textDecoration: 'none', borderBottom: `1px solid ${LINE}` }}>{r.text}</Link> : <span>{r.text}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── 4 · THE EVIDENCE — only now, the ads ── */}
+          {evidence.length > 0 && (
+            <div style={{ marginTop: 58 }}>
+              <div style={label}>The evidence</div>
+              {evidence.map((it, i) => (
+                <div key={it.id || i} style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 10 }}>{it.title}</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {it.media!.slice(0, 3).map((m, k) => m.adId
+                      ? <Link key={k} href={`/knowledge/ad/${m.adId}`}><AdPreview image={m.image} videoUrl={m.videoUrl} w={92} h={116} /></Link>
+                      : <AdPreview key={k} image={m.image} videoUrl={m.videoUrl} w={92} h={116} />)}
+                  </div>
+                  <div style={{ display: 'flex', gap: 18, marginTop: 10 }}>
+                    {it.cta_href && <Link href={it.cta_href} onClick={() => markActed(it)} style={{ fontSize: 12.5, fontWeight: 750, color: GREEN, textDecoration: 'none' }}>{it.cta_label || 'Open the brand file'} →</Link>}
+                    <button onClick={() => { setFocusItem(it); say('Why does it matter?', it) }} disabled={busy}
+                      style={{ background: 'none', border: 'none', color: MUTED, fontSize: 12.5, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', padding: 0 }}>Why does it matter?</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── one lesson, then it ends ── */}
+          {brief.learning && (
+            <div style={{ marginTop: 46, fontSize: 13.5, color: MUTED, lineHeight: 1.6 }}>
+              Worth learning today: {brief.learning.title.replace(/^Today's lesson:\s*/i, '')}{' '}
+              {brief.learning.cta_href && <Link href={brief.learning.cta_href} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>Open the examples →</Link>}
+            </div>
+          )}
+
+          {/* ── sign-off: the brief is finite ── */}
+          <div style={{ marginTop: 36, display: 'flex', alignItems: 'center', gap: 10, color: MUTED, fontSize: 13, fontWeight: 600 }}>
             <span style={{ width: 26, height: 1, background: LINE }} />
-            {brief.quiet ? 'Enjoy the quiet. I’ll break it the moment something moves. — Mello' : 'That’s the standup. I’m here if anything moves. — Mello'}
+            {brief.quiet ? 'Enjoy the quiet. I’ll break it the moment something moves. — Mello' : 'That’s everything. I’m here if anything moves. — Mello'}
           </div>
 
           {/* ── the conversation after the agenda ── */}
@@ -370,11 +409,20 @@ export default function StandupPage() {
             </div>
           )}
         </>
-      )}
+        )
+      })()}
 
-      {/* Below the brief content (Moeez): timely competitor alerts, the feature deck, and a wishlist ask */}
+      {/* Below the brief: timely alerts stay visible; the feature deck hides behind one quiet line
+          (progressive disclosure — depth only for those who ask for it). */}
       {brief && <BriefAlerts />}
-      {brief && <TryMello />}
+      {brief && (
+        <details className="more-mello" style={{ marginTop: 38 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 750, color: MUTED, listStyle: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            What else can I do for you? <span style={{ color: GREEN }}>→</span>
+          </summary>
+          <TryMello />
+        </details>
+      )}
       {brief && <BriefWishlist />}
 
       {/* ── composer: interrupt anytime, in plain language ── */}
