@@ -92,8 +92,14 @@ async function handle(req: NextRequest) {
     const products = (await Promise.all(rawProducts.slice(0, 3).map(async (src) => {
       const m = /^data:([^;]+);base64,([\s\S]*)$/i.exec(src)
       if (m) { const mime = geminiImageMime(m[1] || productMimeType, Buffer.from(m[2], 'base64')); return mime ? { mimeType: mime, dataB64: m[2] } : null }
-      if (/^https?:\/\//i.test(src)) return await fetchImageB64(src)
-      const raw = src.replace(/^data:[^;]+;base64,/, ''); const mime = geminiImageMime(productMimeType, Buffer.from(raw, 'base64'))
+      // Protocol-relative URLs (Shopify stores photos as //host/path with no scheme) must be
+      // fetched, not treated as base64 — prepend https: so they pass the http check.
+      const url = /^\/\/[^/]/.test(src) ? `https:${src}` : src
+      if (/^https?:\/\//i.test(url)) return await fetchImageB64(url)
+      // A bare token that's neither a data-URL nor http(s): accept ONLY if it actually looks like
+      // base64 — never forward a raw URL/path string as inline_data (Gemini 400s on decode).
+      if (!/^[A-Za-z0-9+/=\s]+$/.test(src) || src.length < 100) return null
+      const raw = src.replace(/\s/g, ''); const mime = geminiImageMime(productMimeType, Buffer.from(raw, 'base64'))
       return mime ? { mimeType: mime, dataB64: raw } : null
     }))).filter(Boolean) as { mimeType: string; dataB64: string }[]
     if (products.length === 0) { await refund(); return NextResponse.json({ error: 'could not load product image(s)' }, { status: 502 }) }
