@@ -155,7 +155,21 @@ function StudioInner() {
     setPhotos(p => [...arr, ...p]); setSelected(s => Array.from(new Set([...arr.map(a => a.id), ...s])).slice(0, 3))
   }
   const toggle = (id: string) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : (s.length >= 3 ? s : [...s, id]))
-  const send = () => { const t = draft.trim(); if (!t || !convId || chat.streaming) return; setDraft(''); chat.sendMessage(convId, t) }
+  // Tell Mello what's already on the canvas so she can act on "remake this"/"tweak this" without asking.
+  const canvasContext = () => {
+    const b = brands.find(x => x.id === brandId)
+    const lines: string[] = []
+    if (mode === 'remake' && source?.adId) {
+      lines.push(`A competitor winning ad is ALREADY OPEN on the canvas as the remake source (source_ad_id=${source.adId}${source.brand ? `, from ${source.brand}` : ''}${isVideo ? ', it is a VIDEO ad' : ''}). For "remake this" / "make my version", call create_ad with kind="remake" and OMIT source_ad_id — the canvas already has it.`)
+    } else {
+      lines.push('No competitor ad is open — the canvas is in fresh-create mode. For "make an ad"/"a fresh ad"/"a UGC version", call create_ad with kind="fresh".')
+    }
+    lines.push(`Selected brand: ${b?.name || brandName || 'none set'}${b?.brand_type ? ` (${b.brand_type})` : ''}.`)
+    lines.push(`${selected.length} product photo(s) selected of ${photos.length} available.${photos.length === 0 ? ' No product photos yet — tell the user to analyze their site or upload before you generate.' : ''}`)
+    lines.push(result ? 'There IS a generated image on the canvas now — for "tweak"/"change it"/"bigger logo", call create_ad with kind="tweak" and the instruction.' : 'No generated image yet — tweak is unavailable until something is generated.')
+    return lines.join('\n')
+  }
+  const send = () => { const t = draft.trim(); if (!t || !convId || chat.streaming) return; setDraft(''); chat.sendMessage(convId, t, canvasContext()) }
   // Every generate/tweak becomes a version you can revert to (Ploy's Versions).
   const land = (url: string, genId: string | null, kind: string) => { setResult({ url, genId }); setVersions(v => [...v, { url, genId, kind }]) }
   // Open a past creation from My Work into the canvas — tweak or download it again.

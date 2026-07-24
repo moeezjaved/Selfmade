@@ -117,7 +117,7 @@ export function useChatStream(opts: { onTitle?: (title: string) => void; onCreat
     }
   }, [patchLast])
 
-  const sendMessage = useCallback(async (conversationId: string, text: string) => {
+  const sendMessage = useCallback(async (conversationId: string, text: string, context?: string) => {
     setMessages(prev => [
       ...prev,
       { role: 'user', content: text },
@@ -128,7 +128,7 @@ export function useChatStream(opts: { onTitle?: (title: string) => void; onCreat
       const res = await fetch(`/api/mello/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, surface: surfaceRef.current }),
+        body: JSON.stringify({ message: text, surface: surfaceRef.current, context: context || undefined }),
       })
       if (!res.body) throw new Error('No response stream')
       const reader = res.body.getReader()
