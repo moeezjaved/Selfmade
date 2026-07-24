@@ -43,9 +43,11 @@ export default function HireKeynote() {
       {/* HERO — the opening screen: full-bright reel, cinematic serif, glass CTA. */}
       <section className="beat beat--hero">
         <video className="hero-vid" autoPlay muted loop playsInline preload="auto"
+          onLoadedMetadata={e => { const v = e.currentTarget; v.playbackRate = 1.4; try { v.currentTime = 1 } catch {} }}
+          onTimeUpdate={e => { const v = e.currentTarget; if (v.currentTime >= 9 || (v.duration && v.currentTime >= v.duration - 0.25)) { try { v.currentTime = 1 } catch {} } }}
           src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260405_171521_25968ba2-b594-4b32-aab7-f6b69398a6fa.mp4" />
         <h1 className="hero-h1 fr">Every morning, marketers wake up <em>already behind.</em></h1>
-        <p className="hero-sub fr fr-d1">The market moved all night. Nobody was watching. Mello was — and it left the brief on your desk.</p>
+        <p className="hero-sub fr fr-d1">The market moved all night. Nobody was watching.</p>
         <a href="#offer" className="liquid-glass hero-cta fr fr-d2">Hire Mello</a>
         <div className="hint">Scroll</div>
       </section>
@@ -129,9 +131,9 @@ export default function HireKeynote() {
         .beat--hero{overflow:hidden;padding-top:92px}
         .hero-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#0a0d0a}
         .beat--hero>*:not(.hero-vid){position:relative;z-index:2}
-        .beat--hero .hero-h1{font-family:'Instrument Serif',serif;font-weight:400;font-size:clamp(29px,4.2vw,52px);line-height:1.06;letter-spacing:-.012em;max-width:22ch;color:#fff;text-shadow:0 2px 26px rgba(0,0,0,.4),0 1px 3px rgba(0,0,0,.35)}
+        .beat--hero .hero-h1{font-family:'Instrument Serif',serif;font-weight:400;font-size:clamp(29px,4.2vw,52px);line-height:1.06;letter-spacing:-.012em;max-width:22ch;color:#fff;text-shadow:0 1px 22px rgba(0,0,0,.26)}
         .beat--hero .hero-h1 em{font-style:normal;color:#c4ccc0}
-        .beat--hero .hero-sub{margin-top:24px;max-width:44ch;font-size:clamp(15px,1.6vw,18px);font-weight:500;color:#e0e6db;line-height:1.6;text-shadow:0 2px 18px rgba(0,0,0,.6)}
+        .beat--hero .hero-sub{margin-top:24px;max-width:44ch;font-size:clamp(15px,1.6vw,18px);font-weight:500;color:#eef2ec;line-height:1.6;text-shadow:0 1px 14px rgba(0,0,0,.34)}
         .hero-cta{margin-top:40px;display:inline-block;border-radius:100px;padding:18px 46px;font-size:16px;font-weight:600;color:#fff;text-decoration:none;transition:transform .15s}
         .hero-cta:hover{transform:scale(1.03)}
         .beat--hero .hint{color:rgba(240,244,236,.7)}
