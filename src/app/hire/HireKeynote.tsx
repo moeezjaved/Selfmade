@@ -44,9 +44,9 @@ export default function HireKeynote() {
       <section className="beat beat--hero">
         <video className="hero-vid" autoPlay muted loop playsInline preload="auto"
           src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" />
-        <h1 className="hero-h1 fr">Every morning, marketers wake up <em>already behind.</em></h1>
-        <p className="hero-sub fr fr-d1">The market moved all night. Nobody was watching.</p>
-        <a href="#offer" className="liquid-glass hero-cta fr fr-d2">Hire Mello</a>
+        <h1 className="hero-h1 rv">Every morning, marketers wake up <em>already behind.</em></h1>
+        <p className="hero-sub rv d2">The market moved all night. Nobody was watching.</p>
+        <a href="#offer" className="liquid-glass hero-cta rv d3">Hire Mello</a>
         <div className="hint">Scroll</div>
       </section>
 
@@ -138,10 +138,6 @@ export default function HireKeynote() {
         .hero-cta:hover{transform:scale(1.03)}
         .beat--hero .hint{color:rgba(240,244,236,.7)}
         .beat--hero .hint:after{background:linear-gradient(rgba(240,244,236,.6),transparent)}
-        @keyframes fr{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
-        .fr{animation:fr .8s ease-out both}
-        .fr-d1{animation-delay:.2s}.fr-d2{animation-delay:.4s}
-        @media(prefers-reduced-motion:reduce){.fr{animation:none}}
         .beat p{font-size:clamp(30px,5.6vw,64px);font-weight:800;letter-spacing:-.04em;line-height:1.12;max-width:20ch;text-wrap:balance;color:#f2f5ef}
         .beat .small{font-size:clamp(16px,2vw,20px);font-weight:600;color:#8b978a!important;letter-spacing:-.01em;max-width:44ch;line-height:1.6;margin-top:22px}
         .lime{color:#dffe95}
