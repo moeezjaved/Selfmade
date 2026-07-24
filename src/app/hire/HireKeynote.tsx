@@ -95,7 +95,7 @@ export default function HireKeynote() {
 
       <div className="after">
         <p>{hired ? `Welcome aboard${name.trim() ? ', ' + name.trim().split(' ')[0] : ''} — your first brief arrives tomorrow morning.` : 'Your first brief arrives tomorrow morning.'}</p>
-        <a className="afterlink" href="/home">How Mello works &amp; pricing →</a>
+        <a className="afterlink" href="/home#pricing">How Mello works &amp; pricing →</a>
       </div>
 
       <style>{`
