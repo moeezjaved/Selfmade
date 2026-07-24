@@ -13,9 +13,14 @@
  */
 import { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Sparkles, Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus, Trophy } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { Sparkles, Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus, Trophy, Play } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 import { useChatStream } from '@/components/mello/useChatStream'
+
+// The full, proven video-clone flow (analyze → free script approval → render → poll)
+// lives here — the studio launches it for video winners rather than re-implementing it.
+const CloneVideoModal = dynamic(() => import('../discovery/CloneVideoModal'), { ssr: false })
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -42,6 +47,9 @@ function StudioInner() {
   // mode + remake source
   const [mode, setMode] = useState<'fresh' | 'remake'>('fresh')
   const [source, setSource] = useState<{ adId: string; img: string | null; brand: string | null } | null>(null)
+  const isVideo = params.get('type') === 'video'          // the winner is a video → the video-clone flow
+  const vidUrl = params.get('vid')                        // competitor's mp4 (for the source preview + modal)
+  const [videoOpen, setVideoOpen] = useState(false)
 
   // brand + site
   const [brands, setBrands] = useState<Brand[]>([])
@@ -70,7 +78,7 @@ function StudioInner() {
   const [editText, setEditText] = useState(''); const [editing, setEditing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
-  const cost = 15
+  const cost = isVideo ? 600 : 15
 
   useEffect(() => {
     fetch('/api/brands').then(r => r.json()).then(j => { const bs: Brand[] = j.brands || []; setBrands(bs); if (bs[0]) pickBrand(bs[0]); else setBmode('new') }).catch(() => setBmode('new'))
@@ -138,6 +146,8 @@ function StudioInner() {
 
   const generate = async () => {
     setErr(null)
+    // Video winner → hand off to the proven video-clone flow (free script approval, then render).
+    if (mode === 'remake' && isVideo) { setVideoOpen(true); return }
     const chosen = photos.filter(p => selected.includes(p.id)).map(p => p.src)
     if (!chosen.length) { setErr('Select at least one product photo (analyze your site or upload).'); return }
     if (!confirmCredits(mode === 'remake' ? 'remake this ad' : 'create an ad', cost, balance)) return
@@ -246,12 +256,13 @@ function StudioInner() {
                     /* eslint-disable-next-line @next/next/no-img-element */
                     ? <img src={source.img} alt="competitor ad" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#6b7d6e', fontSize: 12, textAlign: 'center', padding: 16 }}>{source?.brand || 'Competitor'} ad</div>}
+                  {isVideo && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,.6)', pointerEvents: 'none' }}><Play size={30} /></span>}
                 </div>
               </div>
               <div style={{ width: 220 }}>
                 <div style={label}>Your version</div>
                 <div style={{ borderRadius: 14, border: `1.5px dashed ${LINE}`, background: '#fff', aspectRatio: '4/5', display: 'grid', placeItems: 'center', color: MUTED, fontSize: 12, textAlign: 'center', padding: 16 }}>
-                  {busy ? <span style={{ display: 'grid', gap: 8, justifyItems: 'center' }}><Loader2 size={20} className="spin" color={GREEN} />Rebuilding… ~40s</span> : result ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="your version" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }} /> : 'Appears here after Remake'}
+                  {isVideo ? 'Approve the script, then your video renders — it also lands in My Creatives.' : busy ? <span style={{ display: 'grid', gap: 8, justifyItems: 'center' }}><Loader2 size={20} className="spin" color={GREEN} />Rebuilding… ~40s</span> : result ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="your version" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }} /> : 'Appears here after Remake'}
                 </div>
               </div>
             </div>
@@ -334,7 +345,7 @@ function StudioInner() {
           {/* generate */}
           {!result && (
             <button onClick={generate} disabled={busy} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: busy ? '#dfe4de' : LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '14px 28px', fontSize: 15, fontWeight: 850, cursor: busy ? 'default' : 'pointer' }}>
-              {busy ? <><Loader2 size={17} className="spin" /> {remake ? 'Rebuilding… ~40s' : 'Designing… ~30s'}</> : <><Wand2 size={17} /> {remake ? 'Remake this' : 'Create ad'} · {cost} credits</>}
+              {busy ? <><Loader2 size={17} className="spin" /> {remake ? 'Rebuilding… ~40s' : 'Designing… ~30s'}</> : <><Wand2 size={17} /> {isVideo ? 'Remake this video' : remake ? 'Remake this' : 'Create ad'} · {cost} credits</>}
             </button>
           )}
           {err && <div style={{ marginTop: 12, fontSize: 13, color: '#b42318', background: '#fef2f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px', maxWidth: 460 }}>{err}</div>}
@@ -394,6 +405,11 @@ function StudioInner() {
           )}
         </div>
       </div>
+      {/* Video winner → the proven video-clone flow (free script approval → render → My Creatives) */}
+      {videoOpen && source?.adId && (
+        <CloneVideoModal sourceAdId={source.adId} sourceVideoUrl={vidUrl || undefined} sourcePoster={source.img || undefined}
+          onClose={() => { setVideoOpen(false); fetch('/api/creatives').then(r => r.json()).then(j => setWork((j.creatives || []).filter((c: any) => c.media_type !== 'video' && c.status === 'done' && c.image_url).slice(0, 14))).catch(() => {}) }} />
+      )}
       <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
