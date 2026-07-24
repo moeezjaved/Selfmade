@@ -15,6 +15,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const message: string = (body?.message || '').toString().trim()
   if (!message) return new Response('Empty message', { status: 400 })
   const surface: string | undefined = typeof body?.surface === 'string' ? body.surface : undefined
+  const context: string | undefined = typeof body?.context === 'string' ? body.context.slice(0, 2000) : undefined
 
   const admin = createAdminClient()
   const { data: conv } = await admin
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           send({ type: 'title_update', title })
         }
 
-        const result = await runAgent({ userId, history, userMessage: message, send, surface })
+        const result = await runAgent({ userId, history, userMessage: message, send, surface, context })
 
         const { data: saved } = await admin.from('agent_messages').insert({
           conversation_id: conversationId,

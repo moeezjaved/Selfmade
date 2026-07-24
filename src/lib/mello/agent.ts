@@ -70,8 +70,9 @@ export async function runAgent(opts: {
   userMessage: string
   send: Emit
   surface?: string        // e.g. 'studio' — unlocks the canvas-generation tool
+  context?: string        // live surface state (e.g. the studio canvas: loaded source ad, brand)
 }): Promise<AgentResult> {
-  const { userId, history, userMessage, send, surface } = opts
+  const { userId, history, userMessage, send, surface, context } = opts
   const system = await buildSystemPrompt(userId, userMessage, surface)
   // create_ad drives the studio canvas — only expose it there, so Mello never claims to
   // generate on a surface that can't render it.
@@ -79,6 +80,9 @@ export async function runAgent(opts: {
 
   const messages: any[] = [
     { role: 'system', content: system },
+    // Live canvas state so Mello knows what's already loaded (the source ad, brand, current result)
+    // and can act on "remake this" / "tweak this" without asking which ad.
+    ...(context ? [{ role: 'system' as const, content: `CURRENT STUDIO CANVAS STATE:\n${context}` }] : []),
     ...history.map(h => ({ role: h.role, content: h.content })),
     { role: 'user', content: userMessage },
   ]
