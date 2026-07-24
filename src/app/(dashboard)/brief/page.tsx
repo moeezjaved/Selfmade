@@ -420,8 +420,11 @@ export default function StandupPage() {
       {brief && <BriefWishlist />}
 
       {/* ── composer: interrupt anytime, in plain language ── */}
+      {/* The bar is viewport-fixed; the app rail (72px) offsets the content column, so pad the bar's
+          left by the rail on desktop or the inner form drifts ~36px off-center from the brief above. */}
+      <style>{`.brief-composer{padding-left:20px}@media(min-width:769px){.brief-composer{padding-left:92px}}`}</style>
       {brief && (
-        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: 'linear-gradient(transparent, #f6f8f5 34%)', padding: '26px 20px 22px', pointerEvents: 'none' }}>
+        <div className="brief-composer" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: 'linear-gradient(transparent, #f6f8f5 34%)', paddingTop: 26, paddingRight: 20, paddingBottom: 22, pointerEvents: 'none' }}>
           <form onSubmit={(e) => { e.preventDefault(); say(draft) }} style={{ maxWidth: 620, margin: '0 auto', display: 'flex', gap: 9, pointerEvents: 'auto' }}>
             <input value={draft} onChange={e => setDraft(e.target.value)} disabled={busy}
               placeholder={busy ? 'Mello is thinking…' : focusItem ? `Reply to Mello — “make it warmer”, “why?”…` : 'Say anything to Mello…'}
