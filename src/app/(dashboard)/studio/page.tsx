@@ -99,6 +99,7 @@ function StudioInner() {
   // Once the user has analyzed a site or uploaded, the (slow) /api/brands auto-pick must NOT overwrite
   // their photos — that race is why analyzed photos "vanished after 5-10s".
   const touchedRef = useRef(false)
+  const [winnerPlaying, setWinnerPlaying] = useState(false)   // click the lime button to play the winner video inline
 
   useEffect(() => {
     fetch('/api/brands').then(r => r.json()).then(j => { const bs: Brand[] = j.brands || []; setBrands(bs); if (bs[0] && !touchedRef.current) pickBrand(bs[0]); else if (!bs[0]) setBmode('new') }).catch(() => setBmode('new'))
@@ -345,11 +346,22 @@ function StudioInner() {
               <div style={{ width: 220 }}>
                 <div style={label}><Trophy size={12} style={{ verticalAlign: -1, marginRight: 4 }} />The winner</div>
                 <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#0d120e', aspectRatio: '4/5' }}>
-                  {source?.img
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    ? <img src={source.img} alt="competitor ad" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#6b7d6e', fontSize: 12, textAlign: 'center', padding: 16 }}>{source?.brand || 'Competitor'} ad</div>}
-                  {isVideo && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,.6)', pointerEvents: 'none' }}><Play size={30} /></span>}
+                  {isVideo && vidUrl && winnerPlaying
+                    ? <video src={vidUrl} poster={source?.img || undefined} autoPlay controls playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : source?.img
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      ? <img src={source.img} alt="competitor ad" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#6b7d6e', fontSize: 12, textAlign: 'center', padding: 16 }}>{source?.brand || 'Competitor'} ad</div>}
+                  {/* lime play button (same as Discovery) — click to play the winner inline */}
+                  {isVideo && !winnerPlaying && (
+                    <button onClick={() => vidUrl && setWinnerPlaying(true)} aria-label="Play the winning ad"
+                      title={vidUrl ? 'Play' : 'Preview unavailable'} disabled={!vidUrl}
+                      style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', border: 'none', background: 'rgba(0,0,0,0.15)', cursor: vidUrl ? 'pointer' : 'default' }}>
+                      <span style={{ width: 46, height: 46, borderRadius: '50%', background: LIME, display: 'grid', placeItems: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}>
+                        <Play size={20} color={FOREST} fill={FOREST} style={{ marginLeft: 2 }} />
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
               <div style={{ width: 220 }}>
