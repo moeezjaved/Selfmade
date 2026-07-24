@@ -18,11 +18,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { PLANS } from '@/lib/plans'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95'
 const GREEN = '#3f8f4f', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f', PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
 
-type Phase = 'welcome' | 'homework' | 'guess' | 'competitors' | 'questions' | 'integrations' | 'offer' | 'night'
+type Phase = 'welcome' | 'homework' | 'guess' | 'competitors' | 'questions' | 'integrations' | 'offer' | 'night' | 'plan'
 type Note = { kind: string; content: string }
 type Comp = { pageId: string; name: string; avatar?: string | null; adCount?: number | null; country?: string | null }
 
@@ -62,6 +63,14 @@ const btnMain: React.CSSProperties = { background: FOREST, color: LIME, border: 
 const btnGhost: React.CSSProperties = { background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '12px 22px', fontSize: 13.5, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
 const chip = (on: boolean): React.CSSProperties => ({ border: `1.5px solid ${on ? FOREST : LINE}`, background: on ? FOREST : '#fff', color: on ? LIME : INK, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' })
 const inputCss: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', fontSize: 14, fontFamily: 'inherit', color: INK, background: '#fff', outline: 'none', width: '100%' }
+// Plan step
+const btnDark: React.CSSProperties = { background: FOREST, color: '#fff', border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }
+const planCard: React.CSSProperties = { position: 'relative', flex: '1 1 200px', minWidth: 200, maxWidth: 230, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: '20px 18px' }
+const planName: React.CSSProperties = { fontSize: 13, fontWeight: 800, letterSpacing: '.02em', color: INK }
+const planPrice: React.CSSProperties = { fontSize: 30, fontWeight: 850, letterSpacing: '-.03em', color: INK, marginTop: 4 }
+const planPer: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: MUTED, marginLeft: 2 }
+const planFeat: React.CSSProperties = { fontSize: 12.5, color: MUTED, lineHeight: 1.9, marginTop: 10 }
+const planBadge: React.CSSProperties = { position: 'absolute', top: -10, left: 18, background: FOREST, color: LIME, fontSize: 9, fontWeight: 800, letterSpacing: '.1em', borderRadius: 100, padding: '3px 9px' }
 
 export default function InterviewPage() {
   const router = useRouter()
@@ -253,6 +262,19 @@ export default function InterviewPage() {
 
   const kindLabel: Record<string, string> = { brand: 'THE COMPANY', fact: 'NOTED', preference: 'VOICE', goal: 'THE GOAL', scar: 'NEVER AGAIN', rule: 'RED LINE' }
   const night = phase === 'night'
+
+  // Plan step: start a Stripe checkout for a paid plan; on any misconfig/error, fall through to the app
+  // on Free so onboarding never dead-ends. "Skip"/"Start on Free" go straight to /brief.
+  const [planBusy, setPlanBusy] = useState<string>('')
+  async function choosePlan(planId: 'starter' | 'business') {
+    setPlanBusy(planId)
+    try {
+      const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: planId, cycle: 'monthly' }) })
+      const j = await r.json().catch(() => ({}))
+      if (j?.url) { window.location.href = j.url; return }
+    } catch { /* fall through */ }
+    setPlanBusy(''); router.push('/brief')
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: night ? '#0b100c' : '#f6f8f5', fontFamily: "'Inter', -apple-system, sans-serif", transition: 'background .8s ease', display: 'flex', flexDirection: 'column' }}>
@@ -466,9 +488,43 @@ export default function InterviewPage() {
               {nightDone && (
                 <>
                   <p style={{ ...sub, color: '#7d8a7c', marginTop: 24 }}>The deep study takes me all night — competitors, angles, everything that wins in your market. But I already have a first read for you.</p>
-                  <button style={{ ...btnMain, background: LIME, color: FOREST, marginTop: 18 }} onClick={() => router.push('/brief')}>Read my first briefing →</button>
+                  <button style={{ ...btnMain, background: LIME, color: FOREST, marginTop: 18 }} onClick={() => setPhase('plan')}>Read my first briefing →</button>
                 </>
               )}
+            </div>
+          )}
+
+          {/* ── BEAT 10 · PICK A PLAN (skippable — Free is the default) ── */}
+          {phase === 'plan' && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}><Mello /></div>
+              <div style={say}>One last thing — how do you want to work with me?</div>
+              <p style={sub}>Start free and upgrade whenever. You can change or cancel anytime.</p>
+              <div style={{ display: 'flex', gap: 12, margin: '26px auto 0', maxWidth: 720, flexWrap: 'wrap', justifyContent: 'center', textAlign: 'left' }}>
+                {/* Free */}
+                <div style={planCard}>
+                  <div style={planName}>Free</div>
+                  <div style={planPrice}>$0<span style={planPer}>/mo</span></div>
+                  <div style={planFeat}>5 free image ads to start<br />Spy on 1 competitor<br />Daily brief from Mello</div>
+                  <button style={{ ...btnGhost, width: '100%', marginTop: 14 }} onClick={() => router.push('/brief')}>Start on Free →</button>
+                </div>
+                {/* Creator (most popular) */}
+                <div style={{ ...planCard, border: `2px solid ${SELBORDER}`, background: SELBG }}>
+                  <div style={{ ...planBadge }}>MOST POPULAR</div>
+                  <div style={planName}>{PLANS.starter.label}</div>
+                  <div style={planPrice}>${PLANS.starter.priceMonthly}<span style={planPer}>/mo</span></div>
+                  <div style={planFeat}>10 video ads / month<br />Unlimited image ads<br />Spy on 15 competitors</div>
+                  <button style={{ ...btnMain, width: '100%', marginTop: 14, opacity: planBusy ? 0.6 : 1 }} disabled={!!planBusy} onClick={() => choosePlan('starter')}>{planBusy === 'starter' ? 'Opening…' : `Choose ${PLANS.starter.label}`}</button>
+                </div>
+                {/* Agency */}
+                <div style={planCard}>
+                  <div style={planName}>{PLANS.business.label}</div>
+                  <div style={planPrice}>${PLANS.business.priceMonthly}<span style={planPer}>/mo</span></div>
+                  <div style={planFeat}>30 video ads / month<br />Unlimited image ads<br />5 team seats</div>
+                  <button style={{ ...btnDark, width: '100%', marginTop: 14, opacity: planBusy ? 0.6 : 1 }} disabled={!!planBusy} onClick={() => choosePlan('business')}>{planBusy === 'business' ? 'Opening…' : `Choose ${PLANS.business.label}`}</button>
+                </div>
+              </div>
+              <button style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 22, fontFamily: 'inherit' }} onClick={() => router.push('/brief')}>Skip for now — I’ll start free →</button>
             </div>
           )}
         </div>
