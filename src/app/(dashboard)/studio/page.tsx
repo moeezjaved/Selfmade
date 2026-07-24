@@ -16,7 +16,7 @@ import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Sparkles, Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus, Trophy, Play } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
-import { useChatStream } from '@/components/mello/useChatStream'
+import { useChatStream, type CreationEvent } from '@/components/mello/useChatStream'
 
 // The full, proven video-clone flow (analyze → free script approval → render → poll)
 // lives here — the studio launches it for video winners rather than re-implementing it.
@@ -28,6 +28,20 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 type Brand = { id: string; name: string; website?: string; brand_type?: string; brand_kit?: any; products?: { image_urls?: string[] }[] }
 type Photo = { id: string; src: string }
 type Kit = { colors: string[]; fonts: any; logo: string | null; palette: string | null }
+// When Mello drives generation, she passes everything explicitly so generate() never reads stale state.
+type GenOverride = {
+  mode?: 'fresh' | 'remake'
+  source?: { adId: string; img: string | null; brand: string | null } | null
+  productImages?: string[]
+  brandId?: string
+  brandName?: string
+  brandType?: string
+  kit?: Kit
+  headline?: string
+  angle?: string
+  niche?: string
+  aspect?: 'original' | '4:5' | '1:1' | '9:16' | '16:9'
+}
 const uid = () => Math.random().toString(36).slice(2)
 const fileToDataUrl = (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f) })
 const emptyKit = (): Kit => ({ colors: [], fonts: null, logo: null, palette: null })
@@ -38,7 +52,10 @@ const field: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius
 function StudioInner() {
   const { balance } = useCredits()
   const params = useSearchParams()
-  const chat = useChatStream()
+  // Mello can drive the canvas: a `creation` event from the studio surface fires onCreation.
+  // We route it through a ref so the handler always sees the latest state (no stale closure).
+  const creationRef = useRef<(ev: CreationEvent) => void>(() => {})
+  const chat = useChatStream({ surface: 'studio', onCreation: (ev) => creationRef.current(ev) })
   const [convId, setConvId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -144,31 +161,41 @@ function StudioInner() {
   // Open a past creation from My Work into the canvas — tweak or download it again.
   const openWork = (c: { id: string; image_url: string }) => { setResult({ url: c.image_url, genId: c.id }); setVersions([{ url: c.image_url, genId: c.id, kind: 'saved' }]); setErr(null); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60) }
 
-  const generate = async () => {
+  const generate = async (ov?: GenOverride) => {
     setErr(null)
+    if (busy) return
+    // Resolve every input from the explicit override first (Mello-driven), else current UI state.
+    const useMode = ov?.mode ?? mode
+    const useSource = ov?.source !== undefined ? ov.source : source
     // Video winner → hand off to the proven video-clone flow (free script approval, then render).
-    if (mode === 'remake' && isVideo) { setVideoOpen(true); return }
-    const chosen = photos.filter(p => selected.includes(p.id)).map(p => p.src)
+    if (useMode === 'remake' && isVideo) { setVideoOpen(true); return }
+    const chosen = ov?.productImages ?? photos.filter(p => selected.includes(p.id)).map(p => p.src)
     if (!chosen.length) { setErr('Select at least one product photo (analyze your site or upload).'); return }
-    if (!confirmCredits(mode === 'remake' ? 'remake this ad' : 'create an ad', cost, balance)) return
-    const brand = brands.find(b => b.id === brandId)
+    if (!confirmCredits(useMode === 'remake' ? 'remake this ad' : 'create an ad', cost, balance)) return
+    const useKit = ov?.kit ?? kit
+    const useHeadline = ov?.headline ?? headline
+    const useAngle = ov?.angle ?? angle
+    const useNiche = ov?.niche ?? niche
+    const useAspect = ov?.aspect ?? aspect
+    const useBrandName = ov?.brandName ?? brandName
+    const useBrandType = ov?.brandType ?? brands.find(b => b.id === (ov?.brandId ?? brandId))?.brand_type
     setBusy(true); setResult(null)
     try {
-      // A brand-new brand: save it first so the kit persists.
-      let useBrandId = brandId
-      if (bmode === 'new' && brandName.trim()) {
+      // A brand-new brand (manual flow only): save it first so the kit persists.
+      let useBrandId = ov?.brandId ?? brandId
+      if (!ov && bmode === 'new' && brandName.trim()) {
         const httpImgs = chosen.filter(s => /^https?:\/\//i.test(s))
         const jb = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: brandName.trim(), website: website.trim() || null, product_images: httpImgs, brand_kit: kit }) }).then(r => r.json()).catch(() => ({}))
         if (jb?.brand?.id) { useBrandId = jb.brand.id; setBrandId(jb.brand.id) }
       }
 
-      if (mode === 'remake' && source?.adId) {
+      if (useMode === 'remake' && useSource?.adId) {
         // clone the competitor's winner (job-based → poll)
         const body = {
-          adId: source.adId, productImages: chosen, tier: 'pro', brandId: useBrandId || undefined,
-          productType: brand?.brand_type || 'physical', brandName: brandName.trim() || undefined,
-          colors: kit.colors, palette: kit.palette || undefined, logo: kit.logo || undefined,
-          newHeadline: headline.trim() || undefined, aspectRatio: aspect, imageSize: '2K',
+          adId: useSource.adId, productImages: chosen, tier: 'pro', brandId: useBrandId || undefined,
+          productType: useBrandType || 'physical', brandName: useBrandName.trim() || undefined,
+          colors: useKit.colors, palette: useKit.palette || undefined, logo: useKit.logo || undefined,
+          newHeadline: useHeadline.trim() || undefined, aspectRatio: useAspect, imageSize: '2K',
         }
         const enq = await fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
         const ej = await enq.json().catch(() => ({}))
@@ -185,10 +212,10 @@ function StudioInner() {
       } else {
         // fresh create (sync)
         const body = {
-          brandId: useBrandId || undefined, productImages: chosen, brandName: brandName.trim() || undefined,
-          colors: kit.colors, palette: kit.palette || undefined, fonts: kit.fonts, logo: kit.logo || undefined,
-          newHeadline: headline.trim() || undefined, angle: angle.trim() || undefined, niche: niche || undefined,
-          aspectRatio: aspect === 'original' ? '4:5' : aspect, imageSize: '2K',
+          brandId: useBrandId || undefined, productImages: chosen, brandName: useBrandName.trim() || undefined,
+          colors: useKit.colors, palette: useKit.palette || undefined, fonts: useKit.fonts, logo: useKit.logo || undefined,
+          newHeadline: useHeadline.trim() || undefined, angle: useAngle.trim() || undefined, niche: useNiche || undefined,
+          aspectRatio: useAspect === 'original' ? '4:5' : useAspect, imageSize: '2K',
         }
         const r = await fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
         const t = await r.text(); let j: any; try { j = JSON.parse(t) } catch { j = { error: `HTTP ${r.status}` } }
@@ -198,17 +225,59 @@ function StudioInner() {
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
   }
 
-  const applyEdit = async () => {
-    if (!result || !editText.trim()) return
+  const applyEditWith = async (instruction: string) => {
+    if (!result || !instruction.trim() || editing) return
     setEditing(true); setErr(null)
     try {
-      const j = await fetch('/api/discovery/edit-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image: result.url, instruction: editText.trim(), tier: 'pro', parentId: result.genId, brandId: brandId || undefined }) }).then(r => r.json())
+      const j = await fetch('/api/discovery/edit-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image: result.url, instruction: instruction.trim(), tier: 'pro', parentId: result.genId, brandId: brandId || undefined }) }).then(r => r.json())
       const newUrl = j?.url || j?.image
       if (!newUrl) { setErr(j?.error === 'insufficient_credits' ? 'Not enough credits for an edit.' : j?.error || 'Edit failed.'); return }
       land(newUrl, j.generationId || result.genId, 'tweak'); setEditText(''); refreshCredits()
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setEditing(false) }
   }
+  const applyEdit = () => applyEditWith(editText)
   const download = () => { if (result) { const a = document.createElement('a'); a.href = result.url; a.download = 'selfmade-ad.png'; a.target = '_blank'; a.click() } }
+
+  // ── Mello drives the canvas ── she calls create_ad → the server emits a `creation` event →
+  // this maps it onto the canvas and runs the SAME generate()/applyEditWith() the buttons use.
+  // Reassigned every render so it always sees the latest brand/photo/result state.
+  creationRef.current = (ev: CreationEvent) => {
+    setErr(null)
+    if (ev.kind === 'tweak') {
+      const instr = (ev.instruction || '').trim()
+      if (!instr) { setErr('Tell me what to change and I’ll tweak the image.'); return }
+      if (!result) { setErr('Make or open an ad first, then I can tweak it.'); return }
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
+      applyEditWith(instr)
+      return
+    }
+    // Resolve which brand to use (named → matched, else current, else first).
+    let b: Brand | undefined
+    if (ev.brand_name) { const q = ev.brand_name.toLowerCase(); b = brands.find(x => x.name.toLowerCase().includes(q)) }
+    b = b || brands.find(x => x.id === brandId) || brands[0]
+    const ov: GenOverride = {}
+    if (b) {
+      pickBrand(b)
+      const k = b.brand_kit || {}
+      ov.brandId = b.id; ov.brandName = b.name; ov.brandType = b.brand_type
+      ov.kit = { colors: k.colors || [], fonts: k.fonts || null, logo: k.logo || null, palette: k.palette || null }
+      ov.productImages = (b.products || []).flatMap(p => p.image_urls || []).slice(0, 2)
+    }
+    if (ev.angle) { ov.angle = ev.angle; setAngle(ev.angle) }
+    if (ev.headline) { ov.headline = ev.headline; setHeadline(ev.headline) }
+    if (ev.niche) { ov.niche = ev.niche; setNiche(ev.niche) }
+    if (ev.kind === 'remake') {
+      const sid = ev.source_ad_id || source?.adId
+      if (!sid) { setErr('Tell me which ad to remake, or open one first.'); return }
+      const src = { adId: sid, img: source?.adId === sid ? (source?.img ?? null) : null, brand: b?.name || null }
+      ov.mode = 'remake'; ov.source = src; ov.aspect = 'original'
+      setMode('remake'); setSource(src); setAspect('original')
+    } else {
+      ov.mode = 'fresh'; setMode('fresh')
+    }
+    if (!ov.productImages || !ov.productImages.length) { setErr('Add a product photo on the right (analyze your site or upload) and I’ll generate.'); return }
+    generate(ov)
+  }
 
   const kitReady = kit.colors.length > 0 || kit.logo || kit.palette
   const remake = mode === 'remake'
@@ -344,7 +413,7 @@ function StudioInner() {
 
           {/* generate */}
           {!result && (
-            <button onClick={generate} disabled={busy} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: busy ? '#dfe4de' : LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '14px 28px', fontSize: 15, fontWeight: 850, cursor: busy ? 'default' : 'pointer' }}>
+            <button onClick={() => generate()} disabled={busy} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: busy ? '#dfe4de' : LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '14px 28px', fontSize: 15, fontWeight: 850, cursor: busy ? 'default' : 'pointer' }}>
               {busy ? <><Loader2 size={17} className="spin" /> {remake ? 'Rebuilding… ~40s' : 'Designing… ~30s'}</> : <><Wand2 size={17} /> {isVideo ? 'Remake this video' : remake ? 'Remake this' : 'Create ad'} · {cost} credits</>}
             </button>
           )}

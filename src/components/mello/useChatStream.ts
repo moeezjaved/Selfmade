@@ -25,11 +25,26 @@ export interface MelloMessage {
   error?: string
 }
 
-export function useChatStream(opts: { onTitle?: (title: string) => void } = {}) {
+export interface CreationEvent {
+  kind: 'fresh' | 'remake' | 'tweak'
+  brand_name?: string | null
+  angle?: string | null
+  headline?: string | null
+  niche?: string | null
+  instruction?: string | null
+  source_ad_id?: string | null
+  note?: string | null
+}
+
+export function useChatStream(opts: { onTitle?: (title: string) => void; onCreation?: (ev: CreationEvent) => void; surface?: string } = {}) {
   const [messages, setMessages] = useState<MelloMessage[]>([])
   const [streaming, setStreaming] = useState(false)
   const onTitleRef = useRef(opts.onTitle)
   onTitleRef.current = opts.onTitle
+  const onCreationRef = useRef(opts.onCreation)
+  onCreationRef.current = opts.onCreation
+  const surfaceRef = useRef(opts.surface)
+  surfaceRef.current = opts.surface
 
   const setHistory = useCallback((msgs: MelloMessage[]) => setMessages(msgs), [])
   const reset = useCallback(() => setMessages([]), [])
@@ -93,6 +108,9 @@ export function useChatStream(opts: { onTitle?: (title: string) => void } = {}) 
       case 'title_update':
         onTitleRef.current?.(ev.title)
         break
+      case 'creation':
+        onCreationRef.current?.(ev as CreationEvent)
+        break
       case 'error':
         patchLast(m => ({ ...m, error: ev.message }))
         break
@@ -110,7 +128,7 @@ export function useChatStream(opts: { onTitle?: (title: string) => void } = {}) 
       const res = await fetch(`/api/mello/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, surface: surfaceRef.current }),
       })
       if (!res.body) throw new Error('No response stream')
       const reader = res.body.getReader()
