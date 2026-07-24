@@ -60,9 +60,11 @@ function StudioInner() {
   const chatStartedRef = useRef(false)   // once true, the remake-adapt effect must not overwrite the chat
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat.messages])
 
-  // mode + remake source
-  const [mode, setMode] = useState<'fresh' | 'remake'>('fresh')
-  const [source, setSource] = useState<{ adId: string; img: string | null; brand: string | null } | null>(null)
+  // mode + remake source — SEEDED from the URL at first render (not in an effect) so the remake canvas
+  // (and the inline video flow) appears even if the client never hydrates (broken extensions).
+  const _adParam = params.get('ad')
+  const [mode, setMode] = useState<'fresh' | 'remake'>(_adParam ? 'remake' : 'fresh')
+  const [source, setSource] = useState<{ adId: string; img: string | null; brand: string | null } | null>(_adParam ? { adId: _adParam, img: params.get('img'), brand: params.get('brand') } : null)
   const isVideo = params.get('type') === 'video'          // the winner is a video → the video-clone flow
   const vidUrl = params.get('vid')                        // competitor's mp4 (for the source preview)
 
