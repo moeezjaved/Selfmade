@@ -128,7 +128,8 @@ export default async function AdKnowledgePage({ params, searchParams }: { params
 
           {/* REMAKE — the entire business in one button; routes into the logged-in remake flow */}
           <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center' }}>
-            <Link href={`/studio?ad=${encodeURIComponent(params.adId)}${m?.image ? `&img=${encodeURIComponent(m.image)}` : ''}${ad.page_name ? `&brand=${encodeURIComponent(ad.page_name)}` : ''}`} style={{ background: LIME, color: FOREST, fontSize: 14.5, fontWeight: 850, padding: '13px 24px', borderRadius: 100, textDecoration: 'none', boxShadow: '0 14px 30px -14px rgba(23,37,28,.45)' }}>✨ Remake for my brand</Link>
+            {/* Image ads → the two-pane studio; VIDEO ads → the existing video-clone flow (untouched) */}
+            <Link href={m?.isVideo ? `/discovery/${params.adId}` : `/studio?ad=${encodeURIComponent(params.adId)}${m?.image ? `&img=${encodeURIComponent(m.image)}` : ''}${ad.page_name ? `&brand=${encodeURIComponent(ad.page_name)}` : ''}`} style={{ background: LIME, color: FOREST, fontSize: 14.5, fontWeight: 850, padding: '13px 24px', borderRadius: 100, textDecoration: 'none', boxShadow: '0 14px 30px -14px rgba(23,37,28,.45)' }}>✨ Remake for my brand</Link>
             <Link href={`/knowledge/brand/${ad.page_id}`} style={{ background: '#fff', border: `1.5px solid ${LINE}`, color: INK, fontSize: 13, fontWeight: 800, padding: '11px 18px', borderRadius: 100, textDecoration: 'none' }}>The brand&rsquo;s full file →</Link>
           </div>
         </div>
