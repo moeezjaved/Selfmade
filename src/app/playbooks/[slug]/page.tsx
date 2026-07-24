@@ -113,12 +113,14 @@ export default async function PlaybookPage({ params }: { params: { slug: string 
     { title: 'Long-runners', sub: 'still live after 60+ days — proven', ads: ads.filter((a: any) => (a.days || 0) >= 60) },
   ].filter((c) => c.ads.length >= 4)
 
+  // Remake → the two-pane studio, winner pre-loaded (video carries type=video + mp4).
+  const studioHref = (a: any) => `/studio?ad=${encodeURIComponent(a.adId)}${a.m?.video ? `&type=video&vid=${encodeURIComponent(a.m.video)}` : ''}${a.m?.img ? `&img=${encodeURIComponent(a.m.img)}` : ''}${a.brand ? `&brand=${encodeURIComponent(a.brand)}` : ''}`
   const Card = ({ a }: { a: any }) => (
     <div className="pbcard">
       <AdMedia img={a.m.img} video={a.m.video} href={`/knowledge/ad/${a.adId}?pb=${book.slug}`} className="ad" badge={a.days >= 21 ? `${a.days}d` : undefined} />
       <div className="acts">
         <Link className="watch" href={`/knowledge/ad/${a.adId}?pb=${book.slug}`}>▶ Watch</Link>
-        <Link className="remake" href={`/discovery/${a.adId}`}>✨ Remake</Link>
+        <Link className="remake" href={studioHref(a)}>✨ Remake</Link>
       </div>
       <div className="meta"><div className="b">{a.brand || '—'}</div><div className="d">{[a.hook, a.days ? `${a.days}d` : null, a.active ? 'live' : null].filter(Boolean).join(' · ')}</div></div>
     </div>
@@ -163,7 +165,7 @@ export default async function PlaybookPage({ params }: { params: { slug: string 
             {ads.map((a: any) => (
               <div key={a.adId} className="wcard">
                 <AdMedia img={a.m.img} video={a.m.video} href={`/knowledge/ad/${a.adId}?pb=${book.slug}`} className="ad" badge={a.days >= 21 ? `${a.days}d · survivor` : undefined} />
-                <div className="acts"><Link className="remake" href={`/discovery/${a.adId}`}>✨ Remake</Link></div>
+                <div className="acts"><Link className="remake" href={studioHref(a)}>✨ Remake</Link></div>
               </div>
             ))}
           </div>
