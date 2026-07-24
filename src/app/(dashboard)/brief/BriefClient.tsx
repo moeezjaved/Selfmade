@@ -55,7 +55,9 @@ function MelloFace({ size = 36 }: { size?: number }) {
  *  first frame with a play glyph instead of a broken <img>. */
 function Thumb({ src, w = 78, h = 96 }: { src: string; w?: number; h?: number }) {
   const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(src)
-  const box: React.CSSProperties = { width: w, height: h, borderRadius: 12, objectFit: 'cover', border: `1px solid ${LINE}`, background: '#0d120e', display: 'block' }
+  // contain (not cover) so the whole creative shows — no cropped tops. pointer-events:none so a
+  // single click always reaches the wrapping link instead of the <video> swallowing it.
+  const box: React.CSSProperties = { width: w, height: h, borderRadius: 12, objectFit: 'contain', border: `1px solid ${LINE}`, background: '#0d120e', display: 'block', pointerEvents: 'none' }
   if (isVideo) {
     return (
       <span style={{ position: 'relative', display: 'inline-block' }}>
@@ -71,7 +73,8 @@ function Thumb({ src, w = 78, h = 96 }: { src: string; w?: number; h?: number })
 /** A competitor-ad preview: poster image, and if it's a video, hover to play a few seconds inline. */
 function AdPreview({ image, videoUrl, w = 62, h = 78 }: { image: string | null; videoUrl: string | null; w?: number; h?: number }) {
   const ref = useRef<HTMLVideoElement | null>(null)
-  const box: React.CSSProperties = { width: w, height: h, borderRadius: 10, objectFit: 'cover', border: `1px solid ${LINE}`, background: '#0d120e', display: 'block' }
+  // contain (show the whole ad, no cropped top) + pointer-events:none so one click reaches the link.
+  const box: React.CSSProperties = { width: w, height: h, borderRadius: 10, objectFit: 'contain', border: `1px solid ${LINE}`, background: '#0d120e', display: 'block', pointerEvents: 'none' }
   if (videoUrl) {
     return (
       <span style={{ position: 'relative', display: 'inline-block' }}
