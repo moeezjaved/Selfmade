@@ -377,21 +377,35 @@ export default function BriefClient({ initialBrief }: { initialBrief: Brief | nu
           {evidence.length > 0 && (
             <div style={{ marginTop: 58 }}>
               <div style={label}>The evidence</div>
-              {evidence.map((it, i) => (
+              {evidence.map((it, i) => {
+                // Remake straight from the brief: clicking an ad opens the studio with that winner
+                // pre-loaded (same one-click remake as Discovery). The brand-file link goes to the
+                // richer Brand Spy page (every ad + Remake), not the thin knowledge page.
+                const evBrand = it.title.replace(/\s+launched.*$/i, '').replace(/[.:]$/, '').trim()
+                const remakeHref = (m: { adId?: string; image?: string | null; videoUrl?: string | null }) => {
+                  const q = new URLSearchParams({ ad: String(m.adId) })
+                  if (m.videoUrl) { q.set('type', 'video'); q.set('vid', m.videoUrl) }
+                  if (m.image) q.set('img', m.image)
+                  if (evBrand) q.set('brand', evBrand)
+                  return `/studio?${q.toString()}`
+                }
+                const brandFileHref = it.cta_href?.replace('/knowledge/brand/', '/discovery/brand-spy/') || it.cta_href
+                return (
                 <div key={it.id || i} style={{ marginBottom: 28 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 10 }}>{it.title}</div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {it.media!.slice(0, 3).map((m, k) => m.adId
-                      ? <Link key={k} href={`/knowledge/ad/${m.adId}`}><AdPreview image={m.image} videoUrl={m.videoUrl} w={92} h={116} /></Link>
+                      ? <Link key={k} href={remakeHref(m)} onClick={() => markActed(it)} title="Remake this ad in the studio"><AdPreview image={m.image} videoUrl={m.videoUrl} w={92} h={116} /></Link>
                       : <AdPreview key={k} image={m.image} videoUrl={m.videoUrl} w={92} h={116} />)}
                   </div>
                   <div style={{ display: 'flex', gap: 18, marginTop: 10 }}>
-                    {it.cta_href && <Link href={it.cta_href} onClick={() => markActed(it)} style={{ fontSize: 12.5, fontWeight: 750, color: GREEN, textDecoration: 'none' }}>{it.cta_label || 'Open the brand file'} →</Link>}
+                    {brandFileHref && <Link href={brandFileHref} onClick={() => markActed(it)} style={{ fontSize: 12.5, fontWeight: 750, color: GREEN, textDecoration: 'none' }}>{it.cta_label || 'Open the brand file'} →</Link>}
                     <button onClick={() => { setFocusItem(it); say('Why does it matter?', it) }} disabled={busy}
                       style={{ background: 'none', border: 'none', color: MUTED, fontSize: 12.5, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', padding: 0 }}>Why does it matter?</button>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
