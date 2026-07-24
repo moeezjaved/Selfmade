@@ -378,24 +378,15 @@ export default function BriefClient({ initialBrief }: { initialBrief: Brief | nu
             <div style={{ marginTop: 58 }}>
               <div style={label}>The evidence</div>
               {evidence.map((it, i) => {
-                // Remake straight from the brief: clicking an ad opens the studio with that winner
-                // pre-loaded (same one-click remake as Discovery). The brand-file link goes to the
-                // richer Brand Spy page (every ad + Remake), not the thin knowledge page.
-                const evBrand = it.title.replace(/\s+launched.*$/i, '').replace(/[.:]$/, '').trim()
-                const remakeHref = (m: { adId?: string; image?: string | null; videoUrl?: string | null }) => {
-                  const q = new URLSearchParams({ ad: String(m.adId) })
-                  if (m.videoUrl) { q.set('type', 'video'); q.set('vid', m.videoUrl) }
-                  if (m.image) q.set('img', m.image)
-                  if (evBrand) q.set('brand', evBrand)
-                  return `/studio?${q.toString()}`
-                }
+                // Clicking an ad opens its "AD · ON RECORD" knowledge page — the breakdown +
+                // "Remake for my brand". The brand-file link goes to the richer Brand Spy page.
                 const brandFileHref = it.cta_href?.replace('/knowledge/brand/', '/discovery/brand-spy/') || it.cta_href
                 return (
                 <div key={it.id || i} style={{ marginBottom: 28 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 10 }}>{it.title}</div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {it.media!.slice(0, 3).map((m, k) => m.adId
-                      ? <Link key={k} href={remakeHref(m)} onClick={() => markActed(it)} title="Remake this ad in the studio"><AdPreview image={m.image} videoUrl={m.videoUrl} w={92} h={116} /></Link>
+                      ? <Link key={k} href={`/knowledge/ad/${m.adId}`} onClick={() => markActed(it)} title="Open the ad breakdown & remake"><AdPreview image={m.image} videoUrl={m.videoUrl} w={92} h={116} /></Link>
                       : <AdPreview key={k} image={m.image} videoUrl={m.videoUrl} w={92} h={116} />)}
                   </div>
                   <div style={{ display: 'flex', gap: 18, marginTop: 10 }}>
