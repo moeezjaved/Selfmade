@@ -905,6 +905,13 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
   // present the card shows the actual first frame instead of the branded placeholder,
   // and the video only downloads on click (preload off) → fast + cheap.
   const posterSrc = (slide?.type === 'video' && slide.poster) ? cdnSrc(slide.poster) : undefined
+  // Deep-links so every Remake entry point flows into the two-pane studio (same as the ad page +
+  // playbooks). Watch → study the ad (knowledge page); Remake → the studio, winner pre-loaded.
+  const _isVid = slide?.type === 'video'
+  const _img = _isVid ? (slide?.poster || undefined) : slide?.url
+  const _vid = _isVid ? slide?.url : undefined
+  const studioHref = `/studio?ad=${encodeURIComponent(ad.id)}${_isVid ? '&type=video' : ''}${_img ? `&img=${encodeURIComponent(_img)}` : ''}${_vid ? `&vid=${encodeURIComponent(_vid)}` : ''}${ad.pageName ? `&brand=${encodeURIComponent(ad.pageName)}` : ''}`
+  const goStudio = (e: React.MouseEvent) => { e.stopPropagation(); saveDiscoSnapNow(); router.push(studioHref) }
   return (
     <>
     {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName, sourceThumb: slide?.poster || slide?.url }} onClose={() => setCloneOpen(false)} />}
@@ -1025,7 +1032,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         )}
         {slide.type !== 'video' && (
         <button
-          onClick={(e) => { e.stopPropagation(); setCloneOpen(true) }}
+          onClick={goStudio}
           style={{
             pointerEvents: 'auto',
             background: '#dffe95',
@@ -1046,7 +1053,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
           onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
           onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
         >
-          <Copy size={14} strokeWidth={2.4} /> Remake ad
+          <Copy size={14} strokeWidth={2.4} /> Remake
         </button>
         )}
       </div>
@@ -1057,12 +1064,12 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
       {slide.type === 'video' && (
         <div className="hover-overlay" style={{ position: 'absolute', bottom: 44, left: 12, opacity: 0, transition: 'opacity .18s', pointerEvents: 'none', zIndex: 8 }}>
           <button
-            onClick={(e) => { e.stopPropagation(); setVideoCloneOpen(true) }}
+            onClick={goStudio}
             style={{ pointerEvents: 'auto', background: '#dffe95', color: '#14281a', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(0,0,0,0.45)' }}
             onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
             onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
           >
-            <Film size={14} strokeWidth={2.4} /> Remake video
+            <Film size={14} strokeWidth={2.4} /> Remake
           </button>
         </div>
       )}
