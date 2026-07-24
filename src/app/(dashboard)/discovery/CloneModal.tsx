@@ -9,6 +9,7 @@
  * flow lives in CloneVideoModal.
  */
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { X, Upload, Link2, Loader2, Download, Sparkles, Check, Library, ChevronLeft, ChevronRight, Trophy } from 'lucide-react'
 import { flyToCreatives } from '@/lib/flyToCreatives'
@@ -86,6 +87,18 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
   const fileRef = useRef<HTMLInputElement>(null)
   const [mounted, setMounted] = useState(false)                    // portal guard (SSR-safe)
   useEffect(() => { setMounted(true) }, [])
+
+  // R3: image remakes of a KNOWN ad now happen in the studio's inline flow (one place, new UI). Uploaded
+  // images (assetImageUrl) still use this modal below.
+  const router = useRouter()
+  const isRealAd = !ad.assetImageUrl && !!ad.id && !ad.id.startsWith('upload:')
+  useEffect(() => {
+    if (!isRealAd) return
+    const q = new URLSearchParams({ ad: ad.id })
+    if (ad.sourceThumb) q.set('img', ad.sourceThumb)
+    if (ad.pageName) q.set('brand', ad.pageName)
+    router.push(`/studio?${q.toString()}`)
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wizard step (setup phase only): 0 Brand · 1 Photos · 2 Headline & style · 3 Picture options · 4 Review
   const [step, setStep] = useState(0)
@@ -423,6 +436,9 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
   const goNext = () => { if (step < STEPS.length - 1) setStep(step + 1); else generate() }
 
   if (!mounted) return null
+  // Real competitor ads now remake in the studio (see redirect above) — don't flash the old modal.
+  // Uploads (assetImageUrl / upload: ids) keep this modal, since the studio needs a source adId.
+  if (isRealAd) return null
   // Rendered through a portal to <body> so the fixed overlay escapes the virtualized ad card's
   // transform + overflow:hidden (which otherwise clipped it into a narrow strip).
   return createPortal(
