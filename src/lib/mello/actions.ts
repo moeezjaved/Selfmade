@@ -71,3 +71,25 @@ export async function searchMyAssets(userId: string, query: string, limit = 12) 
   const { data } = await admin.from('assets').select('id, file_name, file_type, scene, tags').eq('org_id', org.orgId).ilike('file_name', `%${query}%`).limit(limit)
   return { assets: (data || []).map((a: any) => ({ id: a.id, name: a.file_name, type: a.file_type, scene: a.scene, tags: a.tags })) }
 }
+
+/** Watch a competitor brand — Mello follows + spies it so its new ads land in the brief. Needs the
+ *  page_id (from search_ad_library / get_competitor_ads / find_winning_ads results). */
+export async function watchBrand(userId: string, pageId: string, brandName?: string) {
+  const admin = createAdminClient() as any
+  if (!pageId) return { error: 'page_id required — search for the brand first to get its id' }
+  const { data: existing } = await admin.from('followed_brands').select('id').eq('user_id', userId).eq('page_id', String(pageId)).maybeSingle()
+  if (!existing) await admin.from('followed_brands').insert({ user_id: userId, page_id: String(pageId), brand_name: brandName || null, spied: true })
+  else await admin.from('followed_brands').update({ spied: true, ...(brandName ? { brand_name: brandName } : {}) }).eq('id', existing.id)
+  return { watching: true, brand: brandName || pageId }
+}
+
+/** Stop watching a competitor — by page_id, or by (fuzzy) brand name if that's all Mello has. */
+export async function unwatchBrand(userId: string, opts: { pageId?: string; brandName?: string }) {
+  const admin = createAdminClient() as any
+  let q = admin.from('followed_brands').delete().eq('user_id', userId)
+  if (opts.pageId) q = q.eq('page_id', String(opts.pageId))
+  else if (opts.brandName) q = q.ilike('brand_name', `%${opts.brandName}%`)
+  else return { error: 'need a page_id or brand_name to unwatch' }
+  const { data } = await q.select('page_id, brand_name')
+  return { unwatched: (data || []).length, removed: (data || []).map((r: any) => r.brand_name || r.page_id) }
+}

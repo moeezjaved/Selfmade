@@ -10,6 +10,7 @@
  * (with per-scene / UGC tweak chips).
  */
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { X, Upload, Loader2, Check, Film, Sparkles, Pencil, ChevronLeft, ChevronRight, Trophy } from 'lucide-react'
 import CloneGeneration from '@/components/motion/CloneGeneration'
@@ -88,6 +89,18 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const fileRef = useRef<HTMLInputElement>(null)
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
+
+  // R3: video remakes of a KNOWN ad now happen in the studio's inline flow (one place, new UI). Any
+  // caller that opens this modal with a sourceAdId is redirected there. Uploads (no ad id, only a
+  // sourceVideoUrl) still use this modal below.
+  const router = useRouter()
+  useEffect(() => {
+    if (!sourceAdId) return
+    const q = new URLSearchParams({ ad: sourceAdId, type: 'video' })
+    if (sourceVideoUrl) q.set('vid', sourceVideoUrl)
+    if (sourcePoster) q.set('img', sourcePoster)
+    router.push(`/studio?${q.toString()}`)
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
   // Jump the modal body back to the top whenever the step/phase changes, so the next step's heading
   // is always visible (was staying scrolled down → looked like Next did nothing).
   useEffect(() => { bodyRef.current?.scrollTo({ top: 0, behavior: 'auto' }) }, [step, phase])
@@ -382,6 +395,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const railClickable = (i: number) => phase === 'form' ? i <= 3 : (i >= 4 && i <= 6)
 
   if (!mounted) return null
+  if (sourceAdId) return null   // redirecting to the studio's inline video flow (R3)
   const wide = phase === 'done'
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(8,16,10,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
