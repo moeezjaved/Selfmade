@@ -64,6 +64,8 @@ function StudioInner() {
   // gen
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ url: string; genId: string | null } | null>(null)
+  const [versions, setVersions] = useState<{ url: string; genId: string | null; kind: string }[]>([])
+  const [work, setWork] = useState<{ id: string; image_url: string; type?: string }[]>([])
   const [err, setErr] = useState<string | null>(null)
   const [editText, setEditText] = useState(''); const [editing, setEditing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -72,6 +74,7 @@ function StudioInner() {
   useEffect(() => {
     fetch('/api/brands').then(r => r.json()).then(j => { const bs: Brand[] = j.brands || []; setBrands(bs); if (bs[0]) pickBrand(bs[0]); else setBmode('new') }).catch(() => setBmode('new'))
     fetch('/api/discovery/niches').then(r => r.json()).then(j => setNiches(j.niches || [])).catch(() => {})
+    fetch('/api/creatives').then(r => r.json()).then(j => setWork((j.creatives || []).filter((c: any) => c.media_type !== 'video' && c.status === 'done' && c.image_url).slice(0, 14))).catch(() => {})
     fetch('/api/mello/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).then(r => r.json()).then(j => { if (j?.conversation?.id) setConvId(j.conversation.id) }).catch(() => {})
 
     const adId = params.get('ad'); const img = params.get('img'); const bnd = params.get('brand')
@@ -127,6 +130,10 @@ function StudioInner() {
   }
   const toggle = (id: string) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : (s.length >= 3 ? s : [...s, id]))
   const send = () => { const t = draft.trim(); if (!t || !convId || chat.streaming) return; setDraft(''); chat.sendMessage(convId, t) }
+  // Every generate/tweak becomes a version you can revert to (Ploy's Versions).
+  const land = (url: string, genId: string | null, kind: string) => { setResult({ url, genId }); setVersions(v => [...v, { url, genId, kind }]) }
+  // Open a past creation from My Work into the canvas — tweak or download it again.
+  const openWork = (c: { id: string; image_url: string }) => { setResult({ url: c.image_url, genId: c.id }); setVersions([{ url: c.image_url, genId: c.id, kind: 'saved' }]); setErr(null); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
   const generate = async () => {
     setErr(null)
@@ -159,7 +166,7 @@ function StudioInner() {
         for (let i = 0; i < 140 && !done; i++) {
           await sleep(2500)
           const s = await fetch(`/api/discovery/clone-image/status?id=${ej.jobId}`).then(r => r.json()).catch(() => ({}))
-          if (s.done && s.url) { setResult({ url: s.url, genId: s.generationId || ej.jobId }); done = true }
+          if (s.done && s.url) { land(s.url, s.generationId || ej.jobId, 'remake'); done = true }
           else if (s.failed) { setErr(s.error || 'The remake failed — credits were refunded.'); return }
         }
         if (!done) setErr('Still working — check My Creatives in a minute.')
@@ -175,7 +182,7 @@ function StudioInner() {
         const r = await fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
         const t = await r.text(); let j: any; try { j = JSON.parse(t) } catch { j = { error: `HTTP ${r.status}` } }
         if (!r.ok || !j?.url) { setErr(j?.error === 'insufficient_credits' ? 'Not enough credits.' : j?.error || 'Generation failed — try again.'); return }
-        setResult({ url: j.url, genId: j.generationId || null }); refreshCredits()
+        land(j.url, j.generationId || null, 'fresh'); refreshCredits()
       }
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
   }
@@ -187,7 +194,7 @@ function StudioInner() {
       const j = await fetch('/api/discovery/edit-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image: result.url, instruction: editText.trim(), tier: 'pro', parentId: result.genId, brandId: brandId || undefined }) }).then(r => r.json())
       const newUrl = j?.url || j?.image
       if (!newUrl) { setErr(j?.error === 'insufficient_credits' ? 'Not enough credits for an edit.' : j?.error || 'Edit failed.'); return }
-      setResult({ url: newUrl, genId: j.generationId || result.genId }); setEditText(''); refreshCredits()
+      land(newUrl, j.generationId || result.genId, 'tweak'); setEditText(''); refreshCredits()
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setEditing(false) }
   }
   const download = () => { if (result) { const a = document.createElement('a'); a.href = result.url; a.download = 'selfmade-ad.png'; a.target = '_blank'; a.click() } }
@@ -340,7 +347,7 @@ function StudioInner() {
                 <div style={{ fontSize: 13, color: MUTED, margin: '5px 0 16px', lineHeight: 1.55 }}>Love it? Approve and download. Want a change? Tell Mello and she’ll tweak this exact image.</div>
                 <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
                   <button onClick={download} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><Download size={15} /> Approve &amp; download</button>
-                  <button onClick={() => { setResult(null); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><ImageIcon size={15} /> Another</button>
+                  <button onClick={() => { setResult(null); setVersions([]); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><ImageIcon size={15} /> Another</button>
                 </div>
                 <div style={{ marginTop: 18 }}>
                   <div style={label}>Tweak it</div>
@@ -349,6 +356,38 @@ function StudioInner() {
                     <button onClick={applyEdit} disabled={editing || !editText.trim()} style={{ background: LIME, color: FOREST, border: 'none', borderRadius: 10, padding: '0 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>{editing ? <Loader2 size={14} className="spin" /> : <Wand2 size={14} />}{editing ? '' : 'Tweak'}</button>
                   </div>
                 </div>
+
+                {/* Versions — every tweak is a version you can revert to */}
+                {versions.length > 1 && (
+                  <div style={{ marginTop: 18 }}>
+                    <div style={label}>Versions</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {versions.map((v, i) => (
+                        <button key={i} onClick={() => setResult({ url: v.url, genId: v.genId })} title={v.kind} style={{ position: 'relative', width: 52, height: 66, borderRadius: 9, overflow: 'hidden', border: `2px solid ${result?.url === v.url ? GREEN : LINE}`, background: '#0d120e', cursor: 'pointer', padding: 0 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={v.url} alt={`v${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 8.5, fontWeight: 800, color: '#fff', background: 'rgba(8,12,9,.6)', padding: '1px 0', textAlign: 'center' }}>v{i + 1}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 11, color: MUTED, marginTop: 6 }}>Click a version to bring it back — the newest is your current.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── MY WORK — recent creations; click to reopen, tweak, or download ── */}
+          {work.length > 0 && (
+            <div style={{ marginTop: 40, borderTop: `1px solid ${LINE}`, paddingTop: 22 }}>
+              <div style={label}>My recent work</div>
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
+                {work.map(c => (
+                  <button key={c.id} onClick={() => openWork(c)} title="Open" style={{ flexShrink: 0, width: 96, aspectRatio: '4/5', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#0d120e', cursor: 'pointer', padding: 0 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={c.image_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </button>
+                ))}
               </div>
             </div>
           )}
