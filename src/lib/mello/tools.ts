@@ -9,7 +9,7 @@
 import { listAdAccounts, getAccountInfo, getAdPerformance, searchAdLibrary } from './meta-data'
 import { getCompetitorAds, analyzeNichePatterns, findWinningAds } from './library-data'
 import { addMemory } from './memory'
-import { getTrending, listBoards, createBoard, saveAdToBoard, searchMyAssets } from './actions'
+import { getTrending, listBoards, createBoard, saveAdToBoard, searchMyAssets, watchBrand, unwatchBrand } from './actions'
 
 export const TOOLS = [
   {
@@ -167,6 +167,22 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'watch_brand',
+      description: "Start WATCHING a competitor brand — follows + spies it so its new ads land in the user's brief. Use when the user says 'watch X', 'add X as a competitor', 'change my competitor to X', 'track X'. You need the brand's page_id — get it from search_ad_library / get_competitor_ads / find_winning_ads results first (each ad carries a pageId). For 'change my competitor to X': watch_brand the new one, and unwatch_brand the old one if they named it.",
+      parameters: { type: 'object', required: ['page_id'], properties: { page_id: { type: 'string', description: "The brand's page id (from a search/competitor result)" }, brand_name: { type: 'string' } } },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'unwatch_brand',
+      description: "Stop WATCHING a competitor brand. Use for 'stop watching X', 'remove X', or the old competitor in a 'change my competitor' request. Pass page_id if you have it, else brand_name (matched fuzzily).",
+      parameters: { type: 'object', properties: { page_id: { type: 'string' }, brand_name: { type: 'string' } } },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'search_my_assets',
       description: "Semantic search of the user's OWN uploaded Assets library (their creatives, b-roll, product shots) by meaning — e.g. 'my UGC unboxing clips', 'green product shots'.",
       parameters: { type: 'object', required: ['query'], properties: { query: { type: 'string' }, limit: { type: 'integer' } } },
@@ -253,6 +269,8 @@ export const TOOL_LABELS: Record<string, string> = {
   list_boards: 'Checking your boards…',
   create_board: 'Creating a board…',
   save_ad_to_board: 'Saving to a board…',
+  watch_brand: 'Adding a competitor to watch…',
+  unwatch_brand: 'Removing a competitor…',
   search_my_assets: 'Searching your assets…',
   remember: 'Remembering that…',
   request_clarification: 'Asking for clarification…',
@@ -294,6 +312,10 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       return await createBoard(ctx.userId, String(args.name || ''), args.emoji || '📋')
     case 'save_ad_to_board':
       return await saveAdToBoard(ctx.userId, String(args.ad_id || ''), String(args.board_name || ''))
+    case 'watch_brand':
+      return await watchBrand(ctx.userId, String(args.page_id || ''), args.brand_name)
+    case 'unwatch_brand':
+      return await unwatchBrand(ctx.userId, { pageId: args.page_id, brandName: args.brand_name })
     case 'search_my_assets':
       return await searchMyAssets(ctx.userId, String(args.query || ''), args.limit)
     case 'remember':
