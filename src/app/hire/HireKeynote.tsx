@@ -126,10 +126,10 @@ export default function HireKeynote() {
         .liquid-glass:before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1.4px;background:linear-gradient(180deg,rgba(255,255,255,.45) 0%,rgba(255,255,255,.15) 20%,rgba(255,255,255,0) 40%,rgba(255,255,255,0) 60%,rgba(255,255,255,.15) 80%,rgba(255,255,255,.45) 100%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
         .beat{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;position:relative;font-family:'Inter',-apple-system,system-ui,sans-serif}
         /* HERO — full-bright reel, cinematic serif, glass CTA. No dimming overlay. */
-        .beat--hero{overflow:hidden;padding-top:92px}
+        .beat--hero{overflow:hidden;justify-content:flex-start;padding-top:clamp(132px,23vh,240px)}
         .hero-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#0a0d0a}
         .beat--hero>*:not(.hero-vid){position:relative;z-index:2}
-        .beat--hero .hero-h1{font-family:'Instrument Serif',serif;font-weight:400;font-size:clamp(29px,4.2vw,52px);line-height:1.06;letter-spacing:-.012em;max-width:22ch;color:#fff;text-shadow:0 1px 22px rgba(0,0,0,.26)}
+        .beat--hero .hero-h1{font-family:'Instrument Serif',serif;font-weight:400;font-size:clamp(34px,5.4vw,66px);line-height:1.04;letter-spacing:-.015em;max-width:24ch;color:#fff;text-shadow:0 1px 22px rgba(0,0,0,.26)}
         .beat--hero .hero-h1 em{font-style:normal;color:#c4ccc0}
         .beat--hero .hero-sub{margin-top:24px;max-width:44ch;font-size:clamp(15px,1.6vw,18px);font-weight:500;color:#eef2ec;line-height:1.6;text-shadow:0 1px 14px rgba(0,0,0,.34)}
         .hero-cta{margin-top:40px;display:inline-block;border-radius:100px;padding:18px 46px;font-size:16px;font-weight:600;color:#fff;text-decoration:none;transition:transform .15s}
