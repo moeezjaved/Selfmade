@@ -86,12 +86,12 @@ function AdPreview({ image, videoUrl, w = 62, h = 78 }: { image: string | null; 
   return <span style={box} />
 }
 
-/** A line Mello speaks — appears with a gentle rise so the standup has a spoken rhythm on first load. */
+/** A line Mello speaks — fades up on first load. Uses a PURE CSS animation (not a JS useEffect) so the
+ *  content is visible even when the client never hydrates (broken extensions); animation-fill-mode:both
+ *  holds opacity:0 during the delay, then reveals — no JavaScript required. */
 function Say({ children, delay = 0, big = false }: { children: React.ReactNode; delay?: number; big?: boolean }) {
-  const [shown, setShown] = useState(false)
-  useEffect(() => { const t = setTimeout(() => setShown(true), delay); return () => clearTimeout(t) }, [delay])
   return (
-    <div style={{ opacity: shown ? 1 : 0, transform: shown ? 'none' : 'translateY(10px)', transition: 'opacity .5s cubic-bezier(0,0,.2,1), transform .5s cubic-bezier(0,0,.2,1)', fontSize: big ? 19 : 16, fontWeight: big ? 700 : 400, letterSpacing: big ? '-.015em' : 0, lineHeight: 1.65, color: INK, margin: '0 0 16px' }}>
+    <div className="brief-say" style={{ animationDelay: `${delay}ms`, fontSize: big ? 19 : 16, fontWeight: big ? 700 : 400, letterSpacing: big ? '-.015em' : 0, lineHeight: 1.65, color: INK, margin: '0 0 16px' }}>
       {children}
     </div>
   )
@@ -259,7 +259,10 @@ export default function BriefClient({ initialBrief }: { initialBrief: Brief | nu
           <span style={{ position: 'absolute', right: -2, bottom: 0, width: 8, height: 8, borderRadius: '50%', background: GREEN, border: '2px solid #f6f8f5', animation: 'mp 2s infinite' }} />
         </span>
         <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 650 }}>Mello · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
-        <style>{`@keyframes mp{50%{opacity:.35}} details.more-mello>summary::-webkit-details-marker{display:none}`}</style>
+        <style>{`@keyframes mp{50%{opacity:.35}} details.more-mello>summary::-webkit-details-marker{display:none}
+          @keyframes sayIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+          .brief-say{animation:sayIn .5s cubic-bezier(0,0,.2,1) both}
+          @media(prefers-reduced-motion:reduce){.brief-say{animation:none;opacity:1;transform:none}}`}</style>
       </div>
 
       {/* loading / error */}
