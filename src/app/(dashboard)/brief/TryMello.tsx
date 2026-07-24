@@ -19,9 +19,9 @@ const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', 
 const DISMISS_KEY = 'brief_trymello_v1'
 
 type Tone = 'try' | 'opp'
-type Card = { id: string; icon: any; badge: string; tone: Tone; title: string; desc: string; cta: string; run: () => void }
+type Card = { id: string; icon: any; badge: string; tone: Tone; title: string; short: string; desc: string; cta: string; run: () => void }
 
-export default function TryMello() {
+export default function TryMello({ compact = false }: { compact?: boolean }) {
   const router = useRouter()
   const [dismissed, setDismissed] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
@@ -64,12 +64,49 @@ export default function TryMello() {
   }
 
   const cards: Card[] = [
-    { id: 'spy', icon: Eye, badge: 'Try this', tone: 'try', title: 'Spy on a competitor brand', desc: 'Track any brand and Mello watches every ad they launch — new drops land in this brief.', cta: 'Spy a brand', run: () => router.push('/discovery/brand-spy') },
-    { id: 'remake', icon: Trophy, badge: 'Try this', tone: 'try', title: 'Remake a winning competitor ad', desc: 'Browse thousands of live winners and rebuild any one of them around your product.', cta: 'Browse winners', run: () => router.push('/discovery') },
-    { id: 'upload', icon: Upload, badge: 'Try this', tone: 'try', title: 'Upload your own ad — we’ll clone it', desc: 'Drop in an image or a video from your computer and Mello rebuilds it as a fresh ad.', cta: busy ? 'Uploading…' : 'Upload & clone', run: () => fileRef.current?.click() },
-    { id: 'fresh', icon: Sparkles, badge: 'Try this', tone: 'try', title: 'Create a fresh ad with AI', desc: 'No ad in mind? Mello designs an original from scratch, on-brand, in minutes.', cta: 'Create an ad', run: () => router.push('/creative-studio?studio=1') },
-    { id: 'daily', icon: CalendarClock, badge: 'Opportunity', tone: 'opp', title: 'Let Mello make ads for you daily', desc: 'Pick how many per day — see the credit cost first, then Mello delivers them to your brief every morning.', cta: 'Set it up', run: () => setMakeAds(true) },
+    { id: 'spy', icon: Eye, badge: 'Try this', tone: 'try', title: 'Spy on a competitor brand', short: 'Spy a brand', desc: 'Track any brand and Mello watches every ad they launch — new drops land in this brief.', cta: 'Spy a brand', run: () => router.push('/discovery/brand-spy') },
+    { id: 'remake', icon: Trophy, badge: 'Try this', tone: 'try', title: 'Remake a winning competitor ad', short: 'Remake a winner', desc: 'Browse thousands of live winners and rebuild any one of them around your product.', cta: 'Browse winners', run: () => router.push('/discovery') },
+    { id: 'upload', icon: Upload, badge: 'Try this', tone: 'try', title: 'Upload your own ad — we’ll clone it', short: busy ? 'Uploading…' : 'Upload & clone', desc: 'Drop in an image or a video from your computer and Mello rebuilds it as a fresh ad.', cta: busy ? 'Uploading…' : 'Upload & clone', run: () => fileRef.current?.click() },
+    { id: 'fresh', icon: Sparkles, badge: 'Try this', tone: 'try', title: 'Create a fresh ad with AI', short: 'Create fresh', desc: 'No ad in mind? Mello designs an original from scratch, on-brand, in minutes.', cta: 'Create an ad', run: () => router.push('/studio') },
+    { id: 'daily', icon: CalendarClock, badge: 'Opportunity', tone: 'opp', title: 'Let Mello make ads for you daily', short: 'Daily ads', desc: 'Pick how many per day — see the credit cost first, then Mello delivers them to your brief every morning.', cta: 'Set it up', run: () => setMakeAds(true) },
   ]
+
+  // Shared tail — the hidden file input + modals + error, used by both variants.
+  const tail = (
+    <>
+      {err && <div style={{ marginTop: 10, fontSize: 12.5, color: '#b42318', background: '#fef2f2', border: '1px solid #fecdca', borderRadius: 10, padding: '8px 12px' }}>{err}</div>}
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" hidden onChange={onFile} />
+      {makeAds && <MakeAdsModal brandId={null} onClose={() => setMakeAds(false)} />}
+      {videoUrl && <CloneVideoModal sourceAdId="" sourceVideoUrl={videoUrl} onClose={() => setVideoUrl(null)} />}
+      {imageUrl && <CloneModal ad={{ id: `upload:${Date.now()}`, pageId: '', pageName: 'Your ad', assetImageUrl: imageUrl, sourceThumb: imageUrl }} onClose={() => setImageUrl(null)} />}
+      <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </>
+  )
+
+  // ── Compact variant — a quiet row of chips that keeps every action on the brief without a wall of cards ──
+  if (compact) {
+    return (
+      <div style={{ marginTop: 30 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED, marginBottom: 12 }}>Or start something</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {cards.map(c => {
+            const Icon = c.icon
+            return (
+              <button key={c.id} onClick={c.run} disabled={busy && c.id === 'upload'} title={c.desc}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '9px 15px', fontSize: 13, fontWeight: 750, color: INK, cursor: (busy && c.id === 'upload') ? 'default' : 'pointer', fontFamily: 'inherit' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = SEL_BORDER; e.currentTarget.style.background = SEL_BG }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = LINE; e.currentTarget.style.background = '#fff' }}>
+                {busy && c.id === 'upload' ? <Loader2 size={14} className="spin" color={GREEN} /> : <Icon size={14} color={GREEN} />}
+                {c.short}
+              </button>
+            )
+          })}
+        </div>
+        {tail}
+      </div>
+    )
+  }
+
   const visible = cards.filter(c => !dismissed.includes(c.id))
   if (visible.length === 0) return null
 

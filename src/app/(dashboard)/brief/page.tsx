@@ -415,14 +415,8 @@ export default function StandupPage() {
       {/* Below the brief: timely alerts stay visible; the feature deck hides behind one quiet line
           (progressive disclosure — depth only for those who ask for it). */}
       {brief && <BriefAlerts exclude={[...(brief.headline ? [brief.headline.title] : []), ...brief.items.map(i => i.title)]} />}
-      {brief && (
-        <details className="more-mello" style={{ marginTop: 38 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 750, color: MUTED, listStyle: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            What else can I do for you? <span style={{ color: GREEN }}>→</span>
-          </summary>
-          <TryMello />
-        </details>
-      )}
+      {/* All the ways to make something — kept on the brief, compact so they don't compete with it. */}
+      {brief && <TryMello compact />}
       {brief && <BriefWishlist />}
 
       {/* ── composer: interrupt anytime, in plain language ── */}
