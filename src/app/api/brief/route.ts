@@ -37,7 +37,18 @@ type BriefItem = {
   at?: string                 // ISO timestamp of the underlying event
 }
 
-const soft = async <T,>(p: Promise<T>, fallback: T): Promise<T> => { try { return await p } catch { return fallback } }
+// Every source is fail-soft AND time-boxed: a slow query returns its fallback at BUDGET_MS instead of
+// hanging the whole brief on "pulling the room together…". The brief is a rendering layer — a missing
+// source just drops its item; it must never stall.
+const BUDGET_MS = 6000
+const soft = async <T,>(p: Promise<T>, fallback: T, ms = BUDGET_MS): Promise<T> => {
+  try {
+    return await Promise.race([
+      p,
+      new Promise<T>((_, rej) => setTimeout(() => rej(new Error('brief source timeout')), ms)),
+    ])
+  } catch { return fallback }
+}
 
 export async function GET() {
   const supabase = await createClient()
@@ -70,8 +81,10 @@ export async function GET() {
     // 4. What the user watches (spied + followed) — powers the trend item + the "watching N" stat.
     soft<any[]>(admin.from('followed_brands').select('page_id, brand_name, spied')
       .eq('user_id', user.id).limit(200).then((r: any) => r.data || []), []),
-    // 5. Mello's overnight sweep: ads indexed in the last 24h (dai_created_at_idx → fast).
-    soft<number>(admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true })
+    // 5. Mello's overnight sweep: ads indexed in the last 24h. ESTIMATED count (planner row estimate) —
+    //    an exact count of a 24h slice of a 4.5M-row table is slow on cold start; a "we scanned ~N ads"
+    //    stat only needs to be approximate.
+    soft<number>(admin.from('discovery_ads_index').select('ad_id', { count: 'estimated', head: true })
       .gte('created_at', H24).then((r: any) => r.count || 0), 0),
     // 6. Mello's nightly observations (mig 110, L7) — his own notes about the business.
     soft<any[]>(admin.from('daily_observations').select('id, observation, action, confidence, created_at')
