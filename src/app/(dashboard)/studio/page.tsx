@@ -107,7 +107,17 @@ function StudioInner() {
   const [winnerPlaying, setWinnerPlaying] = useState(false)   // click the lime button to play the winner video inline
 
   useEffect(() => {
-    fetch('/api/brands').then(r => r.json()).then(j => { const bs: Brand[] = j.brands || []; setBrands(bs); if (bs[0] && !touchedRef.current) pickBrand(bs[0]); else if (!bs[0]) setBmode('new') }).catch(() => setBmode('new'))
+    fetch('/api/brands').then(r => r.json()).then(j => {
+      const bs: Brand[] = j.brands || []; setBrands(bs)
+      if (touchedRef.current) return
+      // On a deep-linked remake (?brand=Name), load THAT brand's kit — its logo, colors and product
+      // photos are what the clone engine grounds on. Auto-picking bs[0] fed the engine the wrong
+      // brand's logo, so the remade ad's logo came out reinvented. Fall back to bs[0] only if no match.
+      const bnd = (params.get('brand') || '').trim().toLowerCase()
+      const match = bnd ? bs.find(b => (b.name || '').trim().toLowerCase() === bnd) : null
+      const pick = match || bs[0]
+      if (pick) pickBrand(pick); else setBmode('new')
+    }).catch(() => setBmode('new'))
     fetch('/api/discovery/niches').then(r => r.json()).then(j => setNiches(j.niches || [])).catch(() => {})
     fetch('/api/creatives').then(r => r.json()).then(j => setWork((j.creatives || []).filter((c: any) => c.media_type !== 'video' && c.status === 'done' && c.image_url).slice(0, 14))).catch(() => {})
     fetch('/api/mello/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).then(r => r.json()).then(j => { if (j?.conversation?.id) setConvId(j.conversation.id) }).catch(() => {})
