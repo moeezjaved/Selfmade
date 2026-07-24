@@ -85,6 +85,10 @@ function StudioInner() {
   const [niches, setNiches] = useState<string[]>([])
   const [niche, setNiche] = useState('')
   const [aspect, setAspect] = useState<'original' | '4:5' | '1:1' | '9:16' | '16:9'>('4:5')
+  // Parity with the old image modal: recast the person, quality, and how many versions.
+  const [look, setLook] = useState('match')
+  const [imgQuality, setImgQuality] = useState<'2K' | '4K'>('2K')
+  const [variantCount, setVariantCount] = useState(1)
 
   // gen
   const [busy, setBusy] = useState(false)
@@ -95,7 +99,8 @@ function StudioInner() {
   const [editText, setEditText] = useState(''); const [editing, setEditing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
-  const cost = isVideo ? 600 : 15
+  const perImage = imgQuality === '4K' ? 25 : 15
+  const cost = isVideo ? 600 : perImage * variantCount
   // Once the user has analyzed a site or uploaded, the (slow) /api/brands auto-pick must NOT overwrite
   // their photos — that race is why analyzed photos "vanished after 5-10s".
   const touchedRef = useRef(false)
@@ -213,37 +218,50 @@ function StudioInner() {
       }
 
       if (useMode === 'remake' && useSource?.adId) {
-        // clone the competitor's winner (job-based → poll)
+        // clone the competitor's winner (job-based → poll). Recast the person (look),
+        // pick the quality, and fan out N versions — one job each (they render in parallel).
         const body = {
           adId: useSource.adId, productImages: chosen, tier: 'pro', brandId: useBrandId || undefined,
           productType: useBrandType || 'physical', brandName: useBrandName.trim() || undefined,
           colors: useKit.colors, palette: useKit.palette || undefined, logo: useKit.logo || undefined,
-          newHeadline: useHeadline.trim() || undefined, aspectRatio: useAspect, imageSize: '2K',
+          newHeadline: useHeadline.trim() || undefined, aspectRatio: useAspect, imageSize: imgQuality,
+          look: look !== 'match' ? look : undefined,
         }
-        const enq = await fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-        const ej = await enq.json().catch(() => ({}))
-        if (!enq.ok || !ej.jobId) { setErr(ej.error === 'insufficient_credits' ? 'Not enough credits.' : ej.error || 'Couldn’t start the remake.'); return }
-        let done = false
-        for (let i = 0; i < 140 && !done; i++) {
+        const jobIds: string[] = []
+        for (let v = 0; v < variantCount; v++) {
+          const enq = await fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+          const ej = await enq.json().catch(() => ({}))
+          if (enq.ok && ej.jobId) jobIds.push(ej.jobId)
+          else if (v === 0) { setErr(ej.error === 'insufficient_credits' ? 'Not enough credits.' : ej.error || 'Couldn’t start the remake.'); return }
+        }
+        const pending = new Set(jobIds)
+        let landedAny = false
+        for (let i = 0; i < 160 && pending.size; i++) {
           await sleep(2500)
-          const s = await fetch(`/api/discovery/clone-image/status?id=${ej.jobId}`).then(r => r.json()).catch(() => ({}))
-          if (s.done && s.url) { land(s.url, s.generationId || ej.jobId, 'remake'); done = true }
-          else if (s.failed) { setErr(s.error || 'The remake failed — credits were refunded.'); return }
+          for (const jid of Array.from(pending)) {
+            const s = await fetch(`/api/discovery/clone-image/status?id=${jid}`).then(r => r.json()).catch(() => ({}))
+            if (s.done && s.url) { land(s.url, s.generationId || jid, 'remake'); pending.delete(jid); landedAny = true }
+            else if (s.failed) { pending.delete(jid); if (!landedAny && pending.size === 0) setErr(s.error || 'The remake failed — credits were refunded.') }
+          }
         }
-        if (!done) setErr('Still working — check My Creatives in a minute.')
+        if (!landedAny && pending.size) setErr('Still working — check My Creatives in a minute.')
         refreshCredits()
       } else {
-        // fresh create (sync)
+        // fresh create (sync) — fan out N versions
         const body = {
           brandId: useBrandId || undefined, productImages: chosen, brandName: useBrandName.trim() || undefined,
           colors: useKit.colors, palette: useKit.palette || undefined, fonts: useKit.fonts, logo: useKit.logo || undefined,
           newHeadline: useHeadline.trim() || undefined, angle: useAngle.trim() || undefined, niche: useNiche || undefined,
-          aspectRatio: useAspect === 'original' ? '4:5' : useAspect, imageSize: '2K',
+          aspectRatio: useAspect === 'original' ? '4:5' : useAspect, imageSize: imgQuality,
         }
-        const r = await fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-        const t = await r.text(); let j: any; try { j = JSON.parse(t) } catch { j = { error: `HTTP ${r.status}` } }
-        if (!r.ok || !j?.url) { setErr(j?.error === 'insufficient_credits' ? 'Not enough credits.' : j?.error || 'Generation failed — try again.'); return }
-        land(j.url, j.generationId || null, 'fresh'); refreshCredits()
+        let landedAny = false
+        for (let v = 0; v < variantCount; v++) {
+          const r = await fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+          const t = await r.text(); let j: any; try { j = JSON.parse(t) } catch { j = { error: `HTTP ${r.status}` } }
+          if (!r.ok || !j?.url) { if (!landedAny) { setErr(j?.error === 'insufficient_credits' ? 'Not enough credits.' : j?.error || 'Generation failed — try again.'); return } break }
+          land(j.url, j.generationId || null, 'fresh'); landedAny = true
+        }
+        refreshCredits()
       }
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
   }
@@ -446,6 +464,45 @@ function StudioInner() {
               ))}
             </div>
           </div>
+
+          {/* Look · Quality · Versions — the rest of the old image modal, inline. Image flows only. */}
+          {!(remake && isVideo) && (
+            <>
+              {remake && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={label}>If the ad shows a person</div>
+                  <div style={{ fontSize: 11.5, color: MUTED, margin: '2px 0 8px' }}>Recast them for your audience — or keep the original casting.</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                    {['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic'].map(l => (
+                      <button key={l} onClick={() => setLook(l)} style={{ border: `1.5px solid ${look === l ? GREEN : LINE}`, background: look === l ? '#f2f8ea' : '#fff', color: look === l ? INK : MUTED, borderRadius: 100, padding: '7px 13px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>{l === 'match' ? 'Keep original' : l}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 26, marginBottom: 22 }}>
+                <div>
+                  <div style={label}>Quality</div>
+                  <div style={{ display: 'inline-flex', background: '#eef2ec', borderRadius: 100, padding: 3 }}>
+                    {(['2K', '4K'] as const).map(q => (
+                      <button key={q} onClick={() => setImgQuality(q)} style={{ border: 'none', borderRadius: 100, padding: '7px 15px', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: imgQuality === q ? '#fff' : 'transparent', color: imgQuality === q ? INK : MUTED }}>{q}</button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: MUTED, marginTop: 5 }}>{imgQuality === '4K' ? 'Sharper — 25 credits each' : 'Standard — 15 credits each'}</div>
+                </div>
+
+                <div>
+                  <div style={label}>Versions</div>
+                  <div style={{ display: 'inline-flex', background: '#eef2ec', borderRadius: 100, padding: 3 }}>
+                    {[1, 2, 4, 6, 8].map(n => (
+                      <button key={n} onClick={() => setVariantCount(n)} style={{ border: 'none', borderRadius: 100, padding: '7px 13px', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: variantCount === n ? '#fff' : 'transparent', color: variantCount === n ? INK : MUTED }}>{n}</button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: MUTED, marginTop: 5 }}>{variantCount === 1 ? 'One design' : `${variantCount} designs to pick from`}</div>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* video remake → the inline video flow (language · voice · free script · render), no modal */}
           {remake && isVideo && source?.adId && (

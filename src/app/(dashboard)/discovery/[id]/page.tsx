@@ -164,7 +164,7 @@ export default function AdDetailPage() {
       </div>
 
       {/* Mello's pre-adaptation — the winning ad, already rewritten for the user's brand */}
-      <RemakeAdaptation adId={ad.id} />
+      <RemakeAdaptation adId={ad.id} isVideo={!!ad.videoUrl} videoUrl={ad.videoUrl} poster={ad.thumbnailUrl} />
 
       {/* 3-column layout */}
       <div id="remake-cta" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px 360px', gap: 18, alignItems: 'start' }}>

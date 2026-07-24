@@ -7,6 +7,7 @@
  * the real Generate lives in the Selfmade AI card below.
  */
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 
 type Adaptation = { studied: string; hook: string; primaryText: string; scenes: string[]; voiceover: string }
@@ -15,7 +16,8 @@ type Brand = { id: string; name: string }
 const FOREST = '#17251c', LIME = '#dffe95', INK = '#111514', MUTED = '#6b7280', LINE = '#e2e8f0'
 const cacheKey = (adId: string, brandId: string) => `remake_adapt:${adId}:${brandId}`
 
-export default function RemakeAdaptation({ adId }: { adId: string }) {
+export default function RemakeAdaptation({ adId, isVideo, videoUrl, poster }: { adId: string; isVideo?: boolean; videoUrl?: string | null; poster?: string | null }) {
+  const router = useRouter()
   const [brands, setBrands] = useState<Brand[]>([])
   const [brandId, setBrandId] = useState<string>('')
   const [data, setData] = useState<{ adaptation: Adaptation; brand: Brand } | null>(null)
@@ -55,7 +57,16 @@ export default function RemakeAdaptation({ adId }: { adId: string }) {
     )
   }
 
-  const scrollToGenerate = () => document.getElementById('remake-cta')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // "Generate this for X →" now takes you straight to the studio (the inline flow: photos → for video,
+  // language/voice/free script → render), pre-loaded with this ad + brand — not just a scroll.
+  const goStudio = () => {
+    const q = new URLSearchParams({ ad: adId })
+    if (isVideo) q.set('type', 'video')
+    if (videoUrl) q.set('vid', videoUrl)
+    if (poster) q.set('img', poster)
+    if (data?.brand?.name) q.set('brand', data.brand.name)
+    router.push(`/studio?${q.toString()}`)
+  }
   const ad = data?.adaptation
 
   return (
@@ -99,7 +110,7 @@ export default function RemakeAdaptation({ adId }: { adId: string }) {
             {ad.primaryText && <Field label="Primary text"><div style={{ fontSize: 13, color: '#2c342d', lineHeight: 1.55 }}>{ad.primaryText}</div></Field>}
           </div>
 
-          <button onClick={scrollToGenerate} style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={goStudio} style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Sparkles size={15} /> Generate this for {data?.brand?.name || 'my brand'} →
           </button>
           <div style={{ fontSize: 11, color: MUTED, marginTop: 8 }}>A starting draft — you approve everything before any credits are spent.</div>
