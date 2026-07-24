@@ -22,14 +22,18 @@ const ago = (iso?: string) => {
 }
 const isBlank = (b?: string) => { const t = String(b ?? '').trim(); return !t || /^\d+$/.test(t) }
 
-export default function BriefAlerts() {
+export default function BriefAlerts({ exclude = [] }: { exclude?: string[] }) {
   const [notifs, setNotifs] = useState<Notif[] | null>(null)
+  // Merge, don't repeat: launches the brief already covered (hero/insights/evidence) are excluded —
+  // this section only surfaces brands the brief DIDN'T mention. One fact, one place.
+  const covered = exclude.map(t => t.toLowerCase())
   useEffect(() => {
     fetch('/api/notifications').then(r => r.ok ? r.json() : null).then(d => {
-      if (d?.notifications) setNotifs(d.notifications.filter((n: Notif) => !n.read_at && !isBlank(n.brand_name)).slice(0, 5))
+      if (d?.notifications) setNotifs(d.notifications.filter((n: Notif) => !n.read_at && !isBlank(n.brand_name)).slice(0, 8))
     }).catch(() => {})
   }, [])
-  if (!notifs || notifs.length === 0) return null
+  const shown = (notifs || []).filter(n => !covered.some(t => t.includes(String(n.brand_name || '').toLowerCase()))).slice(0, 3)
+  if (shown.length === 0) return null
 
   return (
     <div style={{ marginBottom: 26 }}>
@@ -38,7 +42,7 @@ export default function BriefAlerts() {
         <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED }}>New from brands you watch</div>
       </div>
       <div style={{ display: 'grid', gap: 8 }}>
-        {notifs.map(n => (
+        {shown.map(n => (
           <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: '12px 15px' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 750, color: INK, letterSpacing: '-.01em' }}>
