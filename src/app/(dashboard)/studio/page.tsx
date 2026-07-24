@@ -59,6 +59,7 @@ function StudioInner() {
   const [convId, setConvId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const chatStartedRef = useRef(false)   // once true, the remake-adapt effect must not overwrite the chat
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat.messages])
 
   // mode + remake source
@@ -117,6 +118,9 @@ function StudioInner() {
     if (mode !== 'remake' || !source?.adId) return
     fetch('/api/remake/adapt', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ adId: source.adId, brandId: brandId || undefined }) })
       .then(r => r.json()).then(d => {
+        // Never overwrite an active conversation — the user may have already started chatting
+        // (this effect re-runs when the brand loads/changes, and resolves async).
+        if (chatStartedRef.current) return
         if (d?.adaptation) {
           const a = d.adaptation
           const lines = [`I studied this ${source.brand || d.adBrand || 'competitor'} ad. ${a.studied || ''}`.trim(),
@@ -169,7 +173,7 @@ function StudioInner() {
     lines.push(result ? 'There IS a generated image on the canvas now — for "tweak"/"change it"/"bigger logo", call create_ad with kind="tweak" and the instruction.' : 'No generated image yet — tweak is unavailable until something is generated.')
     return lines.join('\n')
   }
-  const send = () => { const t = draft.trim(); if (!t || !convId || chat.streaming) return; setDraft(''); chat.sendMessage(convId, t, canvasContext()) }
+  const send = () => { const t = draft.trim(); if (!t || !convId || chat.streaming) return; chatStartedRef.current = true; setDraft(''); chat.sendMessage(convId, t, canvasContext()) }
   // Every generate/tweak becomes a version you can revert to (Ploy's Versions).
   const land = (url: string, genId: string | null, kind: string) => { setResult({ url, genId }); setVersions(v => [...v, { url, genId, kind }]) }
   // Open a past creation from My Work into the canvas — tweak or download it again.
