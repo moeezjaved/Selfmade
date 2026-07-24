@@ -336,6 +336,76 @@ function AdCard({ a, onOpen, onClone }: { a: Card; onOpen: (a: Card) => void; on
   )
 }
 
+// "Mello studied this ad" — the same structured why-it-works Mello shows for video,
+// now on every ad in the drawer. Cached forever server-side (/api/ad-insight), fail-soft.
+function AdInsightPanel({ adId }: { adId: string }) {
+  const [r, setR] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let alive = true
+    setLoading(true); setR(null)
+    fetch(`/api/ad-insight?adId=${encodeURIComponent(adId)}`)
+      .then((x) => x.json()).then((d) => { if (alive && d && !d.error) setR(d) })
+      .catch(() => {}).finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [adId])
+
+  const Tag = ({ k, v }: { k: string; v?: string }) => v ? (
+    <span style={{ fontSize: 11.5, color: '#3a5a2e', background: '#f2f8ea', border: '1px solid #dcebc4', borderRadius: 100, padding: '4px 10px', fontWeight: 700 }}>
+      <span style={{ color: '#8a9a7a' }}>{k} </span>{v}
+    </span>
+  ) : null
+
+  return (
+    <div style={{ margin: '18px', marginTop: 4, background: 'linear-gradient(180deg,#f7fbef,#ffffff)', border: '1px solid #dcebc4', borderRadius: 16, padding: '16px 18px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ width: 24, height: 24, borderRadius: 7, background: '#17251c', color: ACCENT, display: 'grid', placeItems: 'center', fontSize: 13 }}>✨</span>
+        <b style={{ fontSize: 14, color: '#111' }}>Mello studied this ad</b>
+        {r?.confidence != null && <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 800, color: '#16663a', background: '#e7f6ec', borderRadius: 100, padding: '4px 11px' }}>{r.confidence}% sure it works</span>}
+      </div>
+
+      {loading && !r && (
+        <div style={{ display: 'grid', gap: 9 }}>
+          {[80, 95, 70].map((w, i) => <div key={i} style={{ height: 11, width: `${w}%`, background: '#eaf3d8', borderRadius: 6, animation: 'insp 1.2s ease-in-out infinite' }} />)}
+          <div style={{ fontSize: 12, color: '#8a9a7a', marginTop: 2 }}>Reading the hook, the offer, the visual…</div>
+          <style>{`@keyframes insp{0%,100%{opacity:.5}50%{opacity:1}}`}</style>
+        </div>
+      )}
+
+      {r && (
+        <>
+          {r.headline && r.headline !== 'Why this ad works' && (
+            <div style={{ fontSize: 15, fontWeight: 850, color: '#17251c', letterSpacing: '-.01em', marginBottom: 10 }}>{r.headline}</div>
+          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+            <Tag k="Hook" v={r.hook} /><Tag k="Emotion" v={r.emotion} /><Tag k="Who" v={r.audience} />
+            <Tag k="Offer" v={r.offer} /><Tag k="Look" v={r.visualStyle} />
+          </div>
+          {Array.isArray(r.story) && r.story.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              {r.story.map((s: string, i: number) => (
+                <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 800, color: '#2c342d', background: '#fff', border: '1px solid #e8efdc', borderRadius: 8, padding: '4px 9px' }}>{s}</span>
+                  {i < r.story.length - 1 && <span style={{ color: '#8fbf5f', fontWeight: 900 }}>→</span>}
+                </span>
+              ))}
+            </div>
+          )}
+          {Array.isArray(r.bullets) && r.bullets.length > 0 && (
+            <div style={{ display: 'grid', gap: 7 }}>
+              {r.bullets.map((b: string, i: number) => (
+                <div key={i} style={{ display: 'flex', gap: 8, fontSize: 13, color: '#2c342d', lineHeight: 1.45, fontWeight: 550 }}>
+                  <span style={{ color: '#2f7a3f', fontWeight: 900, flexShrink: 0 }}>✓</span>{b}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
   const { pageId } = useParams() as { pageId: string }
   const [cloning, setCloning] = useState(false)
@@ -385,6 +455,7 @@ function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
             <Row k="First seen" v={fmtDate(a.startDate)} />
           </div>
         </div>
+        <AdInsightPanel adId={a.id} />
       </div>
     </div>
   )
