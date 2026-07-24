@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowRight, ArrowUp } from 'lucide-react'
 import TryMello from './TryMello'
 import BriefAlerts from './BriefAlerts'
@@ -193,6 +194,7 @@ export default function StandupPage() {
   const [headlineState, setHeadlineState] = useState<null | 'approved' | 'passed'>(null)
   const [view, setView] = useState<'standup' | 'desk'>('standup')   // Mello's report as a conversation, or as a prepared desk
   const endRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   useEffect(() => { try { const v = localStorage.getItem('brief_view'); if (v === 'desk' || v === 'standup') setView(v) } catch {} }, [])
   const pickView = (v: 'standup' | 'desk') => { setView(v); try { localStorage.setItem('brief_view', v) } catch {} }
@@ -210,6 +212,14 @@ export default function StandupPage() {
     const q = text.trim()
     if (!q || busy) return
     setDraft('')
+    // The brief chat can only talk — it can't generate. If the founder asks to MAKE/CREATE/REMAKE an
+    // ad/image/video, hand off to the studio, where Mello can actually build it (and drive the canvas).
+    if (/\b(make|create|design|build|generate|remake|clone|whip up|come up with|mock up)\b[\s\S]*\b(ad|ads|image|images|photo|picture|creative|creatives|video|videos|ugc|banner|graphic)\b/i.test(q)
+        || /\b(ad|image|video|creative)\b[\s\S]*\b(for my brand|from scratch)\b/i.test(q)) {
+      setThread(t => [...t, { who: 'user', text: q }, { who: 'mello', kind: 'reply', text: 'On it — opening the studio, where I can build that with you.' }])
+      setTimeout(() => router.push('/studio'), 650)
+      return
+    }
     setThread(t => [...t, { who: 'user', text: q }, { who: 'mello', kind: 'reply', text: '', pending: true }])
     setBusy(true)
     try {
