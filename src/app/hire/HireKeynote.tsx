@@ -31,12 +31,22 @@ export default function HireKeynote() {
     // Inline black background wins over the app's global body.bg-dark (class > element selector) and
     // covers the whole scroll — the keynote is a black stage regardless of the surrounding app theme.
     <div ref={rvRoot} style={{ background: '#0a0d0a', minHeight: '100vh', color: '#f2f5ef' }}>
-      <span className="brand">Selfmade</span>
-      <a className="toplogin" href="/login">Log in</a>
+      {/* Persistent glassmorphic nav — Instrument Serif wordmark, liquid-glass CTA. */}
+      <nav className="glassnav">
+        <a href="/" className="gn-logo">Selfmade</a>
+        <div className="gn-right">
+          <a href="/login" className="gn-link">Log in</a>
+          <a href="#offer" className="liquid-glass gn-cta">Hire Mello</a>
+        </div>
+      </nav>
 
-      <section className="beat">
-        <p className="rv">Every morning, marketers wake&nbsp;up already behind.</p>
-        <div className="small rv d2">The market moved all night. Nobody was watching.</div>
+      {/* HERO — the opening screen: full-bright reel, cinematic serif, glass CTA. */}
+      <section className="beat beat--hero">
+        <video className="hero-vid" autoPlay muted loop playsInline preload="auto"
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260405_171521_25968ba2-b594-4b32-aab7-f6b69398a6fa.mp4" />
+        <h1 className="hero-h1 fr">Every morning, marketers wake up <em>already behind.</em></h1>
+        <p className="hero-sub fr fr-d1">The market moved all night. Nobody was watching. Mello was — and it left the brief on your desk.</p>
+        <a href="#offer" className="liquid-glass hero-cta fr fr-d2">Hire Mello</a>
         <div className="hint">Scroll</div>
       </section>
 
@@ -70,7 +80,7 @@ export default function HireKeynote() {
       </section>
 
       {/* THE OFFER */}
-      <div className="stage">
+      <div className="stage" id="offer">
         <div className="paper rv">
           <div className="p-eyebrow">Employment offer · for your countersignature</div>
           <div className="p-title">Offer of Employment</div>
@@ -100,10 +110,36 @@ export default function HireKeynote() {
 
       <style>{`
         html,body{background:#0a0d0a}
-        .brand{position:fixed;top:24px;left:32px;font-size:22px;font-weight:850;letter-spacing:-.03em;color:#f2f5ef;z-index:10;mix-blend-mode:difference}
-        .toplogin{position:fixed;top:28px;right:32px;font-size:14px;font-weight:700;letter-spacing:-.01em;color:#8b978a;text-decoration:none;z-index:10;transition:color .2s}
-        .toplogin:hover{color:#f2f5ef}
+        /* Glassmorphic nav — persistent, centered, Instrument Serif wordmark. */
+        .glassnav{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:1220px;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 32px;font-family:'Inter',sans-serif}
+        .gn-logo{font-family:'Inter',-apple-system,system-ui,sans-serif;font-size:22px;font-weight:850;letter-spacing:-.03em;color:#fff;text-decoration:none;text-shadow:0 2px 18px rgba(0,0,0,.55)}
+        .gn-links{display:none;align-items:center;gap:30px}
+        @media(min-width:768px){.gn-links{display:flex}}
+        .gn-link{font-size:13.5px;font-weight:500;color:#b3bbb0;text-decoration:none;transition:color .2s;text-shadow:0 1px 10px rgba(0,0,0,.5)}
+        .gn-link:hover{color:#fff}
+        .gn-active{color:#fff}
+        .gn-right{display:flex;align-items:center;gap:18px}
+        .gn-cta{border-radius:100px;padding:10px 22px;font-size:13.5px;font-weight:600;color:#fff;text-decoration:none;transition:transform .15s}
+        .gn-cta:hover{transform:scale(1.03)}
+        /* liquid glass — a whisper of frost with a light-catching rim. */
+        .liquid-glass{background:rgba(255,255,255,.01);background-blend-mode:luminosity;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border:none;box-shadow:inset 0 1px 1px rgba(255,255,255,.1);position:relative;overflow:hidden}
+        .liquid-glass:before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1.4px;background:linear-gradient(180deg,rgba(255,255,255,.45) 0%,rgba(255,255,255,.15) 20%,rgba(255,255,255,0) 40%,rgba(255,255,255,0) 60%,rgba(255,255,255,.15) 80%,rgba(255,255,255,.45) 100%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
         .beat{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;position:relative;font-family:'Inter',-apple-system,system-ui,sans-serif}
+        /* HERO — full-bright reel, cinematic serif, glass CTA. No dimming overlay. */
+        .beat--hero{overflow:hidden;padding-top:92px}
+        .hero-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#0a0d0a}
+        .beat--hero>*:not(.hero-vid){position:relative;z-index:2}
+        .beat--hero .hero-h1{font-family:'Instrument Serif',serif;font-weight:400;font-size:clamp(29px,4.2vw,52px);line-height:1.06;letter-spacing:-.012em;max-width:22ch;color:#fff;text-shadow:0 2px 26px rgba(0,0,0,.4),0 1px 3px rgba(0,0,0,.35)}
+        .beat--hero .hero-h1 em{font-style:normal;color:#c4ccc0}
+        .beat--hero .hero-sub{margin-top:24px;max-width:44ch;font-size:clamp(15px,1.6vw,18px);font-weight:500;color:#e0e6db;line-height:1.6;text-shadow:0 2px 18px rgba(0,0,0,.6)}
+        .hero-cta{margin-top:40px;display:inline-block;border-radius:100px;padding:18px 46px;font-size:16px;font-weight:600;color:#fff;text-decoration:none;transition:transform .15s}
+        .hero-cta:hover{transform:scale(1.03)}
+        .beat--hero .hint{color:rgba(240,244,236,.7)}
+        .beat--hero .hint:after{background:linear-gradient(rgba(240,244,236,.6),transparent)}
+        @keyframes fr{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+        .fr{animation:fr .8s ease-out both}
+        .fr-d1{animation-delay:.2s}.fr-d2{animation-delay:.4s}
+        @media(prefers-reduced-motion:reduce){.fr{animation:none}}
         .beat p{font-size:clamp(30px,5.6vw,64px);font-weight:800;letter-spacing:-.04em;line-height:1.12;max-width:20ch;text-wrap:balance;color:#f2f5ef}
         .beat .small{font-size:clamp(16px,2vw,20px);font-weight:600;color:#8b978a!important;letter-spacing:-.01em;max-width:44ch;line-height:1.6;margin-top:22px}
         .lime{color:#dffe95}
