@@ -37,6 +37,10 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [style, setStyle] = useState<'ugc' | 'cinematic'>('ugc')   // Cinematic is gated (coming soon) — UGC ships
   const [language, setLanguage] = useState('en')
   const [voice, setVoice] = useState('nova')
+  // Parity with the old video modal — these feed the analysis/generation, so keep collecting them.
+  const [productName, setProductName] = useState('')
+  const [benefit, setBenefit] = useState('')
+  const [look, setLook] = useState('match')   // recast the on-camera person (default: keep original)
   const [jobId, setJobId] = useState<string | null>(null)
   const [script, setScript] = useState('')
   const [srcSecs, setSrcSecs] = useState<number | null>(null)
@@ -91,7 +95,9 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
     try {
       const start = await fetch('/api/discovery/clone-video', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages, tier: 'premium', productType: brandType || 'physical', language, voice }),
+        body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages, tier: 'premium', productType: brandType || 'physical', language, voice,
+          characterLook: look !== 'match' ? look : undefined,
+          productDetails: { name: productName.trim() || undefined, benefit: benefit.trim() || undefined } }),
       }).then(r => r.json())
       if (!start.jobId) { setErr(start.error === 'insufficient_credits' ? 'Not enough credits.' : (start.error || 'Couldn’t start the script.')); setPhase('setup'); return }
       setJobId(start.jobId)
@@ -146,6 +152,30 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
               <select value={voice} onChange={e => setVoice(e.target.value)} style={field}>{VOICES.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}</select>
             </div>
           </div>
+
+          {/* Product details — same grounding the old modal collected (name + one benefit). */}
+          {!isService && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div><div style={label}>Product name <span style={{ color: '#aab0a6', fontWeight: 600 }}>· optional</span></div>
+                <input value={productName} onChange={e => setProductName(e.target.value)} placeholder={brandName || 'e.g. Hair ResQ Serum'} style={field} />
+              </div>
+              <div><div style={label}>Key benefit <span style={{ color: '#aab0a6', fontWeight: 600 }}>· optional</span></div>
+                <input value={benefit} onChange={e => setBenefit(e.target.value)} placeholder="e.g. thicker hair in 8 weeks" style={field} />
+              </div>
+            </div>
+          )}
+
+          {/* Recast the on-camera person — parity with the old modal's look picker. */}
+          <div style={{ marginBottom: 18 }}>
+            <div style={label}>If the ad shows a person</div>
+            <div style={{ fontSize: 11.5, color: MUTED, margin: '2px 0 8px' }}>Recast them for your audience — or keep the original.</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              {['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic'].map(l => (
+                <button key={l} onClick={() => setLook(l)} style={{ border: `1.5px solid ${look === l ? GREEN : '#e2e8f0'}`, background: look === l ? '#f2f8ea' : '#fff', color: look === l ? INK : MUTED, borderRadius: 100, padding: '7px 13px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{l === 'match' ? 'Keep original' : l}</button>
+              ))}
+            </div>
+          </div>
+
           <button onClick={writeScript} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '13px 24px', fontSize: 14.5, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Wand2 size={16} /> Write my free script
           </button>
