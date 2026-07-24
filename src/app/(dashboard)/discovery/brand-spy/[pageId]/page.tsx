@@ -373,7 +373,7 @@ function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
             <a href={a.snapshotUrl || '#'} target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: ACCENT, color: '#111', fontWeight: 800, fontSize: 14, padding: '11px 0', borderRadius: 10, textDecoration: 'none', marginBottom: 14 }}>Open in Meta Ad Library ↗</a>
             {cloning && ((a.format || '').toLowerCase().includes('video') || !!a.videoUrl
               ? <CloneVideoModal sourceAdId={a.id} sourcePoster={a.thumbnailUrl || undefined} onClose={() => setCloning(false)} />
-              : <CloneModal ad={{ id: a.id, pageId, pageName: a.pageName, assetImageUrl: a.thumbnailUrl || undefined }} onClose={() => setCloning(false)} />)}
+              : <CloneModal ad={{ id: a.id, pageId, pageName: a.pageName, sourceThumb: a.thumbnailUrl || undefined }} onClose={() => setCloning(false)} />)}
             <Row k="Status" v={a.isActive ? <span style={{ color: '#16a34a', fontWeight: 700 }}>● Still Running{a.startDate ? ` from ${fmtDate(a.startDate)}` : ''}</span> : <span style={{ color: '#9ca3af' }}>Inactive{a.stopDate ? ` (ended ${fmtDate(a.stopDate)})` : ''}</span>} />
             <Row k="Time Running" v={`${a.daysRunning || 0} day${(a.daysRunning || 0) === 1 ? '' : 's'}`} />
             <Row k="Format" v={a.format || '—'} />
@@ -428,7 +428,7 @@ function AdLibrary({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: 
   }
   return (
     <div>
-      {cloneImageAd && <CloneModal ad={{ id: cloneImageAd.id, pageId, pageName: cloneImageAd.pageName, assetImageUrl: cloneImageAd.thumbnailUrl || undefined }} onClose={() => setCloneImageAd(null)} />}
+      {cloneImageAd && <CloneModal ad={{ id: cloneImageAd.id, pageId, pageName: cloneImageAd.pageName, sourceThumb: cloneImageAd.thumbnailUrl || undefined }} onClose={() => setCloneImageAd(null)} />}
       {cloneVideoAd && <CloneVideoModal sourceAdId={cloneVideoAd.id} sourcePoster={cloneVideoAd.thumbnailUrl || undefined} onClose={() => setCloneVideoAd(null)} />}
       {/* Analytics header — Media Mix · Top Landing Pages · Top Hooks (Foreplay layout) */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '320px 1fr 1fr', gap: 12, marginBottom: 16 }}>
