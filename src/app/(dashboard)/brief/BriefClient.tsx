@@ -70,20 +70,18 @@ function Thumb({ src, w = 78, h = 96 }: { src: string; w?: number; h?: number })
   return <img src={src} alt="" style={box} />
 }
 
-/** A competitor-ad preview: poster image, and if it's a video, hover to play a few seconds inline. */
+/** A competitor-ad preview. Video ads render as a STATIC poster + ▶ badge (no live <video>), so a
+ *  single click on the wrapping link always opens the ad — nothing can swallow the click. The full
+ *  video plays on the ad's detail page. Everything is pointer-events:none for the same reason. */
 function AdPreview({ image, videoUrl, w = 62, h = 78 }: { image: string | null; videoUrl: string | null; w?: number; h?: number }) {
-  const ref = useRef<HTMLVideoElement | null>(null)
   // contain (show the whole ad, no cropped top) + pointer-events:none so one click reaches the link.
   const box: React.CSSProperties = { width: w, height: h, borderRadius: 10, objectFit: 'contain', border: `1px solid ${LINE}`, background: '#0d120e', display: 'block', pointerEvents: 'none' }
+  const badge = <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 15, textShadow: '0 2px 8px rgba(0,0,0,.55)', pointerEvents: 'none' }}>▶</span>
+  if (videoUrl && image) {
+    return <span style={{ position: 'relative', display: 'inline-block' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={image} alt="" style={box} />{badge}</span>
+  }
   if (videoUrl) {
-    return (
-      <span style={{ position: 'relative', display: 'inline-block' }}
-        onMouseEnter={() => { const v = ref.current; if (v) { v.currentTime = 0; v.play().catch(() => {}) } }}
-        onMouseLeave={() => { const v = ref.current; if (v) { v.pause() } }}>
-        <video ref={ref} src={videoUrl} poster={image || undefined} muted loop playsInline preload="metadata" style={box} />
-        <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 15, textShadow: '0 2px 8px rgba(0,0,0,.55)', pointerEvents: 'none' }}>▶</span>
-      </span>
-    )
+    return <span style={{ position: 'relative', display: 'inline-block' }}><video src={videoUrl} muted playsInline preload="metadata" style={box} />{badge}</span>
   }
   if (image) /* eslint-disable-next-line @next/next/no-img-element */ return <img src={image} alt="" style={box} />
   return <span style={box} />
