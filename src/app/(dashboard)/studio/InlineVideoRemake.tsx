@@ -44,11 +44,33 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [progress, setProgress] = useState<{ label?: string; pct?: number; eta_sec?: number } | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [rescripting, setRescripting] = useState(false)
 
   const isService = brandType === 'service'
   const resolvedBucket = bucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(bucket)
   const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1
   const cost = nSegs > 1 ? 600 * nSegs : 600   // $6 per 15s clip (pricing v2), same as the modal
+
+  // Speaking-time meter — same per-language rates as the old modal. Longer than the target = talks fast.
+  const RATE: Record<string, number> = { en: 2.3, ur: 2.0, hi: 2.1, ar: 1.8, es: 2.6, fr: 2.4, de: 2.2 }
+  const words = script.trim() ? script.trim().split(/\s+/).length : 0
+  const spokenSecs = words ? Math.round(words / (RATE[language] || 2.3)) : 0
+  const overLength = spokenSecs > 0 && spokenSecs > resolvedBucket + 2   // script won't fit the chosen length
+
+  // Pick a length → re-pace the script to fill/trim to that many seconds (free, like the old modal).
+  async function pickLength(b: '15' | '30' | '60' | 'match') {
+    setBucket(b)
+    if (!script.trim() || rescripting) return
+    const target = b === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(b)
+    setRescripting(true)
+    try {
+      const r = await fetch('/api/discovery/clone-video/rescript', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ script, targetSecs: target, language }),
+      }).then(x => x.json())
+      if (r.script) setScript(r.script)
+    } catch { /* keep current script */ } finally { setRescripting(false) }
+  }
 
   const pollUntil = async (id: string, leave: string, maxMs = 800_000): Promise<any> => {
     const iters = Math.ceil(maxMs / 4000)
@@ -141,13 +163,22 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       {/* REVIEW — edit script + length, then render */}
       {phase === 'review' && (
         <div>
-          <div style={label}>Your script <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit anything</span></div>
+          <div style={label}>Your script <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit anything{spokenSecs ? ` · about ${spokenSecs}s of speech` : ''}</span></div>
           <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />
           <div style={{ margin: '16px 0' }}>
-            <div style={label}>Length {srcSecs ? <span style={{ color: '#aab0a6', fontWeight: 600 }}>· their ad runs ~{Math.round(srcSecs)}s</span> : null}</div>
-            <div style={pillRow}>
-              {(['15', '30', '60', 'match'] as const).map(b => <button key={b} onClick={() => setBucket(b)} style={pill(bucket === b)}>{b === 'match' ? `Match theirs${srcSecs ? ` (~${Math.round(srcSecs)}s)` : ''}` : `${b}s`}</button>)}
+            <div style={label}>
+              Length {srcSecs ? <span style={{ color: '#aab0a6', fontWeight: 600 }}>· their ad runs ~{Math.round(srcSecs)}s</span> : null}
+              {rescripting && <span style={{ color: GREEN, fontWeight: 700, marginLeft: 6 }}>· re-pacing the script…</span>}
             </div>
+            <div style={pillRow}>
+              {(['15', '30', '60', 'match'] as const).map(b => <button key={b} disabled={rescripting} onClick={() => pickLength(b)} style={{ ...pill(bucket === b), cursor: rescripting ? 'default' : 'pointer', opacity: rescripting && bucket !== b ? 0.6 : 1 }}>{b === 'match' ? `Match theirs${srcSecs ? ` (~${Math.round(srcSecs)}s)` : ''}` : `${b}s`}</button>)}
+            </div>
+            {/* warn when the script is longer than the chosen length — it'd be spoken too fast */}
+            {overLength && (
+              <div style={{ marginTop: 10, fontSize: 12.5, color: '#7a5a12', background: '#fff8e6', border: '1px solid #f2e2ad', borderRadius: 10, padding: '8px 12px', maxWidth: 460 }}>
+                Your script is about <b>{spokenSecs}s</b> but you picked <b>{resolvedBucket}s</b> — it’ll be read fast. Pick a longer length (I’ll re-pace it), or trim the script.
+              </div>
+            )}
           </div>
           <button onClick={render} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '13px 24px', fontSize: 14.5, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Film size={16} /> Create video · {cost} credits
