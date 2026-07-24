@@ -24,7 +24,7 @@ export async function POST() {
     .select('stripe_subscription_id, plan, status')
     .eq('owner_id', user.id).maybeSingle()
   const subId = (subRow as any)?.stripe_subscription_id as string | undefined
-  if (!subId) return NextResponse.json({ error: 'no_subscription', message: 'Only the workspace owner can end the trial.' }, { status: 400 })
+  if (!subId) return NextResponse.json({ error: 'no_subscription', message: 'You’re on the Free plan — there’s no trial to unlock. Choose a plan to add credits.' }, { status: 400 })
   if ((subRow as any)?.status && (subRow as any).status !== 'trialing') {
     return NextResponse.json({ error: 'not_on_trial', message: 'This subscription is not on a trial.' }, { status: 400 })
   }

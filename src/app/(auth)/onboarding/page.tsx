@@ -365,7 +365,7 @@ export default function InterviewPage() {
               </div>
               <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '16px 18px' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.09em', color: MUTED, textTransform: 'uppercase', marginBottom: 10 }}>{loadingComp ? 'Scanning my index…' : 'I already know these — recognize anyone?'}</div>
-                {!loadingComp && ![...picks, ...suggested].length && <div style={{ fontSize: 13, color: MUTED }}>Search below — I’ll find them.</div>}
+                {!loadingComp && ![...picks, ...suggested].length && <div style={{ fontSize: 13, color: MUTED }}>Type a competitor’s name, or paste their Meta Ad Library link — I’ll find them.</div>}
                 {[...picks, ...suggested.filter(s => !picks.some(p => p.pageId === s.pageId))].slice(0, 7).map(c => {
                   const on = picks.some(p => p.pageId === c.pageId)
                   return (
@@ -378,7 +378,7 @@ export default function InterviewPage() {
                     </button>
                   )
                 })}
-                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by name, or paste a Facebook Ad Library link…" style={{ ...inputCss, marginTop: 8 }} />
+                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Competitor name, or paste their Meta Ad Library link…" style={{ ...inputCss, marginTop: 8 }} />
                 {/* Manual add: if they pasted a Facebook Ad Library URL (or a page id), let them add that
                     brand directly even if it isn't in our index yet — extractPageId reads view_all_page_id. */}
                 {(() => {

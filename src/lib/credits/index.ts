@@ -81,20 +81,27 @@ export async function getBalance(admin: SupabaseClient, userId: string) {
   // Members see the ORG's shared balance (owner's wallet + plan), not their own empty one.
   const owner = await resolveBillingOwner(admin, userId)
   await admin.rpc('ensure_monthly_reset', { p_user: owner })
-  const [{ data: prof }, { data: wallet }] = await Promise.all([
+  const [{ data: prof }, { data: wallet }, { data: sub }] = await Promise.all([
     admin.from('user_profiles').select('credits_balance, plan_id, credits_reset_at, subscription_status, trial_ends_at').eq('user_id', owner).maybeSingle(),
     admin.from('credit_wallets').select('plan_credits_balance, topup_credits_balance, plan_credits_reset_at').eq('owner_id', owner).maybeSingle(),
+    admin.from('subscriptions').select('stripe_subscription_id, status').eq('owner_id', owner).maybeSingle(),
   ])
   const plan_credits = (wallet as any)?.plan_credits_balance ?? 0
   const topup_credits = (wallet as any)?.topup_credits_balance ?? 0
+  // A trial is only REAL when an actual Stripe subscription is trialing. A stale profile
+  // status='trialing' with no subscription (legacy signups) must NOT surface the "pay now to
+  // unlock" CTA — it can only fail with "no subscription". Gate on a real Stripe sub id.
+  const realTrial = (prof as any)?.subscription_status === 'trialing'
+    && !!(sub as any)?.stripe_subscription_id
+    && ((sub as any)?.status ? (sub as any).status === 'trialing' : true)
   return {
     balance: wallet ? plan_credits + topup_credits : (prof?.credits_balance ?? 0),
     plan_credits, topup_credits,
     plan: prof?.plan_id ?? 'free',
     reset_at: (wallet as any)?.plan_credits_reset_at ?? prof?.credits_reset_at ?? null,
     // Trial state — powers the "full credits unlock at trial end / pay now" messaging.
-    trialing: (prof as any)?.subscription_status === 'trialing',
-    trial_ends_at: (prof as any)?.trial_ends_at ?? null,
+    trialing: realTrial,
+    trial_ends_at: realTrial ? ((prof as any)?.trial_ends_at ?? null) : null,
   }
 }
 

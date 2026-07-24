@@ -271,15 +271,21 @@ export default function SettingsPage() {
         <div style={{padding:22}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
             <div style={{fontSize:14,color: metaConnected ? '#3a5a3a' : '#9ca3af'}}>
-              {metaConnected == null ? 'Meta / Facebook — checking…' : metaConnected ? 'Meta / Facebook — Connected ✓' : 'Meta / Facebook — Not connected'}
+              {metaConnected == null ? 'Meta / Facebook — checking…' : metaConnected ? 'Meta / Facebook — Connected ✓' : 'Meta / Facebook'}
             </div>
+            {/* Meta OAuth is gated while the new FB app is in review — show Coming soon, not a dead Connect
+                link. If a user actually has a live connection, keep Reconnect/Disconnect available. */}
             <div style={{display:'flex',alignItems:'center',gap:16}}>
-              <a href="/connect-meta" style={{fontSize:13,color:'#1a3a1a',fontWeight:700,textDecoration:'none'}}>{metaConnected ? 'Reconnect →' : 'Connect →'}</a>
-              {metaConnected && (
-                <button onClick={disconnectMeta} disabled={disconnecting} style={{fontSize:13,color:'#c0392b',fontWeight:700,background:'none',border:'none',fontFamily:'inherit',cursor:disconnecting?'default':'pointer',opacity:disconnecting?0.5:1,padding:0}}>
-                  {disconnecting ? 'Disconnecting…' : 'Disconnect'}
-                </button>
-              )}
+              {metaConnected ? (
+                <>
+                  <a href="/connect-meta" style={{fontSize:13,color:'#1a3a1a',fontWeight:700,textDecoration:'none'}}>Reconnect →</a>
+                  <button onClick={disconnectMeta} disabled={disconnecting} style={{fontSize:13,color:'#c0392b',fontWeight:700,background:'none',border:'none',fontFamily:'inherit',cursor:disconnecting?'default':'pointer',opacity:disconnecting?0.5:1,padding:0}}>
+                    {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+                  </button>
+                </>
+              ) : metaConnected === false ? (
+                <span style={{background:'#f3f4f6',color:'#6b7280',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:800,whiteSpace:'nowrap'}}>Coming soon</span>
+              ) : null}
             </div>
           </div>
         </div>
