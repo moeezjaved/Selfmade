@@ -69,6 +69,7 @@ function StudioInner() {
   const [err, setErr] = useState<string | null>(null)
   const [editText, setEditText] = useState(''); const [editing, setEditing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
   const cost = 15
 
   useEffect(() => {
@@ -133,7 +134,7 @@ function StudioInner() {
   // Every generate/tweak becomes a version you can revert to (Ploy's Versions).
   const land = (url: string, genId: string | null, kind: string) => { setResult({ url, genId }); setVersions(v => [...v, { url, genId, kind }]) }
   // Open a past creation from My Work into the canvas — tweak or download it again.
-  const openWork = (c: { id: string; image_url: string }) => { setResult({ url: c.image_url, genId: c.id }); setVersions([{ url: c.image_url, genId: c.id, kind: 'saved' }]); setErr(null); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  const openWork = (c: { id: string; image_url: string }) => { setResult({ url: c.image_url, genId: c.id }); setVersions([{ url: c.image_url, genId: c.id, kind: 'saved' }]); setErr(null); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60) }
 
   const generate = async () => {
     setErr(null)
@@ -340,7 +341,7 @@ function StudioInner() {
 
           {/* result actions (image shown in the two-col above for remake; standalone for fresh) */}
           {result && (
-            <div style={{ marginTop: 8, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div ref={resultRef} style={{ marginTop: 8, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
               {!remake && /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="Your ad" style={{ width: 320, maxWidth: '100%', borderRadius: 16, border: `1px solid ${LINE}`, boxShadow: '0 30px 60px -30px rgba(23,37,28,.4)', display: 'block' }} />}
               <div style={{ flex: 1, minWidth: 240 }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>{remake ? 'Your version is ready.' : 'Here’s your ad.'}</div>
