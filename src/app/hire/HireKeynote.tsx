@@ -45,9 +45,9 @@ export default function HireKeynote() {
         <video className="hero-vid" autoPlay muted loop playsInline preload="auto"
           onLoadedMetadata={e => { const v = e.currentTarget; v.playbackRate = 1.4; try { v.currentTime = 1 } catch {} }}
           onTimeUpdate={e => { const v = e.currentTarget; if (v.currentTime >= 9 || (v.duration && v.currentTime >= v.duration - 0.25)) { try { v.currentTime = 1 } catch {} } }}
-          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260405_171521_25968ba2-b594-4b32-aab7-f6b69398a6fa.mp4" />
-        <h1 className="hero-h1 fr">Every morning, marketers wake up <em>already behind.</em></h1>
-        <p className="hero-sub fr fr-d1">The market moved all night. Nobody was watching.</p>
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4" />
+        <h1 className="hero-h1 fr">The market moves <em>all night.</em></h1>
+        <p className="hero-sub fr fr-d1">Marketers wake up already behind. Nobody was watching.</p>
         <a href="#offer" className="liquid-glass hero-cta fr fr-d2">Hire Mello</a>
         <div className="hint">Scroll</div>
       </section>
