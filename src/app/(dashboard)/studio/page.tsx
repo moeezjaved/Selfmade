@@ -13,14 +13,12 @@
  */
 import { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import { Sparkles, Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus, Trophy, Play } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 import { useChatStream, type CreationEvent } from '@/components/mello/useChatStream'
 
-// The full, proven video-clone flow (analyze → free script approval → render → poll)
-// lives here — the studio launches it for video winners rather than re-implementing it.
-const CloneVideoModal = dynamic(() => import('../discovery/CloneVideoModal'), { ssr: false })
+// The video-clone flow (language · voice · free script · render) now lives INLINE in the canvas.
+import InlineVideoRemake from './InlineVideoRemake'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -66,8 +64,7 @@ function StudioInner() {
   const [mode, setMode] = useState<'fresh' | 'remake'>('fresh')
   const [source, setSource] = useState<{ adId: string; img: string | null; brand: string | null } | null>(null)
   const isVideo = params.get('type') === 'video'          // the winner is a video → the video-clone flow
-  const vidUrl = params.get('vid')                        // competitor's mp4 (for the source preview + modal)
-  const [videoOpen, setVideoOpen] = useState(false)
+  const vidUrl = params.get('vid')                        // competitor's mp4 (for the source preview)
 
   // brand + site
   const [brands, setBrands] = useState<Brand[]>([])
@@ -190,8 +187,8 @@ function StudioInner() {
     // Resolve every input from the explicit override first (Mello-driven), else current UI state.
     const useMode = ov?.mode ?? mode
     const useSource = ov?.source !== undefined ? ov.source : source
-    // Video winner → hand off to the proven video-clone flow (free script approval, then render).
-    if (useMode === 'remake' && isVideo) { setVideoOpen(true); return }
+    // Video winner → handled by the inline video flow (InlineVideoRemake) in the canvas, not here.
+    if (useMode === 'remake' && isVideo) return
     const chosen = ov?.productImages ?? photos.filter(p => selected.includes(p.id)).map(p => p.src)
     if (!chosen.length) { setErr('Select at least one product photo (analyze your site or upload).'); return }
     if (!confirmCredits(useMode === 'remake' ? 'remake this ad' : 'create an ad', cost, balance)) return
@@ -436,10 +433,20 @@ function StudioInner() {
             </div>
           </div>
 
-          {/* generate */}
-          {!result && (
+          {/* video remake → the inline video flow (language · voice · free script · render), no modal */}
+          {remake && isVideo && source?.adId && (
+            <InlineVideoRemake
+              sourceAdId={source.adId} sourceVideoUrl={vidUrl || undefined} sourcePoster={source.img || undefined}
+              brandId={brandId || undefined} brandType={brands.find(b => b.id === brandId)?.brand_type}
+              productImages={photos.filter(p => selected.includes(p.id)).map(p => p.src)} brandName={brandName || undefined}
+              onDone={() => fetch('/api/creatives').then(r => r.json()).then(j => setWork((j.creatives || []).filter((c: any) => c.media_type !== 'video' && c.status === 'done' && c.image_url).slice(0, 14))).catch(() => {})}
+            />
+          )}
+
+          {/* generate (image fresh + image remake) */}
+          {!result && !(remake && isVideo) && (
             <button onClick={() => generate()} disabled={busy} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: busy ? '#dfe4de' : LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '14px 28px', fontSize: 15, fontWeight: 850, cursor: busy ? 'default' : 'pointer' }}>
-              {busy ? <><Loader2 size={17} className="spin" /> {remake ? 'Rebuilding… ~40s' : 'Designing… ~30s'}</> : <><Wand2 size={17} /> {isVideo ? 'Remake this video' : remake ? 'Remake this' : 'Create ad'} · {cost} credits</>}
+              {busy ? <><Loader2 size={17} className="spin" /> {remake ? 'Rebuilding… ~40s' : 'Designing… ~30s'}</> : <><Wand2 size={17} /> {remake ? 'Remake this' : 'Create ad'} · {cost} credits</>}
             </button>
           )}
           {err && <div style={{ marginTop: 12, fontSize: 13, color: '#b42318', background: '#fef2f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px', maxWidth: 460 }}>{err}</div>}
@@ -499,11 +506,6 @@ function StudioInner() {
           )}
         </div>
       </div>
-      {/* Video winner → the proven video-clone flow (free script approval → render → My Creatives) */}
-      {videoOpen && source?.adId && (
-        <CloneVideoModal sourceAdId={source.adId} sourceVideoUrl={vidUrl || undefined} sourcePoster={source.img || undefined}
-          onClose={() => { setVideoOpen(false); fetch('/api/creatives').then(r => r.json()).then(j => setWork((j.creatives || []).filter((c: any) => c.media_type !== 'video' && c.status === 'done' && c.image_url).slice(0, 14))).catch(() => {}) }} />
-      )}
       <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
