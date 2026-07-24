@@ -190,6 +190,27 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'create_ad',
+      description: "Generate an ad on the studio canvas RIGHT NOW — this actually produces the creative in the panel to the right (it does not just describe it). Use whenever the user asks you to make / create / design / remake / generate an ad, a UGC version, a variation, a fresh concept, or to tweak/change the image currently on the canvas. Only available inside the studio. The canvas uses the brand + product photos already loaded there and confirms the credit cost. For a remake you need source_ad_id — use the ad already open on the canvas, or first find candidates with find_winning_ads and let the user pick one with request_clarification (put the ad_id in each option's value), then call this with that source_ad_id.",
+      parameters: {
+        type: 'object',
+        required: ['kind'],
+        properties: {
+          kind: { type: 'string', enum: ['fresh', 'remake', 'tweak'], description: 'fresh = a brand-new ad from the user\'s product; remake = rebuild a competitor winner around the user\'s product; tweak = edit the image currently on the canvas' },
+          brand_name: { type: 'string', description: "Which of the user's brands to use, if they named one (else the canvas uses the currently selected brand)" },
+          angle: { type: 'string', description: 'Creative angle for a fresh ad, e.g. founder story, problem/solution, UGC testimonial' },
+          headline: { type: 'string', description: 'Headline text, only if the user specified one' },
+          niche: { type: 'string', description: 'Niche, if relevant for a fresh ad' },
+          instruction: { type: 'string', description: 'For kind=tweak: the change to make to the current image, e.g. "bigger logo, warmer background"' },
+          source_ad_id: { type: 'string', description: 'For kind=remake: the competitor ad_id to rebuild' },
+          note: { type: 'string', description: 'One short first-person sentence telling the user what you are making, e.g. "On it — a warm, founder-led UGC version."' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'request_clarification',
       description: 'Ask the user to choose from options before continuing — e.g. which ad account to analyze, or which date range. Renders an inline picker. Use when you genuinely need the user to decide.',
       parameters: {
@@ -235,6 +256,7 @@ export const TOOL_LABELS: Record<string, string> = {
   search_my_assets: 'Searching your assets…',
   remember: 'Remembering that…',
   request_clarification: 'Asking for clarification…',
+  create_ad: 'Creating on the canvas…',
 }
 
 export interface ToolCtx { userId: string }

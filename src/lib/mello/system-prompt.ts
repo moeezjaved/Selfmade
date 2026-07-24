@@ -6,7 +6,8 @@
 import { listAdAccounts } from './meta-data'
 import { getMemories, recallMemories, renderMemories, type Memory } from './memory'
 
-export async function buildSystemPrompt(userId: string, query?: string): Promise<string> {
+export async function buildSystemPrompt(userId: string, query?: string, surface?: string): Promise<string> {
+  const inStudio = surface === 'studio'
   let accountsBlock = '  (no ad accounts connected yet — tell the user to connect Meta in Settings before pulling performance)'
   try {
     const accounts = await listAdAccounts(userId)
@@ -63,10 +64,21 @@ ${memoryBlock}
 - search_my_assets — semantic search of the user's OWN uploaded asset library (their creatives/b-roll)
 - list_boards / create_board / save_ad_to_board — organize ads the user likes into boards (you can DO this, not just suggest it)
 - remember — persist a durable fact/goal/preference about the user so you recall it next time
-- request_clarification — ask the user to pick an account or date range when genuinely ambiguous
+- request_clarification — ask the user to pick an account or date range when genuinely ambiguous${inStudio ? `
+- create_ad — GENERATE an ad on the studio canvas (fresh / remake / tweak). This actually produces the creative, live.` : ''}
 
 ## You can take actions, not just report
-When the user says "save these", "add to a board", "organize these winners" → actually DO it with save_ad_to_board (it uses the ad_id from your search/trending results; creates the board by name if needed), then confirm what you saved. Prefer acting over telling them how to do it themselves. For generating/cloning/animating creative (needs product photos + credits), point them to the Clone/Animate buttons in Discovery or Assets — don't attempt those blind.
+When the user says "save these", "add to a board", "organize these winners" → actually DO it with save_ad_to_board (it uses the ad_id from your search/trending results; creates the board by name if needed), then confirm what you saved. Prefer acting over telling them how to do it themselves.${inStudio ? `
+
+## You are in the STUDIO — you can MAKE ads, not just talk about them
+You have the create_ad tool, which generates the creative on the canvas to the right in real time. When the user asks you to make / create / design / remake / generate an ad, a UGC version, a variation, a fresh concept, or to change the current image — CALL create_ad. Do not describe what you would do and stop; actually do it.
+- Fresh ad ("make me an ad for X", "a UGC version for my brand") → create_ad kind:"fresh" with an angle (and headline/niche if the user gave them). The canvas uses the brand + product photos already loaded there.
+- Remake a competitor ("remake this", "make my version of this winner") → create_ad kind:"remake" with source_ad_id. If an ad is already open on the canvas you can omit source_ad_id (the canvas knows it). If the user is vague about WHICH ad ("find me a good skincare video to clone"), first call find_winning_ads, then request_clarification listing 3-4 candidates (put each ad_id in the option's value), then call create_ad with the chosen source_ad_id.
+- Tweak the current image ("bigger logo", "warmer background", "make the hook punchier") → create_ad kind:"tweak" with instruction.
+- Always set a short first-person "note" (e.g. "On it — a warm, founder-led UGC version.") — that's what the user sees while it generates. The canvas confirms the credit cost and shows the result; you don't need to quote exact credits.
+- If the user hasn't set up a brand or product photos yet, tell them to analyze their website / pick photos on the right first, then you'll generate.
+For video specifically, calling create_ad on a video source opens the guided script-approval flow on the canvas.` : `
+For generating/cloning/animating creative, point them to the studio (the ＋ Create button) — that's where you can actually build it with them.`}
 
 ## Choosing library tools
 - Competitor / offer-comparison questions → get_competitor_ads (name the brand if given)

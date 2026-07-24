@@ -69,9 +69,13 @@ export async function runAgent(opts: {
   history: HistoryMsg[]
   userMessage: string
   send: Emit
+  surface?: string        // e.g. 'studio' — unlocks the canvas-generation tool
 }): Promise<AgentResult> {
-  const { userId, history, userMessage, send } = opts
-  const system = await buildSystemPrompt(userId, userMessage)
+  const { userId, history, userMessage, send, surface } = opts
+  const system = await buildSystemPrompt(userId, userMessage, surface)
+  // create_ad drives the studio canvas — only expose it there, so Mello never claims to
+  // generate on a surface that can't render it.
+  const activeTools = surface === 'studio' ? TOOLS : TOOLS.filter(t => t.function.name !== 'create_ad')
 
   const messages: any[] = [
     { role: 'system', content: system },
@@ -97,7 +101,7 @@ export async function runAgent(opts: {
     let assistantContent = ''
     const toolCalls: Record<number, { id: string; name: string; args: string }> = {}
 
-    const createParams: any = { model: MODEL, stream: true, messages, tools: TOOLS, tool_choice: 'auto' }
+    const createParams: any = { model: MODEL, stream: true, messages, tools: activeTools, tool_choice: 'auto' }
     // Reasoning-tier executors reject temperature and use max_completion_tokens.
     if (isReasoning(MODEL)) createParams.max_completion_tokens = 2200
     else { createParams.temperature = 0.4; createParams.max_tokens = 1800 }
@@ -154,6 +158,28 @@ export async function runAgent(opts: {
     for (const c of calls) {
       let args: any = {}
       try { args = JSON.parse(c.args || '{}') } catch { /* tolerate */ }
+
+      // ── Create on the canvas: emit a creation event the studio executes, end the turn ──
+      // Mirrors request_clarification — the heavy lifting (credits, generate, poll, render)
+      // happens client-side in the studio, which already owns the brand + product photos.
+      if (c.name === 'create_ad') {
+        send({
+          type: 'creation',
+          kind: args.kind || 'fresh',
+          brand_name: args.brand_name || null,
+          angle: args.angle || null,
+          headline: args.headline || null,
+          niche: args.niche || null,
+          instruction: args.instruction || null,
+          source_ad_id: args.source_ad_id || null,
+          note: args.note || null,
+        })
+        recordedToolCalls.push({ tool: 'create_ad', label: 'Creating on the canvas', status: 'complete', sub_item: { label: args.note || 'Generating on the canvas…' } })
+        messages.push({ role: 'tool', tool_call_id: c.id, content: 'Generation started on the canvas.' })
+        if (!finalText) finalText = args.note || 'On it — generating on the canvas now.'
+        stop = true
+        break
+      }
 
       // ── Clarification: emit widget, end the turn ──
       if (c.name === 'request_clarification') {
