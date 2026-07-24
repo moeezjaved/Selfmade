@@ -146,7 +146,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.[0].toUpperCase() || 'A'
   const displayName = user?.user_metadata?.full_name || user?.email || 'User'
-  const planLabel = profile?.subscription_status === 'trialing' ? 'Trial' : PLANS[normalizePlan(effectivePlan)]?.label || 'Free'
+  // Trials were removed in pricing-v2 — a stale subscription_status='trialing' (legacy default) must
+  // not surface as a "Trial" plan. Always show the real plan label.
+  const planLabel = PLANS[normalizePlan(effectivePlan)]?.label || 'Free'
 
   // ── the account menu (desktop + mobile): credits live HERE now, not in a panel ──
   const AcctMenu = ({ style }: { style: React.CSSProperties }) => (
