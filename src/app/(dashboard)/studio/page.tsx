@@ -1,20 +1,24 @@
 'use client'
 /**
  * STUDIO — the two-pane creation surface (Ploy's editor, applied to ads).
- * LEFT: talk to Mello (reuses useChatStream + the real agent) for angles/hooks.
- * RIGHT: the canvas — the SAME inputs the AI Ad Studio already gathers so the ad is
- * actually good: analyze the brand's website (colors/fonts/logo/palette + product
- * photos via /api/discovery/detect-product), pick product photos, set an angle and
- * niche, then Create → the ad renders inline; tweak in plain language; Approve &
- * download. Reuses the existing engine verbatim (generate-ad sync + edit-image);
- * the working modals are untouched.
+ * LEFT: talk to Mello (reuses useChatStream + the real agent).
+ * RIGHT: the canvas, with two modes:
+ *   • Remake a winner — arrive with ?ad=&img= (from a competitor ad). The competitor's
+ *     winning ad shows FIRST as the source; Mello opens with the pre-adaptation
+ *     (/api/remake/adapt); Create runs the real clone engine (/api/discovery/clone-image,
+ *     job-based → poll) and renders your version beside theirs.
+ *   • Create fresh — analyze the brand's site (detect-product → kit + photos), angle,
+ *     niche, then /api/discovery/generate-ad (sync).
+ * Reuses the existing engines verbatim; the working modals are untouched.
  */
-import { useEffect, useRef, useState } from 'react'
-import { Sparkles, Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus } from 'lucide-react'
+import { useEffect, useRef, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Sparkles, Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus, Trophy } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 import { useChatStream } from '@/components/mello/useChatStream'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 type Brand = { id: string; name: string; website?: string; brand_type?: string; brand_kit?: any; products?: { image_urls?: string[] }[] }
 type Photo = { id: string; src: string }
@@ -26,17 +30,22 @@ const emptyKit = (): Kit => ({ colors: [], fonts: null, logo: null, palette: nul
 const label: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED, marginBottom: 8 }
 const field: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '10px 13px', fontSize: 13.5, color: INK, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
 
-export default function StudioPage() {
+function StudioInner() {
   const { balance } = useCredits()
+  const params = useSearchParams()
   const chat = useChatStream()
   const [convId, setConvId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat.messages])
 
+  // mode + remake source
+  const [mode, setMode] = useState<'fresh' | 'remake'>('fresh')
+  const [source, setSource] = useState<{ adId: string; img: string | null; brand: string | null } | null>(null)
+
   // brand + site
   const [brands, setBrands] = useState<Brand[]>([])
-  const [mode, setMode] = useState<'pick' | 'new'>('pick')
+  const [bmode, setBmode] = useState<'pick' | 'new'>('pick')
   const [brandId, setBrandId] = useState<string>('')
   const [brandName, setBrandName] = useState('')
   const [website, setWebsite] = useState('')
@@ -50,7 +59,7 @@ export default function StudioPage() {
   const [angle, setAngle] = useState('')
   const [niches, setNiches] = useState<string[]>([])
   const [niche, setNiche] = useState('')
-  const [aspect, setAspect] = useState<'4:5' | '1:1' | '9:16' | '16:9'>('4:5')
+  const [aspect, setAspect] = useState<'original' | '4:5' | '1:1' | '9:16' | '16:9'>('4:5')
 
   // gen
   const [busy, setBusy] = useState(false)
@@ -61,20 +70,42 @@ export default function StudioPage() {
   const cost = 15
 
   useEffect(() => {
-    fetch('/api/brands').then(r => r.json()).then(j => { const bs: Brand[] = j.brands || []; setBrands(bs); if (bs[0]) pickBrand(bs[0]); else setMode('new') }).catch(() => setMode('new'))
+    fetch('/api/brands').then(r => r.json()).then(j => { const bs: Brand[] = j.brands || []; setBrands(bs); if (bs[0]) pickBrand(bs[0]); else setBmode('new') }).catch(() => setBmode('new'))
     fetch('/api/discovery/niches').then(r => r.json()).then(j => setNiches(j.niches || [])).catch(() => {})
     fetch('/api/mello/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).then(r => r.json()).then(j => { if (j?.conversation?.id) setConvId(j.conversation.id) }).catch(() => {})
-    chat.setHistory([{ role: 'assistant', content: 'This is your studio. On the right, analyze your website so I know your brand — then pick product photos, tell me the angle, and hit Create. Or ask me here for an angle and a hook first.' }])
+
+    const adId = params.get('ad'); const img = params.get('img'); const bnd = params.get('brand')
+    if (adId) {
+      setMode('remake'); setSource({ adId, img: img || null, brand: bnd || null }); setAspect('original')
+      chat.setHistory([{ role: 'assistant', content: 'Let me study this winning ad and adapt it for your brand…' }])
+    } else {
+      chat.setHistory([{ role: 'assistant', content: 'This is your studio. Analyze your website on the right so I know your brand — then pick product photos, set the angle, and hit Create. Or ask me here for an angle and a hook first.' }])
+    }
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Remake: once we know the brand, fetch Mello's pre-adaptation and speak it.
+  useEffect(() => {
+    if (mode !== 'remake' || !source?.adId) return
+    fetch('/api/remake/adapt', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ adId: source.adId, brandId: brandId || undefined }) })
+      .then(r => r.json()).then(d => {
+        if (d?.adaptation) {
+          const a = d.adaptation
+          const lines = [`I studied this ${source.brand || d.adBrand || 'competitor'} ad. ${a.studied || ''}`.trim(),
+            '', `Here's how I'd rebuild it for ${d.brand?.name || 'your brand'}:`,
+            `• Hook: ${a.hook}`, ...(a.scenes || []).slice(0, 3).map((s: string) => `• ${s}`),
+            '', 'Pick your product photos on the right and hit Remake.'].filter(x => x !== undefined)
+          chat.setHistory([{ role: 'assistant', content: lines.join('\n') }])
+        }
+      }).catch(() => {})
+  }, [mode, source?.adId, brandId])   // eslint-disable-line react-hooks/exhaustive-deps
+
   const pickBrand = (b: Brand) => {
-    setMode('pick'); setBrandId(b.id); setBrandName(b.name); setWebsite(b.website || '')
-    const k = b.brand_kit || {}
-    setKit({ colors: k.colors || [], fonts: k.fonts || null, logo: k.logo || null, palette: k.palette || null })
+    setBmode('pick'); setBrandId(b.id); setBrandName(b.name); setWebsite(b.website || '')
+    const k = b.brand_kit || {}; setKit({ colors: k.colors || [], fonts: k.fonts || null, logo: k.logo || null, palette: k.palette || null })
     const imgs = (b.products || []).flatMap(p => p.image_urls || []).slice(0, 10)
     const ph = imgs.map(u => ({ id: uid(), src: u })); setPhotos(ph); setSelected(ph.slice(0, 2).map(p => p.id))
   }
-  const newBrand = () => { setMode('new'); setBrandId(''); setBrandName(''); setWebsite(''); setKit(emptyKit()); setPhotos([]); setSelected([]) }
+  const newBrand = () => { setBmode('new'); setBrandId(''); setBrandName(''); setWebsite(''); setKit(emptyKit()); setPhotos([]); setSelected([]) }
 
   const analyze = async () => {
     if (!website.trim()) return
@@ -86,7 +117,7 @@ export default function StudioPage() {
       const found = Array.from(new Set([...(j.productImages || []), ...(j.images || [])])) as string[]
       if (found.length) { const ph = found.slice(0, 10).map(u => ({ id: uid(), src: u })); setPhotos(p => [...ph, ...p]); setSelected(s => Array.from(new Set([...ph.slice(0, 2).map(p => p.id), ...s])).slice(0, 3)) }
       else setErr('Analyzed the site, but found no product photos — upload a couple below.')
-    } catch (e: any) { setErr('Couldn’t analyze that site — check the URL or upload photos manually.') } finally { setDetecting(false) }
+    } catch { setErr('Couldn’t analyze that site — check the URL or upload photos manually.') } finally { setDetecting(false) }
   }
 
   const onUpload = async (files: FileList | null) => {
@@ -101,26 +132,51 @@ export default function StudioPage() {
     setErr(null)
     const chosen = photos.filter(p => selected.includes(p.id)).map(p => p.src)
     if (!chosen.length) { setErr('Select at least one product photo (analyze your site or upload).'); return }
-    if (!confirmCredits('create an ad', cost, balance)) return
+    if (!confirmCredits(mode === 'remake' ? 'remake this ad' : 'create an ad', cost, balance)) return
+    const brand = brands.find(b => b.id === brandId)
     setBusy(true); setResult(null)
     try {
-      // A brand-new brand: save it first so the kit sticks and future ads reuse it.
+      // A brand-new brand: save it first so the kit persists.
       let useBrandId = brandId
-      if (mode === 'new' && brandName.trim()) {
+      if (bmode === 'new' && brandName.trim()) {
         const httpImgs = chosen.filter(s => /^https?:\/\//i.test(s))
         const jb = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: brandName.trim(), website: website.trim() || null, product_images: httpImgs, brand_kit: kit }) }).then(r => r.json()).catch(() => ({}))
         if (jb?.brand?.id) { useBrandId = jb.brand.id; setBrandId(jb.brand.id) }
       }
-      const body = {
-        brandId: useBrandId || undefined, productImages: chosen, brandName: brandName.trim() || undefined,
-        colors: kit.colors, palette: kit.palette || undefined, fonts: kit.fonts, logo: kit.logo || undefined,
-        newHeadline: headline.trim() || undefined, angle: angle.trim() || undefined, niche: niche || undefined,
-        aspectRatio: aspect, imageSize: '2K',
+
+      if (mode === 'remake' && source?.adId) {
+        // clone the competitor's winner (job-based → poll)
+        const body = {
+          adId: source.adId, productImages: chosen, tier: 'pro', brandId: useBrandId || undefined,
+          productType: brand?.brand_type || 'physical', brandName: brandName.trim() || undefined,
+          colors: kit.colors, palette: kit.palette || undefined, logo: kit.logo || undefined,
+          newHeadline: headline.trim() || undefined, aspectRatio: aspect, imageSize: '2K',
+        }
+        const enq = await fetch('/api/discovery/clone-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+        const ej = await enq.json().catch(() => ({}))
+        if (!enq.ok || !ej.jobId) { setErr(ej.error === 'insufficient_credits' ? 'Not enough credits.' : ej.error || 'Couldn’t start the remake.'); return }
+        let done = false
+        for (let i = 0; i < 140 && !done; i++) {
+          await sleep(2500)
+          const s = await fetch(`/api/discovery/clone-image/status?id=${ej.jobId}`).then(r => r.json()).catch(() => ({}))
+          if (s.done && s.url) { setResult({ url: s.url, genId: s.generationId || ej.jobId }); done = true }
+          else if (s.failed) { setErr(s.error || 'The remake failed — credits were refunded.'); return }
+        }
+        if (!done) setErr('Still working — check My Creatives in a minute.')
+        refreshCredits()
+      } else {
+        // fresh create (sync)
+        const body = {
+          brandId: useBrandId || undefined, productImages: chosen, brandName: brandName.trim() || undefined,
+          colors: kit.colors, palette: kit.palette || undefined, fonts: kit.fonts, logo: kit.logo || undefined,
+          newHeadline: headline.trim() || undefined, angle: angle.trim() || undefined, niche: niche || undefined,
+          aspectRatio: aspect === 'original' ? '4:5' : aspect, imageSize: '2K',
+        }
+        const r = await fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+        const t = await r.text(); let j: any; try { j = JSON.parse(t) } catch { j = { error: `HTTP ${r.status}` } }
+        if (!r.ok || !j?.url) { setErr(j?.error === 'insufficient_credits' ? 'Not enough credits.' : j?.error || 'Generation failed — try again.'); return }
+        setResult({ url: j.url, genId: j.generationId || null }); refreshCredits()
       }
-      const r = await fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-      const t = await r.text(); let j: any; try { j = JSON.parse(t) } catch { j = { error: `HTTP ${r.status}` } }
-      if (!r.ok || !j?.url) { setErr(j?.error === 'insufficient_credits' ? 'Not enough credits.' : j?.error || 'Generation failed — try again.'); return }
-      setResult({ url: j.url, genId: j.generationId || null }); refreshCredits()
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
   }
 
@@ -137,6 +193,7 @@ export default function StudioPage() {
   const download = () => { if (result) { const a = document.createElement('a'); a.href = result.url; a.download = 'selfmade-ad.png'; a.target = '_blank'; a.click() } }
 
   const kitReady = kit.colors.length > 0 || kit.logo || kit.palette
+  const remake = mode === 'remake'
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: "'Inter', -apple-system, sans-serif" }}>
@@ -149,7 +206,7 @@ export default function StudioPage() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px' }}>
           {chat.messages.map((m, i) => (
             <div key={i} style={{ marginBottom: 14, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <div style={{ maxWidth: '86%', fontSize: 13.5, lineHeight: 1.6, padding: '10px 13px', borderRadius: 14, background: m.role === 'user' ? FOREST : '#f2f5f0', color: m.role === 'user' ? '#eef5eb' : INK, whiteSpace: 'pre-wrap' }}>
+              <div style={{ maxWidth: '88%', fontSize: 13.5, lineHeight: 1.6, padding: '10px 13px', borderRadius: 14, background: m.role === 'user' ? FOREST : '#f2f5f0', color: m.role === 'user' ? '#eef5eb' : INK, whiteSpace: 'pre-wrap' }}>
                 {m.content || (m.streaming ? <span style={{ opacity: .6 }}>…</span> : '')}
                 {m.error && <span style={{ color: '#d64545' }}>{m.error}</span>}
               </div>
@@ -159,7 +216,7 @@ export default function StudioPage() {
         </div>
         <div style={{ padding: 12, borderTop: `1px solid ${LINE}` }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, background: '#f6f8f5', border: `1px solid ${LINE}`, borderRadius: 14, padding: '8px 10px' }}>
-            <textarea value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} rows={1} placeholder="Ask Mello for an angle, a hook…" style={{ flex: 1, resize: 'none', border: 'none', background: 'transparent', outline: 'none', fontSize: 13.5, color: INK, fontFamily: 'inherit', maxHeight: 120 }} />
+            <textarea value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} rows={1} placeholder="Ask Mello…" style={{ flex: 1, resize: 'none', border: 'none', background: 'transparent', outline: 'none', fontSize: 13.5, color: INK, fontFamily: 'inherit', maxHeight: 120 }} />
             <button onClick={send} disabled={!draft.trim() || chat.streaming} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: draft.trim() ? FOREST : '#dfe4de', color: draft.trim() ? LIME : '#9aa79a', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }}><ArrowUp size={16} /></button>
           </div>
         </div>
@@ -167,22 +224,41 @@ export default function StudioPage() {
 
       {/* ── RIGHT · the canvas ── */}
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', background: '#fbfcfa' }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', padding: '26px 26px 90px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>Create an ad</div>
-          <div style={{ fontSize: 13, color: MUTED, marginTop: 3, marginBottom: 22 }}>The more Mello knows about your brand, the better the ad. Start with your website.</div>
+        <div style={{ maxWidth: 820, margin: '0 auto', padding: '26px 26px 90px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>{remake ? 'Remake this winner' : 'Create an ad'}</div>
+          <div style={{ fontSize: 13, color: MUTED, marginTop: 3, marginBottom: 20 }}>{remake ? 'Their proven ad, rebuilt around your product.' : 'The more Mello knows about your brand, the better the ad. Start with your website.'}</div>
+
+          {/* ── REMAKE: the competitor's winner, shown FIRST ── */}
+          {remake && (
+            <div style={{ display: 'flex', gap: 18, alignItems: 'stretch', marginBottom: 24, flexWrap: 'wrap' }}>
+              <div style={{ width: 220 }}>
+                <div style={label}><Trophy size={12} style={{ verticalAlign: -1, marginRight: 4 }} />The winner</div>
+                <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#0d120e', aspectRatio: '4/5' }}>
+                  {source?.img
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    ? <img src={source.img} alt="competitor ad" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#6b7d6e', fontSize: 12, textAlign: 'center', padding: 16 }}>{source?.brand || 'Competitor'} ad</div>}
+                </div>
+              </div>
+              <div style={{ width: 220 }}>
+                <div style={label}>Your version</div>
+                <div style={{ borderRadius: 14, border: `1.5px dashed ${LINE}`, background: '#fff', aspectRatio: '4/5', display: 'grid', placeItems: 'center', color: MUTED, fontSize: 12, textAlign: 'center', padding: 16 }}>
+                  {busy ? <span style={{ display: 'grid', gap: 8, justifyItems: 'center' }}><Loader2 size={20} className="spin" color={GREEN} />Rebuilding… ~40s</span> : result ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="your version" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }} /> : 'Appears here after Remake'}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Brand */}
           <div style={{ marginBottom: 20 }}>
-            <div style={label}>Brand</div>
+            <div style={label}>Your brand</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: brands.length ? 12 : 0 }}>
               {brands.map(b => (
-                <button key={b.id} onClick={() => pickBrand(b)} style={{ border: `1.5px solid ${mode === 'pick' && brandId === b.id ? GREEN : LINE}`, background: mode === 'pick' && brandId === b.id ? '#f4fbe6' : '#fff', color: INK, borderRadius: 100, padding: '7px 14px', fontSize: 12.5, fontWeight: 750, cursor: 'pointer' }}>{b.name}</button>
+                <button key={b.id} onClick={() => pickBrand(b)} style={{ border: `1.5px solid ${bmode === 'pick' && brandId === b.id ? GREEN : LINE}`, background: bmode === 'pick' && brandId === b.id ? '#f4fbe6' : '#fff', color: INK, borderRadius: 100, padding: '7px 14px', fontSize: 12.5, fontWeight: 750, cursor: 'pointer' }}>{b.name}</button>
               ))}
-              <button onClick={newBrand} style={{ border: `1.5px dashed ${mode === 'new' ? GREEN : LINE}`, background: mode === 'new' ? '#f4fbe6' : '#fff', color: mode === 'new' ? GREEN : MUTED, borderRadius: 100, padding: '7px 14px', fontSize: 12.5, fontWeight: 750, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Plus size={13} /> New brand</button>
+              <button onClick={newBrand} style={{ border: `1.5px dashed ${bmode === 'new' ? GREEN : LINE}`, background: bmode === 'new' ? '#f4fbe6' : '#fff', color: bmode === 'new' ? GREEN : MUTED, borderRadius: 100, padding: '7px 14px', fontSize: 12.5, fontWeight: 750, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Plus size={13} /> New brand</button>
             </div>
-            {mode === 'new' && <input value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Brand name" style={{ ...field, maxWidth: 320, marginBottom: 10 }} />}
-
-            {/* Website analyze — the key step for a good ad */}
+            {bmode === 'new' && <input value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Brand name" style={{ ...field, maxWidth: 320, marginBottom: 10 }} />}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
                 <Globe size={15} color={MUTED} style={{ position: 'absolute', left: 12, top: 12 }} />
@@ -201,7 +277,7 @@ export default function StudioPage() {
 
           {/* product photos */}
           <div style={{ marginBottom: 20 }}>
-            <div style={label}>Product photos <span style={{ color: '#aab0a6', fontWeight: 600 }}>· pick up to 3</span></div>
+            <div style={label}>Your product photos <span style={{ color: '#aab0a6', fontWeight: 600 }}>· pick up to 3</span></div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(82px, 1fr))', gap: 9 }}>
               {photos.map(p => {
                 const on = selected.includes(p.id)
@@ -221,26 +297,28 @@ export default function StudioPage() {
             {photos.length === 0 && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>Analyze your site above, or upload product photos.</div>}
           </div>
 
-          {/* angle + niche + headline */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-            <div><div style={label}>Angle</div><input value={angle} onChange={e => setAngle(e.target.value)} placeholder="e.g. founder story, problem/solution" style={field} /></div>
-            <div><div style={label}>Niche</div>
-              <select value={niche} onChange={e => setNiche(e.target.value)} style={{ ...field, appearance: 'auto' as any }}>
-                <option value="">Auto-detect</option>
-                {niches.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
+          {/* angle + niche (fresh only) */}
+          {!remake && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div><div style={label}>Angle</div><input value={angle} onChange={e => setAngle(e.target.value)} placeholder="e.g. founder story, problem/solution" style={field} /></div>
+              <div><div style={label}>Niche</div>
+                <select value={niche} onChange={e => setNiche(e.target.value)} style={{ ...field, appearance: 'auto' as any }}>
+                  <option value="">Auto-detect</option>
+                  {niches.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
             </div>
-          </div>
+          )}
           <div style={{ marginBottom: 20 }}><div style={label}>Headline <span style={{ color: '#aab0a6', fontWeight: 600 }}>· optional</span></div>
-            <input value={headline} onChange={e => setHeadline(e.target.value)} placeholder="Leave blank and Mello writes it" style={field} />
+            <input value={headline} onChange={e => setHeadline(e.target.value)} placeholder={remake ? 'Keep theirs, or write your own' : 'Leave blank and Mello writes it'} style={field} />
           </div>
 
           {/* aspect */}
           <div style={{ marginBottom: 22 }}>
             <div style={label}>Format</div>
-            <div style={{ display: 'inline-flex', background: '#eef2ec', borderRadius: 100, padding: 3 }}>
-              {(['4:5', '1:1', '9:16', '16:9'] as const).map(a => (
-                <button key={a} onClick={() => setAspect(a)} style={{ border: 'none', borderRadius: 100, padding: '7px 14px', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: aspect === a ? '#fff' : 'transparent', color: aspect === a ? INK : MUTED }}>{a}</button>
+            <div style={{ display: 'inline-flex', background: '#eef2ec', borderRadius: 100, padding: 3, flexWrap: 'wrap' }}>
+              {(remake ? ['original', '4:5', '1:1', '9:16', '16:9'] : ['4:5', '1:1', '9:16', '16:9']).map(a => (
+                <button key={a} onClick={() => setAspect(a as any)} style={{ border: 'none', borderRadius: 100, padding: '7px 13px', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: aspect === a ? '#fff' : 'transparent', color: aspect === a ? INK : MUTED }}>{a === 'original' ? 'Match theirs' : a}</button>
               ))}
             </div>
           </div>
@@ -248,18 +326,17 @@ export default function StudioPage() {
           {/* generate */}
           {!result && (
             <button onClick={generate} disabled={busy} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: busy ? '#dfe4de' : LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '14px 28px', fontSize: 15, fontWeight: 850, cursor: busy ? 'default' : 'pointer' }}>
-              {busy ? <><Loader2 size={17} className="spin" /> Designing your ad… ~30s</> : <><Wand2 size={17} /> Create ad · {cost} credits</>}
+              {busy ? <><Loader2 size={17} className="spin" /> {remake ? 'Rebuilding… ~40s' : 'Designing… ~30s'}</> : <><Wand2 size={17} /> {remake ? 'Remake this' : 'Create ad'} · {cost} credits</>}
             </button>
           )}
           {err && <div style={{ marginTop: 12, fontSize: 13, color: '#b42318', background: '#fef2f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px', maxWidth: 460 }}>{err}</div>}
 
-          {/* result */}
+          {/* result actions (image shown in the two-col above for remake; standalone for fresh) */}
           {result && (
             <div style={{ marginTop: 8, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={result.url} alt="Your ad" style={{ width: 340, maxWidth: '100%', borderRadius: 16, border: `1px solid ${LINE}`, boxShadow: '0 30px 60px -30px rgba(23,37,28,.4)', display: 'block' }} />
+              {!remake && /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="Your ad" style={{ width: 320, maxWidth: '100%', borderRadius: 16, border: `1px solid ${LINE}`, boxShadow: '0 30px 60px -30px rgba(23,37,28,.4)', display: 'block' }} />}
               <div style={{ flex: 1, minWidth: 240 }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>Here’s your ad.</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>{remake ? 'Your version is ready.' : 'Here’s your ad.'}</div>
                 <div style={{ fontSize: 13, color: MUTED, margin: '5px 0 16px', lineHeight: 1.55 }}>Love it? Approve and download. Want a change? Tell Mello and she’ll tweak this exact image.</div>
                 <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
                   <button onClick={download} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><Download size={15} /> Approve &amp; download</button>
@@ -280,4 +357,8 @@ export default function StudioPage() {
       <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
+}
+
+export default function StudioPage() {
+  return <Suspense fallback={null}><StudioInner /></Suspense>
 }
