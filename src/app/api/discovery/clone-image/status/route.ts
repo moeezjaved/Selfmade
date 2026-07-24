@@ -41,6 +41,6 @@ export async function GET(req: NextRequest) {
     failed: status === 'failed',
     url: (row as any).image_url || null,
     generationId: (row as any).id,
-    error: status === 'failed' ? (FRIENDLY[rawErr || ''] || rawErr || 'Generation failed — credits refunded. Try again.') : null,
+    error: status === 'failed' ? (FRIENDLY[rawErr || ''] || rawErr || 'Generation failed — your credits are refunded automatically (may take a couple of minutes). Try again.') : null,
   })
 }
