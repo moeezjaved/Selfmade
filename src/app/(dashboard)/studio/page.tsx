@@ -97,9 +97,12 @@ function StudioInner() {
   const fileRef = useRef<HTMLInputElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
   const cost = isVideo ? 600 : 15
+  // Once the user has analyzed a site or uploaded, the (slow) /api/brands auto-pick must NOT overwrite
+  // their photos — that race is why analyzed photos "vanished after 5-10s".
+  const touchedRef = useRef(false)
 
   useEffect(() => {
-    fetch('/api/brands').then(r => r.json()).then(j => { const bs: Brand[] = j.brands || []; setBrands(bs); if (bs[0]) pickBrand(bs[0]); else setBmode('new') }).catch(() => setBmode('new'))
+    fetch('/api/brands').then(r => r.json()).then(j => { const bs: Brand[] = j.brands || []; setBrands(bs); if (bs[0] && !touchedRef.current) pickBrand(bs[0]); else if (!bs[0]) setBmode('new') }).catch(() => setBmode('new'))
     fetch('/api/discovery/niches').then(r => r.json()).then(j => setNiches(j.niches || [])).catch(() => {})
     fetch('/api/creatives').then(r => r.json()).then(j => setWork((j.creatives || []).filter((c: any) => c.media_type !== 'video' && c.status === 'done' && c.image_url).slice(0, 14))).catch(() => {})
     fetch('/api/mello/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).then(r => r.json()).then(j => { if (j?.conversation?.id) setConvId(j.conversation.id) }).catch(() => {})
@@ -142,6 +145,7 @@ function StudioInner() {
 
   const analyze = async () => {
     if (!website.trim()) return
+    touchedRef.current = true   // stop a late brands-fetch from clobbering what we analyze
     setDetecting(true); setErr(null)
     try {
       const j = await fetch('/api/discovery/detect-product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: website.trim() }) }).then(r => r.json())
@@ -155,6 +159,7 @@ function StudioInner() {
 
   const onUpload = async (files: FileList | null) => {
     if (!files?.length) return
+    touchedRef.current = true
     const arr = await Promise.all(Array.from(files).slice(0, 6).map(async f => ({ id: uid(), src: await fileToDataUrl(f) })))
     setPhotos(p => [...arr, ...p]); setSelected(s => Array.from(new Set([...arr.map(a => a.id), ...s])).slice(0, 3))
   }
@@ -293,7 +298,9 @@ function StudioInner() {
     } else {
       ov.mode = 'fresh'; setMode('fresh')
     }
-    if (!ov.productImages || !ov.productImages.length) { setErr('Add a product photo on the right (analyze your site or upload) and I’ll generate.'); return }
+    // Video remakes collect the product photo inside the guided video flow — don't block them here.
+    const videoRemake = ov.mode === 'remake' && isVideo
+    if (!videoRemake && (!ov.productImages || !ov.productImages.length)) { setErr('Add a product photo on the right (analyze your site or upload) and I’ll generate.'); return }
     generate(ov)
   }
 
