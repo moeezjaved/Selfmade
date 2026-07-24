@@ -144,7 +144,9 @@ function StudioInner() {
     setBmode('pick'); setBrandId(b.id); setBrandName(b.name); setWebsite(b.website || '')
     const k = b.brand_kit || {}; setKit({ colors: k.colors || [], fonts: k.fonts || null, logo: k.logo || null, palette: k.palette || null })
     const imgs = (b.products || []).flatMap(p => p.image_urls || []).slice(0, 10)
-    const ph = imgs.map(u => ({ id: uid(), src: u })); setPhotos(ph); setSelected(ph.slice(0, 2).map(p => p.id))
+    // Ground on the first 4 product photos (parity with the old clone modal) — more references =
+    // a far more faithful bottle + logo. Selecting only 2 was starving the engine.
+    const ph = imgs.map(u => ({ id: uid(), src: u })); setPhotos(ph); setSelected(ph.slice(0, 4).map(p => p.id))
   }
   const newBrand = () => { setBmode('new'); setBrandId(''); setBrandName(''); setWebsite(''); setKit(emptyKit()); setPhotos([]); setSelected([]) }
 
@@ -157,7 +159,7 @@ function StudioInner() {
       if (j.brandName && !brandName.trim()) setBrandName(j.brandName)
       setKit({ colors: Array.isArray(j.colors) ? j.colors : [], fonts: j.fonts || null, logo: j.logo || null, palette: j.palette || null })
       const found = Array.from(new Set([...(j.productImages || []), ...(j.images || [])])) as string[]
-      if (found.length) { const ph = found.slice(0, 10).map(u => ({ id: uid(), src: u })); setPhotos(p => [...ph, ...p]); setSelected(s => Array.from(new Set([...ph.slice(0, 2).map(p => p.id), ...s])).slice(0, 3)) }
+      if (found.length) { const ph = found.slice(0, 10).map(u => ({ id: uid(), src: u })); setPhotos(p => [...ph, ...p]); setSelected(s => Array.from(new Set([...ph.slice(0, 4).map(p => p.id), ...s])).slice(0, 4)) }
       else setErr('Analyzed the site, but found no product photos — upload a couple below.')
     } catch { setErr('Couldn’t analyze that site — check the URL or upload photos manually.') } finally { setDetecting(false) }
   }
@@ -166,9 +168,9 @@ function StudioInner() {
     if (!files?.length) return
     touchedRef.current = true
     const arr = await Promise.all(Array.from(files).slice(0, 6).map(async f => ({ id: uid(), src: await fileToDataUrl(f) })))
-    setPhotos(p => [...arr, ...p]); setSelected(s => Array.from(new Set([...arr.map(a => a.id), ...s])).slice(0, 3))
+    setPhotos(p => [...arr, ...p]); setSelected(s => Array.from(new Set([...arr.map(a => a.id), ...s])).slice(0, 4))
   }
-  const toggle = (id: string) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : (s.length >= 3 ? s : [...s, id]))
+  const toggle = (id: string) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : (s.length >= 4 ? s : [...s, id]))
   // Tell Mello what's already on the canvas so she can act on "remake this"/"tweak this" without asking.
   const canvasContext = () => {
     const b = brands.find(x => x.id === brandId)
@@ -225,7 +227,7 @@ function StudioInner() {
           productType: useBrandType || 'physical', brandName: useBrandName.trim() || undefined,
           colors: useKit.colors, palette: useKit.palette || undefined, logo: useKit.logo || undefined,
           newHeadline: useHeadline.trim() || undefined, aspectRatio: useAspect, imageSize: imgQuality,
-          look: look !== 'match' ? look : undefined,
+          look,   // always send (default 'match') — byte-identical to the old clone modal's payload
         }
         const jobIds: string[] = []
         for (let v = 0; v < variantCount; v++) {
@@ -368,7 +370,7 @@ function StudioInner() {
                     ? <video src={vidUrl} poster={source?.img || undefined} autoPlay controls playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     : source?.img
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      ? <img src={source.img} alt="competitor ad" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ? <img src={source.img} alt="competitor ad" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#6b7d6e', fontSize: 12, textAlign: 'center', padding: 16 }}>{source?.brand || 'Competitor'} ad</div>}
                   {/* lime play button (same as Discovery) — click to play the winner inline */}
                   {isVideo && !winnerPlaying && (
@@ -384,8 +386,8 @@ function StudioInner() {
               </div>
               <div style={{ width: 220 }}>
                 <div style={label}>Your version</div>
-                <div style={{ borderRadius: 14, border: `1.5px dashed ${LINE}`, background: '#fff', aspectRatio: '4/5', display: 'grid', placeItems: 'center', color: MUTED, fontSize: 12, textAlign: 'center', padding: 16 }}>
-                  {isVideo ? 'Approve the script, then your video renders — it also lands in My Creatives.' : busy ? <span style={{ display: 'grid', gap: 8, justifyItems: 'center' }}><Loader2 size={20} className="spin" color={GREEN} />Rebuilding… ~40s</span> : result ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="your version" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }} /> : 'Appears here after Remake'}
+                <div style={{ borderRadius: 14, border: `1.5px solid ${LINE}`, background: '#0d120e', aspectRatio: '4/5', overflow: 'hidden', display: 'grid', placeItems: 'center', color: MUTED, fontSize: 12, textAlign: 'center', padding: result ? 0 : 16 }}>
+                  {isVideo ? 'Approve the script, then your video renders — it also lands in My Creatives.' : busy ? <span style={{ display: 'grid', gap: 8, justifyItems: 'center', color: MUTED }}><Loader2 size={20} className="spin" color={GREEN} />Rebuilding… ~40s</span> : result ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="your version" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : 'Appears here after Remake'}
                 </div>
               </div>
             </div>
@@ -419,7 +421,7 @@ function StudioInner() {
 
           {/* product photos */}
           <div style={{ marginBottom: 20 }}>
-            <div style={label}>Your product photos <span style={{ color: '#aab0a6', fontWeight: 600 }}>· pick up to 3</span></div>
+            <div style={label}>Your product photos <span style={{ color: '#aab0a6', fontWeight: 600 }}>· pick up to 4</span></div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(82px, 1fr))', gap: 9 }}>
               {photos.map(p => {
                 const on = selected.includes(p.id)
