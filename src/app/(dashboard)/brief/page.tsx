@@ -202,7 +202,8 @@ export default function StandupPage() {
   // One calm default — no toggle, fewer decisions. The Desk variant stays reachable via ?view=desk.
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get('view') === 'desk') setView('desk') } catch {} }, [])
   useEffect(() => { fetch('/api/brief').then(r => r.ok ? r.json() : Promise.reject()).then((b: Brief) => { setBrief(b); setFocusItem(b.headline || b.items[0] || null) }).catch(() => setErr(true)) }, [])
-  useEffect(() => { if (thread.length) endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [thread])
+  // Keep the newest turn just above the composer — block:'end' so it never yanks the page to the top.
+  useEffect(() => { if (thread.length) setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 40) }, [thread])
 
   const h = new Date().getHours()
   const greet = h < 5 ? 'Late one' : h < 12 ? 'Morning' : h < 18 ? 'Afternoon' : 'Evening'
@@ -396,11 +397,11 @@ export default function StandupPage() {
           {thread.length > 0 && (
             <div style={{ marginTop: 26, paddingTop: 22, borderTop: `1px dashed ${LINE}`, display: 'flex', flexDirection: 'column', gap: 14 }}>
               {thread.map((t, i) => t.who === 'user' ? (
-                <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '82%', background: '#eef4ea', borderRadius: '16px 16px 4px 16px', padding: '9px 14px', fontSize: 14, fontWeight: 550, color: INK }}>{t.text}</div>
+                <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '82%', background: '#eef4ea', borderRadius: '16px 16px 4px 16px', padding: '9px 14px', fontSize: 14, fontWeight: 550, color: INK, overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{t.text}</div>
               ) : (
-                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', maxWidth: '90%' }}>
+                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', maxWidth: '90%', minWidth: 0 }}>
                   <MelloFace size={26} />
-                  <div style={{ fontSize: 14.5, lineHeight: 1.6, color: INK, paddingTop: 2 }}>
+                  <div style={{ fontSize: 14.5, lineHeight: 1.6, color: INK, paddingTop: 2, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
                     {(t as any).pending ? <span style={{ color: MUTED }}>Mello is thinking<span style={{ animation: 'mp 1.2s infinite' }}>…</span></span> : (t as any).text}
                   </div>
                 </div>
@@ -425,10 +426,12 @@ export default function StandupPage() {
       <style>{`.brief-composer{padding-left:20px}@media(min-width:769px){.brief-composer{padding-left:92px}}`}</style>
       {brief && (
         <div className="brief-composer" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: 'linear-gradient(transparent, #f6f8f5 34%)', paddingTop: 26, paddingRight: 20, paddingBottom: 22, pointerEvents: 'none' }}>
-          <form onSubmit={(e) => { e.preventDefault(); say(draft) }} style={{ maxWidth: 620, margin: '0 auto', display: 'flex', gap: 9, pointerEvents: 'auto' }}>
-            <input value={draft} onChange={e => setDraft(e.target.value)} disabled={busy}
+          <form onSubmit={(e) => { e.preventDefault(); say(draft) }} style={{ maxWidth: 620, margin: '0 auto', display: 'flex', alignItems: 'flex-end', gap: 9, pointerEvents: 'auto' }}>
+            {/* textarea, not input, so Shift+Enter inserts a newline and Enter sends. Auto-grows to ~5 lines. */}
+            <textarea value={draft} onChange={e => setDraft(e.target.value)} disabled={busy} rows={1}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); say(draft) } }}
               placeholder={busy ? 'Mello is thinking…' : focusItem ? `Reply to Mello — “make it warmer”, “why?”…` : 'Say anything to Mello…'}
-              style={{ flex: 1, border: `1.5px solid ${LINE}`, background: '#fff', borderRadius: 100, padding: '13px 20px', fontSize: 14, color: INK, outline: 'none', fontFamily: 'inherit', boxShadow: '0 6px 20px rgba(16,24,15,.06)' }} />
+              style={{ flex: 1, border: `1.5px solid ${LINE}`, background: '#fff', borderRadius: 22, padding: '13px 20px', fontSize: 14, color: INK, outline: 'none', fontFamily: 'inherit', boxShadow: '0 6px 20px rgba(16,24,15,.06)', resize: 'none', maxHeight: 132, lineHeight: 1.5 }} />
             <button type="submit" disabled={busy || !draft.trim()} aria-label="Send" style={{ width: 46, height: 46, borderRadius: '50%', border: 'none', background: draft.trim() && !busy ? FOREST : '#c7cec5', color: LIME, display: 'grid', placeItems: 'center', cursor: draft.trim() && !busy ? 'pointer' : 'default', flexShrink: 0 }}>
               <ArrowUp size={18} />
             </button>
