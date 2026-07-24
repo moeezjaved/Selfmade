@@ -34,6 +34,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
 }) {
   const { balance } = useCredits()
   const [phase, setPhase] = useState<'setup' | 'scripting' | 'review' | 'rendering' | 'done'>('setup')
+  const [style, setStyle] = useState<'ugc' | 'cinematic'>('ugc')   // Cinematic is gated (coming soon) — UGC ships
   const [language, setLanguage] = useState('en')
   const [voice, setVoice] = useState('nova')
   const [jobId, setJobId] = useState<string | null>(null)
@@ -104,9 +105,17 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
 
   return (
     <div style={{ marginTop: 20 }}>
-      {/* SETUP — language + voice, then the free script */}
+      {/* SETUP — style, language + voice, then the free script */}
       {phase === 'setup' && (
         <div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={label}>Style</div>
+            <div style={pillRow}>
+              <button onClick={() => setStyle('ugc')} style={pill(style === 'ugc')}>UGC</button>
+              <button disabled title="Coming soon" style={{ ...pill(false), cursor: 'default', opacity: 0.6 }}>Cinematic · soon</button>
+            </div>
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>UGC = a creator-style talking video. Cinematic (scene-by-scene) is coming soon.</div>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div><div style={label}>Language</div>
               <select value={language} onChange={e => setLanguage(e.target.value)} style={field}>{LANGS.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}</select>
@@ -135,9 +144,9 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
           <div style={label}>Your script <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit anything</span></div>
           <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />
           <div style={{ margin: '16px 0' }}>
-            <div style={label}>Length</div>
+            <div style={label}>Length {srcSecs ? <span style={{ color: '#aab0a6', fontWeight: 600 }}>· their ad runs ~{Math.round(srcSecs)}s</span> : null}</div>
             <div style={pillRow}>
-              {(['15', '30', '60', 'match'] as const).map(b => <button key={b} onClick={() => setBucket(b)} style={pill(bucket === b)}>{b === 'match' ? 'Match theirs' : `${b}s`}</button>)}
+              {(['15', '30', '60', 'match'] as const).map(b => <button key={b} onClick={() => setBucket(b)} style={pill(bucket === b)}>{b === 'match' ? `Match theirs${srcSecs ? ` (~${Math.round(srcSecs)}s)` : ''}` : `${b}s`}</button>)}
             </div>
           </div>
           <button onClick={render} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '13px 24px', fontSize: 14.5, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
