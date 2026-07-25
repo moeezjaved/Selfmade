@@ -10,7 +10,7 @@ import BriefClient from './BriefClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function BriefPage({ searchParams }: { searchParams?: { view?: string; brand?: string } }) {
+export default async function BriefPage({ searchParams }: { searchParams?: { view?: string; brand?: string; welcome?: string } }) {
   // The view AND the selected brand are resolved on the SERVER and rendered into the HTML. Reading
   // either in a useEffect meant a failed hydration (broken extensions) silently fell back to the
   // default — same class of bug as the studio's mode/source seeding. Never gate first paint on the
@@ -34,5 +34,7 @@ export default async function BriefPage({ searchParams }: { searchParams?: { vie
       initialBrief = await assembleBrief(admin, user.id, { ...(user.user_metadata || {}), email: user.email }, { brandId: activeBrandId })
     } catch { initialBrief = null }
   }
-  return <BriefClient initialBrief={initialBrief} initialView={initialView} brands={brands} activeBrandId={activeBrandId} />
+  // First arrival straight from onboarding's night reveal — surfaces the welcome + the after-value plan ask.
+  const welcome = searchParams?.welcome === '1'
+  return <BriefClient initialBrief={initialBrief} initialView={initialView} brands={brands} activeBrandId={activeBrandId} welcome={welcome} />
 }

@@ -217,7 +217,7 @@ function DeskView({ brief, greet, onAct, onDecision }: { brief: Brief; greet: st
   )
 }
 
-export default function BriefClient({ initialBrief, initialView = 'standup', brands = [], activeBrandId = null }: { initialBrief: Brief | null; initialView?: 'standup' | 'desk' | 'scan'; brands?: { id: string; name: string }[]; activeBrandId?: string | null }) {
+export default function BriefClient({ initialBrief, initialView = 'standup', brands = [], activeBrandId = null, welcome = false }: { initialBrief: Brief | null; initialView?: 'standup' | 'desk' | 'scan'; brands?: { id: string; name: string }[]; activeBrandId?: string | null; welcome?: boolean }) {
   // Seeded from the SERVER render — the brief content is already in the HTML, so it shows even if the
   // client never hydrates (broken extensions). We only fetch as a fallback when the server had nothing.
   const [brief, setBrief] = useState<Brief | null>(initialBrief)
@@ -230,6 +230,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   const [view, setView] = useState<'standup' | 'desk' | 'scan'>(initialView)   // conversation · prepared desk · one-page scan
   const [credits, setCredits] = useState<number | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [planDismissed, setPlanDismissed] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -351,6 +352,17 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
             </select>
             <span style={{ position: 'absolute', right: 12, pointerEvents: 'none', color: MUTED, fontSize: 10 }}>▾</span>
           </div>
+        </div>
+      )}
+
+      {/* First arrival from onboarding — the reveal, sequenced BEFORE the ask (Section 4). A calm
+          serif line, not a banner-ad: proof the night's work was real, then straight into the brief. */}
+      {welcome && (
+        <div style={{ margin: '16px 0 2px', paddingBottom: 16, borderBottom: `1px solid ${PAPERLINE}` }}>
+          <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22, lineHeight: 1.15, color: INK, letterSpacing: '-.01em' }}>
+            I worked through the night{brief?.firstName ? `, ${brief.firstName}` : ''}. Here’s your first briefing.
+          </div>
+          <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>Everything below is real — your actual competitors, your market. Not a demo.</div>
         </div>
       )}
 
@@ -541,6 +553,26 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
         </>
         )
       })()}
+
+      {/* THE ASK — sequenced after the value (Section 4: show, then sell). Only on first arrival, and
+          only after the brief above has been seen. A quiet card, not a wall; Free keeps working. */}
+      {welcome && brief && !planDismissed && (
+        <div style={{ marginTop: 40, border: `1px solid ${PAPERLINE}`, borderRadius: 14, overflow: 'hidden' }}>
+          <div style={{ background: FOREST, color: '#b9c6b4', font: "12px/1.6 ui-monospace, 'SF Mono', Menlo, monospace", padding: '9px 18px', letterSpacing: '.04em' }}>
+            <span style={{ color: LIME }}>✓</span> that was one night. this is every morning.
+          </div>
+          <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22, color: INK, lineHeight: 1.15, letterSpacing: '-.01em' }}>Keep Mello on full-time.</div>
+              <div style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.55, marginTop: 4 }}>You&rsquo;re on Free — 5 image ads, 1 competitor. Upgrading unlocks video ads, more competitors watched, and daily creatives delivered before you wake.</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <Link href="/pricing" style={{ background: FOREST, color: LIME, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>See plans &rarr;</Link>
+              <button onClick={() => setPlanDismissed(true)} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>I&rsquo;m good on Free</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Below the brief: timely alerts stay visible; the feature deck hides behind one quiet line
           (progressive disclosure — depth only for those who ask for it). */}
