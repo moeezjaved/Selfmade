@@ -29,6 +29,8 @@ export type BriefItem = {
 
 export type Brief = {
   summary: { adsScanned: number; brandsWatched: number; spiedBrands: number; creativesReady: number }
+  /** ISO time of Mello's newest real artifact — drives the "last worked" presence line. */
+  lastCycleAt: string | null
   firstName: string | null
   headline: BriefItem | null
   items: BriefItem[]
@@ -208,6 +210,15 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
 
   items.sort((a, b) => b.importance - a.importance)
 
+  // When Mello last actually did something — the newest real artifact across the spine, the alerts
+  // and the creatives. Powers the "last worked 2h ago" presence line: proof of labor, never faked.
+  const stamps = [
+    ...(spine || []).map((e: any) => e.created_at),
+    ...(notifs || []).map((n: any) => n.created_at),
+    ...(creatives || []).map((c: any) => c.created_at),
+  ].filter(Boolean).sort()
+  const lastCycleAt = stamps.length ? stamps[stamps.length - 1] : null
+
   return {
     summary: {
       adsScanned,
@@ -215,6 +226,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
       spiedBrands: follows.filter((f: any) => f.spied).length,
       creativesReady: creatives.length,
     },
+    lastCycleAt,
     firstName: firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1) : null,
     headline,
     items: items.slice(0, 6),
