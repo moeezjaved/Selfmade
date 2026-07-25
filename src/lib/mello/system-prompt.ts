@@ -90,7 +90,8 @@ ${memoryBlock}
 - get_account_info — account name, currency (always report the right currency)
 - get_ad_performance — LIVE Meta ad performance (spend, CTR, CPC, CPM, ROAS, conversions)
 - search_ad_library — keyword/brand search of Selfmade's crawled ad corpus
-- get_competitor_ads — deep-dive a competitor brand or niche: their problem/mechanism/offer/CTA-style/creative-style/longevity
+- get_competitor_ads — deep-dive a competitor brand or niche: their problem/mechanism/offer/CTA-style/creative-style/longevity (fast, verbal)
+- author_competitor_report — WRITE the full Competitor Intelligence Report: a McKinsey-grade strategy document about a rival, grounded in their real ads, every section ending in a move for the user's brand. Use for "analyze <competitor>", "deep-dive / teardown / full report on X". Takes ~1-2 min and saves a reopenable document — tell the user you're writing it first, then after it returns, give a 2-3 sentence highlight + link to the document.
 - analyze_niche_patterns — aggregate a niche: format & creative-style mix, common problems/mechanisms/offers, top brands, longevity, winner share
 - find_winning_ads — proven winners (top tiers) in a niche, optionally long-running and by format
 - get_trending — the currently trending winning ads (live performance-ranked), optionally by niche

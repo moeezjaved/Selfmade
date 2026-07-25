@@ -24,7 +24,7 @@ import type { UserProfile } from '@/types'
 import {
   Settings, LogOut, Menu, X, LifeBuoy, Zap, Sparkles, CreditCard, Users, Plus,
   Eye, TrendingUp, Star, Bookmark, Image as ImageIcon, Heart, Radar,
-  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, ClipboardList, Trophy, Camera, Sun, Newspaper, BookOpen,
+  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, ClipboardList, Trophy, Camera, Sun, Newspaper, BookOpen, FileText,
 } from 'lucide-react'
 import SearchPalette from '@/components/SearchPalette'
 import { cn } from '@/lib/utils'
@@ -35,7 +35,10 @@ type NavItem = { href?: string; icon?: React.ElementType; label?: string; badge?
 const AREAS: { key: string; label: string; railLabel: string; railIcon: React.ElementType; defaultHref: string; items: NavItem[] }[] = [
   {
     key: 'home', label: 'Home', railLabel: 'Home', railIcon: Sun, defaultHref: '/brief',
-    items: [{ href: '/brief', icon: Sun, label: 'Morning Brief' }],
+    items: [
+      { href: '/brief', icon: Sun, label: 'Morning Brief' },
+      { href: '/documents', icon: FileText, label: 'Documents' },
+    ],
   },
   {
     // The competitor ad library — where you spy brands and find ads to remake.

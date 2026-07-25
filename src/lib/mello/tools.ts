@@ -10,6 +10,8 @@ import { listAdAccounts, getAccountInfo, getAdPerformance, searchAdLibrary } fro
 import { getCompetitorAds, analyzeNichePatterns, findWinningAds } from './library-data'
 import { addMemory } from './memory'
 import { getTrending, listBoards, createBoard, saveAdToBoard, searchMyAssets, watchBrand, unwatchBrand } from './actions'
+import { generateCompetitorReport } from './reports/competitor-report'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export const TOOLS = [
   {
@@ -227,6 +229,21 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'author_competitor_report',
+      description: "Write the flagship Competitor Intelligence Report — a McKinsey/Sequoia-grade strategy document about a rival brand, grounded in their real crawled ads, ending every section with a concrete move for the user's own brand. Use when the user says 'analyze <competitor>', 'do a deep-dive / teardown / full report on <brand>', 'give me the strategy doc on X', or wants a serious written analysis (NOT a quick chat answer — for a fast verbal read use get_competitor_ads instead). Takes ~1-2 minutes; it saves a document the user can reopen and returns a link. Tell the user you're writing it before you call this.",
+      parameters: {
+        type: 'object',
+        required: ['competitor'],
+        properties: {
+          competitor: { type: 'string', description: 'The rival brand/company name to analyze' },
+          brand_name: { type: 'string', description: "Which of the user's OWN brands the report is for, if they named one (else their primary brand is used)" },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'request_clarification',
       description: 'Ask the user to choose from options before continuing — e.g. which ad account to analyze, or which date range. Renders an inline picker. Use when you genuinely need the user to decide.',
       parameters: {
@@ -275,9 +292,54 @@ export const TOOL_LABELS: Record<string, string> = {
   remember: 'Remembering that…',
   request_clarification: 'Asking for clarification…',
   create_ad: 'Creating on the canvas…',
+  author_competitor_report: 'Writing the intelligence report…',
 }
 
 export interface ToolCtx { userId: string }
+
+/** Generate the flagship competitor report, save it as a mello_documents row, return a link for Mello. */
+async function authorCompetitorReport(userId: string, competitor: string, brandNameHint?: string): Promise<any> {
+  if (!competitor) return { error: 'Which competitor should I analyze?' }
+  const admin = createAdminClient()
+  let myBrand: { name: string; industry?: string; website?: string; voice?: string; edge?: string } | null = null
+  let orgId: string | null = null
+  let brandId: string | null = null
+  try {
+    let q = admin.from('brands').select('id, name, industry, website, tone, usps, org_id').eq('user_id', userId)
+    if (brandNameHint) q = q.ilike('name', `%${brandNameHint}%`)
+    else q = q.order('created_at', { ascending: true })
+    const { data: brand } = await q.limit(1).maybeSingle()
+    if (brand) {
+      const arr = (v: any) => Array.isArray(v) ? v.filter(Boolean).join('/') : (v || undefined)
+      myBrand = { name: brand.name, industry: arr(brand.industry), website: brand.website || undefined, voice: brand.tone || undefined, edge: arr(brand.usps) }
+      orgId = (brand as any).org_id || null
+      brandId = brand.id
+    }
+  } catch { /* fail-soft */ }
+
+  let report
+  try {
+    report = await generateCompetitorReport({ competitorName: competitor, myBrand })
+  } catch (e: any) {
+    return { error: e?.message || 'Report generation failed — check model keys/quota.' }
+  }
+
+  const { data: saved } = await admin.from('mello_documents').insert({
+    user_id: userId, org_id: orgId, kind: 'competitor_report', title: report.title,
+    subject: competitor, subject_brand_id: brandId, body_md: report.markdown, model: report.model,
+    meta: { adCount: report.adCount },
+  }).select('id, title').maybeSingle()
+
+  return {
+    saved: true,
+    document_id: saved?.id,
+    title: report.title,
+    url: saved?.id ? `/documents/${saved.id}` : null,
+    model: report.model,
+    grounded_on_ads: report.adCount,
+    note: 'The full report is saved. Give the user a 2-3 sentence highlight of the sharpest finding and the single most important move, then link them to the full document.',
+  }
+}
 
 export async function executeTool(name: string, args: any, ctx: ToolCtx): Promise<any> {
   switch (name) {
@@ -321,6 +383,8 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
     case 'remember':
       await addMemory(ctx.userId, String(args.content || ''), args.kind || 'fact')
       return { remembered: String(args.content || '').slice(0, 400) }
+    case 'author_competitor_report':
+      return await authorCompetitorReport(ctx.userId, String(args.competitor || '').trim(), args.brand_name)
     default:
       throw new Error(`Unknown tool: ${name}`)
   }
@@ -347,6 +411,9 @@ export function formatToolResult(name: string, result: any): { sub_item?: any; i
   }
   if (name === 'analyze_niche_patterns') {
     return { icon: 'chart', sub_item: { label: `Analyzed ${result?.sampled ?? 0} ad(s) in the niche` } }
+  }
+  if (name === 'author_competitor_report') {
+    return { icon: 'chart', sub_item: result?.saved ? { label: `Report written · ${result?.model || 'ai'}` } : { label: 'Could not write report' } }
   }
   return {}
 }
