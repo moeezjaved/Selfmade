@@ -75,7 +75,7 @@ Return ONLY JSON:
           signal: AbortSignal.timeout(15000),
         })
         if (or.ok) { const j = await or.json(); out = JSON.parse(j.choices?.[0]?.message?.content || '{}') }
-        else reason = `openai ${or.status}`
+        else { const body = await or.text().catch(() => ''); reason = `openai ${or.status}: ${body.replace(/\s+/g, ' ').slice(0, 260)}` }   // TEMP: full body to pinpoint the 429 cause
       } catch (e: any) { reason = `openai ${String(e?.message || e).slice(0, 60)}` }
     }
     if (!out && process.env.GEMINI_API_KEY) {
