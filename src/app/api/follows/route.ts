@@ -27,12 +27,11 @@ export async function POST(req: NextRequest) {
   if (!pageId) return NextResponse.json({ error: 'pageId required' }, { status: 400 })
 
   // brand_id (migration 117) attaches a competitor to ONE of the user's brands. Nullable — omit it
-  // and the follow stays account-level, exactly as before. Only stamped on insert; we don't
-  // reassign an existing follow's brand on a re-follow.
+  // and the follow stays account-level, exactly as before.
   const brand_id = brandId ? String(brandId) : null
 
   const { data: existing } = await admin
-    .from('followed_brands').select('id').eq('user_id', user.id).eq('page_id', String(pageId)).maybeSingle()
+    .from('followed_brands').select('id, brand_id').eq('user_id', user.id).eq('page_id', String(pageId)).maybeSingle()
   const isFollowing = !!existing
 
   // Set per-brand email alerts (opt-in, 2 credits per email). Follows the brand if not already, so the
@@ -46,7 +45,15 @@ export async function POST(req: NextRequest) {
 
   let following: boolean
   if (action === 'follow' || (action === 'toggle' && !isFollowing)) {
-    if (!isFollowing) await admin.from('followed_brands').insert({ user_id: user.id, page_id: String(pageId), brand_name: brandName || null, email_alerts: !!email_alerts, brand_id })
+    if (!isFollowing) {
+      await admin.from('followed_brands').insert({ user_id: user.id, page_id: String(pageId), brand_name: brandName || null, email_alerts: !!email_alerts, brand_id })
+    } else if (brand_id && !(existing as any).brand_id) {
+      // Already following (e.g. added account-level in onboarding), and now assigned to a brand via
+      // "Watch competitors". Attach it. Only when currently unassigned — first-assignment wins, so we
+      // never silently move a rival off a brand it's already tied to (the single-row limit; migration
+      // 117 header). This is the common path: every legacy follow starts NULL.
+      await admin.from('followed_brands').update({ brand_id }).eq('user_id', user.id).eq('page_id', String(pageId))
+    }
     following = true
   } else {
     if (isFollowing) await admin.from('followed_brands').delete().eq('user_id', user.id).eq('page_id', String(pageId))
