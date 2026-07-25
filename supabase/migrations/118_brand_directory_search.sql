@@ -38,9 +38,11 @@ create or replace function immutable_unaccent(text)
   returns text language sql immutable parallel safe
   as $$ select extensions.unaccent('extensions.unaccent'::regdictionary, $1) $$;
 
--- Fast accent-insensitive substring search at 611K rows. gin_trgm_ops lives in `extensions` too.
+-- Fast accent-insensitive substring search at 611K rows. Opclass is left UNqualified — it resolves
+-- via search_path; schema-qualifying it fails ("operator class extensions.gin_trgm_ops does not
+-- exist"). Only the unaccent dictionary (inside immutable_unaccent) needed the extensions. prefix.
 create index if not exists idx_brand_directory_name_unaccent_trgm
-  on brand_directory using gin (immutable_unaccent(lower(name)) extensions.gin_trgm_ops);
+  on brand_directory using gin (immutable_unaccent(lower(name)) gin_trgm_ops);
 
 -- Relevance-ranked, accent-insensitive search. STABLE + read-only.
 create or replace function search_brand_directory(p_q text, p_industry text default null, p_limit int default 50)
