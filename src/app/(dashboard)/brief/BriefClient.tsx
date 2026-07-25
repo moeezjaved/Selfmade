@@ -425,10 +425,14 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
         <>
           {/* ── 1 · WHAT HAPPENED — one sentence, one number, one visual, one action ── */}
           {/* premium: open with print-like air; the day should feel unhurried, not a dashboard. */}
-          <div style={{ marginTop: 68 }}>
+          {/* First arrival: the welcome banner above already greeted, so drop the standard "greet,
+              name —" line (it was double-greeting) and tighten the air. Keep the ad-count as proof. */}
+          <div style={{ marginTop: welcome ? 22 : 68 }}>
             <Say delay={60}>
               <span style={{ fontSize: 13.5, color: MUTED, fontWeight: 600, letterSpacing: '.002em' }}>
-                {greet}{brief.firstName ? `, ${brief.firstName}` : ''} — overnight I read <b style={{ color: INK, fontWeight: 750 }}><CountUp n={brief.summary.adsScanned} /> ads</b>{brief.summary.brandsWatched > 0 ? <> across your <b style={{ color: INK, fontWeight: 750 }}>{brief.summary.brandsWatched} competitor{brief.summary.brandsWatched === 1 ? '' : 's'}</b></> : null}.
+                {welcome
+                  ? <>Overnight I read <b style={{ color: INK, fontWeight: 750 }}><CountUp n={brief.summary.adsScanned} /> ads</b>{brief.summary.brandsWatched > 0 ? <> across your <b style={{ color: INK, fontWeight: 750 }}>{brief.summary.brandsWatched} competitor{brief.summary.brandsWatched === 1 ? '' : 's'}</b></> : null}.</>
+                  : <>{greet}{brief.firstName ? `, ${brief.firstName}` : ''} — overnight I read <b style={{ color: INK, fontWeight: 750 }}><CountUp n={brief.summary.adsScanned} /> ads</b>{brief.summary.brandsWatched > 0 ? <> across your <b style={{ color: INK, fontWeight: 750 }}>{brief.summary.brandsWatched} competitor{brief.summary.brandsWatched === 1 ? '' : 's'}</b></> : null}.</>}
               </span>
             </Say>
             <Say delay={200}>
