@@ -97,9 +97,15 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
       .eq('user_id', userId).limit(200).then((r: any) => r.data || []), []),
     soft<number>(admin.from('discovery_ads_index').select('ad_id', { count: 'estimated', head: true })
       .gte('created_at', H24).then((r: any) => r.count || 0), 0),
-    soft<any[]>(admin.from('daily_observations').select('id, observation, action, confidence, created_at')
-      .eq('user_id', userId).gte('created_at', H48).order('created_at', { ascending: false }).limit(3)
-      .then((r: any) => r.data || []), []),
+    soft<any[]>((async () => {
+      let q = admin.from('daily_observations').select('id, observation, action, confidence, created_at')
+        .eq('user_id', userId).gte('created_at', H48).order('created_at', { ascending: false }).limit(3)
+      // brand view: ONLY this brand's observations. Unlike the spine, we don't include account-wide
+      // nulls here — an observation names a specific rival ("CeraVe launched 9 ads"), so a null one
+      // belongs to whichever brand watches that rival, not to a brand watching nobody.
+      if (opts.brandId) q = q.eq('brand_id', opts.brandId)
+      const { data } = await q; return data || []
+    })(), []),
   ])
 
   for (const e of spine) {
