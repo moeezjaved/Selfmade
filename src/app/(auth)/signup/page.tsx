@@ -79,7 +79,7 @@ export default function SignupPage() {
       <img src="/logo.png" alt="Selfmade" style={{ height: 34, filter: 'brightness(0)', margin: '0 auto 24px', display: 'block' }} />
       <div style={S.card}>
         <h1 style={S.h1}>Create your account</h1>
-        <p style={S.sub}>Free to start — 5 free image ads, no card.</p>
+        <p style={S.sub}>Free to start — 75 free credits, no card.</p>
 
         <button onClick={handleGoogle} style={S.google}><GoogleIcon /> Continue with Google</button>
 

@@ -7,7 +7,7 @@
  *   variant="dashboard" → CTAs start Stripe checkout / open the Add-funds modal / show current plan
  */
 import { useEffect, useState } from 'react'
-import { PLANS, ACTION_COSTS, normalizePlan, type PlanId } from '@/lib/plans'
+import { ACTION_COSTS, normalizePlan, type PlanId } from '@/lib/plans'
 import { openCredits } from '@/components/credits/CreditModal'
 
 const DARK = '#16321a', LIME = '#dffe95', ACCENT = '#3a7000', MUTED = '#6b7a6b'
@@ -17,21 +17,21 @@ const VID_USD = String(Math.round(ACTION_COSTS.video_clone / 100))
 type CardId = 'free' | 'payg' | 'starter' | 'business'
 interface Card { id: CardId; tier: string; price: string; per: string; note: string; feats: string[]; cta: string; popular?: boolean }
 
+// One paid plan (2026-07-25, Polsia-simple): Free (75 credits) · Mello full-time $49 · pay-as-you-go
+// credits. Agency/business tier retired from display; the $49 plan uses internal `starter` checkout.
 const CARDS: Card[] = [
   { id: 'free', tier: 'Free', price: '$0', per: '', note: 'No card needed',
-    feats: ['5 image ads to try', 'Browse Discovery + Brand Spy', 'Remake any winning ad'], cta: 'Start free' },
+    feats: ['75 free credits (~5 image ads)', 'Browse Discovery + Brand Spy', 'Remake any winning ad', 'Daily brief from Mello'], cta: 'Start free' },
+  { id: 'starter', tier: 'Mello, full-time', price: '$49', per: '/ month', note: 'Everything, every morning',
+    feats: ['Video ads', 'Unlimited image ads', 'Every competitor watched', 'Fresh creatives every morning'], cta: 'Go full-time', popular: true },
   { id: 'payg', tier: 'Pay as you go', price: `$${VID_USD}`, per: '/ video', note: 'No subscription',
-    feats: [`$${VID_USD} per video ad`, `$${IMG_USD} per image ad`, 'Top up any amount, anytime', 'Balance never expires'], cta: 'Add funds' },
-  { id: 'starter', tier: PLANS.starter.label, price: `$${PLANS.starter.priceMonthly}`, per: '/ month', note: 'For sellers running ads weekly',
-    feats: ['Unlimited image ads', `${PLANS.starter.videosPerMonth} video ads / month`, 'Full Discovery + Brand Spy', 'Save + organize in boards'], cta: 'Subscribe', popular: true },
-  { id: 'business', tier: PLANS.business.label, price: `$${PLANS.business.priceMonthly}`, per: '/ month', note: 'For teams & agencies',
-    feats: ['Unlimited image ads', `${PLANS.business.videosPerMonth} video ads / month`, `${PLANS.business.seats} team seats`, 'Priority generation'], cta: 'Subscribe' },
+    feats: [`$${VID_USD} per video ad`, `$${IMG_USD} per image ad`, 'Top up any amount, anytime', 'Balance never expires'], cta: 'Buy credits' },
 ]
 
 const FAQS: { q: string; a: string }[] = [
   { q: 'How does pricing work?', a: `No credits, no math — you pay for what you make. An image ad is $${IMG_USD}, a video ad is $${VID_USD}. Buy as you go, or subscribe for unlimited images plus a monthly batch of videos.` },
-  { q: 'Is there a free trial?', a: `The free plan gives you 5 image ads to try, no card needed. Want to test a video? Pay as you go — one video is just $${VID_USD}, no subscription.` },
-  { q: 'What does "unlimited images" mean?', a: 'On Creator and Agency, image-ad remakes are free and unlimited (fair use). Videos are included up to your monthly count.' },
+  { q: 'Is there a free trial?', a: `The free plan gives you 75 credits (about 5 image ads) to start, no card needed. Want to test a video? Pay as you go — one video is just $${VID_USD}, no subscription.` },
+  { q: 'What does "unlimited images" mean?', a: 'On the full-time plan, image-ad remakes are free and unlimited (fair use). Video ads are included every month.' },
   { q: 'What counts as one video ad?', a: 'A short-form ad up to about 30 seconds. Longer videos use a bit more of your monthly allowance.' },
   { q: 'Can I cancel anytime?', a: 'Yes — one click. You keep everything you made, and any pay-as-you-go balance never expires.' },
   { q: 'How much does an agency charge for the same thing?', a: `A UGC video from a freelancer runs $200–300 and takes a week. Here it's $${VID_USD} and about two minutes.` },
