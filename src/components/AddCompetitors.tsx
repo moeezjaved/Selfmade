@@ -168,8 +168,14 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
         )}
 
         <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} autoFocus
-          placeholder="Competitor name, or paste their Meta Ad Library link…"
+          placeholder="Search a competitor by name…"
           style={{ border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', fontSize: 14, width: '100%', fontFamily: 'inherit', color: INK, outline: 'none', boxSizing: 'border-box' }} />
+        {/* Two distinct paths: search by name (above) vs paste a link (this). */}
+        {!manual && (
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 7, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>🔗</span> Know them already? Paste their <b style={{ fontWeight: 700, color: INK }}>Meta Ad Library</b> link and I’ll add them.
+          </div>
+        )}
 
         <div style={{ marginTop: 10, minHeight: 90 }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED, padding: '6px 2px' }}>

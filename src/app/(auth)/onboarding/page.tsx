@@ -137,8 +137,15 @@ function BrandPalette({ q, setQ, suggested, results, picks, loading, onToggle, e
         </div>
       )}
       <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} onFocus={() => setOpen(true)} onKeyDown={onKey}
-        placeholder={picks.length ? 'Add another — click to pick, or paste a Meta Ad Library link' : 'Click to pick a competitor — or paste their Meta Ad Library link'}
+        placeholder={picks.length ? 'Search another competitor by name…' : 'Search a competitor by name…'}
         style={{ ...inputCss }} />
+      {/* #4 — the two paths, made distinct: search by name (above) vs paste a link (this, always
+          visible). Pasting a Meta Ad Library URL adds them directly. */}
+      {!manual && (
+        <div style={{ fontSize: 12, color: MUTED, marginTop: 7, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>🔗</span> Know them already? Paste their <b style={{ fontWeight: 700, color: INK }}>Meta Ad Library</b> link and I’ll add them.
+        </div>
+      )}
       {open && (groups.length > 0 || loading) && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, boxShadow: '0 20px 44px -22px rgba(23,37,28,.5)', padding: 6, zIndex: 40, maxHeight: 320, overflowY: 'auto' }}>
           {groups.length === 0 && loading && <div style={{ fontSize: 12.5, color: MUTED, padding: '10px 12px' }}>Scanning my index…</div>}
