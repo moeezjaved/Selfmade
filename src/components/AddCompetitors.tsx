@@ -26,8 +26,8 @@ function extractPageId(s: string): string | null {
   return m ? m[1] : null
 }
 
-export default function AddCompetitors({ brandId, brandName, website, onClose, onDone }: {
-  brandId: string | null; brandName: string; website?: string | null
+export default function AddCompetitors({ brandId, brandName, website, industry, onClose, onDone }: {
+  brandId: string | null; brandName: string; website?: string | null; industry?: string[] | null
   onClose: () => void; onDone?: (n: number) => void
 }) {
   const [q, setQ] = useState('')
@@ -35,26 +35,41 @@ export default function AddCompetitors({ brandId, brandName, website, onClose, o
   const [results, setResults] = useState<Comp[]>([])
   const [picks, setPicks] = useState<Comp[]>([])
   const [loading, setLoading] = useState(true)
+  const [niches, setNiches] = useState<string[]>([])
+  const [niche, setNiche] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Seed suggestions from the brand's own name — same two sources onboarding searches.
+  // Seed from the brand's NICHE, ranked by how much each rival actually advertises — far better
+  // than a name fragment ("Bug Shield" once suggested Mountain Buggy). The niche is selectable,
+  // because our guess at a brand's industry is often close-but-wrong.
   useEffect(() => {
-    const seed = (brandName || '').split(/\s+/)[0] || ''
-    if (!seed) { setLoading(false); return }
-    Promise.all([
-      fetch(`/api/discovery/pages?q=${encodeURIComponent(seed)}`).then(r => r.json()).catch(() => null),
-      fetch(`/api/discovery/brands?q=${encodeURIComponent(seed)}&sort=ads`).then(r => r.json()).catch(() => null),
-    ]).then(([p, b]) => {
-      const seen = new Set<string>(); const out: Comp[] = []
-      for (const x of [...(p?.pages || []), ...(b?.brands || [])]) {
-        const id = String(x.pageId || ''); if (!id || seen.has(id)) continue
-        seen.add(id); out.push({ pageId: id, name: x.name, avatar: x.picture || x.avatar || null, adCount: x.adCount ?? null })
-      }
-      setSuggested(out.slice(0, 6))
-    }).finally(() => setLoading(false))
-  }, [brandName])
+    fetch('/api/discovery/brands?sort=ads').then(r => r.json()).then(j => {
+      const list: string[] = Array.isArray(j?.industries) ? j.industries : []
+      setNiches(list)
+      const mine = (industry || []).map(x => String(x).toLowerCase())
+      const match = list.find(n => mine.includes(String(n).toLowerCase()))
+      setNiche(match || '')
+      if (!match) setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [industry])
+
+  // Whenever the niche changes, show that niche's biggest advertisers.
+  useEffect(() => {
+    if (!niche) return
+    setLoading(true)
+    fetch(`/api/discovery/brands?industry=${encodeURIComponent(niche)}&sort=ads`)
+      .then(r => r.json())
+      .then(j => {
+        const out: Comp[] = (j?.brands || []).map((x: any) => ({
+          pageId: String(x.pageId || ''), name: x.name, avatar: x.avatar || x.picture || null, adCount: x.adCount ?? x.source_ad_count ?? null,
+        })).filter((c: Comp) => c.pageId)
+        setSuggested(out.slice(0, 8))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [niche])
 
   useEffect(() => {
     if (!q.trim()) { setResults([]); return }
@@ -121,13 +136,24 @@ export default function AddCompetitors({ brandId, brandName, website, onClose, o
           </div>
         )}
 
+        {niches.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
+            <span style={{ fontSize: 12.5, color: MUTED, fontWeight: 700 }}>Niche</span>
+            <select value={niche} onChange={e => setNiche(e.target.value)}
+              style={{ flex: 1, border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '8px 11px', fontSize: 13, fontFamily: 'inherit', color: INK, background: '#fff', outline: 'none' }}>
+              <option value="">Any niche — I’ll search by name</option>
+              {niches.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        )}
+
         <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} autoFocus
           placeholder="Competitor name, or paste their Meta Ad Library link…"
           style={{ border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', fontSize: 14, width: '100%', fontFamily: 'inherit', color: INK, outline: 'none', boxSizing: 'border-box' }} />
 
         <div style={{ marginTop: 10, minHeight: 90 }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED, padding: '6px 2px' }}>
-            {q.trim() ? 'Search results' : loading ? 'Looking for likely rivals…' : suggested.length ? 'Recognise any of these?' : 'Type a name to search'}
+            {q.trim() ? 'Search results' : loading ? 'Finding the biggest advertisers…' : suggested.length ? (niche ? `Top advertisers in ${niche}` : 'Recognise any of these?') : 'Pick a niche above, or search by name'}
           </div>
           {manual && (
             <button onClick={() => { toggle(manual); setQ('') }} style={rowStyle(false)}>
