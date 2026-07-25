@@ -71,16 +71,40 @@ function CountUp({ n }: { n: number }) {
   return <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v.toLocaleString()}</span>
 }
 
-function MelloFace({ size = 36 }: { size?: number }) {
+/** Mello's state — derived from real data, never decoration. */
+type MelloState = 'delivered' | 'awake' | 'resting'
+
+/**
+ * MELLO — a dark squircle with lit eyes: a small figure working in the dark while you sleep.
+ * Deliberately NOT a lime robot head with antennae — antennae are the cheapest "I'm a bot" tell,
+ * and a bright head competes with the lime we reserve for actions. Every expression is carried by
+ * the eyes alone (a three-word vocabulary), so state is legible at 26px without reading anything.
+ */
+function MelloFace({ size = 36, state = 'awake' }: { size?: number; state?: MelloState }) {
+  const gid = `melloSkin${size}`
   return (
-    <svg width={size} height={size} viewBox="0 0 160 160" style={{ flexShrink: 0 }}>
-      <rect x="34" y="30" width="92" height="96" rx="34" fill={LIME} stroke={FOREST} strokeWidth="5" />
-      <path d="M60 30v-12M100 30v-12" stroke={FOREST} strokeWidth="5" strokeLinecap="round" />
-      <circle cx="60" cy="16" r="5" fill="#7be0a0" stroke={FOREST} strokeWidth="5" />
-      <circle cx="100" cy="16" r="5" fill="#7be0a0" stroke={FOREST} strokeWidth="5" />
-      <rect x="52" y="60" width="56" height="34" rx="17" fill="#fff" stroke={FOREST} strokeWidth="5" />
-      <circle cx="70" cy="77" r="7.5" fill={FOREST} /><circle cx="90" cy="77" r="7.5" fill={FOREST} />
-      <path d="M70 104q10 8 20 0" stroke={FOREST} strokeWidth="5" fill="none" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 160 160" style={{ flexShrink: 0, display: 'block' }} aria-hidden="true">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#23372a" /><stop offset="1" stopColor={FOREST} />
+        </linearGradient>
+      </defs>
+      {/* hairline so the silhouette still reads when placed on a dark surface (studio, keynote) */}
+      <rect x="14" y="14" width="132" height="132" rx="46" fill={`url(#${gid})`} stroke="rgba(255,255,255,.10)" strokeWidth="2" />
+      {state === 'delivered' ? (
+        /* work is waiting for you — the eyes smile */
+        <g stroke={LIME} strokeWidth="9" strokeLinecap="round" fill="none">
+          <path d="M47 88q12-17 24 0" /><path d="M89 88q12-17 24 0" />
+        </g>
+      ) : state === 'resting' ? (
+        /* a genuinely quiet day — Mello says so instead of pretending */
+        <g stroke="#6f8073" strokeWidth="8.5" strokeLinecap="round">
+          <path d="M47 85h24" /><path d="M89 85h24" />
+        </g>
+      ) : (
+        /* awake, watching */
+        <g fill={LIME}><circle cx="59" cy="83" r="11.5" /><circle cx="101" cy="83" r="11.5" /></g>
+      )}
     </svg>
   )
 }
@@ -255,6 +279,11 @@ export default function BriefClient({ initialBrief }: { initialBrief: Brief | nu
 
   const h = new Date().getHours()
   const greet = h < 5 ? 'Late one' : h < 12 ? 'Morning' : h < 18 ? 'Afternoon' : 'Evening'
+  // State without reading: the face reports what's actually true of today's brief.
+  const melloState: MelloState = !brief ? 'awake'
+    : brief.quiet ? 'resting'
+    : (brief.headline || brief.summary.creativesReady > 0) ? 'delivered'
+    : 'awake'
 
   // Send a reply to Mello (grounded by the real agent). `about` = the item being discussed, for context.
   async function say(text: string, about?: Item | null) {
@@ -290,8 +319,8 @@ export default function BriefClient({ initialBrief }: { initialBrief: Brief | nu
       {/* header — a quiet presence, not chrome. No toggle, no competing decisions. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         <span style={{ position: 'relative', display: 'inline-flex' }}>
-          <MelloFace size={28} />
-          <span style={{ position: 'absolute', right: -2, bottom: 0, width: 8, height: 8, borderRadius: '50%', background: GREEN, border: '2px solid #f6f8f5', animation: 'mp 2s infinite' }} />
+          {/* The face carries the state now — the old dot pulsed green even on a dead day. */}
+          <MelloFace size={28} state={melloState} />
         </span>
         <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 650 }}>
           Mello · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
