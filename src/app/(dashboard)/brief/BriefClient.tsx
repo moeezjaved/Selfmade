@@ -20,6 +20,8 @@ import BriefAlerts from './BriefAlerts'
 import BriefWishlist from './BriefWishlist'
 import BriefScan from './BriefScan'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
+import dynamic from 'next/dynamic'
+const AddCompetitors = dynamic(() => import('@/components/AddCompetitors'), { ssr: false })
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
@@ -224,8 +226,17 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   const [focusItem, setFocusItem] = useState<Item | null>(initialBrief?.headline || initialBrief?.items?.[0] || null)   // what the composer is "about"
   const [headlineState, setHeadlineState] = useState<null | 'approved' | 'passed'>(null)
   const [view, setView] = useState<'standup' | 'desk' | 'scan'>(initialView)   // conversation · prepared desk · one-page scan
+  const [credits, setCredits] = useState<number | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+
+  // Credit balance for the scan's Mello column — the same source as the header counter.
+  useEffect(() => {
+    let live = true
+    fetch('/api/credits/balance').then(r => r.ok ? r.json() : null).then(j => { if (live && j && typeof j.balance === 'number') setCredits(j.balance) }).catch(() => {})
+    return () => { live = false }
+  }, [])
 
   // Brand switcher: navigate (server re-scopes the brief), preserving the current view. Interactivity
   // only — the scoped content is already server-rendered from ?brand=, so a failed hydration still
@@ -346,7 +357,15 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
       {err && <div style={{ color: MUTED, fontSize: 15 }}>I couldn&rsquo;t start the standup — refresh in a moment.</div>}
 
       {brief && view === 'desk' && <DeskView brief={brief} greet={greet} onAct={markActed} onDecision={logDecision} />}
-      {brief && view === 'scan' && <BriefScan brief={brief} melloState={melloState} onAct={markActed} onWhy={(it) => { setFocusItem(it); say('Why does it matter?', it) }} />}
+      {brief && view === 'scan' && <BriefScan brief={brief} melloState={melloState} onAct={markActed} onWhy={(it) => { setFocusItem(it); say('Why does it matter?', it) }}
+        credits={credits} activeBrandId={activeBrandId} activeBrandName={activeBrandId ? (brands.find(b => b.id === activeBrandId)?.name || null) : null}
+        onAddCompetitor={() => { if (activeBrandId) setAddOpen(true); else router.push('/brands') }} />}
+
+      {/* Add-competitor modal — opened from the scan's Competitors column for the selected brand. */}
+      {addOpen && activeBrandId && (
+        <AddCompetitors brandId={activeBrandId} brandName={brands.find(b => b.id === activeBrandId)?.name || 'this brand'}
+          onClose={() => setAddOpen(false)} onDone={() => { setAddOpen(false); router.refresh() }} />
+      )}
 
       {brief && view === 'standup' && (() => {
         // ── The hierarchy: 1 what happened · 2 why it matters · 3 what to do · 4 evidence ──
@@ -518,7 +537,9 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
 
       {/* Below the brief: timely alerts stay visible; the feature deck hides behind one quiet line
           (progressive disclosure — depth only for those who ask for it). */}
-      {brief && <BriefAlerts exclude={[...(brief.headline ? [brief.headline.title] : []), ...brief.items.map(i => i.title)]} />}
+      {/* Account-wide alerts pull ALL notifications — hide them in a brand view, or a brand watching
+          nobody would still see other brands' competitor launches below the fold. */}
+      {brief && !activeBrandId && <BriefAlerts exclude={[...(brief.headline ? [brief.headline.title] : []), ...brief.items.map(i => i.title)]} />}
       {/* All the ways to make something — kept on the brief, compact so they don't compete with it. */}
       {/* The scan already carries the capability menu as its fourth column — don't print it twice. */}
       {brief && view !== 'scan' && <TryMello compact />}
