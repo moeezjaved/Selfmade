@@ -77,8 +77,9 @@ function Row({ href, onClick, title, desc, right, first }: {
 const ARROW = <span className="bs-a" style={{ color: '#c2ccc0', fontSize: 15, transition: 'color .15s, transform .15s', display: 'inline-block' }}>→</span>
 const AUTO = <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: FOREST, background: '#f2f8ea', border: '1px solid #a8cf6f', borderRadius: 100, padding: '3px 8px' }}>Auto</span>
 
-export default function BriefScan({ brief, melloState, onAct, onWhy }: {
+export default function BriefScan({ brief, melloState, onAct, onWhy, credits, activeBrandId, activeBrandName, onAddCompetitor }: {
   brief: Brief; melloState: MelloState; onAct: (it: Item) => void; onWhy: (it: Item) => void
+  credits?: number | null; activeBrandId?: string | null; activeBrandName?: string | null; onAddCompetitor?: () => void
 }) {
   const hero = brief.headline || brief.items[0] || null
   const competitors = brief.items.filter(i => i.kind === 'competitor_ads').slice(0, 4)
@@ -105,7 +106,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy }: {
             <div style={{ ...sub, marginBottom: 12 }}>
               {brief.quiet ? 'Nothing needs you today.' : brief.summary.creativesReady > 0 ? `${brief.summary.creativesReady} creative${brief.summary.creativesReady === 1 ? '' : 's'} waiting on your call` : 'Watching your competitors.'}
             </div>
-            {[['Ads read', brief.summary.adsScanned.toLocaleString()], ['Competitors', String(brief.summary.brandsWatched)], ...(worked ? [['Last worked', worked]] : [])].map(([k, v]) => (
+            {[['Ads read', brief.summary.adsScanned.toLocaleString()], ['Competitors', String(brief.summary.brandsWatched)], ...(typeof credits === 'number' ? [['Credits', credits.toLocaleString()]] : []), ...(worked ? [['Last worked', worked]] : [])].map(([k, v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: MUTED, padding: '7px 0' }}>
                 <span>{k}</span><b style={{ color: INK, fontWeight: 750, fontVariantNumeric: 'tabular-nums' }}>{v}</b>
               </div>
@@ -158,7 +159,21 @@ export default function BriefScan({ brief, melloState, onAct, onWhy }: {
         <div className="bs-col">
           <div style={label}>Competitors</div>
           {competitors.length === 0
-            ? <div style={sub}>No new launches in the last 48 hours.</div>
+            ? (
+              <div>
+                <div style={sub}>
+                  {brief.summary.brandsWatched === 0
+                    ? (activeBrandName ? `You're not watching anyone for ${activeBrandName} yet.` : `You're not watching any competitors yet.`)
+                    : 'No new launches in the last 48 hours.'}
+                </div>
+                {onAddCompetitor && (
+                  <button onClick={onAddCompetitor}
+                    style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '8px 15px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    + Add a competitor{activeBrandName ? ` for ${activeBrandName}` : ''}
+                  </button>
+                )}
+              </div>
+            )
             : competitors.map((c, i) => (
                 <div key={c.id || i} style={{ borderTop: i === 0 ? 'none' : `1px solid ${HAIR}`, padding: i === 0 ? '0 0 12px' : '12px 0' }}>
                   <Link href={c.cta_href?.replace('/knowledge/brand/', '/discovery/brand-spy/') || c.cta_href || '/discovery'}
@@ -179,6 +194,12 @@ export default function BriefScan({ brief, melloState, onAct, onWhy }: {
                   )}
                 </div>
               ))}
+          {competitors.length > 0 && onAddCompetitor && (
+            <button onClick={onAddCompetitor}
+              style={{ marginTop: 12, background: 'none', border: 'none', color: GREEN, fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+              + Add a competitor{activeBrandName ? ` for ${activeBrandName}` : ''}
+            </button>
+          )}
         </div>
 
         {/* ── WHAT MELLO CAN DO — the capability menu, always visible ── */}
