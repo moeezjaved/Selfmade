@@ -550,7 +550,9 @@ export default function InterviewPage() {
               {nightDone && (
                 <>
                   <p style={{ ...sub, color: '#7d8a7c', marginTop: 24 }}>The deep study takes me all night — competitors, angles, everything that wins in your market. But I already have a first read for you.</p>
-                  <button style={{ ...btnMain, background: LIME, color: FOREST, marginTop: 18 }} onClick={() => setPhase('plan')}>Read my first briefing →</button>
+                  {/* Section 4 (show, then sell): the promised payoff must BE the payoff. This opens the real
+                      first brief; the plan ask is sequenced after value, as a card inside ?welcome=1. */}
+                  <button style={{ ...btnMain, background: LIME, color: FOREST, marginTop: 18 }} onClick={() => router.push('/brief?welcome=1')}>Read my first briefing →</button>
                 </>
               )}
             </div>
