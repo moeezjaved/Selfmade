@@ -579,7 +579,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
           <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
               <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22, color: INK, lineHeight: 1.15, letterSpacing: '-.01em' }}>Keep Mello on full-time — $49<span style={{ fontSize: 15, color: MUTED }}>/mo</span>.</div>
-              <div style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.55, marginTop: 4 }}>You&rsquo;re on Free (5 image ads, 1 competitor). Full-time unlocks video ads, every competitor watched, and fresh creatives every morning &mdash; or top up credits and pay as you go.</div>
+              <div style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.55, marginTop: 4 }}>You&rsquo;re on Free &mdash; 75 credits to start (about 5 image ads), 1 competitor. Full-time unlocks video ads, every competitor watched, and fresh creatives every morning &mdash; or top up credits and pay as you go.</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
               <button onClick={goFullTime} disabled={subscribing} style={{ background: FOREST, color: LIME, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, border: 'none', cursor: subscribing ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{subscribing ? 'Opening…' : 'Go full-time · $49/mo'}</button>

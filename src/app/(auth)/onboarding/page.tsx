@@ -567,7 +567,7 @@ export default function InterviewPage() {
                 <div style={planCard}>
                   <div style={planName}>Free</div>
                   <div style={planPrice}>$0<span style={planPer}>/mo</span></div>
-                  <div style={planFeat}>5 free image ads to start<br />Spy on 1 competitor<br />Daily brief from Mello</div>
+                  <div style={planFeat}>75 free credits (~5 image ads)<br />Spy on 1 competitor<br />Daily brief from Mello</div>
                   <button style={{ ...btnGhost, width: '100%', marginTop: 14 }} onClick={() => router.push('/brief')}>Start on Free →</button>
                 </div>
                 {/* Full-time — the ONE paid plan ($49/mo). Tiers collapsed to Polsia-simple. */}
