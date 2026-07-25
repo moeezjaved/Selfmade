@@ -279,7 +279,9 @@ export default function BriefClient({ initialBrief, initialView = 'standup' }: {
     fetch('/api/interview/notebook', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entries: [{ kind: 'decision', content }], source: 'standup' }) }).catch(() => {})
 
   return (
-    <div style={{ maxWidth: 620, margin: '0 auto', padding: '26px 20px 150px', fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    // 620 is the reading measure for the narrative brief; the scan is a layout, not prose, so it
+    // takes the page (4 columns need ~330 each or the verbs wrap onto two lines).
+    <div style={{ maxWidth: view === 'scan' ? 1320 : 620, margin: '0 auto', padding: '26px 20px 150px', fontFamily: "'Inter', -apple-system, sans-serif" }}>
       {/* header — a quiet presence, not chrome. No toggle, no competing decisions. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         <span style={{ position: 'relative', display: 'inline-flex' }}>
@@ -484,7 +486,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup' }: {
       <style>{`.brief-composer{padding-left:20px}@media(min-width:769px){.brief-composer{padding-left:92px}}`}</style>
       {brief && (
         <div className="brief-composer" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: 'linear-gradient(transparent, #f6f8f5 34%)', paddingTop: 26, paddingRight: 20, paddingBottom: 22, pointerEvents: 'none' }}>
-          <form onSubmit={(e) => { e.preventDefault(); say(draft) }} style={{ maxWidth: 620, margin: '0 auto', display: 'flex', alignItems: 'flex-end', gap: 9, pointerEvents: 'auto' }}>
+          <form onSubmit={(e) => { e.preventDefault(); say(draft) }} style={{ maxWidth: view === 'scan' ? 1320 : 620, margin: '0 auto', display: 'flex', alignItems: 'flex-end', gap: 9, pointerEvents: 'auto' }}>
             {/* textarea, not input, so Shift+Enter inserts a newline and Enter sends. Auto-grows to ~5 lines. */}
             <textarea value={draft} onChange={e => setDraft(e.target.value)} disabled={busy} rows={1}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); say(draft) } }}
