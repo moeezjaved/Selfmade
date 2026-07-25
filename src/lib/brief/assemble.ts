@@ -50,7 +50,7 @@ const soft = async <T,>(p: PromiseLike<T>, fallback: T, ms = BUDGET_MS): Promise
   } catch { return fallback }
 }
 
-export async function assembleBrief(admin: SupabaseClient, userId: string, userMeta: any): Promise<Brief> {
+export async function assembleBrief(admin: SupabaseClient, userId: string, userMeta: any, opts: { brandId?: string | null } = {}): Promise<Brief> {
   const rawName = String((userMeta as any)?.full_name || (userMeta as any)?.name || '').trim()
   const email = String((userMeta as any)?.email || '')
   const firstName = rawName ? rawName.split(/\s+/)[0] : (email ? email.split('@')[0].replace(/[._-].*$/, '') : '')
@@ -60,16 +60,39 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   const H24 = new Date(Date.now() - 24 * 3600e3).toISOString()
   const D7 = new Date(Date.now() - 7 * 86400e3).toISOString()
 
+  // BRAND SCOPE (switcher). When a brand is selected, restrict the brief to its world: its own
+  // competitors, its own creatives, its own spine items. notifications carry no brand_id, so we scope
+  // them via the brand's watched page_ids (followed_brands.brand_id, migration 117). An empty set
+  // (brand with no competitors yet) → NO_PAGE sentinel so the query returns nothing, not everything.
+  const NO_PAGE = '__none__'
+  let brandPageIds: string[] | null = null
+  if (opts.brandId) {
+    const rows = await soft<any[]>(admin.from('followed_brands').select('page_id')
+      .eq('user_id', userId).eq('brand_id', opts.brandId).then((r: any) => r.data || []), [])
+    brandPageIds = rows.map((r: any) => String(r.page_id)).filter(Boolean)
+  }
+  const scopePages = brandPageIds && brandPageIds.length ? brandPageIds : (brandPageIds ? [NO_PAGE] : null)
+
   const [spine, notifs, creatives, follows, adsScanned, observations] = await Promise.all([
-    soft<any[]>(admin.from('brief_events').select('id, kind, importance, title, body, cta_label, cta_href, payload, created_at')
-      .eq('user_id', userId).gte('created_at', H48).order('importance', { ascending: false }).limit(20)
-      .then((r: any) => r.data || []), []),
-    soft<any[]>(admin.from('notifications').select('id, brand_name, page_id, ad_count, sample_ad_id, created_at')
-      .eq('user_id', userId).eq('type', 'new_ad').gte('created_at', H48).order('created_at', { ascending: false }).limit(8)
-      .then((r: any) => r.data || []), []),
-    soft<any[]>(admin.from('creative_generations').select('id, image_url, type, created_at')
-      .eq('user_id', userId).gte('created_at', H36).order('created_at', { ascending: false }).limit(6)
-      .then((r: any) => r.data || []), []),
+    soft<any[]>((async () => {
+      let q = admin.from('brief_events').select('id, kind, importance, title, body, cta_label, cta_href, payload, created_at')
+        .eq('user_id', userId).gte('created_at', H48).order('importance', { ascending: false }).limit(20)
+      // brand view: this brand's items + truly account-wide ones (brand_id null).
+      if (opts.brandId) q = q.or(`brand_id.eq.${opts.brandId},brand_id.is.null`)
+      const { data } = await q; return data || []
+    })(), []),
+    soft<any[]>((async () => {
+      let q = admin.from('notifications').select('id, brand_name, page_id, ad_count, sample_ad_id, created_at')
+        .eq('user_id', userId).eq('type', 'new_ad').gte('created_at', H48).order('created_at', { ascending: false }).limit(8)
+      if (scopePages) q = q.in('page_id', scopePages)
+      const { data } = await q; return data || []
+    })(), []),
+    soft<any[]>((async () => {
+      let q = admin.from('creative_generations').select('id, image_url, type, created_at')
+        .eq('user_id', userId).gte('created_at', H36).order('created_at', { ascending: false }).limit(6)
+      if (opts.brandId) q = q.eq('brand_id', opts.brandId)
+      const { data } = await q; return data || []
+    })(), []),
     soft<any[]>(admin.from('followed_brands').select('page_id, brand_name, spied, brand_id')
       .eq('user_id', userId).limit(200).then((r: any) => r.data || []), []),
     soft<number>(admin.from('discovery_ads_index').select('ad_id', { count: 'estimated', head: true })
@@ -135,7 +158,9 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     }
   }
 
-  const pageIds = follows.map((f: any) => f.page_id).filter(Boolean).slice(0, 60)
+  // In a brand view, "the brands you watch" means only this brand's competitors.
+  const scopedFollows = scopePages ? follows.filter((f: any) => scopePages.includes(String(f.page_id))) : follows
+  const pageIds = scopedFollows.map((f: any) => f.page_id).filter(Boolean).slice(0, 60)
   const [marketAds, globalAds] = await Promise.all([
     soft((async () => {
       let q = admin.from('discovery_ads_index')
@@ -242,8 +267,8 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   return {
     summary: {
       adsScanned,
-      brandsWatched: follows.length,
-      spiedBrands: follows.filter((f: any) => f.spied).length,
+      brandsWatched: scopedFollows.length,
+      spiedBrands: scopedFollows.filter((f: any) => f.spied).length,
       creativesReady: creatives.length,
     },
     lastCycleAt,

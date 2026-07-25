@@ -11,12 +11,20 @@ import { assembleBrief } from '@/lib/brief/assemble'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  const brief = await assembleBrief(admin, user.id, { ...(user.user_metadata || {}), email: user.email })
+  // Brand switcher: scope to one of the user's brands. Validate ownership so ?brand= can't point at
+  // someone else's brand id.
+  const reqBrand = req.nextUrl.searchParams.get('brand')
+  let brandId: string | null = null
+  if (reqBrand) {
+    const { data: b } = await admin.from('brands').select('id').eq('user_id', user.id).eq('id', reqBrand).maybeSingle()
+    if (b) brandId = reqBrand
+  }
+  const brief = await assembleBrief(admin, user.id, { ...(user.user_metadata || {}), email: user.email }, { brandId })
   return NextResponse.json(brief)
 }
 

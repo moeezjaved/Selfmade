@@ -10,10 +10,11 @@ import BriefClient from './BriefClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function BriefPage({ searchParams }: { searchParams?: { view?: string } }) {
-  // The view is resolved on the SERVER and rendered into the HTML. Reading ?view= in a useEffect
-  // meant a failed hydration (broken extensions) silently fell back to the standup — same class of
-  // bug as the studio's mode/source seeding. Never gate first paint on the client.
+export default async function BriefPage({ searchParams }: { searchParams?: { view?: string; brand?: string } }) {
+  // The view AND the selected brand are resolved on the SERVER and rendered into the HTML. Reading
+  // either in a useEffect meant a failed hydration (broken extensions) silently fell back to the
+  // default — same class of bug as the studio's mode/source seeding. Never gate first paint on the
+  // client: the switcher is interactivity, but the scoped content it produces is server-rendered.
   const v = searchParams?.view
   const initialView: 'standup' | 'desk' | 'scan' = v === 'desk' ? 'desk' : v === 'scan' ? 'scan' : 'standup'
   const supabase = await createClient()
@@ -21,11 +22,17 @@ export default async function BriefPage({ searchParams }: { searchParams?: { vie
   // The (dashboard) layout + middleware already gate auth; if somehow unauthenticated, render the
   // client with no brief (it shows the retry state) rather than crash the server component.
   let initialBrief: Brief | null = null
+  let brands: { id: string; name: string }[] = []
+  let activeBrandId: string | null = null
   if (user) {
     try {
       const admin = createAdminClient()
-      initialBrief = await assembleBrief(admin, user.id, { ...(user.user_metadata || {}), email: user.email })
+      const { data: bs } = await admin.from('brands').select('id, name').eq('user_id', user.id).order('created_at', { ascending: true })
+      brands = (bs || []).map((b: any) => ({ id: String(b.id), name: String(b.name) }))
+      // Only honour ?brand= if it's really one of the user's brands (no scoping to someone else's id).
+      activeBrandId = searchParams?.brand && brands.some(b => b.id === searchParams.brand) ? searchParams.brand! : null
+      initialBrief = await assembleBrief(admin, user.id, { ...(user.user_metadata || {}), email: user.email }, { brandId: activeBrandId })
     } catch { initialBrief = null }
   }
-  return <BriefClient initialBrief={initialBrief} initialView={initialView} />
+  return <BriefClient initialBrief={initialBrief} initialView={initialView} brands={brands} activeBrandId={activeBrandId} />
 }

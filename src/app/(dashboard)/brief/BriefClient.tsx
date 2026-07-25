@@ -213,7 +213,7 @@ function DeskView({ brief, greet, onAct, onDecision }: { brief: Brief; greet: st
   )
 }
 
-export default function BriefClient({ initialBrief, initialView = 'standup' }: { initialBrief: Brief | null; initialView?: 'standup' | 'desk' | 'scan' }) {
+export default function BriefClient({ initialBrief, initialView = 'standup', brands = [], activeBrandId = null }: { initialBrief: Brief | null; initialView?: 'standup' | 'desk' | 'scan'; brands?: { id: string; name: string }[]; activeBrandId?: string | null }) {
   // Seeded from the SERVER render — the brief content is already in the HTML, so it shows even if the
   // client never hydrates (broken extensions). We only fetch as a fallback when the server had nothing.
   const [brief, setBrief] = useState<Brief | null>(initialBrief)
@@ -227,6 +227,17 @@ export default function BriefClient({ initialBrief, initialView = 'standup' }: {
   const endRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
+  // Brand switcher: navigate (server re-scopes the brief), preserving the current view. Interactivity
+  // only — the scoped content is already server-rendered from ?brand=, so a failed hydration still
+  // shows the right brand; only the ability to switch needs JS.
+  const goBrand = (id: string) => {
+    const p = new URLSearchParams()
+    if (id) p.set('brand', id)
+    if (view !== 'standup') p.set('view', view)
+    const qs = p.toString()
+    router.push(`/brief${qs ? `?${qs}` : ''}`)
+  }
+
   // One calm default — no toggle, fewer decisions. The Desk variant stays reachable via ?view=desk.
   // (the view arrives server-rendered via initialView — no client effect, so it survives a failed hydration)
   // Fallback only: the server already rendered the brief into the HTML. We re-fetch client-side ONLY
@@ -235,7 +246,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup' }: {
     if (initialBrief) return
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), 22000)
-    fetch('/api/brief', { signal: ctrl.signal }).then(r => r.ok ? r.json() : Promise.reject())
+    fetch(`/api/brief${activeBrandId ? `?brand=${encodeURIComponent(activeBrandId)}` : ''}`, { signal: ctrl.signal }).then(r => r.ok ? r.json() : Promise.reject())
       .then((b: Brief) => { setBrief(b); setFocusItem(b.headline || b.items[0] || null) })
       .catch(() => setErr(true))
       .finally(() => clearTimeout(t))
@@ -303,6 +314,22 @@ export default function BriefClient({ initialBrief, initialView = 'standup' }: {
           .brief-say{animation:sayIn .5s cubic-bezier(0,0,.2,1) both}
           @media(prefers-reduced-motion:reduce){.brief-say{animation:none;opacity:1;transform:none}}`}</style>
       </div>
+
+      {/* brand switcher — only with 2+ brands (pointless for one). Scopes the whole brief to one
+          brand's world; "All brands" is the pooled default. */}
+      {brands.length > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 2px' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: '#9aa79a' }}>Showing</span>
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <select value={activeBrandId || ''} onChange={e => goBrand(e.target.value)}
+              style={{ appearance: 'none', WebkitAppearance: 'none', background: activeBrandId ? '#eef6e4' : '#fff', border: `1px solid ${activeBrandId ? '#d3e6b8' : PAPERLINE}`, borderRadius: 100, color: INK, fontWeight: 750, fontSize: 13, fontFamily: 'inherit', padding: '5px 30px 5px 13px', cursor: 'pointer', outline: 'none' }}>
+              <option value="">All brands</option>
+              {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            <span style={{ position: 'absolute', right: 12, pointerEvents: 'none', color: MUTED, fontSize: 10 }}>▾</span>
+          </div>
+        </div>
+      )}
 
       {/* loading / error */}
       {!brief && !err && <div style={{ color: MUTED, fontSize: 15 }}><span style={{ opacity: .7 }}>Mello is pulling the room together…</span></div>}
