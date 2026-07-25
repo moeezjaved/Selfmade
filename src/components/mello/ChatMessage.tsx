@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import {
   ChevronRight, CheckCircle2, AlertCircle, BarChart2, Search, Loader2,
-  ThumbsUp, ThumbsDown, Sparkles,
+  ThumbsUp, ThumbsDown,
 } from 'lucide-react'
 import { Markdown } from './Markdown'
+import MelloFace from '@/components/MelloFace'
 import type { MelloMessage } from './useChatStream'
 
 function ThinkingBlock({ durationMs }: { durationMs: number }) {
@@ -103,9 +104,7 @@ export function ChatMessage({ msg, onWidgetAnswer, onFeedback, widgetLocked }: {
   const empty = !msg.content && !hasTools && !msg.interactive_widget && !msg.error && !(msg.plan?.length)
   return (
     <div style={{ display: 'flex', gap: 10, margin: '14px 0' }}>
-      <div style={{ width: 28, height: 28, borderRadius: 8, background: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-        <Sparkles size={15} color="#2d5a27" />
-      </div>
+      <div style={{ flexShrink: 0, marginTop: 2 }}><MelloFace size={28} /></div>
       <div style={{ flex: 1, minWidth: 0 }}>
         {showThinking && msg.thinking_steps!.map((t, i) => <ThinkingBlock key={i} durationMs={t.duration_ms} />)}
         {(msg.plan?.length || 0) > 0 && (

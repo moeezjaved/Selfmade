@@ -13,6 +13,7 @@ import { PLANS, normalizePlan } from '@/lib/plans'
 import { CreditModal } from '@/components/credits/CreditModal'
 import { NotificationBell } from '@/components/NotificationBell'
 import UpsellModalHost from '@/components/UpsellModal'
+import MelloFace from '@/components/MelloFace'
 import RemakeStarter from '@/components/RemakeStarter'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -212,7 +213,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div style={{ padding: '0 16px 6px' }}><RemakeStarter /></div>
           <nav className="flex-1 overflow-y-auto" style={{ padding: '2px 10px 12px' }}>
-            <ItemLink item={{ href: '/mello', icon: Sparkles, label: 'Ask Mello' }} active={melloActive} onClick={() => setNavOpen(false)} />
+            <ItemLink item={{ href: '/mello', icon: () => <MelloFace size={18} />, label: 'Ask Mello' }} active={melloActive} onClick={() => setNavOpen(false)} />
             {AREAS.map(a => (
               <div key={a.key}>
                 <div style={{ padding: '14px 8px 4px', fontSize: 9.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#a2aca2' }}>{a.label}</div>
@@ -248,7 +249,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div onMouseEnter={() => setFlyout(null)}>
-            <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent label="Mello"><Sparkles size={20} /></RailIcon>
+            <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent label="Mello"><MelloFace size={22} /></RailIcon>
           </div>
 
           <div style={{ width: 30, height: 1, background: '#e6eae4', margin: '5px 0' }} />

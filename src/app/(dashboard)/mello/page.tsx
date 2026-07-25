@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Plus, Sparkles, MessageSquare, Trash2, Zap, PanelLeft, X } from 'lucide-react'
+import MelloFace from '@/components/MelloFace'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useChatStream, type MelloMessage } from '@/components/mello/useChatStream'
 import { ChatMessage } from '@/components/mello/ChatMessage'
@@ -124,9 +125,7 @@ export default function MelloPage() {
         ...(isMobile ? { position: 'absolute' as const, top: 0, bottom: 0, left: 0, zIndex: 31, transform: tasksOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease', boxShadow: tasksOpen ? '0 0 30px rgba(0,0,0,0.25)' : 'none' } : {}) }}>
         <div style={{ padding: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Sparkles size={16} color="#2d5a27" />
-            </div>
+            <MelloFace size={28} />
             <span style={{ fontWeight: 800, fontSize: 17, color: '#26331f' }}>Mello</span>
           </div>
           <button onClick={newTask} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid #d3e0cb', background: '#fff', color: '#2d5a27', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
@@ -164,9 +163,7 @@ export default function MelloPage() {
           <div style={{ maxWidth: 760, margin: '0 auto', paddingBottom: 20 }}>
             {isEmpty ? (
               <div style={{ paddingTop: 64, textAlign: 'center' }}>
-                <div style={{ width: 56, height: 56, borderRadius: 16, background: '#dffe95', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                  <Sparkles size={28} color="#2d5a27" />
-                </div>
+                <div style={{ display: 'inline-block', marginBottom: 14 }}><MelloFace size={56} /></div>
                 <h1 style={{ fontSize: 26, fontWeight: 800, color: '#26331f', margin: 0 }}>Ask Mello</h1>
                 <p style={{ color: '#6c7a66', fontSize: 14, marginTop: 6 }}>Trained on insights from billions in ad spend</p>
 
