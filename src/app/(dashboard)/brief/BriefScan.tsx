@@ -40,9 +40,9 @@ const ago = (iso?: string | null): string | null => {
   const d = Math.floor(h / 24); return d === 1 ? 'yesterday' : `${d}d ago`
 }
 
-const label: React.CSSProperties = { fontSize: 10, fontWeight: 800, letterSpacing: '.15em', textTransform: 'uppercase', color: '#8a968a', margin: '0 0 12px' }
-const serif: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 17, fontWeight: 400, color: INK, lineHeight: 1.25, letterSpacing: '-.005em' }
-const sub: React.CSSProperties = { fontSize: 11.5, color: MUTED, lineHeight: 1.45 }
+const label: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a968a', margin: '0 0 12px' }
+const serif: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 20, fontWeight: 400, color: INK, lineHeight: 1.25, letterSpacing: '-.005em' }
+const sub: React.CSSProperties = { fontSize: 13, color: MUTED, lineHeight: 1.5 }
 
 /** A creative, shown. This is an ads product — the ad IS the content, so the scan must carry it.
  *  Video renders as a static poster + badge (never a live <video>): nothing to swallow the click. */
@@ -74,8 +74,8 @@ function Row({ href, onClick, title, desc, right, first }: {
   return <button onClick={onClick} className="bs-row" style={style}>{inner}</button>
 }
 
-const ARROW = <span className="bs-a" style={{ color: '#c2ccc0', fontSize: 13, transition: 'color .15s, transform .15s', display: 'inline-block' }}>→</span>
-const AUTO = <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: FOREST, background: '#f2f8ea', border: '1px solid #a8cf6f', borderRadius: 100, padding: '3px 8px' }}>Auto</span>
+const ARROW = <span className="bs-a" style={{ color: '#c2ccc0', fontSize: 15, transition: 'color .15s, transform .15s', display: 'inline-block' }}>→</span>
+const AUTO = <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: FOREST, background: '#f2f8ea', border: '1px solid #a8cf6f', borderRadius: 100, padding: '3px 8px' }}>Auto</span>
 
 export default function BriefScan({ brief, melloState, onAct, onWhy }: {
   brief: Brief; melloState: MelloState; onAct: (it: Item) => void; onWhy: (it: Item) => void
@@ -89,7 +89,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy }: {
   return (
     <div className="bs" style={{ marginTop: 26, border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#faf9f5' }}>
       {/* the night's work, as one line of texture — truncates rather than wraps */}
-      <div style={{ background: FOREST, color: '#b9c6b4', font: "11.5px/1.8 ui-monospace, 'SF Mono', Menlo, monospace", padding: '9px 18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <div style={{ background: FOREST, color: '#b9c6b4', font: "12.5px/1.8 ui-monospace, 'SF Mono', Menlo, monospace", padding: '9px 18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         &gt; read <b style={{ color: LIME, fontWeight: 400 }}>{brief.summary.adsScanned.toLocaleString()} ads</b> across your {brief.summary.brandsWatched} competitor{brief.summary.brandsWatched === 1 ? '' : 's'}
         {brief.summary.creativesReady > 0 && <> &nbsp;·&nbsp; drafted <b style={{ color: LIME, fontWeight: 400 }}>{brief.summary.creativesReady} creative{brief.summary.creativesReady === 1 ? '' : 's'}</b></>}
         {worked && <> &nbsp;·&nbsp; last worked {worked}</>}
@@ -106,7 +106,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy }: {
               {brief.quiet ? 'Nothing needs you today.' : brief.summary.creativesReady > 0 ? `${brief.summary.creativesReady} creative${brief.summary.creativesReady === 1 ? '' : 's'} waiting on your call` : 'Watching your competitors.'}
             </div>
             {[['Ads read', brief.summary.adsScanned.toLocaleString()], ['Competitors', String(brief.summary.brandsWatched)], ...(worked ? [['Last worked', worked]] : [])].map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: MUTED, padding: '6px 0' }}>
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: MUTED, padding: '7px 0' }}>
                 <span>{k}</span><b style={{ color: INK, fontWeight: 750, fontVariantNumeric: 'tabular-nums' }}>{v}</b>
               </div>
             ))}
@@ -115,8 +115,8 @@ export default function BriefScan({ brief, melloState, onAct, onWhy }: {
           <div className="bs-mello-strip">
             <MelloFace size={38} state={melloState} />
             <div style={{ minWidth: 0 }}>
-              <div style={{ ...serif, fontSize: 16 }}>{stateWord}{brief.summary.creativesReady > 0 ? ` — ${brief.summary.creativesReady} waiting` : ''}</div>
-              <div style={{ ...sub, fontSize: 11 }}>{brief.summary.adsScanned.toLocaleString()} ads · {brief.summary.brandsWatched} competitors{worked ? ` · ${worked}` : ''}</div>
+              <div style={{ ...serif, fontSize: 18 }}>{stateWord}{brief.summary.creativesReady > 0 ? ` — ${brief.summary.creativesReady} waiting` : ''}</div>
+              <div style={{ ...sub, fontSize: 12.5 }}>{brief.summary.adsScanned.toLocaleString()} ads · {brief.summary.brandsWatched} competitors{worked ? ` · ${worked}` : ''}</div>
             </div>
           </div>
         </div>
@@ -129,7 +129,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy }: {
           ) : (
             <>
               <div style={{ paddingBottom: 12 }}>
-                <div style={serif}>{hero.title.replace(/\.+$/, '')}</div>
+                <div style={{ ...serif, fontSize: 23, lineHeight: 1.2 }}>{hero.title.replace(/\.+$/, '')}</div>
                 {hero.body && <div style={{ ...sub, marginTop: 2 }}>{hero.body}</div>}
                 {(hero.thumbs?.[0] || hero.media?.[0]) && (
                   <div style={{ marginTop: 10 }}>
@@ -139,11 +139,11 @@ export default function BriefScan({ brief, melloState, onAct, onWhy }: {
                 <div style={{ marginTop: 11, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   {hero.cta_href && (
                     <Link href={hero.cta_href} onClick={() => onAct(hero)}
-                      style={{ background: LIME, color: FOREST, borderRadius: 100, padding: '9px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none' }}>
+                      style={{ background: LIME, color: FOREST, borderRadius: 100, padding: '10px 18px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>
                       ✓ {hero.cta_label || 'Review & approve'}
                     </Link>
                   )}
-                  <button onClick={() => onWhy(hero)} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Why?</button>
+                  <button onClick={() => onWhy(hero)} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Why?</button>
                 </div>
               </div>
               {second && (
