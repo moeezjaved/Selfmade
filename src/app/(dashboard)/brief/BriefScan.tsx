@@ -140,6 +140,18 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                 )}
               </div>
             )}
+
+            {/* Paid subscribers: no upsell — a top-up card instead (they can still buy PAYG credits). */}
+            {isPaid && onBuyCredits && (
+              <div style={{ marginTop: 18, borderTop: `2px solid ${RULE}`, paddingTop: 14 }}>
+                <div style={{ ...serif, fontSize: 18 }}>Need more this month?</div>
+                <div style={{ ...sub, marginBottom: 12 }}>Top up credits — pay as you go, and they never expire.</div>
+                <button onClick={onBuyCredits}
+                  style={{ width: '100%', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Buy credits →
+                </button>
+              </div>
+            )}
           </div>
           {/* mobile: one line, so the decision stays above the fold */}
           <div className="bs-mello-strip">
