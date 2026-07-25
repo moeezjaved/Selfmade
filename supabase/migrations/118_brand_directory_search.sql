@@ -26,18 +26,21 @@
 --   before this is applied — search just stays accent-sensitive until then.
 -- ─────────────────────────────────────────────────────────────────────────────
 
-create extension if not exists unaccent;
-create extension if not exists pg_trgm;
+-- Supabase installs extensions into the `extensions` schema (not public), so BOTH the unaccent
+-- function and its dictionary must be schema-qualified — an unqualified `unaccent('unaccent'...)`
+-- fails with 42704 at index-build time because `extensions` isn't on the inlined search_path.
+create extension if not exists unaccent with schema extensions;
+create extension if not exists pg_trgm with schema extensions;
 
 -- 1-arg unaccent() is STABLE (not indexable); the 2-arg form with an explicit dictionary is
 -- IMMUTABLE. Wrap it so we can build a functional index.
 create or replace function immutable_unaccent(text)
   returns text language sql immutable parallel safe
-  as $$ select unaccent('unaccent'::regdictionary, $1) $$;
+  as $$ select extensions.unaccent('extensions.unaccent'::regdictionary, $1) $$;
 
--- Fast accent-insensitive substring search at 611K rows.
+-- Fast accent-insensitive substring search at 611K rows. gin_trgm_ops lives in `extensions` too.
 create index if not exists idx_brand_directory_name_unaccent_trgm
-  on brand_directory using gin (immutable_unaccent(lower(name)) gin_trgm_ops);
+  on brand_directory using gin (immutable_unaccent(lower(name)) extensions.gin_trgm_ops);
 
 -- Relevance-ranked, accent-insensitive search. STABLE + read-only.
 create or replace function search_brand_directory(p_q text, p_industry text default null, p_limit int default 50)
