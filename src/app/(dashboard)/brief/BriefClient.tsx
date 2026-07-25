@@ -477,7 +477,8 @@ export default function BriefClient({ initialBrief, initialView = 'standup' }: {
           (progressive disclosure — depth only for those who ask for it). */}
       {brief && <BriefAlerts exclude={[...(brief.headline ? [brief.headline.title] : []), ...brief.items.map(i => i.title)]} />}
       {/* All the ways to make something — kept on the brief, compact so they don't compete with it. */}
-      {brief && <TryMello compact />}
+      {/* The scan already carries the capability menu as its fourth column — don't print it twice. */}
+      {brief && view !== 'scan' && <TryMello compact />}
       {brief && <BriefWishlist />}
 
       {/* ── composer: interrupt anytime, in plain language ── */}
