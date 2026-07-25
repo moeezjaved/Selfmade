@@ -437,7 +437,7 @@ export default function InterviewPage() {
                   </div>
                 ))}
                 {!gSells && !gBuyer && (
-                  <div style={{ ...sub, marginTop: 4 }}>Your site kept its secrets — tell me in a line what you sell and I’ll note it:
+                  <div style={{ ...sub, marginTop: 4 }}>Give me one line on what you sell — I’ll take it from there tonight.
                     <input value={gSells} onChange={e => setGSells(e.target.value)} style={{ ...inputCss, marginTop: 10 }} placeholder="e.g. farm-fresh dairy, delivered — Lahore" /></div>
                 )}
               </div>
