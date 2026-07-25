@@ -49,13 +49,7 @@ export async function POST(req: NextRequest) {
       .replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
       .replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').slice(0, 5000)
 
-    const or = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', max_tokens: 320, temperature: 0.2, response_format: { type: 'json_object' },
-        messages: [{
-          role: 'user',
-          content: `You are a sharp marketing strategist doing pre-interview homework on a company from its website. The company may sell PHYSICAL PRODUCTS, a SERVICE, or SOFTWARE / an APP — infer which and describe it accordingly (don't assume it's a product store). Prefer the structured signals (OG / JSON-LD / title / meta) over sparse body text — many sites (Shopify, SPAs, app landing pages) render little visible text but describe themselves fully in these tags. Form crisp, confident first-pass observations (shown as "I think… correct me if I'm wrong"). Only leave a field blank if there is genuinely no signal.
+    const prompt = `You are a sharp marketing strategist doing pre-interview homework on a company from its website. The company may sell PHYSICAL PRODUCTS, a SERVICE, or SOFTWARE / an APP — infer which and describe it accordingly (don't assume it's a product store). Prefer the structured signals (OG / JSON-LD / title / meta) over sparse body text — many sites (Shopify, SPAs, app landing pages) render little visible text but describe themselves fully in these tags. Form crisp, confident first-pass observations (shown as "I think… correct me if I'm wrong"). Only leave a field blank if there is genuinely no signal.
 
 TITLE: ${title}
 META: ${desc}
@@ -66,13 +60,37 @@ STRUCTURED (JSON-LD): ${ld}
 TEXT: ${text}
 
 Return ONLY JSON:
-{"sells":"what they offer + positioning in ≤9 words — a product ('farm-fresh dairy, delivered — Lahore'), a service ('bookkeeping for US e-commerce brands'), or software ('scheduling app for barbershops')","buyer":"who it's for, ≤8 words","voice":"brand voice in 2-4 words (e.g. 'warm, honest, no hype')","differentiator":"their sharpest edge in ≤10 words","niche":"industry niche in 1-3 words","keywords":["2-4 short search terms to find their COMPETITORS' ads (category words a rival would also match, never this company's own name)"]}`,
-        }],
-      }),
-    })
-    if (!or.ok) throw new Error(`openai ${or.status}`)
-    const j = await or.json()
-    const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
+{"sells":"what they offer + positioning in ≤9 words — a product ('farm-fresh dairy, delivered — Lahore'), a service ('bookkeeping for US e-commerce brands'), or software ('scheduling app for barbershops')","buyer":"who it's for, ≤8 words","voice":"brand voice in 2-4 words (e.g. 'warm, honest, no hype')","differentiator":"their sharpest edge in ≤10 words","niche":"industry niche in 1-3 words","keywords":["2-4 short search terms to find their COMPETITORS' ads (category words a rival would also match, never this company's own name)"]}`
+
+    // Two providers so detection survives one being down/over-quota. OpenAI first; Gemini fallback
+    // (same key that powers the clone engine). This is what unblocked detection when OpenAI 429'd
+    // despite a positive credit balance.
+    let out: any = null
+    let reason = ''
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const or = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 320, temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: prompt }] }),
+          signal: AbortSignal.timeout(15000),
+        })
+        if (or.ok) { const j = await or.json(); out = JSON.parse(j.choices?.[0]?.message?.content || '{}') }
+        else reason = `openai ${or.status}`
+      } catch (e: any) { reason = `openai ${String(e?.message || e).slice(0, 60)}` }
+    }
+    if (!out && process.env.GEMINI_API_KEY) {
+      try {
+        const model = process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash'
+        const gr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 400 } }),
+          signal: AbortSignal.timeout(15000),
+        })
+        if (gr.ok) { const gj = await gr.json(); out = JSON.parse(gj?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') || '{}') }
+        else reason += ` · gemini ${gr.status}`
+      } catch (e: any) { reason += ` · gemini ${String(e?.message || e).slice(0, 60)}` }
+    }
+    if (!out) return NextResponse.json({ sells: null, buyer: null, voice: null, differentiator: null, niche: null, keywords: [], degraded: true, reason: reason.slice(0, 200) })
     return NextResponse.json({
       sells: String(out.sells || '').slice(0, 120) || null,
       buyer: String(out.buyer || '').slice(0, 100) || null,
@@ -82,7 +100,6 @@ Return ONLY JSON:
       keywords: Array.isArray(out.keywords) ? out.keywords.map((k: any) => String(k).slice(0, 40)).slice(0, 4) : [],
     })
   } catch (e: any) {
-    // TEMP diagnostic (reason) — surfaces WHY detection degrades; remove once root cause is fixed.
     return NextResponse.json({ sells: null, buyer: null, voice: null, differentiator: null, niche: null, keywords: [], degraded: true, reason: String(e?.message || e).slice(0, 200) })
   }
 }
