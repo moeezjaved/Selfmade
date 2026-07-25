@@ -230,6 +230,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   const [headlineState, setHeadlineState] = useState<null | 'approved' | 'passed'>(null)
   const [view, setView] = useState<'standup' | 'desk' | 'scan'>(initialView)   // conversation · prepared desk · one-page scan
   const [credits, setCredits] = useState<number | null>(null)
+  const [plan, setPlan] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [planDismissed, setPlanDismissed] = useState(false)
   const [subscribing, setSubscribing] = useState(false)
@@ -252,7 +253,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   // Credit balance for the scan's Mello column — the same source as the header counter.
   useEffect(() => {
     let live = true
-    fetch('/api/credits/balance').then(r => r.ok ? r.json() : null).then(j => { if (live && j && typeof j.balance === 'number') setCredits(j.balance) }).catch(() => {})
+    fetch('/api/credits/balance').then(r => r.ok ? r.json() : null).then(j => { if (live && j) { if (typeof j.balance === 'number') setCredits(j.balance); if (j.plan) setPlan(String(j.plan)) } }).catch(() => {})
     return () => { live = false }
   }, [])
 
@@ -391,7 +392,8 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
 
       {brief && view === 'desk' && <DeskView brief={brief} greet={greet} onAct={markActed} onDecision={logDecision} />}
       {brief && view === 'scan' && <BriefScan brief={brief} melloState={melloState} onAct={markActed} onWhy={(it) => { setFocusItem(it); say('Why does it matter?', it) }}
-        credits={credits} activeBrandId={activeBrandId} activeBrandName={activeBrandId ? (brands.find(b => b.id === activeBrandId)?.name || null) : null}
+        credits={credits} plan={plan} onGoFullTime={goFullTime} subscribing={subscribing} onBuyCredits={() => openCredits('buy')}
+        activeBrandId={activeBrandId} activeBrandName={activeBrandId ? (brands.find(b => b.id === activeBrandId)?.name || null) : null}
         onAddCompetitor={() => { if (activeBrandId) setAddOpen(true); else router.push('/brands') }} />}
 
       {/* Add-competitor modal — opened from the scan's Competitors column for the selected brand. */}
