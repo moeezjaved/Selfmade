@@ -15,11 +15,11 @@ export default async function BriefPage({ searchParams }: { searchParams?: { vie
   // either in a useEffect meant a failed hydration (broken extensions) silently fell back to the
   // default — same class of bug as the studio's mode/source seeding. Never gate first paint on the
   // client: the switcher is interactivity, but the scoped content it produces is server-rendered.
-  // The scan (4-column) is the real brief now. First arrival from onboarding (?welcome=1) opens it,
-  // not the old single-column standup — that mismatch is what read as "the old welcome page".
+  // The scan (4-column) IS the brief now — it's the default for everyone. The old single-column
+  // standup and the desk variant stay reachable at ?view=standup / ?view=desk (kept, not deleted).
   const v = searchParams?.view
   const welcome = searchParams?.welcome === '1'
-  const initialView: 'standup' | 'desk' | 'scan' = v === 'desk' ? 'desk' : v === 'scan' ? 'scan' : v === 'standup' ? 'standup' : welcome ? 'scan' : 'standup'
+  const initialView: 'standup' | 'desk' | 'scan' = v === 'desk' ? 'desk' : v === 'standup' ? 'standup' : 'scan'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   // The (dashboard) layout + middleware already gate auth; if somehow unauthenticated, render the
