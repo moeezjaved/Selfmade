@@ -51,11 +51,32 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
       const mine = (industry || []).map(x => String(x).toLowerCase())
       const match = list.find(n => mine.includes(String(n).toLowerCase()))
       setNiche(match || '')
-      if (!match) setLoading(false)
-    }).catch(() => setLoading(false))
+    }).catch(() => {})
   }, [industry])
 
-  // Whenever the niche changes, show that niche's biggest advertisers.
+  // No niche (or none that matches) → fall back to searching the brand's own name. The niche
+  // vocabulary is deliberately coarse (24 categories like DTC / Fashion), so it's a BROWSE tool for
+  // big advertisers, not a precision competitor finder — the name search is what actually surfaces
+  // a direct rival ("Bug Shield" → Bug MD). Offer both rather than trading one for the other.
+  useEffect(() => {
+    if (niche) return
+    const seed = (brandName || '').split(/\s+/)[0] || ''
+    if (!seed) { setSuggested([]); setLoading(false); return }
+    setLoading(true)
+    Promise.all([
+      fetch(`/api/discovery/pages?q=${encodeURIComponent(seed)}`).then(r => r.json()).catch(() => null),
+      fetch(`/api/discovery/brands?q=${encodeURIComponent(seed)}&sort=ads`).then(r => r.json()).catch(() => null),
+    ]).then(([p, b]) => {
+      const seen = new Set<string>(); const out: Comp[] = []
+      for (const x of [...(p?.pages || []), ...(b?.brands || [])]) {
+        const id = String(x.pageId || ''); if (!id || seen.has(id)) continue
+        seen.add(id); out.push({ pageId: id, name: x.name, avatar: x.picture || x.avatar || null, adCount: x.adCount ?? null })
+      }
+      setSuggested(out.slice(0, 8))
+    }).finally(() => setLoading(false))
+  }, [niche, brandName])
+
+  // A niche IS selected → show that niche's biggest advertisers.
   useEffect(() => {
     if (!niche) return
     setLoading(true)
@@ -153,7 +174,7 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
 
         <div style={{ marginTop: 10, minHeight: 90 }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED, padding: '6px 2px' }}>
-            {q.trim() ? 'Search results' : loading ? 'Finding the biggest advertisers…' : suggested.length ? (niche ? `Top advertisers in ${niche}` : 'Recognise any of these?') : 'Pick a niche above, or search by name'}
+            {q.trim() ? 'Search results' : loading ? 'Looking…' : suggested.length ? (niche ? `Biggest advertisers in ${niche}` : 'Possible rivals — recognise any?') : 'Pick a niche above, or search by name'}
           </div>
           {manual && (
             <button onClick={() => { toggle(manual); setQ('') }} style={rowStyle(false)}>
