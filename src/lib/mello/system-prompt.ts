@@ -5,6 +5,34 @@
  */
 import { listAdAccounts } from './meta-data'
 import { getMemories, recallMemories, renderMemories, type Memory } from './memory'
+import { createAdminClient } from '@/lib/supabase/server'
+
+/** The user's live business state — their brands + who they watch — so Mello reasons over the whole
+ *  picture every turn (the "decision engine on all our data" layer), not just what a tool fetches.
+ *  Fail-soft: any error → a neutral note, never blocks the turn. */
+async function buildBusinessBlock(userId: string): Promise<string> {
+  try {
+    const admin = createAdminClient()
+    const [{ data: brands }, { data: follows }] = await Promise.all([
+      admin.from('brands').select('id, name, website, industry, tone, usps, brand_type').eq('user_id', userId).order('created_at', { ascending: true }).limit(10),
+      admin.from('followed_brands').select('brand_name, brand_id').eq('user_id', userId).limit(60),
+    ])
+    const bl = (brands || []) as any[]
+    const fl = (follows || []) as any[]
+    if (!bl.length && !fl.length) return '  (no brands set up yet — the user is brand-new; help them add their brand + a competitor to watch)'
+    const arr = (v: any) => Array.isArray(v) ? v.filter(Boolean).join('/') : (v || '')
+    const lines = bl.map((b) => {
+      const meta = [arr(b.industry), b.brand_type, b.website].filter(Boolean).join(' · ')
+      const voice = b.tone ? ` — voice: ${b.tone}` : ''
+      const usps = arr(b.usps) ? ` — edge: ${arr(b.usps)}` : ''
+      const watched = fl.filter((f) => f.brand_id && String(f.brand_id) === String(b.id)).map((f) => f.brand_name).filter(Boolean)
+      return `  - ${b.name}${meta ? ` (${meta})` : ''}${voice}${usps}${watched.length ? `\n      · watching for this brand: ${watched.slice(0, 12).join(', ')}` : ''}`
+    })
+    const unassigned = fl.filter((f) => !f.brand_id).map((f) => f.brand_name).filter(Boolean)
+    if (unassigned.length) lines.push(`  - Also watching (not yet tied to a brand): ${unassigned.slice(0, 15).join(', ')}`)
+    return lines.join('\n')
+  } catch { return '  (business context unavailable this turn)' }
+}
 
 export async function buildSystemPrompt(userId: string, query?: string, surface?: string): Promise<string> {
   const inStudio = surface === 'studio'
@@ -27,6 +55,7 @@ export async function buildSystemPrompt(userId: string, query?: string, surface?
   const merged: Memory[] = []
   for (const m of [...relevant, ...recent]) { if (seen.has(m.content)) continue; seen.add(m.content); merged.push(m) }
   const memoryBlock = renderMemories(merged.slice(0, 48))
+  const businessBlock = await buildBusinessBlock(userId)
   const today = new Date().toISOString().slice(0, 10)
 
   return `You are Mello, an AI marketing analyst embedded in Selfmade. You help marketing teams diagnose ad performance, find patterns, generate creative, and get inspiration from top-performing ads. You are trained on insights from billions in ad spend across Selfmade's ad-intelligence library.
@@ -36,6 +65,10 @@ ${today}
 
 ## Connected data sources for this user
 ${accountsBlock}
+
+## The user's business right now — their brands + who they watch
+${businessBlock}
+(This is your standing context. Reason over it by default — when they say "my brand", "our voice", "my competitors", you already know which. Tie advice to the specific brand and the rivals they actually watch. If they ask about a brand or competitor not listed here, say so and offer to add it.)
 
 ## What you remember about this user
 ${memoryBlock}
