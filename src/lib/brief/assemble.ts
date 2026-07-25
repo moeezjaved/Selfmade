@@ -24,6 +24,8 @@ export type BriefItem = {
   cta_href?: string
   thumbs?: string[]
   media?: { image: string | null; videoUrl: string | null; adId?: string }[]
+  /** Which of the user's brands this competitor is watched FOR (migration 117). Absent = account-level. */
+  forBrand?: string
   at?: string
 }
 
@@ -68,7 +70,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     soft<any[]>(admin.from('creative_generations').select('id, image_url, type, created_at')
       .eq('user_id', userId).gte('created_at', H36).order('created_at', { ascending: false }).limit(6)
       .then((r: any) => r.data || []), []),
-    soft<any[]>(admin.from('followed_brands').select('page_id, brand_name, spied')
+    soft<any[]>(admin.from('followed_brands').select('page_id, brand_name, spied, brand_id')
       .eq('user_id', userId).limit(200).then((r: any) => r.data || []), []),
     soft<number>(admin.from('discovery_ads_index').select('ad_id', { count: 'estimated', head: true })
       .gte('created_at', H24).then((r: any) => r.count || 0), 0),
@@ -88,16 +90,34 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     for (const n of notifs as any[]) if (isBlankName(n.brand_name)) n.brand_name = names.get(String(n.page_id)) || null
   }
 
+  // Which of the user's brands each watched competitor belongs to (migration 117): page_id → brand name.
+  // Lets the brief label a competitor line "· for Bug Shield" instead of pooling every brand together.
+  const forBrandByPage = new Map<string, string>()
+  const ownedBrandIds = Array.from(new Set(follows.map((f: any) => f.brand_id).filter(Boolean)))
+  if (ownedBrandIds.length) {
+    const brandNameById = await soft<Map<string, string>>(
+      admin.from('brands').select('id, name').eq('user_id', userId).in('id', ownedBrandIds)
+        .then((r: any) => new Map<string, string>((r.data || []).map((b: any) => [String(b.id), String(b.name)]))),
+      new Map<string, string>())
+    for (const f of follows as any[]) {
+      if (!f.brand_id || !f.page_id) continue
+      const nm = brandNameById.get(String(f.brand_id))
+      if (nm) forBrandByPage.set(String(f.page_id), nm)
+    }
+  }
+
   const compByPage = new Map<string, BriefItem>()
   for (const n of notifs) {
     const brand = (!isBlankName(n.brand_name) && n.brand_name) || 'A brand you watch'
     const c = Math.max(1, Number(n.ad_count) || 1)
+    const forBrand = n.page_id ? forBrandByPage.get(String(n.page_id)) : undefined
     const it: BriefItem = {
       kind: 'competitor_ads', importance: Math.min(85, 55 + c * 5), at: n.created_at,
       title: `${brand} launched ${c === 1 ? 'a new ad' : `${c} new ads`}.`,
       body: c > 2 ? `That's a real push, not routine rotation — worth reading what angle they're betting on before it compounds.` : `A single fresh creative — I'll flag if it turns into a burst.`,
-      why: `You watch ${brand} — a launch like this usually means they found something working.`,
+      why: forBrand ? `You watch ${brand} for ${forBrand} — a launch like this usually means they found something working.` : `You watch ${brand} — a launch like this usually means they found something working.`,
       cta_label: 'Open the brand file', cta_href: n.page_id ? `/knowledge/brand/${n.page_id}` : `/discovery/brand-spy`,
+      forBrand,
     }
     items.push(it)
     if (n.page_id) compByPage.set(String(n.page_id), it)
