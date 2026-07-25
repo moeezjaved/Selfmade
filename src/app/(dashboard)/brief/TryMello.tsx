@@ -83,25 +83,40 @@ export default function TryMello({ compact = false }: { compact?: boolean }) {
     </>
   )
 
-  // ── Compact variant — a quiet row of chips that keeps every action on the brief without a wall of cards ──
+  // ── THE MENU — what Mello can take off your plate.
+  // Polsia's lesson (a verb per capability, and "do it now" paired with "just do it every day")
+  // in a premium form: ranked rows, serif verbs, hairlines instead of boxes, and the accent spent
+  // exactly once — on the delegation. It never self-destructs; a menu you can lose isn't a menu.
+  const MENU: { id: string; verb: string; desc: string; auto?: boolean }[] = [
+    { id: 'remake', verb: 'Remake a winner', desc: 'Their proven ad, rebuilt around your product.' },
+    { id: 'fresh', verb: 'Create a fresh ad', desc: 'An original, on-brand, from your product photos.' },
+    { id: 'spy', verb: 'Spy on a competitor', desc: 'I’ll watch every ad they launch and tell you here.' },
+    { id: 'upload', verb: 'Clone your own ad', desc: 'Drop in an image or a video — I’ll rebuild it.' },
+    { id: 'daily', verb: 'Make ads for me daily', desc: 'Pick how many and I’ll deliver them every morning.', auto: true },
+  ]
   if (compact) {
+    const runById = (id: string) => cards.find(c => c.id === id)?.run()
     return (
-      <div style={{ marginTop: 30 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED, marginBottom: 12 }}>Or start something</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {cards.map(c => {
-            const Icon = c.icon
-            return (
-              <button key={c.id} onClick={c.run} disabled={busy && c.id === 'upload'} title={c.desc}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '9px 15px', fontSize: 13, fontWeight: 750, color: INK, cursor: (busy && c.id === 'upload') ? 'default' : 'pointer', fontFamily: 'inherit' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = SEL_BORDER; e.currentTarget.style.background = SEL_BG }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = LINE; e.currentTarget.style.background = '#fff' }}>
-                {busy && c.id === 'upload' ? <Loader2 size={14} className="spin" color={GREEN} /> : <Icon size={14} color={GREEN} />}
-                {c.short}
-              </button>
-            )
-          })}
+      <div style={{ marginTop: 46 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color: MUTED, marginBottom: 6 }}>What Mello can do</div>
+        <div>
+          {MENU.map((m, i) => (
+            <button key={m.id} onClick={() => runById(m.id)} disabled={busy && m.id === 'upload'} className="mello-menu-row"
+              style={{ display: 'flex', alignItems: 'center', gap: 16, width: '100%', textAlign: 'left', background: 'none', border: 'none',
+                borderTop: i === 0 ? 'none' : `1px solid ${LINE}`, padding: '15px 0', cursor: (busy && m.id === 'upload') ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="mm-verb" style={{ display: 'block', fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 21, fontWeight: 400, letterSpacing: '-.01em', color: INK, transition: 'color .15s' }}>
+                  {busy && m.id === 'upload' ? 'Uploading…' : m.verb}
+                </span>
+                <span style={{ display: 'block', fontSize: 12.5, color: MUTED, marginTop: 2 }}>{m.desc}</span>
+              </span>
+              {m.auto
+                ? <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: FOREST, background: SEL_BG, border: `1px solid ${SEL_BORDER}`, borderRadius: 100, padding: '5px 11px' }}>Auto</span>
+                : <span className="mm-arrow" style={{ flexShrink: 0, color: '#c2ccc0', fontSize: 15, transition: 'color .15s, transform .15s' }}>→</span>}
+            </button>
+          ))}
         </div>
+        <style>{`.mello-menu-row:hover .mm-verb{color:${GREEN}}.mello-menu-row:hover .mm-arrow{color:${GREEN};transform:translateX(3px)}`}</style>
         {tail}
       </div>
     )
