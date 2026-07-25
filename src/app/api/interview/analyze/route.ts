@@ -82,6 +82,7 @@ Return ONLY JSON:
       keywords: Array.isArray(out.keywords) ? out.keywords.map((k: any) => String(k).slice(0, 40)).slice(0, 4) : [],
     })
   } catch (e: any) {
-    return NextResponse.json({ sells: null, buyer: null, voice: null, differentiator: null, niche: null, keywords: [], degraded: true })
+    // TEMP diagnostic (reason) — surfaces WHY detection degrades; remove once root cause is fixed.
+    return NextResponse.json({ sells: null, buyer: null, voice: null, differentiator: null, niche: null, keywords: [], degraded: true, reason: String(e?.message || e).slice(0, 200) })
   }
 }
