@@ -22,6 +22,7 @@ import BriefScan from './BriefScan'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
 import dynamic from 'next/dynamic'
 import Working from '@/components/Working'
+import { mello } from '@/lib/design/voice'
 const AddCompetitors = dynamic(() => import('@/components/AddCompetitors'), { ssr: false })
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
@@ -396,29 +397,30 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
         return (
         <>
           {/* ── 1 · WHAT HAPPENED — one sentence, one number, one visual, one action ── */}
-          <div style={{ marginTop: 44 }}>
+          {/* premium: open with print-like air; the day should feel unhurried, not a dashboard. */}
+          <div style={{ marginTop: 68 }}>
             <Say delay={60}>
-              <span style={{ fontSize: 13.5, color: MUTED, fontWeight: 600 }}>
+              <span style={{ fontSize: 13.5, color: MUTED, fontWeight: 600, letterSpacing: '.002em' }}>
                 {greet}{brief.firstName ? `, ${brief.firstName}` : ''} — overnight I read <b style={{ color: INK, fontWeight: 750 }}><CountUp n={brief.summary.adsScanned} /> ads</b>{brief.summary.brandsWatched > 0 ? <> across your <b style={{ color: INK, fontWeight: 750 }}>{brief.summary.brandsWatched} competitor{brief.summary.brandsWatched === 1 ? '' : 's'}</b></> : null}.
               </span>
             </Say>
             <Say delay={200}>
-              {/* The headline is the one editorial statement of the day — set in the brand's serif
-                  (same face as the landing keynote) so the product reads considered, not generic SaaS. */}
-              <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 40, fontWeight: 400, letterSpacing: '-.015em', lineHeight: 1.1, color: INK, margin: '6px 0 0', textWrap: 'balance' as any }}>
+              {/* The headline is the one editorial statement of the day — Mello's own words, so it's set
+                  in the serif register (voice.mello). Premium: larger, calmer, print-masthead scale. */}
+              <h1 style={{ ...mello(52), fontSize: 'clamp(38px, 4.6vw, 54px)', lineHeight: 1.05, letterSpacing: '-.018em', margin: '16px 0 0', textWrap: 'balance' as any }}>
                 {brief.quiet || !hero ? 'Nothing needs you today.' : hero.title.replace(/\.+$/, '') + '.'}
               </h1>
             </Say>
             {!brief.quiet && hero && (
               <Say delay={340}>
                 <div>
-                  {hero.why && <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: '12px 0 0', maxWidth: 480 }}>{hero.why}</p>}
+                  {hero.why && <p style={{ fontSize: 16, color: MUTED, lineHeight: 1.72, margin: '18px 0 0', maxWidth: 540 }}>{hero.why}</p>}
                   {/* one visual — never a wall of thumbnails */}
                   {isHeadlineHero && hero.thumbs?.[0] && (
-                    <div style={{ marginTop: 24 }}><Thumb src={hero.thumbs[0]} w={158} h={198} /></div>
+                    <div style={{ marginTop: 30 }}><Thumb src={hero.thumbs[0]} w={158} h={198} /></div>
                   )}
                   {!isHeadlineHero && hero.media?.[0] && (
-                    <div style={{ marginTop: 24 }}>
+                    <div style={{ marginTop: 30 }}>
                       {hero.media[0].adId
                         ? <Link href={`/knowledge/ad/${hero.media[0].adId}`}><AdPreview image={hero.media[0].image} videoUrl={hero.media[0].videoUrl} w={158} h={198} /></Link>
                         : <AdPreview image={hero.media[0].image} videoUrl={hero.media[0].videoUrl} w={158} h={198} />}
@@ -443,17 +445,17 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
               </Say>
             )}
             {brief.quiet && (
-              <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: '12px 0 0', maxWidth: 480 }}>Routine rotation only — my honest read is don’t spend today. I’ll break the quiet the moment something moves.</p>
+              <p style={{ fontSize: 16, color: MUTED, lineHeight: 1.72, margin: '18px 0 0', maxWidth: 540 }}>Routine rotation only — my honest read is don’t spend today. I’ll break the quiet the moment something moves.</p>
             )}
           </div>
 
           {/* ── 2 · WHY IT MATTERS — three one-line insights, nothing else ── */}
           {!brief.quiet && insights.length > 0 && (
-            <div style={{ marginTop: 58 }}>
+            <div style={{ marginTop: 72 }}>
               <div style={label}>Why it matters</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {insights.map((it, i) => (
-                  <div key={it.id || i} style={{ fontSize: 16.5, fontWeight: 650, letterSpacing: '-.01em', color: INK, lineHeight: 1.45 }}>
+                  <div key={it.id || i} style={{ fontSize: 17, fontWeight: 600, letterSpacing: '-.011em', color: INK, lineHeight: 1.5 }}>
                     {it.cta_href
                       ? <Link href={it.cta_href} onClick={() => markActed(it)} style={{ color: INK, textDecoration: 'none' }}>{it.title} <span style={{ color: GREEN }}>→</span></Link>
                       : it.title}
@@ -464,7 +466,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
           )}
 
           {/* ── 3 · WHAT TO DO — three recommendations. Never leave the founder thinking. ── */}
-          <div style={{ marginTop: 58 }}>
+          <div style={{ marginTop: 72 }}>
             <div style={label}>Today, I’d do three things</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {recs.slice(0, 3).map((r, i) => (
@@ -478,7 +480,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
 
           {/* ── 4 · THE EVIDENCE — only now, the ads ── */}
           {evidence.length > 0 && (
-            <div style={{ marginTop: 58 }}>
+            <div style={{ marginTop: 72 }}>
               <div style={label}>The evidence</div>
               {evidence.map((it, i) => {
                 // Clicking an ad opens its "AD · ON RECORD" knowledge page — the breakdown +
