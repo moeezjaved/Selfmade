@@ -21,6 +21,7 @@ import BriefWishlist from './BriefWishlist'
 import BriefScan from './BriefScan'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
 import dynamic from 'next/dynamic'
+import Working from '@/components/Working'
 const AddCompetitors = dynamic(() => import('@/components/AddCompetitors'), { ssr: false })
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
@@ -353,7 +354,11 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
       )}
 
       {/* loading / error */}
-      {!brief && !err && <div style={{ color: MUTED, fontSize: 15 }}><span style={{ opacity: .7 }}>Mello is pulling the room together…</span></div>}
+      {!brief && !err && (
+        <div style={{ marginTop: 18 }}>
+          <Working lines={['reading your competitors’ overnight ads', 'decoding this week’s hooks and formats', 'pulling the room together']} />
+        </div>
+      )}
       {err && <div style={{ color: MUTED, fontSize: 15 }}>I couldn&rsquo;t start the standup — refresh in a moment.</div>}
 
       {brief && view === 'desk' && <DeskView brief={brief} greet={greet} onAct={markActed} onDecision={logDecision} />}
