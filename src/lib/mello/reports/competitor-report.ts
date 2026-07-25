@@ -15,7 +15,6 @@
  *      ANTHROPIC_API_KEY is set in Vercel, then auto-upgrades to Opus with no code change.
  */
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCompetitorAds } from '../library-data'
 
 // ── The data pack: real evidence the model reasons over ──────────────────────
 export interface CompetitorPack {
@@ -62,17 +61,75 @@ async function readSite(url?: string): Promise<CompetitorPack['site']> {
   } catch { return null }
 }
 
-/** Assemble the evidence pack from our real corpus. Competitor by name (+ optional website for site read). */
+const PACK_COLS =
+  'ad_id, page_id, page_name, title, body, format, format_style, visual_style, visual_scene, ' +
+  'on_screen_text, problem, mechanism, offer, cta_style, niche, days_running, ' +
+  'creative_reuse_count, brand_active_ads, performance_tier, performance_score, is_active'
+
+const packClean = (s: any): string | null => {
+  if (!s) return null
+  const t = String(s).trim()
+  return t && t.toLowerCase() !== 'n/a' && t.toLowerCase() !== 'unknown' ? t : null
+}
+const packMapAd = (a: any) => ({
+  headline: packClean(a.title),
+  problem: packClean(a.problem), mechanism: packClean(a.mechanism), offer: packClean(a.offer),
+  format_style: packClean(a.format_style), format: a.format, cta_style: packClean(a.cta_style),
+  visual: packClean(a.visual_scene) || packClean(a.visual_style), niche: packClean(a.niche),
+  days_running: a.days_running ?? null, tier: a.performance_tier || null, is_active: a.is_active,
+})
+
+/** Resolve a competitor name to its Meta page_id — the ONLY reliable key into the ads index.
+ *  Order: the user's own followed_brands (they usually watch the rival they're asking about),
+ *  then brand_directory. Fuzzy on the name (handles "Bug MD" vs "BugMD"). */
+async function resolvePageId(admin: any, userId: string | null, name: string): Promise<string | null> {
+  const variants = Array.from(new Set([name, name.replace(/\s+/g, ''), name.replace(/\s+/g, '%')]))
+  if (userId) {
+    for (const v of variants) {
+      const { data } = await admin.from('followed_brands').select('page_id').eq('user_id', userId).ilike('brand_name', `%${v}%`).limit(1).maybeSingle()
+      if (data?.page_id) return String(data.page_id)
+    }
+  }
+  for (const v of variants) {
+    const { data } = await admin.from('brand_directory').select('page_id').ilike('name', `%${v}%`).order('source_ad_count', { ascending: false }).limit(1).maybeSingle()
+    if (data?.page_id) return String(data.page_id)
+  }
+  return null
+}
+
+/** Assemble the evidence pack from our real corpus. Resolves the competitor to a page_id first
+ *  (name-matching the index directly misses spelling variants), then falls back to fuzzy name. */
 export async function assembleCompetitorPack(opts: {
   competitorName: string
   myBrand?: CompetitorPack['myBrand']
   competitorWebsite?: string
+  userId?: string
+  pageId?: string
 }): Promise<CompetitorPack> {
   const admin = createAdminClient()
-  // Pull the competitor's ads (grounded DNA). Fall back gracefully to an empty pack if none crawled.
   let ads: any[] = []
-  try { ads = (await getCompetitorAds({ brand: opts.competitorName, limit: 24 })).ads } catch { ads = [] }
-  void admin
+  try {
+    const pageId = opts.pageId || await resolvePageId(admin, opts.userId || null, opts.competitorName)
+    if (pageId) {
+      // By page_id — exact, and no creative-presence filter: the report needs the ad DNA text, not the media.
+      const { data } = await admin.from('discovery_ads_index').select(PACK_COLS)
+        .eq('page_id', pageId)
+        .order('days_running', { ascending: false, nullsFirst: false })
+        .limit(24)
+      ads = (data || []).map(packMapAd)
+    }
+    if (!ads.length) {
+      // Last resort: fuzzy page_name match ("Bug MD" → %Bug%MD% also hits "BugMD").
+      const fuzzy = opts.competitorName.trim().replace(/[%,()]/g, ' ').split(/\s+/).filter(Boolean).join('%')
+      if (fuzzy) {
+        const { data } = await admin.from('discovery_ads_index').select(PACK_COLS)
+          .ilike('page_name', `%${fuzzy}%`)
+          .order('days_running', { ascending: false, nullsFirst: false })
+          .limit(24)
+        ads = (data || []).map(packMapAd)
+      }
+    }
+  } catch { ads = [] }
 
   const active = ads.filter((a) => a.is_active).length
   const longRunners = [...ads]
@@ -201,9 +258,11 @@ Answer directly: Is this a real threat to ${me} or noise? If you ran ${me}, what
 }
 
 // ── The model chain: Opus → Gemini 2.5 Pro → gpt-4o ──────────────────────────
-async function callAnthropic(system: string, user: string): Promise<string | null> {
+type ModelResult = { text: string | null; why?: string }
+
+async function callAnthropic(system: string, user: string): Promise<ModelResult> {
   const key = process.env.ANTHROPIC_API_KEY
-  if (!key) return null
+  if (!key) return { text: null, why: 'no key' }
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -215,16 +274,16 @@ async function callAnthropic(system: string, user: string): Promise<string | nul
       }),
       signal: AbortSignal.timeout(120_000),
     })
-    if (!r.ok) return null
+    if (!r.ok) return { text: null, why: `http ${r.status}` }
     const j = await r.json()
     const text = (j.content || []).map((c: any) => (c.type === 'text' ? c.text : '')).join('')
-    return text.trim() || null
-  } catch { return null }
+    return { text: text.trim() || null, why: text.trim() ? undefined : 'empty' }
+  } catch (e: any) { return { text: null, why: String(e?.message || e).slice(0, 60) } }
 }
 
-async function callGeminiPro(system: string, user: string): Promise<string | null> {
+async function callGeminiPro(system: string, user: string): Promise<ModelResult> {
   const key = process.env.GEMINI_API_KEY
-  if (!key) return null
+  if (!key) return { text: null, why: 'no key' }
   try {
     const model = process.env.REPORT_GEMINI_MODEL || 'gemini-2.5-pro'
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
@@ -236,16 +295,16 @@ async function callGeminiPro(system: string, user: string): Promise<string | nul
       }),
       signal: AbortSignal.timeout(120_000),
     })
-    if (!r.ok) return null
+    if (!r.ok) return { text: null, why: `http ${r.status}` }
     const j = await r.json()
     const text = (j?.candidates?.[0]?.content?.parts || []).map((pt: any) => pt.text || '').join('')
-    return text.trim() || null
-  } catch { return null }
+    return { text: text.trim() || null, why: text.trim() ? undefined : 'empty' }
+  } catch (e: any) { return { text: null, why: String(e?.message || e).slice(0, 60) } }
 }
 
-async function callOpenAI(system: string, user: string): Promise<string | null> {
+async function callOpenAI(system: string, user: string): Promise<ModelResult> {
   const key = process.env.OPENAI_API_KEY
-  if (!key) return null
+  if (!key) return { text: null, why: 'no key' }
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -255,34 +314,39 @@ async function callOpenAI(system: string, user: string): Promise<string | null> 
       }),
       signal: AbortSignal.timeout(120_000),
     })
-    if (!r.ok) return null
+    if (!r.ok) return { text: null, why: `http ${r.status}` }
     const j = await r.json()
-    return (j.choices?.[0]?.message?.content || '').trim() || null
-  } catch { return null }
+    const text = (j.choices?.[0]?.message?.content || '').trim()
+    return { text: text || null, why: text ? undefined : 'empty' }
+  } catch (e: any) { return { text: null, why: String(e?.message || e).slice(0, 60) } }
 }
 
-export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number }
+export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string }
 
 /** Generate the report end-to-end. Assembles the evidence pack, runs the model chain, returns markdown. */
 export async function generateCompetitorReport(opts: {
   competitorName: string
   myBrand?: CompetitorPack['myBrand']
   competitorWebsite?: string
+  userId?: string
+  pageId?: string
 }): Promise<GeneratedReport> {
   const pack = await assembleCompetitorPack(opts)
   const { system, user } = buildReportPrompt(pack)
 
   let markdown: string | null = null
   let model = ''
+  const misses: string[] = []
   for (const [name, fn] of [
     ['claude-opus', callAnthropic],
     ['gemini-2.5-pro', callGeminiPro],
     ['gpt-4o', callOpenAI],
   ] as const) {
-    markdown = await fn(system, user)
-    if (markdown) { model = name; break }
+    const res = await fn(system, user)
+    if (res.text) { markdown = res.text; model = name; break }
+    misses.push(`${name}: ${res.why || 'failed'}`)
   }
-  if (!markdown) throw new Error('All report models unavailable (Anthropic/Gemini/OpenAI). Check keys/quota.')
+  if (!markdown) throw new Error(`All report models unavailable — ${misses.join(' · ')}`)
 
   const myName = pack.myBrand?.name || 'You'
   return {
@@ -290,5 +354,6 @@ export async function generateCompetitorReport(opts: {
     markdown,
     model,
     adCount: pack.adCount,
+    fallbacks: misses.length ? misses.join(' · ') : undefined,
   }
 }

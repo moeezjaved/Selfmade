@@ -302,32 +302,40 @@ async function authorCompetitorReport(userId: string, competitor: string, brandN
   if (!competitor) return { error: 'Which competitor should I analyze?' }
   const admin = createAdminClient()
   let myBrand: { name: string; industry?: string; website?: string; voice?: string; edge?: string } | null = null
-  let orgId: string | null = null
   let brandId: string | null = null
   try {
-    let q = admin.from('brands').select('id, name, industry, website, tone, usps, org_id').eq('user_id', userId)
+    // NOTE: brands has NO org_id column — selecting it errors the whole query (bug found in the
+    // first live run: the report came out "for You" because this lookup silently nulled).
+    let q = admin.from('brands').select('id, name, industry, website, tone, usps').eq('user_id', userId)
     if (brandNameHint) q = q.ilike('name', `%${brandNameHint}%`)
     else q = q.order('created_at', { ascending: true })
     const { data: brand } = await q.limit(1).maybeSingle()
-    if (brand) {
+    if (!brand && brandNameHint) {
+      // Hinted name didn't match any brand — fall back to the user's primary brand.
+      const { data: first } = await admin.from('brands').select('id, name, industry, website, tone, usps').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+      if (first) {
+        const arr = (v: any) => Array.isArray(v) ? v.filter(Boolean).join('/') : (v || undefined)
+        myBrand = { name: first.name, industry: arr(first.industry), website: first.website || undefined, voice: first.tone || undefined, edge: arr(first.usps) }
+        brandId = first.id
+      }
+    } else if (brand) {
       const arr = (v: any) => Array.isArray(v) ? v.filter(Boolean).join('/') : (v || undefined)
       myBrand = { name: brand.name, industry: arr(brand.industry), website: brand.website || undefined, voice: brand.tone || undefined, edge: arr(brand.usps) }
-      orgId = (brand as any).org_id || null
       brandId = brand.id
     }
   } catch { /* fail-soft */ }
 
   let report
   try {
-    report = await generateCompetitorReport({ competitorName: competitor, myBrand })
+    report = await generateCompetitorReport({ competitorName: competitor, myBrand, userId })
   } catch (e: any) {
     return { error: e?.message || 'Report generation failed — check model keys/quota.' }
   }
 
   const { data: saved } = await admin.from('mello_documents').insert({
-    user_id: userId, org_id: orgId, kind: 'competitor_report', title: report.title,
+    user_id: userId, kind: 'competitor_report', title: report.title,
     subject: competitor, subject_brand_id: brandId, body_md: report.markdown, model: report.model,
-    meta: { adCount: report.adCount },
+    meta: { adCount: report.adCount, ...(report.fallbacks ? { fallbacks: report.fallbacks } : {}) },
   }).select('id, title').maybeSingle()
 
   return {
