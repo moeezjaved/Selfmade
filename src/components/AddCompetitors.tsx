@@ -7,9 +7,8 @@
  * that missing step, reusable: search the index, pick rivals, and run the SAME two calls onboarding
  * runs — enqueue the full-archive crawl, then follow (which is what feeds alerts → the brief).
  *
- * Note: followed_brands is keyed (user_id, page_id) with no brand_id, so competitors are still
- * pooled per USER, not per brand. brandId is accepted and recorded in the notebook so the intent
- * survives until that column exists.
+ * Competitors attach to a brand via followed_brands.brand_id (migration 117): the follow call
+ * carries brandId, so a rival is watched FOR this brand, not just pooled on the account.
  */
 import { useEffect, useRef, useState } from 'react'
 
@@ -119,10 +118,10 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
     let n = 0
     for (const p of picks) {
       await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, name: p.name, crawlOnly: true }) }).catch(() => {})
-      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow' }) }).catch(() => {})
+      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandId || undefined }) }).catch(() => {})
       n++; setDone(n)
     }
-    // Keep the brand↔competitor intent in the notebook until followed_brands carries a brand_id.
+    // Also keep a human-readable trail in Mello's notebook (belt-and-suspenders alongside brand_id).
     fetch('/api/interview/notebook', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ entries: [{ kind: 'fact', content: `Competitors to watch for ${brandName}: ${picks.map(p => p.name).join(', ')}.` }], brandId: brandId || undefined }),

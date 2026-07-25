@@ -347,7 +347,7 @@ export default function InterviewPage() {
     for (const p of picks) {
       setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: `starting on ${p.name} — pulling their live ads`, done: false }])
       await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, name: p.name, crawlOnly: true }) }).catch(() => {})
-      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow' }) }).catch(() => {})
+      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandIdRef.current || undefined }) }).catch(() => {})
     }
     setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: 'studying what wins in your market', done: false }])
     try {
