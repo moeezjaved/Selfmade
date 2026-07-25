@@ -18,7 +18,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { PLANS } from '@/lib/plans'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95'
 const GREEN = '#3f8f4f', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f', PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
@@ -64,7 +63,6 @@ const btnGhost: React.CSSProperties = { background: '#fff', color: INK, border: 
 const chip = (on: boolean): React.CSSProperties => ({ border: `1.5px solid ${on ? FOREST : LINE}`, background: on ? FOREST : '#fff', color: on ? LIME : INK, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' })
 const inputCss: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', fontSize: 14, fontFamily: 'inherit', color: INK, background: '#fff', outline: 'none', width: '100%' }
 // Plan step
-const btnDark: React.CSSProperties = { background: FOREST, color: '#fff', border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }
 const planCard: React.CSSProperties = { position: 'relative', flex: '1 1 200px', minWidth: 200, maxWidth: 230, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: '20px 18px' }
 const planName: React.CSSProperties = { fontSize: 13, fontWeight: 800, letterSpacing: '.02em', color: INK }
 const planPrice: React.CSSProperties = { fontSize: 30, fontWeight: 850, letterSpacing: '-.03em', color: INK, marginTop: 4 }
@@ -572,23 +570,17 @@ export default function InterviewPage() {
                   <div style={planFeat}>5 free image ads to start<br />Spy on 1 competitor<br />Daily brief from Mello</div>
                   <button style={{ ...btnGhost, width: '100%', marginTop: 14 }} onClick={() => router.push('/brief')}>Start on Free →</button>
                 </div>
-                {/* Creator (most popular) */}
+                {/* Full-time — the ONE paid plan ($49/mo). Tiers collapsed to Polsia-simple. */}
                 <div style={{ ...planCard, border: `2px solid ${SELBORDER}`, background: SELBG }}>
-                  <div style={{ ...planBadge }}>MOST POPULAR</div>
-                  <div style={planName}>{PLANS.starter.label}</div>
-                  <div style={planPrice}>${PLANS.starter.priceMonthly}<span style={planPer}>/mo</span></div>
-                  <div style={planFeat}>10 video ads / month<br />Unlimited image ads<br />Spy on 15 competitors</div>
-                  <button style={{ ...btnMain, width: '100%', marginTop: 14, opacity: planBusy ? 0.6 : 1 }} disabled={!!planBusy} onClick={() => choosePlan('starter')}>{planBusy === 'starter' ? 'Opening…' : `Choose ${PLANS.starter.label}`}</button>
-                </div>
-                {/* Agency */}
-                <div style={planCard}>
-                  <div style={planName}>{PLANS.business.label}</div>
-                  <div style={planPrice}>${PLANS.business.priceMonthly}<span style={planPer}>/mo</span></div>
-                  <div style={planFeat}>30 video ads / month<br />Unlimited image ads<br />5 team seats</div>
-                  <button style={{ ...btnDark, width: '100%', marginTop: 14, opacity: planBusy ? 0.6 : 1 }} disabled={!!planBusy} onClick={() => choosePlan('business')}>{planBusy === 'business' ? 'Opening…' : `Choose ${PLANS.business.label}`}</button>
+                  <div style={{ ...planBadge }}>FULL-TIME</div>
+                  <div style={planName}>Mello, full-time</div>
+                  <div style={planPrice}>$49<span style={planPer}>/mo</span></div>
+                  <div style={planFeat}>Video ads<br />Unlimited image ads<br />Every competitor watched<br />Fresh creatives every morning</div>
+                  <button style={{ ...btnMain, width: '100%', marginTop: 14, opacity: planBusy ? 0.6 : 1 }} disabled={!!planBusy} onClick={() => choosePlan('starter')}>{planBusy === 'starter' ? 'Opening…' : 'Go full-time · $49/mo'}</button>
                 </div>
               </div>
-              <button style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 22, fontFamily: 'inherit' }} onClick={() => router.push('/brief')}>Skip for now — I’ll start free →</button>
+              <p style={{ ...sub, marginTop: 16 }}>Prefer to pay as you go? You can buy credits anytime — no subscription.</p>
+              <button style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 14, fontFamily: 'inherit' }} onClick={() => router.push('/brief')}>Skip for now — I’ll start free →</button>
             </div>
           )}
         </div>
