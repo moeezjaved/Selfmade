@@ -30,7 +30,7 @@ export interface CompetitorPack {
   topOffers: string[]
   ctaStyles: Record<string, number>       // soft / hard / none → count
   longRunners: { headline: string | null; days: number; offer: string | null; format: string | null }[]
-  sampleAds: { headline: string | null; problem: string | null; mechanism: string | null; offer: string | null; format: string | null; cta: string | null; days: number | null; tier: string | null }[]
+  sampleAds: { headline: string | null; copy: string | null; problem: string | null; mechanism: string | null; offer: string | null; format: string | null; cta: string | null; days: number | null; tier: string | null }[]
   site: { sells?: string; buyer?: string; voice?: string; differentiator?: string } | null
 }
 
@@ -73,6 +73,7 @@ const packClean = (s: any): string | null => {
 }
 const packMapAd = (a: any) => ({
   headline: packClean(a.title),
+  copy: (a.body || '').replace(/\s+/g, ' ').slice(0, 200) || null,
   problem: packClean(a.problem), mechanism: packClean(a.mechanism), offer: packClean(a.offer),
   format_style: packClean(a.format_style), format: a.format, cta_style: packClean(a.cta_style),
   visual: packClean(a.visual_scene) || packClean(a.visual_style), niche: packClean(a.niche),
@@ -154,7 +155,7 @@ export async function assembleCompetitorPack(opts: {
     ctaStyles: tally(ads, 'cta_style'),
     longRunners,
     sampleAds: ads.slice(0, 14).map((a) => ({
-      headline: a.headline, problem: a.problem, mechanism: a.mechanism, offer: a.offer,
+      headline: a.headline, copy: a.copy ?? null, problem: a.problem, mechanism: a.mechanism, offer: a.offer,
       format: a.format_style || a.format, cta: a.cta_style, days: a.days_running ?? null, tier: a.tier,
     })),
     site,
@@ -169,7 +170,7 @@ function renderEvidence(p: CompetitorPack): string {
     ? p.longRunners.map((r) => `• ${r.days}d live — ${r.headline || 'untitled'}${r.offer ? ` · offer: ${r.offer}` : ''}${r.format ? ` · ${r.format}` : ''}`).join('\n')
     : '• (no longevity data)'
   const samples = p.sampleAds.length
-    ? p.sampleAds.map((a, i) => `${i + 1}. [${a.tier || 'untiered'}${a.days ? `, ${a.days}d` : ''}] ${a.headline || 'untitled'}\n   problem: ${a.problem || '—'} | mechanism: ${a.mechanism || '—'} | offer: ${a.offer || '—'} | ${a.format || '—'} | CTA: ${a.cta || '—'}`).join('\n')
+    ? p.sampleAds.map((a: any, i) => `${i + 1}. [${a.tier || 'untiered'}${a.days ? `, ${a.days}d` : ''}] ${a.headline || 'untitled'}${a.copy ? `\n   copy: "${a.copy}"` : ''}\n   problem: ${a.problem || '—'} | mechanism: ${a.mechanism || '—'} | offer: ${a.offer || '—'} | ${a.format || '—'} | CTA: ${a.cta || '—'}`).join('\n')
     : '(no ads crawled for this competitor yet)'
   return `COMPETITOR: ${p.competitorName}
 CRAWLED ADS: ${p.adCount}${p.activeAds != null ? ` (${p.activeAds} currently active)` : ''}
@@ -206,6 +207,7 @@ ABSOLUTE RULES:
 - Write like an operator who has run ad accounts and shipped product. Sharp, specific, opinionated, a little irreverent. Short paragraphs. Strong verbs.
 - EVERY section must end with a concrete, actionable takeaway FOR ${me} — a hook to steal, an offer to test, a gap to attack, an angle to own. If a section can't produce an action, cut it.
 - GROUND every claim in the evidence provided. Cite specific ads, offers, mechanisms, and longevity numbers from the data. If the data is thin on something, SAY "insufficient signal" — never invent a funding round, a headcount, a revenue figure, or an ad that isn't in the evidence.
+- CRITICAL — data gaps are OUR crawl's gaps, NOT evidence about the rival. A missing problem/mechanism/offer field, a null days_running, or a "testing" performance tier means our classifier hasn't processed that ad yet. NEVER read gaps as the competitor's weakness ("they lack focus", "they have no strategy", "they're not committed"). When fields are missing, lean on what IS present — the headlines, copy, formats, and ad count — and mark the rest "insufficient signal".
 - Numbers over adjectives. "3 of their 5 longest-running ads lead with a price anchor" beats "they use strong offers."
 - This must read like a document a Fortune 500 CEO paid McKinsey for — because that is the bar.`
 
@@ -268,11 +270,14 @@ async function callAnthropic(system: string, user: string): Promise<ModelResult>
       method: 'POST',
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
+        // NOTE: Opus 4.8 REJECTS sampling params (temperature/top_p/top_k → 400) — do not add them.
+        // Adaptive thinking is the recommended mode; it materially improves long-form strategy writing.
         model: process.env.REPORT_ANTHROPIC_MODEL || 'claude-opus-4-8',
-        max_tokens: 8000, temperature: 0.6, system,
+        max_tokens: 8000, system,
+        thinking: { type: 'adaptive' },
         messages: [{ role: 'user', content: user }],
       }),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(220_000),
     })
     if (!r.ok) return { text: null, why: `http ${r.status}` }
     const j = await r.json()
