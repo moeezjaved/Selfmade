@@ -210,7 +210,7 @@ function DeskView({ brief, greet, onAct, onDecision }: { brief: Brief; greet: st
   )
 }
 
-export default function BriefClient({ initialBrief }: { initialBrief: Brief | null }) {
+export default function BriefClient({ initialBrief, initialView = 'standup' }: { initialBrief: Brief | null; initialView?: 'standup' | 'desk' | 'scan' }) {
   // Seeded from the SERVER render — the brief content is already in the HTML, so it shows even if the
   // client never hydrates (broken extensions). We only fetch as a fallback when the server had nothing.
   const [brief, setBrief] = useState<Brief | null>(initialBrief)
@@ -220,12 +220,12 @@ export default function BriefClient({ initialBrief }: { initialBrief: Brief | nu
   const [draft, setDraft] = useState('')
   const [focusItem, setFocusItem] = useState<Item | null>(initialBrief?.headline || initialBrief?.items?.[0] || null)   // what the composer is "about"
   const [headlineState, setHeadlineState] = useState<null | 'approved' | 'passed'>(null)
-  const [view, setView] = useState<'standup' | 'desk' | 'scan'>('standup')   // conversation · prepared desk · one-page scan
+  const [view, setView] = useState<'standup' | 'desk' | 'scan'>(initialView)   // conversation · prepared desk · one-page scan
   const endRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   // One calm default — no toggle, fewer decisions. The Desk variant stays reachable via ?view=desk.
-  useEffect(() => { try { const v = new URLSearchParams(window.location.search).get('view'); if (v === 'desk' || v === 'scan') setView(v) } catch {} }, [])
+  // (the view arrives server-rendered via initialView — no client effect, so it survives a failed hydration)
   // Fallback only: the server already rendered the brief into the HTML. We re-fetch client-side ONLY
   // if the server render came back empty (rare), so a transient server hiccup can still recover.
   useEffect(() => {

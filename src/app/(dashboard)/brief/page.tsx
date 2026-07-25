@@ -10,7 +10,12 @@ import BriefClient from './BriefClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function BriefPage() {
+export default async function BriefPage({ searchParams }: { searchParams?: { view?: string } }) {
+  // The view is resolved on the SERVER and rendered into the HTML. Reading ?view= in a useEffect
+  // meant a failed hydration (broken extensions) silently fell back to the standup — same class of
+  // bug as the studio's mode/source seeding. Never gate first paint on the client.
+  const v = searchParams?.view
+  const initialView: 'standup' | 'desk' | 'scan' = v === 'desk' ? 'desk' : v === 'scan' ? 'scan' : 'standup'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   // The (dashboard) layout + middleware already gate auth; if somehow unauthenticated, render the
@@ -22,5 +27,5 @@ export default async function BriefPage() {
       initialBrief = await assembleBrief(admin, user.id, { ...(user.user_metadata || {}), email: user.email })
     } catch { initialBrief = null }
   }
-  return <BriefClient initialBrief={initialBrief} />
+  return <BriefClient initialBrief={initialBrief} initialView={initialView} />
 }
