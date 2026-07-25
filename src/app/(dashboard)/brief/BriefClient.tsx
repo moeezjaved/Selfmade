@@ -252,6 +252,16 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
       .finally(() => clearTimeout(t))
     return () => clearTimeout(t)
   }, [initialBrief])
+
+  // Brand switch re-navigates → the server component re-runs with a fresh, scoped initialBrief, but
+  // BriefClient isn't remounted, so useState(initialBrief) would keep the OLD brand's data. Re-sync
+  // when the active brand changes (a real, distinct server render arrives alongside it).
+  const didMountBrand = useRef(false)
+  useEffect(() => {
+    if (!didMountBrand.current) { didMountBrand.current = true; return }
+    if (initialBrief) { setBrief(initialBrief); setFocusItem(initialBrief.headline || initialBrief.items?.[0] || null); setThread([]) }
+  }, [activeBrandId])   // eslint-disable-line react-hooks/exhaustive-deps
+
   // Keep the newest turn just above the composer — block:'end' so it never yanks the page to the top.
   useEffect(() => { if (thread.length) setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 40) }, [thread])
 
