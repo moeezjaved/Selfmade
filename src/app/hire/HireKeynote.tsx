@@ -152,9 +152,9 @@ export default function HireKeynote() {
         @media (prefers-reduced-motion: reduce){.rv.in{animation:none}}
         .hint{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;letter-spacing:.22em;color:#4a544a;text-transform:uppercase}
         .hint:after{content:'';display:block;width:1px;height:34px;background:linear-gradient(#4a544a,transparent);margin:10px auto 0}
-        .mello{width:88px;height:88px;border-radius:28px;background:#dffe95;border:3px solid #10180f;position:relative;margin-bottom:38px;animation:floaty 4.5s ease-in-out infinite}
-        .mello:before{content:'';position:absolute;left:18px;right:18px;top:22px;height:27px;border-radius:14px;background:#fff;border:3px solid #10180f}
-        .mello:after{content:'• •';position:absolute;left:0;right:0;top:22px;text-align:center;font-size:17px;letter-spacing:6px;color:#10180f;font-weight:900}
+        /* Mello — the same face as the app: a dark squircle with lit eyes, one identity everywhere. */
+        .mello{width:88px;height:88px;border-radius:31px;background:linear-gradient(#23372a,#17251c);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.10);position:relative;margin-bottom:38px;animation:floaty 4.5s ease-in-out infinite}
+        .mello:after{content:'';position:absolute;left:26px;top:39px;width:13px;height:13px;border-radius:50%;background:#dffe95;box-shadow:23px 0 0 #dffe95}
         @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
         .workline{margin-top:34px;font:600 13px/1 ui-monospace,'SF Mono',Menlo,monospace;color:#5d675c;letter-spacing:.02em}
         .workline b{color:#9fbf72;font-weight:700}

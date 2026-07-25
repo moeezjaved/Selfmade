@@ -18,6 +18,7 @@ import { ArrowUp } from 'lucide-react'
 import TryMello from './TryMello'
 import BriefAlerts from './BriefAlerts'
 import BriefWishlist from './BriefWishlist'
+import MelloFace, { type MelloState } from '@/components/MelloFace'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
@@ -69,44 +70,6 @@ function CountUp({ n }: { n: number }) {
     return () => cancelAnimationFrame(raf)
   }, [n])
   return <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v.toLocaleString()}</span>
-}
-
-/** Mello's state — derived from real data, never decoration. */
-type MelloState = 'delivered' | 'awake' | 'resting'
-
-/**
- * MELLO — a dark squircle with lit eyes: a small figure working in the dark while you sleep.
- * Deliberately NOT a lime robot head with antennae — antennae are the cheapest "I'm a bot" tell,
- * and a bright head competes with the lime we reserve for actions. Every expression is carried by
- * the eyes alone (a three-word vocabulary), so state is legible at 26px without reading anything.
- */
-function MelloFace({ size = 36, state = 'awake' }: { size?: number; state?: MelloState }) {
-  const gid = `melloSkin${size}`
-  return (
-    <svg width={size} height={size} viewBox="0 0 160 160" style={{ flexShrink: 0, display: 'block' }} aria-hidden="true">
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#23372a" /><stop offset="1" stopColor={FOREST} />
-        </linearGradient>
-      </defs>
-      {/* hairline so the silhouette still reads when placed on a dark surface (studio, keynote) */}
-      <rect x="14" y="14" width="132" height="132" rx="46" fill={`url(#${gid})`} stroke="rgba(255,255,255,.10)" strokeWidth="2" />
-      {state === 'delivered' ? (
-        /* work is waiting for you — the eyes smile */
-        <g stroke={LIME} strokeWidth="9" strokeLinecap="round" fill="none">
-          <path d="M47 88q12-17 24 0" /><path d="M89 88q12-17 24 0" />
-        </g>
-      ) : state === 'resting' ? (
-        /* a genuinely quiet day — Mello says so instead of pretending */
-        <g stroke="#6f8073" strokeWidth="8.5" strokeLinecap="round">
-          <path d="M47 85h24" /><path d="M89 85h24" />
-        </g>
-      ) : (
-        /* awake, watching */
-        <g fill={LIME}><circle cx="59" cy="83" r="11.5" /><circle cx="101" cy="83" r="11.5" /></g>
-      )}
-    </svg>
-  )
 }
 
 /** A creative thumbnail that quietly handles video (Mello's video creatives are .mp4) — shows the

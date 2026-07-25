@@ -13,11 +13,12 @@
  */
 import { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Sparkles, Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus, Trophy, Play } from 'lucide-react'
+import { Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus, Trophy, Play } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 import { useChatStream, type CreationEvent } from '@/components/mello/useChatStream'
 
 // The video-clone flow (language · voice · free script · render) now lives INLINE in the canvas.
+import MelloFace from '@/components/MelloFace'
 import InlineVideoRemake from './InlineVideoRemake'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
@@ -342,7 +343,7 @@ function StudioInner() {
       {/* ── LEFT · Mello ── */}
       <div style={{ width: 360, flexShrink: 0, borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', background: '#fff' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '16px 18px', borderBottom: `1px solid ${LINE}` }}>
-          <span style={{ width: 30, height: 30, borderRadius: 9, background: FOREST, color: LIME, display: 'grid', placeItems: 'center' }}><Sparkles size={16} /></span>
+          <MelloFace size={30} />
           <div style={{ fontSize: 14, fontWeight: 800, color: INK }}>Mello</div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px' }}>
