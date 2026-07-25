@@ -23,6 +23,7 @@ import MelloFace, { type MelloState } from '@/components/MelloFace'
 import dynamic from 'next/dynamic'
 import Working from '@/components/Working'
 import { mello } from '@/lib/design/voice'
+import { openCredits } from '@/components/credits/CreditModal'
 const AddCompetitors = dynamic(() => import('@/components/AddCompetitors'), { ssr: false })
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
@@ -231,6 +232,20 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   const [credits, setCredits] = useState<number | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [planDismissed, setPlanDismissed] = useState(false)
+  const [subscribing, setSubscribing] = useState(false)
+
+  // One plan, $49/mo (Section 4 / Polsia-simple). Reuses onboarding's proven checkout call; on any
+  // misconfig it just stops — never dead-ends. Credits are the pay-as-you-go alternative (openCredits).
+  const goFullTime = async () => {
+    if (subscribing) return
+    setSubscribing(true)
+    try {
+      const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: 'starter', cycle: 'monthly' }) })
+      const j = await r.json().catch(() => ({}))
+      if (j?.url) { window.location.href = j.url; return }
+    } catch { /* fall through */ }
+    setSubscribing(false)
+  }
   const endRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -563,12 +578,15 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
           </div>
           <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22, color: INK, lineHeight: 1.15, letterSpacing: '-.01em' }}>Keep Mello on full-time.</div>
-              <div style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.55, marginTop: 4 }}>You&rsquo;re on Free — 5 image ads, 1 competitor. Upgrading unlocks video ads, more competitors watched, and daily creatives delivered before you wake.</div>
+              <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22, color: INK, lineHeight: 1.15, letterSpacing: '-.01em' }}>Keep Mello on full-time — $49<span style={{ fontSize: 15, color: MUTED }}>/mo</span>.</div>
+              <div style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.55, marginTop: 4 }}>You&rsquo;re on Free (5 image ads, 1 competitor). Full-time unlocks video ads, every competitor watched, and fresh creatives every morning &mdash; or top up credits and pay as you go.</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <Link href="/pricing" style={{ background: FOREST, color: LIME, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>See plans &rarr;</Link>
-              <button onClick={() => setPlanDismissed(true)} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>I&rsquo;m good on Free</button>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+              <button onClick={goFullTime} disabled={subscribing} style={{ background: FOREST, color: LIME, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, border: 'none', cursor: subscribing ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{subscribing ? 'Opening…' : 'Go full-time · $49/mo'}</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <button onClick={() => openCredits('buy')} style={{ background: 'none', border: 'none', color: GREEN, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Buy credits</button>
+                <button onClick={() => setPlanDismissed(true)} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>I&rsquo;m good on Free</button>
+              </div>
             </div>
           </div>
         </div>
