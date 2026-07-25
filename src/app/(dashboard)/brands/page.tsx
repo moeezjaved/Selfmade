@@ -30,7 +30,7 @@ const cdn = (u: string, w = 72) => (!u || u.startsWith('data:') || u.includes('.
 
 export default function BrandsPage() {
   const [brands, setBrands] = useState<Brand[]>([])
-  const [watchFor, setWatchFor] = useState<{ id: string | null; name: string; website?: string | null } | null>(null)
+  const [watchFor, setWatchFor] = useState<{ id: string | null; name: string; website?: string | null; industry?: string[] | null } | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -126,7 +126,7 @@ export default function BrandsPage() {
       setMsg({ ok: true, text: images.length ? `✓ “${(d.brand?.name || form.name)}” saved with ${images.length} product photo${images.length === 1 ? '' : 's'}.` : `✓ “${(d.brand?.name || form.name)}” saved.` })
       await load()
       // A brand with nothing to watch produces an empty brief — ask now, while intent is high.
-      setWatchFor({ id: d.brand?.id || null, name: d.brand?.name || form.name, website: form.website || null })
+      setWatchFor({ id: d.brand?.id || null, name: d.brand?.name || form.name, website: form.website || null, industry: csv(form.industry) })
     } catch { setMsg({ ok: false, text: 'Network error — please try again.' }) }
     finally { setSaving(false) }
   }
@@ -227,10 +227,10 @@ export default function BrandsPage() {
 
       {loading ? <div style={{ color: '#9ca3af' }}>Loading…</div>
         : brands.length === 0 ? <div style={{ ...card, color: '#9ca3af', textAlign: 'center' }}>No brands yet — create your first to start remaking ads.</div>
-        : brands.map(b => <BrandCard key={b.id} brand={b} onDelete={() => delBrand(b.id)} onWatch={() => setWatchFor({ id: b.id, name: b.name, website: b.website })} onEdit={editBrand} onSetType={setBrandType} onAddProduct={addProduct} onDelProduct={delProduct} />)}
+        : brands.map(b => <BrandCard key={b.id} brand={b} onDelete={() => delBrand(b.id)} onWatch={() => setWatchFor({ id: b.id, name: b.name, website: b.website, industry: b.industry })} onEdit={editBrand} onSetType={setBrandType} onAddProduct={addProduct} onDelProduct={delProduct} />)}
 
       {watchFor && (
-        <AddCompetitors brandId={watchFor.id} brandName={watchFor.name} website={watchFor.website}
+        <AddCompetitors brandId={watchFor.id} brandName={watchFor.name} website={watchFor.website} industry={watchFor.industry}
           onClose={() => setWatchFor(null)}
           onDone={(n) => setMsg({ ok: true, text: `✓ Watching ${n} competitor${n === 1 ? '' : 's'} for ${watchFor.name} — their new ads will land in your brief.` })} />
       )}
