@@ -80,10 +80,15 @@ function Row({ href, onClick, title, desc, right, first }: {
 const ARROW = <span className="bs-a" style={{ color: '#c2ccc0', fontSize: 15, transition: 'color .15s, transform .15s', display: 'inline-block' }}>→</span>
 const AUTO = <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: FOREST, background: '#f2f8ea', border: '1px solid #a8cf6f', borderRadius: 100, padding: '3px 8px' }}>Auto</span>
 
-export default function BriefScan({ brief, melloState, onAct, onWhy, credits, activeBrandId, activeBrandName, onAddCompetitor }: {
+export default function BriefScan({ brief, melloState, onAct, onWhy, credits, plan, onGoFullTime, subscribing, onBuyCredits, activeBrandId, activeBrandName, onAddCompetitor }: {
   brief: Brief; melloState: MelloState; onAct: (it: Item) => void; onWhy: (it: Item) => void
-  credits?: number | null; activeBrandId?: string | null; activeBrandName?: string | null; onAddCompetitor?: () => void
+  credits?: number | null; plan?: string | null; onGoFullTime?: () => void; subscribing?: boolean; onBuyCredits?: () => void
+  activeBrandId?: string | null; activeBrandName?: string | null; onAddCompetitor?: () => void
 }) {
+  // The plan card lives in the first column, Polsia-style — but only for Free users (don't upsell
+  // someone already paying). $49/mo shown with an honest per-day anchor ($49 / 30 ≈ $1.63).
+  const isPaid = ['starter', 'pro', 'business', 'enterprise'].includes(String(plan || '').toLowerCase())
+  const perDay = (49 / 30).toFixed(2)
   const hero = brief.headline || brief.items[0] || null
   const competitors = brief.items.filter(i => i.kind === 'competitor_ads').slice(0, 4)
   const second = brief.items.find(i => i !== hero && i.kind !== 'competitor_ads') || competitors[0] || null
@@ -114,6 +119,27 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, ac
                 <span>{k}</span><b style={{ color: INK, fontWeight: 750, fontVariantNumeric: 'tabular-nums' }}>{v}</b>
               </div>
             ))}
+
+            {/* Plan card — Polsia-style, in the first column. Free users only. */}
+            {!isPaid && onGoFullTime && (
+              <div style={{ marginTop: 18, borderTop: `2px solid ${RULE}`, paddingTop: 14 }}>
+                <div style={{ ...serif, fontSize: 18 }}>Hire Mello full-time</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, margin: '4px 0 2px' }}>
+                  <span style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>${perDay}</span>
+                  <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 11, color: MUTED }}>/ day</span>
+                </div>
+                <div style={{ ...sub, marginBottom: 12 }}>$49/mo, billed monthly · works while you sleep.</div>
+                <button onClick={onGoFullTime} disabled={subscribing}
+                  style={{ width: '100%', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px', fontSize: 13.5, fontWeight: 800, cursor: subscribing ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                  {subscribing ? 'Opening…' : 'Go full-time →'}
+                </button>
+                {onBuyCredits && (
+                  <button onClick={onBuyCredits} style={{ width: '100%', background: 'none', border: 'none', color: GREEN, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 9 }}>
+                    or buy credits
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           {/* mobile: one line, so the decision stays above the fold */}
           <div className="bs-mello-strip">
