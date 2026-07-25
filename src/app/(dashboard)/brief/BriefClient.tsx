@@ -24,6 +24,7 @@ const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FO
 type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; at?: string }
 type Brief = {
   summary: { adsScanned: number; brandsWatched: number; spiedBrands: number; creativesReady: number }
+  lastCycleAt?: string | null
   firstName: string | null
   headline: Item | null
   items: Item[]
@@ -36,6 +37,39 @@ type Turn =
   | { who: 'mello'; kind: 'signoff'; text: string }
   | { who: 'user'; text: string }
   | { who: 'mello'; kind: 'reply'; text: string; pending?: boolean }
+
+/** "2h ago" — relative so it's timezone-proof (no SSR/client mismatch) and reads like a colleague. */
+function agoLabel(iso?: string | null): string | null {
+  if (!iso) return null
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (!isFinite(mins) || mins < 0) return null
+  if (mins < 60) return mins <= 1 ? 'just now' : `${mins}m ago`
+  const h = Math.floor(mins / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  return d === 1 ? 'yesterday' : `${d}d ago`
+}
+
+/** The overnight number, counted up on first paint. The value is REAL and server-rendered — the
+ *  animation is pure enhancement, so a failed hydration still shows the true figure. */
+function CountUp({ n }: { n: number }) {
+  const [v, setV] = useState(n)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !n) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    let raf = 0
+    const start = performance.now(), DUR = 900
+    setV(0)
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / DUR)
+      setV(Math.round(n * (1 - Math.pow(1 - p, 3))))
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [n])
+  return <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v.toLocaleString()}</span>
+}
 
 function MelloFace({ size = 36 }: { size?: number }) {
   return (
@@ -259,7 +293,13 @@ export default function BriefClient({ initialBrief }: { initialBrief: Brief | nu
           <MelloFace size={28} />
           <span style={{ position: 'absolute', right: -2, bottom: 0, width: 8, height: 8, borderRadius: '50%', background: GREEN, border: '2px solid #f6f8f5', animation: 'mp 2s infinite' }} />
         </span>
-        <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 650 }}>Mello · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+        <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 650 }}>
+          Mello · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          {/* Presence, not chrome: proof an employee was here — real timestamp, never invented. */}
+          {brief?.lastCycleAt && agoLabel(brief.lastCycleAt) && (
+            <span style={{ color: '#9aa79a' }}> · last worked {agoLabel(brief.lastCycleAt)}</span>
+          )}
+        </div>
         <style>{`@keyframes mp{50%{opacity:.35}} details.more-mello>summary::-webkit-details-marker{display:none}
           @keyframes sayIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
           .brief-say{animation:sayIn .5s cubic-bezier(0,0,.2,1) both}
@@ -299,11 +339,13 @@ export default function BriefClient({ initialBrief }: { initialBrief: Brief | nu
           <div style={{ marginTop: 44 }}>
             <Say delay={60}>
               <span style={{ fontSize: 13.5, color: MUTED, fontWeight: 600 }}>
-                {greet}{brief.firstName ? `, ${brief.firstName}` : ''} — overnight I read <b style={{ color: INK, fontWeight: 750 }}>{brief.summary.adsScanned.toLocaleString()} ads</b>{brief.summary.brandsWatched > 0 ? <> across your <b style={{ color: INK, fontWeight: 750 }}>{brief.summary.brandsWatched} competitor{brief.summary.brandsWatched === 1 ? '' : 's'}</b></> : null}.
+                {greet}{brief.firstName ? `, ${brief.firstName}` : ''} — overnight I read <b style={{ color: INK, fontWeight: 750 }}><CountUp n={brief.summary.adsScanned} /> ads</b>{brief.summary.brandsWatched > 0 ? <> across your <b style={{ color: INK, fontWeight: 750 }}>{brief.summary.brandsWatched} competitor{brief.summary.brandsWatched === 1 ? '' : 's'}</b></> : null}.
               </span>
             </Say>
             <Say delay={200}>
-              <h1 style={{ fontSize: 33, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1.18, color: INK, margin: '2px 0 0', textWrap: 'balance' as any }}>
+              {/* The headline is the one editorial statement of the day — set in the brand's serif
+                  (same face as the landing keynote) so the product reads considered, not generic SaaS. */}
+              <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 40, fontWeight: 400, letterSpacing: '-.015em', lineHeight: 1.1, color: INK, margin: '6px 0 0', textWrap: 'balance' as any }}>
                 {brief.quiet || !hero ? 'Nothing needs you today.' : hero.title.replace(/\.+$/, '') + '.'}
               </h1>
             </Say>
