@@ -40,8 +40,11 @@ const ago = (iso?: string | null): string | null => {
   const d = Math.floor(h / 24); return d === 1 ? 'yesterday' : `${d}d ago`
 }
 
-const label: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8a968a', margin: '0 0 12px' }
-const serif: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 20, fontWeight: 400, color: INK, lineHeight: 1.25, letterSpacing: '-.005em' }
+// Broadsheet section header — a mono kicker (the machine register) sitting on a heavy top rule, the
+// way a newspaper marks a section. One change, all four columns, since every column uses `label`.
+const RULE = '#1c1c1a'
+const label: React.CSSProperties = { fontFamily: "ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: '.15em', textTransform: 'uppercase', color: INK, borderTop: `2px solid ${RULE}`, paddingTop: 9, margin: '0 0 16px' }
+const serif: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 20, fontWeight: 400, color: INK, lineHeight: 1.18, letterSpacing: '-.012em' }
 const sub: React.CSSProperties = { fontSize: 13, color: MUTED, lineHeight: 1.5 }
 
 /** A creative, shown. This is an ads product — the ad IS the content, so the scan must carry it.
