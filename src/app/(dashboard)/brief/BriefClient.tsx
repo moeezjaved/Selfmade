@@ -23,7 +23,7 @@ import MelloFace, { type MelloState } from '@/components/MelloFace'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
-type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; at?: string }
+type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string }
 type Brief = {
   summary: { adsScanned: number; brandsWatched: number; spiedBrands: number; creativesReady: number }
   lastCycleAt?: string | null
@@ -174,7 +174,10 @@ function DeskView({ brief, greet, onAct, onDecision }: { brief: Brief; greet: st
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.18em', color: MUTED, textTransform: 'uppercase', marginBottom: 10 }}>What your competitors shipped</div>
           {competitors.map((it, i) => (
             <div key={it.id || i} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 750, color: INK }}>{it.title}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 750, color: INK }}>
+                {it.title}
+                {it.forBrand && <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', color: GREEN, background: '#eef6e4', border: '1px solid #d3e6b8', borderRadius: 100, padding: '1px 8px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>for {it.forBrand}</span>}
+              </div>
               {!!it.media?.length && (
                 <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                   {it.media.slice(0, 3).map((m, k) => (
@@ -422,7 +425,10 @@ export default function BriefClient({ initialBrief, initialView = 'standup' }: {
                 const brandFileHref = it.cta_href?.replace('/knowledge/brand/', '/discovery/brand-spy/') || it.cta_href
                 return (
                 <div key={it.id || i} style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 10 }}>{it.title}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 10 }}>
+                    {it.title}
+                    {it.forBrand && <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', color: GREEN, background: '#eef6e4', border: '1px solid #d3e6b8', borderRadius: 100, padding: '1px 8px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>for {it.forBrand}</span>}
+                  </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {it.media!.slice(0, 3).map((m, k) => m.adId
                       ? <Link key={k} href={`/knowledge/ad/${m.adId}`} onClick={() => markActed(it)} title="Open the ad breakdown & remake"><AdPreview image={m.image} videoUrl={m.videoUrl} w={92} h={116} /></Link>

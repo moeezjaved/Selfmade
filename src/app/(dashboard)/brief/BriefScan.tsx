@@ -20,7 +20,7 @@ import MelloFace, { type MelloState } from '@/components/MelloFace'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e3e2da', HAIR = '#ecebe3', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
-type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; at?: string }
+type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string }
 type Brief = {
   summary: { adsScanned: number; brandsWatched: number; spiedBrands: number; creativesReady: number }
   lastCycleAt?: string | null
@@ -165,7 +165,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy }: {
                     onClick={() => onAct(c)} className="bs-row" style={{ display: 'block', textDecoration: 'none' }}>
                     <span style={{ float: 'right', marginLeft: 10 }}>{ARROW}</span>
                     <span className="bs-t" style={{ ...serif, display: 'block', transition: 'color .15s' }}>{c.title.replace(/\s+launched.*$/i, '').replace(/[.:]$/, '')}</span>
-                    <span style={{ ...sub, display: 'block' }}>{(c.title.match(/launched.*/i)?.[0] || 'New activity').replace(/\.$/, '')}{ago(c.at) ? ` · ${ago(c.at)}` : ''}</span>
+                    <span style={{ ...sub, display: 'block' }}>{(c.title.match(/launched.*/i)?.[0] || 'New activity').replace(/\.$/, '')}{ago(c.at) ? ` · ${ago(c.at)}` : ''}{c.forBrand ? ` · for ${c.forBrand}` : ''}</span>
                   </Link>
                   {/* what they actually launched — a scan of an ads product has to show the ads */}
                   {!!c.media?.length && (
