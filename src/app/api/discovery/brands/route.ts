@@ -32,24 +32,38 @@ export async function GET(req: NextRequest) {
   const page = Math.max(0, parseInt(sp.get('page') || '0'))
   const offset = page * PAGE_SIZE
 
-  let query = admin
-    .from('brand_directory')
-    .select('page_id, name, avatar_url, industry, source_ad_count, country')
-  if (q) query = query.ilike('name', `%${q}%`)
-  if (industry) query = query.eq('industry', industry)
-
-  if (sort === 'name') query = query.order('name', { ascending: true })
-  else query = query.order('source_ad_count', { ascending: false })   // 'ads' default
-  query = query.order('page_id', { ascending: true })                 // stable tiebreaker
-  query = query.range(offset, offset + PAGE_SIZE - 1)
-
-  const { data, error } = await query
-  if (error) {
-    // brand_directory not created yet (migration 049 pending) → clean empty state, not a 500.
-    if (isMissingTable(error)) return NextResponse.json({ brands: [], total: 0, page, pageSize: PAGE_SIZE, hasMore: false, industries: [] })
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  const emptyResp = () => NextResponse.json({ brands: [], total: 0, page, pageSize: PAGE_SIZE, hasMore: false, industries: [] })
+  let brands: any[] = []
+  if (q) {
+    // SEARCH — accent-insensitive, relevance-ranked RPC (migration 118): "fum" → "Füm — The Good
+    // Habit" first, not a wall of par·fum / per·fume. Falls back to the accent-sensitive ILIKE if the
+    // RPC isn't deployed yet, so this ships safely BEFORE the migration is applied.
+    const wanted = Math.min(100, offset + PAGE_SIZE)
+    const { data: rpcData, error: rpcErr } = await admin.rpc('search_brand_directory', { p_q: q, p_industry: industry || null, p_limit: wanted })
+    if (!rpcErr && Array.isArray(rpcData)) {
+      brands = (rpcData as any[]).slice(offset, offset + PAGE_SIZE)
+    } else {
+      let fq = admin.from('brand_directory').select('page_id, name, avatar_url, industry, source_ad_count, country').ilike('name', `%${q}%`)
+      if (industry) fq = fq.eq('industry', industry)
+      fq = fq.order('source_ad_count', { ascending: false }).order('page_id', { ascending: true }).range(offset, offset + PAGE_SIZE - 1)
+      const { data, error } = await fq
+      if (error) { if (isMissingTable(error)) return emptyResp(); return NextResponse.json({ error: error.message }, { status: 400 }) }
+      brands = (data || []) as any[]
+    }
+  } else {
+    // BROWSE (no query) — the existing sort + paginate path.
+    let query = admin.from('brand_directory').select('page_id, name, avatar_url, industry, source_ad_count, country')
+    if (industry) query = query.eq('industry', industry)
+    if (sort === 'name') query = query.order('name', { ascending: true })
+    else query = query.order('source_ad_count', { ascending: false })   // 'ads' default
+    query = query.order('page_id', { ascending: true }).range(offset, offset + PAGE_SIZE - 1)
+    const { data, error } = await query
+    if (error) {
+      if (isMissingTable(error)) return emptyResp()   // brand_directory not created yet (migration 049)
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    brands = (data || []) as any[]
   }
-  const brands = (data || []) as any[]
 
   // Flag status for the visible page (cheap — INs over ≤50 ids):
   //  • inIndex = we've actually crawled this brand's ads (discovery_brand_crawl_state.ads_indexed>0)
