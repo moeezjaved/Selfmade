@@ -5,6 +5,11 @@
  * photos (Clone composites those so it never hallucinates the product).
  */
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
+
+// The competitor step that used to live only in onboarding — a brand with no rivals to watch
+// never appears in a brief, so every creation path now offers it.
+const AddCompetitors = dynamic(() => import('@/components/AddCompetitors'), { ssr: false })
 
 interface Product { id: string; name: string; price: string | null; image_urls: string[] }
 interface Brand {
@@ -25,6 +30,7 @@ const cdn = (u: string, w = 72) => (!u || u.startsWith('data:') || u.includes('.
 
 export default function BrandsPage() {
   const [brands, setBrands] = useState<Brand[]>([])
+  const [watchFor, setWatchFor] = useState<{ id: string | null; name: string; website?: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -119,6 +125,8 @@ export default function BrandsPage() {
       setDetected(null); setDetectedKit(null); setCreating(false)
       setMsg({ ok: true, text: images.length ? `✓ “${(d.brand?.name || form.name)}” saved with ${images.length} product photo${images.length === 1 ? '' : 's'}.` : `✓ “${(d.brand?.name || form.name)}” saved.` })
       await load()
+      // A brand with nothing to watch produces an empty brief — ask now, while intent is high.
+      setWatchFor({ id: d.brand?.id || null, name: d.brand?.name || form.name, website: form.website || null })
     } catch { setMsg({ ok: false, text: 'Network error — please try again.' }) }
     finally { setSaving(false) }
   }
@@ -219,13 +227,19 @@ export default function BrandsPage() {
 
       {loading ? <div style={{ color: '#9ca3af' }}>Loading…</div>
         : brands.length === 0 ? <div style={{ ...card, color: '#9ca3af', textAlign: 'center' }}>No brands yet — create your first to start remaking ads.</div>
-        : brands.map(b => <BrandCard key={b.id} brand={b} onDelete={() => delBrand(b.id)} onEdit={editBrand} onSetType={setBrandType} onAddProduct={addProduct} onDelProduct={delProduct} />)}
+        : brands.map(b => <BrandCard key={b.id} brand={b} onDelete={() => delBrand(b.id)} onWatch={() => setWatchFor({ id: b.id, name: b.name, website: b.website })} onEdit={editBrand} onSetType={setBrandType} onAddProduct={addProduct} onDelProduct={delProduct} />)}
+
+      {watchFor && (
+        <AddCompetitors brandId={watchFor.id} brandName={watchFor.name} website={watchFor.website}
+          onClose={() => setWatchFor(null)}
+          onDone={(n) => setMsg({ ok: true, text: `✓ Watching ${n} competitor${n === 1 ? '' : 's'} for ${watchFor.name} — their new ads will land in your brief.` })} />
+      )}
     </div>
   )
 }
 
-function BrandCard({ brand, onDelete, onEdit, onSetType, onAddProduct, onDelProduct }: {
-  brand: Brand; onDelete: () => void
+function BrandCard({ brand, onDelete, onWatch, onEdit, onSetType, onAddProduct, onDelProduct }: {
+  brand: Brand; onDelete: () => void; onWatch: () => void
   onEdit: (id: string, patch: { name: string; website: string; tone: string }) => void
   onSetType: (id: string, t: string) => void
   onAddProduct: (b: string, n: string, p: string, i: string) => void
@@ -268,6 +282,7 @@ function BrandCard({ brand, onDelete, onEdit, onSetType, onAddProduct, onDelProd
           ) : (
             <>
               <button onClick={() => { resetEf(); setEditing(true) }} style={{ background: 'none', border: 'none', color: '#1a3a1a', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Edit</button>
+              <button onClick={onWatch} style={{ background: 'none', border: 'none', color: '#3f8f4f', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Watch competitors</button>
               <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Delete</button>
             </>
           )}
