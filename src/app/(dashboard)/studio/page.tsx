@@ -19,6 +19,7 @@ import { useChatStream, type CreationEvent } from '@/components/mello/useChatStr
 
 // The video-clone flow (language · voice · free script · render) now lives INLINE in the canvas.
 import MelloFace from '@/components/MelloFace'
+import Working from '@/components/Working'
 import InlineVideoRemake from './InlineVideoRemake'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
@@ -397,8 +398,12 @@ function StudioInner() {
               </div>
               <div style={{ width: 220 }}>
                 <div style={label}>Your version</div>
-                <div style={{ borderRadius: 14, border: `1.5px solid ${LINE}`, background: '#0d120e', aspectRatio: '4/5', overflow: 'hidden', display: 'grid', placeItems: 'center', color: MUTED, fontSize: 12, textAlign: 'center', padding: result ? 0 : 16 }}>
-                  {isVideo ? 'Approve the script, then your video renders — it also lands in My Creatives.' : busy ? <span style={{ display: 'grid', gap: 8, justifyItems: 'center', color: MUTED }}><Loader2 size={20} className="spin" color={GREEN} />Rebuilding… ~40s</span> : result ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="your version" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : 'Appears here after Remake'}
+                <div style={{ borderRadius: 14, border: `1.5px solid ${LINE}`, background: '#0d120e', aspectRatio: '4/5', overflow: 'hidden', display: busy ? 'block' : 'grid', placeItems: 'center', color: MUTED, fontSize: 12, textAlign: 'center', padding: result && !busy ? 0 : 16 }}>
+                  {isVideo ? 'Approve the script, then your video renders — it also lands in My Creatives.' : busy
+                    ? <Working tone="forest" lines={remake
+                        ? ['studying the reference ad', 'grounding on your product & logo', 'building your version']
+                        : ['reading your product', 'sketching the concept', 'building your ad']} />
+                    : result ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="your version" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : 'Appears here after Remake'}
                 </div>
               </div>
             </div>
