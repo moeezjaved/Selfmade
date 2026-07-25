@@ -72,6 +72,104 @@ const planPer: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: MUT
 const planFeat: React.CSSProperties = { fontSize: 12.5, color: MUTED, lineHeight: 1.9, marginTop: 10 }
 const planBadge: React.CSSProperties = { position: 'absolute', top: -10, left: 18, background: FOREST, color: LIME, fontSize: 9, fontWeight: 800, letterSpacing: '.1em', borderRadius: 100, padding: '3px 9px' }
 
+/**
+ * BRAND PALETTE — clicking the field opens a searchable, keyboard-navigable dropdown of brands
+ * (⌘K-style) so founders immediately see they should PICK a competitor — with paste-a-link manual
+ * add. Reuses the onboarding's existing data: `suggested` (country-aware), live `results`, and
+ * togglePick. Picked brands show as removable chips above the field. Multi-select; caps handled upstream.
+ */
+function BrandPalette({ q, setQ, suggested, results, picks, loading, onToggle, extractId }: {
+  q: string; setQ: (v: string) => void; suggested: Comp[]; results: Comp[]; picks: Comp[]
+  loading: boolean; onToggle: (c: Comp) => void; extractId: (s: string) => string | null
+}) {
+  const [open, setOpen] = useState(false)
+  const [sel, setSel] = useState(0)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const pickedIds = new Set(picks.map(p => p.pageId))
+  const typing = q.trim().length > 0
+  const sugg = suggested.filter(s => !pickedIds.has(s.pageId)).slice(0, 7)
+  const res = typing ? results.filter(r => !pickedIds.has(r.pageId)).slice(0, 6) : []
+  const manualId = extractId(q)
+  const manual: Comp | null = manualId && !pickedIds.has(manualId) && !res.some(r => r.pageId === manualId)
+    ? { pageId: manualId, name: `Facebook page ${manualId}` } : null
+
+  const groups = (typing
+    ? [{ label: 'Search results', items: res }]
+    : [{ label: loading ? 'Scanning my index…' : 'Recognize any of these?', items: sugg }]
+  ).filter(g => g.items.length)
+  if (manual) groups.push({ label: 'Add manually', items: [manual] })
+  const flat: Comp[] = groups.flatMap(g => g.items)
+
+  useEffect(() => { setSel(0) }, [q, open])
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc); return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const pick = (c: Comp) => { onToggle(c); if (typing || (manual && c.pageId === manual.pageId)) setQ(''); inputRef.current?.focus() }
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setSel(i => Math.min(i + 1, flat.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(i => Math.max(i - 1, 0)) }
+    else if (e.key === 'Enter') { e.preventDefault(); if (flat[sel]) pick(flat[sel]) }
+    else if (e.key === 'Escape') { setOpen(false) }
+  }
+
+  const Row = ({ c, i }: { c: Comp; i: number }) => {
+    const on = pickedIds.has(c.pageId); const active = i === sel
+    return (
+      <button onMouseDown={e => e.preventDefault()} onClick={() => pick(c)} onMouseEnter={() => setSel(i)}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', background: active ? SELBG : 'transparent', border: `1.5px solid ${active ? SELBORDER : 'transparent'}`, borderRadius: 11, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+        {c.pageId === manual?.pageId
+          ? <span style={{ width: 26, height: 26, borderRadius: 8, background: '#eef2ec', display: 'grid', placeItems: 'center', fontSize: 14 }}>📘</span>
+          /* eslint-disable-next-line @next/next/no-img-element */
+          : c.avatar ? <img src={c.avatar} alt="" style={{ width: 26, height: 26, borderRadius: 8, objectFit: 'cover' }} /> : <span style={{ width: 26, height: 26, borderRadius: 8, background: '#eef2ec', display: 'inline-block' }} />}
+        <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: INK }}>{c.name}</span>
+        {!!c.adCount && <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>{c.adCount} ads</span>}
+        <span style={{ fontSize: 13, fontWeight: 900, color: on ? GREEN : '#c6cfc4' }}>{on ? '✓' : '+'}</span>
+      </button>
+    )
+  }
+
+  let run = 0
+  return (
+    <div ref={boxRef} style={{ position: 'relative' }}>
+      {picks.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 9 }}>
+          {picks.map(p => (
+            <button key={p.pageId} onClick={() => onToggle(p)} title="Remove"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: SELBG, border: `1.5px solid ${SELBORDER}`, color: INK, borderRadius: 100, padding: '5px 11px', fontSize: 12.5, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {p.name} <span style={{ color: MUTED, fontWeight: 800 }}>✕</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} onFocus={() => setOpen(true)} onKeyDown={onKey}
+        placeholder={picks.length ? 'Add another — click to pick, or paste a Meta Ad Library link' : 'Click to pick a competitor — or paste their Meta Ad Library link'}
+        style={{ ...inputCss }} />
+      {open && (groups.length > 0 || loading) && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, boxShadow: '0 20px 44px -22px rgba(23,37,28,.5)', padding: 6, zIndex: 40, maxHeight: 320, overflowY: 'auto' }}>
+          {groups.length === 0 && loading && <div style={{ fontSize: 12.5, color: MUTED, padding: '10px 12px' }}>Scanning my index…</div>}
+          {groups.map(g => (
+            <div key={g.label}>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', color: MUTED, textTransform: 'uppercase', padding: '8px 10px 4px' }}>{g.label}</div>
+              {g.items.map(c => <Row key={c.pageId} c={c} i={run++} />)}
+            </div>
+          ))}
+          {typing && res.length === 0 && !manual && !loading && (
+            <div style={{ fontSize: 12.5, color: MUTED, padding: '10px 12px' }}>No match. Paste their Meta Ad Library link to add them.</div>
+          )}
+          <div style={{ display: 'flex', gap: 14, padding: '8px 10px 4px', borderTop: `1px solid ${LINE}`, marginTop: 4, fontSize: 10.5, color: MUTED, fontWeight: 700 }}>
+            <span>↑↓ navigate</span><span>↵ select</span><span>esc close</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function InterviewPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -363,44 +461,8 @@ export default function InterviewPage() {
                   <button key={code} style={chip(markets.includes(code))} onClick={() => setMarkets(m => m.includes(code) ? m.filter(x => x !== code) : [...m, code])}>{label}</button>
                 ))}
               </div>
-              <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '16px 18px' }}>
-                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.09em', color: MUTED, textTransform: 'uppercase', marginBottom: 10 }}>{loadingComp ? 'Scanning my index…' : 'I already know these — recognize anyone?'}</div>
-                {!loadingComp && ![...picks, ...suggested].length && <div style={{ fontSize: 13, color: MUTED }}>Type a competitor’s name, or paste their Meta Ad Library link — I’ll find them.</div>}
-                {[...picks, ...suggested.filter(s => !picks.some(p => p.pageId === s.pageId))].slice(0, 7).map(c => {
-                  const on = picks.some(p => p.pageId === c.pageId)
-                  return (
-                    <button key={c.pageId} onClick={() => togglePick(c)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', background: on ? SELBG : 'transparent', border: `1.5px solid ${on ? SELBORDER : 'transparent'}`, borderRadius: 11, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 4 }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {c.avatar ? <img src={c.avatar} alt="" style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'cover' }} /> : <span style={{ width: 28, height: 28, borderRadius: 8, background: '#eef2ec', display: 'inline-block' }} />}
-                      <span style={{ flex: 1, fontSize: 13.5, fontWeight: 750, color: INK }}>{c.name}</span>
-                      {!!c.adCount && <span style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>{c.adCount} ads</span>}
-                      <span style={{ fontSize: 13, fontWeight: 900, color: on ? GREEN : '#c6cfc4' }}>{on ? '✓' : '+'}</span>
-                    </button>
-                  )
-                })}
-                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Competitor name, or paste their Meta Ad Library link…" style={{ ...inputCss, marginTop: 8 }} />
-                {/* Manual add: if they pasted a Facebook Ad Library URL (or a page id), let them add that
-                    brand directly even if it isn't in our index yet — extractPageId reads view_all_page_id. */}
-                {(() => {
-                  const id = extractPageId(q)
-                  if (!id || picks.some(p => p.pageId === id) || results.some(r => r.pageId === id)) return null
-                  return (
-                    <button onClick={() => { togglePick({ pageId: id, name: `Facebook page ${id}` }); setQ('') }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', background: SELBG, border: `1.5px solid ${SELBORDER}`, borderRadius: 11, padding: '9px 11px', marginTop: 6, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      <span style={{ fontSize: 15 }}>📘</span>
-                      <span style={{ flex: 1, fontSize: 13, fontWeight: 750, color: INK }}>Add this brand from the Ad Library <span style={{ color: MUTED, fontWeight: 600 }}>· page {id}</span></span>
-                      <span style={{ fontSize: 13, fontWeight: 900, color: GREEN }}>+</span>
-                    </button>
-                  )
-                })()}
-                {results.filter(r => !picks.some(p => p.pageId === r.pageId) && !suggested.some(s => s.pageId === r.pageId)).slice(0, 4).map(c => (
-                  <button key={c.pageId} onClick={() => { togglePick(c); setQ('') }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderRadius: 11, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {c.avatar ? <img src={c.avatar} alt="" style={{ width: 26, height: 26, borderRadius: 8, objectFit: 'cover' }} /> : <span style={{ width: 26, height: 26, borderRadius: 8, background: '#eef2ec', display: 'inline-block' }} />}
-                    <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: INK }}>{c.name}</span>
-                    <span style={{ fontSize: 13, fontWeight: 900, color: '#c6cfc4' }}>+</span>
-                  </button>
-                ))}
-              </div>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.09em', color: MUTED, textTransform: 'uppercase', marginBottom: 10, textAlign: 'left' }}>Pick who I should watch — click to choose</div>
+              <BrandPalette q={q} setQ={setQ} suggested={suggested} results={results} picks={picks} loading={loadingComp} onToggle={togglePick} extractId={extractPageId} />
               <div style={{ textAlign: 'center', marginTop: 18 }}>
                 <button style={{ ...btnMain, opacity: picks.length ? 1 : 0.5 }} disabled={!picks.length} onClick={confirmCompetitors}>
                   Watch {picks.length ? `these ${picks.length}` : 'them'} for me →
