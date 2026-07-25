@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import MelloFace, { type MelloState } from '@/components/MelloFace'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95'
 const GREEN = '#3f8f4f', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f', PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
@@ -41,22 +42,13 @@ function extractPageId(s: string): string | null {
   return null
 }
 
-function Mello({ size = 54 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 160 160">
-      <rect x="34" y="30" width="92" height="96" rx="34" fill={LIME} stroke={FOREST} strokeWidth="5" />
-      <path d="M60 30v-12M100 30v-12" stroke={FOREST} strokeWidth="5" strokeLinecap="round" />
-      <circle cx="60" cy="16" r="5" fill="#7be0a0" stroke={FOREST} strokeWidth="5" />
-      <circle cx="100" cy="16" r="5" fill="#7be0a0" stroke={FOREST} strokeWidth="5" />
-      <rect x="52" y="60" width="56" height="34" rx="17" fill="#fff" stroke={FOREST} strokeWidth="5" />
-      <circle cx="70" cy="77" r="7" fill={FOREST} /><circle cx="90" cy="77" r="7" fill={FOREST} />
-      <circle cx="72" cy="75" r="2.4" fill="#fff" /><circle cx="92" cy="75" r="2.4" fill="#fff" />
-      <path d="M70 104q10 8 20 0" stroke={FOREST} strokeWidth="5" fill="none" strokeLinecap="round" />
-    </svg>
-  )
+// The one Mello face, shared with the brief/rail/studio — the onboarding used to draw its own robot.
+function Mello({ size = 54, state = 'awake' }: { size?: number; state?: MelloState }) {
+  return <MelloFace size={size} state={state} />
 }
 
-const say: React.CSSProperties = { fontSize: 21, fontWeight: 750, letterSpacing: '-.02em', lineHeight: 1.4, color: INK, textAlign: 'center', maxWidth: 460, margin: '0 auto' }
+// Mello's own words → the serif register (voice.mello), same as the brief. Onboarding is Mello speaking.
+const say: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 31, fontWeight: 400, letterSpacing: '-.015em', lineHeight: 1.14, color: INK, textAlign: 'center', maxWidth: 540, margin: '0 auto' }
 const sub: React.CSSProperties = { fontSize: 14, color: MUTED, textAlign: 'center', maxWidth: 420, margin: '10px auto 0', lineHeight: 1.6 }
 const btnMain: React.CSSProperties = { background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }
 const btnGhost: React.CSSProperties = { background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '12px 22px', fontSize: 13.5, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
@@ -540,8 +532,8 @@ export default function InterviewPage() {
           {/* ── BEAT 9 · THE NIGHT ── */}
           {phase === 'night' && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}><Mello /></div>
-              <div style={{ ...say, color: '#fff' }}>I’m starting work now.</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}><Mello state={nightDone ? 'delivered' : 'awake'} /></div>
+              <div style={{ ...say, color: '#fff' }}>{nightDone ? 'Your first brief is ready.' : 'I’m starting work now.'}</div>
               <div style={{ maxWidth: 380, margin: '22px auto 0', textAlign: 'left', font: '600 13px/2.3 ui-monospace, Menlo, monospace', color: '#7d8a7c' }}>
                 {nightLog.map((l, i) => <div key={i}>{l.done ? <span style={{ color: '#a9d96a' }}>✓</span> : <span className="spin-dot">›</span>} {l.t}</div>)}
               </div>
