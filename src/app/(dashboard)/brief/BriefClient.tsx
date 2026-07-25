@@ -18,6 +18,7 @@ import { ArrowUp } from 'lucide-react'
 import TryMello from './TryMello'
 import BriefAlerts from './BriefAlerts'
 import BriefWishlist from './BriefWishlist'
+import BriefScan from './BriefScan'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
@@ -219,12 +220,12 @@ export default function BriefClient({ initialBrief }: { initialBrief: Brief | nu
   const [draft, setDraft] = useState('')
   const [focusItem, setFocusItem] = useState<Item | null>(initialBrief?.headline || initialBrief?.items?.[0] || null)   // what the composer is "about"
   const [headlineState, setHeadlineState] = useState<null | 'approved' | 'passed'>(null)
-  const [view, setView] = useState<'standup' | 'desk'>('standup')   // Mello's report as a conversation, or as a prepared desk
+  const [view, setView] = useState<'standup' | 'desk' | 'scan'>('standup')   // conversation · prepared desk · one-page scan
   const endRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   // One calm default — no toggle, fewer decisions. The Desk variant stays reachable via ?view=desk.
-  useEffect(() => { try { if (new URLSearchParams(window.location.search).get('view') === 'desk') setView('desk') } catch {} }, [])
+  useEffect(() => { try { const v = new URLSearchParams(window.location.search).get('view'); if (v === 'desk' || v === 'scan') setView(v) } catch {} }, [])
   // Fallback only: the server already rendered the brief into the HTML. We re-fetch client-side ONLY
   // if the server render came back empty (rare), so a transient server hiccup can still recover.
   useEffect(() => {
@@ -303,6 +304,7 @@ export default function BriefClient({ initialBrief }: { initialBrief: Brief | nu
       {err && <div style={{ color: MUTED, fontSize: 15 }}>I couldn&rsquo;t start the standup — refresh in a moment.</div>}
 
       {brief && view === 'desk' && <DeskView brief={brief} greet={greet} onAct={markActed} onDecision={logDecision} />}
+      {brief && view === 'scan' && <BriefScan brief={brief} melloState={melloState} onAct={markActed} onWhy={(it) => { setFocusItem(it); say('Why does it matter?', it) }} />}
 
       {brief && view === 'standup' && (() => {
         // ── The hierarchy: 1 what happened · 2 why it matters · 3 what to do · 4 evidence ──
