@@ -268,7 +268,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   // flagship it is. Brand-scoped when a brand is selected. Fail-soft.
   {
     let dq = admin.from('mello_documents')
-      .select('id, kind, title, subject, subject_brand_id, model, created_at')
+      .select('id, kind, title, subject, subject_brand_id, model, meta, created_at')
       .eq('user_id', userId).gte('created_at', D7)
       .order('created_at', { ascending: false }).limit(3)
     if (opts.brandId) dq = dq.eq('subject_brand_id', opts.brandId)
@@ -277,12 +277,17 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
       competitor_report: 'Competitor intelligence', niche_report: 'Niche teardown', strategy_memo: 'Strategy memo',
     }
     for (const d of (docs as any[])) {
+      // Show the competitor's real ad thumbnails inline on the brief card (from the report's swipe file).
+      const swipe: any[] = Array.isArray((d.meta as any)?.swipe) ? (d.meta as any).swipe : []
+      const media = swipe.filter((s) => s?.image || s?.videoUrl).slice(0, 4)
+        .map((s) => ({ image: s.image || null, videoUrl: s.videoUrl || null, adId: s.adId ? String(s.adId) : undefined }))
       items.push({
         id: `doc-${d.id}`, kind: 'document', importance: 78, at: d.created_at,
         title: `${d.subject ? `${d.subject} — ` : ''}${kindLabel[d.kind] || 'Document'}`,
         body: d.title,
         why: 'A full strategy document Mello wrote for you — grounded in real ad data.',
         cta_label: 'Read the full report', cta_href: `/documents/${d.id}`,
+        ...(media.length ? { media } : {}),
       })
     }
   }
