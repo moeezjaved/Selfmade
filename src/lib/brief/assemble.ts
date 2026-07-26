@@ -69,6 +69,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   const H36 = new Date(Date.now() - 36 * 3600e3).toISOString()
   const H24 = new Date(Date.now() - 24 * 3600e3).toISOString()
   const D7 = new Date(Date.now() - 7 * 86400e3).toISOString()
+  const D30 = new Date(Date.now() - 30 * 86400e3).toISOString()
 
   // BRAND SCOPE (switcher). When a brand is selected, restrict the brief to its world: its own
   // competitors, its own creatives, its own spine items. notifications carry no brand_id, so we scope
@@ -177,7 +178,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   // In a brand view, "the brands you watch" means only this brand's competitors.
   const scopedFollows = scopePages ? follows.filter((f: any) => scopePages.includes(String(f.page_id))) : follows
   const pageIds = scopedFollows.map((f: any) => f.page_id).filter(Boolean).slice(0, 60)
-  const [marketAds, globalAds] = await Promise.all([
+  const [marketAds, globalAds, playbookAds] = await Promise.all([
     soft((async () => {
       let q = admin.from('discovery_ads_index')
         .select('ad_id, page_id, hook_type, format_style, emotion, offer, title, body, caption, topics, created_at, discovery_creatives(asset_type, r2_url, poster_url)')
@@ -191,6 +192,15 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     })(), [] as any[]),
     soft((async () => {
       const { data } = await admin.from('discovery_ads_index').select('topics').gte('created_at', H48).order('created_at', { ascending: false }).limit(200)
+      return data || []
+    })(), [] as any[]),
+    // The cross-competitor Playbook reads patterns over a MONTH (crawl cadence is lumpy — a 7-day
+    // window often has too few rows to synthesize). DNA fields only; no media join needed.
+    soft((async () => {
+      if (!pageIds.length) return [] as any[]
+      const { data } = await admin.from('discovery_ads_index')
+        .select('ad_id, page_id, hook_type, format_style, emotion, offer, title, body, caption')
+        .in('page_id', pageIds).gte('created_at', D30).order('created_at', { ascending: false }).limit(400)
       return data || []
     })(), [] as any[]),
   ])
@@ -224,12 +234,15 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     })
   }
 
-  // Cross-competitor synthesis: combine EVERY watched brand's fresh ads into one "what's working" read
-  // — format mix, hooks, emotions, and offers (mined from copy) across the whole competitive set.
-  if (marketAds.length >= 5) {
+  // Cross-competitor synthesis: combine EVERY watched brand's ads (last 30d) into one "what's working"
+  // read — format mix, hooks, emotions, and offers (mined from copy) across the whole competitive set.
+  const pbAds = (playbookAds.length >= 5 ? playbookAds : marketAds) as any[]
+  if (pbAds.length >= 5) {
     let video = 0, imageN = 0
     const hookM = new Map<string, number>(), fmtM = new Map<string, number>(), emoM = new Map<string, number>()
     const brandSet = new Set<string>()
+    // Media split comes from marketAds (they carry the creative join); DNA from the wider pbAds.
+    for (const a of marketAds) { const m = mediaOf(a); if (m?.videoUrl) video++; else if (m?.image) imageN++ }
     // Offer/promo posture mined straight from the ads' copy (same signals as the competitor report).
     const OFFER_RES: { label: string; re: RegExp }[] = [
       { label: 'Price point', re: /(?:^|[^\w])\$\s?\d{1,4}(?:\.\d{2})?(?![\d%])/ },
@@ -242,10 +255,8 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
       { label: 'Limited-time / sale', re: /limited[- ]time|today\s+only|flash\s+sale|ends\s+(?:tonight|today|soon)/i },
     ]
     const offerM = new Map<string, number>()
-    for (const a of marketAds) {
+    for (const a of pbAds) {
       if (a.page_id) brandSet.add(String(a.page_id))
-      const m = mediaOf(a)
-      if (m?.videoUrl) video++; else if (m?.image) imageN++
       if (a.hook_type) hookM.set(a.hook_type, (hookM.get(a.hook_type) || 0) + 1)
       if (a.format_style) fmtM.set(a.format_style, (fmtM.get(a.format_style) || 0) + 1)
       for (const e of (Array.isArray(a.emotion) ? a.emotion : [])) if (e) emoM.set(String(e), (emoM.get(String(e)) || 0) + 1)
@@ -259,16 +270,16 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     const topFmt = rank(fmtM, 1)[0]
     // Gate on the AD COUNT (DNA), not media availability — this card is about formats/hooks/emotions/
     // offers, which every crawled ad has even before its creative is drained to R2.
-    if (marketAds.length >= 5) {
+    {
       const headline = withMedia >= 3 ? (vidPct >= 50 ? `video is winning — ${vidPct}% of new ads` : `image-led — only ${vidPct}% video`) : (topFmt ? `they're leaning on “${topFmt.label}”` : 'the pattern across their ads')
       items.push({
         kind: 'market_playbook', importance: 63,
         title: `What's working across your ${brandSet.size} competitor${brandSet.size === 1 ? '' : 's'}: ${headline}${topHook ? `, hook “${topHook.label}”` : ''}.`,
-        body: `Combined read of ${marketAds.length} fresh ads across every brand you watch — the pattern to copy before it saturates.`,
+        body: `Combined read of ${pbAds.length} recent ads across every brand you watch — the pattern to copy before it saturates.`,
         why: `Ship in the winning format + hook while it's still cheap. I can build you one.`,
         cta_label: 'Make one like this', cta_href: topHook ? `/discovery?q=${encodeURIComponent(topHook.label)}` : '/discovery/brand-spy',
         playbook: {
-          totalAds: marketAds.length, brandsCount: brandSet.size, videoPct: vidPct,
+          totalAds: pbAds.length, brandsCount: brandSet.size, videoPct: vidPct,
           formats: rank(fmtM, 4), hooks: rank(hookM, 4), emotions: rank(emoM, 5), offers: rank(offerM, 5),
         },
       })
