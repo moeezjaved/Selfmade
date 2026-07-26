@@ -20,7 +20,7 @@ import MelloFace, { type MelloState } from '@/components/MelloFace'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e3e2da', HAIR = '#ecebe3', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
-type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string }
+type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string; playbook?: { totalAds: number; brandsCount: number; videoPct: number; formats: { label: string; count: number }[]; hooks: { label: string; count: number }[]; emotions: { label: string; count: number }[]; offers: { label: string; count: number }[] } }
 type Brief = {
   summary: { adsScanned: number; brandsWatched: number; spiedBrands: number; creativesReady: number }
   lastCycleAt?: string | null
@@ -46,6 +46,11 @@ const RULE = '#1c1c1a'
 const label: React.CSSProperties = { fontFamily: "ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: '.15em', textTransform: 'uppercase', color: INK, borderTop: `2px solid ${RULE}`, paddingTop: 9, margin: '0 0 16px' }
 const serif: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 20, fontWeight: 400, color: INK, lineHeight: 1.18, letterSpacing: '-.012em' }
 const sub: React.CSSProperties = { fontSize: 13, color: MUTED, lineHeight: 1.5 }
+// Cross-competitor playbook card styles
+const pbHead: React.CSSProperties = { fontSize: 10.5, color: '#7a8872', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }
+const pbRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5, color: '#33402f', padding: '3px 0' }
+const pbNum: React.CSSProperties = { color: '#66755d', fontVariantNumeric: 'tabular-nums' }
+const pbChip: React.CSSProperties = { fontSize: 11.5, color: '#20321c', background: '#eef7d6', borderRadius: 100, padding: '3px 9px', textTransform: 'capitalize' }
 
 /** A creative, shown. This is an ads product — the ad IS the content, so the scan must carry it.
  *  Video renders as a static poster + badge (never a live <video>): nothing to swallow the click. */
@@ -89,9 +94,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
   // someone already paying). $49/mo shown with an honest per-day anchor ($49 / 30 ≈ $1.63).
   const isPaid = ['starter', 'pro', 'business', 'enterprise'].includes(String(plan || '').toLowerCase())
   const perDay = (49 / 30).toFixed(2)
-  const hero = brief.headline || brief.items[0] || null
+  const playbook = brief.items.find(i => i.kind === 'market_playbook' && i.playbook) || null
+  const hero = brief.headline || brief.items.find(i => i.kind !== 'market_playbook') || null
   const competitors = brief.items.filter(i => i.kind === 'competitor_ads').slice(0, 4)
-  const second = brief.items.find(i => i !== hero && i.kind !== 'competitor_ads') || competitors[0] || null
+  const second = brief.items.find(i => i !== hero && i.kind !== 'competitor_ads' && i.kind !== 'market_playbook') || competitors[0] || null
   const worked = ago(brief.lastCycleAt)
   const stateWord = brief.quiet ? 'Resting' : melloState === 'delivered' ? 'Delivered' : 'Awake'
 
@@ -262,7 +268,66 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
         </div>
       </div>
 
+      {/* ── CROSS-COMPETITOR PLAYBOOK — what's working across ALL watched brands, combined ── */}
+      {playbook?.playbook && (
+        <div style={{ borderTop: `1px solid ${LINE}`, padding: '18px 20px 22px', background: '#fbfcf9' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div>
+              <div style={label}>The playbook across your {playbook.playbook.brandsCount} competitor{playbook.playbook.brandsCount === 1 ? '' : 's'}</div>
+              <div style={{ ...sub, marginTop: 3 }}>Combined from {playbook.playbook.totalAds} fresh ads — the patterns to copy before they saturate.</div>
+            </div>
+            {playbook.cta_href && (
+              <Link href={playbook.cta_href} onClick={() => onAct(playbook)}
+                style={{ background: LIME, color: FOREST, borderRadius: 100, padding: '9px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                ✓ {playbook.cta_label || 'Make one like this'}
+              </Link>
+            )}
+          </div>
+          <div className="bs-pb">
+            {/* Format — video vs image split + top format_style bars */}
+            <div className="bs-pb-c">
+              <div style={pbHead}>Format</div>
+              <div style={{ ...serif, fontSize: 22, color: INK }}>{playbook.playbook.videoPct}%<span style={{ fontSize: 12, color: MUTED, fontWeight: 400, marginLeft: 6, fontFamily: 'inherit' }}>video</span></div>
+              <div style={{ height: 6, borderRadius: 100, background: '#e6ece2', overflow: 'hidden', margin: '6px 0 10px' }}>
+                <div style={{ width: `${playbook.playbook.videoPct}%`, height: '100%', background: GREEN }} />
+              </div>
+              {playbook.playbook.formats.map(f => (
+                <div key={f.label} style={pbRow}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.label}</span><b style={pbNum}>{f.count}</b></div>
+              ))}
+            </div>
+            {/* Hooks */}
+            <div className="bs-pb-c">
+              <div style={pbHead}>Top hooks</div>
+              {playbook.playbook.hooks.length ? playbook.playbook.hooks.map(h => (
+                <div key={h.label} style={pbRow}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.label}</span><b style={pbNum}>{h.count}</b></div>
+              )) : <div style={sub}>Still decoding.</div>}
+            </div>
+            {/* Emotions */}
+            <div className="bs-pb-c">
+              <div style={pbHead}>Emotions they pull</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {playbook.playbook.emotions.length ? playbook.playbook.emotions.map(e => (
+                  <span key={e.label} style={pbChip}>{e.label} <b style={{ color: '#66755d' }}>{e.count}</b></span>
+                )) : <div style={sub}>Still decoding.</div>}
+              </div>
+            </div>
+            {/* Offers */}
+            <div className="bs-pb-c">
+              <div style={pbHead}>Offers they run</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {playbook.playbook.offers.length ? playbook.playbook.offers.map(o => (
+                  <span key={o.label} style={pbChip}>{o.label} <b style={{ color: '#66755d' }}>{o.count}</b></span>
+                )) : <div style={sub}>None surfaced in copy yet.</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        .bs-pb{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:${LINE};border:1px solid ${LINE};border-radius:12px;overflow:hidden}
+        .bs-pb-c{background:#fff;padding:13px 15px;min-width:0}
+        @media(max-width:859px){.bs-pb{grid-template-columns:1fr 1fr}}
         .bs-grid{display:grid;grid-template-columns:repeat(4,1fr)}
         .bs-col{border-right:1px solid ${LINE};padding:16px 18px 22px;min-width:0}
         .bs-col:last-child{border-right:none}
