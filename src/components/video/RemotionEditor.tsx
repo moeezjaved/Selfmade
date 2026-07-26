@@ -22,7 +22,8 @@ export default function RemotionEditor({ jobId }: { jobId?: string }) {
 
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => {
-    fetch(`/api/discovery/clone-video/timeline${jobId ? `?jobId=${jobId}` : ''}`, { cache: 'no-store' })
+    const id = jobId || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('jobId') : null)
+    fetch(`/api/discovery/clone-video/timeline${id ? `?jobId=${id}` : ''}`, { cache: 'no-store' })
       .then((r) => r.json())
       .then((j) => { if (j.error) { setErr(j.error) } else { setTimeline(j.timeline); setNote(j.note || null); setEditable(!!j.editable) } })
       .catch((e) => setErr(String(e)))
