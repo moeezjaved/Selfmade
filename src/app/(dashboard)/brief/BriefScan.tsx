@@ -287,10 +287,14 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             {/* Format — video vs image split + top format_style bars */}
             <div className="bs-pb-c">
               <div style={pbHead}>Format</div>
-              <div style={{ ...serif, fontSize: 22, color: INK }}>{playbook.playbook.videoPct}%<span style={{ fontSize: 12, color: MUTED, fontWeight: 400, marginLeft: 6, fontFamily: 'inherit' }}>video</span></div>
-              <div style={{ height: 6, borderRadius: 100, background: '#e6ece2', overflow: 'hidden', margin: '6px 0 10px' }}>
-                <div style={{ width: `${playbook.playbook.videoPct}%`, height: '100%', background: GREEN }} />
-              </div>
+              {playbook.playbook.videoPct > 0 && (
+                <>
+                  <div style={{ ...serif, fontSize: 22, color: INK }}>{playbook.playbook.videoPct}%<span style={{ fontSize: 12, color: MUTED, fontWeight: 400, marginLeft: 6, fontFamily: 'inherit' }}>video</span></div>
+                  <div style={{ height: 6, borderRadius: 100, background: '#e6ece2', overflow: 'hidden', margin: '6px 0 10px' }}>
+                    <div style={{ width: `${playbook.playbook.videoPct}%`, height: '100%', background: GREEN }} />
+                  </div>
+                </>
+              )}
               {playbook.playbook.formats.map(f => (
                 <div key={f.label} style={pbRow}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.label}</span><b style={pbNum}>{f.count}</b></div>
               ))}
