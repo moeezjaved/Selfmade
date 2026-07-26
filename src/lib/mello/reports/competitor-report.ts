@@ -73,7 +73,9 @@ const PACK_COLS =
   'ad_id, page_id, page_name, title, body, caption, link_url, format, format_style, visual_style, visual_scene, ' +
   'on_screen_text, problem, mechanism, offer, cta_style, niche, days_running, ' +
   'creative_reuse_count, collation_count, brand_active_ads, performance_tier, performance_score, is_active, ' +
-  'start_date, stop_date, last_seen, thumbnail_url, video_url'
+  'start_date, stop_date, last_seen, thumbnail_url, video_url, ' +
+  // The real media lives in discovery_creatives (R2), not on the index row — join it for the swipe visuals.
+  'discovery_creatives(asset_type, r2_url, poster_url, position)'
 
 const packClean = (s: any): string | null => {
   if (!s) return null
@@ -89,17 +91,29 @@ const packDays = (a: any): number | null => {
   const d = Math.floor((endMs - startMs) / 86400000)
   return Number.isFinite(d) ? Math.max(0, Math.min(d, 3650)) : null
 }
-const packMapAd = (a: any) => ({
-  headline: packClean(a.title),
-  copy: (a.body || '').replace(/\s+/g, ' ').slice(0, 200) || null,
-  problem: packClean(a.problem), mechanism: packClean(a.mechanism), offer: packClean(a.offer),
-  format_style: packClean(a.format_style), format: a.format, cta_style: packClean(a.cta_style),
-  visual: packClean(a.visual_scene) || packClean(a.visual_style), niche: packClean(a.niche),
-  days_running: packDays(a), tier: a.performance_tier || null, is_active: a.is_active,
-  page_name: packClean(a.page_name), link_url: packClean(a.link_url), caption: packClean(a.caption),
-  collation_count: typeof a.collation_count === 'number' ? a.collation_count : null,
-  ad_id: a.ad_id ? String(a.ad_id) : null, thumbnail_url: a.thumbnail_url || null, video_url: a.video_url || null,
-})
+// Pull real media (R2) from the joined discovery_creatives, falling back to the index-row columns.
+const packMedia = (a: any): { image: string | null; video: string | null } => {
+  const cre: any[] = Array.isArray(a.discovery_creatives) ? a.discovery_creatives : []
+  const vid = cre.find((c) => c?.asset_type === 'video' && c?.r2_url)
+  const img = cre.find((c) => c?.asset_type === 'image' && c?.r2_url)
+  const image = img?.r2_url || vid?.poster_url || a.thumbnail_url || null
+  const video = vid?.r2_url || a.video_url || null
+  return { image, video }
+}
+const packMapAd = (a: any) => {
+  const media = packMedia(a)
+  return {
+    headline: packClean(a.title),
+    copy: (a.body || '').replace(/\s+/g, ' ').slice(0, 200) || null,
+    problem: packClean(a.problem), mechanism: packClean(a.mechanism), offer: packClean(a.offer),
+    format_style: packClean(a.format_style), format: a.format, cta_style: packClean(a.cta_style),
+    visual: packClean(a.visual_scene) || packClean(a.visual_style), niche: packClean(a.niche),
+    days_running: packDays(a), tier: a.performance_tier || null, is_active: a.is_active,
+    page_name: packClean(a.page_name), link_url: packClean(a.link_url), caption: packClean(a.caption),
+    collation_count: typeof a.collation_count === 'number' ? a.collation_count : null,
+    ad_id: a.ad_id ? String(a.ad_id) : null, thumbnail_url: media.image, video_url: media.video,
+  }
+}
 
 // The domain/path of a landing URL, or the caption fallback — groups ads by funnel destination.
 const funnelKey = (a: any): string | null => {
