@@ -252,21 +252,23 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
       const hay = [a.title, a.body, a.caption, a.offer].filter(Boolean).join(' · ')
       if (hay) for (const { label, re } of OFFER_RES) if (re.test(hay)) offerM.set(label, (offerM.get(label) || 0) + 1)
     }
-    const total = video + imageN
+    const withMedia = video + imageN        // only ads whose creative has drained — for the video% only
     const rank = (m: Map<string, number>, n: number) => Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, count]) => ({ label, count }))
-    const vidPct = total ? Math.round((video / total) * 100) : 0
+    const vidPct = withMedia ? Math.round((video / withMedia) * 100) : 0
     const topHook = rank(hookM, 1)[0]
     const topFmt = rank(fmtM, 1)[0]
-    if (total >= 5) {
-      const headline = vidPct >= 50 ? `video is winning — ${vidPct}% of new ads` : `image-led — only ${vidPct}% video`
+    // Gate on the AD COUNT (DNA), not media availability — this card is about formats/hooks/emotions/
+    // offers, which every crawled ad has even before its creative is drained to R2.
+    if (marketAds.length >= 5) {
+      const headline = withMedia >= 3 ? (vidPct >= 50 ? `video is winning — ${vidPct}% of new ads` : `image-led — only ${vidPct}% video`) : (topFmt ? `they're leaning on “${topFmt.label}”` : 'the pattern across their ads')
       items.push({
         kind: 'market_playbook', importance: 63,
-        title: `What's working across your ${brandSet.size} competitor${brandSet.size === 1 ? '' : 's'}: ${headline}${topFmt ? `, format “${topFmt.label}”` : ''}${topHook ? `, hook “${topHook.label}”` : ''}.`,
-        body: `Combined read of ${total} fresh ads across every brand you watch — the pattern to copy before it saturates.`,
+        title: `What's working across your ${brandSet.size} competitor${brandSet.size === 1 ? '' : 's'}: ${headline}${topHook ? `, hook “${topHook.label}”` : ''}.`,
+        body: `Combined read of ${marketAds.length} fresh ads across every brand you watch — the pattern to copy before it saturates.`,
         why: `Ship in the winning format + hook while it's still cheap. I can build you one.`,
         cta_label: 'Make one like this', cta_href: topHook ? `/discovery?q=${encodeURIComponent(topHook.label)}` : '/discovery/brand-spy',
         playbook: {
-          totalAds: total, brandsCount: brandSet.size, videoPct: vidPct,
+          totalAds: marketAds.length, brandsCount: brandSet.size, videoPct: vidPct,
           formats: rank(fmtM, 4), hooks: rank(hookM, 4), emotions: rank(emoM, 5), offers: rank(offerM, 5),
         },
       })
