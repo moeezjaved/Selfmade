@@ -27,6 +27,16 @@ export type BriefItem = {
   /** Which of the user's brands this competitor is watched FOR (migration 117). Absent = account-level. */
   forBrand?: string
   at?: string
+  /** Cross-competitor synthesis for the 'market_playbook' card — what's working across ALL watched brands. */
+  playbook?: {
+    totalAds: number
+    brandsCount: number
+    videoPct: number
+    formats: { label: string; count: number }[]
+    hooks: { label: string; count: number }[]
+    emotions: { label: string; count: number }[]
+    offers: { label: string; count: number }[]
+  }
 }
 
 export type Brief = {
@@ -170,7 +180,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   const [marketAds, globalAds] = await Promise.all([
     soft((async () => {
       let q = admin.from('discovery_ads_index')
-        .select('ad_id, page_id, hook_type, format_style, topics, created_at, discovery_creatives(asset_type, r2_url, poster_url)')
+        .select('ad_id, page_id, hook_type, format_style, emotion, offer, title, body, caption, topics, created_at, discovery_creatives(asset_type, r2_url, poster_url)')
         .gte('created_at', D7).order('created_at', { ascending: false }).limit(240)
       if (pageIds.length) q = q.in('page_id', pageIds)
       // Brand view with NO competitors: don't fall back to the global market — that produced
@@ -214,33 +224,51 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     })
   }
 
+  // Cross-competitor synthesis: combine EVERY watched brand's fresh ads into one "what's working" read
+  // — format mix, hooks, emotions, and offers (mined from copy) across the whole competitive set.
   if (marketAds.length >= 5) {
     let video = 0, imageN = 0
-    const hookM = new Map<string, number>(), fmtM = new Map<string, number>()
+    const hookM = new Map<string, number>(), fmtM = new Map<string, number>(), emoM = new Map<string, number>()
+    const brandSet = new Set<string>()
+    // Offer/promo posture mined straight from the ads' copy (same signals as the competitor report).
+    const OFFER_RES: { label: string; re: RegExp }[] = [
+      { label: 'Price point', re: /(?:^|[^\w])\$\s?\d{1,4}(?:\.\d{2})?(?![\d%])/ },
+      { label: '% off', re: /\d{1,3}\s?%\s?(?:off|discount|savings?)/i },
+      { label: 'Free shipping', re: /free\s+ship\w*/i },
+      { label: 'Money-back guarantee', re: /(?:money[- ]back|satisfaction|refund)\s+guarantee|guaranteed?\s+or\s+your\s+money/i },
+      { label: 'BOGO / bundle', re: /buy\s+\d\s+get\s+\d|bogo|\bbundle\b|\d\s+for\s+\$?\d/i },
+      { label: 'Subscribe & save', re: /subscribe\s+(?:and|&)\s+save/i },
+      { label: 'Free trial / sample', re: /free\s+(?:trial|sample|gift)/i },
+      { label: 'Limited-time / sale', re: /limited[- ]time|today\s+only|flash\s+sale|ends\s+(?:tonight|today|soon)/i },
+    ]
+    const offerM = new Map<string, number>()
     for (const a of marketAds) {
+      if (a.page_id) brandSet.add(String(a.page_id))
       const m = mediaOf(a)
       if (m?.videoUrl) video++; else if (m?.image) imageN++
       if (a.hook_type) hookM.set(a.hook_type, (hookM.get(a.hook_type) || 0) + 1)
       if (a.format_style) fmtM.set(a.format_style, (fmtM.get(a.format_style) || 0) + 1)
+      for (const e of (Array.isArray(a.emotion) ? a.emotion : [])) if (e) emoM.set(String(e), (emoM.get(String(e)) || 0) + 1)
+      const hay = [a.title, a.body, a.caption, a.offer].filter(Boolean).join(' · ')
+      if (hay) for (const { label, re } of OFFER_RES) if (re.test(hay)) offerM.set(label, (offerM.get(label) || 0) + 1)
     }
     const total = video + imageN
-    const topHook = Array.from(hookM.entries()).sort((a, b) => b[1] - a[1])[0]
-    const topFmt = Array.from(fmtM.entries()).sort((a, b) => b[1] - a[1])[0]
+    const rank = (m: Map<string, number>, n: number) => Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, count]) => ({ label, count }))
     const vidPct = total ? Math.round((video / total) * 100) : 0
+    const topHook = rank(hookM, 1)[0]
+    const topFmt = rank(fmtM, 1)[0]
     if (total >= 5) {
-      const parts: string[] = [vidPct >= 50 ? `video is winning — ${vidPct}% of their new ads` : `it's still image-led — only ${vidPct}% are video`]
-      if (topFmt) parts.push(`the format they keep reaching for is “${topFmt[0]}”`)
-      if (topHook) parts.push(`the common hook is “${topHook[0]}”`)
-      const stillDecoding = !topFmt && !topHook
+      const headline = vidPct >= 50 ? `video is winning — ${vidPct}% of new ads` : `image-led — only ${vidPct}% video`
       items.push({
-        kind: 'market_read', importance: 78,
-        title: `What's working across your competitors this week: ${parts.join(', ')}.`,
-        body: stillDecoding
-          ? `Read from ${total} fresh ads — ${video} video, ${imageN} image. I'm still decoding the hooks and formats on the newest ones — the finer pattern read lands in tomorrow's brief.`
-          : `Read from ${total} fresh ads across the brands you watch — ${video} video, ${imageN} image. ${vidPct >= 50 ? 'If you’re still shipping static, that’s the gap.' : 'Static still holds here — don’t over-rotate to video yet.'}`,
-        why: `This is the pattern to copy before it saturates — I can build you one in this format.`,
-        cta_label: stillDecoding ? 'See the ads' : 'Make one like this',
-        cta_href: topHook ? `/discovery?q=${encodeURIComponent(topHook[0] as string)}` : '/discovery/brand-spy',
+        kind: 'market_playbook', importance: 63,
+        title: `What's working across your ${brandSet.size} competitor${brandSet.size === 1 ? '' : 's'}: ${headline}${topFmt ? `, format “${topFmt.label}”` : ''}${topHook ? `, hook “${topHook.label}”` : ''}.`,
+        body: `Combined read of ${total} fresh ads across every brand you watch — the pattern to copy before it saturates.`,
+        why: `Ship in the winning format + hook while it's still cheap. I can build you one.`,
+        cta_label: 'Make one like this', cta_href: topHook ? `/discovery?q=${encodeURIComponent(topHook.label)}` : '/discovery/brand-spy',
+        playbook: {
+          totalAds: total, brandsCount: brandSet.size, videoPct: vidPct,
+          formats: rank(fmtM, 4), hooks: rank(hookM, 4), emotions: rank(emoM, 5), offers: rank(offerM, 5),
+        },
       })
     }
   }

@@ -162,6 +162,7 @@ export function buildStudioPrompt(opts: {
   insights?: { topHooks?: string[]; topAngles?: string[]; topFormats?: string[]; topEmotions?: string[]; topCtas?: string[] }
   productDesc?: string
   angle?: string          // user-supplied concept/positioning ("quit nicotine naturally — 92% success")
+  isService?: boolean     // service/app/website brand → no physical product to render as hero
 }): string {
   const n = opts.numInspirations
   const firstProductIdx = n + 1
@@ -203,10 +204,14 @@ export function buildStudioPrompt(opts: {
     n > 0
       ? `Images 1-${n} are REFERENCE DESIGNS for inspiration ONLY — study their design sophistication: composition, typography energy, color grading, use of negative space, and premium finish. Match that CALIBER of design, but create an ORIGINAL layout. Do NOT copy any single reference or reuse its product, text, or people.`
       : `Aim for a premium, agency-quality, scroll-stopping design.`,
-    `Image${opts.numProducts > 1 ? `s ${firstProductIdx}-${firstProductIdx + opts.numProducts - 1}` : ` ${firstProductIdx}`} ${opts.numProducts > 1 ? 'are' : 'is'} the USER'S PRODUCT and it is the HERO of the ad.`,
-    `Render the product 1:1 from the photo(s): match its EXACT silhouette, proportions, materials, textures, and on-label branding/text. Do NOT reshape, restyle, or invent a different product.`,
-    `SIZE THE PRODUCT REALISTICALLY — this is critical. Render it at its true real-world size RELATIVE TO the scene: a small handheld device must look small in a hand, in correct proportion to fingers, faces, furniture, and surroundings. Keep it to roughly a QUARTER of the frame; never enlarge it, never make it larger-than-life, never let it dominate the composition. If a person holds it, it must look natural in their grip, not oversized. Leave clear negative space around it. It is the only product shown.`,
-    opts.productDesc ? `The product is: ${opts.productDesc}.` : '',
+    // SERVICE / APP brands have no physical product — the ad sells an outcome, not an object. Never
+    // invent a fake product; build a concept-led ad (bold type, a real person mid-benefit, or clean UI).
+    opts.isService
+      ? `This is a SERVICE / APP / DIGITAL brand — there is NO physical product to show. Do NOT invent, render, or imply a physical product, box, bottle, or device. Build a concept-led ad that sells the OUTCOME/benefit: use bold editorial typography, negative space, and either an abstract brand-colored composition or a real person clearly experiencing the result (relief, delight, success). ${opts.numProducts > 0 ? `Image${opts.numProducts > 1 ? `s ${firstProductIdx}-${firstProductIdx + opts.numProducts - 1}` : ` ${firstProductIdx}`} ${opts.numProducts > 1 ? 'are' : 'is'} the brand's own imagery/app UI/screenshots — use ${opts.numProducts > 1 ? 'them' : 'it'} as an on-screen device mockup or supporting visual, NEVER as a physical object in a scene.` : `No product photos are attached — lead entirely with typography, brand color, and concept.`}`
+      : `Image${opts.numProducts > 1 ? `s ${firstProductIdx}-${firstProductIdx + opts.numProducts - 1}` : ` ${firstProductIdx}`} ${opts.numProducts > 1 ? 'are' : 'is'} the USER'S PRODUCT and it is the HERO of the ad.`,
+    opts.isService ? '' : `Render the product 1:1 from the photo(s): match its EXACT silhouette, proportions, materials, textures, and on-label branding/text. Do NOT reshape, restyle, or invent a different product.`,
+    opts.isService ? '' : `SIZE THE PRODUCT REALISTICALLY — this is critical. Render it at its true real-world size RELATIVE TO the scene: a small handheld device must look small in a hand, in correct proportion to fingers, faces, furniture, and surroundings. Keep it to roughly a QUARTER of the frame; never enlarge it, never make it larger-than-life, never let it dominate the composition. If a person holds it, it must look natural in their grip, not oversized. Leave clear negative space around it. It is the only product shown.`,
+    opts.productDesc ? `The ${opts.isService ? 'brand/service' : 'product'} is: ${opts.productDesc}.` : '',
     opts.angle ? `The ad's core message/angle is: ${opts.angle}. Build the concept, headline, and supporting copy around THIS.` : '',
     insightLine ? `Ground the concept in what wins in this industry — ${insightLine}.` : '',
     styleLine,
