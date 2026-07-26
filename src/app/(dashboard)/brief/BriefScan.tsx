@@ -173,11 +173,19 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
               <div style={{ paddingBottom: 12 }}>
                 <div style={{ ...serif, fontSize: 23, lineHeight: 1.2 }}>{hero.title.replace(/\.+$/, '')}</div>
                 {hero.body && <div style={{ ...sub, marginTop: 2 }}>{hero.body}</div>}
-                {(hero.thumbs?.[0] || hero.media?.[0]) && (
+                {/* A document (competitor report) shows a ROW of the rival's real ad thumbnails; other
+                    heroes (a made creative) show their single shot. */}
+                {hero.media && hero.media.length > 1 ? (
+                  <div style={{ marginTop: 10, display: 'flex', gap: 7 }}>
+                    {hero.media.slice(0, 4).map((m, i) => (
+                      <Shot key={i} image={m.image} videoUrl={m.videoUrl} w={92} h={115} />
+                    ))}
+                  </div>
+                ) : (hero.thumbs?.[0] || hero.media?.[0]) ? (
                   <div style={{ marginTop: 10 }}>
                     <Shot image={hero.thumbs?.[0] || hero.media?.[0]?.image} videoUrl={hero.media?.[0]?.videoUrl} w={132} h={165} />
                   </div>
-                )}
+                ) : null}
                 <div style={{ marginTop: 11, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   {hero.cta_href && (
                     <Link href={hero.cta_href} onClick={() => onAct(hero)}
