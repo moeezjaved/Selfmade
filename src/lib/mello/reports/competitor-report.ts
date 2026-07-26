@@ -427,7 +427,23 @@ async function callOpenAI(system: string, user: string): Promise<ModelResult> {
   } catch (e: any) { return { text: null, why: String(e?.message || e).slice(0, 60) } }
 }
 
-export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string; usage?: Usage; costUsd?: number | null; swipe?: CompetitorPack['swipe'] }
+export interface ReportStats { adCount: number; activeAds: number | null; longestDays: number | null; creatorPct: number | null; topCreator: string | null; formatTop: string | null }
+export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string; usage?: Usage; costUsd?: number | null; swipe?: CompetitorPack['swipe']; stats?: ReportStats }
+
+/** Headline numbers for the report's visual stat strip — derived from the same pack the prose uses. */
+function computeStats(p: CompetitorPack): ReportStats {
+  const creatorAds = p.creators.reduce((n, c) => n + c.count, 0)
+  const longestDays = p.longRunners.reduce((m, r) => Math.max(m, r.days || 0), 0) || null
+  const formatTop = Object.entries(p.formatMix).sort((a, b) => b[1] - a[1])[0]?.[0] || null
+  return {
+    adCount: p.adCount,
+    activeAds: p.activeAds,
+    longestDays,
+    creatorPct: p.adCount ? Math.round((creatorAds / p.adCount) * 100) : null,
+    topCreator: p.creators[0]?.name || null,
+    formatTop,
+  }
+}
 
 /** Generate the report end-to-end. Assembles the evidence pack, runs the model chain, returns markdown. */
 export async function generateCompetitorReport(opts: {
@@ -471,5 +487,6 @@ export async function generateCompetitorReport(opts: {
     usage,
     costUsd: costUsd(model, usage),
     swipe: pack.swipe,
+    stats: computeStats(pack),
   }
 }
