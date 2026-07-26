@@ -351,7 +351,7 @@ async function authorCompetitorReport(userId: string, competitor: string, brandN
   const { data: saved } = await admin.from('mello_documents').insert({
     user_id: userId, kind: 'competitor_report', title: report.title,
     subject: competitor, subject_brand_id: brandId, body_md: report.markdown, model: report.model,
-    meta: { adCount: report.adCount, ...(report.fallbacks ? { fallbacks: report.fallbacks } : {}), ...(report.usage ? { usage: report.usage } : {}), ...(report.costUsd != null ? { costUsd: report.costUsd } : {}), ...(report.swipe?.length ? { swipe: report.swipe } : {}), ...(report.stats ? { stats: report.stats } : {}), ...(report.creators?.length ? { creators: report.creators } : {}) },
+    meta: { adCount: report.adCount, ...(report.fallbacks ? { fallbacks: report.fallbacks } : {}), ...(report.usage ? { usage: report.usage } : {}), ...(report.costUsd != null ? { costUsd: report.costUsd } : {}), ...(report.swipe?.length ? { swipe: report.swipe } : {}), ...(report.stats ? { stats: report.stats } : {}), ...(report.creators?.length ? { creators: report.creators } : {}), ...(report.scale ? { scale: report.scale } : {}), ...(report.momentum ? { momentum: report.momentum } : {}), ...(report.funnels?.length ? { funnels: report.funnels } : {}), ...(report.offerSignals?.length ? { offerSignals: report.offerSignals } : {}) },
   }).select('id, title').maybeSingle()
   if (txId && report.adCount) await commitCredits(admin, txId, { model: report.model, costUsd: report.costUsd ?? null, docId: saved?.id }).then(() => {}, () => {})
 

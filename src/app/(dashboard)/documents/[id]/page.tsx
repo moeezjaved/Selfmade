@@ -30,6 +30,10 @@ export default async function DocumentPage({ params }: { params: { id: string } 
   const swipe: { adId: string; headline: string | null; copy: string | null; days: number | null; format: string | null; image: string | null; videoUrl: string | null }[] = (doc.meta as any)?.swipe || []
   const creators: { name: string; count: number; ads: { adId: string; headline: string | null; days: number | null; format: string | null; image: string | null; videoUrl: string | null }[] }[] = (doc.meta as any)?.creators || []
   const subject = doc.subject || ''
+  const scale = (doc.meta as any)?.scale || null
+  const momentum = (doc.meta as any)?.momentum || null
+  const funnels: { page: string; count: number }[] = (doc.meta as any)?.funnels || []
+  const offerSignals: { label: string; count: number; example: string | null }[] = (doc.meta as any)?.offerSignals || []
   const stats = (doc.meta as any)?.stats || null
   const statCells: { label: string; value: string }[] = stats ? [
     { label: 'Ads tracked', value: String(stats.adCount ?? '—') },
@@ -79,7 +83,47 @@ export default async function DocumentPage({ params }: { params: { id: string } 
         </div>
       )}
 
-      <div style={{ borderTop: '1px solid #e6ece2', paddingTop: 20 }}>
+      {(scale || momentum || funnels.length > 0 || offerSignals.length > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12, margin: '18px 0 4px' }}>
+          {scale && (
+            <div style={{ border: '1px solid #e6ece2', borderRadius: 12, padding: '13px 15px', background: '#fbfcf9' }}>
+              <div style={{ fontSize: 10.5, color: '#7a8872', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Estimated scale</div>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: '#20321c', lineHeight: 1.3 }}>{scale.tier}</div>
+              <div style={{ fontSize: 11.5, color: '#8a9880', marginTop: 4 }}>{[scale.activeAds != null ? `${scale.activeAds} active ads` : null, scale.avgDays != null ? `avg ${scale.avgDays}d live` : null, scale.maxCollation ? `${scale.maxCollation}× top copy` : null].filter(Boolean).join(' · ')}</div>
+            </div>
+          )}
+          {momentum && (
+            <div style={{ border: '1px solid #e6ece2', borderRadius: 12, padding: '13px 15px', background: '#fbfcf9' }}>
+              <div style={{ fontSize: 10.5, color: '#7a8872', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Launch momentum</div>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: momentum.trend === 'accelerating' ? '#2f7d1f' : momentum.trend === 'cooling' ? '#a15a25' : '#20321c', lineHeight: 1.3, textTransform: 'capitalize' }}>{momentum.trend}</div>
+              <div style={{ fontSize: 11.5, color: '#8a9880', marginTop: 4 }}>{momentum.thisWindow} new in last 30d vs {momentum.prevWindow} prior</div>
+            </div>
+          )}
+          {funnels.length > 0 && (
+            <div style={{ border: '1px solid #e6ece2', borderRadius: 12, padding: '13px 15px', background: '#fbfcf9' }}>
+              <div style={{ fontSize: 10.5, color: '#7a8872', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Where their ads point</div>
+              {funnels.slice(0, 3).map((f) => (
+                <div key={f.page} style={{ fontSize: 12, color: '#33402f', display: 'flex', justifyContent: 'space-between', gap: 8, padding: '2px 0' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.page}</span>
+                  <b style={{ color: '#66755d', fontVariantNumeric: 'tabular-nums' }}>{f.count}</b>
+                </div>
+              ))}
+            </div>
+          )}
+          {offerSignals.length > 0 && (
+            <div style={{ border: '1px solid #e6ece2', borderRadius: 12, padding: '13px 15px', background: '#fbfcf9' }}>
+              <div style={{ fontSize: 10.5, color: '#7a8872', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 7 }}>Their offer play</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {offerSignals.slice(0, 5).map((o) => (
+                  <span key={o.label} style={{ fontSize: 11, color: '#20321c', background: '#eef7d6', borderRadius: 100, padding: '3px 9px', fontWeight: 700 }} title={o.example || undefined}>{o.label} ×{o.count}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ borderTop: '1px solid #e6ece2', paddingTop: 20, marginTop: 16 }}>
         <Markdown content={doc.body_md || ''} />
       </div>
 
