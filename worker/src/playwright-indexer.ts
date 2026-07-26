@@ -116,6 +116,7 @@ interface ExtractedAd {
   end_date_string?: string
   start_date_epoch?: number      // Meta's start_date (unix seconds) — present ~always
   end_date_epoch?: number
+  collation_count?: number       // Meta's "N ads use this creative" — concurrent-duplicate / scaling count
   targeted_countries?: string[]  // targeted_or_reached_countries (empty in country=ALL crawls)
   publisher_platform?: string[]  // FACEBOOK / INSTAGRAM / MESSENGER / ...
   display_format?: string
@@ -250,6 +251,7 @@ function extractAdsFromText(text: string): ExtractedAd[] {
       end_date_string: obj.end_date_string,
       start_date_epoch: typeof obj.start_date === 'number' ? obj.start_date : undefined,
       end_date_epoch: typeof obj.end_date === 'number' ? obj.end_date : undefined,
+      collation_count: typeof obj.collation_count === 'number' ? obj.collation_count : undefined,  // Meta's "N ads use this creative" — active-duplicate count = scaling signal
       targeted_countries: Array.isArray(obj.targeted_or_reached_countries) ? obj.targeted_or_reached_countries : undefined,
       publisher_platform: Array.isArray(snap.publisher_platform) ? snap.publisher_platform
                         : (Array.isArray(obj.publisher_platform) ? obj.publisher_platform : undefined),
@@ -481,6 +483,7 @@ async function saveAdsToIndex(
     // Meta usually omits the *_string dates but always sends epoch start_date.
     start_date: ad.start_date_string || epochToIso(ad.start_date_epoch),
     stop_date: ad.end_date_string || epochToIso(ad.end_date_epoch),
+    collation_count: ad.collation_count ?? null,   // scaling signal (mig 121)
     // Auto-tag from ad text + payload so Industry/Theme/Platform filters work
     // server-side (no manual category typing needed — Mars Men self-tags).
     industries: detectIndustries(`${ad.body_text || ''} ${ad.caption || ''} ${ad.page_name || ''}`),

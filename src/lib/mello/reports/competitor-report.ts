@@ -30,6 +30,12 @@ export interface CompetitorPack {
   topOffers: string[]
   ctaStyles: Record<string, number>       // soft / hard / none → count
   longRunners: { headline: string | null; days: number; offer: string | null; format: string | null }[]
+  /** Whitelisted creator/partner pages fronting the rival's ads ("VickeyCooks with Bug MD") → count. */
+  creators: { name: string; count: number }[]
+  /** Landing-page destinations the ad volume points at (funnel map) → count. */
+  funnels: { page: string; count: number }[]
+  /** The ad they're scaling hardest RIGHT NOW — highest collation_count (Meta's "N ads use this creative"). */
+  topScaling: { headline: string | null; copy: string | null; count: number; offer: string | null; format: string | null } | null
   sampleAds: { headline: string | null; copy: string | null; problem: string | null; mechanism: string | null; offer: string | null; format: string | null; cta: string | null; days: number | null; tier: string | null }[]
   site: { sells?: string; buyer?: string; voice?: string; differentiator?: string } | null
 }
@@ -62,9 +68,9 @@ async function readSite(url?: string): Promise<CompetitorPack['site']> {
 }
 
 const PACK_COLS =
-  'ad_id, page_id, page_name, title, body, format, format_style, visual_style, visual_scene, ' +
+  'ad_id, page_id, page_name, title, body, caption, link_url, format, format_style, visual_style, visual_scene, ' +
   'on_screen_text, problem, mechanism, offer, cta_style, niche, days_running, ' +
-  'creative_reuse_count, brand_active_ads, performance_tier, performance_score, is_active, ' +
+  'creative_reuse_count, collation_count, brand_active_ads, performance_tier, performance_score, is_active, ' +
   'start_date, stop_date, last_seen'
 
 const packClean = (s: any): string | null => {
@@ -88,7 +94,16 @@ const packMapAd = (a: any) => ({
   format_style: packClean(a.format_style), format: a.format, cta_style: packClean(a.cta_style),
   visual: packClean(a.visual_scene) || packClean(a.visual_style), niche: packClean(a.niche),
   days_running: packDays(a), tier: a.performance_tier || null, is_active: a.is_active,
+  page_name: packClean(a.page_name), link_url: packClean(a.link_url), caption: packClean(a.caption),
+  collation_count: typeof a.collation_count === 'number' ? a.collation_count : null,
 })
+
+// The domain/path of a landing URL, or the caption fallback — groups ads by funnel destination.
+const funnelKey = (a: any): string | null => {
+  const raw = a.link_url || (a.caption ? `https://${a.caption}` : '')
+  if (!raw) return null
+  try { const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`); return (u.hostname + u.pathname).replace(/\/$/, '').slice(0, 60) } catch { return String(a.caption || '').slice(0, 60) || null }
+}
 
 /** Resolve a competitor name to its Meta page_id — the ONLY reliable key into the ads index.
  *  Order: the user's own followed_brands (they usually watch the rival they're asking about),
@@ -149,6 +164,29 @@ export async function assembleCompetitorPack(opts: {
     .slice(0, 6)
     .map((a) => ({ headline: a.headline, days: a.days_running || 0, offer: a.offer, format: a.format_style || a.format }))
 
+  // Creator/whitelist roster: page_names on the rival's ads that aren't the rival's own brand name =
+  // influencers/partners fronting their ads (Meta's "<Creator> with <Brand>" whitelisting). High-signal.
+  const canon = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const rivalCanon = canon(opts.competitorName)
+  const creatorCounts = new Map<string, number>()
+  for (const a of ads) {
+    const pn = a.page_name
+    if (!pn) continue
+    const c = canon(pn)
+    if (c === rivalCanon || rivalCanon.includes(c) || c.includes(rivalCanon)) continue  // the brand itself
+    creatorCounts.set(pn, (creatorCounts.get(pn) || 0) + 1)
+  }
+  const creators = Array.from(creatorCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count }))
+
+  // Funnel map: which landing destinations get the ad volume.
+  const funnelCounts = new Map<string, number>()
+  for (const a of ads) { const k = funnelKey(a); if (k) funnelCounts.set(k, (funnelCounts.get(k) || 0) + 1) }
+  const funnels = Array.from(funnelCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([page, count]) => ({ page, count }))
+
+  // Scaling hardest right now: the creative with the most concurrent duplicates (collation_count).
+  const scaler = [...ads].filter((a) => (a.collation_count || 0) > 1).sort((a, b) => (b.collation_count || 0) - (a.collation_count || 0))[0]
+  const topScaling = scaler ? { headline: scaler.headline, copy: scaler.copy ?? null, count: scaler.collation_count, offer: scaler.offer, format: scaler.format_style || scaler.format } : null
+
   const site = await readSite(opts.competitorWebsite)
 
   return {
@@ -164,6 +202,9 @@ export async function assembleCompetitorPack(opts: {
     topOffers: topN(ads, 'offer', 6),
     ctaStyles: tally(ads, 'cta_style'),
     longRunners,
+    creators,
+    funnels,
+    topScaling,
     sampleAds: ads.slice(0, 14).map((a) => ({
       headline: a.headline, copy: a.copy ?? null, problem: a.problem, mechanism: a.mechanism, offer: a.offer,
       format: a.format_style || a.format, cta: a.cta_style, days: a.days_running ?? null, tier: a.tier,
@@ -196,7 +237,7 @@ OFFERS THEY RUN:
 ${list(p.topOffers)}
 LONGEST-RUNNING ADS (proven winners — longevity = they're paying to keep it live):
 ${runners}
-${p.site ? `THEIR SITE SAYS: ${[p.site.sells, p.site.differentiator].filter(Boolean).join(' · ')}\n` : ''}AD-BY-AD SAMPLE (the raw evidence — cite these):
+${p.topScaling ? `SCALING HARDEST RIGHT NOW (most concurrent duplicates of one creative — Meta says ${p.topScaling.count} active copies): ${p.topScaling.headline || 'untitled'}${p.topScaling.offer ? ` · offer: ${p.topScaling.offer}` : ''}${p.topScaling.copy ? `\n   copy: "${p.topScaling.copy}"` : ''}\n` : ''}${p.creators.length ? `CREATOR / WHITELIST ROSTER (partner pages fronting their ads — who they pay to front creative):\n${p.creators.map((c) => `• ${c.name} (${c.count} ad${c.count === 1 ? '' : 's'})`).join('\n')}\n` : ''}${p.funnels.length ? `FUNNEL / LANDING DESTINATIONS (where the ad volume points — their funnel strategy):\n${p.funnels.map((f) => `• ${f.page} (${f.count})`).join('\n')}\n` : ''}${p.site ? `THEIR SITE SAYS: ${[p.site.sells, p.site.differentiator].filter(Boolean).join(' · ')}\n` : ''}AD-BY-AD SAMPLE (the raw evidence — cite these):
 ${samples}`
 }
 
@@ -244,11 +285,17 @@ List the customer JOBS their ads are hired for (in the customer's own voice — 
 ## Their Creative Playbook
 The hooks, mechanisms, and offer structures they lean on — cite the actual ads and longevity. What's their signature move? What's formulaic? → the hook/offer ${me} should test or deliberately avoid.
 
+## What They're Scaling Right Now
+If the evidence has "SCALING HARDEST RIGHT NOW" (a creative with many concurrent duplicates) OR a clearly reused/longest-running creative, name it as their current bet — this is the ad they're spending most behind TODAY. Quote its hook/offer. → the single ad ${me} should study and make their own version of first. Skip only if there is genuinely no scaling/longevity signal.
+
+## Who Fronts Their Ads
+If the evidence has a "CREATOR / WHITELIST ROSTER", this is gold: the partner/influencer pages they pay to front their creative (Meta whitelisting). Name the top creators and what share of volume runs through creators vs the brand's own page. → whether ${me} should recruit creators in the same style, and which archetype. If the roster is empty, say they run ads mostly from their own page and skip.
+
 ## Longevity Tells (what they're betting real money on)
 Read the longest-running ads as revealed preference — those are their proven winners. What pattern do the survivors share? → the pattern ${me} should adapt.
 
 ## Growth & Distribution
-How they appear to acquire — creative volume, format bets, offer cadence, retargeting signals visible in the ad mix. Strongest and weakest channels. → where ${me} can out-flank them.
+How they appear to acquire — creative volume, format bets, offer cadence, and their FUNNEL: use the "FUNNEL / LANDING DESTINATIONS" evidence to say where the ad volume points (product page vs advertorial/listicle vs quiz) and what that reveals about their strategy. Strongest and weakest channels. → where ${me} can out-flank them (including the funnel type to copy or avoid).
 
 ## The Moat (what can't be copied fast)
 Brand, offer economics, creative velocity, data, distribution, community. Be honest — many advertisers have NO moat. → whether ${me} can beat them on this.
