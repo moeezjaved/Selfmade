@@ -136,26 +136,28 @@ export async function assembleCompetitorPack(opts: {
   pageId?: string
 }): Promise<CompetitorPack> {
   const admin = createAdminClient()
+  // collation_count (mig 121) may not be applied yet — one missing optional column must NOT nuke the
+  // whole report. Try the full column set; if PostgREST errors on it, retry without collation_count.
+  const PACK_COLS_CORE = PACK_COLS.replace(', collation_count', '')
+  const selectAds = async (make: (cols: string) => any): Promise<any[]> => {
+    let res = await make(PACK_COLS)
+    if (res.error) res = await make(PACK_COLS_CORE)
+    return (res.data || []).map(packMapAd)
+  }
   let ads: any[] = []
   try {
     const pageId = opts.pageId || await resolvePageId(admin, opts.userId || null, opts.competitorName)
     if (pageId) {
       // By page_id — exact, and no creative-presence filter: the report needs the ad DNA text, not the media.
-      const { data } = await admin.from('discovery_ads_index').select(PACK_COLS)
-        .eq('page_id', pageId)
-        .order('start_date', { ascending: true, nullsFirst: false })
-        .limit(24)
-      ads = (data || []).map(packMapAd)
+      ads = await selectAds((cols) => admin.from('discovery_ads_index').select(cols)
+        .eq('page_id', pageId).order('start_date', { ascending: true, nullsFirst: false }).limit(24))
     }
     if (!ads.length) {
       // Last resort: fuzzy page_name match ("Bug MD" → %Bug%MD% also hits "BugMD").
       const fuzzy = opts.competitorName.trim().replace(/[%,()]/g, ' ').split(/\s+/).filter(Boolean).join('%')
       if (fuzzy) {
-        const { data } = await admin.from('discovery_ads_index').select(PACK_COLS)
-          .ilike('page_name', `%${fuzzy}%`)
-          .order('start_date', { ascending: true, nullsFirst: false })
-          .limit(24)
-        ads = (data || []).map(packMapAd)
+        ads = await selectAds((cols) => admin.from('discovery_ads_index').select(cols)
+          .ilike('page_name', `%${fuzzy}%`).order('start_date', { ascending: true, nullsFirst: false }).limit(24))
       }
     }
   } catch { ads = [] }
