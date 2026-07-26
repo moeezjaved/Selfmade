@@ -347,6 +347,15 @@ export default function InterviewPage() {
       await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandIdRef.current || undefined }) }).catch(() => {})
     }
     setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: 'studying what wins in your market', done: false }])
+    // Auto-author the first Competitor Intelligence Report on the primary competitor — the show-then-sell
+    // wow that greets them on the brief. Fire-and-forget on gpt-4o (~$0.04 vs Opus ~$0.25) so a wave of
+    // signups stays cheap; it runs server-side even after they navigate to /brief. Never blocks the night.
+    if (picks[0]?.name) {
+      void fetch('/api/mello/documents/competitor-report', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ competitor: picks[0].name, brandId: brandIdRef.current || undefined, preferModel: 'gpt-4o' }),
+      }).catch(() => {})
+    }
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) await supabase.from('user_profiles').update({ niche: analysis?.niche || null, onboarding_completed: true }).eq('user_id', user.id)

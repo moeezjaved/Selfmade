@@ -351,6 +351,8 @@ export async function generateCompetitorReport(opts: {
   competitorWebsite?: string
   userId?: string
   pageId?: string
+  /** Force a cheaper model to lead the chain (onboarding uses 'gpt-4o' — ~$0.04 vs Opus ~$0.25). */
+  preferModel?: 'gpt-4o' | 'gemini-2.5-pro' | 'claude-opus'
 }): Promise<GeneratedReport> {
   const pack = await assembleCompetitorPack(opts)
   const { system, user } = buildReportPrompt(pack)
@@ -359,11 +361,15 @@ export async function generateCompetitorReport(opts: {
   let model = ''
   let usage: Usage | undefined
   const misses: string[] = []
-  for (const [name, fn] of [
+  // Default chain optimizes for quality (Opus first). preferModel puts a cheaper model first for
+  // high-volume paths (onboarding), with the rest kept as fallbacks so it still always produces a report.
+  const chain: [string, (s: string, u: string) => Promise<ModelResult>][] = [
     ['claude-opus', callAnthropic],
     ['gemini-2.5-pro', callGeminiPro],
     ['gpt-4o', callOpenAI],
-  ] as const) {
+  ]
+  if (opts.preferModel) chain.sort((a, b) => (a[0] === opts.preferModel ? -1 : b[0] === opts.preferModel ? 1 : 0))
+  for (const [name, fn] of chain) {
     const res = await fn(system, user)
     if (res.text) { markdown = res.text; model = name; usage = res.usage; break }
     misses.push(`${name}: ${res.why || 'failed'}`)
