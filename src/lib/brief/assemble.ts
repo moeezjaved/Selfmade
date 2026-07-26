@@ -199,9 +199,11 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     // empty even when we hold plenty of their ads). Newest-first, capped. DNA fields only, no media.
     soft((async () => {
       if (!pageIds.length) return [] as any[]
+      // No ORDER BY — sorting hundreds of rows across many page_ids on a huge table can blow the 6s
+      // budget. A representative sample (page_id index, capped) is all the DNA aggregation needs.
       const { data } = await admin.from('discovery_ads_index')
         .select('ad_id, page_id, hook_type, format_style, emotion, offer, title, body, caption')
-        .in('page_id', pageIds).order('created_at', { ascending: false }).limit(400)
+        .in('page_id', pageIds).limit(400)
       return data || []
     })(), [] as any[]),
   ])
