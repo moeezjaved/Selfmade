@@ -35,6 +35,12 @@ export interface CompetitorPack {
   creators: { name: string; count: number; ads: { adId: string; headline: string | null; days: number | null; format: string | null; image: string | null; videoUrl: string | null }[] }[]
   /** Landing-page destinations the ad volume points at (funnel map) → count. */
   funnels: { page: string; count: number }[]
+  /** Pricing/promo posture mined from the ad copy (price points, discounts, guarantees, shipping…). */
+  offerSignals: { label: string; count: number; example: string | null }[]
+  /** Launch momentum from real start_dates — are they accelerating or cooling off? */
+  momentum: { monthly: { month: string; count: number }[]; thisWindow: number; prevWindow: number; trend: 'accelerating' | 'steady' | 'cooling' } | null
+  /** Directional operation-scale estimate (FB hides commercial spend — inferred from what's visible). */
+  scale: { tier: string; activeAds: number; avgDays: number | null; maxCollation: number | null; note: string }
   /** The ad they're scaling hardest RIGHT NOW — highest collation_count (Meta's "N ads use this creative"). */
   topScaling: { headline: string | null; copy: string | null; count: number; offer: string | null; format: string | null } | null
   /** Swipe file — the rival's proven winners with the media + ad_id needed for one-click "Make my version". */
@@ -113,7 +119,64 @@ const packMapAd = (a: any) => {
     page_name: packClean(a.page_name), link_url: packClean(a.link_url), caption: packClean(a.caption),
     collation_count: typeof a.collation_count === 'number' ? a.collation_count : null,
     ad_id: a.ad_id ? String(a.ad_id) : null, thumbnail_url: media.image, video_url: media.video,
+    on_screen_text: packClean(a.on_screen_text), start_date: a.start_date || null,
   }
+}
+
+// Mine offer/pricing signals straight from the ad copy we already store (no crawler change needed).
+// Founders want the rival's pricing/promo posture — this surfaces it from headline+copy+caption+OST.
+const OFFER_PATTERNS: { label: string; re: RegExp }[] = [
+  { label: 'Price point', re: /(?:^|[^\w])(\$\s?\d{1,4}(?:\.\d{2})?)(?![\d%])/ },
+  { label: '% discount', re: /(\d{1,3}\s?%\s?(?:off|discount|savings?))/i },
+  { label: '$ off', re: /(\$\s?\d{1,4}\s?(?:off|discount))/i },
+  { label: 'Free shipping', re: /(free\s+ship\w*)/i },
+  { label: 'Money-back guarantee', re: /((?:\d{1,3}[- ]day\s+)?(?:money[- ]back|satisfaction|refund)\s+guarantee|guaranteed?\s+or\s+your\s+money)/i },
+  { label: 'BOGO / bundle', re: /(buy\s+\d\s+get\s+\d|bogo|\bbundle\b|\d\s+for\s+\$?\d)/i },
+  { label: 'Subscribe & save', re: /(subscribe\s+(?:and|&)\s+save|subscription\s+save)/i },
+  { label: 'Free trial / sample', re: /(free\s+(?:trial|sample|gift))/i },
+  { label: 'Limited-time / sale', re: /(limited[- ]time|today\s+only|flash\s+sale|ends\s+(?:tonight|today|soon)|\bsale\s+ends)/i },
+]
+const mineOffers = (ads: any[]): { label: string; count: number; example: string | null }[] => {
+  const hits = new Map<string, { count: number; example: string | null }>()
+  for (const a of ads) {
+    const hay = [a.headline, a.copy, a.caption, a.on_screen_text, a.offer].filter(Boolean).join(' · ')
+    if (!hay) continue
+    for (const { label, re } of OFFER_PATTERNS) {
+      const m = re.exec(hay)
+      if (m) {
+        const cur = hits.get(label) || { count: 0, example: null }
+        cur.count += 1
+        if (!cur.example) cur.example = (m[1] || m[0]).trim().slice(0, 40)
+        hits.set(label, cur)
+      }
+    }
+  }
+  return Array.from(hits.entries()).sort((a, b) => b[1].count - a[1].count).map(([label, v]) => ({ label, count: v.count, example: v.example }))
+}
+
+// Launch momentum from real start_dates: are they accelerating or cooling off? (revealed spend intent)
+const computeMomentum = (ads: any[]): { monthly: { month: string; count: number }[]; thisWindow: number; prevWindow: number; trend: 'accelerating' | 'steady' | 'cooling' } | null => {
+  const dated = ads.map((a) => (a.start_date ? Date.parse(a.start_date) : NaN)).filter((n) => Number.isFinite(n)) as number[]
+  if (dated.length < 3) return null
+  const now = Date.now(), D30 = 2592000000
+  const thisWindow = dated.filter((t) => t >= now - D30).length
+  const prevWindow = dated.filter((t) => t < now - D30 && t >= now - 2 * D30).length
+  const trend = thisWindow > prevWindow * 1.3 ? 'accelerating' : thisWindow < prevWindow * 0.7 ? 'cooling' : 'steady'
+  const byMonth = new Map<string, number>()
+  for (const t of dated) { const d = new Date(t); const k = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; byMonth.set(k, (byMonth.get(k) || 0) + 1) }
+  const monthly = Array.from(byMonth.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1).slice(-6).map(([month, count]) => ({ month, count }))
+  return { monthly, thisWindow, prevWindow, trend }
+}
+
+// Relative operation-scale estimate. FB hides commercial spend, so we infer size from what IS visible:
+// active-ad breadth × creative velocity × longevity × concurrent duplicates. A directional tier, not $.
+const computeScale = (ads: any[], active: number): { tier: string; activeAds: number; avgDays: number | null; maxCollation: number | null; note: string } => {
+  const daysArr = ads.map((a) => a.days_running).filter((d: any) => typeof d === 'number') as number[]
+  const avgDays = daysArr.length ? Math.round(daysArr.reduce((s, d) => s + d, 0) / daysArr.length) : null
+  const maxCollation = ads.reduce((m: number, a: any) => Math.max(m, a.collation_count || 0), 0) || null
+  const score = active * 2 + (avgDays || 0) / 10 + (maxCollation || 0) * 3
+  const tier = active >= 20 || score >= 60 ? 'Large / well-funded advertiser' : active >= 8 || score >= 25 ? 'Mid-size, actively scaling' : 'Small / early — testing'
+  return { tier, activeAds: active, avgDays, maxCollation, note: 'Directional estimate from ad breadth × longevity × concurrent duplicates — Meta does not publish spend for commercial ads.' }
 }
 
 // The domain/path of a landing URL, or the caption fallback — groups ads by funnel destination.
@@ -242,6 +305,9 @@ export async function assembleCompetitorPack(opts: {
     longRunners,
     creators,
     funnels,
+    offerSignals: mineOffers(ads),
+    momentum: computeMomentum(ads),
+    scale: computeScale(ads, active),
     topScaling,
     swipe,
     sampleAds: ads.slice(0, 14).map((a) => ({
@@ -276,7 +342,8 @@ OFFERS THEY RUN:
 ${list(p.topOffers)}
 LONGEST-RUNNING ADS (proven winners — longevity = they're paying to keep it live):
 ${runners}
-${p.topScaling ? `SCALING HARDEST RIGHT NOW (most concurrent duplicates of one creative — Meta says ${p.topScaling.count} active copies): ${p.topScaling.headline || 'untitled'}${p.topScaling.offer ? ` · offer: ${p.topScaling.offer}` : ''}${p.topScaling.copy ? `\n   copy: "${p.topScaling.copy}"` : ''}\n` : ''}${p.creators.length ? `CREATOR / WHITELIST ROSTER (partner pages fronting their ads — who they pay to front creative):\n${p.creators.map((c) => `• ${c.name} (${c.count} ad${c.count === 1 ? '' : 's'})`).join('\n')}\n` : ''}${p.funnels.length ? `FUNNEL / LANDING DESTINATIONS (where the ad volume points — their funnel strategy):\n${p.funnels.map((f) => `• ${f.page} (${f.count})`).join('\n')}\n` : ''}${p.site ? `THEIR SITE SAYS: ${[p.site.sells, p.site.differentiator].filter(Boolean).join(' · ')}\n` : ''}AD-BY-AD SAMPLE (the raw evidence — cite these):
+${p.topScaling ? `SCALING HARDEST RIGHT NOW (most concurrent duplicates of one creative — Meta says ${p.topScaling.count} active copies): ${p.topScaling.headline || 'untitled'}${p.topScaling.offer ? ` · offer: ${p.topScaling.offer}` : ''}${p.topScaling.copy ? `\n   copy: "${p.topScaling.copy}"` : ''}\n` : ''}ESTIMATED OPERATION SCALE: ${p.scale.tier} — ${p.scale.activeAds} active ads${p.scale.avgDays != null ? `, avg ${p.scale.avgDays}d live` : ''}${p.scale.maxCollation ? `, up to ${p.scale.maxCollation} copies of one creative` : ''}. (${p.scale.note})
+${p.momentum ? `LAUNCH MOMENTUM: ${p.momentum.trend} — ${p.momentum.thisWindow} new ad(s) in the last 30 days vs ${p.momentum.prevWindow} the 30 days before. Monthly launches: ${p.momentum.monthly.map((m) => `${m.month}:${m.count}`).join(', ')}.\n` : ''}${p.offerSignals.length ? `PRICING / PROMO POSTURE (mined from their ad copy — their offer strategy):\n${p.offerSignals.map((o) => `• ${o.label} ×${o.count}${o.example ? ` (e.g. "${o.example}")` : ''}`).join('\n')}\n` : ''}${p.creators.length ? `CREATOR / WHITELIST ROSTER (partner pages fronting their ads — who they pay to front creative):\n${p.creators.map((c) => `• ${c.name} (${c.count} ad${c.count === 1 ? '' : 's'})`).join('\n')}\n` : ''}${p.funnels.length ? `FUNNEL / LANDING DESTINATIONS (where the ad volume points — their funnel strategy):\n${p.funnels.map((f) => `• ${f.page} (${f.count})`).join('\n')}\n` : ''}${p.site ? `THEIR SITE SAYS: ${[p.site.sells, p.site.differentiator].filter(Boolean).join(' · ')}\n` : ''}AD-BY-AD SAMPLE (the raw evidence — cite these):
 ${samples}`
 }
 
@@ -315,6 +382,12 @@ A three-minute read. If the founder reads only this, they must know: what this r
 ## The Rival at a Glance
 Positioning, target customer, apparent stage, offer/pricing posture, category. Only what the evidence + site support; mark gaps honestly. → what this tells ${me}.
 
+## Scale & Momentum
+Use "ESTIMATED OPERATION SCALE" and "LAUNCH MOMENTUM" to size this rival and read their direction. State the scale tier plainly and WHY (active-ad breadth, avg longevity, concurrent duplicates) — and be explicit that Meta hides commercial spend so this is a directional read, not a dollar figure. Then the momentum verdict: are they accelerating, steady, or cooling, and what that means (a brand flooding new creative is scaling spend; a brand coasting on old winners is milking, or stalling). → what ${me} should do about the timing (attack while they're distracted, or brace for a push). Skip only if there's genuinely no date/scale signal.
+
+## Their Offer & Pricing Play
+Use "PRICING / PROMO POSTURE" (mined from their ad copy). Name the exact price points, discounts, guarantees, shipping, and urgency devices they lean on, with the counts. What is their default promotional posture — premium and rarely discounted, or discount-driven? If the evidence is thin here, say "insufficient offer signal in the copy we've crawled" — do NOT invent prices. → the specific offer/guarantee ${me} should test or beat.
+
 ## The Real Product (the transformation they sell)
 Don't list features. Map the BEFORE → AFTER transformation their ads promise the customer, per major angle. → the transformation ${me} could own instead.
 
@@ -350,7 +423,14 @@ Their bad ideas — angles, offers, or patterns that look tempting but are traps
 
 ## Final Verdict
 Answer directly: Is this a real threat to ${me} or noise? If you ran ${me}, what would you ship first after reading this? Then finish with EXACTLY this line, filled in:
-**The biggest lesson ${p.competitorName} teaches ${me} is ______.**`
+**The biggest lesson ${p.competitorName} teaches ${me} is ______.**
+
+## The 30-Day Plan
+Close with a concrete, sequenced battle plan for ${me} — the single most valuable part of this document. NOT vague advice; specific moves tied to the evidence above, ordered by week, each phrased as a command a founder can act on Monday morning. Use this exact structure:
+- **This week (days 1–7):** 2–3 moves — the hook/offer/creator to test first, drawn from what's working for the rival. Name the specific ad or angle to remake.
+- **Weeks 2–3:** 2–3 moves — the durable creative/offer/funnel advantage to build (e.g. recruit a creator in X style, launch the funnel type they use, test the guarantee they lack).
+- **Week 4 & the metric:** the one move that compounds, plus the ONE number ${me} should watch to know it's working.
+Every line must be a real action grounded in this rival's data — no filler.`
 
   return { system, user }
 }
@@ -439,7 +519,7 @@ async function callOpenAI(system: string, user: string): Promise<ModelResult> {
 }
 
 export interface ReportStats { adCount: number; activeAds: number | null; longestDays: number | null; creatorPct: number | null; topCreator: string | null; formatTop: string | null }
-export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string; usage?: Usage; costUsd?: number | null; swipe?: CompetitorPack['swipe']; stats?: ReportStats; creators?: CompetitorPack['creators'] }
+export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string; usage?: Usage; costUsd?: number | null; swipe?: CompetitorPack['swipe']; stats?: ReportStats; creators?: CompetitorPack['creators']; scale?: CompetitorPack['scale']; momentum?: CompetitorPack['momentum']; funnels?: CompetitorPack['funnels']; offerSignals?: CompetitorPack['offerSignals'] }
 
 /** Headline numbers for the report's visual stat strip — derived from the same pack the prose uses. */
 function computeStats(p: CompetitorPack): ReportStats {
@@ -501,5 +581,9 @@ export async function generateCompetitorReport(opts: {
     stats: computeStats(pack),
     // Only creators that actually have ads with media are worth rendering as a visual roster.
     creators: pack.creators.filter((c) => c.ads.length > 0).slice(0, 6),
+    scale: pack.scale,
+    momentum: pack.momentum,
+    funnels: pack.funnels,
+    offerSignals: pack.offerSignals,
   }
 }
