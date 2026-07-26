@@ -64,12 +64,22 @@ async function readSite(url?: string): Promise<CompetitorPack['site']> {
 const PACK_COLS =
   'ad_id, page_id, page_name, title, body, format, format_style, visual_style, visual_scene, ' +
   'on_screen_text, problem, mechanism, offer, cta_style, niche, days_running, ' +
-  'creative_reuse_count, brand_active_ads, performance_tier, performance_score, is_active'
+  'creative_reuse_count, brand_active_ads, performance_tier, performance_score, is_active, ' +
+  'start_date, stop_date, last_seen'
 
 const packClean = (s: any): string | null => {
   if (!s) return null
   const t = String(s).trim()
   return t && t.toLowerCase() !== 'n/a' && t.toLowerCase() !== 'unknown' ? t : null
+}
+// Derive real longevity from the (correctly-crawled) start_date — stored days_running is stale/0.
+const packDays = (a: any): number | null => {
+  const startMs = a.start_date ? Date.parse(a.start_date) : NaN
+  if (!Number.isFinite(startMs)) return (typeof a.days_running === 'number' && a.days_running > 0) ? a.days_running : null
+  const stopMs = a.stop_date ? Date.parse(a.stop_date) : NaN
+  const endMs = a.is_active ? Date.now() : (Number.isFinite(stopMs) ? stopMs : (a.last_seen ? Date.parse(a.last_seen) : Date.now()))
+  const d = Math.floor((endMs - startMs) / 86400000)
+  return Number.isFinite(d) ? Math.max(0, Math.min(d, 3650)) : null
 }
 const packMapAd = (a: any) => ({
   headline: packClean(a.title),
@@ -77,7 +87,7 @@ const packMapAd = (a: any) => ({
   problem: packClean(a.problem), mechanism: packClean(a.mechanism), offer: packClean(a.offer),
   format_style: packClean(a.format_style), format: a.format, cta_style: packClean(a.cta_style),
   visual: packClean(a.visual_scene) || packClean(a.visual_style), niche: packClean(a.niche),
-  days_running: a.days_running ?? null, tier: a.performance_tier || null, is_active: a.is_active,
+  days_running: packDays(a), tier: a.performance_tier || null, is_active: a.is_active,
 })
 
 /** Resolve a competitor name to its Meta page_id — the ONLY reliable key into the ads index.
@@ -115,7 +125,7 @@ export async function assembleCompetitorPack(opts: {
       // By page_id — exact, and no creative-presence filter: the report needs the ad DNA text, not the media.
       const { data } = await admin.from('discovery_ads_index').select(PACK_COLS)
         .eq('page_id', pageId)
-        .order('days_running', { ascending: false, nullsFirst: false })
+        .order('start_date', { ascending: true, nullsFirst: false })
         .limit(24)
       ads = (data || []).map(packMapAd)
     }
@@ -125,7 +135,7 @@ export async function assembleCompetitorPack(opts: {
       if (fuzzy) {
         const { data } = await admin.from('discovery_ads_index').select(PACK_COLS)
           .ilike('page_name', `%${fuzzy}%`)
-          .order('days_running', { ascending: false, nullsFirst: false })
+          .order('start_date', { ascending: true, nullsFirst: false })
           .limit(24)
         ads = (data || []).map(packMapAd)
       }

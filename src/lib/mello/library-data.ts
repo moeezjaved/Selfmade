@@ -15,12 +15,26 @@ const HAS_CREATIVE = 'thumbnail_url.like.%r2.dev%,video_url.like.%r2.dev%'
 const SELECT_COLS =
   'ad_id, page_name, page_id, title, body, format, format_style, visual_style, visual_scene, ' +
   'on_screen_text, problem, mechanism, offer, cta_style, niche, days_running, ' +
-  'creative_reuse_count, brand_active_ads, performance_tier, performance_score, is_active, thumbnail_url'
+  'creative_reuse_count, brand_active_ads, performance_tier, performance_score, is_active, thumbnail_url, ' +
+  'start_date, stop_date, last_seen'
 
 function clean(s: any): string | null {
   if (!s) return null
   const t = String(s).trim()
   return t && t.toLowerCase() !== 'n/a' && t.toLowerCase() !== 'unknown' ? t : null
+}
+
+// days_running is DERIVED, not trusted from storage: the crawler captures Facebook's real start_date
+// (and stop_date) correctly, but the stored days_running is left 0 (the nightly rollup only recomputes
+// a narrow recent window). For an active ad longevity grows daily, so a stored value is always stale.
+// Compute it from the real dates: active → now − start; ended → stop − start. Clamp [0, 3650].
+function deriveDays(a: any): number | null {
+  const startMs = a.start_date ? Date.parse(a.start_date) : NaN
+  if (!Number.isFinite(startMs)) return (typeof a.days_running === 'number' && a.days_running > 0) ? a.days_running : null
+  const stopMs = a.stop_date ? Date.parse(a.stop_date) : NaN
+  const endMs = a.is_active ? Date.now() : (Number.isFinite(stopMs) ? stopMs : (a.last_seen ? Date.parse(a.last_seen) : Date.now()))
+  const d = Math.floor((endMs - startMs) / 86400000)
+  return Number.isFinite(d) ? Math.max(0, Math.min(d, 3650)) : null
 }
 
 function mapAd(a: any) {
@@ -37,7 +51,7 @@ function mapAd(a: any) {
     offer: clean(a.offer),
     cta_style: clean(a.cta_style),
     niche: clean(a.niche),
-    days_running: a.days_running ?? null,
+    days_running: deriveDays(a),
     reuse_count: a.creative_reuse_count ?? 0,
     tier: a.performance_tier || null,
     is_active: a.is_active,
