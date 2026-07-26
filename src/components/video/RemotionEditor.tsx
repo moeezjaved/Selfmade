@@ -19,15 +19,40 @@ export default function RemotionEditor({ jobId }: { jobId?: string }) {
   const [editable, setEditable] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [id, setId] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [renderStatus, setRenderStatus] = useState<string | null>(null)
+  const [exports, setExports] = useState<Record<string, string> | null>(null)
 
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => {
-    const id = jobId || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('jobId') : null)
-    fetch(`/api/discovery/clone-video/timeline${id ? `?jobId=${id}` : ''}`, { cache: 'no-store' })
+    const qid = jobId || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('jobId') : null)
+    fetch(`/api/discovery/clone-video/timeline${qid ? `?jobId=${qid}` : ''}`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((j) => { if (j.error) { setErr(j.error) } else { setTimeline(j.timeline); setNote(j.note || null); setEditable(!!j.editable) } })
+      .then((j) => { if (j.error) { setErr(j.error) } else { setTimeline(j.timeline); setNote(j.note || null); setEditable(!!j.editable); setId(j.jobId || null); setRenderStatus(j.render?.status || null); setExports(j.exports || null) } })
       .catch((e) => setErr(String(e)))
   }, [jobId])
+
+  const save = async () => {
+    if (!id || !timeline) return
+    setSaveState('saving')
+    await fetch('/api/discovery/clone-video/timeline', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobId: id, timeline }) }).catch(() => {})
+    setSaveState('saved'); setTimeout(() => setSaveState('idle'), 2000)
+  }
+
+  const exportAll = async () => {
+    if (!id || !timeline) return
+    setRenderStatus('requested')
+    await fetch('/api/discovery/clone-video/render', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobId: id, timeline, aspects: [timeline.aspect] }) }).catch(() => {})
+    // Poll until the render worker finishes (or fails).
+    const poll = async () => {
+      const j = await fetch(`/api/discovery/clone-video/timeline?jobId=${id}`, { cache: 'no-store' }).then((r) => r.json()).catch(() => null)
+      if (!j) return
+      setRenderStatus(j.render?.status || null); setExports(j.exports || null)
+      if (j.render?.status === 'requested' || j.render?.status === 'rendering') setTimeout(poll, 5000)
+    }
+    setTimeout(poll, 5000)
+  }
 
   const dims = timeline ? ASPECT_DIMS[timeline.aspect] : ASPECT_DIMS['9:16']
   const durationInFrames = useMemo(() => (timeline ? totalDurationInFrames(timeline) : 300), [timeline])
@@ -105,7 +130,21 @@ export default function RemotionEditor({ jobId }: { jobId?: string }) {
           <button onClick={() => patch((t) => hasLogo ? { ...t, layers: t.layers.filter((l) => l.type !== 'logo') } : { ...t, layers: [...t.layers, { type: 'logo', src: t.brand?.logo || '', corner: 'tr', scale: 0.12 }] })} disabled={!hasLogo && !timeline.brand?.logo} style={{ fontSize: 12.5, padding: '7px 14px', borderRadius: 999, cursor: 'pointer', border: '1px solid #d7ddd2', background: hasLogo ? '#eaf3de' : '#fff', color: '#20321c', fontWeight: 700 }}>{hasLogo ? 'Logo on' : 'Logo off'}</button>
         </div>
 
-        <div style={{ fontSize: 11.5, color: '#8a9880' }}>Export + save land in Step 4. This is the live-edit foundation.</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid #e6ece2', paddingTop: 12 }}>
+          <button onClick={save} disabled={!editable || saveState === 'saving'} style={{ fontSize: 13, fontWeight: 700, padding: '9px 16px', borderRadius: 999, cursor: 'pointer', border: '1px solid #d7ddd2', background: '#fff', color: '#20321c' }}>
+            {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? '✓ Saved' : 'Save edits'}
+          </button>
+          <button onClick={exportAll} disabled={!editable || renderStatus === 'requested' || renderStatus === 'rendering'} style={{ fontSize: 13, fontWeight: 800, padding: '9px 18px', borderRadius: 999, cursor: 'pointer', border: 'none', background: '#17251c', color: '#fff' }}>
+            {renderStatus === 'requested' || renderStatus === 'rendering' ? 'Rendering…' : `Export ${timeline.aspect} →`}
+          </button>
+          {renderStatus === 'failed' && <span style={{ fontSize: 12, color: '#a33' }}>Render failed — try again.</span>}
+        </div>
+        {exports && Object.keys(exports).length > 0 && (
+          <div style={{ fontSize: 12.5, color: '#20321c' }}>
+            Exports: {Object.entries(exports).map(([a, url]) => (<a key={a} href={url as string} target="_blank" rel="noreferrer" style={{ color: '#3a7d2c', fontWeight: 700, marginRight: 12 }}>{a} ↓</a>))}
+          </div>
+        )}
+        <div style={{ fontSize: 11.5, color: '#8a9880' }}>Edits are free + instant. Export renders once on the droplet.</div>
       </div>
     </div>
   )
