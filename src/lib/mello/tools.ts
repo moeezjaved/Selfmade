@@ -12,6 +12,7 @@ import { addMemory } from './memory'
 import { getTrending, listBoards, createBoard, saveAdToBoard, searchMyAssets, watchBrand, unwatchBrand } from './actions'
 import { generateCompetitorReport } from './reports/competitor-report'
 import { createAdminClient } from '@/lib/supabase/server'
+import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 
 export const TOOLS = [
   {
@@ -325,18 +326,34 @@ async function authorCompetitorReport(userId: string, competitor: string, brandN
     }
   } catch { /* fail-soft */ }
 
+  // Reserve 50 credits up front (competitor_report action, mig 122). If they can't afford it, tell
+  // Mello to offer buying credits — don't burn the model call.
+  let txId: string | null = null
+  try {
+    const tx = await reserveCredits(admin, userId, 'competitor_report')
+    txId = tx.id
+  } catch (e: any) {
+    if (e instanceof InsufficientCreditsError) {
+      return { error: 'insufficient_credits', need: e.need, have: e.have, note: 'The user does not have enough credits (a report costs 50). Tell them and offer to buy credits — do not proceed.' }
+    }
+    return { error: 'Could not reserve credits for the report.' }
+  }
+
   let report
   try {
     report = await generateCompetitorReport({ competitorName: competitor, myBrand, userId })
   } catch (e: any) {
+    await refundCredits(admin, txId).then(() => {}, () => {})
     return { error: e?.message || 'Report generation failed — check model keys/quota.' }
   }
+  if (!report.adCount) await refundCredits(admin, txId).then(() => {}, () => {})  // 0 ads → not worth charging
 
   const { data: saved } = await admin.from('mello_documents').insert({
     user_id: userId, kind: 'competitor_report', title: report.title,
     subject: competitor, subject_brand_id: brandId, body_md: report.markdown, model: report.model,
     meta: { adCount: report.adCount, ...(report.fallbacks ? { fallbacks: report.fallbacks } : {}), ...(report.usage ? { usage: report.usage } : {}), ...(report.costUsd != null ? { costUsd: report.costUsd } : {}), ...(report.swipe?.length ? { swipe: report.swipe } : {}) },
   }).select('id, title').maybeSingle()
+  if (txId && report.adCount) await commitCredits(admin, txId, { model: report.model, costUsd: report.costUsd ?? null, docId: saved?.id }).then(() => {}, () => {})
 
   return {
     saved: true,

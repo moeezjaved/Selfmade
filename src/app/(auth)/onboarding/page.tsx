@@ -353,7 +353,7 @@ export default function InterviewPage() {
     if (picks[0]?.name) {
       void fetch('/api/mello/documents/competitor-report', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ competitor: picks[0].name, brandId: brandIdRef.current || undefined, preferModel: 'gpt-4o' }),
+        body: JSON.stringify({ competitor: picks[0].name, brandId: brandIdRef.current || undefined, preferModel: 'gpt-4o', charge: false }),
       }).catch(() => {})
     }
     try {
