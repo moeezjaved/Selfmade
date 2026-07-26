@@ -112,7 +112,18 @@ export function Markdown({ content }: { content: string }) {
     while (i < lines.length && lines[i].trim() && !/^\s*[-*]\s+/.test(lines[i]) && !/^\s*\d+\.\s+/.test(lines[i]) && !/^#{1,4}\s/.test(lines[i]) && !lines[i].includes('|')) {
       para.push(lines[i]); i++
     }
-    blocks.push(<p key={key++} style={{ margin: '6px 0', color: '#2f3b2b', fontSize: 14, lineHeight: 1.6 }}>{inline(para.join(' '), `p${key}`)}</p>)
+    const text = para.join(' ')
+    // "→ do this" takeaway lines render as a highlighted action callout (the report's most useful lines).
+    if (/^\s*(→|➔|=&gt;|->)\s*/.test(text)) {
+      const body = text.replace(/^\s*(→|➔|=&gt;|->)\s*/, '')
+      blocks.push(
+        <div key={key++} style={{ margin: '12px 0', padding: '11px 14px', background: '#eef7d6', borderLeft: '3px solid #26331f', borderRadius: '0 8px 8px 0', color: '#20321c', fontSize: 13.5, lineHeight: 1.55 }}>
+          <span style={{ fontWeight: 800, marginRight: 6 }}>→</span>{inline(body, `cta${key}`)}
+        </div>
+      )
+    } else {
+      blocks.push(<p key={key++} style={{ margin: '6px 0', color: '#2f3b2b', fontSize: 14, lineHeight: 1.6 }}>{inline(text, `p${key}`)}</p>)
+    }
   }
 
   return <div>{blocks}</div>

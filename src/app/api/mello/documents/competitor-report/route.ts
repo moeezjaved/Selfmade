@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     subject_brand_id: brandId,
     body_md: report.markdown,
     model: report.model,
-    meta: { adCount: report.adCount, ...(report.fallbacks ? { fallbacks: report.fallbacks } : {}), ...(report.usage ? { usage: report.usage } : {}), ...(report.costUsd != null ? { costUsd: report.costUsd } : {}), ...(report.swipe?.length ? { swipe: report.swipe } : {}) },
+    meta: { adCount: report.adCount, ...(report.fallbacks ? { fallbacks: report.fallbacks } : {}), ...(report.usage ? { usage: report.usage } : {}), ...(report.costUsd != null ? { costUsd: report.costUsd } : {}), ...(report.swipe?.length ? { swipe: report.swipe } : {}), ...(report.stats ? { stats: report.stats } : {}) },
   }).select('id, title, model, created_at').maybeSingle()
 
   if (error) { await refund(); return NextResponse.json({ error: error.message }, { status: 500 }) }

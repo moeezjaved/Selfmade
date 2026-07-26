@@ -29,6 +29,14 @@ export default async function DocumentPage({ params }: { params: { id: string } 
   const costUsd = (doc.meta as any)?.costUsd ?? null
   const swipe: { adId: string; headline: string | null; copy: string | null; days: number | null; format: string | null; image: string | null; videoUrl: string | null }[] = (doc.meta as any)?.swipe || []
   const subject = doc.subject || ''
+  const stats = (doc.meta as any)?.stats || null
+  const statCells: { label: string; value: string }[] = stats ? [
+    { label: 'Ads tracked', value: String(stats.adCount ?? '—') },
+    ...(stats.activeAds != null ? [{ label: 'Active now', value: String(stats.activeAds) }] : []),
+    ...(stats.longestDays != null ? [{ label: 'Longest-running', value: `${stats.longestDays}d` }] : []),
+    ...(stats.creatorPct != null ? [{ label: 'Creator-fronted', value: `${stats.creatorPct}%` }] : []),
+    ...(stats.formatTop ? [{ label: 'Top format', value: stats.formatTop }] : []),
+  ] : []
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '32px 24px 96px' }}>
@@ -53,6 +61,22 @@ export default async function DocumentPage({ params }: { params: { id: string } 
         {adCount != null ? <><span style={{ opacity: 0.4 }}>·</span><span>grounded on {adCount} real ad{adCount === 1 ? '' : 's'}</span></> : null}
         {costUsd != null ? <><span style={{ opacity: 0.4 }}>·</span><span title="Model cost to generate this report">cost ${Number(costUsd).toFixed(3)}</span></> : null}
       </div>
+
+      {statCells.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${statCells.length}, 1fr)`, gap: 1, background: '#e6ece2', border: '1px solid #e6ece2', borderRadius: 12, overflow: 'hidden', marginBottom: 8 }}>
+          {statCells.map((s) => (
+            <div key={s.label} style={{ background: '#fbfcf9', padding: '14px 12px', textAlign: 'center' }}>
+              <div style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, color: '#17251c', lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: 10.5, color: '#7a8872', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 5 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {stats?.topCreator && (
+        <div style={{ fontSize: 13, color: '#66755d', margin: '2px 0 20px' }}>
+          Fronted heavily by <strong style={{ color: '#20321c' }}>{stats.topCreator}</strong> and other whitelisted creators.
+        </div>
+      )}
 
       <div style={{ borderTop: '1px solid #e6ece2', paddingTop: 20 }}>
         <Markdown content={doc.body_md || ''} />
