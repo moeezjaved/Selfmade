@@ -260,7 +260,19 @@ Answer directly: Is this a real threat to ${me} or noise? If you ran ${me}, what
 }
 
 // ── The model chain: Opus → Gemini 2.5 Pro → gpt-4o ──────────────────────────
-type ModelResult = { text: string | null; why?: string }
+type Usage = { in: number; out: number }
+type ModelResult = { text: string | null; why?: string; usage?: Usage }
+
+// $ per 1M tokens (input, output). Used to stamp real cost on each report's meta.
+const PRICING: Record<string, { in: number; out: number }> = {
+  'claude-opus': { in: 5, out: 25 },
+  'gemini-2.5-pro': { in: 1.25, out: 10 },
+  'gpt-4o': { in: 2.5, out: 10 },
+}
+const costUsd = (model: string, u?: Usage): number | null => {
+  const p = PRICING[model]; if (!p || !u) return null
+  return +((u.in * p.in + u.out * p.out) / 1_000_000).toFixed(4)
+}
 
 async function callAnthropic(system: string, user: string): Promise<ModelResult> {
   const key = process.env.ANTHROPIC_API_KEY
@@ -282,7 +294,8 @@ async function callAnthropic(system: string, user: string): Promise<ModelResult>
     if (!r.ok) return { text: null, why: `http ${r.status}` }
     const j = await r.json()
     const text = (j.content || []).map((c: any) => (c.type === 'text' ? c.text : '')).join('')
-    return { text: text.trim() || null, why: text.trim() ? undefined : 'empty' }
+    const usage = { in: j.usage?.input_tokens || 0, out: j.usage?.output_tokens || 0 }
+    return { text: text.trim() || null, why: text.trim() ? undefined : 'empty', usage }
   } catch (e: any) { return { text: null, why: String(e?.message || e).slice(0, 60) } }
 }
 
@@ -303,7 +316,9 @@ async function callGeminiPro(system: string, user: string): Promise<ModelResult>
     if (!r.ok) return { text: null, why: `http ${r.status}` }
     const j = await r.json()
     const text = (j?.candidates?.[0]?.content?.parts || []).map((pt: any) => pt.text || '').join('')
-    return { text: text.trim() || null, why: text.trim() ? undefined : 'empty' }
+    const um = j?.usageMetadata || {}
+    const usage = { in: um.promptTokenCount || 0, out: (um.candidatesTokenCount || 0) + (um.thoughtsTokenCount || 0) }
+    return { text: text.trim() || null, why: text.trim() ? undefined : 'empty', usage }
   } catch (e: any) { return { text: null, why: String(e?.message || e).slice(0, 60) } }
 }
 
@@ -322,11 +337,12 @@ async function callOpenAI(system: string, user: string): Promise<ModelResult> {
     if (!r.ok) return { text: null, why: `http ${r.status}` }
     const j = await r.json()
     const text = (j.choices?.[0]?.message?.content || '').trim()
-    return { text: text || null, why: text ? undefined : 'empty' }
+    const usage = { in: j.usage?.prompt_tokens || 0, out: j.usage?.completion_tokens || 0 }
+    return { text: text || null, why: text ? undefined : 'empty', usage }
   } catch (e: any) { return { text: null, why: String(e?.message || e).slice(0, 60) } }
 }
 
-export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string }
+export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string; usage?: Usage; costUsd?: number | null }
 
 /** Generate the report end-to-end. Assembles the evidence pack, runs the model chain, returns markdown. */
 export async function generateCompetitorReport(opts: {
@@ -341,6 +357,7 @@ export async function generateCompetitorReport(opts: {
 
   let markdown: string | null = null
   let model = ''
+  let usage: Usage | undefined
   const misses: string[] = []
   for (const [name, fn] of [
     ['claude-opus', callAnthropic],
@@ -348,7 +365,7 @@ export async function generateCompetitorReport(opts: {
     ['gpt-4o', callOpenAI],
   ] as const) {
     const res = await fn(system, user)
-    if (res.text) { markdown = res.text; model = name; break }
+    if (res.text) { markdown = res.text; model = name; usage = res.usage; break }
     misses.push(`${name}: ${res.why || 'failed'}`)
   }
   if (!markdown) throw new Error(`All report models unavailable — ${misses.join(' · ')}`)
@@ -360,5 +377,7 @@ export async function generateCompetitorReport(opts: {
     model,
     adCount: pack.adCount,
     fallbacks: misses.length ? misses.join(' · ') : undefined,
+    usage,
+    costUsd: costUsd(model, usage),
   }
 }
