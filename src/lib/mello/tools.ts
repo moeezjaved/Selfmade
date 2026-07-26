@@ -335,7 +335,7 @@ async function authorCompetitorReport(userId: string, competitor: string, brandN
   const { data: saved } = await admin.from('mello_documents').insert({
     user_id: userId, kind: 'competitor_report', title: report.title,
     subject: competitor, subject_brand_id: brandId, body_md: report.markdown, model: report.model,
-    meta: { adCount: report.adCount, ...(report.fallbacks ? { fallbacks: report.fallbacks } : {}), ...(report.usage ? { usage: report.usage } : {}), ...(report.costUsd != null ? { costUsd: report.costUsd } : {}) },
+    meta: { adCount: report.adCount, ...(report.fallbacks ? { fallbacks: report.fallbacks } : {}), ...(report.usage ? { usage: report.usage } : {}), ...(report.costUsd != null ? { costUsd: report.costUsd } : {}), ...(report.swipe?.length ? { swipe: report.swipe } : {}) },
   }).select('id, title').maybeSingle()
 
   return {

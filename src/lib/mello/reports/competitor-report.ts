@@ -36,6 +36,8 @@ export interface CompetitorPack {
   funnels: { page: string; count: number }[]
   /** The ad they're scaling hardest RIGHT NOW — highest collation_count (Meta's "N ads use this creative"). */
   topScaling: { headline: string | null; copy: string | null; count: number; offer: string | null; format: string | null } | null
+  /** Swipe file — the rival's proven winners with the media + ad_id needed for one-click "Make my version". */
+  swipe: { adId: string; headline: string | null; copy: string | null; days: number | null; format: string | null; image: string | null; videoUrl: string | null }[]
   sampleAds: { headline: string | null; copy: string | null; problem: string | null; mechanism: string | null; offer: string | null; format: string | null; cta: string | null; days: number | null; tier: string | null }[]
   site: { sells?: string; buyer?: string; voice?: string; differentiator?: string } | null
 }
@@ -71,7 +73,7 @@ const PACK_COLS =
   'ad_id, page_id, page_name, title, body, caption, link_url, format, format_style, visual_style, visual_scene, ' +
   'on_screen_text, problem, mechanism, offer, cta_style, niche, days_running, ' +
   'creative_reuse_count, collation_count, brand_active_ads, performance_tier, performance_score, is_active, ' +
-  'start_date, stop_date, last_seen'
+  'start_date, stop_date, last_seen, thumbnail_url, video_url'
 
 const packClean = (s: any): string | null => {
   if (!s) return null
@@ -96,6 +98,7 @@ const packMapAd = (a: any) => ({
   days_running: packDays(a), tier: a.performance_tier || null, is_active: a.is_active,
   page_name: packClean(a.page_name), link_url: packClean(a.link_url), caption: packClean(a.caption),
   collation_count: typeof a.collation_count === 'number' ? a.collation_count : null,
+  ad_id: a.ad_id ? String(a.ad_id) : null, thumbnail_url: a.thumbnail_url || null, video_url: a.video_url || null,
 })
 
 // The domain/path of a landing URL, or the caption fallback — groups ads by funnel destination.
@@ -187,6 +190,14 @@ export async function assembleCompetitorPack(opts: {
   const scaler = [...ads].filter((a) => (a.collation_count || 0) > 1).sort((a, b) => (b.collation_count || 0) - (a.collation_count || 0))[0]
   const topScaling = scaler ? { headline: scaler.headline, copy: scaler.copy ?? null, count: scaler.collation_count, offer: scaler.offer, format: scaler.format_style || scaler.format } : null
 
+  // Swipe file — their proven winners a founder can remake in one click. Rank by scaling + longevity;
+  // only ads that carry an ad_id + some media/headline are useful (the "Make my version" button needs it).
+  const swipe = [...ads]
+    .filter((a) => a.ad_id && (a.thumbnail_url || a.video_url) && (a.headline || a.copy))
+    .sort((a, b) => ((b.collation_count || 0) - (a.collation_count || 0)) || ((b.days_running || 0) - (a.days_running || 0)))
+    .slice(0, 6)
+    .map((a) => ({ adId: a.ad_id as string, headline: a.headline, copy: a.copy ?? null, days: a.days_running ?? null, format: a.format_style || a.format, image: a.thumbnail_url, videoUrl: a.video_url }))
+
   const site = await readSite(opts.competitorWebsite)
 
   return {
@@ -205,6 +216,7 @@ export async function assembleCompetitorPack(opts: {
     creators,
     funnels,
     topScaling,
+    swipe,
     sampleAds: ads.slice(0, 14).map((a) => ({
       headline: a.headline, copy: a.copy ?? null, problem: a.problem, mechanism: a.mechanism, offer: a.offer,
       format: a.format_style || a.format, cta: a.cta_style, days: a.days_running ?? null, tier: a.tier,
@@ -399,7 +411,7 @@ async function callOpenAI(system: string, user: string): Promise<ModelResult> {
   } catch (e: any) { return { text: null, why: String(e?.message || e).slice(0, 60) } }
 }
 
-export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string; usage?: Usage; costUsd?: number | null }
+export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string; usage?: Usage; costUsd?: number | null; swipe?: CompetitorPack['swipe'] }
 
 /** Generate the report end-to-end. Assembles the evidence pack, runs the model chain, returns markdown. */
 export async function generateCompetitorReport(opts: {
@@ -442,5 +454,6 @@ export async function generateCompetitorReport(opts: {
     fallbacks: misses.length ? misses.join(' · ') : undefined,
     usage,
     costUsd: costUsd(model, usage),
+    swipe: pack.swipe,
   }
 }
