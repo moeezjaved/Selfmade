@@ -214,6 +214,7 @@ async function recordCreativeUrlSeen(url: string, type: 'image' | 'video', r2Url
 // ========== Ad object parser ==========
 // Extract structured ad data from Meta's GraphQL response shape (verified
 // from MVP captures of Gymshark/Hims/Nike).
+let DEBUG_DATES_SEEN = 0  // TEMP: caps the DEBUG_DATES probe output (remove with the probe)
 function extractAdsFromText(text: string): ExtractedAd[] {
   const found: ExtractedAd[] = []
   const adIdRegex = /"ad_archive_id"\s*:\s*"(\d{10,})"/g
@@ -240,6 +241,20 @@ function extractAdsFromText(text: string): ExtractedAd[] {
 
     const snap = obj.snapshot || {}
     const media = extractMediaUrls(snap)
+
+    // TEMP PROBE (log-only, changes no data): when DEBUG_DATES=1, dump every date/time-ish
+    // key Meta sends for the first handful of parsed ad objects — both the collation wrapper
+    // (no snapshot/media) and the full copy. This pinpoints which field holds the REAL launch
+    // date so we can fix days_running with certainty instead of guessing. Remove after diagnosis.
+    if (process.env.DEBUG_DATES === '1' && DEBUG_DATES_SEEN < 6) {
+      DEBUG_DATES_SEEN++
+      const dateKeys: Record<string, any> = {}
+      for (const k of Object.keys(obj)) {
+        if (/date|time|start|end|active|created|elapsed|duration/i.test(k)) dateKeys[k] = obj[k]
+      }
+      const hasMediaHere = (media.allImages?.length ?? 0) > 0 || (media.allVideos?.length ?? 0) > 0
+      console.error(`[DEBUG_DATES] ad=${obj.ad_archive_id} is_active=${obj.is_active} hasMedia=${hasMediaHere} keys=${JSON.stringify(dateKeys)}`)
+    }
 
     found.push({
       ad_archive_id: obj.ad_archive_id,
