@@ -27,6 +27,8 @@ export default async function DocumentPage({ params }: { params: { id: string } 
   const when = doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''
   const adCount = (doc.meta as any)?.adCount ?? null
   const costUsd = (doc.meta as any)?.costUsd ?? null
+  const swipe: { adId: string; headline: string | null; copy: string | null; days: number | null; format: string | null; image: string | null; videoUrl: string | null }[] = (doc.meta as any)?.swipe || []
+  const subject = doc.subject || ''
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '32px 24px 96px' }}>
@@ -55,6 +57,41 @@ export default async function DocumentPage({ params }: { params: { id: string } 
       <div style={{ borderTop: '1px solid #e6ece2', paddingTop: 20 }}>
         <Markdown content={doc.body_md || ''} />
       </div>
+
+      {swipe.length > 0 && (
+        <div style={{ marginTop: 40, borderTop: '3px solid #26331f', paddingTop: 18 }}>
+          <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7a62' }}>Swipe file</div>
+          <h2 style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, lineHeight: 1.15, color: '#1c2617', margin: '4px 0 4px', fontWeight: 400 }}>Steal these — remade for you</h2>
+          <p style={{ fontSize: 13.5, color: '#66755d', margin: '0 0 18px', lineHeight: 1.6 }}>
+            {subject ? `${subject}'s` : 'Their'} proven winners. One click rebuilds any of them around your product, in your brand.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+            {swipe.map((s) => {
+              const isVideo = !!s.videoUrl
+              const href = `/studio?ad=${encodeURIComponent(s.adId)}${isVideo ? '&type=video' : ''}${s.image ? `&img=${encodeURIComponent(s.image)}` : ''}${s.videoUrl ? `&vid=${encodeURIComponent(s.videoUrl)}` : ''}${subject ? `&brand=${encodeURIComponent(subject)}` : ''}`
+              return (
+                <div key={s.adId} style={{ border: '1px solid #e6ece2', borderRadius: 12, overflow: 'hidden', background: '#fff', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ position: 'relative', aspectRatio: '4/5', background: '#f0f3ee' }}>
+                    {s.image && <img src={s.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                    {isVideo && <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,.6)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 100 }}>▶ VIDEO</span>}
+                  </div>
+                  <div style={{ padding: '11px 12px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                    <div style={{ fontSize: 12.5, color: '#2f3b2b', lineHeight: 1.4, flex: 1 }}>
+                      {(s.headline || s.copy || 'Untitled ad').slice(0, 90)}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: '#8a9880', fontFamily: 'ui-monospace, Menlo, monospace' }}>
+                      {[s.days ? `${s.days}d live` : null, s.format].filter(Boolean).join(' · ')}
+                    </div>
+                    <Link href={href} style={{ display: 'block', textAlign: 'center', background: '#c9f24d', color: '#17251c', fontSize: 12.5, fontWeight: 800, padding: '9px 12px', borderRadius: 100, textDecoration: 'none' }}>
+                      ✨ Make my version →
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
