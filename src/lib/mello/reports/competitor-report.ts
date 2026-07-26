@@ -30,8 +30,9 @@ export interface CompetitorPack {
   topOffers: string[]
   ctaStyles: Record<string, number>       // soft / hard / none → count
   longRunners: { headline: string | null; days: number; offer: string | null; format: string | null }[]
-  /** Whitelisted creator/partner pages fronting the rival's ads ("VickeyCooks with Bug MD") → count. */
-  creators: { name: string; count: number }[]
+  /** Whitelisted creator/partner pages fronting the rival's ads ("VickeyCooks with Bug MD") → count +
+   *  that creator's actual ads (media) so the founder can SEE the creative, not just the name. */
+  creators: { name: string; count: number; ads: { adId: string; headline: string | null; days: number | null; format: string | null; image: string | null; videoUrl: string | null }[] }[]
   /** Landing-page destinations the ad volume points at (funnel map) → count. */
   funnels: { page: string; count: number }[]
   /** The ad they're scaling hardest RIGHT NOW — highest collation_count (Meta's "N ads use this creative"). */
@@ -187,15 +188,25 @@ export async function assembleCompetitorPack(opts: {
   // influencers/partners fronting their ads (Meta's "<Creator> with <Brand>" whitelisting). High-signal.
   const canon = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
   const rivalCanon = canon(opts.competitorName)
-  const creatorCounts = new Map<string, number>()
+  const creatorMap = new Map<string, any[]>()
   for (const a of ads) {
     const pn = a.page_name
     if (!pn) continue
     const c = canon(pn)
     if (c === rivalCanon || rivalCanon.includes(c) || c.includes(rivalCanon)) continue  // the brand itself
-    creatorCounts.set(pn, (creatorCounts.get(pn) || 0) + 1)
+    const arr = creatorMap.get(pn) || []; arr.push(a); creatorMap.set(pn, arr)
   }
-  const creators = Array.from(creatorCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count }))
+  const creators = Array.from(creatorMap.entries())
+    .sort((a, b) => b[1].length - a[1].length).slice(0, 8)
+    .map(([name, creAds]) => ({
+      name, count: creAds.length,
+      // up to 3 of THIS creator's real ads (scaling + longevity first) with media for the founder to see.
+      ads: creAds
+        .filter((a) => a.ad_id && (a.thumbnail_url || a.video_url))
+        .sort((x, y) => ((y.collation_count || 0) - (x.collation_count || 0)) || ((y.days_running || 0) - (x.days_running || 0)))
+        .slice(0, 3)
+        .map((a) => ({ adId: a.ad_id as string, headline: a.headline, days: a.days_running ?? null, format: a.format_style || a.format, image: a.thumbnail_url, videoUrl: a.video_url })),
+    }))
 
   // Funnel map: which landing destinations get the ad volume.
   const funnelCounts = new Map<string, number>()
@@ -428,7 +439,7 @@ async function callOpenAI(system: string, user: string): Promise<ModelResult> {
 }
 
 export interface ReportStats { adCount: number; activeAds: number | null; longestDays: number | null; creatorPct: number | null; topCreator: string | null; formatTop: string | null }
-export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string; usage?: Usage; costUsd?: number | null; swipe?: CompetitorPack['swipe']; stats?: ReportStats }
+export interface GeneratedReport { title: string; markdown: string; model: string; adCount: number; fallbacks?: string; usage?: Usage; costUsd?: number | null; swipe?: CompetitorPack['swipe']; stats?: ReportStats; creators?: CompetitorPack['creators'] }
 
 /** Headline numbers for the report's visual stat strip — derived from the same pack the prose uses. */
 function computeStats(p: CompetitorPack): ReportStats {
@@ -488,5 +499,7 @@ export async function generateCompetitorReport(opts: {
     costUsd: costUsd(model, usage),
     swipe: pack.swipe,
     stats: computeStats(pack),
+    // Only creators that actually have ads with media are worth rendering as a visual roster.
+    creators: pack.creators.filter((c) => c.ads.length > 0).slice(0, 6),
   }
 }
