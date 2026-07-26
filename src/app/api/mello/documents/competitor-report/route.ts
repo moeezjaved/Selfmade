@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}))
   const competitor = String(b?.competitor || '').trim()
   const brandId = b?.brandId ? String(b.brandId) : null
+  const preferModel = ['gpt-4o', 'gemini-2.5-pro', 'claude-opus'].includes(b?.preferModel) ? b.preferModel : undefined
   if (!competitor) return NextResponse.json({ error: 'competitor is required' }, { status: 400 })
 
   const admin = createAdminClient()
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   let report
   try {
-    report = await generateCompetitorReport({ competitorName: competitor, myBrand, userId: user.id })
+    report = await generateCompetitorReport({ competitorName: competitor, myBrand, userId: user.id, preferModel })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Report generation failed' }, { status: 502 })
   }
