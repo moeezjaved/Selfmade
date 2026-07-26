@@ -194,13 +194,14 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
       const { data } = await admin.from('discovery_ads_index').select('topics').gte('created_at', H48).order('created_at', { ascending: false }).limit(200)
       return data || []
     })(), [] as any[]),
-    // The cross-competitor Playbook reads patterns over a MONTH (crawl cadence is lumpy — a 7-day
-    // window often has too few rows to synthesize). DNA fields only; no media join needed.
+    // The cross-competitor Playbook synthesizes the MOST RECENT ads for the watched brands — no hard
+    // date filter (crawl cadence is lumpy; created_at reflects first-crawl, so a date window can be
+    // empty even when we hold plenty of their ads). Newest-first, capped. DNA fields only, no media.
     soft((async () => {
       if (!pageIds.length) return [] as any[]
       const { data } = await admin.from('discovery_ads_index')
         .select('ad_id, page_id, hook_type, format_style, emotion, offer, title, body, caption')
-        .in('page_id', pageIds).gte('created_at', D30).order('created_at', { ascending: false }).limit(400)
+        .in('page_id', pageIds).order('created_at', { ascending: false }).limit(400)
       return data || []
     })(), [] as any[]),
   ])
