@@ -340,6 +340,10 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   }
 
   items.sort((a, b) => b.importance - a.importance)
+  // The cross-competitor Playbook is a full-width card, not a ranked Today item — keep it out of the
+  // top-6 competition so it always survives (it would otherwise lose the slice to a low launch alert).
+  const playbookItem = items.find((i) => i.kind === 'market_playbook') || null
+  const rankedItems = items.filter((i) => i.kind !== 'market_playbook')
 
   // When Mello last actually did something — the newest real artifact across the spine, the alerts
   // and the creatives. Powers the "last worked 2h ago" presence line: proof of labor, never faked.
@@ -360,7 +364,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     lastCycleAt,
     firstName: firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1) : null,
     headline,
-    items: items.slice(0, 6),
+    items: [...rankedItems.slice(0, 6), ...(playbookItem ? [playbookItem] : [])],
     learning,
     quiet: items.length === 0 && !headline,
   }
