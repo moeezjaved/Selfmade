@@ -242,18 +242,33 @@ function extractAdsFromText(text: string): ExtractedAd[] {
     const snap = obj.snapshot || {}
     const media = extractMediaUrls(snap)
 
-    // TEMP PROBE (log-only, changes no data): when DEBUG_DATES=1, dump every date/time-ish
-    // key Meta sends for the first handful of parsed ad objects — both the collation wrapper
-    // (no snapshot/media) and the full copy. This pinpoints which field holds the REAL launch
-    // date so we can fix days_running with certainty instead of guessing. Remove after diagnosis.
-    if (process.env.DEBUG_DATES === '1' && DEBUG_DATES_SEEN < 6) {
-      DEBUG_DATES_SEEN++
-      const dateKeys: Record<string, any> = {}
-      for (const k of Object.keys(obj)) {
-        if (/date|time|start|end|active|created|elapsed|duration/i.test(k)) dateKeys[k] = obj[k]
+    // TEMP DIAGNOSTIC (writes to crawl_date_probe, mig 120): capture every date/time-ish key Meta
+    // sends per ad, next to the value our CURRENT parser would store, so we can SELECT the table and
+    // see which field holds the REAL launch date — then ship the days_running fix with certainty
+    // instead of guessing, and DROP this table. Only writes SUSPICIOUS ads (active with a computed
+    // start within the last ~2 days = the broken population), so the table stays tiny. Fire-and-forget,
+    // capped per process. Remove this block + the table after diagnosis.
+    if (DEBUG_DATES_SEEN < 400) {
+      const computedStartIso = obj.start_date_string || epochToIso(typeof obj.start_date === 'number' ? obj.start_date : undefined)
+      const computedMs = computedStartIso ? Date.parse(computedStartIso) : NaN
+      const suspicious = !!obj.is_active && (!Number.isFinite(computedMs) || (Date.now() - computedMs) < 2 * 86400e3)
+      if (suspicious) {
+        DEBUG_DATES_SEEN++
+        const dateKeys: Record<string, any> = {}
+        for (const k of Object.keys(obj)) {
+          if (/date|time|start|end|active|created|elapsed|duration|collation/i.test(k)) dateKeys[k] = obj[k]
+        }
+        const hasMediaHere = (media.allImages?.length ?? 0) > 0 || (media.allVideos?.length ?? 0) > 0
+        void (supabase as any).from('crawl_date_probe').upsert({
+          ad_id: String(obj.ad_archive_id),
+          page_name: snap.page_name || null,
+          is_active: !!obj.is_active,
+          has_media: hasMediaHere,
+          computed_start: computedStartIso || null,
+          raw_dates: dateKeys,
+          seen_at: new Date().toISOString(),
+        }, { onConflict: 'ad_id' }).then(() => {}, () => {})
       }
-      const hasMediaHere = (media.allImages?.length ?? 0) > 0 || (media.allVideos?.length ?? 0) > 0
-      console.error(`[DEBUG_DATES] ad=${obj.ad_archive_id} is_active=${obj.is_active} hasMedia=${hasMediaHere} keys=${JSON.stringify(dateKeys)}`)
     }
 
     found.push({

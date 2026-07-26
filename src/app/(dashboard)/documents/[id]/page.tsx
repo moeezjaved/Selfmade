@@ -26,6 +26,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
 
   const when = doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''
   const adCount = (doc.meta as any)?.adCount ?? null
+  const costUsd = (doc.meta as any)?.costUsd ?? null
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '32px 24px 96px' }}>
@@ -48,6 +49,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
         <span>Written by Mello</span>
         {doc.model ? <><span style={{ opacity: 0.4 }}>·</span><span>{MODEL_LABEL[doc.model] || doc.model}</span></> : null}
         {adCount != null ? <><span style={{ opacity: 0.4 }}>·</span><span>grounded on {adCount} real ad{adCount === 1 ? '' : 's'}</span></> : null}
+        {costUsd != null ? <><span style={{ opacity: 0.4 }}>·</span><span title="Model cost to generate this report">cost ${Number(costUsd).toFixed(3)}</span></> : null}
       </div>
 
       <div style={{ borderTop: '1px solid #e6ece2', paddingTop: 20 }}>
