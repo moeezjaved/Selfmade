@@ -262,6 +262,31 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     })
   }
 
+  // AI-authored documents Mello has written (competitor teardowns, niche reports). Surfaced LIVE —
+  // not queued as a next-day brief_event — so a report the user just triggered (or the one generated
+  // during onboarding) shows the moment they land on the brief. High importance so it reads as the
+  // flagship it is. Brand-scoped when a brand is selected. Fail-soft.
+  {
+    let dq = admin.from('mello_documents')
+      .select('id, kind, title, subject, subject_brand_id, model, created_at')
+      .eq('user_id', userId).gte('created_at', D7)
+      .order('created_at', { ascending: false }).limit(3)
+    if (opts.brandId) dq = dq.eq('subject_brand_id', opts.brandId)
+    const docs = await soft<any[]>(dq.then((r: any) => r.data || []) as any, [])
+    const kindLabel: Record<string, string> = {
+      competitor_report: 'Competitor intelligence', niche_report: 'Niche teardown', strategy_memo: 'Strategy memo',
+    }
+    for (const d of (docs as any[])) {
+      items.push({
+        id: `doc-${d.id}`, kind: 'document', importance: 78, at: d.created_at,
+        title: `${d.subject ? `${d.subject} — ` : ''}${kindLabel[d.kind] || 'Document'}`,
+        body: d.title,
+        why: 'A full strategy document Mello wrote for you — grounded in real ad data.',
+        cta_label: 'Read the full report', cta_href: `/documents/${d.id}`,
+      })
+    }
+  }
+
   items.sort((a, b) => b.importance - a.importance)
 
   // When Mello last actually did something — the newest real artifact across the spine, the alerts
