@@ -276,20 +276,23 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     const kindLabel: Record<string, string> = {
       competitor_report: 'Competitor intelligence', niche_report: 'Niche teardown', strategy_memo: 'Strategy memo',
     }
-    for (const d of (docs as any[])) {
+    ;(docs as any[]).forEach((d: any, di: number) => {
       // Show the competitor's real ad thumbnails inline on the brief card (from the report's swipe file).
       const swipe: any[] = Array.isArray((d.meta as any)?.swipe) ? (d.meta as any).swipe : []
       const media = swipe.filter((s) => s?.image || s?.videoUrl).slice(0, 4)
         .map((s) => ({ image: s.image || null, videoUrl: s.videoUrl || null, adId: s.adId ? String(s.adId) : undefined }))
+      // The NEWEST report leads the Today column (90 — above competitor-launch alerts at ≤85, below a
+      // ready-to-approve creative at 100) so the flagship the user just triggered is impossible to miss.
+      // Older reports sit lower (76) so a stack of them doesn't crowd out fresh competitor intel.
       items.push({
-        id: `doc-${d.id}`, kind: 'document', importance: 78, at: d.created_at,
+        id: `doc-${d.id}`, kind: 'document', importance: di === 0 ? 90 : 76, at: d.created_at,
         title: `${d.subject ? `${d.subject} — ` : ''}${kindLabel[d.kind] || 'Document'}`,
         body: d.title,
         why: 'A full strategy document Mello wrote for you — grounded in real ad data.',
         cta_label: 'Read the full report', cta_href: `/documents/${d.id}`,
         ...(media.length ? { media } : {}),
       })
-    }
+    })
   }
 
   items.sort((a, b) => b.importance - a.importance)
