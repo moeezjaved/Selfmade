@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Remotion ships ESM that Next must transpile, or the @remotion/player chunk silently fails to
+  // evaluate (the editor hangs on "Loading…"). Required per Remotion's Next.js integration docs.
+  transpilePackages: ['remotion', '@remotion/player'],
   images: {
     domains: ['graph.facebook.com', 'scontent.example.com'],
   },
