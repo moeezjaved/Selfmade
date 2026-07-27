@@ -35,9 +35,9 @@ export async function POST(req: NextRequest) {
   // Clamp to [2, the source ad's analysed cut count] — the client can pick FEWER (shorter/cheaper, less
   // work) but never MORE than the source has (that ceiling keeps pricing honest). Stored back into
   // scene_count so the worker renders exactly this many.
-  const srcMaxScenes = Math.max(2, Math.min(10, Number(meta.scene_count) || 2))
+  const srcMaxScenes = Math.max(2, Math.min(16, Number(meta.scene_count) || 2))
   const reqScenes = Number(sceneCount)
-  const nScenes = Number.isFinite(reqScenes) ? Math.max(2, Math.min(srcMaxScenes, Math.round(reqScenes))) : srcMaxScenes
+  let nScenes = Number.isFinite(reqScenes) ? Math.max(2, Math.min(srcMaxScenes, Math.round(reqScenes))) : srcMaxScenes
 
   // UGC length buckets: 15s = 1 clip (classic), 30s = 2 chained segments, 60s = 4. 'match' auto-picks
   // the nearest bucket from the source ad's analysed duration. Segments are priced by the same
@@ -47,6 +47,20 @@ export async function POST(req: NextRequest) {
   // is the ceiling; the user may pick a SHORTER bucket but not a longer one.
   const srcSecs = Number(meta?.beat_sheet?.duration_seconds) || 15
   const srcBucketCap = srcSecs <= 22 ? 15 : srcSecs <= 45 ? 30 : 60
+
+  // ── CINEMATIC LENGTH = the user's picked bucket, and it drives EVERYTHING: scene count (~1 scene per
+  // 3s: 15s → 5, 30s → 10, 60s → 16) and, in the worker, per-scene durations + script pacing. This fixes
+  // the core mismatch where scenes followed the SOURCE length (a 71s ad → 10 scenes) while the script
+  // followed the CHOSEN length (15s) — which chopped the voiceover into 1-2-word fragments and rendered
+  // minutes of footage for seconds of script. Never longer than the source (clone = match the source). ──
+  let targetSecs = 0
+  if (chosenMode === 'faithful') {
+    let b = Number(durationBucket) || 15
+    if (durationBucket === 'match') b = Math.round(srcSecs)
+    targetSecs = Math.max(8, Math.min(b, Math.round(srcSecs) || b, 60))
+    const lenCapScenes = Math.max(2, Math.min(16, Math.floor(targetSecs / 3)))
+    nScenes = Math.min(nScenes, lenCapScenes)
+  }
   let nSeg = 1
   if (chosenMode === 'ugc') {
     let bucket: number = Number(durationBucket) || 15
@@ -115,7 +129,7 @@ export async function POST(req: NextRequest) {
   const finalScript = (typeof script === 'string' && script.trim()) ? script.trim() : (meta.script || '')
   const { error } = await admin.from('creative_generations').update({
     // User-edited on-screen text callouts (falls back to the auto-detected ones). Sanitized + capped.
-    status: 'processing', credit_tx: txId, clone_meta: { ...meta, ...addonMeta, final_script: finalScript, mode: chosenMode, scene_count: nScenes, segments: nSeg, duration: clipDuration,
+    status: 'processing', credit_tx: txId, clone_meta: { ...meta, ...addonMeta, final_script: finalScript, mode: chosenMode, scene_count: nScenes, segments: nSeg, duration: clipDuration, ...(targetSecs ? { duration_target: targetSecs } : {}),
       overlays: Array.isArray(overlays)
         ? overlays.filter((o: any) => o && String(o.text || '').trim()).slice(0, 8).map((o: any) => ({ t: String(o.t || '').slice(0, 12), text: String(o.text).trim().slice(0, 60) }))
         : (meta.overlays || []) },

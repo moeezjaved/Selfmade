@@ -66,7 +66,10 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const resolvedBucket = bucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(bucket)
   const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1
   // Cinematic is priced per scene (video_clone_xN); UGC per 15s clip. Actual charge is server-side.
-  const cost = style === 'cinematic' ? 600 * Math.max(2, srcScenes) : (nSegs > 1 ? 600 * nSegs : 600)
+  // Cinematic: the CHOSEN length drives the scene count (~1 scene per 3s — 15s → 5, 30s → 10, 60s → 16),
+  // capped by what the source actually has. This is what the user pays for and what renders.
+  const cineScenes = Math.max(2, Math.min(sbScenes || srcScenes || 2, Math.floor(resolvedBucket / 3), 16))
+  const cost = style === 'cinematic' ? 600 * cineScenes : (nSegs > 1 ? 600 * nSegs : 600)
 
   // Speaking-time meter — same per-language rates as the old modal. Longer than the target = talks fast.
   const RATE: Record<string, number> = { en: 2.3, ur: 2.0, hi: 2.1, ar: 1.8, es: 2.6, fr: 2.4, de: 2.2 }
@@ -154,7 +157,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       const cinematic = style === 'cinematic'
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId, script, mode: cinematic ? 'faithful' : 'ugc', durationBucket: bucket, sceneCount: cinematic ? Math.max(2, sbScenes || srcScenes) : nSegs, overlays: [], extraLangs: [], endCard: null, hookVariants: false }),
+        body: JSON.stringify({ jobId, script, mode: cinematic ? 'faithful' : 'ugc', durationBucket: bucket, sceneCount: cinematic ? cineScenes : nSegs, overlays: [], extraLangs: [], endCard: null, hookVariants: false }),
       }).then(r => r.json())
       if (ap.error) { setErr(ap.error === 'insufficient_credits' ? 'Not enough credits.' : ap.error); setPhase('review'); return }
       refreshCredits()
@@ -238,7 +241,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
             ? <>
                 <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit any scene, preview it, reorder — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
                 {jobId
-                  ? <Storyboard jobId={jobId} embedded mode={style} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
+                  ? <Storyboard jobId={jobId} embedded mode={style} maxScenes={Math.max(2, Math.min(16, Math.floor(resolvedBucket / 3)))} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
                   : <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />}
               </>
             : <>

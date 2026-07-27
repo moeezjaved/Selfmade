@@ -15,7 +15,7 @@ type Board = {
 
 const ROLE_LABEL: Record<string, string> = { hook: 'Hook', body: 'Body', cta: 'CTA' }
 
-export default function Storyboard({ jobId, embedded, mode, resyncScript, resyncKey, onScript, onSceneCount }: {
+export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScript, resyncKey, onScript, onSceneCount }: {
   jobId?: string
   /** Embedded in the remake modal: hide the title + own Approve button (the modal's Create button drives). */
   embedded?: boolean
@@ -23,6 +23,9 @@ export default function Storyboard({ jobId, embedded, mode, resyncScript, resync
    * from text), so we skip generating them entirely (no wasted Pro credit) and show a script-only plan.
    * Cinematic animates the approved keyframes, so it keeps them. */
   mode?: 'ugc' | 'cinematic'
+  /** Cap the scene cards to the chosen output length (~1 scene per 3s) so what's shown = what renders
+   * and each scene's voiceover is a full sentence, not a fragment. Extra source scenes are dropped. */
+  maxScenes?: number
   /** When the parent re-paces the script (length picker), it bumps resyncKey with the new resyncScript
    * so we re-split the voiceover across the scenes — the storyboard tracks the re-paced script. */
   resyncScript?: string
@@ -42,9 +45,22 @@ export default function Storyboard({ jobId, embedded, mode, resyncScript, resync
     const id = jobId || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('jobId') : null)
     fetch(`/api/discovery/clone-video/storyboard${id ? `?jobId=${id}` : ''}`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((j) => { if (j.error) setErr(j.error); else { setBoard(j); setScenes(j.scenes || []) } })
+      .then((j) => {
+        if (j.error) { setErr(j.error); return }
+        setBoard(j)
+        // Cap the cards to the chosen length (~1 scene/3s) and re-split the FULL script across the kept
+        // scenes — otherwise a 71s source shows 10 cards with 1-2-word fragments under a 15s pick.
+        let sc: Scene[] = j.scenes || []
+        if (maxScenes && sc.length > maxScenes) {
+          const kept = sc.slice(0, maxScenes)
+          const words = String(j.script || '').trim().split(/\s+/).filter(Boolean)
+          const per = Math.max(1, Math.ceil(words.length / kept.length))
+          sc = kept.map((s: Scene, i: number) => ({ ...s, scriptLine: words.slice(i * per, (i + 1) * per).join(' ') }))
+        }
+        setScenes(sc)
+      })
       .catch((e) => setErr(String(e)))
-  }, [jobId])
+  }, [jobId])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Embedded: keep the parent modal's script + scene count in sync with the storyboard edits, so its
   // Create button generates exactly the plan shown here.
@@ -93,9 +109,14 @@ export default function Storyboard({ jobId, embedded, mode, resyncScript, resync
     if (!resyncKey || resyncKey === lastResync.current || !resyncScript || !scenes.length) return
     lastResync.current = resyncKey
     const words = resyncScript.trim().split(/\s+/).filter(Boolean)
-    const per = Math.max(1, Math.ceil(words.length / scenes.length))
-    setScenes((prev) => prev.map((s, i) => ({ ...s, scriptLine: words.slice(i * per, (i + 1) * per).join(' ') })))
-  }, [resyncKey])   // eslint-disable-line react-hooks/exhaustive-deps
+    setScenes((prev) => {
+      // A longer pick allows MORE scenes (up to what the source has), a shorter pick trims — the card
+      // count always tracks the chosen length, and the re-paced script re-splits across what's kept.
+      const capped = maxScenes && prev.length > maxScenes ? prev.slice(0, maxScenes) : prev
+      const per = Math.max(1, Math.ceil(words.length / Math.max(1, capped.length)))
+      return capped.map((s, i) => ({ ...s, scriptLine: words.slice(i * per, (i + 1) * per).join(' ') }))
+    })
+  }, [resyncKey, maxScenes])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const move = (i: number, dir: -1 | 1) => setScenes((prev) => {
     const j = i + dir
@@ -131,7 +152,7 @@ export default function Storyboard({ jobId, embedded, mode, resyncScript, resync
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {board.hookType && <span style={chip}>Hook: {board.hookType}</span>}
         <span style={chip}>{(mode ? mode === 'cinematic' : board.suggestedMode === 'faithful') ? 'Cinematic' : 'UGC'}</span>
-        <span style={chip}>{board.sceneCount} scenes</span>
+        <span style={chip}>{scenes.length || board.sceneCount} scenes</span>
         {board.durationSeconds && <span style={chip}>~{Math.round(board.durationSeconds)}s</span>}
         <span style={{ ...chip, background: board.editable ? '#dffe95' : '#f0efe8', color: board.editable ? '#17251c' : '#68756b' }}>
           {board.editable ? 'Editable — nothing generated yet' : 'Already generated (read-only)'}

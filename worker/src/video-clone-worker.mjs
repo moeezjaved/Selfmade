@@ -1733,7 +1733,11 @@ async function analyzeJob(job) {
     // the real full-length script the user reads/edits/approves — WYSIWYG, no surprise expansion at render
     // (the generate-time fill sees it already fits and leaves it alone). UGC keeps its short script.
     if (cinematic) {
-      const paced = await fillScriptToLength(script, srcSecs, meta.language, meta.product_details?.name)
+      // Pace the DRAFT to the review screen's DEFAULT length pick (15s), capped by the source — NOT to
+      // the full source length (a 71s source paced 71s of words under a 15s default = fragments
+      // everywhere). Picking a longer length re-paces client-side; approve stores the real target.
+      const draftTarget = Math.max(8, Math.min(15, Math.round(srcSecs) || 15))
+      const paced = await fillScriptToLength(script, draftTarget, meta.language, meta.product_details?.name)
       if (paced && paced.trim()) script = paced
     }
     // Auto-detect + adapt the ad's on-screen text callouts (25g PROTEIN, price, CTA…) for the user's
@@ -1803,6 +1807,16 @@ async function generateJob(job) {
       const scenes = (Array.isArray(meta.scene_plan) && meta.scene_plan.length)
         ? meta.scene_plan
         : await buildScenePlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, nScenes, meta.character_look, finalScript, isService)
+      // USER-CHOSEN LENGTH drives the cut: distribute duration_target evenly across the kept scenes, so
+      // the footage matches the approved script's pacing. (Scene durations used to keep the SOURCE's
+      // timings — a 71s source with a 15s script rendered minutes of footage that the dead-air guard
+      // then chopped into a mess.) Only when the plan is fresh — a resumed plan keeps its clip timings.
+      const targetSecs = Number(meta.duration_target) || 0
+      if (targetSecs && !(Array.isArray(meta.scene_plan) && meta.scene_plan.length)) {
+        const per = Math.max(3, Math.min(15, Math.round(targetSecs / Math.max(1, scenes.length))))
+        for (const s of scenes) s.duration = per
+        console.log(`🎯 ${job.id} cinematic length ${targetSecs}s → ${scenes.length} scenes × ${per}s`)
+      }
       const base = join(tmpdir(), `fj-${job.id}`)
       const tmp = []
       let falCost = 0   // estimated fal spend for this job (checkpoint reuses cost nothing)
