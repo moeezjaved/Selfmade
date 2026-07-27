@@ -68,7 +68,19 @@ function StudioInner() {
   const [mode, setMode] = useState<'fresh' | 'remake'>(_adParam ? 'remake' : 'fresh')
   const [source, setSource] = useState<{ adId: string; img: string | null; brand: string | null } | null>(_adParam ? { adId: _adParam, img: params.get('img'), brand: params.get('brand') } : null)
   const isVideo = params.get('type') === 'video'          // the winner is a video → the video-clone flow
-  const vidUrl = params.get('vid')                        // competitor's mp4 (for the source preview)
+  const vidParam = params.get('vid')                      // competitor's mp4 (for the source preview)
+  // Some remake entry points pass only the poster (img=) and no vid= — resolve the source mp4 from the
+  // ad id so the winner still plays (and the clone flow gets the real motion reference).
+  const [resolvedVid, setResolvedVid] = useState<string | null>(null)
+  useEffect(() => {
+    if (!isVideo || vidParam || !_adParam) return
+    fetch(`/api/discovery/ad/${_adParam}`, { cache: 'no-store' }).then((r) => r.json()).then((j) => {
+      const cre = Array.isArray(j?.ad?.creatives) ? j.ad.creatives : []
+      const vid = cre.find((c: any) => c?.asset_type === 'video' && c?.r2_url)?.r2_url || j?.ad?.videoUrl || null
+      if (vid) setResolvedVid(vid)
+    }).catch(() => {})
+  }, [isVideo, vidParam, _adParam])
+  const vidUrl = vidParam || resolvedVid                  // param wins; else the resolved source mp4
 
   // brand + site
   const [brands, setBrands] = useState<Brand[]>([])
