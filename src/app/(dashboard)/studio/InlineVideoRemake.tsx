@@ -104,8 +104,22 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       const st = await pollUntil(start.jobId, 'analyzing', 400_000)
       if (st.timedOut) { setErr('The script is taking longer than usual — try again in a moment.'); setPhase('setup'); return }
       if (st.error) { setErr(st.error); setPhase('setup'); return }
-      setScript(st.script || '')
+      let drafted = st.script || ''
       setSrcSecs(Number(st.sourceSeconds) || null)
+      // The drafted UGC script is often paced to the source's slow rate → one short line. Auto-fill it
+      // to the default length (15s) so the review screen shows a real, full-length script, not a stub.
+      try {
+        const target = 15
+        const wc = drafted.trim() ? drafted.trim().split(/\s+/).length : 0
+        if (wc && wc < target * (RATE[language] || 2.3) * 0.75) {
+          const r = await fetch('/api/discovery/clone-video/rescript', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ script: drafted, targetSecs: target, language }),
+          }).then(x => x.json())
+          if (r?.script) drafted = r.script
+        }
+      } catch { /* keep the drafted script */ }
+      setScript(drafted)
       setPhase('review')
     } catch (e: any) { setErr(String(e?.message || e)); setPhase('setup') }
   }
