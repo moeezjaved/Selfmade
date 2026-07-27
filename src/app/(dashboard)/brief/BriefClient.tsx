@@ -333,9 +333,9 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
     fetch('/api/interview/notebook', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entries: [{ kind: 'decision', content }], source: 'standup' }) }).catch(() => {})
 
   return (
-    // 620 is the reading measure for the narrative brief; the scan is a layout, not prose, so it
-    // takes the page (4 columns need ~330 each or the verbs wrap onto two lines).
-    <div style={{ maxWidth: view === 'scan' ? 1320 : 620, margin: '0 auto', padding: '26px 20px 72px', fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    // 620 is the reading measure for the narrative brief; the scan is the founder's workspace —
+    // it breathes at 1440 with real gutters (the 70/30 grid needs the room).
+    <div style={{ maxWidth: view === 'scan' ? 1440 : 620, margin: '0 auto', padding: view === 'scan' ? '26px clamp(20px, 4vw, 48px) 140px' : '26px 20px 72px', fontFamily: "'Inter', -apple-system, sans-serif" }}>
       {/* header — a quiet presence, not chrome. No toggle, no competing decisions. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         <span style={{ position: 'relative', display: 'inline-flex' }}>
@@ -359,7 +359,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
           brand's world; "All brands" is the pooled default. */}
       {brands.length > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 2px' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: '#9aa79a' }}>Showing</span>
+          <span style={{ fontSize: 12.5, fontWeight: 650, color: '#9aa79a' }}>Showing</span>
           <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
             <select value={activeBrandId || ''} onChange={e => goBrand(e.target.value)}
               style={{ appearance: 'none', WebkitAppearance: 'none', background: activeBrandId ? '#eef6e4' : '#fff', border: `1px solid ${activeBrandId ? '#d3e6b8' : PAPERLINE}`, borderRadius: 100, color: INK, fontWeight: 750, fontSize: 13, fontFamily: 'inherit', padding: '5px 30px 5px 13px', cursor: 'pointer', outline: 'none' }}>
@@ -613,15 +613,17 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
           left by the rail on desktop or the inner form drifts ~36px off-center from the brief above. */}
       <style>{`.brief-composer{padding-left:20px}@media(min-width:769px){.brief-composer{padding-left:92px}}`}</style>
       {brief && (
-        <div className="brief-composer" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: 'linear-gradient(transparent, #f6f8f5 34%)', paddingTop: 26, paddingRight: 20, paddingBottom: 22, pointerEvents: 'none' }}>
-          <form onSubmit={(e) => { e.preventDefault(); say(draft) }} style={{ maxWidth: view === 'scan' ? 1320 : 620, margin: '0 auto', display: 'flex', alignItems: 'flex-end', gap: 9, pointerEvents: 'auto' }}>
+        <div className="brief-composer" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: 'linear-gradient(transparent, #f6f8f5 44%)', paddingTop: 30, paddingRight: 20, paddingBottom: 22, pointerEvents: 'none' }}>
+          {/* The composer floats — Claude-style: one centered pill, soft elevation, always there.
+              Talking to Mello should feel like talking to your co-founder, not filling a form. */}
+          <form onSubmit={(e) => { e.preventDefault(); say(draft) }} style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'flex-end', gap: 9, pointerEvents: 'auto' }}>
             {/* textarea, not input, so Shift+Enter inserts a newline and Enter sends. Auto-grows to ~5 lines. */}
             <textarea value={draft} onChange={e => setDraft(e.target.value)} disabled={busy} rows={1}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); say(draft) } }}
-              placeholder={busy ? 'Mello is thinking…' : focusItem ? `Reply to Mello — “make it warmer”, “why?”…` : 'Say anything to Mello…'}
-              style={{ flex: 1, border: `1.5px solid ${LINE}`, background: '#fff', borderRadius: 22, padding: '13px 20px', fontSize: 14, color: INK, outline: 'none', fontFamily: 'inherit', boxShadow: '0 6px 20px rgba(16,24,15,.06)', resize: 'none', maxHeight: 132, lineHeight: 1.5 }} />
-            <button type="submit" disabled={busy || !draft.trim()} aria-label="Send" style={{ width: 46, height: 46, borderRadius: '50%', border: 'none', background: draft.trim() && !busy ? FOREST : '#c7cec5', color: LIME, display: 'grid', placeItems: 'center', cursor: draft.trim() && !busy ? 'pointer' : 'default', flexShrink: 0 }}>
-              <ArrowUp size={18} />
+              placeholder={busy ? 'Mello is thinking…' : 'Ask Mello anything…'}
+              style={{ flex: 1, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 26, padding: '15px 22px', fontSize: 14.5, color: INK, outline: 'none', fontFamily: 'inherit', boxShadow: '0 2px 6px rgba(16,24,15,.05), 0 18px 50px -16px rgba(16,24,15,.22)', resize: 'none', maxHeight: 132, lineHeight: 1.5 }} />
+            <button type="submit" disabled={busy || !draft.trim()} aria-label="Send" style={{ width: 50, height: 50, borderRadius: '50%', border: 'none', background: draft.trim() && !busy ? FOREST : '#c7cec5', color: LIME, display: 'grid', placeItems: 'center', cursor: draft.trim() && !busy ? 'pointer' : 'default', flexShrink: 0, boxShadow: draft.trim() && !busy ? '0 10px 26px -10px rgba(23,37,28,.5)' : 'none', transition: 'background .15s, box-shadow .15s' }}>
+              <ArrowUp size={19} />
             </button>
           </form>
         </div>
