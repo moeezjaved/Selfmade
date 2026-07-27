@@ -105,7 +105,7 @@ export default function TryMello({ compact = false }: { compact?: boolean }) {
               style={{ display: 'flex', alignItems: 'center', gap: 16, width: '100%', textAlign: 'left', background: 'none', border: 'none',
                 borderTop: i === 0 ? 'none' : `1px solid ${LINE}`, padding: '15px 0', cursor: (busy && m.id === 'upload') ? 'default' : 'pointer', fontFamily: 'inherit' }}>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span className="mm-verb" style={{ display: 'block', fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 21, fontWeight: 400, letterSpacing: '-.01em', color: INK, transition: 'color .15s' }}>
+                <span className="mm-verb" style={{ display: 'block', fontFamily: 'Inter, -apple-system, system-ui, sans-serif', fontSize: 19, fontWeight: 700, letterSpacing: '-.015em', color: INK, transition: 'color .15s' }}>
                   {busy && m.id === 'upload' ? 'Uploading…' : m.verb}
                 </span>
                 <span style={{ display: 'block', fontSize: 12.5, color: MUTED, marginTop: 2 }}>{m.desc}</span>

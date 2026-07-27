@@ -45,7 +45,9 @@ const ago = (iso?: string | null): string | null => {
 // way a newspaper marks a section. One change, all four columns, since every column uses `label`.
 const RULE = '#1c1c1a'
 const label: React.CSSProperties = { fontFamily: "ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: '.15em', textTransform: 'uppercase', color: INK, borderTop: `2px solid ${RULE}`, paddingTop: 9, margin: '0 0 16px' }
-const serif: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 20, fontWeight: 400, color: INK, lineHeight: 1.18, letterSpacing: '-.012em' }
+// "Headline" style — sans (Inter) for readability, kept under the name `serif` so every call site
+// (`...serif`) switches at once. Bold weight gives the editorial heft the serif used to carry.
+const serif: React.CSSProperties = { fontFamily: "Inter, -apple-system, 'Segoe UI', system-ui, sans-serif", fontSize: 18, fontWeight: 700, color: INK, lineHeight: 1.28, letterSpacing: '-.014em' }
 const sub: React.CSSProperties = { fontSize: 13, color: MUTED, lineHeight: 1.5 }
 // Cross-competitor playbook card styles
 const pbHead: React.CSSProperties = { fontSize: 10.5, color: '#7a8872', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }
@@ -366,7 +368,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
         .bs-pb{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:${LINE};border:1px solid ${LINE};border-radius:12px;overflow:hidden}
         .bs-pb-c{background:#fff;padding:13px 15px;min-width:0}
         @media(max-width:859px){.bs-pb{grid-template-columns:1fr 1fr}}
-        .bs-grid{display:grid;grid-template-columns:repeat(4,1fr)}
+        .bs-grid{display:grid;grid-template-columns:repeat(4,1fr);align-items:start}
         .bs-col{border-right:1px solid ${LINE};padding:16px 18px 22px;min-width:0}
         .bs-col:last-child{border-right:none}
         .bs-mello-strip{display:none}

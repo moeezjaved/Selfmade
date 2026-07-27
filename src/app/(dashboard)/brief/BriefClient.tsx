@@ -335,7 +335,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   return (
     // 620 is the reading measure for the narrative brief; the scan is a layout, not prose, so it
     // takes the page (4 columns need ~330 each or the verbs wrap onto two lines).
-    <div style={{ maxWidth: view === 'scan' ? 1320 : 620, margin: '0 auto', padding: '26px 20px 150px', fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    <div style={{ maxWidth: view === 'scan' ? 1320 : 620, margin: '0 auto', padding: '26px 20px 72px', fontFamily: "'Inter', -apple-system, sans-serif" }}>
       {/* header — a quiet presence, not chrome. No toggle, no competing decisions. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         <span style={{ position: 'relative', display: 'inline-flex' }}>
@@ -375,7 +375,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
           serif line, not a banner-ad: proof the night's work was real, then straight into the brief. */}
       {welcome && (
         <div style={{ margin: '16px 0 2px', paddingBottom: 16, borderBottom: `1px solid ${PAPERLINE}` }}>
-          <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22, lineHeight: 1.15, color: INK, letterSpacing: '-.01em' }}>
+          <div style={{ fontFamily: 'Inter, -apple-system, system-ui, sans-serif', fontWeight: 750, fontSize: 20, lineHeight: 1.25, color: INK, letterSpacing: '-.015em' }}>
             I worked through the night{brief?.firstName ? `, ${brief.firstName}` : ''}. Here’s your first briefing.
           </div>
           <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>Everything below is real — your actual competitors, your market. Not a demo.</div>
@@ -584,7 +584,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
           </div>
           <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22, color: INK, lineHeight: 1.15, letterSpacing: '-.01em' }}>Keep Mello on full-time — $49<span style={{ fontSize: 15, color: MUTED }}>/mo</span>.</div>
+              <div style={{ fontFamily: 'Inter, -apple-system, system-ui, sans-serif', fontWeight: 750, fontSize: 20, color: INK, lineHeight: 1.25, letterSpacing: '-.015em' }}>Keep Mello on full-time — $49<span style={{ fontSize: 15, color: MUTED }}>/mo</span>.</div>
               <div style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.55, marginTop: 4 }}>You&rsquo;re on Free &mdash; 75 credits to start (about 5 image ads), 1 competitor. Full-time unlocks video ads, every competitor watched, and fresh creatives every morning &mdash; or top up credits and pay as you go.</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>

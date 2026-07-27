@@ -59,7 +59,7 @@ export default function MelloTasks({ brandId }: { brandId?: string | null }) {
               {done && <span style={{ ...chip, color: '#2f7d1f', background: '#e7f3de' }}>Done</span>}
               {failed && <span style={{ ...chip, color: '#a3382d', background: '#fbe9e6' }}>Failed</span>}
             </div>
-            <div style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 19, color: INK, lineHeight: 1.2 }}>{t.title}</div>
+            <div style={{ fontFamily: 'Inter, -apple-system, system-ui, sans-serif', fontWeight: 700, fontSize: 17, color: INK, lineHeight: 1.3, letterSpacing: '-.01em' }}>{t.title}</div>
             {t.why && <div style={{ fontSize: 13, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>{t.why}</div>}
 
             <div style={{ marginTop: 11 }}>
