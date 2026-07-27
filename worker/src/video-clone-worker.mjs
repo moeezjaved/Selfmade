@@ -43,7 +43,7 @@ const clipCost = (tier, secs, audio = false) => (tier === 'fast' ? SEEDANCE_FAST
 // HARD PER-JOB FAL CEILING (safety net). No single video may spend more than this on fal, no matter
 // what the logic does — re-rolls stop and the free real-photo cover takes over. A 30s UGC is ~$7 and
 // a 60s ~$14, so $18 leaves headroom for normal work while killing any runaway (the $22 spout loop).
-const MAX_FAL_USD = Number(process.env.MAX_FAL_PER_JOB_USD || 18)
+const MAX_FAL_USD = Number(process.env.MAX_FAL_PER_JOB_USD || 5)   // hard per-job fal ceiling (was 18 — too high for a ~$6 video); env-tunable
 const EVERY = 8000
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
