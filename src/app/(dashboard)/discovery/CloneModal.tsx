@@ -377,7 +377,7 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
       errRef.current = null
       const done = await Promise.all(jobIds.map(pollOne))
       const okCount = done.filter(Boolean).length
-      if (okCount === 0) setErr(errRef.current || 'Generation is taking longer than usual — check My Creatives in a minute.')
+      if (okCount === 0) setErr(errRef.current || 'The model’s busy right now, so this is taking a little longer — it’ll land in My Creatives shortly, or show there as failed and refunded. You can keep browsing.')
       else if (okCount < count) setErr(`${okCount} of ${count} variations generated${errRef.current ? ` — ${errRef.current}` : ''}.`)
       refreshCredits()   // reflect any refunds from failed variations
     } catch (e: any) { setErr(String(e?.message || e)) }
@@ -454,7 +454,7 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
 
         {busy && !hasResults ? (
           <div style={{ background: '#f6f7f5' }}>
-            <CloneGeneration helper="Making your ad · ~30–90 seconds · they appear as they’re ready · keep browsing" />
+            <CloneGeneration helper="Making your ad · usually under 2 minutes, longer when the model’s busy · it lands in My Creatives either way · keep browsing" />
           </div>
         ) : hasResults ? (
           // ── Results + chat-style edit loop (light) ──
@@ -738,7 +738,7 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
                   <section>
                     <Kicker>Step 5 of 5</Kicker>
                     <H2>Ready — here’s your order</H2>
-                    <Lead>Check it over, then create. It’s ready in about a minute and lands right here + in My Creatives.</Lead>
+                    <Lead>Check it over, then create. It’s usually ready in a minute or two — longer when the model’s busy — and lands right here + in My Creatives.</Lead>
                     <div style={{ border: `1px solid ${L_LINE}`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
                       <ReviewRow k="Making" v={`Picture ad · ${count} version${count > 1 ? 's' : ''}`} onEdit={() => setStep(3)} />
                       <ReviewRow k="Brand" v={brandName} onEdit={() => setStep(0)} />

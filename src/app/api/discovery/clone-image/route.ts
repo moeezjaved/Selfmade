@@ -287,6 +287,17 @@ async function runGeneration(input: {
     // Pro model congested (never downgraded) → a clear, retryable message; credits refund in fail().
     if (!best) {
       const raw = (gen && !gen.ok && gen.error) || 'generation failed'
+      // Self-heal: Gemini congestion is usually momentary. Before surfacing "busy" to the user, retry
+      // ONCE after a short pause (budget permitting) — this turns most transient blips into a success
+      // the user never sees. Bounded by the same deadline so it can't push us into a Vercel kill.
+      if (raw === 'pro_model_busy' && !outOfTime()) {
+        await new Promise((r) => setTimeout(r, 3000))
+        const retry = await generateImage(prompt, genImages, useTier, { aspectRatio: resolvedAspect, imageSize })
+        if (retry.ok) { best = { mimeType: retry.mimeType, dataB64: retry.dataB64 }; usedModel = retry.model; verdictLog.push('busy-retry-ok') }
+      }
+    }
+    if (!best) {
+      const raw = (gen && !gen.ok && gen.error) || 'generation failed'
       if (raw === 'pro_model_busy') {
         return await fail('The Pro image model is busy right now — please try again in a minute. You weren’t charged.', 'pro_model_busy')
       }
