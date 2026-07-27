@@ -54,8 +54,12 @@ const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxSha
 function Shot({ image, videoUrl, w, h }: { image?: string | null; videoUrl?: string | null; w: number; h: number }) {
   const box: React.CSSProperties = { width: w, height: h, borderRadius: 10, objectFit: 'contain', background: '#0d120e', display: 'block', pointerEvents: 'none' }
   const badge = <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 13, textShadow: '0 2px 8px rgba(0,0,0,.55)', pointerEvents: 'none' }}>▶</span>
-  if (image) return <span style={{ position: 'relative', display: 'inline-block' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={image} alt="" style={box} />{videoUrl ? badge : null}</span>
-  if (videoUrl) return <span style={{ position: 'relative', display: 'inline-block' }}><video src={videoUrl} muted playsInline preload="metadata" style={box} />{badge}</span>
+  // Mello's own video creatives arrive via `thumbs` (an r2 .mp4 URL) — an <img> with a video src
+  // renders the broken-image glyph. Detect and show the first frame instead.
+  const imgIsVideo = !!image && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(image)
+  if (image && !imgIsVideo) return <span style={{ position: 'relative', display: 'inline-block' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={image} alt="" style={box} />{videoUrl ? badge : null}</span>
+  const vsrc = imgIsVideo ? image! : videoUrl
+  if (vsrc) return <span style={{ position: 'relative', display: 'inline-block' }}><video src={vsrc} muted playsInline preload="metadata" style={box} />{badge}</span>
   return null
 }
 
