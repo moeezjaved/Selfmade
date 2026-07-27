@@ -15,7 +15,7 @@ type Board = {
 
 const ROLE_LABEL: Record<string, string> = { hook: 'Hook', body: 'Body', cta: 'CTA' }
 
-export default function Storyboard({ jobId, embedded, mode, onScript, onSceneCount }: {
+export default function Storyboard({ jobId, embedded, mode, resyncScript, resyncKey, onScript, onSceneCount }: {
   jobId?: string
   /** Embedded in the remake modal: hide the title + own Approve button (the modal's Create button drives). */
   embedded?: boolean
@@ -23,6 +23,10 @@ export default function Storyboard({ jobId, embedded, mode, onScript, onSceneCou
    * from text), so we skip generating them entirely (no wasted Pro credit) and show a script-only plan.
    * Cinematic animates the approved keyframes, so it keeps them. */
   mode?: 'ugc' | 'cinematic'
+  /** When the parent re-paces the script (length picker), it bumps resyncKey with the new resyncScript
+   * so we re-split the voiceover across the scenes — the storyboard tracks the re-paced script. */
+  resyncScript?: string
+  resyncKey?: number
   onScript?: (joinedScript: string) => void
   onSceneCount?: (n: number) => void
 }) {
@@ -77,6 +81,17 @@ export default function Storyboard({ jobId, embedded, mode, onScript, onSceneCou
     autoRan.current = true
     ;(async () => { for (const s of scenes) if (!s.preview) await genKeyframe(s) })()
   }, [board, scenes.length])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Parent re-paced the script (length picker) → re-split it evenly across the current scenes so the
+  // storyboard voiceover shows the NEW length's script, matching what will render.
+  const lastResync = useRef(0)
+  useEffect(() => {
+    if (!resyncKey || resyncKey === lastResync.current || !resyncScript || !scenes.length) return
+    lastResync.current = resyncKey
+    const words = resyncScript.trim().split(/\s+/).filter(Boolean)
+    const per = Math.max(1, Math.ceil(words.length / scenes.length))
+    setScenes((prev) => prev.map((s, i) => ({ ...s, scriptLine: words.slice(i * per, (i + 1) * per).join(' ') })))
+  }, [resyncKey])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const move = (i: number, dir: -1 | 1) => setScenes((prev) => {
     const j = i + dir

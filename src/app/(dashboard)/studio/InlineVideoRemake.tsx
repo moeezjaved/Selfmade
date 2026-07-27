@@ -10,9 +10,13 @@
  *   done    → the video, download, make another
  */
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { Loader2, Film, Download, Wand2, Play } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 import Storyboard from '@/components/video/Storyboard'
+// The Remotion editor is browser-only (@remotion/player) — load it client-side and show it INLINE the
+// moment a video finishes, so editing (captions/CTA/logo/aspect) happens in the same window, no click.
+const RemotionEditor = dynamic(() => import('@/components/video/RemotionEditor'), { ssr: false, loading: () => <div style={{ fontSize: 13, color: '#68756b' }}>Loading the editor…</div> })
 
 const FOREST = '#17251c', LIME = '#dffe95', INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', GREEN = '#3f8f4f'
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -69,6 +73,11 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const spokenSecs = words ? Math.round(words / (RATE[language] || 2.3)) : 0
   const overLength = spokenSecs > 0 && spokenSecs > resolvedBucket + 2   // script won't fit the chosen length
 
+  // Bumped whenever the script is re-paced, so the embedded storyboard re-splits its scenes to the
+  // NEW script (otherwise picking 30s would re-pace the render but leave the storyboard showing the old
+  // lines). The value is the new script; the tick forces the storyboard's re-split effect to run.
+  const [rescriptTick, setRescriptTick] = useState(0)
+
   // Pick a length → re-pace the script to fill/trim to that many seconds (free, like the old modal).
   async function pickLength(b: '15' | '30' | '60' | 'match') {
     setBucket(b)
@@ -80,7 +89,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ script, targetSecs: target, language }),
       }).then(x => x.json())
-      if (r.script) setScript(r.script)
+      if (r.script) { setScript(r.script); setRescriptTick(t => t + 1) }   // re-pace render AND storyboard
     } catch { /* keep current script */ } finally { setRescripting(false) }
   }
 
@@ -221,7 +230,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
         <div>
           <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit any scene, preview it, reorder — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
           {jobId
-            ? <Storyboard jobId={jobId} embedded mode={style} onScript={setScript} onSceneCount={setSbScenes} />
+            ? <Storyboard jobId={jobId} embedded mode={style} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
             : <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />}
           <div style={{ margin: '16px 0' }}>
             <div style={label}>
@@ -261,19 +270,19 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       {/* DONE — the video */}
       {phase === 'done' && videoUrl && (
         <div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: INK, marginBottom: 10 }}>Your video is ready.</div>
-          <video src={videoUrl} controls playsInline poster={sourcePoster || undefined} style={{ width: 300, maxWidth: '100%', borderRadius: 14, border: `1px solid ${LINE}`, background: '#0d120e', display: 'block' }} />
-          <div style={{ display: 'flex', gap: 9, marginTop: 12, flexWrap: 'wrap' }}>
-            {/* Edit & export is the PRIMARY next step — captions, CTA, logo, aspect, all free in the editor. */}
-            {jobId && (
-              <a href={`/studio/editor?jobId=${jobId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: LIME, borderRadius: 100, padding: '11px 22px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}><Wand2 size={15} /> Edit &amp; export</a>
-            )}
-            {/* Direct download via our proxy (Content-Disposition: attachment) — no new tab, real "Save as". */}
-            <a href={`/api/creatives/download?url=${encodeURIComponent(videoUrl)}&name=${encodeURIComponent(`${(productName || brandName || 'aura').toString().trim() || 'aura'}-ad.mp4`)}`}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}><Download size={15} /> Download</a>
-            <button onClick={() => { setPhase('setup'); setVideoUrl(null); setScript(''); setJobId(null); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}><Play size={15} /> Another</button>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>Your video is ready — edit it live below.</div>
+            <div style={{ display: 'flex', gap: 9 }}>
+              {/* Direct download via our proxy (Content-Disposition: attachment) — no new tab, real "Save as". */}
+              <a href={`/api/creatives/download?url=${encodeURIComponent(videoUrl)}&name=${encodeURIComponent(`${(productName || brandName || 'aura').toString().trim() || 'aura'}-ad.mp4`)}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}><Download size={14} /> Download</a>
+              <button onClick={() => { setPhase('setup'); setVideoUrl(null); setScript(''); setJobId(null); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}><Play size={14} /> Another</button>
+            </div>
           </div>
-          <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>Edit — change captions, CTA, logo or aspect, free — then export to every platform.</div>
+          {/* The Remotion editor, INLINE — captions, CTA, logo, aspect, all free, right here (no click-through). */}
+          {jobId ? <RemotionEditor jobId={jobId} /> : (
+            <video src={videoUrl} controls playsInline poster={sourcePoster || undefined} style={{ width: 300, maxWidth: '100%', borderRadius: 14, border: `1px solid ${LINE}`, background: '#0d120e', display: 'block' }} />
+          )}
         </div>
       )}
 
