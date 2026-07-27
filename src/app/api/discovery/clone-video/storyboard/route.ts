@@ -35,11 +35,18 @@ export async function GET(req: NextRequest) {
 
   const meta = (row as any).clone_meta || {}
   const beat = meta.beat_sheet || {}
-  const beats: { t?: string; action?: string }[] = Array.isArray(beat.beats) ? beat.beats : []
+  const beats: { t?: string; action?: string; thumb?: string; preview?: string }[] = Array.isArray(beat.beats) ? beat.beats : []
   const script = meta.final_script || meta.script || beat.transcript || ''
-  const lines = splitScript(script, beats.length || 1)
 
-  const srcBeats: { t?: string; action?: string; thumb?: string; preview?: string }[] = beats.length ? beats : [{ action: beat.avatar || 'Opening shot' }]
+  // How many scene cards to SHOW = the analyzed scene_count (what the badge promises), never fewer than
+  // the beats we have. Single-take UGC often analyzes with an EMPTY beats array — without this it would
+  // say "3 scenes" but render one "Opening shot" card. We synthesize the missing cards by splitting the
+  // script across them, so the storyboard always matches the count and every scene is editable.
+  const wantN = Math.max(1, Math.min(10, Number(meta.scene_count) || beats.length || 1))
+  const n = Math.max(beats.length, wantN)
+  const srcBeats: { t?: string; action?: string; thumb?: string; preview?: string }[] =
+    Array.from({ length: n }, (_, i) => beats[i] || { action: i === 0 ? (beat.avatar || 'Opening shot') : '' })
+  const lines = splitScript(script, srcBeats.length)
   const scenes = srcBeats.map((b, i) => ({
     index: i,
     role: i === 0 ? 'hook' : i === srcBeats.length - 1 ? 'cta' : 'body',
@@ -58,7 +65,7 @@ export async function GET(req: NextRequest) {
     tone: beat.tone || null,
     isTalkingHead: beat.is_talking_head ?? null,
     suggestedMode: meta.suggested_mode || (beat.is_talking_head ? 'ugc' : 'faithful'),
-    sceneCount: meta.scene_count || scenes.length,
+    sceneCount: scenes.length,   // always equals the cards shown (badge ↔ cards can't disagree)
     durationSeconds: beat.duration_seconds || null,
     script,
     scenes,
