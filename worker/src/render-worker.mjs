@@ -30,8 +30,8 @@ const r2 = new S3Client({
 })
 
 async function getJSON(path) { const r = await fetch(`${U}/rest/v1/${path}`, { headers: H }); if (!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json() }
-async function patchMeta(id, meta) {
-  const r = await fetch(`${U}/rest/v1/creative_generations?id=eq.${id}`, { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ clone_meta: meta }) })
+async function patchMeta(id, meta, extra) {
+  const r = await fetch(`${U}/rest/v1/creative_generations?id=eq.${id}`, { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ clone_meta: meta, ...(extra || {}) }) })
   if (!r.ok) console.warn('patch', id, r.status, (await r.text()).slice(0, 140))
 }
 
@@ -69,7 +69,12 @@ async function processJob(job) {
       exports[aspect] = `${R2_PUBLIC}/${key}`
       console.log(`✅ ${job.id} ${aspect} → ${exports[aspect]}`)
     }
-    await patchMeta(job.id, { ...meta, exports, render: { ...meta.render, status: 'done', finishedAt: new Date().toISOString() } })
+    // When the worker asked us to be the DEFAULT output (cinematic), swap image_url to the primary
+    // aspect's Remotion cut. Only on success — if we never got here, the ffmpeg fallback stays.
+    const primary = exports[aspects[0]]
+    const extra = meta.render?.replaceImageUrl && primary ? { image_url: primary } : undefined
+    if (extra) console.log(`🔁 ${job.id} image_url → Remotion cut ${primary}`)
+    await patchMeta(job.id, { ...meta, exports, render: { ...meta.render, status: 'done', finishedAt: new Date().toISOString() } }, extra)
   } catch (e) {
     console.warn(`render ${job.id} failed:`, String(e).slice(0, 200))
     await patchMeta(job.id, { ...meta, exports, render: { ...meta.render, status: 'failed', error: String(e).slice(0, 200) } })

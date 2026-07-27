@@ -822,6 +822,44 @@ async function storyboardFrames(sourceVideoUrl, beats, id) {
   } finally { await rm(f, { force: true }).catch(() => {}) }
 }
 
+// Upload a local audio file (the cinematic VO mp3) to R2 so the Remotion timeline can play it as a
+// track (Remotion re-assembles from the SILENT scene clips; without this the Remotion cut is silent).
+async function uploadAudioR2(localPath, key) {
+  const buf = await readFile(localPath)
+  await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: buf, ContentType: 'audio/mpeg', CacheControl: 'public, max-age=86400' }))
+  return `${R2_PUBLIC}/${key}`
+}
+
+// Split a script into evenly-timed caption cues across [start,end] — matches the app's cuesFromScript.
+function cuesFromScriptJS(script, start, end, maxPerCue = 7) {
+  const words = String(script || '').trim().split(/\s+/).filter(Boolean)
+  if (!words.length || end <= start) return []
+  const chunks = []
+  for (let i = 0; i < words.length; i += maxPerCue) chunks.push(words.slice(i, i + maxPerCue).join(' '))
+  const per = (end - start) / chunks.length
+  return chunks.map((text, i) => ({ startSec: +(start + i * per).toFixed(2), endSec: +(start + (i + 1) * per).toFixed(2), text }))
+}
+
+// Build the Remotion Timeline for a cinematic render: silent scene clips (Series) + the VO audio track
+// + captions from the script + brand. selfmade-render assembles this into the final (transitions +
+// brand frame) — the same shape the app's build-timeline produces. Kept minimal + defensive.
+function buildCinematicTimeline(meta, scenes, clipsDone, script, voUrl) {
+  const kit = meta.brand_kit || {}
+  const sc = (scenes || []).map((s, i) => ({
+    id: `s${i}`, role: i === 0 ? 'hook' : 'other', src: clipsDone[i], trimStart: 0,
+    durationSec: Math.max(1, Number(s && s.duration) || 5), talking: !!(s && s.has_people),
+  })).filter((x) => x.src)
+  if (!sc.length) return null
+  const total = sc.reduce((a, x) => a + x.durationSec, 0)
+  return {
+    version: 1, format: 'cinematic', fps: 30, aspect: meta.aspect || '9:16',
+    brand: { logo: kit.logo || null, colors: { cta: (kit.palette && kit.palette.cta) || '#639922', accent: (kit.palette && kit.palette.accent) || '#dffe95', text: '#17251c' } },
+    audio: { voiceover: voUrl || null, music: null },
+    scenes: sc,
+    layers: cuesFromScriptJS(script, 0, total).length ? [{ type: 'captions', style: 'block', color: '#ffffff', cues: cuesFromScriptJS(script, 0, total) }] : [],
+  }
+}
+
 // ── PRODUCT-PERFECT KEYFRAME (people-scenes) ─────────────────────────────────
 // The core fidelity trick: IMAGE models render a small product pixel-perfect (our image clone
 // proves it daily); VIDEO models invent a generic blurry bottle the moment a person holds it in a
@@ -1938,6 +1976,7 @@ async function generateJob(job) {
         }
         // Assemble a full cut from a clip list: concat → VO mux → end-card. Reused by the main cut,
         // the hook variants (different scene 1) and the extra-language outputs (different VO).
+        let mainVoUrl = null   // the MAIN cut's VO, uploaded so the Remotion timeline can play it
         const assemble = async (clipFiles, voText, tag) => {
           const catX = `${base}-${tag}-cat.mp4`
           tmp.push(catX)
@@ -1952,6 +1991,7 @@ async function generateJob(job) {
               const voForTts = capScriptToSeconds(voText, clipDur * 1.25 + 2)
               const vo = await ttsVoiceover(voForTts, `${job.id}-${tag}`, meta.voice, meta.language)
               tmp.push(vo)
+              if (tag === 'main') { try { mainVoUrl = await uploadAudioR2(vo, `creatives/vo/${job.id}.mp3`) } catch (e) { console.warn(`vo upload ${job.id}:`, e.message) } }
               const mixed = `${base}-${tag}-vo.mp4`
               tmp.push(mixed)
               await muxVoiceover(catX, vo, mixed)
@@ -1977,7 +2017,12 @@ async function generateJob(job) {
           if (main.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
           else await rpc('refund_credits', { p_tx: meta.end_card.tx })
         }
-        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: voScript, final_script: voScript, fal_cost_est: +falCost.toFixed(2), ...(meta.hook_variants_tx ? { hook_label: 'Original hook' } : {}) } })
+        // Remotion is the DEFAULT cinematic assembly: emit the timeline (silent scene clips + VO track +
+        // captions + brand) and request a render that REPLACES image_url with the Remotion cut. The
+        // ffmpeg `url` above stays as image_url until selfmade-render succeeds → automatic fallback if it fails.
+        let cineTimeline = null
+        try { cineTimeline = buildCinematicTimeline(meta, scenes, clipsDone, voScript, mainVoUrl) } catch (e) { console.warn(`cine timeline ${job.id}:`, e.message) }
+        await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: voScript, final_script: voScript, fal_cost_est: +falCost.toFixed(2), ...(meta.hook_variants_tx ? { hook_label: 'Original hook' } : {}), ...(cineTimeline ? { timeline: cineTimeline, render: { status: 'requested', aspects: ['9:16'], replaceImageUrl: true } } : {}) } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'faithful', scenes: scenes.length, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (faithful, ${scenes.length} scenes) ${job.id} → ${url}`)
 
