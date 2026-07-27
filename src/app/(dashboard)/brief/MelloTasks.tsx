@@ -72,7 +72,7 @@ export default function MelloTasks({ brandId }: { brandId?: string | null }) {
               ) : (
                 <button onClick={() => run(t, i)} disabled={busy[t.id || t.suggested_key || String(i)]}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {failed ? 'Try again' : 'Start'} {t.credits ? <span style={{ color: '#9db98a', fontWeight: 600 }}>· {t.credits} cr</span> : null} →
+                  {failed ? 'Try again' : 'Start'} {t.credits ? <span style={{ color: '#9db98a', fontWeight: 600 }}>· {t.credits} credits</span> : <span style={{ color: '#9db98a', fontWeight: 600 }}>· free</span>} →
                 </button>
               )}
               {failed && t.error && <div style={{ fontSize: 12, color: '#a3382d', marginTop: 6 }}>{t.error}</div>}

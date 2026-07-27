@@ -92,6 +92,18 @@ export async function suggestTasks(admin: SupabaseClient, userId: string, brandI
   }
   const ranked = Array.from(byPage.values()).sort((a, b) => b.ads - a.ads)
 
+  // Map each watched competitor (page_id) → the BRAND that actually follows it, so a creative for
+  // "country delight" is built for the brand tracking it (Ejad Farm), NOT whatever brand is active
+  // (that mismatch is how a country-delight task produced an Aura ad). mig 117: followed_brands.brand_id.
+  const followMap = new Map<string, string>()
+  if (ranked.length) {
+    const { data: fb } = await admin.from('followed_brands')
+      .select('page_id, brand_id').eq('user_id', userId).in('page_id', ranked.map((c) => c.pageId))
+    for (const r of (fb || []) as any[]) {
+      if (r.page_id && r.brand_id && !followMap.has(String(r.page_id))) followMap.set(String(r.page_id), String(r.brand_id))
+    }
+  }
+
   // ── RESEARCH — the strongest signal first (a burst worth a full report) ──
   for (const c of ranked) {
     if (c.ads < 4) continue                                     // a real push, not routine rotation
@@ -103,23 +115,23 @@ export async function suggestTasks(admin: SupabaseClient, userId: string, brandI
       evidence: { competitor: c.name, pageId: c.pageId, adCount: c.ads },
       credits: 50,
       suggested_key: `research:${c.pageId}:${isoDay()}`,
-      brand_id: brandId || null,
+      brand_id: followMap.get(c.pageId) || brandId || null,      // scope to the brand that tracks them
     })
     if (out.length >= 2) break                                  // leave room for a creative + video move
   }
 
-  // ── CREATIVE + VIDEO — need the reader's product photos to swap the brand in ──
-  const brand = await resolveBrand(admin, userId, brandId)
-  if (brand && brand.productImages.length > 0 && ranked.length) {
-    // Anchor on the busiest competitor — the one whose momentum matters most today.
-    const lead = ranked[0]
+  // ── CREATIVE + VIDEO — for the busiest competitor whose FOLLOWING BRAND has product photos ──
+  for (const lead of ranked) {
+    const leadBrandId = followMap.get(lead.pageId) || brandId || null
+    const brand = await resolveBrand(admin, userId, leadBrandId)
+    if (!brand || brand.productImages.length === 0) continue     // need a brand + photos to swap in
     const { image, video } = await topAdsForPage(admin, lead.pageId)
 
     if (image?.adId) {
       const runs = image.days && image.days >= 14 ? ` — it's been running ${image.days} days, so it's working` : ''
       out.push({
         kind: 'creative',
-        title: `Make your version of ${lead.name}'s top ad`,
+        title: `Make ${brand.name || 'your'} version of ${lead.name}'s top ad`,
         why: `Their best-performing image ad${runs}. I'll rebuild its winning structure around ${brand.name || 'your product'} — your version, ready to launch.`,
         evidence: { competitor: lead.name, sourceAdId: image.adId, media: image.media, brandId: brand.id, productType: brand.brandType, format: 'image' },
         credits: null,   // priced by plan (free for subscribers) — clone-image reserves/commits its own
@@ -131,7 +143,7 @@ export async function suggestTasks(admin: SupabaseClient, userId: string, brandI
       const runs = video.days && video.days >= 14 ? ` (running ${video.days} days)` : ''
       out.push({
         kind: 'video',
-        title: `Recreate ${lead.name}'s top video`,
+        title: `Recreate ${lead.name}'s top video for ${brand.name || 'your brand'}`,
         why: `Their strongest video ad${runs}. I'll analyze it into a storyboard for ${brand.name || 'your product'} — you approve the plan before any video credits are spent.`,
         evidence: { competitor: lead.name, sourceAdId: video.adId, sourceVideoUrl: video.media, brandId: brand.id, productType: brand.brandType, format: 'video' },
         credits: null,   // storyboard is free; video is charged only on approve
@@ -139,6 +151,7 @@ export async function suggestTasks(admin: SupabaseClient, userId: string, brandI
         brand_id: brand.id,
       })
     }
+    break   // one creative/video anchor is enough — the desk shows the plan, not a backlog
   }
 
   return out.slice(0, 4)
