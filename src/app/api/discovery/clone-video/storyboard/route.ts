@@ -39,9 +39,10 @@ export async function GET(req: NextRequest) {
   const script = meta.final_script || meta.script || beat.transcript || ''
   const lines = splitScript(script, beats.length || 1)
 
-  const scenes = (beats.length ? beats : [{ action: beat.avatar || 'Opening shot' }]).map((b, i) => ({
+  const srcBeats: { t?: string; action?: string }[] = beats.length ? beats : [{ action: beat.avatar || 'Opening shot' }]
+  const scenes = srcBeats.map((b, i) => ({
     index: i,
-    role: i === 0 ? 'hook' : i === beats.length - 1 ? 'cta' : 'body',
+    role: i === 0 ? 'hook' : i === srcBeats.length - 1 ? 'cta' : 'body',
     time: b.t || null,
     action: b.action || '',
     scriptLine: lines[i] || '',
