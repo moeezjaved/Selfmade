@@ -1721,21 +1721,8 @@ async function analyzeJob(job) {
     }
     meta.product_details = productDetails
     meta.source_wps = srcRate || null
-    // GENDER LOCK (BOTH modes — UGC and faithful): buildSeedancePrompt / buildScenePlan copy the
-    // on-camera creator from beat.avatar. When the analysis produced no avatar, the writer invents a
-    // random creator and its guess ignores the source's real gender (that's how a man's UGC came back
-    // as a woman). Backfill the avatar from a real source frame here in the SHARED draft path — before
-    // the script is written and before mode branches — so both UGC and faithful lock to the true
-    // presenter. Skipped when an avatar already exists or the user asked to recast. ~2¢, one call.
-    if (!meta.character_look && job.source_video_url) {
-      const av = String((beat && beat.avatar) || '').toLowerCase().trim()
-      if (!av || av === 'none' || av.startsWith('none')) {
-        try {
-          const desc = await describeCreator(job.source_video_url, 1, `${job.id}-avatar`)
-          if (desc && beat) { beat.avatar = desc; console.log(`🧍 ${job.id} backfilled source avatar for gender lock (draft)`) }
-        } catch (e) { console.warn(`avatar backfill ${job.id}:`, e.message) }
-      }
-    }
+    // (Gender/avatar backfill lives in the FAITHFUL generate branch only — UGC preserves the source
+    // creator's gender correctly on its own via frame-chaining, so it's deliberately left untouched.)
     let { prompt, script, gloss } = await buildSeedancePrompt(beat, productDetails, productImages.length, null, meta.character_look, meta.language, isService)
     // Cap the drafted narration to the SOURCE's own talk-time so the clone matches the original length,
     // using the ad's REAL words/sec when we have it (same language) — a fast talker's clone gets more
