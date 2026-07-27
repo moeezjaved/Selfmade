@@ -80,20 +80,20 @@ export default function HireKeynote() {
           <div className="b-term">&gt; read <b>1,001 ads</b> across your 3 competitors&nbsp;&nbsp;·&nbsp;&nbsp;drafted <b>4 creatives</b>&nbsp;&nbsp;·&nbsp;&nbsp;last worked 1h ago</div>
           <div className="b-body">
             <div className="b-card">
-              <span className="b-chip">Research</span>
-              <div className="b-title">Produce the Country Delight intelligence report</div>
-              <div className="b-why">They launched 59 ads in 48h — a real push, not rotation. You want their playbook before it compounds.</div>
-              <span className="b-btn">Start · 50 credits →</span>
+              <span className="b-chip b-chip--done">Done for you</span>
+              <div className="b-title">I finished 4 new creatives — this is the strongest.</div>
+              <div className="b-why">Built from what&rsquo;s winning in your market this week. Nothing goes live until you say so.</div>
+              <span className="b-btn">Review &amp; approve →</span>
             </div>
             <div className="b-card">
-              <span className="b-chip">Video</span>
-              <div className="b-title">Recreate their top video for your brand</div>
-              <div className="b-why">Storyboarded from their winner, scene by scene. You approve every frame before a credit is spent.</div>
-              <span className="b-btn b-btn--ghost">Review the storyboard →</span>
+              <span className="b-chip">Competitor</span>
+              <div className="b-title">Country Delight launched 12 new ads.</div>
+              <div className="b-why">A real push, not rotation — 12 in 48h. Here&rsquo;s their angle before it compounds.</div>
+              <span className="b-btn b-btn--ghost">Open the brand file →</span>
             </div>
           </div>
         </div>
-        <div className="b-caption rv">A real morning brief. Nothing ships without your approval.</div>
+        <div className="b-caption rv">A representative morning brief. Yours is built from your own market — and nothing ships without your approval.</div>
       </section>
 
       {/* HOW — the whole arrangement in three beats. A real sequence, so the numbers are honest. */}
@@ -210,7 +210,8 @@ export default function HireKeynote() {
         .b-term b{color:#dffe95;font-weight:700}
         .b-body{padding:18px;display:flex;flex-direction:column;gap:12px}
         .b-card{border:1px solid #ecebe2;border-radius:12px;padding:16px 18px;background:#fff}
-        .b-chip{display:inline-block;font:700 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#3f6a1e;background:#eef7d6;border-radius:5px;padding:4px 8px}
+        .b-chip{display:inline-block;font:700 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#68756b;background:#eef0ea;border-radius:5px;padding:4px 8px}
+        .b-chip--done{color:#3f6a1e;background:#eef7d6}
         .b-title{font-size:16.5px;font-weight:750;letter-spacing:-.015em;color:#171d18;margin-top:9px;line-height:1.3}
         .b-why{font-size:13px;color:#68756b;line-height:1.55;margin-top:5px}
         .b-btn{display:inline-block;margin-top:12px;background:#17251c;color:#dffe95;border-radius:100px;padding:9px 17px;font-size:12.5px;font-weight:800}
