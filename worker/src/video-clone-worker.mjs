@@ -1045,14 +1045,22 @@ async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, 
   const { request_id, status_url, response_url } = await sub.json()
   const statusUrl = status_url || `https://queue.fal.run/${model}/requests/${request_id}/status`
   const resultUrl = response_url || `https://queue.fal.run/${model}/requests/${request_id}`
-  for (let i = 0; i < 120; i++) {
+  // Poll until COMPLETED. Seedance can queue for a long while under load, so allow 30 min (300×6s).
+  // CRITICAL: if the loop exhausts WITHOUT ever seeing COMPLETED, we must NOT fetch the result — fal
+  // answers a still-running request with a 400 "Request is still in progress", which used to surface
+  // as an opaque "fal result 400" and kill the whole job (losing every earlier scene's fal spend).
+  // Throw a clean, retryable timeout instead: the per-scene checkpoint means a re-run resumes from
+  // this scene, reusing all completed scenes for free.
+  let completed = false
+  for (let i = 0; i < 300; i++) {
     await sleep(6000)
     const sr = await fetch(statusUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
     if (!sr.ok) continue
     const st = await sr.json()
-    if (st.status === 'COMPLETED') break
+    if (st.status === 'COMPLETED') { completed = true; break }
     if (st.status === 'FAILED' || st.status === 'ERROR') throw new Error(`fal job ${st.status}`)
   }
+  if (!completed) throw new Error('fal timed out (still IN_PROGRESS after 30m) — retry to resume')
   const rr = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
   if (!rr.ok) {
     const txt = (await rr.text()).slice(0, 400)
@@ -1080,14 +1088,18 @@ async function falQueueRun(model, input, iters = 200) {
   const { request_id, status_url, response_url } = await sub.json()
   const statusUrl = status_url || `https://queue.fal.run/${model}/requests/${request_id}/status`
   const resultUrl = response_url || `https://queue.fal.run/${model}/requests/${request_id}`
+  // See falGenerate's poll comment: never fetch the result unless we actually saw COMPLETED, or a
+  // still-running job returns a 400 that used to masquerade as a hard failure.
+  let completed = false
   for (let i = 0; i < iters; i++) {
     await sleep(6000)
     const sr = await fetch(statusUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
     if (!sr.ok) continue
     const st = await sr.json()
-    if (st.status === 'COMPLETED') break
+    if (st.status === 'COMPLETED') { completed = true; break }
     if (st.status === 'FAILED' || st.status === 'ERROR') throw new Error(`fal ${model} ${st.status}`)
   }
+  if (!completed) throw new Error(`fal ${model} timed out (still IN_PROGRESS) — retry to resume`)
   const rr = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
   if (!rr.ok) {
     const txt = (await rr.text()).slice(0, 400)
