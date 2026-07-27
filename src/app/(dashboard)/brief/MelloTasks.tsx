@@ -64,7 +64,7 @@ export default function MelloTasks({ brandId }: { brandId?: string | null }) {
 
             <div style={{ marginTop: 11 }}>
               {done && t.result?.url ? (
-                <Link href={t.result.url} style={{ display: 'inline-block', background: LIME, color: FOREST, borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>Open the report →</Link>
+                <Link href={t.result.url} style={{ display: 'inline-block', background: LIME, color: FOREST, borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>{t.result.cta || 'Open it →'}</Link>
               ) : running ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: GREEN, fontWeight: 600 }}>
                   <span className="mt-spin" style={{ width: 14, height: 14, border: `2px solid ${GREEN}`, borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block' }} /> {KIND[t.kind]?.run || 'Working…'}
