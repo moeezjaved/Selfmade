@@ -38,6 +38,8 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
   const [niche, setNiche] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(0)
+  const [howOpen, setHowOpen] = useState(false)   // "how to find the Meta Ad Library link" steps
+  const [link, setLink] = useState('')            // dedicated Meta Ad Library link box (separate from name search)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Seed from the brand's NICHE, ranked by how much each rival actually advertises — far better
@@ -134,6 +136,13 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
   const list = q.trim() ? results : suggested
   const manual: Comp | null = manualId && !pickedIds.has(manualId) && !list.some(r => r.pageId === manualId)
     ? { pageId: manualId, name: `Facebook page ${manualId}` } : null
+  // Dedicated Meta Ad Library link box (separate from the name search).
+  const linkId = extractPageId(link)
+  const addFromLink = () => {
+    if (!linkId) return
+    if (!pickedIds.has(linkId)) toggle({ pageId: linkId, name: `Facebook page ${linkId}` })
+    setLink('')
+  }
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,.45)', zIndex: 80, display: 'grid', placeItems: 'center', padding: 20 }}>
@@ -170,12 +179,31 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
         <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} autoFocus
           placeholder="Search a competitor by name…"
           style={{ border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', fontSize: 14, width: '100%', fontFamily: 'inherit', color: INK, outline: 'none', boxSizing: 'border-box' }} />
-        {/* Two distinct paths: search by name (above) vs paste a link (this). */}
-        {!manual && (
-          <div style={{ fontSize: 12, color: MUTED, marginTop: 7, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>🔗</span> Know them already? Paste their <b style={{ fontWeight: 700, color: INK }}>Meta Ad Library</b> link and I’ll add them.
+        {/* SEPARATE path — add a competitor by their Meta Ad Library link (its own box, not the name search).
+            Most users don't know how to get that link, so the how-to is one click away. */}
+        <div style={{ marginTop: 12, padding: '12px 14px', border: `1px solid ${LINE}`, borderRadius: 12, background: '#f9faf7' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: INK }}>🔗 Or add by Meta Ad Library link</div>
+            <button onClick={() => setHowOpen(o => !o)} style={{ background: 'none', border: 'none', color: GREEN, fontWeight: 800, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>{howOpen ? 'Hide steps' : 'How do I get it?'}</button>
           </div>
-        )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={link} onChange={e => setLink(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addFromLink() }}
+              placeholder="Paste the facebook.com/ads/library/… link"
+              style={{ flex: 1, border: `1.5px solid ${linkId ? GREEN : LINE}`, borderRadius: 10, padding: '9px 12px', fontSize: 13, fontFamily: 'inherit', color: INK, outline: 'none', boxSizing: 'border-box' }} />
+            <button onClick={addFromLink} disabled={!linkId}
+              style={{ background: linkId ? FOREST : '#dfe4de', color: linkId ? LIME : '#9aa79a', border: 'none', borderRadius: 100, padding: '0 18px', fontSize: 13, fontWeight: 800, cursor: linkId ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Add</button>
+          </div>
+          {link.trim() && !linkId && <div style={{ fontSize: 11.5, color: '#a3552b', marginTop: 6 }}>That doesn’t look like a Meta Ad Library link — it should contain <code style={{ background: '#eef2ec', padding: '1px 4px', borderRadius: 4 }}>view_all_page_id=…</code></div>}
+          {howOpen && (
+            <ol style={{ margin: '10px 0 0', padding: '10px 12px 10px 28px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, color: INK, fontSize: 12, lineHeight: 1.7 }}>
+              <li>Open the <a href="https://www.facebook.com/ads/library/" target="_blank" rel="noreferrer" style={{ color: GREEN, fontWeight: 700 }}>Meta Ad Library</a> (opens in a new tab).</li>
+              <li>Set <b>Ad category</b> to “All ads”, pick the country, and search the brand’s name.</li>
+              <li>Click the brand to open <b>their</b> page of ads.</li>
+              <li>Copy the URL from the address bar — it contains <code style={{ background: '#eef2ec', padding: '1px 4px', borderRadius: 4 }}>view_all_page_id=…</code></li>
+              <li>Paste it here and hit <b>Add</b>.</li>
+            </ol>
+          )}
+        </div>
 
         <div style={{ marginTop: 10, minHeight: 90 }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED, padding: '6px 2px' }}>
