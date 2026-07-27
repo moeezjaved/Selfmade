@@ -15,7 +15,13 @@ type Board = {
 
 const ROLE_LABEL: Record<string, string> = { hook: 'Hook', body: 'Body', cta: 'CTA' }
 
-export default function Storyboard({ jobId }: { jobId?: string }) {
+export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: {
+  jobId?: string
+  /** Embedded in the remake modal: hide the title + own Approve button (the modal's Create button drives). */
+  embedded?: boolean
+  onScript?: (joinedScript: string) => void
+  onSceneCount?: (n: number) => void
+}) {
   const [board, setBoard] = useState<Board | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [scenes, setScenes] = useState<Scene[]>([])
@@ -30,6 +36,14 @@ export default function Storyboard({ jobId }: { jobId?: string }) {
       .then((j) => { if (j.error) setErr(j.error); else { setBoard(j); setScenes(j.scenes || []) } })
       .catch((e) => setErr(String(e)))
   }, [jobId])
+
+  // Embedded: keep the parent modal's script + scene count in sync with the storyboard edits, so its
+  // Create button generates exactly the plan shown here.
+  useEffect(() => {
+    if (!embedded || !scenes.length) return
+    onScript?.(scenes.map((s) => s.scriptLine).join(' ').trim())
+    onSceneCount?.(scenes.length)
+  }, [scenes, embedded])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const [busy, setBusy] = useState<Record<number, boolean>>({})
   const [genErr, setGenErr] = useState<Record<number, string>>({})
@@ -128,13 +142,15 @@ export default function Storyboard({ jobId }: { jobId?: string }) {
         ))}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 18, flexWrap: 'wrap' }}>
-        <button onClick={generate} disabled={!board.editable || generating}
-          style={{ fontSize: 14, fontWeight: 800, padding: '11px 22px', borderRadius: 999, cursor: board.editable ? 'pointer' : 'default', border: 'none', background: board.editable ? '#17251c' : '#d7ddd2', color: '#fff' }}>
-          {generating ? 'Starting generation…' : board.editable ? 'Approve & generate →' : 'Already generated'}
-        </button>
-        <span style={{ fontSize: 12, color: '#8a9880' }}>Editing the storyboard is free. Seedance only shoots once you approve.</span>
-      </div>
+      {!embedded && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 18, flexWrap: 'wrap' }}>
+          <button onClick={generate} disabled={!board.editable || generating}
+            style={{ fontSize: 14, fontWeight: 800, padding: '11px 22px', borderRadius: 999, cursor: board.editable ? 'pointer' : 'default', border: 'none', background: board.editable ? '#17251c' : '#d7ddd2', color: '#fff' }}>
+            {generating ? 'Starting generation…' : board.editable ? 'Approve & generate →' : 'Already generated'}
+          </button>
+          <span style={{ fontSize: 12, color: '#8a9880' }}>Editing the storyboard is free. Seedance only shoots once you approve.</span>
+        </div>
+      )}
     </div>
   )
 }

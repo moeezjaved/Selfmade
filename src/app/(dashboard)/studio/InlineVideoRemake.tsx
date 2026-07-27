@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Film, Download, Wand2, Play } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
+import Storyboard from '@/components/video/Storyboard'
 
 const FOREST = '#17251c', LIME = '#dffe95', INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', GREEN = '#3f8f4f'
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -46,6 +47,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   // founder A/B the Remotion-assembled cinematic result while it stays hidden for other users.
   const [cineOn, setCineOn] = useState(false)
   const [srcScenes, setSrcScenes] = useState(3)   // analyzed scene count, used for cinematic cost + approve
+  const [sbScenes, setSbScenes] = useState(0)     // scenes the founder KEPT in the embedded storyboard
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get('cinematic') === '1') setCineOn(true) } catch {} }, [])
   const [script, setScript] = useState('')
   const [srcSecs, setSrcSecs] = useState<number | null>(null)
@@ -139,7 +141,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       const cinematic = style === 'cinematic'
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId, script, mode: cinematic ? 'faithful' : 'ugc', durationBucket: bucket, sceneCount: cinematic ? Math.max(2, srcScenes) : nSegs, overlays: [], extraLangs: [], endCard: null, hookVariants: false }),
+        body: JSON.stringify({ jobId, script, mode: cinematic ? 'faithful' : 'ugc', durationBucket: bucket, sceneCount: cinematic ? Math.max(2, sbScenes || srcScenes) : nSegs, overlays: [], extraLangs: [], endCard: null, hookVariants: false }),
       }).then(r => r.json())
       if (ap.error) { setErr(ap.error === 'insufficient_credits' ? 'Not enough credits.' : ap.error); setPhase('review'); return }
       refreshCredits()
@@ -217,8 +219,10 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       {/* REVIEW — edit script + length, then render */}
       {phase === 'review' && (
         <div>
-          <div style={label}>Your script <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit anything{spokenSecs ? ` · about ${spokenSecs}s of speech` : ''}</span></div>
-          <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />
+          <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit any scene, preview it, reorder — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
+          {jobId
+            ? <Storyboard jobId={jobId} embedded onScript={setScript} onSceneCount={setSbScenes} />
+            : <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />}
           <div style={{ margin: '16px 0' }}>
             <div style={label}>
               Length {srcSecs ? <span style={{ color: '#aab0a6', fontWeight: 600 }}>· their ad runs ~{Math.round(srcSecs)}s</span> : null}
@@ -238,12 +242,6 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
             <Film size={16} /> Create video · {cost} credits
           </button>
           <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>Credits are only spent now — refunded automatically if the render fails.</div>
-          {/* Storyboard-before-generation: shape the plan scene-by-scene before spending. Same free review, richer. */}
-          {jobId && (
-            <a href={`/studio/storyboard?jobId=${jobId}`} style={{ display: 'inline-block', marginTop: 12, fontSize: 12.5, color: GREEN, fontWeight: 800, textDecoration: 'none' }}>
-              ✎ Edit scene-by-scene in the storyboard →
-            </a>
-          )}
         </div>
       )}
 
