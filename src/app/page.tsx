@@ -8,9 +8,9 @@ import type { Metadata } from 'next'
 import HireKeynote from './hire/HireKeynote'
 
 const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
-const TITLE = 'Selfmade — Hire Your First AI Marketer'
-const DESC = 'Meet Mello, your AI marketer. Works 24/7 to study your competitors, learn from 3M+ winning Meta ads across 611K brands, create your ad creatives, and report back every morning. One employee. Never sleeps.'
-const OG_DESC = 'Hire your first AI marketer. Mello studies your competitors, learns from 3M+ winning ads, creates your creatives, and reports back every morning.'
+const TITLE = 'Selfmade — The Marketing Co-founder'
+const DESC = 'Meet Mello, the marketing co-founder. It studies your market all night — every competitor ad, every winning angle across 3M+ ads and 611K brands — and walks in every morning with the work already done. Nothing ships without your yes.'
+const OG_DESC = 'The Marketing Co-founder. Mello studies your market all night and brings you the work every morning — already done. You approve; it ships.'
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
