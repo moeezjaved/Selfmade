@@ -47,6 +47,7 @@ export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: 
 
   const [busy, setBusy] = useState<Record<number, boolean>>({})
   const [genErr, setGenErr] = useState<Record<number, string>>({})
+  const [zoom, setZoom] = useState<string | null>(null)   // enlarged keyframe (click a thumbnail)
   // Generate (or regenerate) a keyframe for one scene — a cheap image preview of what THIS scene will
   // look like with your product/creator, BEFORE paying video prices. The worker animates it on approve.
   const genKeyframe = async (s: Scene) => {
@@ -98,6 +99,11 @@ export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: 
 
   return (
     <div>
+      {zoom && (
+        <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(20,25,20,.82)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out' }}>
+          <img src={zoom} alt="" style={{ maxWidth: '92vw', maxHeight: '92vh', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} />
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {board.hookType && <span style={chip}>Hook: {board.hookType}</span>}
         <span style={chip}>{board.suggestedMode === 'faithful' ? 'Cinematic' : 'UGC'}</span>
@@ -126,7 +132,7 @@ export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: 
             <div>
               <div style={{ width: 96, aspectRatio: '9/16', borderRadius: 8, overflow: 'hidden', background: '#eef2ec', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                 {(s.preview || s.thumb)
-                  ? <img src={s.preview || s.thumb || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ? <img src={s.preview || s.thumb || ''} alt="" onClick={() => s.preview && setZoom(s.preview)} title={s.preview ? 'Click to enlarge' : ''} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: s.preview ? 'zoom-in' : 'default' }} />
                   : <span style={{ fontSize: 20, color: '#b4bdad' }}>▦</span>}
                 {s.preview && <span style={{ position: 'absolute', top: 4, left: 4, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', color: '#17251c', background: '#dffe95', borderRadius: 4, padding: '1px 4px' }}>YOURS</span>}
                 {busy[s.index] && <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#3a7d2c', fontWeight: 700 }}>…</div>}
