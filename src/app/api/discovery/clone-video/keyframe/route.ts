@@ -81,8 +81,9 @@ export async function POST(req: NextRequest) {
   const url = await uploadBufferToR2(Buffer.from(gen.dataB64, 'base64'), `creatives/keyframes/${jobId}/${sceneIndex}-${Date.now()}.jpg`, gen.mimeType)
   if (!url) return NextResponse.json({ error: 'could not store the keyframe' }, { status: 500 })
 
-  // Persist the preview onto the beat so the storyboard + generation can use it.
-  if (beats[sceneIndex]) beats[sceneIndex].preview = url
+  // Persist the preview AND the (possibly user-edited) shot description onto the beat, so a reload keeps
+  // the image and the cinematic render animates exactly the shot the user described here.
+  if (beats[sceneIndex]) { beats[sceneIndex].preview = url; if (b?.action) beats[sceneIndex].action = action }
   const nextMeta = { ...meta, beat_sheet: { ...beat, beats } }
   await admin.from('creative_generations').update({ clone_meta: nextMeta }).eq('id', jobId).eq('user_id', user.id)
 
