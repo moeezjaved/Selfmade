@@ -32,18 +32,20 @@ export default function Storyboard({ jobId }: { jobId?: string }) {
   }, [jobId])
 
   const [busy, setBusy] = useState<Record<number, boolean>>({})
+  const [genErr, setGenErr] = useState<Record<number, string>>({})
   // Generate (or regenerate) a keyframe for one scene — a cheap image preview of what THIS scene will
   // look like with your product/creator, BEFORE paying video prices. The worker animates it on approve.
   const genKeyframe = async (s: Scene) => {
     if (!board?.editable || busy[s.index]) return
-    setBusy((b) => ({ ...b, [s.index]: true }))
+    setBusy((b) => ({ ...b, [s.index]: true })); setGenErr((e) => ({ ...e, [s.index]: '' }))
     try {
       const r = await fetch('/api/discovery/clone-video/keyframe', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jobId: board.jobId, sceneIndex: s.index, action: s.action }),
       }).then((x) => x.json())
       if (r?.preview) setScenes((prev) => prev.map((x) => x.index === s.index ? { ...x, preview: r.preview } : x))
-    } catch { /* leave as-is */ } finally { setBusy((b) => ({ ...b, [s.index]: false })) }
+      else setGenErr((e) => ({ ...e, [s.index]: r?.error === 'pro_model_busy' ? 'Image model busy — try again' : (r?.error || 'Could not generate') }))
+    } catch { setGenErr((e) => ({ ...e, [s.index]: 'Could not generate — try again' })) } finally { setBusy((b) => ({ ...b, [s.index]: false })) }
   }
 
   const move = (i: number, dir: -1 | 1) => setScenes((prev) => {
@@ -110,6 +112,7 @@ export default function Storyboard({ jobId }: { jobId?: string }) {
                   {busy[s.index] ? 'Generating…' : s.preview ? 'Regenerate' : 'Preview scene'}
                 </button>
               )}
+              {genErr[s.index] && <div style={{ width: 96, marginTop: 4, fontSize: 9.5, color: '#a15a25', lineHeight: 1.3 }}>{genErr[s.index]}</div>}
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 12.5, color: '#66755d', marginBottom: 8 }}>{s.action || 'Scene action'}</div>
