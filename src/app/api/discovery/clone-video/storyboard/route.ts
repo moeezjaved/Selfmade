@@ -1,0 +1,65 @@
+/**
+ * GET /api/discovery/clone-video/storyboard?jobId=<id>
+ * The storyboard-BEFORE-generation view: turns a job's analysis (clone_meta.beat_sheet + script) into
+ * scene cards, so the user edits the PLAN before Seedance runs. Works on a 'review' job (the normal
+ * pre-generation gate) or any analyzed job (beat_sheet is retained). No generation, no credits.
+ */
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+
+export const dynamic = 'force-dynamic'
+
+// Split the adapted script across N beats, proportionally, so each scene card carries its own line.
+function splitScript(script: string, n: number): string[] {
+  const words = String(script || '').trim().split(/\s+/).filter(Boolean)
+  if (!words.length || n <= 0) return Array(Math.max(0, n)).fill('')
+  const per = Math.ceil(words.length / n)
+  const out: string[] = []
+  for (let i = 0; i < n; i++) out.push(words.slice(i * per, (i + 1) * per).join(' '))
+  return out
+}
+
+export async function GET(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = createAdminClient()
+  const jobId = req.nextUrl.searchParams.get('jobId')
+  let q = admin.from('creative_generations')
+    .select('id, user_id, status, image_url, clone_meta')
+    .eq('user_id', user.id).eq('type', 'video_clone')
+  q = jobId ? q.eq('id', jobId) : q.in('status', ['review', 'done']).order('created_at', { ascending: false })
+  const { data: row } = await q.limit(1).maybeSingle()
+  if (!row) return NextResponse.json({ error: 'no analyzed remake found' }, { status: 404 })
+
+  const meta = (row as any).clone_meta || {}
+  const beat = meta.beat_sheet || {}
+  const beats: { t?: string; action?: string }[] = Array.isArray(beat.beats) ? beat.beats : []
+  const script = meta.final_script || meta.script || beat.transcript || ''
+  const lines = splitScript(script, beats.length || 1)
+
+  const scenes = (beats.length ? beats : [{ action: beat.avatar || 'Opening shot' }]).map((b, i) => ({
+    index: i,
+    role: i === 0 ? 'hook' : i === beats.length - 1 ? 'cta' : 'body',
+    time: b.t || null,
+    action: b.action || '',
+    scriptLine: lines[i] || '',
+  }))
+
+  return NextResponse.json({
+    jobId: (row as any).id,
+    status: (row as any).status,
+    editable: (row as any).status === 'review',   // only a pre-generation job can still be changed + generated
+    hookType: beat.hook_type || null,
+    tone: beat.tone || null,
+    isTalkingHead: beat.is_talking_head ?? null,
+    suggestedMode: meta.suggested_mode || (beat.is_talking_head ? 'ugc' : 'faithful'),
+    sceneCount: meta.scene_count || scenes.length,
+    durationSeconds: beat.duration_seconds || null,
+    script,
+    scenes,
+    onScreenText: Array.isArray(beat.on_screen_text) ? beat.on_screen_text : [],
+    sourcePoster: meta.source_poster || null,
+  })
+}
