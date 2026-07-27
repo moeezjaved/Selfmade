@@ -1815,6 +1815,20 @@ async function generateJob(job) {
     // skipping the ref avoids fal's likeness blocks entirely. ──
     if (meta.mode === 'faithful') {
       const nScenes = Math.max(2, Math.min(16, Number(meta.scene_count) || 2))
+      // GENDER LOCK: buildScenePlan copies the on-camera person from beat_sheet.avatar. When the
+      // analysis produced no avatar (empty/'none' — e.g. a cached/older beat sheet that only carried
+      // beats), the scene writer INVENTS a person and its guess ignores the source's real gender —
+      // that's how a man's ad came back as a woman. Backfill the avatar from a real source frame
+      // (gender-first description) before planning, unless the user asked to recast. ~2¢, one call.
+      if (!meta.character_look && job.source_video_url) {
+        const av = String(meta.beat_sheet?.avatar || '').toLowerCase().trim()
+        if (!av || av === 'none' || av.startsWith('none')) {
+          try {
+            const desc = await describeCreator(job.source_video_url, 1, `${job.id}-avatar`)
+            if (desc) { meta.beat_sheet = { ...(meta.beat_sheet || {}), avatar: desc }; console.log(`🧍 ${job.id} backfilled source avatar for gender lock`) }
+          } catch (e) { console.warn(`avatar backfill ${job.id}:`, e.message) }
+        }
+      }
       // Reuse the stamped plan on resume — a fresh plan would mismatch the checkpointed clips.
       const scenes = (Array.isArray(meta.scene_plan) && meta.scene_plan.length)
         ? meta.scene_plan
