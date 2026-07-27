@@ -114,6 +114,15 @@ async function runGeneration(input: {
 }) {
   const { jobId, userId, userEmail, body, txId, imageSize } = input
   const admin = createAdminClient()
+  // Wall-clock budget. The generation runs in waitUntil() under Vercel's maxDuration (300s). Under
+  // Gemini congestion the 3×(generate+verify) QA ladder — each call with its own retry backoff — can
+  // blow past that ceiling, and the function is KILLED mid-flight: neither done nor fail() runs, so
+  // the row is left silently 'processing' (the "appeared in My Creatives but never generated" bug;
+  // the cron later marks it failed with no message). Guarding on this deadline lets us stop cleanly
+  // and either ship the best render so far or fail() gracefully (refund + real message) IN TIME.
+  const started = Date.now()
+  const DEADLINE_MS = 210_000               // leave ~90s of the 300s ceiling for upload + finalize
+  const outOfTime = () => Date.now() - started > DEADLINE_MS
   const fail = async (msg: string, reason?: string) => {
     if (txId) await admin.rpc('refund_credits', { p_tx: txId }).then(() => {}, () => {})
     await admin.from('creative_generations').update({ status: 'failed', clone_meta: { tx_id: txId, error: msg, ...(reason ? { fail_reason: reason } : {}) } }).eq('id', jobId)
@@ -255,6 +264,10 @@ async function runGeneration(input: {
     let usedModel: string | null = null   // which Gemini model actually produced the winning image (admin telemetry)
     const verdictLog: string[] = []
     for (let i = 0; i < MAX_GENS; i++) {
+      // Deadline guard: a full generate+verify round can take 60-120s under congestion. If we're out
+      // of budget, stop before Vercel kills the function mid-round — ship the best render we already
+      // have (i>0 ⇒ best is set), rather than leave a silent stuck row. First attempt always runs.
+      if (i > 0 && outOfTime()) { verdictLog.push('deadline'); break }
       const attemptPrompt = i === 0 ? prompt : `${prompt} IMPORTANT CORRECTION: ${verdictLog[verdictLog.length - 1]}`
       gen = await generateImage(attemptPrompt, genImages, useTier, { aspectRatio: resolvedAspect, imageSize })
       if (!gen.ok) break
@@ -288,7 +301,10 @@ async function runGeneration(input: {
     // second pass automatically: the user picks "Pakistani/Indian/…" once and receives the recast image
     // in one step — no manual tweak. Falls back to the un-recast clone if the pass fails.
     let recastApplied: 'yes' | 'failed' | 'no' = wantsRecast ? 'failed' : 'no'
-    if (wantsRecast && best) {
+    // Skip the recast pass if we're out of budget — a 4th generateImage here is what tips a congested
+    // job past the 300s ceiling. Shipping the (correct, un-recast) clone beats a killed, stuck row;
+    // the user can recast it as a one-click tweak.
+    if (wantsRecast && best && !outOfTime()) {
       try {
         // ETHNICITY-ONLY recast: change the PERSON (features/skin/hair) but KEEP the reference outfit.
         // We used to force Pakistani/Indian/Arab looks into traditional dress (shalwar kameez, saree,
