@@ -79,12 +79,21 @@ export function buildTimelineFromJob(row: Row, brand?: Brand): { timeline: Timel
   }
 
   if (!scenes.length && row.image_url) {
-    // Fallback: single-take UGC (or any job) with no cached clean clips — passthrough the final video as
-    // one scene. Its text/captions are already baked, so we DON'T add layers (they'd double-print).
+    // Single-take UGC — one continuous talking-head clip. The footage stays ONE layer (you can't
+    // re-cut a lip-synced take; changing the words = a Seedance re-shoot). But the main render does NOT
+    // burn karaoke captions (only the separate captions job does), so when they weren't baked we can
+    // make the take editable: captions from the script + logo become free, editable layers on top.
     const dur = Math.max(4, Number(meta?.beat_sheet?.duration_seconds) || 15)
     scenes.push({ id: 'take', role: 'take', src: row.image_url, trimStart: 0, durationSec: dur, talking: true })
-    editable = false
-    note = 'This remake was rendered before the timeline engine — showing the finished video as one layer. New remakes will be fully editable.'
+    const captionsBaked = !!meta.caption_segments   // the opt-in karaoke-captions job burned text into pixels
+    if (captionsBaked) {
+      editable = false
+      note = 'Captions are baked into this render — showing it as one layer. Re-remake without burned captions to make them editable.'
+    } else {
+      editable = true
+      captionCues.push(...cuesFromScript(meta.final_script || meta.script || '', 0, dur))
+      note = 'Single-take UGC: the footage is one shot, but captions, CTA, logo, colours and aspect are all free to edit here.'
+    }
   }
 
   const layers: Layer[] = []
