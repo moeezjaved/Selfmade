@@ -79,7 +79,11 @@ export default function Storyboard({ jobId, embedded, mode, resyncScript, resync
   useEffect(() => {
     if (autoRan.current || !board?.editable || !scenes.length || !showKeyframes) return   // UGC: no keyframes
     autoRan.current = true
-    ;(async () => { for (const s of scenes) if (!s.preview) await genKeyframe(s) })()
+    // Regenerate a scene if it has NO preview, OR a STALE one — a keyframe URL that belongs to a
+    // different job (the beats can carry a previous analysis's previews, which is how old-run women
+    // kept showing). A fresh keyframe for THIS job uses the reference frame + gender lock.
+    const stale = (s: Scene) => !s.preview || (!!board?.jobId && !s.preview.includes(board.jobId))
+    ;(async () => { for (const s of scenes) if (stale(s)) await genKeyframe(s) })()
   }, [board, scenes.length])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Parent re-paced the script (length picker) → re-split it evenly across the current scenes so the
