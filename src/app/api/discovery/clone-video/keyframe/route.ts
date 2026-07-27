@@ -83,9 +83,15 @@ export async function POST(req: NextRequest) {
   const productImgs = (await Promise.all(rawImgs.map(fetchImageB64))).filter(Boolean) as { mimeType: string; dataB64: string }[]
 
   const isService = meta.product_type === 'service' || meta.product_type === 'app'
+  // The reference creator's look (hair colour, age, wardrobe…) + setting, captured by the analysis —
+  // so the preview matches the reference person AND stays the SAME person across every scene.
+  const avatar = String(beat.avatar || '').trim().slice(0, 240)
+  const setting = String(beat.setting || '').trim().slice(0, 160)
   const creatorClause = look && look.toLowerCase() !== 'match'
-    ? `Feature a ${look} creator/person as the scene calls for.`
-    : 'Cast whatever people the scene naturally needs (or none).'
+    ? `If a person is on camera, cast a ${look} creator${avatar ? `, keeping the reference creator's age range, hair style and wardrobe vibe (${avatar})` : ''} — the SAME person in every scene.`
+    : avatar
+      ? `If a person is on camera, they MUST match the reference creator exactly — ${avatar} — copying gender, age, ethnicity, hair (colour + style) and wardrobe; the SAME person appears in every scene.`
+      : 'Cast whatever people the scene naturally needs (or none), kept consistent across scenes.'
   const productClause = isService || !productImgs.length
     ? 'This is a service/brand — do NOT invent a physical product; lead with the person, setting, or an on-phone app view.'
     : `The attached image(s) are the user's product${productName ? ` ("${productName}")` : ''} — render it 1:1 (exact silhouette, label, materials); do NOT reshape or invent a different product.`
@@ -97,6 +103,7 @@ export async function POST(req: NextRequest) {
   const prompt = [
     `Create ONE photorealistic vertical 9:16 video KEYFRAME that recreates this ad scene's composition for the brand — the FIRST FRAME of a short video clip.`,
     `SCENE TO RECREATE: ${shot}.`,
+    setting ? `Setting (match the reference): ${setting}.` : '',
     `Match that scene's shot type (close-up / wide / over-the-shoulder), framing, and energy — but make it an ORIGINAL image (never copy any real person's face).`,
     productClause,
     creatorClause,
