@@ -299,7 +299,7 @@ export const TOOL_LABELS: Record<string, string> = {
 export interface ToolCtx { userId: string }
 
 /** Generate the flagship competitor report, save it as a mello_documents row, return a link for Mello. */
-async function authorCompetitorReport(userId: string, competitor: string, brandNameHint?: string): Promise<any> {
+export async function authorCompetitorReport(userId: string, competitor: string, brandNameHint?: string): Promise<any> {
   if (!competitor) return { error: 'Which competitor should I analyze?' }
   const admin = createAdminClient()
   let myBrand: { name: string; industry?: string; website?: string; voice?: string; edge?: string } | null = null
