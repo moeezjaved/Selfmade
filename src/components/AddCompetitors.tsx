@@ -40,6 +40,7 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
   const [done, setDone] = useState(0)
   const [howOpen, setHowOpen] = useState(false)   // "how to find the Meta Ad Library link" steps
   const [link, setLink] = useState('')            // dedicated Meta Ad Library link box (separate from name search)
+  const [saved, setSaved] = useState<string[] | null>(null)   // names just added → show the "on it" confirmation
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Seed from the brand's NICHE, ranked by how much each rival actually advertises — far better
@@ -128,7 +129,7 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ entries: [{ kind: 'fact', content: `Competitors to watch for ${brandName}: ${picks.map(p => p.name).join(', ')}.` }], brandId: brandId || undefined }),
     }).catch(() => {})
-    setBusy(false); onDone?.(picks.length); onClose()
+    setBusy(false); onDone?.(picks.length); setSaved(picks.map(p => p.name))   // show the "I'm on it" state, don't close silently
   }
 
   const pickedIds = new Set(picks.map(p => p.pageId))
@@ -147,6 +148,27 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,.45)', zIndex: 80, display: 'grid', placeItems: 'center', padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: 'min(520px,96vw)', background: '#fff', borderRadius: 18, padding: '22px 24px 20px', maxHeight: '88vh', overflowY: 'auto' }}>
+        {saved ? (
+          // "On it" confirmation — the crawl is queued; the brief fills + an email lands when ads load.
+          <div style={{ textAlign: 'center', padding: '10px 4px 4px' }}>
+            <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#eef7d6', display: 'grid', placeItems: 'center', margin: '0 auto 14px', fontSize: 22 }}>🛰️</div>
+            <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 24, color: INK, lineHeight: 1.2 }}>On it — watching {saved.length} for {brandName}.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '16px 0', textAlign: 'left' }}>
+              {saved.map((nm, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: INK, background: '#f6f8f5', border: `1px solid ${LINE}`, borderRadius: 10, padding: '10px 12px' }}>
+                  <span className="ac-spin" style={{ width: 14, height: 14, border: `2px solid ${GREEN}`, borderTopColor: 'transparent', borderRadius: '50%', flexShrink: 0 }} />
+                  <span style={{ fontWeight: 700, flex: 1 }}>{nm}</span>
+                  <span style={{ fontSize: 12, color: MUTED }}>reading their archive…</span>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.6, margin: '0 0 16px' }}>
+              I’m pulling their full ad archive now — it can take a few minutes. Their ads will show up on your brief the moment they’re loaded.
+            </p>
+            <button onClick={onClose} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 26px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Done</button>
+            <style>{`.ac-spin{animation:acspin 1s linear infinite}@keyframes acspin{to{transform:rotate(360deg)}}`}</style>
+          </div>
+        ) : (<>
         <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 25, color: INK, lineHeight: 1.2 }}>
           Who should I watch for {brandName}?
         </div>
@@ -235,6 +257,7 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
           </button>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Later</button>
         </div>
+        </>)}
       </div>
     </div>
   )
