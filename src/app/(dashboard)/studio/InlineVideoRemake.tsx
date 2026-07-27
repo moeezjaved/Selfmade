@@ -214,6 +214,12 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
             <Film size={16} /> Create video · {cost} credits
           </button>
           <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>Credits are only spent now — refunded automatically if the render fails.</div>
+          {/* Storyboard-before-generation: shape the plan scene-by-scene before spending. Same free review, richer. */}
+          {jobId && (
+            <a href={`/studio/storyboard?jobId=${jobId}`} style={{ display: 'inline-block', marginTop: 12, fontSize: 12.5, color: GREEN, fontWeight: 800, textDecoration: 'none' }}>
+              ✎ Edit scene-by-scene in the storyboard →
+            </a>
+          )}
         </div>
       )}
 
@@ -238,7 +244,11 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
           <div style={{ display: 'flex', gap: 9, marginTop: 12 }}>
             <a href={videoUrl} download target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: LIME, borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}><Download size={15} /> Download</a>
             <button onClick={() => { setPhase('setup'); setVideoUrl(null); setScript(''); setJobId(null); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}><Play size={15} /> Another</button>
+            {jobId && (
+              <a href={`/studio/editor?jobId=${jobId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}><Wand2 size={15} /> Edit &amp; export</a>
+            )}
           </div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>Open the editor to change captions, CTA, logo or aspect — free — and export to every platform.</div>
         </div>
       )}
 

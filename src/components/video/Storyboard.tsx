@@ -31,13 +31,21 @@ export default function Storyboard({ jobId }: { jobId?: string }) {
       .catch((e) => setErr(String(e)))
   }, [jobId])
 
+  const move = (i: number, dir: -1 | 1) => setScenes((prev) => {
+    const j = i + dir
+    if (j < 0 || j >= prev.length) return prev
+    const next = [...prev];[next[i], next[j]] = [next[j], next[i]]; return next
+  })
+  const remove = (index: number) => setScenes((prev) => (prev.length <= 1 ? prev : prev.filter((s) => s.index !== index)))
+
   const generate = async () => {
     if (!board?.editable) return
     setGenerating(true)
     const script = scenes.map((s) => s.scriptLine).join(' ').trim()
+    // Scene count follows the edited storyboard, so the worker shoots exactly the scenes you kept.
     await fetch('/api/discovery/clone-video/approve', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jobId: board.jobId, script, mode: board.suggestedMode, sceneCount: board.sceneCount }),
+      body: JSON.stringify({ jobId: board.jobId, script, mode: board.suggestedMode, sceneCount: scenes.length }),
     }).catch(() => {})
     setGenerating(false)
   }
@@ -66,6 +74,13 @@ export default function Storyboard({ jobId }: { jobId?: string }) {
               <div style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, color: '#17251c', lineHeight: 1 }}>{i + 1}</div>
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872' }}>{ROLE_LABEL[s.role] || 'Scene'}</div>
               {s.time && <div style={{ fontSize: 10, color: '#a7b09e', fontFamily: 'ui-monospace, Menlo, monospace' }}>{s.time}</div>}
+              {board.editable && (
+                <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+                  <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" style={{ border: '1px solid #e6ece2', background: '#fff', borderRadius: 5, width: 20, height: 20, cursor: i === 0 ? 'default' : 'pointer', color: '#66755d', fontSize: 11, lineHeight: 1, padding: 0 }}>↑</button>
+                  <button onClick={() => move(i, 1)} disabled={i === scenes.length - 1} aria-label="Move down" style={{ border: '1px solid #e6ece2', background: '#fff', borderRadius: 5, width: 20, height: 20, cursor: i === scenes.length - 1 ? 'default' : 'pointer', color: '#66755d', fontSize: 11, lineHeight: 1, padding: 0 }}>↓</button>
+                  <button onClick={() => remove(s.index)} disabled={scenes.length <= 1} aria-label="Remove scene" style={{ border: '1px solid #f0dada', background: '#fff', borderRadius: 5, width: 20, height: 20, cursor: scenes.length <= 1 ? 'default' : 'pointer', color: '#b3564e', fontSize: 11, lineHeight: 1, padding: 0 }}>✕</button>
+                </div>
+              )}
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 12.5, color: '#66755d', marginBottom: 8 }}>{s.action || 'Scene action'}</div>
