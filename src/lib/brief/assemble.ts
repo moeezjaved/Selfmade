@@ -36,6 +36,14 @@ export type BriefItem = {
     hooks: { label: string; count: number }[]
     emotions: { label: string; count: number }[]
     offers: { label: string; count: number }[]
+    /** Mello's call on the pattern — the winner, how sure, and whether to run it. */
+    judgment?: {
+      winner: string
+      confidence: 'High' | 'Medium' | 'Low'
+      confidenceWhy: string
+      verdict: 'Adopt' | 'Test' | 'Watch'
+      verdictWhy: string
+    }
   }
 }
 
@@ -275,6 +283,31 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     const vidPct = withMedia ? Math.round((video / withMedia) * 100) : 0
     const topHook = rank(hookM, 1)[0]
     const topFmt = rank(fmtM, 1)[0]
+    const topOffer = rank(offerM, 1)[0]
+
+    // ── JUDGMENT — Mello's call on the pattern: the winner, how sure, whether to run it. ──
+    // Confidence = how concentrated the leading hook/format is, weighted by sample size + how many
+    // rival brands agree. One brand doing something is a habit; three doing it is a market signal.
+    const hookShare = topHook ? topHook.count / pbAds.length : 0
+    const fmtShare = topFmt ? topFmt.count / pbAds.length : 0
+    const lead = Math.max(hookShare, fmtShare)
+    const sampleOk = pbAds.length >= 30
+    const multiBrand = brandSet.size >= 2
+    const confidence: 'High' | 'Medium' | 'Low' =
+      (lead >= 0.4 && sampleOk && multiBrand) ? 'High'
+      : (lead >= 0.25 || (lead >= 0.2 && sampleOk)) ? 'Medium'
+      : 'Low'
+    const verdict: 'Adopt' | 'Test' | 'Watch' = confidence === 'High' ? 'Adopt' : confidence === 'Medium' ? 'Test' : 'Watch'
+    const mediaLabel = withMedia >= 3 ? (vidPct >= 50 ? 'Video' : 'Image') : (topFmt?.label || null)
+    const winner = [mediaLabel, topHook ? `“${topHook.label}” hook` : null, topOffer ? `${topOffer.label.toLowerCase()} offer` : null]
+      .filter(Boolean).join(' + ') || 'the shared pattern'
+    const confidenceWhy = `${Math.round(lead * 100)}% of ${pbAds.length} ads${multiBrand ? ` across ${brandSet.size} brands` : ' (one brand)'} share it`
+    const verdictWhy = confidence === 'High'
+      ? 'Strong agreement across the set — ship this format + hook before it saturates.'
+      : confidence === 'Medium'
+      ? 'A real signal, not yet a consensus — run one and let the numbers decide.'
+      : 'Signal is still thin — keep watching before you commit spend.'
+    const judgment = { winner, confidence, confidenceWhy, verdict, verdictWhy }
     // Gate on the AD COUNT (DNA), not media availability — this card is about formats/hooks/emotions/
     // offers, which every crawled ad has even before its creative is drained to R2.
     {
@@ -288,6 +321,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
         playbook: {
           totalAds: pbAds.length, brandsCount: brandSet.size, videoPct: vidPct,
           formats: rank(fmtM, 4), hooks: rank(hookM, 4), emotions: rank(emoM, 5), offers: rank(offerM, 5),
+          judgment,
         },
       })
     }

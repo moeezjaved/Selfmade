@@ -21,7 +21,7 @@ import MelloTasks from './MelloTasks'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e3e2da', HAIR = '#ecebe3', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
-type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string; playbook?: { totalAds: number; brandsCount: number; videoPct: number; formats: { label: string; count: number }[]; hooks: { label: string; count: number }[]; emotions: { label: string; count: number }[]; offers: { label: string; count: number }[] } }
+type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string; playbook?: { totalAds: number; brandsCount: number; videoPct: number; formats: { label: string; count: number }[]; hooks: { label: string; count: number }[]; emotions: { label: string; count: number }[]; offers: { label: string; count: number }[]; judgment?: { winner: string; confidence: 'High' | 'Medium' | 'Low'; confidenceWhy: string; verdict: 'Adopt' | 'Test' | 'Watch'; verdictWhy: string } } }
 type Brief = {
   summary: { adsScanned: number; brandsWatched: number; spiedBrands: number; creativesReady: number }
   lastCycleAt?: string | null
@@ -286,6 +286,37 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
               </Link>
             )}
           </div>
+          {playbook.playbook.judgment && (() => {
+            const j = playbook.playbook.judgment!
+            const tone = j.verdict === 'Adopt' ? { bg: '#eef7d6', fg: '#3f6a1e', dot: GREEN } : j.verdict === 'Test' ? { bg: '#fdf3d9', fg: '#8a6a12', dot: '#c99a1e' } : { bg: '#eef1ec', fg: '#5c6a5a', dot: '#9aa79a' }
+            return (
+              <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: '14px 16px', marginBottom: 16 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
+                  {/* Winner — the one pattern to copy */}
+                  <div style={{ flex: '2 1 240px', minWidth: 220 }}>
+                    <div style={label}>Mello’s call</div>
+                    <div style={{ ...serif, fontSize: 19, color: INK, lineHeight: 1.25, marginTop: 4 }}>{j.winner}</div>
+                    <div style={{ ...sub, marginTop: 4 }}>The one pattern to copy across the set.</div>
+                  </div>
+                  {/* Confidence */}
+                  <div style={{ flex: '1 1 130px', minWidth: 120 }}>
+                    <div style={label}>Confidence</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 6 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: tone.dot, display: 'inline-block' }} />
+                      <span style={{ fontSize: 15, fontWeight: 800, color: INK }}>{j.confidence}</span>
+                    </div>
+                    <div style={{ ...sub, marginTop: 4 }}>{j.confidenceWhy}</div>
+                  </div>
+                  {/* Should you use it */}
+                  <div style={{ flex: '1 1 150px', minWidth: 140 }}>
+                    <div style={label}>Should you use it</div>
+                    <div style={{ display: 'inline-block', background: tone.bg, color: tone.fg, borderRadius: 100, padding: '3px 11px', fontSize: 12.5, fontWeight: 800, marginTop: 6 }}>{j.verdict}</div>
+                    <div style={{ ...sub, marginTop: 6, lineHeight: 1.45 }}>{j.verdictWhy}</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
           <div className="bs-pb">
             {/* Format — video vs image split + top format_style bars */}
             <div className="bs-pb-c">
