@@ -43,12 +43,12 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [benefit, setBenefit] = useState('')
   const [look, setLook] = useState('match')   // recast the on-camera person (default: keep original)
   const [jobId, setJobId] = useState<string | null>(null)
-  // Cinematic is gated "coming soon" for everyone EXCEPT a testing flag (?cinematic=1) — lets the
-  // founder A/B the Remotion-assembled cinematic result while it stays hidden for other users.
-  const [cineOn, setCineOn] = useState(false)
+  // Cinematic (Remotion-assembled, scene-by-scene) is now available to select — labelled "· testing".
+  // (Set ?cinematic=0 to force-hide it if ever needed.)
+  const [cineOn, setCineOn] = useState(true)
   const [srcScenes, setSrcScenes] = useState(3)   // analyzed scene count, used for cinematic cost + approve
   const [sbScenes, setSbScenes] = useState(0)     // scenes the founder KEPT in the embedded storyboard
-  useEffect(() => { try { if (new URLSearchParams(window.location.search).get('cinematic') === '1') setCineOn(true) } catch {} }, [])
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get('cinematic') === '0') setCineOn(false) } catch {} }, [])
   const [script, setScript] = useState('')
   const [srcSecs, setSrcSecs] = useState<number | null>(null)
   const [bucket, setBucket] = useState<'15' | '30' | '60' | 'match'>('15')
