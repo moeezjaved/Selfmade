@@ -9,7 +9,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2 } from 'lucide-react'
+import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2, Film } from 'lucide-react'
 import { creativeFilename } from '@/lib/filename'
 import toast from 'react-hot-toast'
 import { refreshCredits, useCredits } from '@/components/credits/CreditCounter'
@@ -357,6 +357,12 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
             <>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Your video</div>
               <button onClick={() => downloadCreative(creativeFilename({ brand: gen.brand_name, ext: 'mp4', kind: gen.type, date: new Date(gen.created_at) }))} disabled={downloading} style={{ ...btn, justifyContent: 'center' }}><Download size={15} /> {downloading ? 'Downloading…' : 'Download MP4'}</button>
+              {/* Open the full Remotion timeline editor for this remake (captions, trims, multi-aspect
+                  export). The editor loads by jobId; it was previously only reachable from the studio
+                  remake flow, so finished videos in My Creatives had no way in. */}
+              {gen.type === 'video_clone' && (
+                <a href={`/studio/editor?jobId=${gen.id}`} style={{ ...btn, justifyContent: 'center', textDecoration: 'none' }}><Film size={15} /> Open in editor</a>
+              )}
               <button onClick={copyUrl} style={{ ...btnGhost, justifyContent: 'center' }}><Link2 size={15} /> {copied ? 'Copied ✓' : 'Copy URL'}</button>
 
               {/* ── Fix a moment — POINT at the exact seconds on the video, say what's wrong, fix just
