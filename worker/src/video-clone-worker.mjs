@@ -503,12 +503,12 @@ function sceneCountFor(beat) {
 // is ≥5s on Seedance, so a short fast-cut ad can't demand more scenes than duration/5 (else the clone
 // would run far longer than the source); and a hard ceiling of 10 for render time + cost sanity.
 function clampScenes(count, secs) {
-  // Scenes can be as short as the source's real cuts (~1.5s each) — Seedance renders each at its 4s
-  // minimum and the stitch trims to true length, so the cap is the source duration / ~1.5s, NOT /4
-  // (the old /4 cap collapsed an 8s fast-cut ad to 2 scenes). Pass the REAL (ffprobe) duration, not
-  // Gemini's estimate. Hard ceiling 10 for cost/render-time sanity.
-  const durCap = Math.max(2, Math.floor((Number(secs) || 15) / 1.5))
-  return Math.max(2, Math.min(count, durCap, 10))
+  // Each scene is a PAID Seedance clip rendered at a 4s MINIMUM (even a 1.5s cut costs 4s of gen), and
+  // the voiceover is split across scenes — so too many scenes on a short ad = high fal cost AND a script
+  // chopped into 1-2-word fragments. Cap at ~1 scene per 3s (a 15s ad → ~5 scenes = ~3s of VO each,
+  // full sentences, half the clips). Hard ceiling 8 for cost/render sanity. (Was /1.5 → up to 10.)
+  const durCap = Math.max(2, Math.floor((Number(secs) || 15) / 3))
+  return Math.max(2, Math.min(count, durCap, 8))
 }
 
 // ── gpt-4o: beat sheet → per-scene Seedance prompts for FAITHFUL mode. Each reference scene becomes
