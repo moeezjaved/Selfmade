@@ -508,7 +508,7 @@ function clampScenes(count, secs) {
   // chopped into 1-2-word fragments. Cap at ~1 scene per 3s (a 15s ad → ~5 scenes = ~3s of VO each,
   // full sentences, half the clips). Hard ceiling 8 for cost/render sanity. (Was /1.5 → up to 10.)
   const durCap = Math.max(2, Math.floor((Number(secs) || 15) / 3))
-  return Math.max(2, Math.min(count, durCap, 8))
+  return Math.max(2, Math.min(count, durCap, 16))   // ceiling 16 so longer ads get more scenes (was 8)
 }
 
 // ── gpt-4o: beat sheet → per-scene Seedance prompts for FAITHFUL mode. Each reference scene becomes
@@ -1798,7 +1798,7 @@ async function generateJob(job) {
     // forced talking head). No video reference per scene: the beat sheet grounds each prompt, and
     // skipping the ref avoids fal's likeness blocks entirely. ──
     if (meta.mode === 'faithful') {
-      const nScenes = Math.max(2, Math.min(10, Number(meta.scene_count) || 2))
+      const nScenes = Math.max(2, Math.min(16, Number(meta.scene_count) || 2))
       // Reuse the stamped plan on resume — a fresh plan would mismatch the checkpointed clips.
       const scenes = (Array.isArray(meta.scene_plan) && meta.scene_plan.length)
         ? meta.scene_plan
