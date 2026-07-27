@@ -25,7 +25,7 @@ async function enhanceShot(brief: string, ctx: { role?: string; scriptLine?: str
     : ctx.role === 'cta' ? 'This is the CTA — end on the product, in-hand or hero.' : 'This is a body/demo beat.'
   const sys = 'You direct ONE shot for a short vertical (9:16) UGC/ad video. Turn the user’s rough idea into a single, concrete, filmable shot description an image model can render as the FIRST FRAME of a clip. '
     + 'Specify: shot type (close-up / medium / wide / over-the-shoulder), framing, the subject’s exact action with the product, and lighting/mood. '
-    + (ctx.isService ? 'This is a SERVICE/app — no physical product; lead with the person or an on-phone view. ' : `Keep the product ("${ctx.productName || 'the product'}") exactly as-is, at true real-world size. `)
+    + (ctx.isService ? 'This is a SERVICE/app — no physical product; lead with the person or an on-phone view. ' : `Keep the product ("${ctx.productName || 'the product'}") exactly as-is, at TRUE real-world size (a small handheld item stays small in the hand, never enlarged). If the idea names a competitor's product/brand, replace it with "${ctx.productName || 'the product'}". `)
     + 'If a person appears, frame to AVOID a clear front-facing face (chin-down, side, or over-the-shoulder) for likeness safety. No on-screen text, no logos. '
     + 'Return ONLY the shot description, one sentence, max 45 words.'
   const user = `Rough idea: "${brief}".${ctx.scriptLine ? ` They say: "${ctx.scriptLine.slice(0, 160)}".` : ''} ${roleHint}${ctx.look && ctx.look.toLowerCase() !== 'match' ? ` Cast a ${ctx.look} person.` : ''}`
@@ -89,6 +89,15 @@ export async function POST(req: NextRequest) {
   const refFrameUrl = beats[sceneIndex]?.thumb || null
   const refFrame = refFrameUrl ? await fetchImageB64(refFrameUrl) : null
 
+  // SAME PERSON across scenes: once an earlier scene's keyframe exists, use it as a character lock so
+  // scene 2/3 aren't a DIFFERENT-looking creator (a UGC/cinematic ad needs one consistent presenter).
+  let charLock: { mimeType: string; dataB64: string } | null = null
+  if (sceneIndex > 0) {
+    for (let j = sceneIndex - 1; j >= 0; j--) {
+      if (beats[j]?.preview) { charLock = await fetchImageB64(beats[j].preview); if (charLock) break }
+    }
+  }
+
   const isService = meta.product_type === 'service' || meta.product_type === 'app'
   // The reference creator's look (hair colour, age, wardrobe…) + setting, captured by the analysis —
   // so the preview matches the reference person AND stays the SAME person across every scene.
@@ -99,26 +108,44 @@ export async function POST(req: NextRequest) {
     : avatar
       ? `If a person is on camera, they MUST match the reference creator exactly — ${avatar} — copying gender, age, ethnicity, hair (colour + style) and wardrobe; the SAME person appears in every scene.`
       : 'Cast whatever people the scene naturally needs (or none), kept consistent across scenes.'
-  // With a reference frame, the product image(s) come SECOND — call that out so the model doesn't
-  // mistake the reference for the product to render.
-  const productNoun = refFrame ? 'The product image(s) (after the reference)' : 'The attached image(s)'
   const productClause = isService || !productImgs.length
     ? 'This is a service/brand — do NOT invent a physical product; lead with the person, setting, or an on-phone app view.'
-    : `${productNoun} are the user's product${productName ? ` ("${productName}")` : ''} — render it 1:1 (exact silhouette, label, materials); do NOT reshape or invent a different product.`
+    : `Render the user's product${productName ? ` ("${productName}")` : ''} 1:1 — exact silhouette, label, materials — at its TRUE real-world size relative to the hand/body (a small handheld item stays small in the hand, NEVER enlarged, stretched or out of proportion). Do NOT reshape or invent a different product.`
+  // The analysis may name the COMPETITOR's product in the shot text (e.g. "FÜM device") — that always
+  // means the USER's product here. Never render a competitor's product, name or logo.
+  const brandNeutral = productName ? `Any product named in the shot refers to "${productName}" (the user's product) — never a competitor's product, brand name or logo.` : 'Any product named in the shot is the user\'s product — never a competitor\'s brand or logo.'
+  // When a same-creator lock exists it OVERRIDES the descriptive clause — keep that exact person.
+  const personClause = charLock
+    ? 'The on-camera person MUST be the EXACT SAME creator shown in the same-creator reference image — match their face, hair, skin tone and wardrobe precisely; it is the same person throughout the video.'
+    : creatorClause
 
   // Mello upgrades the raw shot brief into a proper filmable direction before the model sees it —
   // users write "person holding facewash"; this makes it a real shot (framing, action, lighting).
   const shot = await enhanceShot(action, { role: beats[sceneIndex]?.role || (sceneIndex === 0 ? 'hook' : ''), scriptLine: b?.scriptLine || beats[sceneIndex]?.scriptLine, productName, isService, look })
 
+  // Assemble reference images in a FIXED order and describe each by position so the model can't
+  // confuse them: composition ref → same-creator ref → product photo(s).
+  const genImages: { mimeType: string; dataB64: string }[] = []
+  const legend: string[] = []
+  if (refFrame) { genImages.push(refFrame); legend.push(`Image ${genImages.length} = COMPOSITION reference (match its framing/angle/layout ONLY; replace the person + product, never copy its pixels or a real face).`) }
+  if (charLock) { genImages.push(charLock); legend.push(`Image ${genImages.length} = the SAME CREATOR to keep — match this person's face, hair, skin tone and wardrobe exactly.`) }
+  if (!isService && productImgs.length) {
+    const first = genImages.length + 1
+    for (const p of productImgs) genImages.push(p)
+    legend.push(`Image${productImgs.length > 1 ? 's' : ''} ${first}${productImgs.length > 1 ? `–${genImages.length}` : ''} = the user's product (render 1:1, true real-world size).`)
+  }
+
   const prompt = [
-    `Create ONE photorealistic vertical 9:16 video KEYFRAME that recreates this ad scene's composition for the brand — the FIRST FRAME of a short video clip.`,
-    // When present, the reference frame is the strongest signal — match its layout exactly, replace the person + product.
-    refFrame ? `The FIRST attached image is a COMPOSITION REFERENCE from the original ad — match its exact framing, camera angle, subject placement, distance and background layout. But do NOT copy it: REPLACE any on-screen person with an ORIGINAL creator (never reproduce the real person's face) and REPLACE any product with the user's product. Recreate the SHOT, not the pixels.` : '',
+    `Create ONE photorealistic vertical 9:16 video KEYFRAME — the FIRST FRAME of a short video clip.`,
+    legend.length ? `Attached reference images, in order — ${legend.join(' ')}` : '',
+    refFrame
+      ? `Recreate the COMPOSITION reference's framing, angle, distance and background layout — but make it an ORIGINAL image: replace the person with your creator (never a real face) and swap in the user's product. Recreate the SHOT, not the pixels.`
+      : `Match the scene's shot type (close-up / wide / over-the-shoulder), framing and energy as an ORIGINAL image (never copy any real person's face).`,
     `SCENE TO RECREATE: ${shot}.`,
     setting ? `Setting (match the reference): ${setting}.` : '',
-    refFrame ? '' : `Match that scene's shot type (close-up / wide / over-the-shoulder), framing, and energy — but make it an ORIGINAL image (never copy any real person's face).`,
     productClause,
-    creatorClause,
+    brandNeutral,
+    personClause,
     `Natural, real, ad-quality lighting. Leave headroom for motion. NO on-screen text, NO captions, NO watermark, NO other brand's logo.`,
   ].filter(Boolean).join(' ')
 
@@ -126,8 +153,6 @@ export async function POST(req: NextRequest) {
   // for product fidelity — the standard model's weaker results would carry straight into the clip. We
   // only trim RESOLUTION to 1K (not 2K): resolution is independent of model quality and 1K is already
   // above a 720p frame, so it's faster + lighter on quota with no visible loss once it's moving video.
-  // Reference frame first (composition guide), then the product images (rendered 1:1).
-  const genImages = refFrame ? [refFrame, ...productImgs] : productImgs
   const gen = await generateImage(prompt, genImages, 'pro', { aspectRatio: '9:16', imageSize: '1K' })
   if (!gen.ok) return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The image model is busy — top up the Gemini billing or try again in a moment.' : gen.error }, { status: 502 })
 
