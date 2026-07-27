@@ -9,7 +9,7 @@
  *   review  → edit the script + pick length → "Create video · N cr" (spends on approve)
  *   done    → the video, download, make another
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2, Film, Download, Wand2, Play } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 
@@ -42,6 +42,11 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [benefit, setBenefit] = useState('')
   const [look, setLook] = useState('match')   // recast the on-camera person (default: keep original)
   const [jobId, setJobId] = useState<string | null>(null)
+  // Cinematic is gated "coming soon" for everyone EXCEPT a testing flag (?cinematic=1) — lets the
+  // founder A/B the Remotion-assembled cinematic result while it stays hidden for other users.
+  const [cineOn, setCineOn] = useState(false)
+  const [srcScenes, setSrcScenes] = useState(3)   // analyzed scene count, used for cinematic cost + approve
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get('cinematic') === '1') setCineOn(true) } catch {} }, [])
   const [script, setScript] = useState('')
   const [srcSecs, setSrcSecs] = useState<number | null>(null)
   const [bucket, setBucket] = useState<'15' | '30' | '60' | 'match'>('15')
@@ -53,7 +58,8 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const isService = brandType === 'service'
   const resolvedBucket = bucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(bucket)
   const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1
-  const cost = nSegs > 1 ? 600 * nSegs : 600   // $6 per 15s clip (pricing v2), same as the modal
+  // Cinematic is priced per scene (video_clone_xN); UGC per 15s clip. Actual charge is server-side.
+  const cost = style === 'cinematic' ? 600 * Math.max(2, srcScenes) : (nSegs > 1 ? 600 * nSegs : 600)
 
   // Speaking-time meter — same per-language rates as the old modal. Longer than the target = talks fast.
   const RATE: Record<string, number> = { en: 2.3, ur: 2.0, hi: 2.1, ar: 1.8, es: 2.6, fr: 2.4, de: 2.2 }
@@ -106,6 +112,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       if (st.error) { setErr(st.error); setPhase('setup'); return }
       let drafted = st.script || ''
       setSrcSecs(Number(st.sourceSeconds) || null)
+      setSrcScenes(Math.max(2, Math.min(10, Number(st.sceneCount) || 3)))
       // The drafted UGC script is often paced to the source's slow rate → one short line. Auto-fill it
       // to the default length (15s) so the review screen shows a real, full-length script, not a stub.
       try {
@@ -129,13 +136,14 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
     if (!confirmCredits('remake this video', cost, balance)) return
     setErr(null); setProgress(null); setPhase('rendering')
     try {
+      const cinematic = style === 'cinematic'
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId, script, mode: 'ugc', durationBucket: bucket, sceneCount: nSegs, overlays: [], extraLangs: [], endCard: null, hookVariants: false }),
+        body: JSON.stringify({ jobId, script, mode: cinematic ? 'faithful' : 'ugc', durationBucket: bucket, sceneCount: cinematic ? Math.max(2, srcScenes) : nSegs, overlays: [], extraLangs: [], endCard: null, hookVariants: false }),
       }).then(r => r.json())
       if (ap.error) { setErr(ap.error === 'insufficient_credits' ? 'Not enough credits.' : ap.error); setPhase('review'); return }
       refreshCredits()
-      const st = await pollUntil(jobId, 'processing', nSegs > 1 ? 1_680_000 : 800_000)
+      const st = await pollUntil(jobId, 'processing', (cinematic || nSegs > 1) ? 1_680_000 : 800_000)
       if (st.timedOut) { setErr('Still rendering — multi-scene videos take a bit longer. It’ll appear in My Creatives when it’s ready (credits reserved, auto-refunded if it fails).'); setPhase('review'); return }
       if (st.error || !st.url) { setErr((st.error || 'The render failed') + ' — credits were refunded.'); setPhase('review'); refreshCredits(); return }
       setVideoUrl(st.url); setPhase('done'); onDone?.()
@@ -154,9 +162,11 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
             <div style={label}>Style</div>
             <div style={pillRow}>
               <button onClick={() => setStyle('ugc')} style={pill(style === 'ugc')}>UGC</button>
-              <button disabled title="Coming soon" style={{ ...pill(false), cursor: 'default', opacity: 0.6 }}>Cinematic · soon</button>
+              {cineOn
+                ? <button onClick={() => setStyle('cinematic')} style={pill(style === 'cinematic')}>Cinematic · testing</button>
+                : <button disabled title="Coming soon" style={{ ...pill(false), cursor: 'default', opacity: 0.6 }}>Cinematic · soon</button>}
             </div>
-            <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>UGC = a creator-style talking video. Cinematic (scene-by-scene) is coming soon.</div>
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>UGC = a creator-style talking video.{cineOn ? ' Cinematic = scene-by-scene, assembled with Remotion (transitions + brand frame).' : ' Cinematic (scene-by-scene) is coming soon.'}</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div><div style={label}>Language</div>
