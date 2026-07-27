@@ -10,7 +10,7 @@
  *   docker run -d --name alert-worker --restart unless-stopped --init \
  *     --env-file <env> -v /opt/worker/src:/app/src selfmade-worker npx tsx src/alert-worker.mjs
  */
-import { sendPaidEmail, getUserEmail, newAdBundleEmail, emailEnabled } from './email.mjs'
+import { sendPaidEmail, sendEmail, emailShell, getUserEmail, newAdBundleEmail, emailEnabled } from './email.mjs'
 
 const U = (process.env.SUPABASE_URL || '').split('\n')[0].replace(/\/$/, '')
 const K = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -33,9 +33,37 @@ async function write(method, path, body) {
 
 async function tick() {
   let follows
-  try { follows = await getJSON('followed_brands?select=id,user_id,page_id,brand_name,last_notified_at,email_alerts') }
+  try { follows = await getJSON('followed_brands?select=id,user_id,page_id,brand_name,last_notified_at,email_alerts,load_emailed') }
   catch (e) { console.warn('fetch follows failed:', e.message); return }
   if (!Array.isArray(follows) || !follows.length) return
+
+  // ── One-time "your spy is loaded" email — the moment a newly-added competitor's archive has ads in
+  // the index, tell the user (they asked to be told when loading finishes). Gated on load_emailed so it
+  // fires exactly once per follow. Free transactional email (not the paid new-ad alert). ──
+  let loadedMailed = 0
+  for (const f of follows) {
+    if (f.load_emailed) continue
+    let cnt = 0
+    try {
+      const rows = await getJSON(`discovery_ads_index?select=ad_id&page_id=eq.${enc(f.page_id)}&has_creative=is.true&limit=1000`)
+      cnt = Array.isArray(rows) ? rows.length : 0
+    } catch { continue }
+    if (cnt < 1) continue   // nothing loaded yet — re-check next tick
+    await write('PATCH', `followed_brands?id=eq.${enc(f.id)}`, { load_emailed: true }).catch(() => {})   // mark first → no double-send
+    f.load_emailed = true
+    if (!emailEnabled) continue
+    const to = await getUserEmail(f.user_id).catch(() => null)
+    if (!to) continue
+    const label = cnt >= 1000 ? '1,000+' : String(cnt)
+    try {
+      await sendEmail({ to, subject: `${f.brand_name || 'Your competitor'} is loaded — ${label} ads`,
+        html: emailShell({ heading: `${f.brand_name || 'Your competitor'} is loaded`,
+          bodyHtml: `<p>I finished reading their ad archive — <b>${label} ads</b> are in. They're on your brief now, and I'll flag the moment they launch anything new.</p>`,
+          ctaText: 'Open your brief', ctaPath: '/brief' }) })
+      loadedMailed++
+    } catch (e) { console.warn(`spy-loaded email ${f.page_id}:`, e.message) }
+  }
+  if (loadedMailed) console.log(`🛰️ ${loadedMailed} spy-loaded email(s) sent`)
 
   let made = 0
   // Collect every opted-in user's brands-with-new-ads so we can send ONE bundled email per user

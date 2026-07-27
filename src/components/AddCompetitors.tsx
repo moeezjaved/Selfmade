@@ -163,7 +163,7 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
               ))}
             </div>
             <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.6, margin: '0 0 16px' }}>
-              I’m pulling their full ad archive now — it can take a few minutes. Their ads will show up on your brief the moment they’re loaded.
+              I’m pulling their full ad archive now — it can take a few minutes. I’ll <b style={{ color: INK }}>email you</b> the moment their ads are loaded, and they’ll show up on your brief.
             </p>
             <button onClick={onClose} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 26px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Done</button>
             <style>{`.ac-spin{animation:acspin 1s linear infinite}@keyframes acspin{to{transform:rotate(360deg)}}`}</style>
