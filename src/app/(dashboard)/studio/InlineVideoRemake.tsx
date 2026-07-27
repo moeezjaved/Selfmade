@@ -50,6 +50,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   // Cinematic (Remotion-assembled, scene-by-scene) is now available to select — labelled "· testing".
   // (Set ?cinematic=0 to force-hide it if ever needed.)
   const [cineOn, setCineOn] = useState(true)
+  const [styleTouched, setStyleTouched] = useState(false)   // did the user manually pick a mode? (else auto-pick from analysis)
   const [srcScenes, setSrcScenes] = useState(3)   // analyzed scene count, used for cinematic cost + approve
   const [sbScenes, setSbScenes] = useState(0)     // scenes the founder KEPT in the embedded storyboard
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get('cinematic') === '0') setCineOn(false) } catch {} }, [])
@@ -124,6 +125,9 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       let drafted = st.script || ''
       setSrcSecs(Number(st.sourceSeconds) || null)
       setSrcScenes(Math.max(2, Math.min(10, Number(st.sceneCount) || 3)))
+      // Auto-pick the mode from the analysis (talking-head → UGC; b-roll / multi-scene → Cinematic),
+      // unless the user already chose one. Stops UGC being forced onto a b-roll ad (→ invented creator).
+      if (!styleTouched && cineOn && st.suggestedMode) setStyle(st.suggestedMode === 'faithful' ? 'cinematic' : 'ugc')
       // The drafted UGC script is often paced to the source's slow rate → one short line. Auto-fill it
       // to the default length (15s) so the review screen shows a real, full-length script, not a stub.
       try {
@@ -172,12 +176,12 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
           <div style={{ marginBottom: 16 }}>
             <div style={label}>Style</div>
             <div style={pillRow}>
-              <button onClick={() => setStyle('ugc')} style={pill(style === 'ugc')}>UGC</button>
+              <button onClick={() => { setStyle('ugc'); setStyleTouched(true) }} style={pill(style === 'ugc')}>UGC</button>
               {cineOn
-                ? <button onClick={() => setStyle('cinematic')} style={pill(style === 'cinematic')}>Cinematic · testing</button>
+                ? <button onClick={() => { setStyle('cinematic'); setStyleTouched(true) }} style={pill(style === 'cinematic')}>Cinematic · testing</button>
                 : <button disabled title="Coming soon" style={{ ...pill(false), cursor: 'default', opacity: 0.6 }}>Cinematic · soon</button>}
             </div>
-            <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>UGC = a creator-style talking video.{cineOn ? ' Cinematic = scene-by-scene, assembled with Remotion (transitions + brand frame).' : ' Cinematic (scene-by-scene) is coming soon.'}</div>
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>Mello picks the right one from the ad — UGC for a talking creator, Cinematic (scene-by-scene, Remotion-assembled) for a b-roll ad. Override anytime.</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div><div style={label}>Language</div>
