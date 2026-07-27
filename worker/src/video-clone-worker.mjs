@@ -1659,7 +1659,20 @@ async function analyzeJob(job) {
       try {
         const q = await fetch(`${U}/rest/v1/creative_generations?select=clone_meta&source_video_url=eq.${encodeURIComponent(job.source_video_url)}&id=neq.${job.id}&type=eq.video_clone&order=created_at.desc&limit=8`, { headers: H })
         const rows = q.ok ? await q.json() : []
-        const hit = rows.find((r) => r?.clone_meta?.beat_sheet && Number(r?.clone_meta?.scene_count) > 0)
+        // Only reuse a SUBSTANTIVE prior analysis. A HOLLOW one (empty transcript, empty beat actions,
+        // no avatar) is worse than none: reusing it ALSO skips the fresh Whisper transcript backfill
+        // below, so the script gets written from the product alone instead of transcreated from the
+        // ad's real spoken words, the gender is guessed, and scenes recreate nothing real. Reject it
+        // and analyse fresh. (This is the root cause behind "the clone ignores the original script".)
+        const substantive = (m) => {
+          const bs = m?.beat_sheet
+          if (!bs || !(Number(m?.scene_count) > 0)) return false
+          const words = String(bs.transcript || '').trim().split(/\s+/).filter(Boolean).length
+          const acts = Array.isArray(bs.beats) ? bs.beats.filter((b) => String(b?.action || '').trim().length > 3).length : 0
+          const av = String(bs.avatar || '').trim().toLowerCase()
+          return words >= 4 || acts >= 2 || (!!av && av !== 'none' && !av.startsWith('none'))
+        }
+        const hit = rows.find((r) => substantive(r?.clone_meta))
         if (hit) { cachedA = hit.clone_meta; console.log(`♻️ ${job.id} reusing analysis (scenes=${cachedA.scene_count}, suggest=${cachedA.suggested_mode})`) }
       } catch (e) { console.warn('analysis-cache lookup:', e.message) }
     }
@@ -1687,7 +1700,11 @@ async function analyzeJob(job) {
     // Only apply the source rate when the CLONE language matches the source language — word density
     // doesn't transfer across languages, so a translation keeps the safe default rate.
     let srcRate = cachedA ? (Number(cachedA.source_wps) || null) : null
-    if (!cachedA && OPENAI_KEY && job.source_video_url) {
+    // Safety net: transcribe the source whenever we DON'T already have its real spoken words — either a
+    // fresh analysis, OR a reused analysis whose transcript is empty. Without the transcript the script
+    // is invented from the product instead of transcreated from what the ad actually says.
+    const haveTranscript = String((beat && beat.transcript) || '').trim().split(/\s+/).filter(Boolean).length >= 4
+    if (!haveTranscript && OPENAI_KEY && job.source_video_url) {
       try {
         const tr = await transcribeSegments(job.source_video_url)
         const w = tr.words || []
