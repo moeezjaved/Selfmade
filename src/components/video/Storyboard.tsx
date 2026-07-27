@@ -139,7 +139,17 @@ export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: 
               {genErr[s.index] && <div style={{ width: 96, marginTop: 4, fontSize: 9.5, color: '#a15a25', lineHeight: 1.3 }}>{genErr[s.index]}</div>}
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, color: '#66755d', marginBottom: 8 }}>{s.action || 'Scene action'}</div>
+              {/* SHOT — what's SHOWN. Editing this + Regenerate redraws the image to match. */}
+              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872', marginBottom: 4 }}>Shot — what’s shown{board.editable && <span style={{ textTransform: 'none', letterSpacing: 0, color: '#a7b09e', fontWeight: 400 }}> · edit, then Regenerate</span>}</div>
+              <input
+                value={s.action}
+                disabled={!board.editable}
+                onChange={(e) => setScenes((prev) => prev.map((x) => x.index === s.index ? { ...x, action: e.target.value } : x))}
+                placeholder="Describe the shot — e.g. close-up of hands applying the face wash on the cheek"
+                style={{ width: '100%', fontSize: 12.5, color: '#20321c', border: '1px solid #e6ece2', borderRadius: 8, padding: '7px 10px', marginBottom: 10, background: board.editable ? '#fff' : '#faf9f5', fontFamily: 'inherit' }}
+              />
+              {/* VOICEOVER — what's SAID (the spoken line; not the image). */}
+              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872', marginBottom: 4 }}>Voiceover — what’s said</div>
               <textarea
                 value={s.scriptLine}
                 disabled={!board.editable}
