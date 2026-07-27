@@ -1814,7 +1814,13 @@ async function generateJob(job) {
           // person holding the EXACT product) and lead the video model's references with it — the
           // video model animates a frame that's already correct instead of inventing a blurry bottle.
           let keyframe = null
-          if (s.has_people && productImages.length) {
+          // If the FOUNDER already approved a keyframe for this scene in the storyboard (beats[i].preview),
+          // animate THAT — their choice, already on-brand and likeness-safe — instead of composing a fresh one.
+          const approvedKeyframe = meta.beat_sheet && Array.isArray(meta.beat_sheet.beats) && meta.beat_sheet.beats[i] && meta.beat_sheet.beats[i].preview
+          if (approvedKeyframe) {
+            keyframe = approvedKeyframe
+            console.log(`🖼 ${job.id} scene ${i + 1} using founder-approved storyboard keyframe`)
+          } else if (s.has_people && productImages.length) {
             try {
               keyframe = await composeKeyframe({ scenePrompt: s.prompt, productImageUrls: productImages, jobId: job.id, tag: `sc${i}`, aspect: meta.aspect })
               if (keyframe) console.log(`🖼 ${job.id} scene ${i + 1} keyframe composed (product-locked)`)
