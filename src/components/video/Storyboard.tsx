@@ -126,7 +126,7 @@ export default function Storyboard({ jobId, embedded, mode, resyncScript, resync
       )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {board.hookType && <span style={chip}>Hook: {board.hookType}</span>}
-        <span style={chip}>{board.suggestedMode === 'faithful' ? 'Cinematic' : 'UGC'}</span>
+        <span style={chip}>{(mode ? mode === 'cinematic' : board.suggestedMode === 'faithful') ? 'Cinematic' : 'UGC'}</span>
         <span style={chip}>{board.sceneCount} scenes</span>
         {board.durationSeconds && <span style={chip}>~{Math.round(board.durationSeconds)}s</span>}
         <span style={{ ...chip, background: board.editable ? '#dffe95' : '#f0efe8', color: board.editable ? '#17251c' : '#68756b' }}>
