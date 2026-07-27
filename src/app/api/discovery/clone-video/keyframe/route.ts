@@ -43,7 +43,10 @@ export async function POST(req: NextRequest) {
   const meta = (row as any).clone_meta || {}
   const beat = meta.beat_sheet || {}
   const beats: any[] = Array.isArray(beat.beats) ? beat.beats : []
-  const action = String(b?.action || beats[sceneIndex]?.action || 'Opening shot').slice(0, 300)
+  // Single-take UGC analyzes with no beats; the storyboard synthesizes scene cards, so a preview can
+  // target an index that has no beat row yet. Pad the array so the preview always has a slot to persist.
+  while (beats.length <= sceneIndex) beats.push({ action: '' })
+  const action = String(b?.action || b?.scriptLine || beats[sceneIndex]?.action || beats[sceneIndex]?.scriptLine || 'Opening shot').slice(0, 300)
   const look = String(b?.look || meta.character_look || '').trim()
   const productName = meta.product_details?.name || meta.brand_name || ''
 
@@ -68,8 +71,11 @@ export async function POST(req: NextRequest) {
     `Natural, real, ad-quality lighting. Leave headroom for motion. NO on-screen text, NO captions, NO watermark, NO other brand's logo.`,
   ].filter(Boolean).join(' ')
 
-  const gen = await generateImage(prompt, productImgs, 'pro', { aspectRatio: '9:16' })
-  if (!gen.ok) return NextResponse.json({ error: gen.error }, { status: 502 })
+  // A storyboard PREVIEW is a disposable reference, not the final ad — so unlike the clone (Pro-only,
+  // never downgrade), if Pro is busy we fall back to the standard model so the preview reliably appears.
+  let gen = await generateImage(prompt, productImgs, 'pro', { aspectRatio: '9:16' })
+  if (!gen.ok && gen.error === 'pro_model_busy') gen = await generateImage(prompt, productImgs, 'default', { aspectRatio: '9:16' })
+  if (!gen.ok) return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The image model is busy right now — try again in a moment.' : gen.error }, { status: 502 })
 
   const url = await uploadBufferToR2(Buffer.from(gen.dataB64, 'base64'), `creatives/keyframes/${jobId}/${sceneIndex}-${Date.now()}.jpg`, gen.mimeType)
   if (!url) return NextResponse.json({ error: 'could not store the keyframe' }, { status: 500 })

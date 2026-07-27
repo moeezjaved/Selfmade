@@ -55,7 +55,7 @@ export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: 
     try {
       const r = await fetch('/api/discovery/clone-video/keyframe', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId: board.jobId, sceneIndex: s.index, action: s.action }),
+        body: JSON.stringify({ jobId: board.jobId, sceneIndex: s.index, action: s.action, scriptLine: s.scriptLine }),
       }).then((x) => x.json())
       if (r?.preview) setScenes((prev) => prev.map((x) => x.index === s.index ? { ...x, preview: r.preview } : x))
       else setGenErr((e) => ({ ...e, [s.index]: r?.error === 'pro_model_busy' ? 'Image model busy — try again' : (r?.error || 'Could not generate') }))
