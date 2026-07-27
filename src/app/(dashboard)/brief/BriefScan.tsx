@@ -1,25 +1,27 @@
 'use client'
 /**
- * THE SCAN — the brief as a one-page company scan (Polsia's structure, Selfmade's skin).
+ * THE SCAN — the Morning Brief as the founder's operating system, not a dashboard (2026-07-28).
  *
- * Four columns: Mello (who's working) · Today (the one decision) · Competitors (who moved) ·
- * What Mello can do (the capability menu). Founders land and see, without clicking, what happened
- * and everything they're able to do about it — the discoverability Polsia gets right.
+ * The redesign laws (Chesky/PG/Jobs/Rams room):
+ *   · ONE focal point — the hero card. It carries the page's only strong elevation; nothing
+ *     competes with it visually. A screenshot of it alone should communicate the product.
+ *   · 70/30 — everything that answers "what should I do next?" lives LEFT (hero → Mello's plan →
+ *     competitors → playbook). Everything supporting lives RIGHT (Mello, plan, capabilities).
+ *   · Borders down ~70% — whitespace, contrast and soft elevation carry separation. Hairlines
+ *     survive only inside lists, where rows genuinely need a seam.
+ *   · Sentence case everywhere. 20px section titles, 15px body. No uppercase, no mono kickers.
+ *   · Green is spent on primary actions only.
  *
- * Where it deliberately departs from Polsia:
- *   · rows are RANKED, not equal-weight — the day's decision still wins the page
- *   · hairlines and type instead of boxed mono buttons — boxes are brittle at narrow widths
- *     (all-caps labels wrap and boxes can only grow taller); type reflows
- *   · the accent is spent twice — the approve button and the one Auto — not on twelve buttons
- *
- * Responsive: ≥1200 four columns · 860–1199 a 2×2 grid · <860 one column, re-ordered so the
- * decision leads and Mello's column collapses to a single status strip.
+ * Every capability of the previous scan is preserved: hero approve + Why?, second item, Mello's
+ * plan (MelloTasks), competitor rows w/ ad previews + add-competitor, capability menu, plan card /
+ * top-up, credits, cross-competitor playbook with Mello's judgment. The thin status row replaces
+ * the dark terminal strip. Responsive: ≥1060 two columns · below, sidebar stacks under the work.
  */
 import Link from 'next/link'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
 import MelloTasks from './MelloTasks'
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e3e2da', HAIR = '#ecebe3', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
+const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
 type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string; playbook?: { totalAds: number; brandsCount: number; videoPct: number; formats: { label: string; count: number }[]; hooks: { label: string; count: number }[]; emotions: { label: string; count: number }[]; offers: { label: string; count: number }[]; judgment?: { winner: string; confidence: 'High' | 'Medium' | 'Low'; confidenceWhy: string; verdict: 'Adopt' | 'Test' | 'Watch'; verdictWhy: string } } }
 type Brief = {
@@ -41,354 +43,374 @@ const ago = (iso?: string | null): string | null => {
   const d = Math.floor(h / 24); return d === 1 ? 'yesterday' : `${d}d ago`
 }
 
-// Broadsheet section header — a mono kicker (the machine register) sitting on a heavy top rule, the
-// way a newspaper marks a section. One change, all four columns, since every column uses `label`.
-const RULE = '#1c1c1a'
-const label: React.CSSProperties = { fontFamily: "ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: '.15em', textTransform: 'uppercase', color: INK, borderTop: `2px solid ${RULE}`, paddingTop: 9, margin: '0 0 16px' }
-// "Headline" style — sans (Inter) for readability, kept under the name `serif` so every call site
-// (`...serif`) switches at once. Bold weight gives the editorial heft the serif used to carry.
-const serif: React.CSSProperties = { fontFamily: "Inter, -apple-system, 'Segoe UI', system-ui, sans-serif", fontSize: 18, fontWeight: 700, color: INK, lineHeight: 1.28, letterSpacing: '-.014em' }
-const sub: React.CSSProperties = { fontSize: 13, color: MUTED, lineHeight: 1.5 }
-// Cross-competitor playbook card styles
-const pbHead: React.CSSProperties = { fontSize: 10.5, color: '#7a8872', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }
-const pbRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5, color: '#33402f', padding: '3px 0' }
-const pbNum: React.CSSProperties = { color: '#66755d', fontVariantNumeric: 'tabular-nums' }
-const pbChip: React.CSSProperties = { fontSize: 11.5, color: '#20321c', background: '#eef7d6', borderRadius: 100, padding: '3px 9px', textTransform: 'capitalize' }
+/** Section title — 20px sentence case. The only heading device on the page besides the hero. */
+const section: React.CSSProperties = { fontSize: 20, fontWeight: 750, letterSpacing: '-.02em', color: INK, margin: '0 0 4px' }
+const sectionSub: React.CSSProperties = { fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: '0 0 18px' }
+const body: React.CSSProperties = { fontSize: 15, color: MUTED, lineHeight: 1.6 }
+/** A quiet card — white on the #F7F8F5 page, separation by elevation, not outline. */
+const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
 
-/** A creative, shown. This is an ads product — the ad IS the content, so the scan must carry it.
- *  Video renders as a static poster + badge (never a live <video>): nothing to swallow the click. */
+/** A creative, shown. Video renders as poster + badge (never live) so clicks always reach the link. */
 function Shot({ image, videoUrl, w, h }: { image?: string | null; videoUrl?: string | null; w: number; h: number }) {
-  const box: React.CSSProperties = { width: w, height: h, borderRadius: 9, objectFit: 'contain', border: `1px solid ${LINE}`, background: '#0d120e', display: 'block', pointerEvents: 'none' }
+  const box: React.CSSProperties = { width: w, height: h, borderRadius: 10, objectFit: 'contain', background: '#0d120e', display: 'block', pointerEvents: 'none' }
   const badge = <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 13, textShadow: '0 2px 8px rgba(0,0,0,.55)', pointerEvents: 'none' }}>▶</span>
   if (image) return <span style={{ position: 'relative', display: 'inline-block' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={image} alt="" style={box} />{videoUrl ? badge : null}</span>
   if (videoUrl) return <span style={{ position: 'relative', display: 'inline-block' }}><video src={videoUrl} muted playsInline preload="metadata" style={box} />{badge}</span>
   return null
 }
 
-/** One hairline row — a verb and what it does. Never a box. */
+const ARROW = <span className="bsx-a" style={{ color: '#c2ccc0', fontSize: 16, transition: 'color .15s, transform .15s', display: 'inline-block' }}>→</span>
+
+/** One capability row — a verb and what it does. Hairline seams only inside the list. */
 function Row({ href, onClick, title, desc, right, first }: {
   href?: string; onClick?: () => void; title: string; desc: string; right?: React.ReactNode; first?: boolean
 }) {
   const inner = (
     <>
-      {right && <span style={{ float: 'right', marginLeft: 10 }}>{right}</span>}
-      <span className="bs-t" style={{ ...serif, display: 'block', transition: 'color .15s' }}>{title}</span>
-      <span style={{ ...sub, display: 'block' }}>{desc}</span>
+      {right && <span style={{ float: 'right', marginLeft: 10, marginTop: 2 }}>{right}</span>}
+      <span className="bsx-t" style={{ display: 'block', fontSize: 15, fontWeight: 700, letterSpacing: '-.012em', color: INK, lineHeight: 1.35, transition: 'color .15s' }}>{title}</span>
+      <span style={{ display: 'block', fontSize: 13, color: MUTED, lineHeight: 1.5, marginTop: 1 }}>{desc}</span>
     </>
   )
   const style: React.CSSProperties = {
     display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none',
-    borderTop: first ? 'none' : `1px solid ${HAIR}`, padding: first ? '0 0 11px' : '11px 0',
+    borderTop: first ? 'none' : `1px solid ${LINE}`, padding: first ? '0 0 12px' : '12px 0',
     cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none',
   }
-  if (href) return <Link href={href} onClick={onClick} className="bs-row" style={style}>{inner}</Link>
-  return <button onClick={onClick} className="bs-row" style={style}>{inner}</button>
+  if (href) return <Link href={href} onClick={onClick} className="bsx-row" style={style}>{inner}</Link>
+  return <button onClick={onClick} className="bsx-row" style={style}>{inner}</button>
 }
-
-const ARROW = <span className="bs-a" style={{ color: '#c2ccc0', fontSize: 15, transition: 'color .15s, transform .15s', display: 'inline-block' }}>→</span>
-const AUTO = <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: FOREST, background: '#f2f8ea', border: '1px solid #a8cf6f', borderRadius: 100, padding: '3px 8px' }}>Auto</span>
 
 export default function BriefScan({ brief, melloState, onAct, onWhy, credits, plan, onGoFullTime, subscribing, onBuyCredits, activeBrandId, activeBrandName, onAddCompetitor }: {
   brief: Brief; melloState: MelloState; onAct: (it: Item) => void; onWhy: (it: Item) => void
   credits?: number | null; plan?: string | null; onGoFullTime?: () => void; subscribing?: boolean; onBuyCredits?: () => void
   activeBrandId?: string | null; activeBrandName?: string | null; onAddCompetitor?: () => void
 }) {
-  // The plan card lives in the first column, Polsia-style — but only for Free users (don't upsell
-  // someone already paying). $49/mo shown with an honest per-day anchor ($49 / 30 ≈ $1.63).
   const isPaid = ['starter', 'pro', 'business', 'enterprise'].includes(String(plan || '').toLowerCase())
   const perDay = (49 / 30).toFixed(2)
   const playbook = brief.items.find(i => i.kind === 'market_playbook' && i.playbook) || null
   const hero = brief.headline || brief.items.find(i => i.kind !== 'market_playbook') || null
   const competitors = brief.items.filter(i => i.kind === 'competitor_ads').slice(0, 4)
-  const second = brief.items.find(i => i !== hero && i.kind !== 'competitor_ads' && i.kind !== 'market_playbook') || competitors[0] || null
+  const second = brief.items.find(i => i !== hero && i.kind !== 'competitor_ads' && i.kind !== 'market_playbook') || null
   const worked = ago(brief.lastCycleAt)
   const stateWord = brief.quiet ? 'Resting' : melloState === 'delivered' ? 'Delivered' : 'Awake'
 
   return (
-    <div className="bs" style={{ marginTop: 26, border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#faf9f5' }}>
-      {/* the night's work, as one line of texture — truncates rather than wraps */}
-      <div style={{ background: FOREST, color: '#b9c6b4', font: "12.5px/1.8 ui-monospace, 'SF Mono', Menlo, monospace", padding: '9px 18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        &gt; read <b style={{ color: LIME, fontWeight: 400 }}>{brief.summary.adsScanned.toLocaleString()} ads</b> across your {brief.summary.brandsWatched} competitor{brief.summary.brandsWatched === 1 ? '' : 's'}
-        {brief.summary.creativesReady > 0 && <> &nbsp;·&nbsp; drafted <b style={{ color: LIME, fontWeight: 400 }}>{brief.summary.creativesReady} creative{brief.summary.creativesReady === 1 ? '' : 's'}</b></>}
-        {worked && <> &nbsp;·&nbsp; last worked {worked}</>}
+    <div className="bsx" style={{ marginTop: 20 }}>
+      {/* ── Thin status row — what the dark strip used to shout, said quietly. ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, color: MUTED, paddingBottom: 22 }}>
+        {worked && <><span>Updated {worked}</span><span style={{ color: '#d3d6cf' }}>·</span></>}
+        <span><b style={{ color: INK, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{brief.summary.brandsWatched}</b> competitor{brief.summary.brandsWatched === 1 ? '' : 's'} tracked</span>
+        <span style={{ color: '#d3d6cf' }}>·</span>
+        <span><b style={{ color: INK, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{brief.summary.adsScanned.toLocaleString()}</b> ads read overnight</span>
+        {brief.summary.creativesReady > 0 && <><span style={{ color: '#d3d6cf' }}>·</span><span><b style={{ color: GREEN, fontWeight: 700 }}>{brief.summary.creativesReady}</b> creative{brief.summary.creativesReady === 1 ? '' : 's'} ready</span></>}
       </div>
 
-      <div className="bs-grid">
-        {/* ── MELLO — collapses to a single strip under 860 ── */}
-        <div className="bs-col bs-mello">
-          <div className="bs-mello-desk">
-            <div style={label}>Mello</div>
-            <MelloFace size={52} state={melloState} />
-            <div style={{ ...serif, marginTop: 10 }}>{stateWord}</div>
-            <div style={{ ...sub, marginBottom: 12 }}>
-              {brief.quiet ? 'Nothing needs you today.' : brief.summary.creativesReady > 0 ? `${brief.summary.creativesReady} creative${brief.summary.creativesReady === 1 ? '' : 's'} waiting on your call` : 'Watching your competitors.'}
-            </div>
-            {[['Ads read', brief.summary.adsScanned.toLocaleString()], ['Competitors', String(brief.summary.brandsWatched)], ...(typeof credits === 'number' ? [['Credits', credits.toLocaleString()]] : []), ...(worked ? [['Last worked', worked]] : [])].map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: MUTED, padding: '7px 0' }}>
-                <span>{k}</span><b style={{ color: INK, fontWeight: 750, fontVariantNumeric: 'tabular-nums' }}>{v}</b>
-              </div>
-            ))}
+      <div className="bsx-grid">
+        {/* ════ LEFT — the workspace. Everything that answers "what should I do next?" ════ */}
+        <div style={{ minWidth: 0 }}>
 
-            {/* Plan card — Polsia-style, in the first column. Free users only. */}
-            {!isPaid && onGoFullTime && (
-              <div style={{ marginTop: 18, borderTop: `2px solid ${RULE}`, paddingTop: 14 }}>
-                <div style={{ ...serif, fontSize: 18 }}>Hire Mello full-time</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, margin: '4px 0 2px' }}>
-                  <span style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>${perDay}</span>
-                  <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 11, color: MUTED }}>/ day</span>
+          {/* ── The hero card — the one focal point. ── */}
+          <div style={{ ...card, borderRadius: 20, boxShadow: '0 1px 3px rgba(17,24,17,.05), 0 24px 60px -24px rgba(17,24,17,.18)', padding: 'clamp(24px, 3vw, 36px)', marginBottom: 24 }}>
+            {brief.quiet || !hero ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                  <MelloFace size={24} state={melloState} />
+                  <span style={{ fontSize: 13, fontWeight: 650, color: MUTED }}>Mello&rsquo;s call today</span>
                 </div>
-                <div style={{ ...sub, marginBottom: 12 }}>$49/mo, billed monthly · works while you sleep.</div>
-                <button onClick={onGoFullTime} disabled={subscribing}
-                  style={{ width: '100%', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px', fontSize: 13.5, fontWeight: 800, cursor: subscribing ? 'default' : 'pointer', fontFamily: 'inherit' }}>
-                  {subscribing ? 'Opening…' : 'Go full-time →'}
-                </button>
-                {onBuyCredits && (
-                  <button onClick={onBuyCredits} style={{ width: '100%', background: 'none', border: 'none', color: GREEN, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 9 }}>
-                    or buy credits
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Paid subscribers: no upsell — a top-up card instead (they can still buy PAYG credits). */}
-            {isPaid && onBuyCredits && (
-              <div style={{ marginTop: 18, borderTop: `2px solid ${RULE}`, paddingTop: 14 }}>
-                <div style={{ ...serif, fontSize: 18 }}>Need more this month?</div>
-                <div style={{ ...sub, marginBottom: 12 }}>Top up credits — pay as you go, and they never expire.</div>
-                <button onClick={onBuyCredits}
-                  style={{ width: '100%', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  Buy credits →
-                </button>
-              </div>
-            )}
-          </div>
-          {/* mobile: one line, so the decision stays above the fold */}
-          <div className="bs-mello-strip">
-            <MelloFace size={38} state={melloState} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ ...serif, fontSize: 18 }}>{stateWord}{brief.summary.creativesReady > 0 ? ` — ${brief.summary.creativesReady} waiting` : ''}</div>
-              <div style={{ ...sub, fontSize: 12.5 }}>{brief.summary.adsScanned.toLocaleString()} ads · {brief.summary.brandsWatched} competitors{worked ? ` · ${worked}` : ''}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── TODAY — the one decision ── */}
-        <div className="bs-col bs-today">
-          {/* Mello's plan — decisions ready to run with one click (the CEO desk). Shows above the read. */}
-          <MelloTasks brandId={activeBrandId} />
-          <div style={label}>Today</div>
-          {brief.quiet || !hero ? (
-            <div><div style={serif}>Nothing needs you today.</div><div style={sub}>My honest read is don’t spend.</div></div>
-          ) : (
-            <>
-              <div style={{ paddingBottom: 12 }}>
-                <div style={{ ...serif, fontSize: 23, lineHeight: 1.2 }}>{hero.title.replace(/\.+$/, '')}</div>
-                {hero.body && <div style={{ ...sub, marginTop: 2 }}>{hero.body}</div>}
-                {/* A document (competitor report) shows a ROW of the rival's real ad thumbnails; other
-                    heroes (a made creative) show their single shot. */}
+                <div style={{ fontSize: 'clamp(22px, 2.4vw, 28px)', fontWeight: 800, letterSpacing: '-.025em', color: INK, lineHeight: 1.15 }}>Nothing needs you today.</div>
+                <p style={{ ...body, marginTop: 10, maxWidth: 520 }}>Routine rotation only — my honest read is don&rsquo;t spend. I&rsquo;ll break the quiet the moment something moves.</p>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                  <MelloFace size={24} state={melloState} />
+                  <span style={{ fontSize: 13, fontWeight: 650, color: MUTED }}>Highest priority</span>
+                  {hero.forBrand && <span style={{ fontSize: 12, fontWeight: 700, color: GREEN, background: '#eef6e4', borderRadius: 100, padding: '2px 10px' }}>for {hero.forBrand}</span>}
+                </div>
+                <div style={{ fontSize: 'clamp(22px, 2.4vw, 28px)', fontWeight: 800, letterSpacing: '-.025em', color: INK, lineHeight: 1.18, textWrap: 'balance' as any }}>
+                  {hero.title.replace(/\.+$/, '')}
+                </div>
+                {(hero.why || hero.body) && <p style={{ ...body, marginTop: 10, maxWidth: 560 }}>{hero.why || hero.body}</p>}
+                {/* the work itself — a document shows the rival's real ads; a creative shows its shot */}
                 {hero.media && hero.media.length > 1 ? (
-                  <div style={{ marginTop: 10, display: 'flex', gap: 7 }}>
+                  <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     {hero.media.slice(0, 4).map((m, i) => (
-                      <Shot key={i} image={m.image} videoUrl={m.videoUrl} w={92} h={115} />
+                      <Shot key={i} image={m.image} videoUrl={m.videoUrl} w={96} h={120} />
                     ))}
                   </div>
                 ) : (hero.thumbs?.[0] || hero.media?.[0]) ? (
-                  <div style={{ marginTop: 10 }}>
-                    <Shot image={hero.thumbs?.[0] || hero.media?.[0]?.image} videoUrl={hero.media?.[0]?.videoUrl} w={132} h={165} />
+                  <div style={{ marginTop: 18 }}>
+                    <Shot image={hero.thumbs?.[0] || hero.media?.[0]?.image} videoUrl={hero.media?.[0]?.videoUrl} w={140} h={175} />
                   </div>
                 ) : null}
-                <div style={{ marginTop: 11, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ marginTop: 22, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                   {hero.cta_href && (
                     <Link href={hero.cta_href} onClick={() => onAct(hero)}
-                      style={{ background: LIME, color: FOREST, borderRadius: 100, padding: '10px 18px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>
-                      ✓ {hero.cta_label || 'Review & approve'}
+                      style={{ background: FOREST, color: LIME, borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800, textDecoration: 'none', letterSpacing: '-.01em' }}>
+                      {hero.cta_label || 'Review & approve'} →
                     </Link>
                   )}
-                  <button onClick={() => onWhy(hero)} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Why?</button>
+                  <button onClick={() => onWhy(hero)} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Why this?</button>
                 </div>
-              </div>
-              {second && (
-                <Row first={false} title={second.title.replace(/\.+$/, '')} desc={second.why || second.body || 'Worth a look today.'}
-                  href={second.cta_href} onClick={() => onAct(second)} right={ARROW} />
-              )}
-            </>
-          )}
-        </div>
-
-        {/* ── COMPETITORS — who moved ── */}
-        <div className="bs-col">
-          <div style={label}>Competitors</div>
-          {competitors.length === 0
-            ? (
-              <div>
-                <div style={sub}>
-                  {brief.summary.brandsWatched === 0
-                    ? (activeBrandName ? `You're not watching anyone for ${activeBrandName} yet.` : `You're not watching any competitors yet.`)
-                    : 'No new launches in the last 48 hours.'}
-                </div>
-                {onAddCompetitor && (
-                  <button onClick={onAddCompetitor}
-                    style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '8px 15px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    + Add a competitor{activeBrandName ? ` for ${activeBrandName}` : ''}
-                  </button>
-                )}
-              </div>
-            )
-            : competitors.map((c, i) => (
-                <div key={c.id || i} style={{ borderTop: i === 0 ? 'none' : `1px solid ${HAIR}`, padding: i === 0 ? '0 0 12px' : '12px 0' }}>
-                  <Link href={c.cta_href?.replace('/knowledge/brand/', '/discovery/brand-spy/') || c.cta_href || '/discovery'}
-                    onClick={() => onAct(c)} className="bs-row" style={{ display: 'block', textDecoration: 'none' }}>
-                    <span style={{ float: 'right', marginLeft: 10 }}>{ARROW}</span>
-                    <span className="bs-t" style={{ ...serif, display: 'block', transition: 'color .15s' }}>{c.title.replace(/\s+launched.*$/i, '').replace(/[.:]$/, '')}</span>
-                    <span style={{ ...sub, display: 'block' }}>{(c.title.match(/launched.*/i)?.[0] || 'New activity').replace(/\.$/, '')}{ago(c.at) ? ` · ${ago(c.at)}` : ''}{c.forBrand ? ` · for ${c.forBrand}` : ''}</span>
-                  </Link>
-                  {/* what they actually launched — a scan of an ads product has to show the ads */}
-                  {!!c.media?.length && (
-                    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                      {c.media.slice(0, 3).map((m, k) => (
-                        <Link key={k} href={m.adId ? `/knowledge/ad/${m.adId}` : (c.cta_href || '/discovery')} onClick={() => onAct(c)}>
-                          <Shot image={m.image} videoUrl={m.videoUrl} w={44} h={55} />
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-          {competitors.length > 0 && onAddCompetitor && (
-            <button onClick={onAddCompetitor}
-              style={{ marginTop: 12, background: 'none', border: 'none', color: GREEN, fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
-              + Add a competitor{activeBrandName ? ` for ${activeBrandName}` : ''}
-            </button>
-          )}
-        </div>
-
-        {/* ── WHAT MELLO CAN DO — the capability menu, always visible ── */}
-        <div className="bs-col">
-          <div style={label}>What Mello can do</div>
-          <Row first href="/discovery" title="Remake a winner" desc="Their proven ad, rebuilt around your product." right={ARROW} />
-          <Row href="/studio" title="Create a fresh ad" desc="An original, on-brand, from your product photos." right={ARROW} />
-          <Row href="/studio" title="Make a UGC video" desc="A creator-style video, in your language." right={ARROW} />
-          <Row href="/discovery/brand-spy" title="Spy on a competitor" desc="I’ll watch every ad they launch." right={ARROW} />
-          <Row href="/settings" title="Make ads for me daily" desc="Pick how many — delivered every morning." right={AUTO} />
-        </div>
-      </div>
-
-      {/* ── CROSS-COMPETITOR PLAYBOOK — what's working across ALL watched brands, combined ── */}
-      {playbook?.playbook && (
-        <div style={{ borderTop: `1px solid ${LINE}`, padding: '18px 20px 22px', background: '#fbfcf9' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-            <div>
-              <div style={label}>The playbook across your {playbook.playbook.brandsCount} competitor{playbook.playbook.brandsCount === 1 ? '' : 's'}</div>
-              <div style={{ ...sub, marginTop: 3 }}>Combined from {playbook.playbook.totalAds} fresh ads — the patterns to copy before they saturate.</div>
-            </div>
-            {playbook.cta_href && (
-              <Link href={playbook.cta_href} onClick={() => onAct(playbook)}
-                style={{ background: LIME, color: FOREST, borderRadius: 100, padding: '9px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                ✓ {playbook.cta_label || 'Make one like this'}
-              </Link>
+              </>
             )}
           </div>
-          {playbook.playbook.judgment && (() => {
-            const j = playbook.playbook.judgment!
-            const tone = j.verdict === 'Adopt' ? { bg: '#eef7d6', fg: '#3f6a1e', dot: GREEN } : j.verdict === 'Test' ? { bg: '#fdf3d9', fg: '#8a6a12', dot: '#c99a1e' } : { bg: '#eef1ec', fg: '#5c6a5a', dot: '#9aa79a' }
-            return (
-              <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: '14px 16px', marginBottom: 16 }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
-                  {/* Winner — the one pattern to copy */}
-                  <div style={{ flex: '2 1 240px', minWidth: 220 }}>
-                    <div style={label}>Mello’s call</div>
-                    <div style={{ ...serif, fontSize: 19, color: INK, lineHeight: 1.25, marginTop: 4 }}>{j.winner}</div>
-                    <div style={{ ...sub, marginTop: 4 }}>The one pattern to copy across the set.</div>
-                  </div>
-                  {/* Confidence */}
-                  <div style={{ flex: '1 1 130px', minWidth: 120 }}>
-                    <div style={label}>Confidence</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 6 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: tone.dot, display: 'inline-block' }} />
-                      <span style={{ fontSize: 15, fontWeight: 800, color: INK }}>{j.confidence}</span>
+
+          {/* ── Mello's plan — decisions ready to run (the CEO desk). ── */}
+          <MelloTasks brandId={activeBrandId} />
+
+          {/* ── Also today — the one runner-up, a quiet row. ── */}
+          {second && (
+            <div style={{ ...card, padding: '16px 22px', marginBottom: 24 }}>
+              <Link href={second.cta_href || '/discovery'} onClick={() => onAct(second)} className="bsx-row" style={{ display: 'block', textDecoration: 'none' }}>
+                <span style={{ float: 'right', marginLeft: 10, marginTop: 4 }}>{ARROW}</span>
+                <span className="bsx-t" style={{ display: 'block', fontSize: 15.5, fontWeight: 700, letterSpacing: '-.012em', color: INK, lineHeight: 1.35, transition: 'color .15s' }}>{second.title.replace(/\.+$/, '')}</span>
+                <span style={{ display: 'block', fontSize: 13.5, color: MUTED, lineHeight: 1.5, marginTop: 2 }}>{second.why || second.body || 'Worth a look today.'}</span>
+              </Link>
+            </div>
+          )}
+
+          {/* ── Competitors — who moved overnight, as living rows. ── */}
+          <div style={{ marginTop: 32 }}>
+            <div style={section}>Competitors overnight</div>
+            <div style={sectionSub}>
+              {competitors.length === 0
+                ? (brief.summary.brandsWatched === 0
+                    ? (activeBrandName ? `You're not watching anyone for ${activeBrandName} yet.` : `You're not watching any competitors yet.`)
+                    : 'No new launches in the last 48 hours.')
+                : 'What they shipped while you slept.'}
+            </div>
+
+            {competitors.length > 0 && (
+              <div style={{ ...card, padding: '6px 22px' }}>
+                {competitors.map((c, i) => {
+                  const name = c.title.replace(/\s+launched.*$/i, '').replace(/[.:]$/, '')
+                  const activity = (c.title.match(/launched.*/i)?.[0] || 'New activity').replace(/\.$/, '')
+                  const when = ago(c.at)
+                  const fresh = c.at ? (Date.now() - new Date(c.at).getTime()) < 24 * 3600e3 : false
+                  return (
+                    <div key={c.id || i} style={{ borderTop: i === 0 ? 'none' : `1px solid ${LINE}`, padding: '15px 0' }}>
+                      <Link href={c.cta_href?.replace('/knowledge/brand/', '/discovery/brand-spy/') || c.cta_href || '/discovery'}
+                        onClick={() => onAct(c)} className="bsx-row" style={{ display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none' }}>
+                        {/* brand mark — initial avatar; the ad previews are the real face */}
+                        <span style={{ position: 'relative', flexShrink: 0 }}>
+                          <span style={{ width: 40, height: 40, borderRadius: 12, background: FOREST, color: LIME, display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 800 }}>{name.charAt(0).toUpperCase()}</span>
+                          {fresh && <span title="Active in the last 24h" style={{ position: 'absolute', right: -2, top: -2, width: 10, height: 10, borderRadius: '50%', background: GREEN, border: '2px solid #fff' }} />}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span className="bsx-t" style={{ display: 'block', fontSize: 15.5, fontWeight: 700, letterSpacing: '-.012em', color: INK, transition: 'color .15s', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                          <span style={{ display: 'block', fontSize: 13, color: MUTED, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {activity}{when ? ` · ${when}` : ''}{c.forBrand ? ` · for ${c.forBrand}` : ''}
+                          </span>
+                        </span>
+                        {/* what they actually launched */}
+                        {!!c.media?.length && (
+                          <span className="bsx-shots" style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                            {c.media.slice(0, 3).map((m, k) => (
+                              <Shot key={k} image={m.image} videoUrl={m.videoUrl} w={42} h={53} />
+                            ))}
+                          </span>
+                        )}
+                        {ARROW}
+                      </Link>
                     </div>
-                    <div style={{ ...sub, marginTop: 4 }}>{j.confidenceWhy}</div>
+                  )
+                })}
+              </div>
+            )}
+
+            {onAddCompetitor && (
+              competitors.length === 0 && brief.summary.brandsWatched === 0
+                ? (
+                  <button onClick={onAddCompetitor}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    + Add a competitor{activeBrandName ? ` for ${activeBrandName}` : ''}
+                  </button>
+                )
+                : (
+                  <button onClick={onAddCompetitor}
+                    style={{ marginTop: 14, background: 'none', border: 'none', color: GREEN, fontSize: 13, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                    + Add a competitor{activeBrandName ? ` for ${activeBrandName}` : ''}
+                  </button>
+                )
+            )}
+          </div>
+
+          {/* ── The playbook — what's working across every watched brand, with Mello's judgment. ── */}
+          {playbook?.playbook && (
+            <div style={{ marginTop: 40 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={section}>The playbook across your {playbook.playbook.brandsCount} competitor{playbook.playbook.brandsCount === 1 ? '' : 's'}</div>
+                  <div style={{ ...sectionSub, margin: 0 }}>Combined from {playbook.playbook.totalAds} fresh ads — the patterns to copy before they saturate.</div>
+                </div>
+                {playbook.cta_href && (
+                  <Link href={playbook.cta_href} onClick={() => onAct(playbook)}
+                    style={{ background: FOREST, color: LIME, borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                    {playbook.cta_label || 'Make one like this'} →
+                  </Link>
+                )}
+              </div>
+
+              {playbook.playbook.judgment && (() => {
+                const j = playbook.playbook.judgment!
+                const tone = j.verdict === 'Adopt' ? { bg: '#eef7d6', fg: '#3f6a1e', dot: GREEN } : j.verdict === 'Test' ? { bg: '#fdf3d9', fg: '#8a6a12', dot: '#c99a1e' } : { bg: '#eef1ec', fg: '#5c6a5a', dot: '#9aa79a' }
+                return (
+                  <div style={{ ...card, padding: '20px 24px', marginTop: 18 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 26, alignItems: 'flex-start' }}>
+                      <div style={{ flex: '2 1 240px', minWidth: 220 }}>
+                        <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 6 }}>Mello&rsquo;s call</div>
+                        <div style={{ fontSize: 18, fontWeight: 750, letterSpacing: '-.018em', color: INK, lineHeight: 1.3 }}>{j.winner}</div>
+                        <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>The one pattern to copy across the set.</div>
+                      </div>
+                      <div style={{ flex: '1 1 130px', minWidth: 120 }}>
+                        <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 6 }}>Confidence</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: tone.dot, display: 'inline-block' }} />
+                          <span style={{ fontSize: 15, fontWeight: 800, color: INK }}>{j.confidence}</span>
+                        </div>
+                        <div style={{ fontSize: 13, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>{j.confidenceWhy}</div>
+                      </div>
+                      <div style={{ flex: '1 1 150px', minWidth: 140 }}>
+                        <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 6 }}>Should you use it</div>
+                        <div style={{ display: 'inline-block', background: tone.bg, color: tone.fg, borderRadius: 100, padding: '3px 11px', fontSize: 12.5, fontWeight: 800 }}>{j.verdict}</div>
+                        <div style={{ fontSize: 13, color: MUTED, marginTop: 6, lineHeight: 1.5 }}>{j.verdictWhy}</div>
+                      </div>
+                    </div>
                   </div>
-                  {/* Should you use it */}
-                  <div style={{ flex: '1 1 150px', minWidth: 140 }}>
-                    <div style={label}>Should you use it</div>
-                    <div style={{ display: 'inline-block', background: tone.bg, color: tone.fg, borderRadius: 100, padding: '3px 11px', fontSize: 12.5, fontWeight: 800, marginTop: 6 }}>{j.verdict}</div>
-                    <div style={{ ...sub, marginTop: 6, lineHeight: 1.45 }}>{j.verdictWhy}</div>
+                )
+              })()}
+
+              <div className="bsx-pb" style={{ marginTop: 14 }}>
+                {/* Format */}
+                <div className="bsx-pb-c" style={{ ...card }}>
+                  <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 8 }}>Format</div>
+                  {playbook.playbook.videoPct > 0 && (
+                    <>
+                      <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>{playbook.playbook.videoPct}%<span style={{ fontSize: 12.5, color: MUTED, fontWeight: 500, marginLeft: 6 }}>video</span></div>
+                      <div style={{ height: 6, borderRadius: 100, background: '#eef0ea', overflow: 'hidden', margin: '6px 0 10px' }}>
+                        <div style={{ width: `${playbook.playbook.videoPct}%`, height: '100%', background: GREEN }} />
+                      </div>
+                    </>
+                  )}
+                  {playbook.playbook.formats.map(f => (
+                    <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, color: '#33402f', padding: '3px 0' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.label}</span>
+                      <b style={{ color: '#66755d', fontVariantNumeric: 'tabular-nums' }}>{f.count}</b>
+                    </div>
+                  ))}
+                </div>
+                {/* Hooks */}
+                <div className="bsx-pb-c" style={{ ...card }}>
+                  <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 8 }}>Top hooks</div>
+                  {playbook.playbook.hooks.length ? playbook.playbook.hooks.map(h => (
+                    <div key={h.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, color: '#33402f', padding: '3px 0' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.label}</span>
+                      <b style={{ color: '#66755d', fontVariantNumeric: 'tabular-nums' }}>{h.count}</b>
+                    </div>
+                  )) : <div style={{ fontSize: 13, color: MUTED }}>Still decoding.</div>}
+                </div>
+                {/* Emotions */}
+                <div className="bsx-pb-c" style={{ ...card }}>
+                  <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 8 }}>Emotions they pull</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {playbook.playbook.emotions.length ? playbook.playbook.emotions.map(e => (
+                      <span key={e.label} style={{ fontSize: 12, color: '#20321c', background: '#eef7d6', borderRadius: 100, padding: '3px 10px', textTransform: 'capitalize' }}>{e.label} <b style={{ color: '#66755d' }}>{e.count}</b></span>
+                    )) : <div style={{ fontSize: 13, color: MUTED }}>Still decoding.</div>}
+                  </div>
+                </div>
+                {/* Offers */}
+                <div className="bsx-pb-c" style={{ ...card }}>
+                  <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 8 }}>Offers they run</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {playbook.playbook.offers.length ? playbook.playbook.offers.map(o => (
+                      <span key={o.label} style={{ fontSize: 12, color: '#20321c', background: '#eef7d6', borderRadius: 100, padding: '3px 10px', textTransform: 'capitalize' }}>{o.label} <b style={{ color: '#66755d' }}>{o.count}</b></span>
+                    )) : <div style={{ fontSize: 13, color: MUTED }}>None surfaced in copy yet.</div>}
                   </div>
                 </div>
               </div>
-            )
-          })()}
-          <div className="bs-pb">
-            {/* Format — video vs image split + top format_style bars */}
-            <div className="bs-pb-c">
-              <div style={pbHead}>Format</div>
-              {playbook.playbook.videoPct > 0 && (
-                <>
-                  <div style={{ ...serif, fontSize: 22, color: INK }}>{playbook.playbook.videoPct}%<span style={{ fontSize: 12, color: MUTED, fontWeight: 400, marginLeft: 6, fontFamily: 'inherit' }}>video</span></div>
-                  <div style={{ height: 6, borderRadius: 100, background: '#e6ece2', overflow: 'hidden', margin: '6px 0 10px' }}>
-                    <div style={{ width: `${playbook.playbook.videoPct}%`, height: '100%', background: GREEN }} />
-                  </div>
-                </>
-              )}
-              {playbook.playbook.formats.map(f => (
-                <div key={f.label} style={pbRow}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.label}</span><b style={pbNum}>{f.count}</b></div>
-              ))}
             </div>
-            {/* Hooks */}
-            <div className="bs-pb-c">
-              <div style={pbHead}>Top hooks</div>
-              {playbook.playbook.hooks.length ? playbook.playbook.hooks.map(h => (
-                <div key={h.label} style={pbRow}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.label}</span><b style={pbNum}>{h.count}</b></div>
-              )) : <div style={sub}>Still decoding.</div>}
-            </div>
-            {/* Emotions */}
-            <div className="bs-pb-c">
-              <div style={pbHead}>Emotions they pull</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {playbook.playbook.emotions.length ? playbook.playbook.emotions.map(e => (
-                  <span key={e.label} style={pbChip}>{e.label} <b style={{ color: '#66755d' }}>{e.count}</b></span>
-                )) : <div style={sub}>Still decoding.</div>}
-              </div>
-            </div>
-            {/* Offers */}
-            <div className="bs-pb-c">
-              <div style={pbHead}>Offers they run</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {playbook.playbook.offers.length ? playbook.playbook.offers.map(o => (
-                  <span key={o.label} style={pbChip}>{o.label} <b style={{ color: '#66755d' }}>{o.count}</b></span>
-                )) : <div style={sub}>None surfaced in copy yet.</div>}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+
+        {/* ════ RIGHT — the supporting sidebar. Mello, plan, capabilities. ════ */}
+        <aside className="bsx-side">
+          {/* Mello — who's working for you */}
+          <div style={{ ...card, padding: '20px 22px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <MelloFace size={44} state={melloState} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 750, letterSpacing: '-.015em', color: INK }}>{stateWord}</div>
+                <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.45 }}>
+                  {brief.quiet ? 'Nothing needs you today.' : brief.summary.creativesReady > 0 ? `${brief.summary.creativesReady} creative${brief.summary.creativesReady === 1 ? '' : 's'} waiting on your call` : 'Watching your competitors.'}
+                </div>
+              </div>
+            </div>
+            {typeof credits === 'number' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: MUTED, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${LINE}` }}>
+                <span>Credits</span><b style={{ color: INK, fontWeight: 750, fontVariantNumeric: 'tabular-nums' }}>{credits.toLocaleString()}</b>
+              </div>
+            )}
+          </div>
+
+          {/* Plan — free users see the hire card; paid see a quiet top-up */}
+          {!isPaid && onGoFullTime && (
+            <div style={{ ...card, padding: '20px 22px' }}>
+              <div style={{ fontSize: 16, fontWeight: 750, letterSpacing: '-.015em', color: INK }}>Hire Mello full-time</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, margin: '6px 0 2px' }}>
+                <span style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>${perDay}</span>
+                <span style={{ fontSize: 12.5, color: MUTED }}>/ day</span>
+              </div>
+              <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.5, marginBottom: 14 }}>$49/mo, billed monthly · works while you sleep.</div>
+              <button onClick={onGoFullTime} disabled={subscribing}
+                style={{ width: '100%', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '12px', fontSize: 13.5, fontWeight: 800, cursor: subscribing ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                {subscribing ? 'Opening…' : 'Go full-time →'}
+              </button>
+              {onBuyCredits && (
+                <button onClick={onBuyCredits} style={{ width: '100%', background: 'none', border: 'none', color: GREEN, fontSize: 12.5, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit', marginTop: 10 }}>
+                  or buy credits
+                </button>
+              )}
+            </div>
+          )}
+          {isPaid && onBuyCredits && (
+            <div style={{ ...card, padding: '20px 22px' }}>
+              <div style={{ fontSize: 16, fontWeight: 750, letterSpacing: '-.015em', color: INK }}>Need more this month?</div>
+              <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.5, margin: '4px 0 14px' }}>Top up credits — pay as you go, and they never expire.</div>
+              <button onClick={onBuyCredits}
+                style={{ width: '100%', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '12px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Buy credits →
+              </button>
+            </div>
+          )}
+
+          {/* What Mello can do — the capability menu, always visible */}
+          <div style={{ ...card, padding: '20px 22px' }}>
+            <div style={{ fontSize: 16, fontWeight: 750, letterSpacing: '-.015em', color: INK, marginBottom: 14 }}>What Mello can do</div>
+            <Row first href="/discovery" title="Remake a winner" desc="Their proven ad, rebuilt around your product." right={ARROW} />
+            <Row href="/studio" title="Create a fresh ad" desc="An original, on-brand, from your product photos." right={ARROW} />
+            <Row href="/studio" title="Make a UGC video" desc="A creator-style video, in your language." right={ARROW} />
+            <Row href="/discovery/brand-spy" title="Spy on a competitor" desc="I'll watch every ad they launch." right={ARROW} />
+            <Row href="/settings" title="Make ads for me daily" desc="Pick how many — delivered every morning."
+              right={<span style={{ fontSize: 11, fontWeight: 750, color: FOREST, background: '#f2f8ea', border: `1px solid #a8cf6f`, borderRadius: 100, padding: '2px 9px' }}>Auto</span>} />
+          </div>
+        </aside>
+      </div>
 
       <style>{`
-        .bs-pb{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:${LINE};border:1px solid ${LINE};border-radius:12px;overflow:hidden}
-        .bs-pb-c{background:#fff;padding:13px 15px;min-width:0}
-        @media(max-width:859px){.bs-pb{grid-template-columns:1fr 1fr}}
-        .bs-grid{display:grid;grid-template-columns:repeat(4,1fr);align-items:start}
-        .bs-col{border-right:1px solid ${LINE};padding:16px 18px 22px;min-width:0}
-        .bs-col:last-child{border-right:none}
-        .bs-mello-strip{display:none}
-        .bs-row:hover .bs-t{color:${GREEN}}
-        .bs-row:hover .bs-a{color:${GREEN};transform:translateX(3px)}
-        @media(max-width:1199px){
-          .bs-grid{grid-template-columns:repeat(2,1fr)}
-          .bs-col:nth-child(2n){border-right:none}
-          .bs-col:nth-child(-n+2){border-bottom:1px solid ${LINE}}
+        .bsx-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:32px;align-items:start}
+        .bsx-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px}
+        .bsx-row:hover .bsx-t{color:${GREEN}}
+        .bsx-row:hover .bsx-a{color:${GREEN};transform:translateX(3px)}
+        .bsx-pb{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+        .bsx-pb-c{padding:16px 18px;min-width:0}
+        @media(max-width:1220px){.bsx-pb{grid-template-columns:repeat(2,1fr)}}
+        @media(max-width:1059px){
+          .bsx-grid{grid-template-columns:1fr}
+          .bsx-side{position:static;margin-top:8px}
         }
-        @media(max-width:859px){
-          .bs-grid{grid-template-columns:1fr}
-          .bs-col{border-right:none;border-bottom:1px solid ${LINE};padding:15px}
-          .bs-col:last-child{border-bottom:none}
-          /* the decision leads on a phone; Mello becomes one line above it */
-          .bs-mello{order:-2;padding-bottom:13px}
-          .bs-today{order:-1}
-          .bs-mello-desk{display:none}
-          .bs-mello-strip{display:flex;align-items:center;gap:11px}
-        }
+        @media(max-width:640px){.bsx-shots{display:none!important}}
       `}</style>
     </div>
   )

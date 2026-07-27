@@ -43,17 +43,17 @@ export default function MelloTasks({ brandId }: { brandId?: string | null }) {
   if (!tasks) return null
   if (!tasks.length) return null
 
-  const chip: React.CSSProperties = { fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: GREEN, background: '#eef7d6', borderRadius: 5, padding: '2px 7px' }
+  const chip: React.CSSProperties = { fontSize: 11.5, fontWeight: 750, color: GREEN, background: '#eef7d6', borderRadius: 100, padding: '3px 10px' }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-      <div style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: INK, borderTop: '2px solid #1c1c1a', paddingTop: 9 }}>Mello’s plan for today</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+      <div style={{ fontSize: 20, fontWeight: 750, letterSpacing: '-.02em', color: INK }}>Mello&rsquo;s plan for today</div>
       {tasks.map((t, i) => {
         const running = t.status === 'running'
         const done = t.status === 'done'
         const failed = t.status === 'failed'
         return (
-          <div key={t.id || t.suggested_key || i} style={{ border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 15px', background: '#fff' }}>
+          <div key={t.id || t.suggested_key || i} style={{ borderRadius: 16, padding: '18px 22px', background: '#fff', boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
               <span style={chip}>{KIND[t.kind]?.label || t.kind}</span>
               {done && <span style={{ ...chip, color: '#2f7d1f', background: '#e7f3de' }}>Done</span>}
