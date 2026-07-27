@@ -71,10 +71,10 @@ export async function POST(req: NextRequest) {
     `Natural, real, ad-quality lighting. Leave headroom for motion. NO on-screen text, NO captions, NO watermark, NO other brand's logo.`,
   ].filter(Boolean).join(' ')
 
-  // A storyboard PREVIEW is a disposable reference, not the final ad — so unlike the clone (Pro-only,
-  // never downgrade), if Pro is busy we fall back to the standard model so the preview reliably appears.
-  let gen = await generateImage(prompt, productImgs, 'pro', { aspectRatio: '9:16' })
-  if (!gen.ok && gen.error === 'pro_model_busy') gen = await generateImage(prompt, productImgs, 'default', { aspectRatio: '9:16' })
+  // A storyboard keyframe is animated into a 720p clip and only seeds the shot's composition — so it
+  // uses the STANDARD model (not Pro 2K): ~3× faster, far lighter on the image quota, and identical
+  // once it's a moving 720p frame. (The final clone stays Pro-only; that's where fidelity is paid for.)
+  const gen = await generateImage(prompt, productImgs, 'default', { aspectRatio: '9:16' })
   if (!gen.ok) return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The image model is busy right now — try again in a moment.' : gen.error }, { status: 502 })
 
   const url = await uploadBufferToR2(Buffer.from(gen.dataB64, 'base64'), `creatives/keyframes/${jobId}/${sceneIndex}-${Date.now()}.jpg`, gen.mimeType)
