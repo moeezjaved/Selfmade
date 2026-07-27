@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useState } from 'react'
 
-type Scene = { index: number; role: string; time: string | null; action: string; scriptLine: string }
+type Scene = { index: number; role: string; time: string | null; action: string; scriptLine: string; thumb?: string | null }
 type Board = {
   jobId: string; status: string; editable: boolean; hookType: string | null; suggestedMode: string
   sceneCount: number; durationSeconds: number | null; script: string; scenes: Scene[]
@@ -69,7 +69,7 @@ export default function Storyboard({ jobId }: { jobId?: string }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {scenes.map((s, i) => (
-          <div key={s.index} style={{ display: 'grid', gridTemplateColumns: '56px 1fr', gap: 14, border: '1px solid #e6ece2', borderRadius: 12, padding: '14px 16px', background: '#fff' }}>
+          <div key={s.index} style={{ display: 'grid', gridTemplateColumns: '56px 96px 1fr', gap: 14, border: '1px solid #e6ece2', borderRadius: 12, padding: '14px 16px', background: '#fff', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <div style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, color: '#17251c', lineHeight: 1 }}>{i + 1}</div>
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872' }}>{ROLE_LABEL[s.role] || 'Scene'}</div>
@@ -81,6 +81,9 @@ export default function Storyboard({ jobId }: { jobId?: string }) {
                   <button onClick={() => remove(s.index)} disabled={scenes.length <= 1} aria-label="Remove scene" style={{ border: '1px solid #f0dada', background: '#fff', borderRadius: 5, width: 20, height: 20, cursor: scenes.length <= 1 ? 'default' : 'pointer', color: '#b3564e', fontSize: 11, lineHeight: 1, padding: 0 }}>✕</button>
                 </div>
               )}
+            </div>
+            <div style={{ width: 96, aspectRatio: '9/16', borderRadius: 8, overflow: 'hidden', background: '#eef2ec', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {s.thumb ? <img src={s.thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 20, color: '#b4bdad' }}>▦</span>}
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 12.5, color: '#66755d', marginBottom: 8 }}>{s.action || 'Scene action'}</div>
