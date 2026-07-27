@@ -17,6 +17,7 @@
  */
 import Link from 'next/link'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
+import MelloTasks from './MelloTasks'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e3e2da', HAIR = '#ecebe3', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
@@ -171,6 +172,8 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
 
         {/* ── TODAY — the one decision ── */}
         <div className="bs-col bs-today">
+          {/* Mello's plan — decisions ready to run with one click (the CEO desk). Shows above the read. */}
+          <MelloTasks brandId={activeBrandId} />
           <div style={label}>Today</div>
           {brief.quiet || !hero ? (
             <div><div style={serif}>Nothing needs you today.</div><div style={sub}>My honest read is don’t spend.</div></div>
