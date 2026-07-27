@@ -228,10 +228,19 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       {/* REVIEW — edit script + length, then render */}
       {phase === 'review' && (
         <div>
-          <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit any scene, preview it, reorder — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
-          {jobId
-            ? <Storyboard jobId={jobId} embedded mode={style} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
-            : <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />}
+          {/* UGC = one continuous take → a plain SCRIPT is the whole plan (no scene storyboard). Cinematic
+              = scene-by-scene, so it gets the visual storyboard with keyframes. */}
+          {style === 'cinematic'
+            ? <>
+                <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit any scene, preview it, reorder — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
+                {jobId
+                  ? <Storyboard jobId={jobId} embedded mode={style} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
+                  : <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />}
+              </>
+            : <>
+                <div style={label}>Your script <span style={{ color: '#aab0a6', fontWeight: 600 }}>· the creator says this — edit it freely{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
+                <textarea value={script} onChange={e => setScript(e.target.value)} rows={7} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 150 }} />
+              </>}
           <div style={{ margin: '16px 0' }}>
             <div style={label}>
               Length {srcSecs ? <span style={{ color: '#aab0a6', fontWeight: 600 }}>· their ad runs ~{Math.round(srcSecs)}s</span> : null}
