@@ -71,11 +71,12 @@ export async function POST(req: NextRequest) {
     `Natural, real, ad-quality lighting. Leave headroom for motion. NO on-screen text, NO captions, NO watermark, NO other brand's logo.`,
   ].filter(Boolean).join(' ')
 
-  // A storyboard keyframe is animated into a 720p clip and only seeds the shot's composition — so it
-  // uses the STANDARD model (not Pro 2K): ~3× faster, far lighter on the image quota, and identical
-  // once it's a moving 720p frame. (The final clone stays Pro-only; that's where fidelity is paid for.)
-  const gen = await generateImage(prompt, productImgs, 'default', { aspectRatio: '9:16' })
-  if (!gen.ok) return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The image model is busy right now — try again in a moment.' : gen.error }, { status: 502 })
+  // The keyframe seeds the final video (the worker animates the approved one), so it uses the PRO model
+  // for product fidelity — the standard model's weaker results would carry straight into the clip. We
+  // only trim RESOLUTION to 1K (not 2K): resolution is independent of model quality and 1K is already
+  // above a 720p frame, so it's faster + lighter on quota with no visible loss once it's moving video.
+  const gen = await generateImage(prompt, productImgs, 'pro', { aspectRatio: '9:16', imageSize: '1K' })
+  if (!gen.ok) return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The image model is busy — top up the Gemini billing or try again in a moment.' : gen.error }, { status: 502 })
 
   const url = await uploadBufferToR2(Buffer.from(gen.dataB64, 'base64'), `creatives/keyframes/${jobId}/${sceneIndex}-${Date.now()}.jpg`, gen.mimeType)
   if (!url) return NextResponse.json({ error: 'could not store the keyframe' }, { status: 500 })
