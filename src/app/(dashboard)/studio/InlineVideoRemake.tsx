@@ -221,7 +221,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
         <div>
           <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit any scene, preview it, reorder — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
           {jobId
-            ? <Storyboard jobId={jobId} embedded onScript={setScript} onSceneCount={setSbScenes} />
+            ? <Storyboard jobId={jobId} embedded mode={style} onScript={setScript} onSceneCount={setSbScenes} />
             : <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />}
           <div style={{ margin: '16px 0' }}>
             <div style={label}>
@@ -263,14 +263,17 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
         <div>
           <div style={{ fontSize: 16, fontWeight: 800, color: INK, marginBottom: 10 }}>Your video is ready.</div>
           <video src={videoUrl} controls playsInline poster={sourcePoster || undefined} style={{ width: 300, maxWidth: '100%', borderRadius: 14, border: `1px solid ${LINE}`, background: '#0d120e', display: 'block' }} />
-          <div style={{ display: 'flex', gap: 9, marginTop: 12 }}>
-            <a href={videoUrl} download target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: LIME, borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}><Download size={15} /> Download</a>
-            <button onClick={() => { setPhase('setup'); setVideoUrl(null); setScript(''); setJobId(null); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}><Play size={15} /> Another</button>
+          <div style={{ display: 'flex', gap: 9, marginTop: 12, flexWrap: 'wrap' }}>
+            {/* Edit & export is the PRIMARY next step — captions, CTA, logo, aspect, all free in the editor. */}
             {jobId && (
-              <a href={`/studio/editor?jobId=${jobId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}><Wand2 size={15} /> Edit &amp; export</a>
+              <a href={`/studio/editor?jobId=${jobId}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: LIME, borderRadius: 100, padding: '11px 22px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}><Wand2 size={15} /> Edit &amp; export</a>
             )}
+            {/* Direct download via our proxy (Content-Disposition: attachment) — no new tab, real "Save as". */}
+            <a href={`/api/creatives/download?url=${encodeURIComponent(videoUrl)}&name=${encodeURIComponent(`${(productName || brandName || 'aura').toString().trim() || 'aura'}-ad.mp4`)}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}><Download size={15} /> Download</a>
+            <button onClick={() => { setPhase('setup'); setVideoUrl(null); setScript(''); setJobId(null); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}><Play size={15} /> Another</button>
           </div>
-          <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>Open the editor to change captions, CTA, logo or aspect — free — and export to every platform.</div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>Edit — change captions, CTA, logo or aspect, free — then export to every platform.</div>
         </div>
       )}
 
