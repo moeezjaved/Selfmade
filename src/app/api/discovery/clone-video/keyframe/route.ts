@@ -74,8 +74,9 @@ export async function POST(req: NextRequest) {
   // A storyboard PREVIEW is a disposable reference, not the final ad — so unlike the clone (Pro-only,
   // never downgrade), if Pro is busy we fall back to the standard model so the preview reliably appears.
   let gen = await generateImage(prompt, productImgs, 'pro', { aspectRatio: '9:16' })
+  const proErr = gen.ok ? null : gen.error
   if (!gen.ok && gen.error === 'pro_model_busy') gen = await generateImage(prompt, productImgs, 'default', { aspectRatio: '9:16' })
-  if (!gen.ok) return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The image model is busy right now — try again in a moment.' : gen.error }, { status: 502 })
+  if (!gen.ok) return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The image model is busy right now — try again in a moment.' : gen.error, detail: gen.error, proErr, hadProduct: productImgs.length }, { status: 502 })
 
   const url = await uploadBufferToR2(Buffer.from(gen.dataB64, 'base64'), `creatives/keyframes/${jobId}/${sceneIndex}-${Date.now()}.jpg`, gen.mimeType)
   if (!url) return NextResponse.json({ error: 'could not store the keyframe' }, { status: 500 })
