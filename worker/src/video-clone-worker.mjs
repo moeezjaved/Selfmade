@@ -802,15 +802,20 @@ async function stillFromClip(clipUrl, id, tag) {
 // Storyboard reference frames: grab one frame from the SOURCE video at each beat's moment so the
 // pre-generation storyboard shows a real film strip (not text). Best-effort — mutates beats[i].thumb
 // in place, downloads the source ONCE. Any failure leaves beats untouched (caller wraps in try/catch).
-async function storyboardFrames(sourceVideoUrl, beats, id) {
-  if (!sourceVideoUrl || !Array.isArray(beats) || !beats.length) return
+async function storyboardFrames(sourceVideoUrl, beat, wantN, id) {
+  if (!sourceVideoUrl || !beat) return
+  let beats = Array.isArray(beat.beats) ? beat.beats : []
+  // Single-take UGC analyzes with NO beats — synthesize N slots (N = the scene count) so each
+  // storyboard scene still gets a real reference frame, sampled evenly across the source video.
+  if (!beats.length) { const n = Math.max(1, Math.min(8, Math.round(Number(wantN) || 3))); beats = Array.from({ length: n }, () => ({ action: '' })); beat.beats = beats }
   const f = join(tmpdir(), `sb-${id}.mp4`)
   try {
     await downloadToFile(sourceVideoUrl, f)
     const dur = (await probeDuration(f)) || 15
     for (let i = 0; i < Math.min(beats.length, 12); i++) {
       const start = parseFloat(String(beats[i]?.t ?? '').replace(/[^\d.].*$/, ''))
-      const at = Math.max(0.2, Math.min(dur - 0.2, Number.isFinite(start) ? start : (i * dur) / beats.length))
+      // No timestamp (synthesized slot) → sample at the scene's MIDPOINT across the clip.
+      const at = Math.max(0.2, Math.min(dur - 0.2, Number.isFinite(start) ? start : ((i + 0.5) * dur) / beats.length))
       const jpg = join(tmpdir(), `sb-${id}-${i}.jpg`)
       try {
         await ff(['-y', '-ss', String(at), '-i', f, '-frames:v', '1', '-q:v', '4', '-vf', 'scale=360:-1', jpg])
@@ -1736,7 +1741,7 @@ async function analyzeJob(job) {
     const overlays = await adaptOverlays(beat && beat.on_screen_text, productDetails, meta.brand_name).catch(() => [])
     // Grab a reference frame per beat from the source video so the storyboard shows a real film strip
     // (mutates beat.beats[i].thumb in place). Best-effort — never blocks the draft.
-    try { await storyboardFrames(job.source_video_url, beat && beat.beats, job.id) } catch (e) { console.warn(`storyboard frames ${job.id}:`, e.message) }
+    try { await storyboardFrames(job.source_video_url, beat, scenes, job.id) } catch (e) { console.warn(`storyboard frames ${job.id}:`, e.message) }
     await stamp({ status: 'review', clone_meta: { ...meta, beat_sheet: beat, seedance_prompt: prompt, script, script_gloss: gloss, suggested_mode: cinematic ? 'faithful' : 'ugc', scene_count: scenes, overlays } })
     console.log(`📝 drafted ${job.id} → awaiting approval (suggest=${cinematic ? 'faithful' : 'ugc'}, scenes=${scenes})`)
   } catch (e) {

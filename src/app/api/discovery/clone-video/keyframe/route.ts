@@ -82,6 +82,13 @@ export async function POST(req: NextRequest) {
   const rawImgs: string[] = Array.isArray(meta.product_image_urls) ? meta.product_image_urls.slice(0, 3) : []
   const productImgs = (await Promise.all(rawImgs.map(fetchImageB64))).filter(Boolean) as { mimeType: string; dataB64: string }[]
 
+  // CLOSEST-TO-REFERENCE: the analysis grabbed the source ad's real frame at this beat (beats[i].thumb).
+  // Feed it as a COMPOSITION guide so the keyframe tracks the reference shot-for-shot (framing, angle,
+  // subject placement) — while we REPLACE the person with an original creator and swap in the user's
+  // product, never reproducing the competitor's pixels or a real face.
+  const refFrameUrl = beats[sceneIndex]?.thumb || null
+  const refFrame = refFrameUrl ? await fetchImageB64(refFrameUrl) : null
+
   const isService = meta.product_type === 'service' || meta.product_type === 'app'
   // The reference creator's look (hair colour, age, wardrobe…) + setting, captured by the analysis —
   // so the preview matches the reference person AND stays the SAME person across every scene.
@@ -92,9 +99,12 @@ export async function POST(req: NextRequest) {
     : avatar
       ? `If a person is on camera, they MUST match the reference creator exactly — ${avatar} — copying gender, age, ethnicity, hair (colour + style) and wardrobe; the SAME person appears in every scene.`
       : 'Cast whatever people the scene naturally needs (or none), kept consistent across scenes.'
+  // With a reference frame, the product image(s) come SECOND — call that out so the model doesn't
+  // mistake the reference for the product to render.
+  const productNoun = refFrame ? 'The product image(s) (after the reference)' : 'The attached image(s)'
   const productClause = isService || !productImgs.length
     ? 'This is a service/brand — do NOT invent a physical product; lead with the person, setting, or an on-phone app view.'
-    : `The attached image(s) are the user's product${productName ? ` ("${productName}")` : ''} — render it 1:1 (exact silhouette, label, materials); do NOT reshape or invent a different product.`
+    : `${productNoun} are the user's product${productName ? ` ("${productName}")` : ''} — render it 1:1 (exact silhouette, label, materials); do NOT reshape or invent a different product.`
 
   // Mello upgrades the raw shot brief into a proper filmable direction before the model sees it —
   // users write "person holding facewash"; this makes it a real shot (framing, action, lighting).
@@ -102,9 +112,11 @@ export async function POST(req: NextRequest) {
 
   const prompt = [
     `Create ONE photorealistic vertical 9:16 video KEYFRAME that recreates this ad scene's composition for the brand — the FIRST FRAME of a short video clip.`,
+    // When present, the reference frame is the strongest signal — match its layout exactly, replace the person + product.
+    refFrame ? `The FIRST attached image is a COMPOSITION REFERENCE from the original ad — match its exact framing, camera angle, subject placement, distance and background layout. But do NOT copy it: REPLACE any on-screen person with an ORIGINAL creator (never reproduce the real person's face) and REPLACE any product with the user's product. Recreate the SHOT, not the pixels.` : '',
     `SCENE TO RECREATE: ${shot}.`,
     setting ? `Setting (match the reference): ${setting}.` : '',
-    `Match that scene's shot type (close-up / wide / over-the-shoulder), framing, and energy — but make it an ORIGINAL image (never copy any real person's face).`,
+    refFrame ? '' : `Match that scene's shot type (close-up / wide / over-the-shoulder), framing, and energy — but make it an ORIGINAL image (never copy any real person's face).`,
     productClause,
     creatorClause,
     `Natural, real, ad-quality lighting. Leave headroom for motion. NO on-screen text, NO captions, NO watermark, NO other brand's logo.`,
@@ -114,7 +126,9 @@ export async function POST(req: NextRequest) {
   // for product fidelity — the standard model's weaker results would carry straight into the clip. We
   // only trim RESOLUTION to 1K (not 2K): resolution is independent of model quality and 1K is already
   // above a 720p frame, so it's faster + lighter on quota with no visible loss once it's moving video.
-  const gen = await generateImage(prompt, productImgs, 'pro', { aspectRatio: '9:16', imageSize: '1K' })
+  // Reference frame first (composition guide), then the product images (rendered 1:1).
+  const genImages = refFrame ? [refFrame, ...productImgs] : productImgs
+  const gen = await generateImage(prompt, genImages, 'pro', { aspectRatio: '9:16', imageSize: '1K' })
   if (!gen.ok) return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The image model is busy — top up the Gemini billing or try again in a moment.' : gen.error }, { status: 502 })
 
   const url = await uploadBufferToR2(Buffer.from(gen.dataB64, 'base64'), `creatives/keyframes/${jobId}/${sceneIndex}-${Date.now()}.jpg`, gen.mimeType)
