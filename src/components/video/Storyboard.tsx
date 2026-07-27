@@ -15,13 +15,18 @@ type Board = {
 
 const ROLE_LABEL: Record<string, string> = { hook: 'Hook', body: 'Body', cta: 'CTA' }
 
-export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: {
+export default function Storyboard({ jobId, embedded, mode, onScript, onSceneCount }: {
   jobId?: string
   /** Embedded in the remake modal: hide the title + own Approve button (the modal's Create button drives). */
   embedded?: boolean
+  /** 'ugc' | 'cinematic' — for UGC the keyframes DON'T drive the render (Seedance generates the creator
+   * from text), so we skip generating them entirely (no wasted Pro credit) and show a script-only plan.
+   * Cinematic animates the approved keyframes, so it keeps them. */
+  mode?: 'ugc' | 'cinematic'
   onScript?: (joinedScript: string) => void
   onSceneCount?: (n: number) => void
 }) {
+  const showKeyframes = mode !== 'ugc'   // UGC = script-only plan (keyframes are preview-only + wasteful there)
   const [board, setBoard] = useState<Board | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [scenes, setScenes] = useState<Scene[]>([])
@@ -68,7 +73,7 @@ export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: 
   // persisted previews mean a reload skips already-generated scenes and never re-charges the model.
   const autoRan = useRef(false)
   useEffect(() => {
-    if (autoRan.current || !board?.editable || !scenes.length) return
+    if (autoRan.current || !board?.editable || !scenes.length || !showKeyframes) return   // UGC: no keyframes
     autoRan.current = true
     ;(async () => { for (const s of scenes) if (!s.preview) await genKeyframe(s) })()
   }, [board, scenes.length])   // eslint-disable-line react-hooks/exhaustive-deps
@@ -116,7 +121,7 @@ export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: 
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {scenes.map((s, i) => (
-          <div key={s.index} style={{ display: 'grid', gridTemplateColumns: '56px 96px 1fr', gap: 14, border: '1px solid #e6ece2', borderRadius: 12, padding: '14px 16px', background: '#fff', alignItems: 'start' }}>
+          <div key={s.index} style={{ display: 'grid', gridTemplateColumns: showKeyframes ? '56px 96px 1fr' : '56px 1fr', gap: 14, border: '1px solid #e6ece2', borderRadius: 12, padding: '14px 16px', background: '#fff', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <div style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, color: '#17251c', lineHeight: 1 }}>{i + 1}</div>
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872' }}>{ROLE_LABEL[s.role] || 'Scene'}</div>
@@ -129,7 +134,7 @@ export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: 
                 </div>
               )}
             </div>
-            <div>
+            {showKeyframes && <div>
               <div style={{ width: 96, aspectRatio: '9/16', borderRadius: 8, overflow: 'hidden', background: '#eef2ec', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                 {(s.preview || s.thumb)
                   ? <img src={s.preview || s.thumb || ''} alt="" onClick={() => s.preview && setZoom(s.preview)} title={s.preview ? 'Click to enlarge' : ''} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: s.preview ? 'zoom-in' : 'default' }} />
@@ -143,18 +148,18 @@ export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: 
                 </button>
               )}
               {genErr[s.index] && <div style={{ width: 96, marginTop: 4, fontSize: 9.5, color: '#a15a25', lineHeight: 1.3 }}>{genErr[s.index]}</div>}
-            </div>
+            </div>}
             <div style={{ minWidth: 0 }}>
-              {/* SHOT — what's SHOWN. Editing this + Regenerate redraws the image to match. */}
-              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872', marginBottom: 4 }}>Shot — what’s shown{board.editable && <span style={{ textTransform: 'none', letterSpacing: 0, color: '#a7b09e', fontWeight: 400 }}> · edit, then Regenerate</span>}</div>
+              {/* SHOT — what's SHOWN. For UGC (no keyframes) this is just the beat description; for Cinematic, editing + Regenerate redraws the image. */}
+              {showKeyframes && <><div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872', marginBottom: 4 }}>Shot — what’s shown{board.editable && <span style={{ textTransform: 'none', letterSpacing: 0, color: '#a7b09e', fontWeight: 400 }}> · edit, then Regenerate</span>}</div>
               <input
                 value={s.action}
                 disabled={!board.editable}
                 onChange={(e) => setScenes((prev) => prev.map((x) => x.index === s.index ? { ...x, action: e.target.value } : x))}
                 placeholder="Describe the shot — e.g. close-up of hands applying the face wash on the cheek"
                 style={{ width: '100%', fontSize: 12.5, color: '#20321c', border: '1px solid #e6ece2', borderRadius: 8, padding: '7px 10px', marginBottom: 10, background: board.editable ? '#fff' : '#faf9f5', fontFamily: 'inherit' }}
-              />
-              {/* VOICEOVER — what's SAID (the spoken line; not the image). */}
+              /></>}
+              {/* VOICEOVER — what's SAID (the spoken line — this drives BOTH UGC and Cinematic renders). */}
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872', marginBottom: 4 }}>Voiceover — what’s said</div>
               <textarea
                 value={s.scriptLine}
