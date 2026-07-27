@@ -5,7 +5,7 @@
  * scene cards BEFORE Seedance runs. On a 'review' job, editing the script + hitting Generate approves
  * it (spends credits, worker generates only the approved plan). Read-only for already-generated jobs.
  */
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 type Scene = { index: number; role: string; time: string | null; action: string; scriptLine: string; thumb?: string | null; preview?: string | null }
 type Board = {
@@ -61,6 +61,16 @@ export default function Storyboard({ jobId, embedded, onScript, onSceneCount }: 
       else setGenErr((e) => ({ ...e, [s.index]: r?.error === 'pro_model_busy' ? 'Image model busy — try again' : (r?.error || 'Could not generate') }))
     } catch { setGenErr((e) => ({ ...e, [s.index]: 'Could not generate — try again' })) } finally { setBusy((b) => ({ ...b, [s.index]: false })) }
   }
+
+  // Auto-generate a keyframe for every scene that has none — the storyboard should show its visual plan
+  // on load, not wait for per-scene clicks. Sequential (gentle on the image quota), runs once per job;
+  // persisted previews mean a reload skips already-generated scenes and never re-charges the model.
+  const autoRan = useRef(false)
+  useEffect(() => {
+    if (autoRan.current || !board?.editable || !scenes.length) return
+    autoRan.current = true
+    ;(async () => { for (const s of scenes) if (!s.preview) await genKeyframe(s) })()
+  }, [board, scenes.length])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const move = (i: number, dir: -1 | 1) => setScenes((prev) => {
     const j = i + dir
