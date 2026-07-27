@@ -14,6 +14,34 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 export const runtime = 'nodejs'
 
+// Turn whatever the user typed (or the auto-derived scene brief) into a concrete, filmable SHOT for
+// the image model — users write "person holding facewash"; the model needs shot type + framing +
+// product handling + lighting. Grounds it in the product, keeps faces likeness-safe, stays one line.
+// Best-effort: if the LLM is unavailable/errors, we fall back to the raw brief unchanged.
+async function enhanceShot(brief: string, ctx: { role?: string; scriptLine?: string; productName?: string; isService?: boolean; look?: string }): Promise<string> {
+  const key = process.env.OPENAI_API_KEY
+  if (!key || !brief.trim()) return brief
+  const roleHint = ctx.role === 'hook' ? 'This is the HOOK — a creator/person on camera is ideal.'
+    : ctx.role === 'cta' ? 'This is the CTA — end on the product, in-hand or hero.' : 'This is a body/demo beat.'
+  const sys = 'You direct ONE shot for a short vertical (9:16) UGC/ad video. Turn the user’s rough idea into a single, concrete, filmable shot description an image model can render as the FIRST FRAME of a clip. '
+    + 'Specify: shot type (close-up / medium / wide / over-the-shoulder), framing, the subject’s exact action with the product, and lighting/mood. '
+    + (ctx.isService ? 'This is a SERVICE/app — no physical product; lead with the person or an on-phone view. ' : `Keep the product ("${ctx.productName || 'the product'}") exactly as-is, at true real-world size. `)
+    + 'If a person appears, frame to AVOID a clear front-facing face (chin-down, side, or over-the-shoulder) for likeness safety. No on-screen text, no logos. '
+    + 'Return ONLY the shot description, one sentence, max 45 words.'
+  const user = `Rough idea: "${brief}".${ctx.scriptLine ? ` They say: "${ctx.scriptLine.slice(0, 160)}".` : ''} ${roleHint}${ctx.look && ctx.look.toLowerCase() !== 'match' ? ` Cast a ${ctx.look} person.` : ''}`
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL_MINI || 'gpt-4o-mini', temperature: 0.6, max_tokens: 120, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!r.ok) return brief
+    const j = await r.json()
+    const out = String(j?.choices?.[0]?.message?.content || '').trim().replace(/^["']|["']$/g, '')
+    return out.length >= 8 ? out.slice(0, 400) : brief
+  } catch { return brief }
+}
+
 async function fetchImageB64(url: string): Promise<{ mimeType: string; dataB64: string } | null> {
   try {
     const u = /^\/\/[^/]/.test(url) ? `https:${url}` : url
@@ -62,9 +90,13 @@ export async function POST(req: NextRequest) {
     ? 'This is a service/brand — do NOT invent a physical product; lead with the person, setting, or an on-phone app view.'
     : `The attached image(s) are the user's product${productName ? ` ("${productName}")` : ''} — render it 1:1 (exact silhouette, label, materials); do NOT reshape or invent a different product.`
 
+  // Mello upgrades the raw shot brief into a proper filmable direction before the model sees it —
+  // users write "person holding facewash"; this makes it a real shot (framing, action, lighting).
+  const shot = await enhanceShot(action, { role: beats[sceneIndex]?.role || (sceneIndex === 0 ? 'hook' : ''), scriptLine: b?.scriptLine || beats[sceneIndex]?.scriptLine, productName, isService, look })
+
   const prompt = [
     `Create ONE photorealistic vertical 9:16 video KEYFRAME that recreates this ad scene's composition for the brand — the FIRST FRAME of a short video clip.`,
-    `SCENE TO RECREATE: ${action}.`,
+    `SCENE TO RECREATE: ${shot}.`,
     `Match that scene's shot type (close-up / wide / over-the-shoulder), framing, and energy — but make it an ORIGINAL image (never copy any real person's face).`,
     productClause,
     creatorClause,
@@ -83,7 +115,11 @@ export async function POST(req: NextRequest) {
 
   // Persist the preview AND the (possibly user-edited) shot description onto the beat, so a reload keeps
   // the image and the cinematic render animates exactly the shot the user described here.
-  if (beats[sceneIndex]) { beats[sceneIndex].preview = url; if (b?.action) beats[sceneIndex].action = action }
+  if (beats[sceneIndex]) {
+    beats[sceneIndex].preview = url
+    if (b?.action) beats[sceneIndex].action = String(b.action).slice(0, 300)   // keep the user's raw text in the field
+    beats[sceneIndex].shot_prompt = shot                                        // the enhanced direction (for the render)
+  }
   const nextMeta = { ...meta, beat_sheet: { ...beat, beats } }
   await admin.from('creative_generations').update({ clone_meta: nextMeta }).eq('id', jobId).eq('user_id', user.id)
 
