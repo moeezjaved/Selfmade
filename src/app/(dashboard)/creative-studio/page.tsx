@@ -235,12 +235,8 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   const [twMsg, setTwMsg] = useState<string | null>(null)
   const [twNote, setTwNote] = useState('')
   const [twChip, setTwChip] = useState<string | null>(null)   // selected problem chip — selection only, never fires
-  useEffect(() => {
-    if (gen.type !== 'video_clone' || gen.media_type !== 'video' || !gen.image_url) return
-    fetch(`/api/discovery/clone-video/status?id=${gen.id}`).then((r) => r.json())
-      .then((st) => setTw({ tweakable: !!st.tweakable, ugcTweakable: !!st.ugcTweakable, segmentTweakable: !!st.segmentTweakable, scenes: st.tweakScenes || [], segments: st.tweakSegments || [] }))
-      .catch(() => {})
-  }, [gen.id, gen.type, gen.media_type, gen.image_url])
+  // (The per-video tweakability fetch was removed with the in-modal tweak panel — editing now lives in
+  // the Remotion editor, so there's nothing here to gate anymore.)
   // Keep the modal scrolled to the TOP so the video is always fully visible — on open and after a
   // tweak swaps the video in (the panel is taller than the viewport, so it otherwise stayed scrolled
   // down and cut off the video). rootRef's parent is the Overlay's scroll container.
@@ -365,170 +361,9 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
               )}
               <button onClick={copyUrl} style={{ ...btnGhost, justifyContent: 'center' }}><Link2 size={15} /> {copied ? 'Copied ✓' : 'Copy URL'}</button>
 
-              {/* ── Fix a moment — POINT at the exact seconds on the video, say what's wrong, fix just
-                  that. Precise patch is the hero; whole-section/clip re-shoots are the secondary path. ── */}
-              {gen.type === 'video_clone' && gen.media_type === 'video' && !!img && (() => {
-                const pill = (on: boolean): React.CSSProperties => ({ padding: '6px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${on ? '#1a3a1a' : '#d1d5db'}`, background: on ? '#f0fdf4' : '#fff', color: '#1a3a1a' })
-                const noteBox = { width: '100%', resize: 'vertical' as const, fontSize: 12.5, fontFamily: 'inherit', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', boxSizing: 'border-box' as const }
-                const mmss = (t?: number) => t == null ? '' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`
-                const secLbl = (t: number) => `${mmss(t)}.${Math.floor((t % 1) * 10)}`   // 0:03.4
-                const primary = { padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: '#1a3a1a', color: '#dffe95' }
-                const round1 = (t: number) => Math.round(t * 10) / 10
-                const seek = (t: number) => { if (videoRef.current) { videoRef.current.currentTime = Math.max(0, t); videoRef.current.pause() } }
-                const rangeValid = markFrom != null && markTo != null && markTo > markFrom
-                // Preview just the marked window: play from start, auto-pause at end.
-                const playRange = () => {
-                  const v = videoRef.current
-                  if (!v || markFrom == null) return
-                  const end = markTo != null ? markTo : markFrom + 3
-                  v.currentTime = markFrom
-                  const onTick = () => { if (v.currentTime >= end) { v.pause(); v.removeEventListener('timeupdate', onTick) } }
-                  v.addEventListener('timeupdate', onTick)
-                  v.play()
-                }
-                return (
-                <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>🎯 Fix a moment</div>
-                  {twBusy ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1a3a1a', fontSize: 12.5 }}><Loader2 size={14} className="spin" /> Fixing… (~2–3 min, the video updates here)</div>
-                  ) : (<>
-                    {/* PRECISE MOMENT PICKER — the hero interaction */}
-                    <div style={{ fontSize: 11.5, color: '#6b7280' }}>Play the video to where it&apos;s wrong, mark the <b>start</b> and <b>end</b>, then tell us what to fix — we fix only those seconds.</div>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <button onClick={() => { const t = round1(nowSec); setMarkFrom(t); if (markTo != null && markTo <= t) setMarkTo(null) }} style={pill(false)}>⚑ Set start<span style={{ color: '#6b7280', fontWeight: 500 }}> · now {secLbl(nowSec)}</span></button>
-                      <button onClick={() => { const t = round1(nowSec); if (markFrom == null || t > markFrom) setMarkTo(t) }} style={pill(false)}>⚑ Set end<span style={{ color: '#6b7280', fontWeight: 500 }}> · now {secLbl(nowSec)}</span></button>
-                      {(markFrom != null || markTo != null) && (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: rangeValid ? '#15803d' : '#b45309', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          {markFrom != null ? <button onClick={() => seek(markFrom)} title="jump to start" style={{ ...pill(true), padding: '3px 8px' }}>{secLbl(markFrom)}</button> : '—'}
-                          <span>→</span>
-                          {markTo != null ? <button onClick={() => seek(markTo)} title="jump to end" style={{ ...pill(true), padding: '3px 8px' }}>{secLbl(markTo)}</button> : '…'}
-                          <button onClick={() => { setMarkFrom(null); setMarkTo(null) }} title="clear" style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>×</button>
-                        </span>
-                      )}
-                    </div>
-                    {rangeValid && (
-                      <button onClick={playRange} style={{ ...pill(false), alignSelf: 'flex-start' }}>▶ Play this part ({secLbl(markFrom!)}–{secLbl(markTo!)})</button>
-                    )}
-                    <textarea value={twNote} onChange={(e) => setTwNote(e.target.value.slice(0, 300))} rows={2} style={noteBox} placeholder={'What’s wrong in this moment? e.g. “the pouch has a cap — it should be a flat sealed pouch” or “product looks squashed”'} />
-                    <button
-                      disabled={!rangeValid}
-                      onClick={() => runTweak({ type: 'patch_broll', from: markFrom, to: markTo, note: twNote.trim() || undefined })}
-                      style={{ ...primary, opacity: rangeValid ? 1 : 0.45, cursor: rangeValid ? 'pointer' : 'not-allowed' }}>
-                      🩹 Fix this moment{rangeValid ? ` (${secLbl(markFrom!)}–${secLbl(markTo!)})` : ''} · 150 cr
-                    </button>
-                    {rangeValid && (markTo! - markFrom!) > 5 && (
-                      <div style={{ fontSize: 11, color: '#b45309' }}>That&apos;s {secLbl(markTo! - markFrom!)}s — a patch covers up to 5s, so we&apos;ll patch the first 5s ({secLbl(markFrom!)}–{secLbl(markFrom! + 5)}). For a longer stretch, use &quot;Re-shoot a whole section&quot; below.</div>
-                    )}
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>Quick patch: replaces those seconds with a clean product close-up (up to 5s), voiceover keeps playing. Best for a wrong cap/label for a moment. To change what actually happens in a scene, use <b>“Change a scene”</b> below.</div>
-
-                    {/* SECONDARY — bigger fixes (whole section / whole clip) */}
-                    {tw?.segmentTweakable && (tw.segments?.length || 0) > 0 && (
-                      <details style={{ marginTop: 4, borderTop: '1px dashed #e5e7eb', paddingTop: 10 }}>
-                        <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#374151' }}>Bigger problem? Re-shoot a whole section</summary>
-                        <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 8, lineHeight: 1.5 }}>Your video is built from <b>sections</b> (one spoken part each). This re-films a whole section from scratch — the person, the action <i>and</i> the voice for that part. Use it when the whole part is wrong (not just a moment). It costs more and the creator may look slightly different. <b>1)</b> Pick the section:</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-                          {tw.segments.map((s, i) => {
-                            const range = s.start != null && s.end != null ? `${mmss(s.start)}–${mmss(s.end)}` : ''
-                            return (
-                              <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} title={s.script} style={{ ...pill(twSel === i), textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 10px', whiteSpace: 'normal' }}>
-                                <span style={{ fontWeight: 700 }}>Section {i + 1}{range ? ` · ${range}` : ''}</span>
-                                {s.script ? <span style={{ fontWeight: 400, color: '#6b7280', fontSize: 11 }}>“{s.script.slice(0, 60)}{s.script.length > 60 ? '…' : ''}”</span> : null}
-                              </button>
-                            )
-                          })}
-                        </div>
-                        {twSel != null && (<>
-                          {/* SAFE: the button stays disabled until the user actually SAYS what's wrong —
-                              a re-shoot with no instruction was firing on a stray click. */}
-                          <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 10 }}><b>2)</b> Type what&apos;s wrong in the box above, then:</div>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
-                            <button disabled={!twNote.trim()} onClick={() => runTweak({ type: 'redo_segment', scene: twSel, chip: 'redo', note: twNote.trim() || undefined })} style={{ ...primary, opacity: twNote.trim() ? 1 : 0.45, cursor: twNote.trim() ? 'pointer' : 'not-allowed' }}>✨ Re-shoot Section {twSel + 1} · 600 cr</button>
-                            {!twNote.trim() && <span style={{ fontSize: 11, color: '#b45309' }}>write what to fix first</span>}
-                          </div>
-                        </>)}
-                      </details>
-                    )}
-                    {tw?.ugcTweakable && (
-                      <details style={{ marginTop: 4, borderTop: '1px dashed #e5e7eb', paddingTop: 10 }}>
-                        <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#374151' }}>Bigger problem? Re-shoot the whole clip</summary>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-                          {[['size', 'Too big/small'], ['product', 'Product wrong'], ['person', 'Person off'], ['action', 'Not using it'], ['redo', 'Just re-roll']].map(([k, label]) => (
-                            <button key={k} onClick={() => setTwChip(twChip === k ? null : k)} style={pill(twChip === k)}>{label}</button>
-                          ))}
-                        </div>
-                        <button disabled={!twChip && !twNote.trim()} onClick={() => runTweak({ type: 'redo_ugc', chip: twChip || 'redo', note: twNote.trim() || undefined })} style={{ ...primary, marginTop: 8, opacity: (twChip || twNote.trim()) ? 1 : 0.45, cursor: (twChip || twNote.trim()) ? 'pointer' : 'not-allowed' }}>✨ Re-roll clip with this fix · 450cr</button>
-                      </details>
-                    )}
-                    {tw?.tweakable && (tw.scenes?.length || 0) > 0 && (
-                      <details open style={{ marginTop: 4, borderTop: '2px solid #eef5eb', paddingTop: 12 }}>
-                        <summary style={{ fontSize: 13, fontWeight: 800, cursor: 'pointer', color: '#1a3a1a' }}>✏️ Change a scene — just describe it</summary>
-                        <div style={{ fontSize: 11.5, color: '#6b7280', margin: '8px 0 6px', lineHeight: 1.5 }}>Pick the scene, type what you want in plain words, and we turn it into a great edit. This re-films the whole scene — best for a wrong action, setting or look.</div>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                          {tw.scenes.map((s, i) => <button key={i} onClick={() => setTwSel(twSel === i ? null : i)} style={pill(twSel === i)}>Scene {i + 1} · {s.duration}s</button>)}
-                        </div>
-                        {twSel != null && (<>
-                          <textarea value={twNote} onChange={(e) => setTwNote(e.target.value)} rows={3}
-                            placeholder="Describe the new scene in plain words — e.g. “she sprays it at the gecko on the wall from arm’s length and it drops off the wall”. We rewrite it into a great edit."
-                            style={{ ...input, width: '100%', resize: 'vertical', marginTop: 10, fontSize: 13 }} />
-                          <details style={{ marginTop: 6 }}>
-                            <summary style={{ fontSize: 11.5, color: '#6b7280', cursor: 'pointer' }}>…or tap a quick fix instead of typing</summary>
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                              {[['size', 'Too big/small'], ['product', 'Product wrong'], ['action', 'Wrong action'], ['person', 'Person off'], ['closeup', 'Close-up'], ['redo', 'Redo']].map(([k, label]) => (
-                                <button key={k} onClick={() => setTwChip(twChip === k ? null : k)} style={pill(twChip === k)}>{label}</button>
-                              ))}
-                              {tw.scenes.length > 2 && <button onClick={() => runTweak({ type: 'remove_scene', scene: twSel })} style={{ ...pill(false), color: '#15803d' }}>Remove · free</button>}
-                            </div>
-                          </details>
-                          <button disabled={!twChip && !twNote.trim()} onClick={() => runTweak({ type: 'redo_scene', scene: twSel, chip: twChip || 'redo', note: twNote.trim() || undefined })} style={{ ...primary, marginTop: 8, opacity: (twChip || twNote.trim()) ? 1 : 0.45, cursor: (twChip || twNote.trim()) ? 'pointer' : 'not-allowed' }}>✨ Redo scene {twSel + 1} · 600 cr</button>
-                        </>)}
-                      </details>
-                    )}
-                  </>)}
-                  {receipt && !twBusy && (
-                    <div style={{ marginTop: 10, background: '#f0fdf4', border: '0.5px solid #bbf7d0', borderRadius: 8, padding: '9px 11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: '#15803d', fontWeight: 500 }}>✓ Fixed{receipt.cost ? ` · used ${receipt.cost} credits` : ' · free'}</span>
-                      <button onClick={undoTweak} style={{ background: '#fff', border: '0.5px solid #86efac', color: '#15803d', borderRadius: 8, padding: '5px 12px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>↩ Undo (bring back the old version)</button>
-                    </div>
-                  )}
-                  {twMsg && !receipt && <div style={{ fontSize: 11.5, marginTop: 8, color: (twMsg === 'Updated ✓' || twMsg.startsWith('Reverted')) ? '#15803d' : '#b91c1c' }}>{twMsg}</div>}
-                </div>
-                )
-              })()}
-
-              {/* Captions add-on — burn TikTok-style captions (85% of feed watches on mute). */}
-              <div style={{ borderTop: '1px solid #eef2f0', marginTop: 6, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>✨ Add captions <span style={{ color: '#9ca3af', fontWeight: 500 }}>· 100 cr</span></div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {(['bold', 'minimal', 'boxed'] as const).map((s) => (
-                    <button key={s} onClick={() => setCapStyle(s)} style={{ flex: 1, textTransform: 'capitalize', padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${capStyle === s ? '#1a3a1a' : '#d1d5db'}`, background: capStyle === s ? '#f0fdf4' : '#fff', color: '#1a3a1a' }}>{s}</button>
-                  ))}
-                </div>
-                <select value={capLang} onChange={(e) => setCapLang(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12.5, fontFamily: 'inherit' }}>
-                  <option value="en">Captions in English</option>
-                  <option value="ur">Captions in Urdu</option>
-                  <option value="hi">Captions in Hindi</option>
-                  <option value="ar">Captions in Arabic</option>
-                </select>
-                {/* Accent colour (highlighted word, or the box for 'boxed') + size. */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11.5, color: '#6b7280' }}>Colour</span>
-                  {['#dffe95', '#ffffff', '#ffd60a', '#ff375f', '#0a84ff', '#000000'].map((c) => (
-                    <button key={c} onClick={() => setCapColor(c)} title={c} style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', border: capColor.toLowerCase() === c ? '2px solid #1a3a1a' : '1px solid #d1d5db' }} />
-                  ))}
-                  <input type="color" value={capColor} onChange={(e) => setCapColor(e.target.value)} title="Custom colour" style={{ width: 26, height: 26, padding: 0, border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 11.5, color: '#6b7280', marginRight: 2 }}>Size</span>
-                  {([['s', 'Small'], ['m', 'Medium'], ['l', 'Large']] as const).map(([v, l]) => (
-                    <button key={v} onClick={() => setCapSize(v)} style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${capSize === v ? '#1a3a1a' : '#d1d5db'}`, background: capSize === v ? '#f0fdf4' : '#fff', color: '#1a3a1a' }}>{l}</button>
-                  ))}
-                </div>
-                {capErr && <div style={{ fontSize: 12, color: '#dc2626' }}>{capErr}</div>}
-                <button onClick={addCaptions} disabled={capBusy} style={{ ...btn, justifyContent: 'center', opacity: capBusy ? 0.6 : 1 }}>
-                  {capBusy ? <><Loader2 size={15} className="spin" /> Adding captions…</> : <><Sparkles size={15} /> Add captions · 100 cr</>}
-                </button>
-                <p style={{ fontSize: 10.5, color: '#9ca3af', margin: 0 }}>Caption language is independent of the voiceover — e.g. Urdu VO with English captions.</p>
-              </div>
+              {/* Editing (captions, trims, per-scene fixes) now lives in the Remotion timeline editor —
+                  "Open in editor" above. The old in-modal tweak/captions panel was removed to avoid two
+                  competing edit surfaces. */}
             </>
           ) : (
             <>
