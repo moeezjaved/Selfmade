@@ -1,6 +1,5 @@
 'use client'
-import ComingSoonMeta from '@/components/ComingSoonMeta'
-import { META_LIVE } from '@/lib/flags'
+import MetaGate from '@/components/MetaGate'
 /**
  * /leaderboard — week-over-week creative leaderboard. Two sections:
  *  1) Performance shifts — Scaling / Declining / Newly launched / Recently paused pill tabs, each a
@@ -276,9 +275,8 @@ function mdLite(s: string): string {
     .replace(/\n/g, '<br/>')
 }
 
-// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
-// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+// ── Gate: needs a connected Meta ad account. MetaGate keys off the connection (BYO or OAuth),
+// not the old META_LIVE flag — connected users get the surface, everyone else a connect prompt. ──
 export default function LeaderboardPageGate() {
-  if (!META_LIVE) return <ComingSoonMeta feature="Leaderboard" />
-  return <LeaderboardPage />
+  return <MetaGate feature="the Leaderboard"><LeaderboardPage /></MetaGate>
 }

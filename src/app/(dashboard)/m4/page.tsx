@@ -1,7 +1,6 @@
 'use client'
-import ComingSoonMeta from '@/components/ComingSoonMeta'
-import { META_LIVE } from '@/lib/flags'
 import React, { useState } from 'react'
+import MetaGate from '@/components/MetaGate'
 import UpgradeGate from '@/components/UpgradeGate'
 import { useIsMobile } from '@/lib/useIsMobile'
 
@@ -899,9 +898,8 @@ function M4Inner() {
   )
 }
 
-// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
-// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+// ── Gate: M4 (the campaign cockpit — launch, scale, manage on Meta) needs a CONNECTED ad account.
+// BYO-token connect works without the OAuth app, so MetaGate keys off the connection itself. ──
 export default function M4PageGate() {
-  if (!META_LIVE) return <ComingSoonMeta feature="Launch Ads" />
-  return <M4Page />
+  return <MetaGate feature="campaign launch"><M4Page /></MetaGate>
 }
