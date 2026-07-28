@@ -454,7 +454,14 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
 
         {busy && !hasResults ? (
           <div style={{ background: '#f6f7f5' }}>
-            <CloneGeneration helper="Making your ad · usually under 2 minutes, longer when the model’s busy · it lands in My Creatives either way · keep browsing" />
+            {/* The transformation stage: the ORIGINAL ad on stage, Mello's work passing over it, the
+                user's real product docking in — so the finished ad is a reveal, not a surprise. A
+                bigger proxy render (w=480) than the 160px pickers; falls back to the ghost card when
+                there's no source image (e.g. some asset uploads). */}
+            <CloneGeneration
+              refImage={(() => { const t = ad.sourceThumb || ad.assetImageUrl; if (!t) return null; return (t.startsWith('data:') || t.includes('.r2.dev') || t.includes('r2.cloudflarestorage') || t.includes('cdn.tryselfmade')) ? t : `https://images.weserv.nl/?url=${encodeURIComponent(t)}&w=480&q=78&output=webp` })()}
+              productImage={(() => { const p = photos.find((x) => selected.includes(x.id))?.src; if (!p) return null; return (p.startsWith('data:') || p.includes('.r2.dev') || p.includes('r2.cloudflarestorage') || p.includes('cdn.tryselfmade')) ? p : `https://images.weserv.nl/?url=${encodeURIComponent(p)}&w=200&q=75&output=webp` })()}
+              helper="Making your ad · usually under 2 minutes, longer when the model’s busy · it lands in My Creatives either way · keep browsing" />
           </div>
         ) : hasResults ? (
           // ── Results + chat-style edit loop (light) ──
@@ -487,7 +494,9 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
                 )}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <div style={{ position: 'relative' }}>
-                  <img src={active.url} alt="remade ad" style={{ width: '100%', borderRadius: 12, border: `1px solid ${L_LINE}`, opacity: editing ? 0.5 : 1 }} />
+                  {/* the reveal — one-time settle when a version first shows; the transformation's payoff */}
+                  <style>{`@keyframes clone-reveal{from{opacity:.001;transform:scale(.985)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){img[alt="remade ad"]{animation:none!important}}`}</style>
+                  <img key={active.url} src={active.url} alt="remade ad" style={{ width: '100%', borderRadius: 12, border: `1px solid ${L_LINE}`, opacity: editing ? 0.5 : 1, animation: 'clone-reveal .7s cubic-bezier(.2,.7,.2,1) both' }} />
                   {editing && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: GREEN, gap: 8, fontSize: 13, fontWeight: 600 }}><Loader2 size={18} className="spin" /> Editing…</div>}
                 </div>
                 <div style={{ background: '#fcfdfb', border: `1px solid ${L_LINE}`, borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
