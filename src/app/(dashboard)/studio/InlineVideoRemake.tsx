@@ -35,9 +35,15 @@ function RenderFilmstrip({ jobId, progress }: { jobId: string; progress: { label
       .catch(() => {})
     return () => { live = false }
   }, [jobId])
-  const m = /(\d+)\s*of\s*(\d+)/i.exec(progress?.label || '')
+  // Only show the strip when the render is genuinely shot-by-shot: a cinematic 'scene X of N' progress
+  // label, OR we actually have scene keyframes. UGC is ONE continuous take ('Filming your video…', no
+  // keyframes) — a filmstrip there would imply discrete shots that don't exist, so it keeps the plain
+  // bar (UGC untouched, and honest).
+  const m = /scene\s*(\d+)\s*of\s*(\d+)/i.exec(progress?.label || '')
+  const hasFrames = frames.some(Boolean)
+  if (!m && !hasFrames) return null
   const total = m ? Math.max(Number(m[2]), frames.length) : frames.length
-  if (!total) return null
+  if (total < 2) return null
   const cur = m ? Number(m[1]) : Math.max(1, Math.ceil(((progress?.pct || 8) / 100) * total))
   const cells = Array.from({ length: total }, (_, i) => frames[i] || null)
   return (
