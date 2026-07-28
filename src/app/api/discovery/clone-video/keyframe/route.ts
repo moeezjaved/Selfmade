@@ -110,16 +110,23 @@ export async function POST(req: NextRequest) {
   let castUrl: string | null = meta.cast_sheet || null
   if (wantsPerson) {
     if (!castUrl) {
+      // GENDER LOCK for the cast sheet: when the analysis gave us no avatar text, ground the cast's
+      // gender/age/ethnicity in the REAL source frame (beats[i].thumb). Gemini image-gen accepts real
+      // photos as references (only fal's VIDEO filter blocks them), and we tell it to invent a NEW face —
+      // so the cast stays synthetic (safe downstream) but no longer flips a man's ad to a woman.
+      const castRefs = (!avatar && refFrame) ? [refFrame] : []
       const castPrompt = [
         'Create ONE photorealistic vertical 9:16 portrait of a SINGLE original person — a fictional everyday creator for a UGC/social ad, NOT any real individual or celebrity.',
         look && look.toLowerCase() !== 'match' ? `The person is ${look} in appearance.` : '',
         avatar
           ? `They look like this reference creator — match GENDER first, then age range, ethnicity, hair (colour + style), any facial hair/glasses and wardrobe: ${avatar}.`
-          : 'A natural, relatable, real-looking person (any gender) suited to this ad.',
+          : castRefs.length
+            ? 'MATCH the GENDER, apparent age, ethnicity and build of the person in the attached reference photo (Image 1) — but give them a COMPLETELY NEW, different face (a fictional person, never the real one). Same kind of person, brand-new identity. Do NOT change a man to a woman or vice-versa.'
+            : 'A natural, relatable, real-looking person (any gender) suited to this ad.',
         'Waist-up, relaxed and friendly, looking toward the camera, soft natural indoor light, simple neutral background. This is a CHARACTER REFERENCE — clean, sharp and clear so the exact same person can be recreated in later shots.',
         'NO text, NO logos, NO product in frame, NO borders.',
       ].filter(Boolean).join(' ')
-      const castGen = await generateImage(castPrompt, [], 'pro', { aspectRatio: '9:16', imageSize: '1K' })
+      const castGen = await generateImage(castPrompt, castRefs, 'pro', { aspectRatio: '9:16', imageSize: '1K' })
       if (castGen.ok) {
         const uploaded = await uploadBufferToR2(Buffer.from(castGen.dataB64, 'base64'), `creatives/cast/${jobId}.jpg`, castGen.mimeType)
         if (uploaded) {

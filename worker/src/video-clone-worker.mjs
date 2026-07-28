@@ -434,6 +434,30 @@ function lookClause(beat, look) {
 
 // ── gpt-4o: beat sheet + product → Seedance prompt + script. When forcedScript is given (the user's
 // APPROVED/edited voiceover) the prompt is built around EXACTLY that script. ──
+// ── TRANSCREATE: rewrite the ORIGINAL ad's spoken script for the user's product, keeping the same
+// hook, arc, claims and beats in the same order — a dedicated, focused call so the original's message
+// actually drives the clone (the Seedance-prompt builder kept ignoring a buried "transcreate" note and
+// produced a generic product pitch). Returns the adapted script, or null on any failure. ──
+async function transcreateAdScript(transcript, product, lang) {
+  if (!OPENAI_KEY) return null
+  const L = langName(lang)
+  const nonEn = lang && lang !== 'en'
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o', temperature: 0.6, max_tokens: 500,
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: `Here is the EXACT spoken voiceover of a winning video ad:\n"${String(transcript).replace(/"/g, "'").slice(0, 1400)}"\n\nRewrite it as the voiceover for a CLONE that sells this product instead:\n${JSON.stringify(product).slice(0, 500)}\n\nRULES:\n- Keep the SAME hook, the SAME narrative arc (problem → discovery → benefit → call to action), the SAME emotional beats and the SAME claims, in the SAME order.\n- Change ONLY the product to the user's — someone who saw the original must recognise the same ad.\n- Do NOT write a generic "hey everyone, check out this amazing device" pitch — follow what the original actually says.\n- Natural spoken ${L}${nonEn ? " in that language's native script (not romanized); keep only real product/brand names in Latin" : ''}, real creator/UGC tone. No stage directions, no on-screen-text notes.\nReturn ONLY JSON: {"script":"..."}` }],
+    }),
+  })
+  if (!r.ok) throw new Error(`transcreate ${r.status}`)
+  const j = await r.json()
+  let out = {}
+  try { out = JSON.parse(j.choices?.[0]?.message?.content || '{}') } catch { return null }
+  const s = typeof out.script === 'string' ? out.script.trim() : ''
+  return s.length >= 8 ? s : null
+}
+
 async function buildSeedancePrompt(beat, product, nImages, forcedScript, look, lang, isService) {
   const refList = Array.from({ length: nImages }, (_, i) => `@Image${i + 1}`).join(', ')
   const recast = look && look !== 'match'
@@ -1701,11 +1725,11 @@ async function analyzeJob(job) {
     // Only apply the source rate when the CLONE language matches the source language — word density
     // doesn't transfer across languages, so a translation keeps the safe default rate.
     let srcRate = cachedA ? (Number(cachedA.source_wps) || null) : null
-    // Safety net: transcribe the source whenever we DON'T already have its real spoken words — either a
-    // fresh analysis, OR a reused analysis whose transcript is empty. Without the transcript the script
-    // is invented from the product instead of transcreated from what the ad actually says.
-    const haveTranscript = String((beat && beat.transcript) || '').trim().split(/\s+/).filter(Boolean).length >= 4
-    if (!haveTranscript && OPENAI_KEY && job.source_video_url) {
+    // Capture the source's REAL spoken words into a reliable local — the single source of truth for the
+    // script. (Relying on beat.transcript surviving into the dense Seedance-prompt builder was flaky;
+    // the words were transcribed but the clone still came out as a generic product pitch.)
+    let srcTranscript = String((beat && beat.transcript) || '').trim()
+    if (srcTranscript.split(/\s+/).filter(Boolean).length < 4 && OPENAI_KEY && job.source_video_url) {
       try {
         const tr = await transcribeSegments(job.source_video_url)
         const w = tr.words || []
@@ -1715,16 +1739,30 @@ async function analyzeJob(job) {
           const cloneLang = (meta.language || 'en').slice(0, 2)
           const srcLang = (tr.language || 'en').slice(0, 2)
           if (cloneLang === srcLang) srcRate = rate
-          if (beat) beat.transcript = w.map((x) => x.word).join(' ').replace(/\s+/g, ' ').trim() || beat.transcript
+          srcTranscript = w.map((x) => x.word).join(' ').replace(/\s+/g, ' ').trim()
+          if (beat && srcTranscript) beat.transcript = srcTranscript
           console.log(`🎙 ${job.id} whisper: ${w.length} words / ${speech.toFixed(1)}s = ${rate.toFixed(1)} wps (src=${srcLang}, clone=${cloneLang})`)
         }
       } catch (e) { console.warn(`whisper source ${job.id}:`, e.message) }
     }
     meta.product_details = productDetails
     meta.source_wps = srcRate || null
+    // ── TRANSCREATE THE SCRIPT (dedicated step) ── The clone must SAY what the original said, adapted to
+    // the user's product — not a generic "check out this amazing device" pitch. We do this in its OWN
+    // focused call from the real transcript, then hand the result to the prompt builder as the exact
+    // spoken words. This is decoupled from the Seedance system prompt (which kept ignoring the buried
+    // "transcreate" bullet). Applies to BOTH modes — it's script only, never touches gender/UGC.
+    const twords = srcTranscript.split(/\s+/).filter(Boolean).length
+    console.log(`📄 ${job.id} source transcript: ${twords} words → ${twords >= 8 ? 'transcreating' : 'no transcript, will write fresh'}`)
+    let forced = null
+    if (!isService && twords >= 8) {
+      try { forced = await transcreateAdScript(srcTranscript, productDetails, meta.language) } catch (e) { console.warn(`transcreate ${job.id}:`, e.message) }
+      if (forced) console.log(`✍️ ${job.id} transcreated script from source (${forced.split(/\s+/).length} words)`)
+    }
     // (Gender/avatar backfill lives in the FAITHFUL generate branch only — UGC preserves the source
     // creator's gender correctly on its own via frame-chaining, so it's deliberately left untouched.)
-    let { prompt, script, gloss } = await buildSeedancePrompt(beat, productDetails, productImages.length, null, meta.character_look, meta.language, isService)
+    let { prompt, script, gloss } = await buildSeedancePrompt(beat, productDetails, productImages.length, forced, meta.character_look, meta.language, isService)
+    if (forced) script = forced   // the transcreated script is the source of truth for the review screen
     // Cap the drafted narration to the SOURCE's own talk-time so the clone matches the original length,
     // using the ad's REAL words/sec when we have it (same language) — a fast talker's clone gets more
     // words, a slow one fewer. The user still sees + can edit this before approving.
