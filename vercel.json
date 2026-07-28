@@ -44,6 +44,12 @@
     },
     "src/app/api/cron/observations/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/meta-audit/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/meta/connect-byo/route.ts": {
+      "maxDuration": 120
     }
   },
   "crons": [
@@ -90,6 +96,10 @@
     {
       "path": "/api/cron/observations",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/meta-audit",
+      "schedule": "20 5 * * *"
     }
   ]
 }

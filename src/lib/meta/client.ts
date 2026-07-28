@@ -118,6 +118,12 @@ export class MetaClient {
     return res.data
   }
 
+  /** Campaign-level (CBO) daily budget update — dollars in, cents to Graph. */
+  async scaleCampaignBudget(campaignId: string, newDailyBudget: number) {
+    const res = await this.client.post(`/${campaignId}`, { daily_budget: Math.round(newDailyBudget * 100) })
+    return res.data
+  }
+
   async updateAdSet(adSetId: string, updates: Record<string, unknown>) {
     const res = await this.client.post(`/${adSetId}`, updates)
     return res.data
