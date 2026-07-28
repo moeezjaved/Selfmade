@@ -26,7 +26,10 @@ async function enhanceShot(brief: string, ctx: { role?: string; scriptLine?: str
   const sys = 'You direct ONE shot for a short vertical (9:16) UGC/ad video. Turn the user’s rough idea into a single, concrete, filmable shot description an image model can render as the FIRST FRAME of a clip. '
     + 'Specify: shot type (close-up / medium / wide / over-the-shoulder), framing, the subject’s exact action with the product, and lighting/mood. '
     + (ctx.isService ? 'This is a SERVICE/app — no physical product; lead with the person or an on-phone view. ' : `Keep the product ("${ctx.productName || 'the product'}") exactly as-is, at TRUE real-world size (a small handheld item stays small in the hand, never enlarged). If the idea names a competitor's product/brand, replace it with "${ctx.productName || 'the product'}". `)
-    + 'If a person appears, frame to AVOID a clear front-facing face (chin-down, side, or over-the-shoulder) for likeness safety. No on-screen text, no logos. '
+    // A clear front-facing face is FINE and preferred — the person is a fictional AI creator (locked by
+    // the synthetic cast sheet), and fal's likeness filter blocks REAL photos, not AI-generated faces.
+    // (We used to hide faces "for likeness safety" — that was wrong and hurt consistency + hook shots.)
+    + 'If a person appears, frame them naturally for the shot — a hook or testimonial beat can be a clear front-facing close-up. No on-screen text, no logos. '
     + 'Return ONLY the shot description, one sentence, max 45 words.'
   const user = `Rough idea: "${brief}".${ctx.scriptLine ? ` They say: "${ctx.scriptLine.slice(0, 160)}".` : ''} ${roleHint}${ctx.look && ctx.look.toLowerCase() !== 'match' ? ` Cast a ${ctx.look} person.` : ''}`
   try {

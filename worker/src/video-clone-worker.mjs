@@ -1877,6 +1877,15 @@ async function generateJob(job) {
         // features them passes that frame as an @Image ref ("the SAME person as this frame"). Identity
         // flows through pixels, not adjectives — the fix for "a different person in every scene".
         const charAnchors = { ...(meta.scene_char_anchors || {}) }
+        // ── PHASE 2.5 (CINEMATIC ONLY) · SEED IDENTITY FROM THE SYNTHETIC CAST SHEET ──────────────
+        // fal's likeness filter blocks REAL faces but ACCEPTS AI-generated portraits — so the cast
+        // sheet (a clean, synthetic, front-facing portrait built during the storyboard) is a safe,
+        // strong character reference. Seeding it as anchor "A" up front means every people-scene locks
+        // to the SAME approved presenter from scene 1 onward — the AdMove result — instead of capturing
+        // identity from scene 1's RENDER, which is where the "invented a woman" drift crept in whenever
+        // a real-frame reference got filter-blocked. The per-scene capture below only fills anchors we
+        // DON'T already have, so this cast-sheet seed is never overwritten. UGC never reaches this code.
+        if (meta.cast_sheet && !charAnchors.A) { charAnchors.A = meta.cast_sheet; console.log(`🎭 ${job.id} identity seeded from cast sheet (cinematic)`) }
         const N = scenes.length
         const PER_SCENE = 75   // ~seconds a scene render takes → drives the ETA
         for (let i = 0; i < scenes.length; i++) {
