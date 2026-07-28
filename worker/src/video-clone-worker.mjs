@@ -837,6 +837,7 @@ async function storyboardFrames(sourceVideoUrl, beat, wantN, id) {
   try {
     await downloadToFile(sourceVideoUrl, f)
     const dur = (await probeDuration(f)) || 15
+    let ok = 0
     for (let i = 0; i < Math.min(beats.length, 12); i++) {
       const start = parseFloat(String(beats[i]?.t ?? '').replace(/[^\d.].*$/, ''))
       // No timestamp (synthesized slot) → sample at the scene's MIDPOINT across the clip.
@@ -846,10 +847,12 @@ async function storyboardFrames(sourceVideoUrl, beat, wantN, id) {
         await ff(['-y', '-ss', String(at), '-i', f, '-frames:v', '1', '-q:v', '4', '-vf', 'scale=360:-1', jpg])
         const key = `creatives/storyboard/${id}/${i}.jpg`
         await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: await readFile(jpg), ContentType: 'image/jpeg', CacheControl: 'public, max-age=86400' }))
-        beats[i].thumb = `${R2_PUBLIC}/${key}`
-      } catch { /* skip this frame */ } finally { await rm(jpg, { force: true }).catch(() => {}) }
+        if (beats[i]) beats[i].thumb = `${R2_PUBLIC}/${key}`
+        ok++
+      } catch (e) { console.warn(`sb-frame ${id} #${i}:`, e.message) /* one bad frame shouldn't kill the strip */ } finally { await rm(jpg, { force: true }).catch(() => {}) }
     }
-  } finally { await rm(f, { force: true }).catch(() => {}) }
+    console.log(`🎞 ${id} storyboard frames: ${ok}/${Math.min(beats.length, 12)} grabbed from source`)
+  } catch (e) { console.warn(`storyboardFrames ${id}:`, e.message) } finally { await rm(f, { force: true }).catch(() => {}) }
 }
 
 // Upload a local audio file (the cinematic VO mp3) to R2 so the Remotion timeline can play it as a
@@ -1708,6 +1711,14 @@ async function analyzeJob(job) {
     }
     if (cachedA) beat = cachedA.beat_sheet
     else if (job.source_video_url) { try { beat = await analyzeVideo(job.source_video_url) } catch (e) { console.warn('analyze:', e.message) } }
+    // NEVER leave beat null. When Gemini analysis fails/returns nothing (quota, oversized source, a
+    // transient error), a null beat made storyboardFrames early-return → the storyboard had ZERO real
+    // frames from the reference and every keyframe was invented generically. A minimal beat sheet still
+    // lets us grab real source frames (thumbs) evenly across the clip, so the storyboard stays grounded
+    // in the actual reference video even with no AI beat analysis. The script is unaffected (it comes
+    // from the Whisper transcript + transcreation, not the beat sheet).
+    if (!beat || typeof beat !== 'object') { beat = { beats: [] }; console.warn(`⚠️ ${job.id} no AI beat sheet — grounding storyboard on source frames only`) }
+    if (!Array.isArray(beat.beats)) beat.beats = []
     const productImages = Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []
     // LOOK at the product photo once (vision) so scripts describe what it actually is — capsules vs
     // gummies etc. Persisted into product_details so every later prompt builder gets it too.
