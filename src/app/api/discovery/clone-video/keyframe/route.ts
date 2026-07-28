@@ -89,19 +89,57 @@ export async function POST(req: NextRequest) {
   const refFrameUrl = beats[sceneIndex]?.thumb || null
   const refFrame = refFrameUrl ? await fetchImageB64(refFrameUrl) : null
 
-  // SAME PERSON across scenes: once an earlier scene's keyframe exists, use it as a character lock so
-  // scene 2/3 aren't a DIFFERENT-looking creator (a UGC/cinematic ad needs one consistent presenter).
-  let charLock: { mimeType: string; dataB64: string } | null = null
-  if (sceneIndex > 0) {
-    for (let j = sceneIndex - 1; j >= 0; j--) {
-      if (beats[j]?.preview) { charLock = await fetchImageB64(beats[j].preview); if (charLock) break }
-    }
-  }
-
   const isService = meta.product_type === 'service' || meta.product_type === 'app'
   // The reference creator's look (hair colour, age, wardrobe…) + setting, captured by the analysis —
   // so the preview matches the reference person AND stays the SAME person across every scene.
   const avatar = String(beat.avatar || '').trim().slice(0, 240)
+
+  // ── PHASE 2 · CAST SHEET — the single source of truth for WHO is on camera. ──────────────────────
+  // Before this, scenes chained off the previous scene's keyframe: scene 0 was unanchored (invented a
+  // fresh person) and the chain drifted if any early scene was regenerated. Now we mint ONE canonical
+  // character portrait for the job (from the reference creator's look), store it at meta.cast_sheet,
+  // and use it as the same-person reference for EVERY scene — including scene 0. One consistent
+  // presenter across the whole storyboard, locked before the founder approves a single frame.
+  const wantsPerson = !isService && (
+    (!!avatar && !/^none/i.test(avatar)) || beat.is_talking_head === true || beat.is_talking_head === undefined
+  )
+  let castImg: { mimeType: string; dataB64: string } | null = null
+  let castUrl: string | null = meta.cast_sheet || null
+  if (wantsPerson) {
+    if (!castUrl) {
+      const castPrompt = [
+        'Create ONE photorealistic vertical 9:16 portrait of a SINGLE original person — a fictional everyday creator for a UGC/social ad, NOT any real individual or celebrity.',
+        look && look.toLowerCase() !== 'match' ? `The person is ${look} in appearance.` : '',
+        avatar
+          ? `They look like this reference creator — match GENDER first, then age range, ethnicity, hair (colour + style), any facial hair/glasses and wardrobe: ${avatar}.`
+          : 'A natural, relatable, real-looking person (any gender) suited to this ad.',
+        'Waist-up, relaxed and friendly, looking toward the camera, soft natural indoor light, simple neutral background. This is a CHARACTER REFERENCE — clean, sharp and clear so the exact same person can be recreated in later shots.',
+        'NO text, NO logos, NO product in frame, NO borders.',
+      ].filter(Boolean).join(' ')
+      const castGen = await generateImage(castPrompt, [], 'pro', { aspectRatio: '9:16', imageSize: '1K' })
+      if (castGen.ok) {
+        const uploaded = await uploadBufferToR2(Buffer.from(castGen.dataB64, 'base64'), `creatives/cast/${jobId}.jpg`, castGen.mimeType)
+        if (uploaded) {
+          // Race guard: a parallel scene request may have minted the cast sheet first. Re-read and, if
+          // one now exists, use THAT one so every scene locks to the SAME person (never two casts).
+          const { data: fresh } = await admin.from('creative_generations').select('clone_meta').eq('id', jobId).maybeSingle()
+          const freshCast = (fresh as any)?.clone_meta?.cast_sheet
+          castUrl = freshCast || uploaded
+          meta.cast_sheet = castUrl
+        }
+      }
+    }
+    if (castUrl) castImg = await fetchImageB64(castUrl)
+  }
+
+  // SAME PERSON across scenes: the cast sheet is the primary lock (applies to scene 0 too). If it's
+  // unavailable, fall back to the old behaviour — chain off the most recent earlier scene's keyframe.
+  let charLock: { mimeType: string; dataB64: string } | null = castImg
+  if (!charLock && sceneIndex > 0) {
+    for (let j = sceneIndex - 1; j >= 0; j--) {
+      if (beats[j]?.preview) { charLock = await fetchImageB64(beats[j].preview); if (charLock) break }
+    }
+  }
   const setting = String(beat.setting || '').trim().slice(0, 160)
   const creatorClause = look && look.toLowerCase() !== 'match'
     ? `If a person is on camera, cast a ${look} creator${avatar ? `, keeping the reference creator's age range, hair style and wardrobe vibe (${avatar})` : ''} — the SAME person in every scene.`
