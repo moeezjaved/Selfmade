@@ -232,6 +232,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   const [credits, setCredits] = useState<number | null>(null)
   const [plan, setPlan] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [addBrandId, setAddBrandId] = useState<string | null>(null)   // which brand the add-competitor modal targets
   const [planDismissed, setPlanDismissed] = useState(false)
   const [subscribing, setSubscribing] = useState(false)
 
@@ -394,11 +395,20 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
       {brief && view === 'scan' && <BriefScan brief={brief} melloState={melloState} onAct={markActed} onWhy={(it) => { setFocusItem(it); say('Why does it matter?', it) }}
         credits={credits} plan={plan} onGoFullTime={goFullTime} subscribing={subscribing} onBuyCredits={() => openCredits('buy')}
         activeBrandId={activeBrandId} activeBrandName={activeBrandId ? (brands.find(b => b.id === activeBrandId)?.name || null) : null}
-        onAddCompetitor={() => { if (activeBrandId) setAddOpen(true); else router.push('/brands') }} />}
+        onAddCompetitor={() => {
+          // Resolve which brand to attach the competitor to: the selected one, or the user's only
+          // brand when none is selected (the switcher is hidden with a single brand, so activeBrandId
+          // is null even though they DO have a brand — that's why "+ Add a competitor" used to bounce
+          // to the brand page instead of opening the modal). Only fall back to /brands when there's no
+          // brand at all (create one first) or 2+ brands and none picked (go choose).
+          const target = activeBrandId || (brands.length === 1 ? brands[0].id : null)
+          if (target) { setAddBrandId(target); setAddOpen(true) }
+          else router.push('/brands')
+        }} />}
 
-      {/* Add-competitor modal — opened from the scan's Competitors column for the selected brand. */}
-      {addOpen && activeBrandId && (
-        <AddCompetitors brandId={activeBrandId} brandName={brands.find(b => b.id === activeBrandId)?.name || 'this brand'}
+      {/* Add-competitor modal — opened from the scan's Competitors column for the resolved brand. */}
+      {addOpen && addBrandId && (
+        <AddCompetitors brandId={addBrandId} brandName={brands.find(b => b.id === addBrandId)?.name || 'this brand'}
           onClose={() => setAddOpen(false)} onDone={() => { setAddOpen(false); router.refresh() }} />
       )}
 
