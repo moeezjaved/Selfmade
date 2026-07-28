@@ -20,6 +20,44 @@ const RemotionEditor = dynamic(() => import('@/components/video/RemotionEditor')
 
 const FOREST = '#17251c', LIME = '#dffe95', INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', GREEN = '#3f8f4f'
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+// ── RENDER FILMSTRIP — "Mello is filming your ad, shot by shot." The approved storyboard keyframes sit
+// in a strip; as each scene actually renders, its cell lights up (done ✓ / now filming / up next),
+// driven by the worker's real "scene X of N" progress. Honest — it mirrors the actual render, not a
+// decorative loop. Falls back to nothing (caller keeps the plain bar) if we can't load the keyframes.
+function RenderFilmstrip({ jobId, progress }: { jobId: string; progress: { label?: string; pct?: number } | null }) {
+  const [frames, setFrames] = useState<(string | null)[]>([])
+  useEffect(() => {
+    let live = true
+    fetch(`/api/discovery/clone-video/storyboard?jobId=${encodeURIComponent(jobId)}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(b => { if (live && b?.scenes?.length) setFrames(b.scenes.map((s: any) => s.preview || s.thumb || null)) })
+      .catch(() => {})
+    return () => { live = false }
+  }, [jobId])
+  const m = /(\d+)\s*of\s*(\d+)/i.exec(progress?.label || '')
+  const total = m ? Math.max(Number(m[2]), frames.length) : frames.length
+  if (!total) return null
+  const cur = m ? Number(m[1]) : Math.max(1, Math.ceil(((progress?.pct || 8) / 100) * total))
+  const cells = Array.from({ length: total }, (_, i) => frames[i] || null)
+  return (
+    <div style={{ display: 'flex', gap: 8, marginTop: 14, marginBottom: 4, flexWrap: 'wrap' }}>
+      <style>{`@keyframes vfilm{0%,100%{box-shadow:0 0 0 0 rgba(63,143,79,.5)}50%{box-shadow:0 0 0 4px rgba(63,143,79,0)}}@media(prefers-reduced-motion:reduce){.vfilm-active{animation:none!important}}`}</style>
+      {cells.map((src, i) => {
+        const done = i + 1 < cur, active = i + 1 === cur
+        return (
+          <div key={i} className={active ? 'vfilm-active' : undefined} style={{ position: 'relative', width: 52, height: 66, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#0d120e', border: active ? `2px solid ${GREEN}` : `1px solid ${LINE}`, opacity: done ? 1 : active ? 1 : 0.45, transition: 'opacity .4s ease, border-color .4s ease', animation: active ? 'vfilm 2.2s ease-in-out infinite' : undefined }}>
+            {src
+              ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: done ? 'none' : active ? 'none' : 'grayscale(.5)' }} />
+              : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: '#5d675c', fontSize: 13, fontWeight: 700 }}>{i + 1}</div>}
+            {done && <div style={{ position: 'absolute', inset: 0, background: 'rgba(23,37,28,.55)', display: 'grid', placeItems: 'center', color: LIME, fontSize: 15, fontWeight: 900 }}>✓</div>}
+            {active && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: FOREST, color: LIME, fontSize: 8, fontWeight: 800, letterSpacing: '.04em', textAlign: 'center', padding: '2px 0' }}>FILMING</div>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 const label: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED, marginBottom: 8 }
 const field: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '10px 13px', fontSize: 13.5, color: INK, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', appearance: 'auto' as any }
 
@@ -276,7 +314,9 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: INK, fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
             <Loader2 size={18} className="spin" color={GREEN} /> {progress?.label || 'Rendering your video…'}{progress?.eta_sec ? ` · ~${Math.ceil((progress.eta_sec || 0) / 60)} min` : ''}
           </div>
-          <div style={{ height: 8, borderRadius: 100, background: '#eef2ec', overflow: 'hidden' }}>
+          {/* Mello filming your ad shot by shot — the approved scenes light up as each one renders. */}
+          {jobId && <RenderFilmstrip jobId={jobId} progress={progress} />}
+          <div style={{ height: 8, borderRadius: 100, background: '#eef2ec', overflow: 'hidden', marginTop: 12 }}>
             <div style={{ height: '100%', width: `${Math.max(6, Math.min(98, progress?.pct || 8))}%`, background: GREEN, borderRadius: 100, transition: 'width .6s ease' }} />
           </div>
           <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>You can leave this open — it also lands in My Creatives when it’s ready.</div>
