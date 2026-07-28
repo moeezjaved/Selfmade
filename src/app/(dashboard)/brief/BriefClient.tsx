@@ -621,7 +621,12 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
       {/* ── composer: interrupt anytime, in plain language ── */}
       {/* The bar is viewport-fixed; the app rail (72px) offsets the content column, so pad the bar's
           left by the rail on desktop or the inner form drifts ~36px off-center from the brief above. */}
-      <style>{`.brief-composer{padding-left:20px}@media(min-width:769px){.brief-composer{padding-left:92px}}`}</style>
+      <style>{`.brief-composer{padding-left:20px}@media(min-width:769px){.brief-composer{padding-left:92px}}
+        /* The composer is the LAST arrival — Mello finishes laying out the desk, then invites you to
+           talk. Pure enhancement; reduced-motion shows it instantly. */
+        .brief-composer form{animation:bcIn .6s cubic-bezier(.2,.7,.2,1) both;animation-delay:.85s}
+        @keyframes bcIn{from{opacity:.001;transform:translateY(10px)}to{opacity:1;transform:none}}
+        @media(prefers-reduced-motion:reduce){.brief-composer form{animation:none}}`}</style>
       {brief && (
         <div className="brief-composer" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: 'linear-gradient(transparent, #f6f8f5 44%)', paddingTop: 30, paddingRight: 20, paddingBottom: 22, pointerEvents: 'none' }}>
           {/* The composer floats — Claude-style: one centered pill, soft elevation, always there.

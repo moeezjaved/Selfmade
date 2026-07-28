@@ -17,6 +17,7 @@
  * top-up, credits, cross-competitor playbook with Mello's judgment. The thin status row replaces
  * the dark terminal strip. Responsive: ≥1060 two columns · below, sidebar stacks under the work.
  */
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
 import MelloTasks from './MelloTasks'
@@ -49,6 +50,28 @@ const sectionSub: React.CSSProperties = { fontSize: 13.5, color: MUTED, lineHeig
 const body: React.CSSProperties = { fontSize: 15, color: MUTED, lineHeight: 1.6 }
 /** A quiet card — white on the #F7F8F5 page, separation by elevation, not outline. */
 const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
+
+/** The overnight number, counted up on first paint — "Mello was reading while you slept", felt, not
+ *  stated. The REAL value is server-rendered; the count-up is pure enhancement (no JS / reduced
+ *  motion → the true figure simply shows). Same pattern as the standup's CountUp. */
+function Count({ n }: { n: number }) {
+  const [v, setV] = useState(n)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !n) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    let raf = 0
+    const start = performance.now(), DUR = 900
+    setV(0)
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / DUR)
+      setV(Math.round(n * (1 - Math.pow(1 - p, 3))))
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [n])
+  return <>{v.toLocaleString()}</>
+}
 
 /** A creative, shown. Video renders as poster + badge (never live) so clicks always reach the link. */
 function Shot({ image, videoUrl, w, h }: { image?: string | null; videoUrl?: string | null; w: number; h: number }) {
@@ -101,21 +124,25 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
 
   return (
     <div className="bsx" style={{ marginTop: 20 }}>
+      {/* ── ARRIVAL — the brief doesn't "load", it was PREPARED. One calm sequence: the status row
+          states the night's work → the hero settles into place → the rest of the desk follows → the
+          sidebar last. Pure CSS (runs without JS, honors prefers-reduced-motion); ~1s total, nothing
+          blocks interaction, and every element is in the HTML from the first byte. ── */}
       {/* ── Thin status row — what the dark strip used to shout, said quietly. ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, color: MUTED, paddingBottom: 22 }}>
+      <div className="bsx-e" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, color: MUTED, paddingBottom: 22 }}>
         {worked && <><span>Updated {worked}</span><span style={{ color: '#d3d6cf' }}>·</span></>}
         <span><b style={{ color: INK, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{brief.summary.brandsWatched}</b> competitor{brief.summary.brandsWatched === 1 ? '' : 's'} tracked</span>
         <span style={{ color: '#d3d6cf' }}>·</span>
-        <span><b style={{ color: INK, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{brief.summary.adsScanned.toLocaleString()}</b> ads read overnight</span>
+        <span><b style={{ color: INK, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}><Count n={brief.summary.adsScanned} /></b> ads read overnight</span>
         {brief.summary.creativesReady > 0 && <><span style={{ color: '#d3d6cf' }}>·</span><span><b style={{ color: GREEN, fontWeight: 700 }}>{brief.summary.creativesReady}</b> creative{brief.summary.creativesReady === 1 ? '' : 's'} ready</span></>}
       </div>
 
-      <div className="bsx-grid">
+      <div className="bsx-grid bsx-dim">
         {/* ════ LEFT — the workspace. Everything that answers "what should I do next?" ════ */}
         <div style={{ minWidth: 0 }}>
 
-          {/* ── The hero card — the one focal point. ── */}
-          <div style={{ ...card, borderRadius: 20, boxShadow: '0 1px 3px rgba(17,24,17,.05), 0 24px 60px -24px rgba(17,24,17,.18)', padding: 'clamp(24px, 3vw, 36px)', marginBottom: 24 }}>
+          {/* ── The hero card — the one focal point. It GROWS gently into place; nothing competes. ── */}
+          <div className="bsx-hero" style={{ ...card, borderRadius: 20, boxShadow: '0 1px 3px rgba(17,24,17,.05), 0 24px 60px -24px rgba(17,24,17,.18)', padding: 'clamp(24px, 3vw, 36px)', marginBottom: 24 }}>
             {brief.quiet || !hero ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
@@ -162,11 +189,13 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
           </div>
 
           {/* ── Mello's plan — decisions ready to run (the CEO desk). ── */}
-          <MelloTasks brandId={activeBrandId} />
+          <div className="bsx-e" style={{ animationDelay: '.3s' }}>
+            <MelloTasks brandId={activeBrandId} />
+          </div>
 
           {/* ── Also today — the one runner-up, a quiet row. ── */}
           {second && (
-            <div style={{ ...card, padding: '16px 22px', marginBottom: 24 }}>
+            <div className="bsx-e" style={{ ...card, padding: '16px 22px', marginBottom: 24, animationDelay: '.38s' }}>
               <Link href={second.cta_href || '/discovery'} onClick={() => onAct(second)} className="bsx-row" style={{ display: 'block', textDecoration: 'none' }}>
                 <span style={{ float: 'right', marginLeft: 10, marginTop: 4 }}>{ARROW}</span>
                 <span className="bsx-t" style={{ display: 'block', fontSize: 15.5, fontWeight: 700, letterSpacing: '-.012em', color: INK, lineHeight: 1.35, transition: 'color .15s' }}>{second.title.replace(/\.+$/, '')}</span>
@@ -175,8 +204,8 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             </div>
           )}
 
-          {/* ── Competitors — who moved overnight, as living rows. ── */}
-          <div style={{ marginTop: 32 }}>
+          {/* ── Competitors — who moved overnight, as living rows that slide into place. ── */}
+          <div className="bsx-e" style={{ marginTop: 32, animationDelay: '.46s' }}>
             <div style={section}>Competitors overnight</div>
             <div style={sectionSub}>
               {competitors.length === 0
@@ -194,13 +223,13 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                   const when = ago(c.at)
                   const fresh = c.at ? (Date.now() - new Date(c.at).getTime()) < 24 * 3600e3 : false
                   return (
-                    <div key={c.id || i} style={{ borderTop: i === 0 ? 'none' : `1px solid ${LINE}`, padding: '15px 0' }}>
+                    <div key={c.id || i} className="bsx-e" style={{ borderTop: i === 0 ? 'none' : `1px solid ${LINE}`, padding: '15px 0', animationDelay: `${0.52 + i * 0.08}s` }}>
                       <Link href={c.cta_href?.replace('/knowledge/brand/', '/discovery/brand-spy/') || c.cta_href || '/discovery'}
                         onClick={() => onAct(c)} className="bsx-row" style={{ display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none' }}>
                         {/* brand mark — initial avatar; the ad previews are the real face */}
                         <span style={{ position: 'relative', flexShrink: 0 }}>
                           <span style={{ width: 40, height: 40, borderRadius: 12, background: FOREST, color: LIME, display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 800 }}>{name.charAt(0).toUpperCase()}</span>
-                          {fresh && <span title="Active in the last 24h" style={{ position: 'absolute', right: -2, top: -2, width: 10, height: 10, borderRadius: '50%', background: GREEN, border: '2px solid #fff' }} />}
+                          {fresh && <span className="bsx-dot" title="Active in the last 24h" style={{ position: 'absolute', right: -2, top: -2, width: 10, height: 10, borderRadius: '50%', background: GREEN, border: '2px solid #fff' }} />}
                         </span>
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span className="bsx-t" style={{ display: 'block', fontSize: 15.5, fontWeight: 700, letterSpacing: '-.012em', color: INK, transition: 'color .15s', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
@@ -243,7 +272,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
 
           {/* ── The playbook — what's working across every watched brand, with Mello's judgment. ── */}
           {playbook?.playbook && (
-            <div style={{ marginTop: 40 }}>
+            <div className="bsx-e" style={{ marginTop: 40, animationDelay: '.6s' }}>
               <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
                 <div>
                   <div style={section}>The playbook across your {playbook.playbook.brandsCount} competitor{playbook.playbook.brandsCount === 1 ? '' : 's'}</div>
@@ -339,7 +368,8 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
         </div>
 
         {/* ════ RIGHT — the supporting sidebar. Mello, plan, capabilities. ════ */}
-        <aside className="bsx-side">
+        {/* The sidebar arrives LAST and quietly — it must never beat the decision. */}
+        <aside className="bsx-side bsx-e" style={{ animationDelay: '.7s' }}>
           {/* Mello — who's working for you */}
           <div style={{ ...card, padding: '20px 22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -403,6 +433,20 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
       </div>
 
       <style>{`
+        /* ── Arrival choreography — pure enhancement. Content is in the HTML from the first byte
+           (opacity starts at .001, never display:none); reduced-motion turns it all off. ── */
+        .bsx-e{animation:bsxIn .65s cubic-bezier(.2,.7,.2,1) both}
+        @keyframes bsxIn{from{opacity:.001;transform:translateY(12px)}to{opacity:1;transform:none}}
+        /* The hero settles with a whisper of scale — "grows into place", never bounces. */
+        .bsx-hero{animation:bsxHero .8s cubic-bezier(.2,.7,.2,1) both;animation-delay:.12s}
+        @keyframes bsxHero{from{opacity:.001;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+        /* Live pulse on a competitor active in the last 24h — a heartbeat, not a strobe. */
+        .bsx-dot{animation:bsxPulse 2.6s ease-in-out infinite}
+        @keyframes bsxPulse{0%,100%{box-shadow:0 0 0 0 rgba(63,143,79,.45)}50%{box-shadow:0 0 0 4px rgba(63,143,79,0)}}
+        /* Ask-Mello focus: when the composer is active, the desk recedes and the conversation leads. */
+        .bsx-dim{transition:opacity .35s ease}
+        body:has(.brief-composer textarea:focus) .bsx-dim{opacity:.55}
+        @media (prefers-reduced-motion: reduce){.bsx-e,.bsx-hero,.bsx-dot{animation:none}.bsx-dim{transition:none}body:has(.brief-composer textarea:focus) .bsx-dim{opacity:1}}
         .bsx-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:32px;align-items:start}
         .bsx-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px}
         .bsx-row:hover .bsx-t{color:${GREEN}}
