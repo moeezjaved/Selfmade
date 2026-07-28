@@ -125,6 +125,13 @@ export async function sendWelcomeEmail(to: string, fullName?: string): Promise<b
   return sendEmail(to, 'Welcome to Selfmade 👋 remake your first ad', html)
 }
 
+/** Admin ops alert — fired on generation failures (image + video) so systemic problems surface in
+ *  the admin's inbox WITHOUT a user having to report them. Best-effort, never throws. */
+export async function sendAdminAlert(subject: string, bodyHtml: string): Promise<void> {
+  const to = process.env.ADMIN_ALERT_EMAIL || 'moeez@virginteez.com'
+  try { await sendEmail(to, subject, `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;line-height:1.6;color:#1c2617;">${bodyHtml}</div>`) } catch { /* best-effort */ }
+}
+
 export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   if (!KEY || !to) return false
   try {

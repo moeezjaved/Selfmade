@@ -147,7 +147,12 @@ async function handle(req: NextRequest) {
     // Order: [inspirations..., products..., logo?] — the prompt references indexes accordingly.
     const genImages = [...inspImgs, ...products, ...(logoImg ? [logoImg] : [])]
     const gen = await generateImage(prompt, genImages, 'pro', { aspectRatio: resolvedAspect, imageSize })
-    if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error }, { status: 502 }) }
+    if (!gen.ok) {
+      await refund()
+      const { sendAdminAlert } = await import('@/lib/email')
+      await sendAdminAlert(`⚠️ studio ad generation failed`, `<p>User <b>${user.id}</b>'s fresh-ad generation failed and was refunded.</p><p><b>Error:</b> ${String(gen.error).slice(0, 300)}</p>`)
+      return NextResponse.json({ error: gen.error }, { status: 502 })
+    }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 
@@ -169,6 +174,10 @@ async function handle(req: NextRequest) {
     })
   } catch (e: any) {
     await refund()
+    try {
+      const { sendAdminAlert } = await import('@/lib/email')
+      await sendAdminAlert(`⚠️ studio ad generation crashed`, `<p>User <b>${user.id}</b>'s fresh-ad generation crashed and was refunded.</p><p><b>Error:</b> ${String(e?.message || e).slice(0, 300)}</p>`)
+    } catch { /* best-effort */ }
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 })
   }
 }
