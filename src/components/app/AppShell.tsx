@@ -18,13 +18,12 @@ import RemakeStarter from '@/components/RemakeStarter'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { META_LIVE } from '@/lib/flags'
 import type { User } from '@supabase/supabase-js'
 import type { UserProfile } from '@/types'
 import {
   Settings, LogOut, Menu, X, LifeBuoy, Zap, Sparkles, CreditCard, Users, Plus,
   Eye, TrendingUp, Star, Bookmark, Image as ImageIcon, Heart, Radar,
-  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, ClipboardList, Trophy, Camera, Sun, Newspaper, BookOpen, FileText,
+  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, ClipboardList, Trophy, Camera, Sun, Newspaper, BookOpen, FileText, Plug,
 } from 'lucide-react'
 import SearchPalette from '@/components/SearchPalette'
 import { cn } from '@/lib/utils'
@@ -59,12 +58,15 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
       { href: '/brands',                   icon: Store,    label: 'My Brands' },
       { href: '/assets',                   icon: ImageIcon,label: 'Assets' },
       { section: 'Launch' },
-      { href: '/m4',          icon: Rocket,    label: 'Launch Ads',       badge: META_LIVE ? null : 'SOON' },
-      { href: '/campaigns',   icon: Megaphone, label: 'Campaigns',        badge: META_LIVE ? null : 'SOON' },
-      { href: '/insights',    icon: LineChart, label: 'Scale & Insights', badge: META_LIVE ? null : 'SOON' },
-      { href: '/reports',     icon: BarChart2, label: 'Reports',          badge: META_LIVE ? null : 'SOON' },
-      { href: '/leaderboard', icon: Trophy,    label: 'Leaderboard',      badge: META_LIVE ? null : 'SOON' },
-      { href: '/snapshots',   icon: Camera,    label: 'Snapshots',        badge: META_LIVE ? null : 'SOON' },
+      // Connect Meta is the front door — BYO token, no app-review wait. The surfaces below unlock the
+      // moment a connection lands (MetaGate keys off the connection, not the retired META_LIVE flag).
+      { href: '/connect/meta', icon: Plug,      label: 'Connect Meta' },
+      { href: '/m4',          icon: Rocket,    label: 'Launch Ads' },
+      { href: '/campaigns',   icon: Megaphone, label: 'Campaigns' },
+      { href: '/insights',    icon: LineChart, label: 'Scale & Insights' },
+      { href: '/reports',     icon: BarChart2, label: 'Reports' },
+      { href: '/leaderboard', icon: Trophy,    label: 'Leaderboard' },
+      { href: '/snapshots',   icon: Camera,    label: 'Snapshots' },
     ],
   },
 ]
