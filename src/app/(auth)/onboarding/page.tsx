@@ -359,6 +359,9 @@ export default function InterviewPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) await supabase.from('user_profiles').update({ niche: analysis?.niche || null, onboarding_completed: true }).eq('user_id', user.id)
+      // Stamp the same cookie the middleware onboarding-gate reads, so the very next navigation to
+      // /brief passes instantly — never bounced back by a read that hasn't caught the write yet.
+      try { document.cookie = `sm_onb=1; path=/; max-age=${60 * 60 * 24 * 30}; samesite=lax` } catch { /* ignore */ }
     } catch { /* non-blocking */ }
     setNightLog(l => l.map(x => ({ ...x, done: true })))
     setNightDone(true)
