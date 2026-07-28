@@ -20,6 +20,8 @@ type Report = {
   offer?: string
   visualStyle?: string
   story: string[]
+  /** One editor's line per story beat (same order) — powers the played breakdown. Optional: old cached reports lack it. */
+  storyLines?: string[]
   bullets: string[]
   confidence: number
 }
@@ -87,9 +89,9 @@ export async function GET(req: NextRequest) {
       const or = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4o-mini', max_tokens: 420, temperature: 0.3, response_format: { type: 'json_object' },
+          model: 'gpt-4o-mini', max_tokens: 560, temperature: 0.3, response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: 'You are Mello, a sharp performance-marketing analyst. From the classified facts of a winning ad, produce a STRUCTURED breakdown a founder can act on. Only use provided facts — never invent metrics or results. Return JSON: {"headline": string (≤7 words), "hook": string (≤6 words, what the opening does), "emotion": string (one word), "audience": string (≤6 words, who it targets), "offer": string (≤7 words), "visualStyle": string (≤4 words), "story": string[] (4-6 SHORT beats of the narrative arc, e.g. ["Problem","Founder","Transformation","CTA"]), "bullets": string[] (3-4 punchy reasons it works, ≤14 words each)}. Be concrete and specific to THIS ad.' },
+            { role: 'system', content: 'You are Mello, a sharp performance-marketing analyst. From the classified facts of a winning ad, produce a STRUCTURED breakdown a founder can act on. Only use provided facts — never invent metrics or results. Return JSON: {"headline": string (≤7 words), "hook": string (≤6 words, what the opening does), "emotion": string (one word), "audience": string (≤6 words, who it targets), "offer": string (≤7 words), "visualStyle": string (≤4 words), "story": string[] (4-6 SHORT beats of the narrative arc, e.g. ["Problem","Founder","Transformation","CTA"]), "storyLines": string[] (same length/order as story — for each beat, ONE editor\'s line ≤12 words explaining what that beat DOES to the viewer, e.g. "Names the pain before the product ever appears"), "bullets": string[] (3-4 punchy reasons it works, ≤14 words each)}. Be concrete and specific to THIS ad.' },
             { role: 'user', content: JSON.stringify(facts) },
           ],
         }),
@@ -106,6 +108,9 @@ export async function GET(req: NextRequest) {
             offer: p.offer ? String(p.offer).slice(0, 60) : undefined,
             visualStyle: p.visualStyle ? String(p.visualStyle).slice(0, 40) : (ad.visual_style || undefined),
             story: p.story.map((s: any) => String(s).slice(0, 24)).slice(0, 6),
+            // One editor's line per beat — drives the played breakdown in Understand. Trimmed to the
+            // story's length so label/line always pair; absent (old cache) → the arc renders static.
+            storyLines: Array.isArray(p.storyLines) ? p.storyLines.map((s: any) => String(s).slice(0, 110)).slice(0, p.story.length) : undefined,
             bullets: p.bullets.map((s: any) => String(s).slice(0, 140)).slice(0, 4),
             confidence: confidenceOf(ad),   // always our computed, honest number
           }
