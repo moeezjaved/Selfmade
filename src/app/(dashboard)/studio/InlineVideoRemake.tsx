@@ -21,6 +21,59 @@ const RemotionEditor = dynamic(() => import('@/components/video/RemotionEditor')
 const FOREST = '#17251c', LIME = '#dffe95', INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', GREEN = '#3f8f4f'
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+// ── UGC RECORDING BOOTH — UGC is one continuous selfie take, so there are no shots to strip. The
+// honest, alive wait: a phone viewfinder RECORDING your creator, with your REAL approved script
+// running as a karaoke teleprompter (the words they're speaking), a live waveform, a REC dot and a
+// ticking timecode. True to what's rendering (a talking-head saying these exact words); reduced motion
+// stops the animation but keeps the frame + full caption.
+function UgcRecording({ script }: { script: string }) {
+  const words = (script || '').trim().split(/\s+/).filter(Boolean)
+  const [n, setN] = useState(0)      // words revealed
+  const [sec, setSec] = useState(0)  // recording timecode
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setN(words.length); return }
+    const w = setInterval(() => setN((x) => (x + 1 > words.length ? 0 : x + 1)), 360)   // ~natural speaking cadence, loops
+    const t = setInterval(() => setSec((s) => s + 1), 1000)
+    return () => { clearInterval(w); clearInterval(t) }
+  }, [script])   // eslint-disable-line react-hooks/exhaustive-deps
+  const mm = Math.floor(sec / 60), ss = String(sec % 60).padStart(2, '0')
+  const shown = words.slice(Math.max(0, n - 14), n)   // a rolling teleprompter window
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14, marginBottom: 4 }}>
+      <style>{`@keyframes ugcrec{0%,100%{opacity:1}50%{opacity:.25}}@keyframes ugcwave{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}@media(prefers-reduced-motion:reduce){.ugc-rec,.ugc-wave span{animation:none!important}}`}</style>
+      <div style={{ position: 'relative', width: 236, aspectRatio: '9 / 16', borderRadius: 22, overflow: 'hidden', background: 'radial-gradient(120% 80% at 50% 22%, #2a3b2e 0%, #141d16 60%, #0c120e 100%)', boxShadow: '0 24px 60px -22px rgba(14,27,18,.55), inset 0 0 0 1px rgba(223,254,149,.08)' }}>
+        {/* REC + timecode */}
+        <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', alignItems: 'center', gap: 6, zIndex: 3 }}>
+          <span className="ugc-rec" style={{ width: 9, height: 9, borderRadius: '50%', background: '#ff4d4d', display: 'inline-block', boxShadow: '0 0 10px 1px rgba(255,77,77,.7)', animation: 'ugcrec 1.2s ease-in-out infinite' }} />
+          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#fff' }}>REC</span>
+        </div>
+        <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.85)', fontVariantNumeric: 'tabular-nums', zIndex: 3, fontFamily: 'ui-monospace, Menlo, monospace' }}>{mm}:{ss}</div>
+        {/* the creator — a soft on-camera silhouette (identity is what's rendering; this is the viewfinder) */}
+        <div style={{ position: 'absolute', left: '50%', top: '30%', transform: 'translateX(-50%)', width: 84, height: 84, borderRadius: '50%', background: 'linear-gradient(#e9efe2,#c3d0b6)', opacity: .5 }} />
+        <div style={{ position: 'absolute', left: '50%', top: '52%', transform: 'translateX(-50%)', width: 150, height: 120, borderRadius: '50% 50% 0 0', background: 'linear-gradient(#e9efe2,#c3d0b6)', opacity: .45 }} />
+        {/* teleprompter — the REAL script, karaoke reveal */}
+        <div style={{ position: 'absolute', left: 12, right: 12, bottom: 46, zIndex: 3 }}>
+          <div style={{ background: 'rgba(10,15,11,.55)', borderRadius: 10, padding: '9px 11px', backdropFilter: 'blur(3px)' }}>
+            <div style={{ fontSize: 13, lineHeight: 1.5, fontWeight: 700, color: 'rgba(255,255,255,.55)', letterSpacing: '-.01em', minHeight: 38 }}>
+              {shown.map((w, i) => {
+                const isLast = i === shown.length - 1
+                return <span key={n - shown.length + i} style={{ color: isLast ? '#dffe95' : 'rgba(255,255,255,.85)', transition: 'color .2s' }}>{w} </span>
+              })}
+              {words.length > 0 && <span style={{ display: 'inline-block', width: 2, height: 14, background: '#dffe95', verticalAlign: '-2px' }} />}
+            </div>
+          </div>
+        </div>
+        {/* live waveform */}
+        <div className="ugc-wave" style={{ position: 'absolute', left: 0, right: 0, bottom: 16, display: 'flex', gap: 3, alignItems: 'center', justifyContent: 'center', height: 20, zIndex: 3 }}>
+          {[0, .12, .28, .05, .34, .18, .4, .1, .3, .22, .38, .08, .26, .15].map((d, i) => (
+            <span key={i} style={{ width: 3, height: 18, borderRadius: 3, background: '#dffe95', opacity: .85, transformOrigin: 'center', animation: `ugcwave ${0.7 + (i % 4) * 0.12}s ease-in-out ${d}s infinite` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── RENDER FILMSTRIP — "Mello is filming your ad, shot by shot." The approved storyboard keyframes sit
 // in a strip; as each scene actually renders, its cell lights up (done ✓ / now filming / up next),
 // driven by the worker's real "scene X of N" progress. Honest — it mirrors the actual render, not a
@@ -320,8 +373,10 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: INK, fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
             <Loader2 size={18} className="spin" color={GREEN} /> {progress?.label || 'Rendering your video…'}{progress?.eta_sec ? ` · ~${Math.ceil((progress.eta_sec || 0) / 60)} min` : ''}
           </div>
-          {/* Mello filming your ad shot by shot — the approved scenes light up as each one renders. */}
-          {jobId && <RenderFilmstrip jobId={jobId} progress={progress} />}
+          {/* Cinematic → the scenes light up as they film. UGC → the recording booth speaks your script. */}
+          {style === 'cinematic'
+            ? (jobId && <RenderFilmstrip jobId={jobId} progress={progress} />)
+            : <UgcRecording script={script} />}
           <div style={{ height: 8, borderRadius: 100, background: '#eef2ec', overflow: 'hidden', marginTop: 12 }}>
             <div style={{ height: '100%', width: `${Math.max(6, Math.min(98, progress?.pct || 8))}%`, background: GREEN, borderRadius: 100, transition: 'width .6s ease' }} />
           </div>
