@@ -19,7 +19,7 @@ import { waitUntil } from '@vercel/functions'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateImage, buildClonePrompt, geminiEnabled, nearestAspect, describeProduct, verifyClonedAd } from '@/lib/gemini/image'
 import { uploadBufferToR2 } from '@/lib/r2'
-import { sendFirstAdEmail } from '@/lib/email'
+import { sendFirstAdEmail, sendAdminAlert } from '@/lib/email'
 import { isRateLimited } from '@/lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
@@ -126,6 +126,10 @@ async function runGeneration(input: {
   const fail = async (msg: string, reason?: string) => {
     if (txId) await admin.rpc('refund_credits', { p_tx: txId }).then(() => {}, () => {})
     await admin.from('creative_generations').update({ status: 'failed', clone_meta: { tx_id: txId, error: msg, ...(reason ? { fail_reason: reason } : {}) } }).eq('id', jobId)
+    // Admin alert on every image-remake failure — reason included so busy-spikes vs real bugs are
+    // distinguishable from the inbox alone. Best-effort, never blocks the refund path.
+    await sendAdminAlert(`⚠️ image remake failed — ${jobId.slice(0, 8)}`,
+      `<p>Job <b>${jobId}</b> (user ${userId}) failed and was refunded.</p><p><b>Reason:</b> ${reason || 'unspecified'}</p><p><b>Shown to user:</b> ${msg}</p>`)
   }
   try {
     const { adId, refImageUrl, productImageB64, productImages, productMimeType, newHeadline, brandName, colors, brandId, aspectRatio, look } = body || {}
