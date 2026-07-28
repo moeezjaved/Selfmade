@@ -718,7 +718,10 @@ async function trimReference(url, id, opts = {}) {
 
 // ── Multi-clip assembly helpers (faithful scenes + long-form UGC segments) ────
 async function downloadToFile(url, path) {
-  const r = await fetch(url)
+  // Hard timeout: a naked fetch can hang FOREVER on a dead CDN connection, which left jobs stuck in
+  // 'processing' with no error — the class of failure only an admin could see. 3 min is generous for
+  // any clip; on abort the error is retryable, so the self-heal path resumes from checkpoints.
+  const r = await fetch(url, { signal: AbortSignal.timeout(180_000) })
   if (!r.ok) throw new Error(`download clip ${r.status}`)
   await writeFile(path, Buffer.from(await r.arrayBuffer()))
 }
@@ -1053,13 +1056,13 @@ async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, 
   const input = { prompt: fullPrompt, image_urls: (imageUrls || []).slice(0, 9), resolution: resolution || '720p', aspect_ratio: aspect || '9:16', generate_audio: generateAudio !== false }
   if (videoUrl) input.video_urls = [videoUrl]
   if (duration) input.duration = String(duration)
-  let sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
+  let sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(120_000) })
   if (!sub.ok) {
     const txt = (await sub.text()).slice(0, 400)
     // Duration out of range for this model tier → retry once at the safe default.
     if (/duration/i.test(txt) && input.duration && input.duration !== '10') {
       input.duration = '10'
-      sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
+      sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(120_000) })
       if (!sub.ok) throw new Error(`fal submit ${sub.status} ${(await sub.text()).slice(0, 200)}`)
     } else if (/content_policy_violation/i.test(txt)) {
       // Tag WHICH input fal rejected so callers can react precisely: a flagged reference VIDEO can
@@ -1082,14 +1085,15 @@ async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, 
   let completed = false
   for (let i = 0; i < 300; i++) {
     await sleep(6000)
-    const sr = await fetch(statusUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
+    const sr = await fetch(statusUrl, { headers: { Authorization: `Key ${FAL_KEY}` }, signal: AbortSignal.timeout(30_000) }).catch(() => null)
+    if (!sr) continue
     if (!sr.ok) continue
     const st = await sr.json()
     if (st.status === 'COMPLETED') { completed = true; break }
     if (st.status === 'FAILED' || st.status === 'ERROR') throw new Error(`fal job ${st.status}`)
   }
   if (!completed) throw new Error('fal timed out (still IN_PROGRESS after 30m) — retry to resume')
-  const rr = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
+  const rr = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` }, signal: AbortSignal.timeout(90_000) })
   if (!rr.ok) {
     const txt = (await rr.text()).slice(0, 400)
     // fal moderates at TWO points: submit AND result. A likeness block surfacing at the RESULT fetch
@@ -1111,7 +1115,7 @@ async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, 
 
 // ── Generic fal queue submit + poll (any model) ───────────────────────────────
 async function falQueueRun(model, input, iters = 200) {
-  const sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
+  const sub = await fetch(`https://queue.fal.run/${model}`, { method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(120_000) })
   if (!sub.ok) throw new Error(`fal ${model} submit ${sub.status} ${(await sub.text()).slice(0, 200)}`)
   const { request_id, status_url, response_url } = await sub.json()
   const statusUrl = status_url || `https://queue.fal.run/${model}/requests/${request_id}/status`
@@ -1121,14 +1125,15 @@ async function falQueueRun(model, input, iters = 200) {
   let completed = false
   for (let i = 0; i < iters; i++) {
     await sleep(6000)
-    const sr = await fetch(statusUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
+    const sr = await fetch(statusUrl, { headers: { Authorization: `Key ${FAL_KEY}` }, signal: AbortSignal.timeout(30_000) }).catch(() => null)
+    if (!sr) continue
     if (!sr.ok) continue
     const st = await sr.json()
     if (st.status === 'COMPLETED') { completed = true; break }
     if (st.status === 'FAILED' || st.status === 'ERROR') throw new Error(`fal ${model} ${st.status}`)
   }
   if (!completed) throw new Error(`fal ${model} timed out (still IN_PROGRESS) — retry to resume`)
-  const rr = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` } })
+  const rr = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` }, signal: AbortSignal.timeout(90_000) })
   if (!rr.ok) {
     const txt = (await rr.text()).slice(0, 400)
     // Same result-time moderation classification as falGenerate — see comment there.
@@ -1848,7 +1853,7 @@ async function generateJob(job) {
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   // Live progress the modal polls: {label, pct, eta_sec}. fal gives no % for video gen, so WE report
   // the real pipeline step + a running ETA (best-effort; never fails the render).
-  const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0) } } }).catch(() => {})
+  const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0), at: Date.now() } } }).catch(() => {})   // `at` = heartbeat, lets a watchdog spot stalls
   try {
     const finalScript = meta.final_script || meta.script || ''
 
@@ -2571,13 +2576,39 @@ async function generateJob(job) {
     if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { fal_request_id: requestId, actual_cost_usd: +falCost.toFixed(2) } })
     console.log(`🎬 cloned ${job.id} → ${url}`)
   } catch (e) {
-    console.warn(`generate ${job.id} failed:`, e.message)
-    await stamp({ status: 'failed', clone_meta: { ...meta, error: e.message } })
+    const msg = String(e?.message || e)
+    // ── SELF-HEAL — the system fixes what an admin used to fix by hand. TRANSIENT failures (a fal
+    // queue timeout, a network blip, a 5xx, an aborted download) leave the job in 'processing' with a
+    // bumped auto_retries counter and RETURN: the pump re-picks it next tick and the render RESUMES
+    // from the per-scene checkpoints — finished scenes cost nothing to reuse, so a retry re-renders
+    // only what actually failed. Two automatic attempts; only then does it hard-fail + refund. Real
+    // errors (content policy, bad input, insufficient credits) never retry — they fail honestly at once.
+    const retryable = /timed out|still IN_PROGRESS|fetch failed|network|ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|abort|socket|\b(500|502|503|504)\b|overload|unavailable|Premature close|terminated/i.test(msg)
+      && !/content_policy|likeness|real people|insufficient|no product|not found/i.test(msg)
+    const tries = Number(meta.auto_retries || 0)
+    if (retryable && tries < 2) {
+      console.warn(`🩺 ${job.id} transient failure (auto-retry ${tries + 1}/2) — resuming from checkpoints: ${msg.slice(0, 140)}`)
+      // Backoff (2 min, then 5 min) so a longer provider outage doesn't burn both retries in seconds.
+      await stamp({ clone_meta: { ...meta, auto_retries: tries + 1, retry_after: Date.now() + (tries === 0 ? 120_000 : 300_000), last_auto_retry: msg.slice(0, 180), progress: { label: 'Hit a busy patch — retrying automatically…', pct: 12, eta_sec: 240, at: Date.now() } } })
+      return   // status stays 'processing' → the pump re-picks; scene checkpoints make the resume cheap
+    }
+    console.warn(`generate ${job.id} failed:`, msg)
+    await stamp({ status: 'failed', clone_meta: { ...meta, error: msg } })
     if (job.credit_tx) await rpc('refund_credits', { p_tx: job.credit_tx })
     // Add-on reservations must never strand when the base render fails.
     for (const ex of (Array.isArray(meta.extra_langs) ? meta.extra_langs : [])) if (ex.tx) await rpc('refund_credits', { p_tx: ex.tx })
     if (meta.end_card && meta.end_card.tx) await rpc('refund_credits', { p_tx: meta.end_card.tx })
     if (meta.hook_variants_tx) await rpc('refund_credits', { p_tx: meta.hook_variants_tx })
+    // ── ADMIN VISIBILITY — a final failure means the self-heal couldn't save it. Log it durably and
+    // email the admin so systemic problems surface WITHOUT a user having to report them. Best-effort.
+    try {
+      await fetch(`${U}/rest/v1/activity_logs`, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: job.user_id, action_type: 'VIDEO_RENDER_FAILED', entity_type: 'video_clone', description: `${meta.mode || 'video'} render failed after ${tries} auto-retries: ${msg.slice(0, 200)}`, performed_by: 'video-clone-worker' }) })
+    } catch { /* best-effort */ }
+    try {
+      const { sendEmail, emailShell } = await import('./email.mjs')
+      const to = process.env.ADMIN_ALERT_EMAIL || 'moeez@virginteez.com'
+      await sendEmail({ to, subject: `⚠️ video render failed (${meta.mode || 'video'}) — ${job.id.slice(0, 8)}`, html: emailShell({ heading: 'Video render failed', bodyHtml: `<p>Job <b>${job.id}</b> failed after ${tries} automatic retries and was refunded.</p><p><b>Error:</b> ${msg.slice(0, 300)}</p><p>User: ${job.user_id}</p>` }) })
+    } catch { /* best-effort */ }
   }
 }
 
@@ -2602,7 +2633,7 @@ async function tweakJob(job) {
   const t = meta.tweak || {}
   const isService = meta.product_type === 'service'   // service/app brand → no physical product path
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
-  const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0) } } }).catch(() => {})
+  const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0), at: Date.now() } } }).catch(() => {})   // `at` = heartbeat, lets a watchdog spot stalls
   // Restore the row to its previous DONE state (original video intact) + refund the tweak tx.
   const bail = async (why) => {
     console.warn(`tweak ${job.id} failed: ${why}`)
@@ -2965,6 +2996,8 @@ async function pump() {
     const generating = await getJSON(`creative_generations?${sel}&status=eq.processing&image_url=is.null`).catch(() => [])
     for (const j of generating || []) {
       if (inflight.has(j.id) || genActive >= MAX_GEN) continue
+      // Self-heal backoff: a job that just auto-retried waits out its retry_after before re-pickup.
+      if (j?.clone_meta?.retry_after && Date.now() < Number(j.clone_meta.retry_after)) continue
       inflight.add(j.id); genActive++
       generateJob(j).catch((e) => console.warn('generate crash:', e?.message)).finally(() => { inflight.delete(j.id); genActive-- })
     }
