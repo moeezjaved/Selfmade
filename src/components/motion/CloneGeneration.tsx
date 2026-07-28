@@ -30,17 +30,71 @@ const KEYFRAMES = `
 @media (prefers-reduced-motion: reduce){ .sm-anim{animation:none !important;} .sm-glow{opacity:.4 !important;} .sm-dots span{animation:none !important;opacity:.7 !important;} }
 `
 
-export default function CloneGeneration({ helper = 'This usually takes 15–40 seconds · you can keep browsing' }: { helper?: string }) {
+// ── THE TRANSFORMATION STAGE (used when the caller passes the real images) ────────────────────────
+// The Jobs cut of the wait screen: no ghost card, no abstraction. The ORIGINAL winning ad sits on
+// stage the entire time, and Mello's work passes over it in four visible acts on one slow clock —
+//   1. a reading line sweeps the ad (studying the structure)
+//   2. YOUR product photo slides in and docks on the corner (the swap, made literal)
+//   3. a soft band settles where the headline lives (rewriting the copy)
+//   4. the whole card breathes once (polish)
+// — so when the finished ad replaces it, the founder has WATCHED the transformation, not waited
+// through it. Statuses stay in sync with the acts (same 2.2s × 4 clock). Honest: these are the real
+// steps the generation performs. Reduced motion: the original ad simply shows, statuses still cycle.
+const TF_STATUSES = ['Reading the winning structure', 'Placing your exact product', 'Rewriting the copy for your brand', 'Polishing the design']
+const TF_KEYFRAMES = `
+@keyframes tf-scan { 0%{top:-4%;opacity:0;} 2%{opacity:1;} 20%{top:102%;opacity:1;} 23%,100%{top:102%;opacity:0;} }
+@keyframes tf-prod { 0%,25%{transform:translate(130%,0);opacity:0;} 30%{transform:translate(0,0);opacity:1;} 90%{transform:translate(0,0);opacity:1;} 96%,100%{opacity:0;} }
+@keyframes tf-ring { 0%,30%{opacity:0;} 34%{opacity:.9;} 44%{opacity:.25;} 50%,100%{opacity:0;} }
+@keyframes tf-band { 0%,50%{opacity:0;} 55%{opacity:1;} 72%{opacity:1;} 78%,100%{opacity:0;} }
+@keyframes tf-bandshine { 0%,52%{transform:translateX(-120%);} 74%{transform:translateX(120%);} 100%{transform:translateX(120%);} }
+@keyframes tf-breathe { 0%,76%{box-shadow:0 18px 44px -16px rgba(14,27,18,.3);} 86%{box-shadow:0 22px 60px -14px rgba(143,214,106,.55);} 100%{box-shadow:0 18px 44px -16px rgba(14,27,18,.3);} }
+`
+
+function TransformStage({ refImage, productImage }: { refImage: string; productImage?: string | null }) {
+  return (
+    <div style={{ padding: '30px 22px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="sm-anim" style={{ position: 'relative', width: 280, maxWidth: '74vw', borderRadius: 16, overflow: 'visible', animation: 'tf-breathe 8.8s linear infinite' }}>
+        {/* the original — on stage the whole time, never hidden */}
+        <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#0d120e', aspectRatio: '4 / 5', boxShadow: '0 0 0 1px rgba(14,27,18,.07)' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={refImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          {/* act 1 — the reading line */}
+          <div className="sm-anim" style={{ position: 'absolute', left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, rgba(223,254,149,0), #dffe95 30%, #dffe95 70%, rgba(223,254,149,0))', boxShadow: '0 0 14px 2px rgba(223,254,149,.55)', animation: 'tf-scan 8.8s linear infinite' }} />
+          {/* act 3 — the headline band (top third, where the copy lives) */}
+          <div className="sm-anim" style={{ position: 'absolute', top: '7%', left: '6%', right: '6%', height: '16%', borderRadius: 10, background: 'rgba(223,254,149,.14)', border: '1px solid rgba(223,254,149,.5)', overflow: 'hidden', animation: 'tf-band 8.8s linear infinite' }}>
+            <div className="sm-anim" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.35) 50%, rgba(255,255,255,0) 70%)', animation: 'tf-bandshine 8.8s linear infinite' }} />
+          </div>
+        </div>
+        {/* act 2 — YOUR product arrives and docks on the corner */}
+        {productImage && (
+          <div className="sm-anim" style={{ position: 'absolute', right: -14, bottom: 16, animation: 'tf-prod 8.8s cubic-bezier(.2,.7,.2,1) infinite' }}>
+            <div style={{ position: 'relative', background: '#fff', borderRadius: 12, padding: 5, boxShadow: '0 12px 28px -10px rgba(14,27,18,.4)' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={productImage} alt="" style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: 8, display: 'block' }} />
+              <div className="sm-anim" style={{ position: 'absolute', inset: -3, borderRadius: 15, border: '2px solid #dffe95', animation: 'tf-ring 8.8s linear infinite', pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', top: -9, left: '50%', transform: 'translateX(-50%)', background: '#17251c', color: '#dffe95', fontSize: 9, fontWeight: 800, letterSpacing: '.06em', padding: '2px 8px', borderRadius: 100, whiteSpace: 'nowrap' }}>YOURS</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function CloneGeneration({ helper = 'This usually takes 15–40 seconds · you can keep browsing', refImage, productImage }: { helper?: string; refImage?: string | null; productImage?: string | null }) {
   const [idx, setIdx] = useState(0)
   useEffect(() => { const t = setInterval(() => setIdx(i => (i + 1) % 4), 2200); return () => clearInterval(t) }, [])
+  const transform = !!refImage
+  const statuses = transform ? TF_STATUSES : STATUSES
   return (
     <div style={{ fontFamily: 'Inter, sans-serif' }}>
-      <style>{KEYFRAMES}</style>
+      <style>{KEYFRAMES + (transform ? TF_KEYFRAMES : '')}</style>
       {/* indeterminate bar */}
       <div style={{ height: 3, background: '#e7e9e4', position: 'relative', overflow: 'hidden', borderRadius: 3 }}>
         <div className="sm-anim" style={{ position: 'absolute', top: 0, height: '100%', width: '42%', borderRadius: 3, background: 'linear-gradient(90deg, rgba(223,254,149,0) 0%, #dffe95 50%, rgba(223,254,149,0) 100%)', animation: 'sm-indet 1.5s cubic-bezier(.65,0,.35,1) infinite' }} />
       </div>
-      {/* stage */}
+      {/* stage — the real transformation when we have the original ad; the ghost card otherwise */}
+      {transform ? <TransformStage refImage={refImage!} productImage={productImage} /> : (
       <div style={{ padding: '34px 22px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
         <div className="sm-anim sm-glow" style={{ position: 'absolute', width: 260, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(223,254,149,.9) 0%, rgba(223,254,149,0) 70%)', filter: 'blur(38px)', animation: 'sm-glow 4.5s linear infinite', zIndex: 0 }} />
         <div className="sm-anim" style={{ position: 'relative', zIndex: 1, animation: 'sm-dissolve 4.5s linear infinite' }}>
@@ -65,9 +119,10 @@ export default function CloneGeneration({ helper = 'This usually takes 15–40 s
           </div>
         </div>
       </div>
+      )}
       {/* status cycle */}
       <div style={{ height: 22, position: 'relative', margin: '12px 22px 6px' }}>
-        {STATUSES.map((text, i) => (
+        {statuses.map((text, i) => (
           <div key={i} style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, transition: 'opacity .5s ease', opacity: i === idx ? 1 : 0 }}>
             <span style={{ fontSize: 13.5, fontWeight: 500, color: '#5f665b' }}>{text}</span>
             <span className="sm-dots" style={{ display: 'inline-flex', gap: 3, marginBottom: 1 }}>
