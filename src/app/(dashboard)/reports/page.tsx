@@ -1,6 +1,5 @@
 'use client'
-import ComingSoonMeta from '@/components/ComingSoonMeta'
-import { META_LIVE } from '@/lib/flags'
+import MetaGate from '@/components/MetaGate'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import AccountSelector from '@/components/AccountSelector'
@@ -679,9 +678,8 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
   )
 }
 
-// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
-// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+// ── Gate: needs a connected Meta ad account. MetaGate keys off the connection (BYO or OAuth),
+// not the old META_LIVE flag — connected users get the surface, everyone else a connect prompt. ──
 export default function ReportsPageGate() {
-  if (!META_LIVE) return <ComingSoonMeta feature="Reports" />
-  return <ReportsPage />
+  return <MetaGate feature="Reports"><ReportsPage /></MetaGate>
 }

@@ -1,6 +1,5 @@
 'use client'
-import ComingSoonMeta from '@/components/ComingSoonMeta'
-import { META_LIVE } from '@/lib/flags'
+import MetaGate from '@/components/MetaGate'
 /**
  * /snapshots — the archive of "Share once" snapshots: frozen, point-in-time, shareable copies of a
  * report's data. Created via Share report → Share once (NOT Save, which updates the live report).
@@ -92,9 +91,8 @@ function EmptyState() {
 
 const btnLight: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', height: 32, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', color: G12, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, textDecoration: 'none', flexShrink: 0 }
 
-// ── Launch-day gate: this surface needs a CONNECTED Meta ad account; the new Facebook app is
-// in review, so OAuth is dead. Show the coming-soon teaser until NEXT_PUBLIC_META_LIVE=1. ──
+// ── Gate: needs a connected Meta ad account. MetaGate keys off the connection (BYO or OAuth),
+// not the old META_LIVE flag — connected users get the surface, everyone else a connect prompt. ──
 export default function SnapshotsPageGate() {
-  if (!META_LIVE) return <ComingSoonMeta feature="Snapshots" />
-  return <SnapshotsPage />
+  return <MetaGate feature="Snapshots"><SnapshotsPage /></MetaGate>
 }
