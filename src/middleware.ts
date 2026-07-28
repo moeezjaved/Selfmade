@@ -122,6 +122,35 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/brief', request.url))
     }
 
+    // ── Onboarding gate ──────────────────────────────────────────
+    // A first-timer must complete onboarding before using the app. Signup DOES route them to
+    // /onboarding, but that was the ONLY enforcement — a refresh, a bookmark, or a direct link to
+    // /brief slipped straight past it (middleware never checked), which is how someone "signed up and
+    // never saw onboarding". Enforce it here on every protected page. Cookie-cached: once we see the
+    // profile is onboarded we stamp sm_onb=1 and never read the DB again, so onboarded users (the vast
+    // majority of requests) pay ZERO extra latency. Exempt pages a mid-onboarding user still needs
+    // (billing/settings/meta/payment) so the gate can never trap them; /onboarding itself isn't
+    // protected, so there's no redirect loop. Fail open on any DB hiccup — never block on a timeout.
+    const ONBOARD_EXEMPT = ['/billing', '/settings', '/connect-meta', '/payment', '/business-email-required']
+    if (user && request.cookies.get('sm_onb')?.value !== '1'
+        && PROTECTED.some(p => pathname.startsWith(p))
+        && !ONBOARD_EXEMPT.some(p => pathname.startsWith(p))) {
+      const onbRes = await withTimeout(
+        Promise.resolve(
+          supabase.from('user_profiles').select('onboarding_completed').eq('user_id', user.id).single()
+        ),
+        1500,
+      )
+      if (onbRes?.data) {
+        if (!(onbRes.data as any).onboarding_completed) {
+          return NextResponse.redirect(new URL('/onboarding', request.url))
+        }
+        // Onboarded — remember it so we skip this read on every future request (30 days).
+        response.cookies.set('sm_onb', '1', { path: '/', maxAge: 60 * 60 * 24 * 30, sameSite: 'lax' })
+      }
+      // onbRes null (timeout) → fail open; the next request re-checks when the DB is responsive.
+    }
+
     // ── Subscription gate ────────────────────────────────────────
     if (user && REQUIRES_SUBSCRIPTION.some(p => pathname.startsWith(p))) {
       const profileRes = await withTimeout(
