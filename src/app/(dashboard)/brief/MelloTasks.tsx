@@ -13,6 +13,8 @@ const KIND: Record<string, { label: string; run: string }> = {
   research: { label: 'Research', run: 'Reading their ads · writing the report…' },
   creative: { label: 'Creative', run: 'Designing the ad…' },
   video: { label: 'Video', run: 'Building the storyboard…' },
+  meta_pause: { label: 'Your ads', run: 'Pausing the campaign on Meta…' },
+  meta_scale: { label: 'Your ads', run: 'Raising the budget on Meta…' },
 }
 
 type Task = {

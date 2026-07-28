@@ -123,6 +123,34 @@ export async function POST(req: NextRequest) {
         }
       }
 
+    } else if (task.kind === 'meta_pause' || task.kind === 'meta_scale') {
+      // ── The approve→act loop (Company Brain architecture): the audit SUGGESTED this action; the
+      // founder clicking Start IS the approval; we execute against their own ad account via the
+      // MetaClient and log it durably. Free (no credits) — it's their account, their call. ──
+      const { createMetaClientForUser } = await import('@/lib/meta/client')
+      let mc: any = null
+      try { mc = await createMetaClientForUser(user.id) } catch { /* handled below */ }
+      if (!mc) failed = 'Meta isn’t connected (or access expired) — reconnect and I can act on your account.'
+      else if (!ev.metaCampaignId) failed = 'This suggestion is missing its campaign — refresh the brief for a new one.'
+      else if (task.kind === 'meta_pause') {
+        await mc.pauseCampaign(String(ev.metaCampaignId))
+        result = { url: '/m4', title: task.title, cta: 'See your campaigns →', emailNoun: 'campaign pause', campaign: ev.campaignName }
+      } else {
+        const nb = Number(ev.newBudget)
+        if (!nb || nb <= 0) failed = 'No target budget on this suggestion — refresh the brief for a new one.'
+        else {
+          await mc.scaleCampaignBudget(String(ev.metaCampaignId), nb)
+          result = { url: '/m4', title: task.title, cta: 'See your campaigns →', emailNoun: 'budget scale', campaign: ev.campaignName, newBudget: nb }
+        }
+      }
+      if (!failed) {
+        await admin.from('activity_logs').insert({
+          user_id: user.id, action_type: task.kind.toUpperCase(), entity_type: 'campaign',
+          description: `${task.kind === 'meta_pause' ? 'Paused' : `Scaled to $${ev.newBudget}/day`} “${ev.campaignName || ev.metaCampaignId}” — approved from the brief`,
+          performed_by: 'mello',
+        }).then(() => {}, () => {})
+      }
+
     } else {
       failed = `Task kind "${task.kind}" isn't runnable yet.`
     }

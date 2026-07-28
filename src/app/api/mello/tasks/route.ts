@@ -25,6 +25,9 @@ export async function GET(req: NextRequest) {
 
   const seenKeys = new Set(persisted.map((t: any) => t.suggested_key).filter(Boolean))
   const active = persisted.filter((t: any) => ['running', 'done', 'failed'].includes(t.status))
+  // Suggestions PERSISTED by background engines (the nightly Meta audit inserts meta_pause/meta_scale
+  // rows directly) — they must surface on the desk too, not only the live-computed ones.
+  const persistedSuggested = persisted.filter((t: any) => t.status === 'suggested')
 
   // Fresh suggestions, minus anything already persisted (ran/dismissed/done).
   let suggestions: any[] = []
@@ -37,6 +40,7 @@ export async function GET(req: NextRequest) {
   const done = active.filter((t: any) => t.status === 'done')
   const tasks = [
     ...running.map((t: any) => ({ ...t, suggested: false })),
+    ...persistedSuggested.map((t: any) => ({ ...t, suggested: false })),   // has an id → run by id
     ...suggestions.map((s) => ({ ...s, status: 'suggested', suggested: true })),
     ...done.slice(0, 2).map((t: any) => ({ ...t, suggested: false })),
   ].slice(0, 4)
