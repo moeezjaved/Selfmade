@@ -1682,20 +1682,25 @@ async function analyzeJob(job) {
     let cachedA = null
     if (job.source_video_url) {
       try {
-        const q = await fetch(`${U}/rest/v1/creative_generations?select=clone_meta&source_video_url=eq.${encodeURIComponent(job.source_video_url)}&id=neq.${job.id}&type=eq.video_clone&order=created_at.desc&limit=8`, { headers: H })
+        const q = await fetch(`${U}/rest/v1/creative_generations?select=clone_meta&source_video_url=eq.${encodeURIComponent(job.source_video_url)}&id=neq.${job.id}&type=eq.video_clone&order=created_at.desc&limit=20`, { headers: H })
         const rows = q.ok ? await q.json() : []
-        // Only reuse a SUBSTANTIVE prior analysis. A HOLLOW one (empty transcript, empty beat actions,
-        // no avatar) is worse than none: reusing it ALSO skips the fresh Whisper transcript backfill
-        // below, so the script gets written from the product alone instead of transcreated from the
-        // ad's real spoken words, the gender is guessed, and scenes recreate nothing real. Reject it
-        // and analyse fresh. (This is the root cause behind "the clone ignores the original script".)
+        // Reuse a prior analysis that carries real STRUCTURE — beats with source frames (thumbs),
+        // timestamps or actions, OR a transcript/avatar. This is what grounds the storyboard in the
+        // actual reference video (real frames per scene). The transcript + script are ALWAYS rebuilt
+        // fresh below (Whisper backfill + dedicated transcreation run regardless of cache), so reusing a
+        // frame-rich-but-transcript-less analysis no longer means a generic script — it just brings the
+        // reference's real shots back. (Rejecting these was the regression that made the storyboard stop
+        // matching the reference video.) Only a truly EMPTY analysis is skipped so we analyse fresh.
         const substantive = (m) => {
           const bs = m?.beat_sheet
           if (!bs || !(Number(m?.scene_count) > 0)) return false
+          const beats = Array.isArray(bs.beats) ? bs.beats : []
+          const hasFrames = beats.some((b) => b?.thumb)                                   // real source frames grabbed
+          const hasTimed = beats.filter((b) => String(b?.t || '').trim()).length >= 2     // real per-beat timestamps
           const words = String(bs.transcript || '').trim().split(/\s+/).filter(Boolean).length
-          const acts = Array.isArray(bs.beats) ? bs.beats.filter((b) => String(b?.action || '').trim().length > 3).length : 0
+          const acts = beats.filter((b) => String(b?.action || '').trim().length > 3).length
           const av = String(bs.avatar || '').trim().toLowerCase()
-          return words >= 4 || acts >= 2 || (!!av && av !== 'none' && !av.startsWith('none'))
+          return hasFrames || hasTimed || acts >= 2 || words >= 4 || (!!av && av !== 'none' && !av.startsWith('none'))
         }
         const hit = rows.find((r) => substantive(r?.clone_meta))
         if (hit) { cachedA = hit.clone_meta; console.log(`♻️ ${job.id} reusing analysis (scenes=${cachedA.scene_count}, suggest=${cachedA.suggested_mode})`) }
