@@ -78,13 +78,17 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
   const genKeyframe = async (s: Scene) => {
     if (!board?.editable || busy[s.index]) return
     setBusy((b) => ({ ...b, [s.index]: true })); setGenErr((e) => ({ ...e, [s.index]: '' }))
+    // One call, with a single retry when the image model is momentarily busy (Gemini congestion) — a
+    // transient blip shouldn't leave a permanent hole in the storyboard the way it used to.
+    const once = () => fetch('/api/discovery/clone-video/keyframe', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jobId: board.jobId, sceneIndex: s.index, action: s.action, scriptLine: s.scriptLine }),
+    }).then((x) => x.json()).catch(() => ({ error: 'network' }))
     try {
-      const r = await fetch('/api/discovery/clone-video/keyframe', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId: board.jobId, sceneIndex: s.index, action: s.action, scriptLine: s.scriptLine }),
-      }).then((x) => x.json())
+      let r = await once()
+      if (!r?.preview && /busy|network|429|503/i.test(String(r?.error || ''))) { await new Promise((res) => setTimeout(res, 3500)); r = await once() }
       if (r?.preview) setScenes((prev) => prev.map((x) => x.index === s.index ? { ...x, preview: r.preview } : x))
-      else setGenErr((e) => ({ ...e, [s.index]: r?.error === 'pro_model_busy' ? 'Image model busy — try again' : (r?.error || 'Could not generate') }))
+      else setGenErr((e) => ({ ...e, [s.index]: /busy/i.test(String(r?.error || '')) ? 'Image model busy — tap to retry' : (r?.error || 'Could not generate') }))
     } catch { setGenErr((e) => ({ ...e, [s.index]: 'Could not generate — try again' })) } finally { setBusy((b) => ({ ...b, [s.index]: false })) }
   }
 
@@ -99,7 +103,18 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
     // different job (the beats can carry a previous analysis's previews, which is how old-run women
     // kept showing). A fresh keyframe for THIS job uses the reference frame + gender lock.
     const stale = (s: Scene) => !s.preview || (!!board?.jobId && !s.preview.includes(board.jobId))
-    ;(async () => { for (const s of scenes) if (stale(s)) await genKeyframe(s) })()
+    // Fill the whole board fast: do the FIRST scene alone (it mints the shared cast sheet so every
+    // other scene locks to the same presenter), then generate the rest with light concurrency (2 at a
+    // time) so a 5-scene storyboard appears in ~two waves instead of five slow serial renders. Previews
+    // persist, so a reload never re-charges an already-drawn scene.
+    ;(async () => {
+      const todo = scenes.filter(stale)
+      if (!todo.length) return
+      const [first, ...rest] = todo
+      await genKeyframe(first)
+      const CONC = 2
+      for (let i = 0; i < rest.length; i += CONC) await Promise.all(rest.slice(i, i + CONC).map((s) => genKeyframe(s)))
+    })()
   }, [board, scenes.length])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Parent re-paced the script (length picker) → re-split it evenly across the current scenes so the
@@ -142,6 +157,14 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
 
   const chip: React.CSSProperties = { fontSize: 12, color: '#20321c', background: '#eef7d6', borderRadius: 999, padding: '4px 11px', fontWeight: 700 }
 
+  // Storyboard-first: show the founder the full visual plan (every scene drawn with their product +
+  // the SAME cast) BEFORE they pay for a single second of video. Track how many frames are drawn so
+  // the header shows progress and the Approve button waits until the board is complete.
+  const isCurrent = (s: Scene) => !!s.preview && (!board?.jobId || s.preview.includes(board.jobId))
+  const drawnCount = scenes.filter(isCurrent).length
+  const drawing = showKeyframes && board.editable && Object.values(busy).some(Boolean)
+  const boardIncomplete = showKeyframes && board.editable && drawnCount < scenes.length
+
   return (
     <div>
       {zoom && (
@@ -157,6 +180,11 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
         <span style={{ ...chip, background: board.editable ? '#dffe95' : '#f0efe8', color: board.editable ? '#17251c' : '#68756b' }}>
           {board.editable ? 'Editable — nothing generated yet' : 'Already generated (read-only)'}
         </span>
+        {showKeyframes && board.editable && boardIncomplete && (
+          <span style={{ ...chip, background: '#fff6df', color: '#7a5b12' }}>
+            🎨 Drawing your storyboard… {drawnCount}/{scenes.length}
+          </span>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -215,11 +243,11 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
 
       {!embedded && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 18, flexWrap: 'wrap' }}>
-          <button onClick={generate} disabled={!board.editable || generating}
-            style={{ fontSize: 14, fontWeight: 800, padding: '11px 22px', borderRadius: 999, cursor: board.editable ? 'pointer' : 'default', border: 'none', background: board.editable ? '#17251c' : '#d7ddd2', color: '#fff' }}>
-            {generating ? 'Starting generation…' : board.editable ? 'Approve & generate →' : 'Already generated'}
+          <button onClick={generate} disabled={!board.editable || generating || drawing}
+            style={{ fontSize: 14, fontWeight: 800, padding: '11px 22px', borderRadius: 999, cursor: (board.editable && !drawing) ? 'pointer' : 'default', border: 'none', background: (board.editable && !drawing) ? '#17251c' : '#d7ddd2', color: '#fff' }}>
+            {generating ? 'Starting generation…' : drawing ? `Drawing your storyboard… ${drawnCount}/${scenes.length}` : board.editable ? 'Approve & generate →' : 'Already generated'}
           </button>
-          <span style={{ fontSize: 12, color: '#8a9880' }}>Editing the storyboard is free. Seedance only shoots once you approve.</span>
+          <span style={{ fontSize: 12, color: '#8a9880' }}>Review the storyboard first — editing it is free. Seedance only shoots once you approve.</span>
         </div>
       )}
     </div>
