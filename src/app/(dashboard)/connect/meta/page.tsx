@@ -76,12 +76,13 @@ export default function ConnectMetaByo() {
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               {stepNum(1, !!accounts)}
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 800 }}>Create a System User token <span style={{ color: MUTED, fontWeight: 600 }}>· ~30 seconds, one time</span></div>
+                <div style={{ fontSize: 15, fontWeight: 800 }}>Create a System User token <span style={{ color: MUTED, fontWeight: 600 }}>· ~2 minutes, one time</span></div>
                 <ol style={{ fontSize: 13.5, color: '#2c342d', lineHeight: 1.8, margin: '8px 0 0', paddingLeft: 18 }}>
-                  <li>Open <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noreferrer" style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>Business Settings → System users <ExternalLink size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /></a> and click <b>Add</b> (name it “Selfmade”, role Admin).</li>
-                  <li><b>Assign assets</b> → pick your ad account(s) → full control.</li>
-                  <li><b>Generate token</b> → choose scopes <b>ads_read</b>, <b>ads_management</b>, <b>read_insights</b> → set expiry <b>Never</b> → copy it.</li>
+                  <li><b>Add an app to your Business</b> (required before a token can be generated — a brand-new app is fine, <b>no review needed</b>): <a href="https://business.facebook.com/settings/apps" target="_blank" rel="noreferrer" style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>Business Settings → Apps <ExternalLink size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /></a> → <b>Add → Create a New App ID</b> → name it “Selfmade”, type <b>Business</b>.</li>
+                  <li>Open <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noreferrer" style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>System users <ExternalLink size={11} style={{ display: 'inline', verticalAlign: '-1px' }} /></a> → <b>Add</b> a system user (name “Selfmade”, role Admin), then <b>Assign assets</b> → your ad account(s) → full control.</li>
+                  <li><b>Generate token</b> → pick the app from step 1 → scopes <b>ads_read</b>, <b>ads_management</b>, <b>read_insights</b> → expiry <b>Never</b> → copy it.</li>
                 </ol>
+                <div style={{ fontSize: 12, color: MUTED, background: '#f4f7f2', borderRadius: 8, padding: '8px 11px', marginTop: 9, lineHeight: 1.5 }}>“Generate token” greyed out? That’s step 1 — your Business has no app yet. Add one (above) and it lights up. The app needs no approval to read <i>your own</i> ad account.</div>
               </div>
             </div>
           </div>
