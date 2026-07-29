@@ -23,15 +23,15 @@ const CARDS: Card[] = [
   { id: 'free', tier: 'Free', price: '$0', per: '', note: 'No card needed',
     feats: ['75 free credits (~5 image ads)', 'Browse Discovery + Brand Spy', 'Remake any winning ad', 'Daily brief from Mello'], cta: 'Start free' },
   { id: 'starter', tier: 'Mello, full-time', price: '$49', per: '/ month', note: 'Everything, every morning',
-    feats: ['Video ads', 'Unlimited image ads', 'Every competitor watched', 'Fresh creatives every morning'], cta: 'Go full-time', popular: true },
+    feats: [`6,000 credits / month`, `$${IMG_USD} per image ad · $${VID_USD} per video`, 'Every competitor watched', 'Fresh creatives every morning'], cta: 'Go full-time', popular: true },
   // Pay-as-you-go card retired (2026-07-29) — one plan: Free + $49. Credit top-ups still available
   // in-app via the credit counter for paid users; just not shown as a pricing column.
 ]
 
 const FAQS: { q: string; a: string }[] = [
-  { q: 'How does pricing work?', a: `No credits, no math — you pay for what you make. An image ad is $${IMG_USD}, a video ad is $${VID_USD}. Buy as you go, or subscribe for unlimited images plus a monthly batch of videos.` },
+  { q: 'How does pricing work?', a: `You pay for what you make — an image ad is $${IMG_USD}, a video ad is $${VID_USD}. The $49 plan gives you 6,000 credits a month to spend on either, plus every-competitor tracking and a fresh brief each morning.` },
   { q: 'Is there a free trial?', a: `The free plan gives you 75 credits (about 5 image ads) to start, no card needed. Want to test a video? Pay as you go — one video is just $${VID_USD}, no subscription.` },
-  { q: 'What does "unlimited images" mean?', a: 'On the full-time plan, image-ad remakes are free and unlimited (fair use). Video ads are included every month.' },
+  { q: 'What can I make with the credits?', a: `Anything — spend your 6,000 monthly credits on image ads ($${IMG_USD} each), video ads ($${VID_USD} each), or spying competitors. Unused credits from top-ups never expire.` },
   { q: 'What counts as one video ad?', a: 'A short-form ad up to about 30 seconds. Longer videos use a bit more of your monthly allowance.' },
   { q: 'Can I cancel anytime?', a: 'Yes — one click. You keep everything you made, and any pay-as-you-go balance never expires.' },
   { q: 'How much does an agency charge for the same thing?', a: `A UGC video from a freelancer runs $200–300 and takes a week. Here it's $${VID_USD} and about two minutes.` },
@@ -122,7 +122,7 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
       <div style={{ marginTop: 28, padding: '18px 22px', borderRadius: 16, background: '#f2f8f0', border: '1px solid #d8e6d4', textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#16261a' }}>
         A UGC video from a freelancer: <span style={{ color: MUTED, fontWeight: 500 }}>$200–300 and a week.</span> &nbsp;Here: ${VID_USD} and 2 minutes.
       </div>
-      <p style={{ marginTop: 12, fontSize: 12.5, color: MUTED, textAlign: 'center' }}>1 video ad = a short-form ad up to ~30s; longer videos use a bit more. Unlimited images are fair-use. Prices in USD.</p>
+      <p style={{ marginTop: 12, fontSize: 12.5, color: MUTED, textAlign: 'center' }}>1 video ad = a short-form ad up to ~30s; longer videos use a bit more. Prices in USD.</p>
 
       {/* FAQ */}
       <h3 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', margin: '48px 0 18px', textAlign: 'center' }}>Frequently asked questions</h3>

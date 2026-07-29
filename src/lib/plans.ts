@@ -130,11 +130,12 @@ export const ACTION_COSTS: Record<string, number> = {
   video_clone: 600,         // UGC 15s ($6.00 @ 1cr=1¢) — the "video ad = $6" anchor (v2 pricing)
   video_captions: 100,      // TikTok-style burned captions — high-margin add-on
   asset_ai_tag: 10,         // AI tagging of an uploaded asset (caption/embed + video clip analysis)
+  brand_spy: 50,            // spy a competitor — start tracking + thorough ad-library crawl ($0.50)
 }
 
-// Image-remake actions that are FREE + unlimited for subscribers (pricing model v2). Studio (original
-// ads) stays metered — it's a distinct premium feature, not the "image ad remake" we advertise free.
-export const FREE_FOR_SUBSCRIBERS = new Set(['image_clone_pro', 'image_clone_4k', 'image_edit_pro'])
+// Retired 2026-07-29: no free images on any plan — every image ad is charged its credit_pricing price
+// ($0.15). (The DB stopped free-images in migration 104; this app-layer set is now empty to match.)
+export const FREE_FOR_SUBSCRIBERS = new Set<string>()
 
 // ── Top-up packs — pricing spec §3.1 ──
 export interface TopupPack { id: string; credits: number; priceUsd: number }
