@@ -160,7 +160,17 @@ export default function HireKeynote() {
           <span>·</span>
           <a href="/login">Log in</a>
         </div>
-        <div className="copyright">© {new Date().getFullYear()} Selfmade</div>
+        {/* Legal — required to be reachable from the homepage (payment providers + Meta). */}
+        <div className="after-links legal-links">
+          <a href="/privacy">Privacy</a>
+          <span>·</span>
+          <a href="/terms">Terms</a>
+          <span>·</span>
+          <a href="/refund">Refund Policy</a>
+          <span>·</span>
+          <a href="/contact">Contact</a>
+        </div>
+        <div className="copyright">© {new Date().getFullYear()} Selfmade · operated by Virgin Teez</div>
       </footer>
 
       <style>{`
@@ -260,6 +270,8 @@ export default function HireKeynote() {
         .after-links{display:flex;gap:12px;align-items:center;font-size:13px;color:#c9cfc2}
         .after-links a{color:#68756b;font-weight:650;text-decoration:none;border-bottom:1px solid #e0e5db;padding-bottom:1px;transition:color .2s}
         .after-links a:hover{color:#171d18}
+        .legal-links{margin-top:2px;font-size:12px}
+        .legal-links a{font-weight:600}
         .copyright{font-size:11.5px;color:#b6bcae;margin-top:14px}
 
         /* reveal — pure enhancement: content is ALWAYS visible; .in replays a gentle rise. */
