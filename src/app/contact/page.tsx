@@ -26,7 +26,7 @@ export default function Contact() {
         <div style={{ fontSize: 13, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '.06em' }}>Contact</div>
         <h1 style={{ fontSize: 'clamp(28px,5vw,40px)', fontWeight: 800, letterSpacing: '-.02em', margin: '10px 0 16px' }}>Get in touch</h1>
         <p style={{ fontSize: 16.5, color: '#374151', lineHeight: 1.7, margin: '0 0 24px' }}>We usually reply within one business day.</p>
-        {[['Support', 'Help with your account, credits, or a generation.', 'support@tryselfmade.ai'],
+        {[['Support', 'Help with your account, credits, or a generation.', COMPANY.supportEmail],
           ['Sales', 'Plans, teams, and Enterprise.', 'sales@tryselfmade.ai'],
           ['Partnerships', 'Integrations, affiliates, and press.', 'hello@tryselfmade.ai']].map(([t, d, e]) => (
           <div key={t} style={{ border: '1px solid #eef0ee', borderRadius: 14, padding: '18px 20px', marginBottom: 12 }}>
@@ -45,7 +45,7 @@ export default function Contact() {
             <dt style={{ fontWeight: 800, color: INK }}>Address</dt>
             <dd style={{ margin: '0 0 12px', whiteSpace: 'pre-line' }}>{COMPANY.address}</dd>
             <dt style={{ fontWeight: 800, color: INK }}>Customer support</dt>
-            <dd style={{ margin: '0 0 4px' }}><a href="mailto:support@tryselfmade.ai" style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>support@tryselfmade.ai</a></dd>
+            <dd style={{ margin: '0 0 4px' }}><a href={`mailto:${COMPANY.supportEmail}`} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>{COMPANY.supportEmail}</a></dd>
             <dd style={{ margin: 0 }}>Phone: <a href={`tel:${COMPANY.phone.replace(/[^+\d]/g, '')}`} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>{COMPANY.phone}</a></dd>
           </dl>
         </div>
