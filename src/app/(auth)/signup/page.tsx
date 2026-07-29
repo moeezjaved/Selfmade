@@ -46,6 +46,15 @@ export default function SignupPage() {
       },
     })
     if (error) { toast.error(error.message); setLoading(false); return }
+    // Already-registered email: Supabase returns a "success" with an EMPTY identities array (email-
+    // enumeration protection) — no email is actually sent. Detect it and send them to log in instead
+    // of a fake "check your inbox" they'd wait on forever.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      toast.error('That email is already registered — please log in instead.')
+      setLoading(false)
+      setTimeout(() => router.push(`/login?email=${encodeURIComponent(form.email.trim())}`), 1200)
+      return
+    }
     // Fire the welcome email (best-effort, non-blocking).
     fetch('/api/auth/welcome', { method: 'POST' }).catch(() => {})
     // If 'Confirm email' is ON in Supabase, signUp returns NO session → show a check-your-inbox
