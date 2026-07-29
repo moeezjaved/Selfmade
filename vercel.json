@@ -50,6 +50,9 @@
     },
     "src/app/api/meta/connect-byo/route.ts": {
       "maxDuration": 120
+    },
+    "src/app/api/cron/payfast-renewals/route.ts": {
+      "maxDuration": 120
     }
   },
   "crons": [
@@ -100,6 +103,10 @@
     {
       "path": "/api/cron/meta-audit",
       "schedule": "20 5 * * *"
+    },
+    {
+      "path": "/api/cron/payfast-renewals",
+      "schedule": "0 6 * * *"
     }
   ]
 }

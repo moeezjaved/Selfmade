@@ -22,9 +22,16 @@ const BASE = IS_LIVE ? 'https://ipg1.apps.net.pk' : 'https://ipguat.apps.net.pk'
 export const TOKEN_URL = `${BASE}/Ecommerce/api/Transaction/GetAccessToken`
 export const POST_URL = `${BASE}/Ecommerce/api/Transaction/PostTransaction`
 
-/** USD→PKR for display/charge amounts. PayFast settles PKR; set the rate in env to keep prices sane. */
+/**
+ * Charge currency. We deal in USD, so default to USD — the amount is sent as-is. If a merchant is
+ * PKR-only, set PAYFAST_CURRENCY=PKR and we convert USD→PKR at PAYFAST_USD_PKR. One switch, no code
+ * change. (Confirm with PayFast that USD is enabled on the live account before going live in USD.)
+ */
+export const CURRENCY = (process.env.PAYFAST_CURRENCY || 'USD').toUpperCase()
 export const USD_PKR = Number(process.env.PAYFAST_USD_PKR || '280')
 export const usdToPkr = (usd: number) => Math.max(1, Math.round(usd * USD_PKR))
+/** The amount to actually charge, in the configured currency, from a USD price. */
+export const chargeAmount = (usd: number) => (CURRENCY === 'PKR' ? usdToPkr(usd) : usd)
 
 /** A unique basket id per checkout — the key that ties the IPN back to our order row. */
 export function makeBasketId(prefix = 'SM'): string {
@@ -65,13 +72,39 @@ export function hashMatches(basketId: string, errCode: string, received: string)
   return diff === 0
 }
 
+/**
+ * Charge a previously-tokenized card WITHOUT the user present (subscription auto-renewal).
+ * PayFast returns an Instrument_token on the first RECURRING_TXN=TRUE payment; this re-charges it
+ * server-to-server. The exact recurring endpoint isn't in the shared docs — set PAYFAST_RECURRING_URL
+ * (+ the field names PayFast specifies) once they provide it, and auto-renewal goes fully hands-free.
+ * Until then this returns { ok:false, needsSpec:true } and the cron falls back to an email re-pay link.
+ */
+export async function chargeWithToken(opts: { instrumentToken: string; basketId: string; amount: number; currency?: string; description?: string }): Promise<{ ok: boolean; transactionId?: string; error?: string; needsSpec?: boolean }> {
+  const url = process.env.PAYFAST_RECURRING_URL
+  if (!url) return { ok: false, needsSpec: true, error: 'PAYFAST_RECURRING_URL not set — awaiting PayFast recurring-charge endpoint' }
+  try {
+    const body = new URLSearchParams({
+      MERCHANT_ID, SECURED_KEY, BASKET_ID: opts.basketId, TXNAMT: String(opts.amount),
+      CURRENCY_CODE: opts.currency || CURRENCY, TOKEN: opts.instrumentToken, RECURRING_TXN: 'TRUE',
+      TXNDESC: opts.description || 'Selfmade subscription renewal',
+    }).toString()
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body, signal: AbortSignal.timeout(30000) })
+    const j = await r.json().catch(() => ({} as any))
+    const code = j.err_code || j.ERR_CODE
+    if (code === '000') return { ok: true, transactionId: j.transaction_id || j.TRANSACTION_ID }
+    return { ok: false, error: j.err_msg || `err_code ${code}` }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+}
+
 /** Build the full field map the client form POSTs to POST_URL. */
 export function buildTransactionFields(opts: {
   token: string; basketId: string; amount: number; currency?: string; description: string
   email?: string; mobile?: string; recurring?: boolean; successUrl: string; failureUrl: string; checkoutUrl: string
 }): Record<string, string> {
   return {
-    CURRENCY_CODE: opts.currency || 'PKR',
+    CURRENCY_CODE: opts.currency || CURRENCY,
     MERCHANT_ID,
     MERCHANT_NAME: 'Selfmade',
     TOKEN: opts.token,
