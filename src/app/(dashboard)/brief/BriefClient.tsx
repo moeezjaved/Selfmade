@@ -242,6 +242,12 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
     if (subscribing) return
     setSubscribing(true)
     try {
+      // PayFast is the active rail — auto-submits a form to the hosted page. Stripe is the fallback.
+      if (process.env.NEXT_PUBLIC_PAYMENTS_PROVIDER === 'payfast') {
+        const { startPayfastCheckout } = await import('@/lib/payfast/start')
+        await startPayfastCheckout({ kind: 'subscription', plan: 'starter', cycle: 'monthly' })
+        return   // redirecting to PayFast
+      }
       const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: 'starter', cycle: 'monthly' }) })
       const j = await r.json().catch(() => ({}))
       if (j?.url) { window.location.href = j.url; return }
@@ -320,11 +326,16 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
     setThread(t => [...t, { who: 'user', text: q }, { who: 'mello', kind: 'reply', text: '', pending: true }])
     setBusy(true)
     try {
-      const r = await fetch('/api/brief/reply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: q, item: about ? { title: about.title, body: about.body } : (focusItem ? { title: focusItem.title, body: focusItem.body } : undefined) }) })
+      // Hard client timeout — the reply runs the full Mello agent (tools + LLM), which can occasionally
+      // stall; without this the composer sat on "Mello is thinking…" forever. 75s then a graceful msg.
+      const r = await fetch('/api/brief/reply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: q, item: about ? { title: about.title, body: about.body } : (focusItem ? { title: focusItem.title, body: focusItem.body } : undefined) }), signal: AbortSignal.timeout(75000) })
       const j = await r.json().catch(() => ({}))
       setThread(t => { const c = [...t]; const last = c[c.length - 1]; if (last && last.who === 'mello' && (last as any).kind === 'reply') (c[c.length - 1] as any) = { who: 'mello', kind: 'reply', text: j.reply || 'Got it.' }; return c })
-    } catch {
-      setThread(t => { const c = [...t]; (c[c.length - 1] as any) = { who: 'mello', kind: 'reply', text: 'I hit a snag — try me again in a moment.' }; return c })
+    } catch (e: any) {
+      const msg = e?.name === 'TimeoutError' || e?.name === 'AbortError'
+        ? 'That took longer than I like — ask me again and I’ll be quicker.'
+        : 'I hit a snag — try me again in a moment.'
+      setThread(t => { const c = [...t]; (c[c.length - 1] as any) = { who: 'mello', kind: 'reply', text: msg }; return c })
     } finally { setBusy(false) }
   }
 

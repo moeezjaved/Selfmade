@@ -344,7 +344,7 @@ export default function InterviewPage() {
     for (const p of picks) {
       setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: `starting on ${p.name} — pulling their live ads`, done: false }])
       await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, name: p.name, crawlOnly: true }) }).catch(() => {})
-      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandIdRef.current || undefined }) }).catch(() => {})
+      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandIdRef.current || undefined, spied: true }) }).catch(() => {})
     }
     setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: 'studying what wins in your market', done: false }])
     // Auto-author the first Competitor Intelligence Report on the primary competitor — the show-then-sell
@@ -376,6 +376,11 @@ export default function InterviewPage() {
   async function choosePlan(planId: 'starter' | 'business') {
     setPlanBusy(planId)
     try {
+      if (process.env.NEXT_PUBLIC_PAYMENTS_PROVIDER === 'payfast') {
+        const { startPayfastCheckout } = await import('@/lib/payfast/start')
+        await startPayfastCheckout({ kind: 'subscription', plan: planId, cycle: 'monthly' })
+        return   // redirecting to PayFast
+      }
       const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: planId, cycle: 'monthly' }) })
       const j = await r.json().catch(() => ({}))
       if (j?.url) { window.location.href = j.url; return }

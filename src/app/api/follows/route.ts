@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  const { pageId, brandName, action = 'toggle', email_alerts, brandId } = await req.json()
+  const { pageId, brandName, action = 'toggle', email_alerts, brandId, spied } = await req.json()
   if (!pageId) return NextResponse.json({ error: 'pageId required' }, { status: 400 })
 
   // brand_id (migration 117) attaches a competitor to ONE of the user's brands. Nullable — omit it
@@ -46,7 +46,12 @@ export async function POST(req: NextRequest) {
   let following: boolean
   if (action === 'follow' || (action === 'toggle' && !isFollowing)) {
     if (!isFollowing) {
-      await admin.from('followed_brands').insert({ user_id: user.id, page_id: String(pageId), brand_name: brandName || null, email_alerts: !!email_alerts, brand_id })
+      // spied:true (from onboarding) puts the competitor in Brand Spy immediately — free here, since
+      // it's a follow, not the paid /brand-spy action. Default follows stay spied=false (Following only).
+      await admin.from('followed_brands').insert({ user_id: user.id, page_id: String(pageId), brand_name: brandName || null, email_alerts: !!email_alerts, brand_id, ...(spied === true ? { spied: true } : {}) })
+    } else if (spied === true) {
+      // Already followed (e.g. account-level) → promote to spied so it shows in Brand Spy.
+      await admin.from('followed_brands').update({ spied: true }).eq('user_id', user.id).eq('page_id', String(pageId))
     } else if (brand_id && !(existing as any).brand_id) {
       // Already following (e.g. added account-level in onboarding), and now assigned to a brand via
       // "Watch competitors". Attach it. Only when currently unassigned — first-assignment wins, so we
