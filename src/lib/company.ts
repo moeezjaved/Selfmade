@@ -12,9 +12,9 @@ export const COMPANY = {
   // Full registered/business address, one line per line (used with whiteSpace: pre-line)
   address: '123 Example Street\nCity, State/Region, Postal Code\nCountry', // TODO: real registered address
   // Customer support phone in international format
-  phone: '+1 (000) 000-0000', // TODO: real support phone
-  // Support email (already a live inbox)
-  supportEmail: 'support@tryselfmade.ai',
+  phone: '+1 782 822 0679',
+  // Support email (live inbox)
+  supportEmail: 'moeez@selfmade.ai',
   // Trading/brand name shown to customers
   brand: 'Selfmade',
 } as const
