@@ -65,8 +65,13 @@ function StudioInner() {
   // mode + remake source — SEEDED from the URL at first render (not in an effect) so the remake canvas
   // (and the inline video flow) appears even if the client never hydrates (broken extensions).
   const _adParam = params.get('ad')
-  const [mode, setMode] = useState<'fresh' | 'remake'>(_adParam ? 'remake' : 'fresh')
-  const [source, setSource] = useState<{ adId: string; img: string | null; brand: string | null } | null>(_adParam ? { adId: _adParam, img: params.get('img'), brand: params.get('brand') } : null)
+  // src=asset → remaking an UPLOADED asset (from /assets), not a library ad. No adId; the source is the
+  // asset's own file URL (image → refImageUrl, video → sourceVideoUrl). Same Studio UI, different source.
+  const _assetSrc = params.get('src') === 'asset'
+  const _remakeInit = !!_adParam || _assetSrc
+  const [mode, setMode] = useState<'fresh' | 'remake'>(_remakeInit ? 'remake' : 'fresh')
+  const [source, setSource] = useState<{ adId: string; img: string | null; brand: string | null } | null>(
+    _remakeInit ? { adId: _adParam || '', img: params.get('img'), brand: params.get('brand') } : null)
   const isVideo = params.get('type') === 'video'          // the winner is a video → the video-clone flow
   const vidParam = params.get('vid')                      // competitor's mp4 (for the source preview)
   // Some remake entry points pass only the poster (img=) and no vid= — resolve the source mp4 from the
@@ -243,11 +248,12 @@ function StudioInner() {
         if (jb?.brand?.id) { useBrandId = jb.brand.id; setBrandId(jb.brand.id) }
       }
 
-      if (useMode === 'remake' && useSource?.adId) {
-        // clone the competitor's winner (job-based → poll). Recast the person (look),
-        // pick the quality, and fan out N versions — one job each (they render in parallel).
+      if (useMode === 'remake' && (useSource?.adId || useSource?.img)) {
+        // clone the source (job-based → poll). Competitor library ad → adId; an uploaded asset →
+        // refImageUrl (its own file). Recast the person (look), pick quality, fan out N versions.
         const body = {
-          adId: useSource.adId, productImages: chosen, tier: 'pro', brandId: useBrandId || undefined,
+          ...(useSource.adId ? { adId: useSource.adId } : { refImageUrl: useSource.img }),
+          productImages: chosen, tier: 'pro', brandId: useBrandId || undefined,
           productType: useBrandType || 'physical', brandName: useBrandName.trim() || undefined,
           colors: useKit.colors, palette: useKit.palette || undefined, logo: useKit.logo || undefined,
           newHeadline: useHeadline.trim() || undefined, aspectRatio: useAspect, imageSize: imgQuality,
@@ -534,10 +540,11 @@ function StudioInner() {
             </>
           )}
 
-          {/* video remake → the inline video flow (language · voice · free script · render), no modal */}
-          {remake && isVideo && source?.adId && (
+          {/* video remake → the inline video flow (language · voice · free script · render), no modal.
+              Works for a library ad (source.adId) OR an uploaded asset (vidUrl, no adId). */}
+          {remake && isVideo && (source?.adId || vidUrl) && (
             <InlineVideoRemake
-              sourceAdId={source.adId} sourceVideoUrl={vidUrl || undefined} sourcePoster={source.img || undefined}
+              sourceAdId={source?.adId || ''} sourceVideoUrl={vidUrl || undefined} sourcePoster={source?.img || undefined}
               brandId={brandId || undefined} brandType={brands.find(b => b.id === brandId)?.brand_type}
               productImages={photos.filter(p => selected.includes(p.id)).map(p => p.src)} brandName={brandName || undefined}
               onDone={() => fetch('/api/creatives').then(r => r.json()).then(j => setWork((j.creatives || []).filter((c: any) => c.media_type !== 'video' && c.status === 'done' && c.image_url).slice(0, 14))).catch(() => {})}
