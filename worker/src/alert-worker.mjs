@@ -55,9 +55,27 @@ async function tick() {
     const to = await getUserEmail(f.user_id).catch(() => null)
     if (!to) continue
     const label = cnt >= 1000 ? '1,000+' : String(cnt)
+    // Resolve a real brand name — the stored brand_name is often a bare page_id (numeric) for
+    // paste-a-link / early follows. Fall back crawl_state → directory so the email never says
+    // "583749931481207 is loaded". If nothing resolves, use a friendly generic.
+    const isNumericName = (s) => { const t = String(s ?? '').trim(); return !t || /^\d+$/.test(t) }
+    let brandName = f.brand_name
+    if (isNumericName(brandName)) {
+      try {
+        const cs = await getJSON(`discovery_brand_crawl_state?select=brand_name&page_id=eq.${enc(f.page_id)}&limit=1`)
+        if (Array.isArray(cs) && cs[0]?.brand_name && !isNumericName(cs[0].brand_name)) brandName = cs[0].brand_name
+      } catch { /* ignore */ }
+    }
+    if (isNumericName(brandName)) {
+      try {
+        const dir = await getJSON(`brand_directory?select=name&page_id=eq.${enc(f.page_id)}&limit=1`)
+        if (Array.isArray(dir) && dir[0]?.name && !isNumericName(dir[0].name)) brandName = dir[0].name
+      } catch { /* ignore */ }
+    }
+    if (isNumericName(brandName)) brandName = 'Your competitor'
     try {
-      await sendEmail({ to, subject: `${f.brand_name || 'Your competitor'} is loaded — ${label} ads`,
-        html: emailShell({ heading: `${f.brand_name || 'Your competitor'} is loaded`,
+      await sendEmail({ to, subject: `${brandName} is loaded — ${label} ads`,
+        html: emailShell({ heading: `${brandName} is loaded`,
           bodyHtml: `<p>I finished reading their ad archive — <b>${label} ads</b> are in. They're on your brief now, and I'll flag the moment they launch anything new.</p>`,
           ctaText: 'Open your brief', ctaPath: '/brief' }) })
       loadedMailed++

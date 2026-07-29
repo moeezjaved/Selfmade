@@ -175,7 +175,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <AcctItem href="/mcp" icon={Sparkles} label="API & MCP" />
           <AcctItem href="/team" icon={Users} label="Team & members" />
           <AcctItem href="/billing" icon={CreditCard} label="Billing & plan" />
-          <AcctItem href="/billing" icon={Zap} label="Upgrade plan" accent />
+          {/* Only offer "Upgrade" on Free — a paid member has nothing to upgrade to (one paid plan);
+              manage/cancel lives under Billing & plan. Avoids "Upgrade" showing while already full-time. */}
+          {normalizePlan(effectivePlan) === 'free' && <AcctItem href="/billing" icon={Zap} label="Upgrade plan" accent />}
           <AcctItem href="https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi" icon={Bookmark} label="Chrome extension" external />
           <AcctItem href="/contact" icon={LifeBuoy} label="Support & feedback" />
           <div style={{ height: 1, background: '#eef1ec', margin: '6px 0' }} />

@@ -107,10 +107,12 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
       const { data } = await q; return data || []
     })(), []),
     soft<any[]>((async () => {
-      let q = admin.from('creative_generations').select('id, image_url, type, created_at')
-        .eq('user_id', userId).gte('created_at', H36).order('created_at', { ascending: false }).limit(6)
+      // Only FINISHED creatives count as "ready" — drafts/processing/review/failed must not inflate
+      // the "N creatives ready" count or the headline (bug: a draft video showed as a 3rd "ready").
+      let q = admin.from('creative_generations').select('id, image_url, type, created_at, status')
+        .eq('user_id', userId).eq('status', 'done').gte('created_at', H36).order('created_at', { ascending: false }).limit(6)
       if (opts.brandId) q = q.eq('brand_id', opts.brandId)
-      const { data } = await q; return data || []
+      const { data } = await q; return (data || []).filter((c: any) => c.image_url)
     })(), []),
     soft<any[]>(admin.from('followed_brands').select('page_id, brand_name, spied, brand_id')
       .eq('user_id', userId).limit(200).then((r: any) => r.data || []), []),
