@@ -1,6 +1,5 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
-import BackLink from './BackLink'
+import LegalShell from '@/components/LegalShell'
 import { COMPANY } from '@/lib/company'
 
 export const metadata: Metadata = {
@@ -8,50 +7,41 @@ export const metadata: Metadata = {
   description: 'Get in touch with the Selfmade team — support, sales, and partnership enquiries.',
   alternates: { canonical: '/contact' },
 }
-const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
+const INK = '#0e1b12', GREEN = '#16a34a'
 
 export default function Contact() {
+  const channels: [string, string, string][] = [
+    ['Support', 'Help with your account, credits, or a generation.', COMPANY.supportEmail],
+    ['Sales', 'Plans, teams, and Enterprise.', 'sales@tryselfmade.ai'],
+    ['Partnerships', 'Integrations, affiliates, and press.', 'hello@tryselfmade.ai'],
+  ]
   return (
-    <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", background: '#fff', color: INK, minHeight: '100vh' }}>
-      <nav style={{ borderBottom: '1px solid #f0f2ef' }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-            <BackLink />
-            <Link href="/">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 24, filter: 'brightness(0)' }} /></Link>
-          </div>
-          <Link href="/signup" style={{ background: LIME, color: INK, padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Start for free</Link>
-        </div>
-      </nav>
-      <div style={{ maxWidth: 620, margin: '0 auto', padding: '56px 24px 80px' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '.06em' }}>Contact</div>
-        <h1 style={{ fontSize: 'clamp(28px,5vw,40px)', fontWeight: 800, letterSpacing: '-.02em', margin: '10px 0 16px' }}>Get in touch</h1>
-        <p style={{ fontSize: 16.5, color: '#374151', lineHeight: 1.7, margin: '0 0 24px' }}>We usually reply within one business day.</p>
-        {[['Support', 'Help with your account, credits, or a generation.', COMPANY.supportEmail],
-          ['Sales', 'Plans, teams, and Enterprise.', 'sales@tryselfmade.ai'],
-          ['Partnerships', 'Integrations, affiliates, and press.', 'hello@tryselfmade.ai']].map(([t, d, e]) => (
-          <div key={t} style={{ border: '1px solid #eef0ee', borderRadius: 14, padding: '18px 20px', marginBottom: 12 }}>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>{t}</div>
+    <LegalShell eyebrow="Contact" title="Get in touch" intro="We usually reply within one business day.">
+      <div style={{ display: 'grid', gap: 12 }}>
+        {channels.map(([t, d, e]) => (
+          <a key={t} href={`mailto:${e}`} style={{ display: 'block', border: '1px solid #eef0ee', borderRadius: 16, padding: '18px 20px', textDecoration: 'none', background: '#fff', boxShadow: '0 1px 2px rgba(14,27,18,.04), 0 14px 40px -26px rgba(14,27,18,.18)', transition: 'transform .15s, box-shadow .15s' }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>{t}</div>
             <div style={{ fontSize: 14, color: '#6b7280', margin: '4px 0 8px' }}>{d}</div>
-            <a href={`mailto:${e}`} style={{ color: GREEN, fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>{e}</a>
-          </div>
+            <span style={{ color: GREEN, fontWeight: 700, fontSize: 15 }}>{e} →</span>
+          </a>
         ))}
-
-        {/* ── Business details — required by payment providers (registered entity, address, phone). ── */}
-        <div style={{ border: '1px solid #eef0ee', borderRadius: 14, padding: '20px 22px', marginTop: 20, background: '#fafbfa' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Business details</div>
-          <dl style={{ margin: 0, fontSize: 14.5, lineHeight: 1.7, color: '#374151' }}>
-            <dt style={{ fontWeight: 800, color: INK }}>Registered business</dt>
-            <dd style={{ margin: '0 0 12px' }}>{COMPANY.legalName}</dd>
-            {COMPANY.address && (<>
-              <dt style={{ fontWeight: 800, color: INK }}>Address</dt>
-              <dd style={{ margin: '0 0 12px', whiteSpace: 'pre-line' }}>{COMPANY.address}</dd>
-            </>)}
-            <dt style={{ fontWeight: 800, color: INK }}>Customer support</dt>
-            <dd style={{ margin: '0 0 4px' }}><a href={`mailto:${COMPANY.supportEmail}`} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>{COMPANY.supportEmail}</a></dd>
-            <dd style={{ margin: 0 }}>Phone: <a href={`tel:${COMPANY.phone.replace(/[^+\d]/g, '')}`} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>{COMPANY.phone}</a></dd>
-          </dl>
-        </div>
       </div>
-    </div>
+
+      {/* ── Business details — required by payment providers ── */}
+      <div style={{ border: '1px solid #eef0ee', borderRadius: 16, padding: '22px 24px', marginTop: 20, background: 'linear-gradient(180deg,#fafcf7,#ffffff)' }}>
+        <div style={{ fontSize: 12.5, fontWeight: 800, color: GREEN, textTransform: 'uppercase', letterSpacing: '.14em', marginBottom: 14 }}>Business details</div>
+        <dl style={{ margin: 0, fontSize: 14.5, lineHeight: 1.7, color: '#374151' }}>
+          <dt style={{ fontWeight: 800, color: INK }}>Registered business</dt>
+          <dd style={{ margin: '2px 0 14px' }}>{COMPANY.legalName}</dd>
+          {COMPANY.address && (<>
+            <dt style={{ fontWeight: 800, color: INK }}>Address</dt>
+            <dd style={{ margin: '2px 0 14px', whiteSpace: 'pre-line' }}>{COMPANY.address}</dd>
+          </>)}
+          <dt style={{ fontWeight: 800, color: INK }}>Customer support</dt>
+          <dd style={{ margin: '2px 0 4px' }}><a href={`mailto:${COMPANY.supportEmail}`} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>{COMPANY.supportEmail}</a></dd>
+          <dd style={{ margin: 0 }}>Phone: <a href={`tel:${COMPANY.phone.replace(/[^+\d]/g, '')}`} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>{COMPANY.phone}</a></dd>
+        </dl>
+      </div>
+    </LegalShell>
   )
 }
