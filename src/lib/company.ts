@@ -7,10 +7,10 @@
  * verifies them against your business registration. Placeholders are marked TODO.
  */
 export const COMPANY = {
-  // Legal registered entity name (e.g. "Selfmade Technologies Ltd" or your sole-proprietor name)
-  legalName: 'Selfmade Technologies', // TODO: exact registered legal name
+  // Legal registered entity name
+  legalName: 'Virgin Teez',
   // Full registered/business address, one line per line (used with whiteSpace: pre-line)
-  address: '123 Example Street\nCity, State/Region, Postal Code\nCountry', // TODO: real registered address
+  address: '', // TODO: add registered address when ready (blocks left off cleanly render nothing)
   // Customer support phone in international format
   phone: '+1 782 822 0679',
   // Support email (live inbox)

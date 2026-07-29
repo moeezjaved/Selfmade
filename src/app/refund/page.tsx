@@ -52,7 +52,7 @@ export default function Refund() {
         <H>6. Contact</H>
         <p style={{ marginBottom: 0 }}>
           {COMPANY.legalName}<br />
-          <span style={{ whiteSpace: 'pre-line' }}>{COMPANY.address}</span><br />
+          {COMPANY.address && <><span style={{ whiteSpace: 'pre-line' }}>{COMPANY.address}</span><br /></>}
           Email: <a href={`mailto:${COMPANY.supportEmail}`} style={{ color: GREEN, fontWeight: 600, textDecoration: 'none' }}>{COMPANY.supportEmail}</a><br />
           Phone: <a href={`tel:${COMPANY.phone.replace(/[^+\d]/g, '')}`} style={{ color: GREEN, fontWeight: 600, textDecoration: 'none' }}>{COMPANY.phone}</a>
         </p>
