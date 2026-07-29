@@ -34,6 +34,18 @@ export async function GET(req: NextRequest) {
     .select('owner_id, plan, billing_cycle, status, current_period_end, payfast_instrument_token, payfast_renewal_notified_at')
     .eq('provider', 'payfast').eq('status', 'active').lte('current_period_end', dueBy).limit(500)
 
+  // Cancelled subscriptions that have reached period end → downgrade to Free now (access ran out).
+  let downgraded = 0
+  const { data: cancelled } = await admin.from('subscriptions')
+    .select('owner_id, plan, current_period_end')
+    .eq('provider', 'payfast').eq('status', 'canceled').neq('plan', 'free').lte('current_period_end', new Date(now).toISOString()).limit(500)
+  for (const c of cancelled || []) {
+    await admin.rpc('apply_plan', { p_user: c.owner_id, p_plan: 'free', p_reset: null }).then(() => {}, () => {})
+    await admin.from('subscriptions').update({ plan: 'free', updated_at: new Date().toISOString() }).eq('owner_id', c.owner_id)
+    await admin.from('user_profiles').update({ plan_id: 'free' }).eq('user_id', c.owner_id).then(() => {}, () => {})
+    downgraded++
+  }
+
   let charged = 0, emailed = 0, pastDue = 0
   for (const s of subs || []) {
     const plan = PLANS[s.plan as PlanId]
@@ -86,5 +98,5 @@ export async function GET(req: NextRequest) {
     } catch { /* best-effort */ }
   }
 
-  return NextResponse.json({ ok: true, considered: subs?.length || 0, charged, emailed, pastDue })
+  return NextResponse.json({ ok: true, considered: subs?.length || 0, charged, emailed, pastDue, downgraded })
 }

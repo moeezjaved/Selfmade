@@ -78,6 +78,17 @@ export default function BillingPage() {
     window.location.href = url
   }
 
+  // Cancel the PayFast subscription — access continues until period end, then downgrades to Free.
+  const cancelPlan = async () => {
+    if (!confirm('Cancel your subscription? You’ll keep full access until the end of your current billing period, then move to Free.')) return
+    setLoading(true)
+    try {
+      const r = await fetch('/api/billing/cancel', { method: 'POST' }).then((x) => x.json()).catch(() => ({}))
+      if (r?.ok) { alert('Your subscription is cancelled — access continues until the end of this period.'); window.location.reload() }
+      else { alert(r?.error || 'Could not cancel — please contact support.'); setLoading(false) }
+    } catch { alert('Could not cancel — please try again.'); setLoading(false) }
+  }
+
   const status = profile?.subscription_status || 'trialing'
   const trialEnds = profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null
   const trialDaysLeft = trialEnds ? Math.max(0, Math.ceil((trialEnds.getTime() - Date.now()) / 86400000)) : 0
@@ -138,15 +149,15 @@ export default function BillingPage() {
               {loading ? 'Loading…' : 'Manage subscription →'}
             </button>
             <button
-              onClick={() => checkout('portal')}
+              onClick={cancelPlan}
               disabled={loading}
-              style={{ background: 'transparent', border: '1px solid rgba(220,38,38,0.35)', color: '#f87171', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{ background: 'transparent', border: '1px solid rgba(220,38,38,0.35)', color: '#f87171', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit' }}
             >
               Cancel subscription
             </button>
           </div>
           <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 10, marginBottom: 0 }}>
-            Cancelling opens the Stripe portal — access continues until end of billing period.
+            Cancelling stops future renewals — your plan stays active until the end of the current period.
           </p>
         </div>
       )}
