@@ -267,29 +267,41 @@ export async function POST(req: NextRequest) {
     const gate = await requireUnder(admin, billingOwner, 'brandSpy', trackedCount || 0)
     if (gate) return NextResponse.json(gate, { status: 402 })
 
-    // Charge for the spy (50 cr = $0.50) — reserve first so we never track a brand we couldn't bill.
-    // Charged to the org's shared wallet (reserveCredits resolves the billing owner).
-    let tx
-    try {
-      tx = await reserveCredits(admin, user.id, 'brand_spy', pageId)
-    } catch (e) {
-      if (e instanceof InsufficientCreditsError) {
-        return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, action: 'brand_spy' }, { status: 402 })
-      }
-      throw e
-    }
+    // Re-spy is FREE if the org already PAID for this brand before (stop-spy then spy-again must not
+    // double-charge). We keep the credit_transactions ledger on un-spy, so a prior committed brand_spy
+    // for this page_id means "already bought" → track again for free.
+    const { data: priorPaid } = await admin.from('credit_transactions')
+      .select('id').in('user_id', orgIds).eq('action_type', 'brand_spy').eq('reference_id', pageId)
+      .neq('status', 'refunded').limit(1).maybeSingle()
 
-    // Within the cap + paid → track it (fresh thorough re-crawl) + follow for new-ad alerts.
-    try {
+    let charged = false
+    if (!priorPaid) {
+      // First time on this brand → charge 50cr. Reserve first so we never track a brand we couldn't bill.
+      let tx
+      try {
+        tx = await reserveCredits(admin, user.id, 'brand_spy', pageId)
+      } catch (e) {
+        if (e instanceof InsufficientCreditsError) {
+          return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, action: 'brand_spy' }, { status: 402 })
+        }
+        throw e
+      }
+      try {
+        await ensureTracked(admin, pageId, name, true)
+        await ensureFollowed(admin, user.id, pageId, name)
+      } catch (e) {
+        await refundCredits(admin, tx.id).catch(() => {})   // never charge for a spy that didn't start
+        throw e
+      }
+      await commitCredits(admin, tx.id, { pageId, name })
+      charged = true
+    } else {
+      // Already paid before → free re-spy.
       await ensureTracked(admin, pageId, name, true)
       await ensureFollowed(admin, user.id, pageId, name)
-    } catch (e) {
-      await refundCredits(admin, tx.id).catch(() => {})   // never charge for a spy that didn't start
-      throw e
     }
-    await commitCredits(admin, tx.id, { pageId, name })
-    await logActivity(admin, user.id, 'BRAND_SPIED', `Started spying ${name} (−50 cr)`)
-    return NextResponse.json({ pageId, charged: true, cost: 50 })
+    await logActivity(admin, user.id, 'BRAND_SPIED', `Started spying ${name}${charged ? ' (−50 cr)' : ' (re-spy, free)'}`)
+    return NextResponse.json({ pageId, charged, cost: charged ? 50 : 0 })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Something went wrong — please try again.' }, { status: 500 })
   }
