@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireFeature } from '@/lib/entitlements'
 import { TOPUP_PACKS, PLANS, type PlanId } from '@/lib/plans'
-import { getAccessToken, buildTransactionFields, makeBasketId, usdToPkr, POST_URL } from '@/lib/payfast'
+import { getAccessToken, buildTransactionFields, makeBasketId, chargeAmount, CURRENCY, POST_URL } from '@/lib/payfast'
 
 export const dynamic = 'force-dynamic'
 const APP_URL = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
@@ -28,13 +28,13 @@ export async function POST(req: NextRequest) {
     if (gate) return NextResponse.json(gate, { status: 402 })
     const p = TOPUP_PACKS.find((x) => x.id === pack)
     if (!p) return NextResponse.json({ error: 'invalid_pack' }, { status: 400 })
-    amount = usdToPkr(p.priceUsd); credits = p.credits
+    amount = chargeAmount(p.priceUsd); credits = p.credits
     description = `Selfmade — ${p.credits} credit top-up`
   } else if (kind === 'subscription') {
     const pl = PLANS[plan as PlanId]
     if (!pl || plan === 'free' || plan === 'enterprise') return NextResponse.json({ error: 'invalid_plan' }, { status: 400 })
     const annual = cycle === 'annual'
-    amount = usdToPkr((annual ? pl.priceAnnualMonthly * 12 : pl.priceMonthly))
+    amount = chargeAmount(annual ? pl.priceAnnualMonthly * 12 : pl.priceMonthly)
     planId = plan
     description = `Selfmade — ${pl.label} plan (${annual ? 'annual' : 'monthly'})`
   } else {
@@ -47,12 +47,12 @@ export async function POST(req: NextRequest) {
   const { error: insErr } = await admin.from('payfast_orders').insert({
     basket_id: basketId, user_id: user.id, kind, ref: pack || plan || null,
     credits, plan: planId, billing_cycle: cycle === 'annual' ? 'annual' : 'monthly',
-    amount, currency: 'PKR', status: 'pending',
+    amount, currency: CURRENCY, status: 'pending',
   })
   if (insErr) return NextResponse.json({ error: 'order_failed', message: insErr.message }, { status: 500 })
 
   try {
-    const token = await getAccessToken(basketId, amount, 'PKR')
+    const token = await getAccessToken(basketId, amount, CURRENCY)
     const fields = buildTransactionFields({
       token, basketId, amount, description,
       email: user.email || undefined,

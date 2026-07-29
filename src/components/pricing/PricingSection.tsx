@@ -24,8 +24,8 @@ const CARDS: Card[] = [
     feats: ['75 free credits (~5 image ads)', 'Browse Discovery + Brand Spy', 'Remake any winning ad', 'Daily brief from Mello'], cta: 'Start free' },
   { id: 'starter', tier: 'Mello, full-time', price: '$49', per: '/ month', note: 'Everything, every morning',
     feats: ['Video ads', 'Unlimited image ads', 'Every competitor watched', 'Fresh creatives every morning'], cta: 'Go full-time', popular: true },
-  { id: 'payg', tier: 'Pay as you go', price: `$${VID_USD}`, per: '/ video', note: 'No subscription',
-    feats: [`$${VID_USD} per video ad`, `$${IMG_USD} per image ad`, 'Top up any amount, anytime', 'Balance never expires'], cta: 'Buy credits' },
+  // Pay-as-you-go card retired (2026-07-29) — one plan: Free + $49. Credit top-ups still available
+  // in-app via the credit counter for paid users; just not shown as a pricing column.
 ]
 
 const FAQS: { q: string; a: string }[] = [
