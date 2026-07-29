@@ -55,20 +55,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true })
   }
 
-  // ── Grant, exactly once. ──
+  // ── Grant, exactly once — to the BILLING OWNER (shared org wallet), not the raw purchaser, so a
+  // member's purchase upgrades the org the same way top-ups + Stripe do. (Solo users: owner == self.) ──
+  const { resolveBillingOwner } = await import('@/lib/org')
+  const owner = await resolveBillingOwner(admin, order.user_id)
   try {
     if (order.kind === 'topup' && order.credits) {
-      await admin.rpc('grant_topup_pack', { p_user: order.user_id, p_credits: order.credits, p_amount: Number(order.amount), p_stripe: `payfast:${txnId || basketId}` })
+      await admin.rpc('grant_topup_pack', { p_user: owner, p_credits: order.credits, p_amount: Number(order.amount), p_stripe: `payfast:${txnId || basketId}` })
     } else if (order.kind === 'subscription' && order.plan) {
       const pl = PLANS[order.plan as PlanId]
       const now = new Date()
       const periodEnd = new Date(now.getTime() + (order.billing_cycle === 'annual' ? 365 : 30) * 86400e3)
       await admin.from('subscriptions').upsert({
-        owner_id: order.user_id, plan: order.plan, billing_cycle: order.billing_cycle,
+        owner_id: owner, plan: order.plan, billing_cycle: order.billing_cycle,
         status: 'active', current_period_end: periodEnd.toISOString(),
         payfast_instrument_token: token || null, provider: 'payfast', updated_at: now.toISOString(),
       }, { onConflict: 'owner_id' })
-      await admin.rpc('apply_plan', { p_user: order.user_id, p_plan: order.plan, p_reset: periodEnd.toISOString() })
+      await admin.rpc('apply_plan', { p_user: owner, p_plan: order.plan, p_reset: periodEnd.toISOString() })
       void pl
     }
     await admin.from('payfast_orders').update({ status: 'paid', err_code: errCode, transaction_id: txnId, instrument_token: token, paid_at: new Date().toISOString(), raw: params }).eq('basket_id', basketId)
