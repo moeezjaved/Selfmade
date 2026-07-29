@@ -58,6 +58,13 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
     if (current === c.id) return
     setBusy(c.id)
     try {
+      // PayFast is the active rail (NEXT_PUBLIC_PAYMENTS_PROVIDER=payfast). Falls back to Stripe otherwise.
+      if (process.env.NEXT_PUBLIC_PAYMENTS_PROVIDER === 'payfast') {
+        const { startPayfastCheckout } = await import('@/lib/payfast/start')
+        const res = await startPayfastCheckout({ kind: 'subscription', plan: c.id, cycle: 'monthly' })
+        if (res?.error) alert(res.message || res.error || 'Could not start checkout.')
+        return   // redirecting to PayFast
+      }
       const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: c.id, cycle: 'monthly' }) })
       const j = await r.json()
       if (j.url) window.location.href = j.url
