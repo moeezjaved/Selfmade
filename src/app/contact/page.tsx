@@ -42,8 +42,10 @@ export default function Contact() {
           <dl style={{ margin: 0, fontSize: 14.5, lineHeight: 1.7, color: '#374151' }}>
             <dt style={{ fontWeight: 800, color: INK }}>Registered business</dt>
             <dd style={{ margin: '0 0 12px' }}>{COMPANY.legalName}</dd>
-            <dt style={{ fontWeight: 800, color: INK }}>Address</dt>
-            <dd style={{ margin: '0 0 12px', whiteSpace: 'pre-line' }}>{COMPANY.address}</dd>
+            {COMPANY.address && (<>
+              <dt style={{ fontWeight: 800, color: INK }}>Address</dt>
+              <dd style={{ margin: '0 0 12px', whiteSpace: 'pre-line' }}>{COMPANY.address}</dd>
+            </>)}
             <dt style={{ fontWeight: 800, color: INK }}>Customer support</dt>
             <dd style={{ margin: '0 0 4px' }}><a href={`mailto:${COMPANY.supportEmail}`} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>{COMPANY.supportEmail}</a></dd>
             <dd style={{ margin: 0 }}>Phone: <a href={`tel:${COMPANY.phone.replace(/[^+\d]/g, '')}`} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>{COMPANY.phone}</a></dd>
