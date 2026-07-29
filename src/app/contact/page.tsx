@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import BackLink from './BackLink'
+import { COMPANY } from '@/lib/company'
 
 export const metadata: Metadata = {
   title: { absolute: 'Contact Selfmade' },
@@ -34,6 +35,20 @@ export default function Contact() {
             <a href={`mailto:${e}`} style={{ color: GREEN, fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>{e}</a>
           </div>
         ))}
+
+        {/* ── Business details — required by payment providers (registered entity, address, phone). ── */}
+        <div style={{ border: '1px solid #eef0ee', borderRadius: 14, padding: '20px 22px', marginTop: 20, background: '#fafbfa' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Business details</div>
+          <dl style={{ margin: 0, fontSize: 14.5, lineHeight: 1.7, color: '#374151' }}>
+            <dt style={{ fontWeight: 800, color: INK }}>Registered business</dt>
+            <dd style={{ margin: '0 0 12px' }}>{COMPANY.legalName}</dd>
+            <dt style={{ fontWeight: 800, color: INK }}>Address</dt>
+            <dd style={{ margin: '0 0 12px', whiteSpace: 'pre-line' }}>{COMPANY.address}</dd>
+            <dt style={{ fontWeight: 800, color: INK }}>Customer support</dt>
+            <dd style={{ margin: '0 0 4px' }}><a href="mailto:support@tryselfmade.ai" style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>support@tryselfmade.ai</a></dd>
+            <dd style={{ margin: 0 }}>Phone: <a href={`tel:${COMPANY.phone.replace(/[^+\d]/g, '')}`} style={{ color: GREEN, fontWeight: 700, textDecoration: 'none' }}>{COMPANY.phone}</a></dd>
+          </dl>
+        </div>
       </div>
     </div>
   )
