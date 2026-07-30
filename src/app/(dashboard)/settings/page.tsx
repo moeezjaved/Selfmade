@@ -20,6 +20,8 @@ export default function SettingsPage() {
   const [autopilots, setAutopilots] = useState<{ id: string; brand_name: string | null; media_type: string; runs: number }[]>([])
   const [brands, setBrands] = useState<{ id: string; name: string }[]>([])
   const [apBrand, setApBrand] = useState(''); const [apMedia, setApMedia] = useState<'image' | 'video'>('image'); const [apBusy, setApBusy] = useState(false)
+  const [apComp, setApComp] = useState('')  // optional competitor page_id — daily ad follows THIS rival's latest ad
+  const [competitors, setCompetitors] = useState<{ pageId: string; name: string }[]>([])
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)  // null = still loading
   const [disconnecting, setDisconnecting] = useState(false)
   const [newPw, setNewPw] = useState(''); const [confirmPw, setConfirmPw] = useState(''); const [pwSaving, setPwSaving] = useState(false)
@@ -46,6 +48,13 @@ export default function SettingsPage() {
       fetch('/api/autopilot').then(r => r.json()).then(j => { if (!cancelled && Array.isArray(j.items)) setAutopilots(j.items) }).catch(() => {})
       // load the user's brands so autopilot can be turned on RIGHT HERE (no dependency on a remake step)
       fetch('/api/brands').then(r => r.json()).then(j => { if (!cancelled && Array.isArray(j.brands)) setBrands(j.brands.map((b: any) => ({ id: b.id, name: b.name }))) }).catch(() => {})
+      // load the competitors already in Brand Spy, so the daily ad can FOLLOW one of them for reference
+      fetch('/api/follows').then(r => r.json()).then(j => {
+        const rows: any[] = Array.isArray(j?.follows) ? j.follows : (Array.isArray(j) ? j : [])
+        const spied = rows.filter(f => f && f.spied && f.page_id && f.brand_name)
+          .map(f => ({ pageId: String(f.page_id), name: String(f.brand_name) }))
+        if (!cancelled) setCompetitors(spied)
+      }).catch(() => {})
     })()
     return () => { cancelled = true }
   }, [])
@@ -63,7 +72,8 @@ export default function SettingsPage() {
     if (!apBrand || apBusy) return
     setApBusy(true)
     try {
-      const r = await fetch('/api/autopilot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brandId: apBrand, mediaType: apMedia }) }).then(x => x.json()).catch(() => ({}))
+      const comp = competitors.find(c => c.pageId === apComp)
+      const r = await fetch('/api/autopilot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brandId: apBrand, mediaType: apMedia, settings: comp ? { competitorPageId: comp.pageId, competitorName: comp.name } : {} }) }).then(x => x.json()).catch(() => ({}))
       if (r?.id) {
         const j = await fetch('/api/autopilot').then(x => x.json()).catch(() => ({}))
         if (Array.isArray(j.items)) setAutopilots(j.items)
@@ -207,8 +217,14 @@ export default function SettingsPage() {
               <option value="image">Image ad</option>
               <option value="video">Video ad</option>
             </select>
+            {/* Optional: follow ONE competitor from Brand Spy — the daily ad is modelled on their latest ad. */}
+            <select value={apComp} onChange={(e)=>setApComp(e.target.value)} title="Reference a competitor's ads" style={{flex:'1 1 160px',minWidth:150,padding:'9px 12px',borderRadius:10,border:'1.5px solid #e2e8f0',background:'#fff',fontSize:13,fontFamily:'inherit',color:'#1a3a1a'}}>
+              <option value="">{competitors.length ? 'Reference: my product (default)' : 'No competitors in Brand Spy yet'}</option>
+              {competitors.map(c=> <option key={c.pageId} value={c.pageId}>Follow: {c.name}</option>)}
+            </select>
             <button onClick={enrollAutopilot} disabled={!apBrand||apBusy} style={{padding:'9px 18px',borderRadius:100,border:'none',background: apBrand&&!apBusy ? '#1a3a1a':'#e2e8f0',color: apBrand&&!apBusy ? '#dffe95':'#9ca3af',fontSize:13,fontWeight:800,cursor: apBrand&&!apBusy ?'pointer':'default',fontFamily:'inherit',whiteSpace:'nowrap'}}>{apBusy?'Turning on…':'Turn on daily ads'}</button>
           </div>
+          <div style={{fontSize:12,color:'#7a9a7a',padding:'0 4px 10px',marginTop:-6}}>Pick a competitor to have each morning’s ad modelled on <b>their newest ad</b> — remade for your product. Leave it on “my product” to generate from your own brand.</div>
           {autopilots.length === 0 ? (
             <div style={{fontSize:12.5,color:'#9ca3af',padding:'0 4px 4px'}}>No brands on autopilot yet — pick one above and Mello emails a fresh ad every morning.</div>
           ) : autopilots.map((a) => (

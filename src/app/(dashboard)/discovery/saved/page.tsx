@@ -403,7 +403,18 @@ export default function SavedAdsPage() {
                         <span title="This was a video ad — the extension saved its poster. Remake it as a picture here, or find the ad in Discovery to remake as a full video."
                           style={{ flexShrink: 0, fontSize: 8.5, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: 100, textTransform: 'uppercase', color: '#3730a3', background: '#e0e7ff', border: '1px solid #c7d2fe' }}>🎬 Video</span>
                       )}
-                      <button onClick={() => (isVid ? setCloneVid(saved) : setCloneImg(saved))} title={isVid ? 'Remake this video ad with your product' : posterVideo ? 'Remake as a picture (this is a video ad — open it in Discovery to remake as a full video)' : 'Remake this ad with your product'}
+                      <button onClick={() => {
+                        // Extension-saved ads have no internal discovery adId, so the clone MODAL can't
+                        // anchor to a real ad — that's the "old UI" the user hit. Route them to the new
+                        // studio asset flow (same as the Assets page) with the saved media as reference.
+                        if (ext) {
+                          const vurl = isVid ? (videoSrc || null) : null
+                          if (vurl) window.location.href = `/studio?src=asset&type=video&vid=${encodeURIComponent(vurl)}`
+                          else window.location.href = `/studio?src=asset&img=${encodeURIComponent(media || saved.snapshot_url || '')}`
+                          return
+                        }
+                        return isVid ? setCloneVid(saved) : setCloneImg(saved)
+                      }} title={isVid ? 'Remake this video ad with your product' : posterVideo ? 'Remake as a picture (this is a video ad — open it in Discovery to remake as a full video)' : 'Remake this ad with your product'}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1a3a1a', padding: 0, flexShrink: 0, display: 'flex' }}
                         onMouseEnter={e => (e.currentTarget.style.color = '#65a30d')}
                         onMouseLeave={e => (e.currentTarget.style.color = '#1a3a1a')}>
@@ -467,7 +478,15 @@ export default function SavedAdsPage() {
                     </div>
                     {/* Clone CTA — prominent footer so it's unmissable */}
                     <div style={{ marginTop: 'auto', padding: '0 12px 12px' }}>
-                      <button onClick={() => (isVid ? setCloneVid(saved) : setCloneImg(saved))}
+                      <button onClick={() => {
+                        if (ext) {
+                          const vurl = isVid ? (videoSrc || null) : null
+                          if (vurl) window.location.href = `/studio?src=asset&type=video&vid=${encodeURIComponent(vurl)}`
+                          else window.location.href = `/studio?src=asset&img=${encodeURIComponent(media || saved.snapshot_url || '')}`
+                          return
+                        }
+                        return isVid ? setCloneVid(saved) : setCloneImg(saved)
+                      }}
                         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 12px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 10, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
                         onMouseEnter={e => (e.currentTarget.style.background = '#12290f')}
                         onMouseLeave={e => (e.currentTarget.style.background = '#1a3a1a')}>
