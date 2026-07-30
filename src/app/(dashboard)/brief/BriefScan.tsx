@@ -411,11 +411,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                 style={{ width: '100%', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '12px', fontSize: 13.5, fontWeight: 800, cursor: subscribing ? 'default' : 'pointer', fontFamily: 'inherit' }}>
                 {subscribing ? 'Opening…' : 'Go full-time →'}
               </button>
-              {onBuyCredits && (
-                <button onClick={onBuyCredits} style={{ width: '100%', background: 'none', border: 'none', color: GREEN, fontSize: 12.5, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit', marginTop: 10 }}>
-                  or buy credits
-                </button>
-              )}
+              {/* "or buy credits" removed 2026-07-30 — pay-as-you-go is retired as a public offer. */}
             </div>
           )}
           {isPaid && onBuyCredits && (

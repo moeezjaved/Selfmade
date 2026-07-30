@@ -8,8 +8,9 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      // The landing now lives at the root `/`; keep the old /home URL working.
-      { source: '/home', destination: '/', permanent: true },
+      // NOTE: /home serves HomeLanding — the full "how it works + pricing" page (with #pricing).
+      // It must NOT redirect to / (the hire landing has no pricing section), or the footer's
+      // "How Mello works & pricing" link dead-ends. Root / = hire pitch; /home = how-it-works+pricing.
       // The brief redirect-era /ads/meta/* structure → back to the canonical flat /ads/* URLs.
       // (Meta is the only platform today; TikTok will get a literal /ads/tiktok/* prefix.)
       { source: '/ads/meta/format/:format', destination: '/ads/format/:format', permanent: true },
