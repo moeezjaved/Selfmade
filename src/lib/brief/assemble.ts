@@ -320,9 +320,9 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
         title: `What's working across your ${brandSet.size} competitor${brandSet.size === 1 ? '' : 's'}: ${headline}${topHook ? `, hook “${topHook.label}”` : ''}.`,
         body: `Combined read of ${pbAds.length} recent ads across every brand you watch — the pattern to copy before it saturates.`,
         why: `Ship in the winning format + hook while it's still cheap. I can build you one.`,
-        // "Make one like this" → the Create Ad studio (make a creative in this pattern), NOT a
-        // Discovery keyword search — pre-filling the hook label as a search query was wrong.
-        cta_label: 'Make one like this', cta_href: '/creative-studio?studio=1',
+        // "Make one like this" → the competitor ads this playbook is built from (the watched brands'
+        // ad feed), so the founder sees the real winners first and picks one to remake.
+        cta_label: 'Make one like this', cta_href: '/discovery/following',
         playbook: {
           totalAds: pbAds.length, brandsCount: brandSet.size, videoPct: vidPct,
           formats: rank(fmtM, 4), hooks: rank(hookM, 4), emotions: rank(emoM, 5), offers: rank(offerM, 5),
