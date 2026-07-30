@@ -341,11 +341,11 @@ function AiPanel({ ad }: { ad: Ad }) {
         <div style={{ borderTop: '1px solid #eef2f0', marginTop: 14, paddingTop: 12 }}>
         <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Or turn it into a script</div>
         {!script ? (
-          // Gated 'Coming soon' for the clone-first launch (product decision). The transcribe/duplicate
-          // flow below is intact; re-enable by removing `disabled` + the badge and restoring the label.
-          <button style={{ ...ctaS, background: '#f1f5f2', color: '#9ca3af', cursor: 'default' }} disabled
+          // Enabled 2026-07-30 — the transcribe→framework flow is live (was gated 'Coming soon' for the
+          // clone-first launch). Charges the transcribe action; result renders below.
+          <button style={{ ...ctaS, background: '#eef7dc', color: '#1a3a1a' }}
             onClick={() => run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 2, d => { setScript(d.script); setThin(!!d.thinSpeech) })}>
-            <Sparkles size={16} /> Generate Script <span style={{ fontSize: 10, fontWeight: 800, background: '#e5e7eb', color: '#6b7280', borderRadius: 100, padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '.04em', marginLeft: 4 }}>Coming soon</span>
+            <Sparkles size={16} /> Generate Script
           </button>
         ) : (
           <div>
@@ -394,11 +394,12 @@ function DetailMedia({ slides, adId }: { slides: { type: 'image' | 'video'; url:
   const total = slides.length
 
   const download = () => {
+    // Route through the same-origin proxy — the browser ignores the `download` attribute on a
+    // cross-origin URL (R2 / fbcdn), which made it open in a new tab instead of downloading.
+    const name = `${adId}-${slide.type}-${idx}.${slide.type === 'video' ? 'mp4' : 'jpg'}`
     const a = document.createElement('a')
-    a.href = slide.url
-    a.download = `${adId}-${slide.type}-${idx}.${slide.type === 'video' ? 'mp4' : 'jpg'}`
-    a.target = '_blank'
-    a.rel = 'noopener noreferrer'
+    a.href = `/api/download?url=${encodeURIComponent(slide.url)}&name=${encodeURIComponent(name)}`
+    a.download = name
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
 
