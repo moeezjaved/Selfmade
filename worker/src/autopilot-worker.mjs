@@ -60,15 +60,37 @@ async function pickFreshAd(sourceAdId, usedIds) {
   return null
 }
 
+// FOLLOW A COMPETITOR — when the enrollment names a competitor (settings.competitorPageId), each day's
+// reference is THAT rival's freshest ad: prefer an active winner, else their newest active ad. This is
+// what "make my daily ad by following 1 competitor" means — we clone whoever they picked, not a niche pick.
+async function pickCompetitorAd(pageId, usedIds) {
+  if (!pageId) return null
+  const exclude = [...new Set([...(usedIds || [])].filter(Boolean))]
+  const notIn = exclude.length ? `&ad_id=not.in.(${exclude.map(enc).join(',')})` : ''
+  const base = `discovery_ads_index?select=ad_id&page_id=eq.${enc(String(pageId))}&has_creative=is.true&is_active=is.true${notIn}`
+  try {
+    // Their best active ad first (a proven winner), newest such ad; fall back to their newest active ad.
+    const win = await getJSON(`${base}&performance_tier=eq.winning&order=last_seen.desc.nullslast&limit=1`)
+    if (Array.isArray(win) && win.length) return win[0].ad_id
+    const any = await getJSON(`${base}&order=last_seen.desc.nullslast&limit=1`)
+    if (Array.isArray(any) && any.length) return any[0].ad_id
+  } catch { /* fall through */ }
+  console.warn(`autopilot competitor: no usable ad for page ${pageId} → falling back to niche pick`)
+  return null
+}
+
 async function processOne(e) {
   const settings = e.settings || {}
   const kind = e.last_kind === 'fresh' ? 'variation' : 'fresh'   // alternate; first run (null) → 'fresh'... start 'variation'
   const useKind = e.last_kind == null ? 'variation' : kind
 
   let adId = null
-  if (useKind === 'variation' && e.source_ad_id) adId = e.source_ad_id
+  // If they're following a competitor, that rival's freshest ad is the reference every day (highest priority).
+  if (settings.competitorPageId) adId = await pickCompetitorAd(settings.competitorPageId, e.used_ad_ids)
+  const followedComp = !!adId
+  if (!adId && useKind === 'variation' && e.source_ad_id) adId = e.source_ad_id
   if (!adId) adId = await pickFreshAd(e.source_ad_id, e.used_ad_ids)   // fresh, or variation with no source
-  const actualKind = (useKind === 'variation' && adId === e.source_ad_id) ? 'variation' : 'fresh'
+  const actualKind = followedComp ? 'fresh' : ((useKind === 'variation' && adId === e.source_ad_id) ? 'variation' : 'fresh')
   if (!adId) { await patch(`ad_autopilot?id=eq.${enc(e.id)}`, { last_run_at: nowIso() }); console.warn(`autopilot ${e.id}: no ad to clone`); return }
 
   // Brand product photos (physical); service brands may have screenshots or none.
