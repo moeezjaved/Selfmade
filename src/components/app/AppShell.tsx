@@ -152,6 +152,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     try { document.cookie = 'sm_onb=; path=/; max-age=0; samesite=lax' } catch { /* ignore */ }
     await supabase.auth.signOut(); router.push('/login')
   }
+  // Cancel plan — one tap from the account menu (paid users only). Keeps access until period end,
+  // then the renewals cron downgrades to Free. Confirms first.
+  const cancelPlan = async () => {
+    if (!confirm('Cancel your subscription? You keep full access until the end of your current billing period, then move to Free.')) return
+    try {
+      const r = await fetch('/api/billing/cancel', { method: 'POST' }).then((x) => x.json()).catch(() => ({}))
+      if (r?.ok) { alert('Your subscription is cancelled — access continues until the end of this period.'); router.push('/billing') }
+      else alert(r?.error || 'Could not cancel — please contact support.')
+    } catch { alert('Could not cancel — please try again.') }
+  }
 
   const initials = user?.user_metadata?.full_name
     ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -183,6 +193,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {/* Only offer "Upgrade" on Free — a paid member has nothing to upgrade to (one paid plan);
               manage/cancel lives under Billing & plan. Avoids "Upgrade" showing while already full-time. */}
           {normalizePlan(effectivePlan) === 'free' && <AcctItem href="/billing" icon={Zap} label="Upgrade plan" accent />}
+          {/* Cancel plan — paid users only. One tap; keeps access until period end, then downgrades to Free. */}
+          {normalizePlan(effectivePlan) !== 'free' && (
+            <button onClick={cancelPlan} className="sm-acct-item"
+              style={{ ...ACCT_ITEM, width: '100%', border: 'none', background: 'none', cursor: 'pointer', color: '#b91c1c', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', textAlign: 'left' }}>
+              <X size={16} style={{ flexShrink: 0 }} /><span>Cancel plan</span>
+            </button>
+          )}
           <AcctItem href="https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi" icon={Bookmark} label="Chrome extension" external />
           <AcctItem href="/contact" icon={LifeBuoy} label="Support & feedback" />
           <div style={{ height: 1, background: '#eef1ec', margin: '6px 0' }} />
