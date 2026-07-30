@@ -146,7 +146,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => { mounted = false }
   }, [])
 
-  const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/login') }
+  const handleSignOut = async () => {
+    // Clear the onboarding-gate cookie — otherwise it carries over to the NEXT account signed in on
+    // this browser, and that new user skips the onboarding interview (the middleware trusts sm_onb=1).
+    try { document.cookie = 'sm_onb=; path=/; max-age=0; samesite=lax' } catch { /* ignore */ }
+    await supabase.auth.signOut(); router.push('/login')
+  }
 
   const initials = user?.user_metadata?.full_name
     ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)

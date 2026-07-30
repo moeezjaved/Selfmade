@@ -398,10 +398,14 @@ function StudioInner() {
                 <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#0d120e', aspectRatio: '4/5' }}>
                   {isVideo && vidUrl && winnerPlaying
                     ? <video src={vidUrl} poster={source?.img || undefined} autoPlay controls playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    : source?.img
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      ? <img src={source.img} alt="competitor ad" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                      : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#6b7d6e', fontSize: 12, textAlign: 'center', padding: 16 }}>{source?.brand || 'Competitor'} ad</div>}
+                    : isVideo && vidUrl
+                      /* Idle video → show its own first frame (no poster). Never render a video URL as
+                         an <img> (that was the broken thumbnail for uploaded-asset remakes). */
+                      ? <video src={vidUrl} preload="metadata" muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      : source?.img
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        ? <img src={source.img} alt="competitor ad" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#6b7d6e', fontSize: 12, textAlign: 'center', padding: 16 }}>{source?.brand || 'Competitor'} ad</div>}
                   {/* lime play button (same as Discovery) — click to play the winner inline */}
                   {isVideo && !winnerPlaying && (
                     <button onClick={() => vidUrl && setWinnerPlaying(true)} aria-label="Play the winning ad"

@@ -356,11 +356,19 @@ export default function SavedAdsPage() {
                 const posterVideo = ext && !!ad.was_video && !isVid
                 // Extension ads: the R2 snapshot_url IS the creative (image jpg or video mp4). Internal
                 // ads keep a Meta Ad Library page as snapshot_url, so use the stored thumbnail instead.
-                const media = ad.thumbnailUrl || ad.creatives?.[0]?.url || (ext && !isVid ? saved.snapshot_url : null)
-                // Only treat it as a PLAYABLE video when we actually stored an .mp4 in R2. Extension
-                // saves of IG/FB blob videos have no fetchable mp4 (snapshot_url is a dead blob/CDN
-                // url) → don't render a black <video>; fall through to the poster / "open original".
-                const videoSrc = ext && isVid && /\.mp4(\?|$)/i.test(saved.snapshot_url || '') ? saved.snapshot_url : null
+                // Poster: try every field a save might store it under (internal discovery saves,
+                // extension saves, and asset saves all differ) so a video at least shows its thumbnail.
+                const media = ad.thumbnailUrl || ad.poster_url || ad.creatives?.[0]?.poster_url || ad.creatives?.[0]?.url || (ext && !isVid ? saved.snapshot_url : null)
+                // Playable video: accept any real mp4 we stored — internal discovery saves keep the R2
+                // mp4 under videoUrl/r2_url; extension saves put it in snapshot_url. This fixes
+                // "Video preview unavailable" for videos saved from Discovery.
+                // Internal discovery saves keep a real R2 mp4 under videoUrl/r2_url — trust those as-is
+                // (they can carry query strings). Extension blobs are only safe when they end in .mp4.
+                const http = (u?: string) => (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : null
+                const mp4 = (u?: string) => (typeof u === 'string' && /\.mp4(\?|$)/i.test(u)) ? u : null
+                const videoSrc = isVid
+                  ? (http(ad.videoUrl) || http(ad.r2_url) || http(ad.creatives?.[0]?.r2_url) || (ext ? mp4(saved.snapshot_url) : mp4(saved.snapshot_url)))
+                  : null
                 // Where the external "open" link should go — the page it was saved from, not the raw R2 file.
                 const openUrl = (ext && ad.source_url) ? ad.source_url : saved.snapshot_url
                 const tier = ad.performanceTier
