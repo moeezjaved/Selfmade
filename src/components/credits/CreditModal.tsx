@@ -150,7 +150,9 @@ export function CreditModal() {
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: '#9ca3af' }}>Current plan</div>
                 <div style={{ fontSize: 22, fontWeight: 800, color: INK, marginTop: 2 }}>{ent.label}</div>
               </div>
-              {planId !== 'business' && planId !== 'enterprise' && (
+              {/* Only Free can upgrade — Creator ($49) is the top public plan, so a paid user has
+                  nothing to upgrade to. Manage/cancel lives on Billing. */}
+              {planId === 'free' && (
                 <a href="/billing" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: INK, color: LIME, padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
                   <Zap size={14} /> Upgrade
                 </a>

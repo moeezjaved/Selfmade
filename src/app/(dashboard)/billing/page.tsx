@@ -162,16 +162,8 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Trial status (not locked) */}
-      {status === 'trialing' && !trialEnded && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '14px 18px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 700, color: '#15803d', fontSize: 14 }}>Free trial active</div>
-            <div style={{ fontSize: 12, color: '#166534', marginTop: 2 }}>{trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''} remaining — no charge yet</div>
-          </div>
-          <span style={{ fontSize: 22 }}>⏳</span>
-        </div>
-      )}
+      {/* Trial banner removed 2026-07-30: there is NO free trial in the pricing model (Free plan +
+          paid $49, charged immediately). The old "Free trial active — N days, no charge" was false. */}
 
       {/* NOTE: the plan grid above (PricingSection) is the single source of pricing. A legacy
           hardcoded "$49/mo (no name)" selector used to render here too — it contradicted the real
