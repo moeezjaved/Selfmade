@@ -41,10 +41,28 @@ export async function POST(req: NextRequest) {
     if (names.length) watchLine = `The founder is watching these competitors (their ads are in your crawled library — pull specifics with search_ad_library / get_competitor_ads): ${names.join(', ')}.\n\n`
   } catch { /* best-effort */ }
 
+  const asksCompetitors = /competitor|rival|who\s+(?:am|are)\s+i\s+watch|who\s+do\s+i\s+watch|my\s+brands?\b/i.test(q)
+
   // No competitors yet + they're asking ABOUT competitors → answer directly, DON'T run the agent
   // (its prompt forbids saying "I can't find them", so with zero watched it spins/hangs/hallucinates).
-  if (watchCount === 0 && /competitor|rival|who\s+(?:am|are)\s+i\s+watch|my\s+brands?\b/i.test(q)) {
+  if (watchCount === 0 && asksCompetitors) {
     return NextResponse.json({ reply: `You're not watching any competitors yet — add one from Discovery → Spy a brand, and I'll track every ad they launch and pull the patterns into your brief.` })
+  }
+
+  // FAST PATH — a plain identity/list question ("tell me my competitor name", "who am I watching")
+  // is answered from data we ALREADY have. Routing it through the full LLM tool-loop is what made a
+  // one-word answer sit on "Mello is thinking…" — this returns instantly, no model call, no stall.
+  const isListQuestion = asksCompetitors && /\b(name|names|list|who|which|what)\b/i.test(q) && q.length < 90
+  if (watchCount > 0 && isListQuestion) {
+    const admin = createAdminClient()
+    const { data: follows } = await admin.from('followed_brands')
+      .select('brand_name, spied').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20)
+    const names = (follows || []).map((f: any) => f.brand_name).filter((n: string) => !isBlankName(n))
+    const list = names.length === 1 ? names[0]
+      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+    return NextResponse.json({ reply: names.length === 1
+      ? `You're watching ${list} — I read their whole ad archive and flag every new ad they launch. Want me to pull their latest, or add another?`
+      : `You're watching ${names.length}: ${list}. I track every ad each one launches and roll the patterns into your brief. Want the latest from any of them?` })
   }
 
   // Frame the reply as a standup exchange: Mello already SAID something this morning, the founder is
@@ -59,7 +77,7 @@ export async function POST(req: NextRequest) {
     // so we ALWAYS return a reply fast (never leave the client on "Mello is thinking…").
     const result: any = await Promise.race([
       runAgentToText(user.id, prompt),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('agent_timeout')), 45000)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('agent_timeout')), 30000)),
     ])
     const reply = (result?.text || '').trim() || `Got it — I'm on it.`
     return NextResponse.json({ reply })
