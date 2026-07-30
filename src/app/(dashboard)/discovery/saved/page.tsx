@@ -67,7 +67,11 @@ export default function SavedAdsPage() {
     try {
       const res = await fetch(`/api/discovery/saved?board_id=${selectedBoard}`)
       const data = await res.json()
-      setSavedAds(data.ads || [])
+      // Merge tags added at SAVE-TIME (stored in ad_data.tags) with tags added later on the board
+      // (the top-level `tags` column) — otherwise a tag chosen while saving never appeared here.
+      setSavedAds((data.ads || []).map((a: any) => ({
+        ...a, tags: Array.from(new Set([...(a.tags || []), ...(a.ad_data?.tags || [])])),
+      })))
     } finally {
       setLoadingAds(false)
     }
