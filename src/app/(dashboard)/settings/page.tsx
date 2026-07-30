@@ -18,6 +18,8 @@ export default function SettingsPage() {
   const [prefsSaved, setPrefsSaved] = useState(false)
   const [prefsSaving, setPrefsSaving] = useState(false)
   const [autopilots, setAutopilots] = useState<{ id: string; brand_name: string | null; media_type: string; runs: number }[]>([])
+  const [brands, setBrands] = useState<{ id: string; name: string }[]>([])
+  const [apBrand, setApBrand] = useState(''); const [apMedia, setApMedia] = useState<'image' | 'video'>('image'); const [apBusy, setApBusy] = useState(false)
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)  // null = still loading
   const [disconnecting, setDisconnecting] = useState(false)
   const [newPw, setNewPw] = useState(''); const [confirmPw, setConfirmPw] = useState(''); const [pwSaving, setPwSaving] = useState(false)
@@ -42,6 +44,8 @@ export default function SettingsPage() {
       fetch('/api/notifications/prefs').then(r => r.json()).then(j => { if (!cancelled && j.prefs) setPrefs(j.prefs) }).catch(() => {})
       // load daily-autopilot enrollments (non-blocking)
       fetch('/api/autopilot').then(r => r.json()).then(j => { if (!cancelled && Array.isArray(j.items)) setAutopilots(j.items) }).catch(() => {})
+      // load the user's brands so autopilot can be turned on RIGHT HERE (no dependency on a remake step)
+      fetch('/api/brands').then(r => r.json()).then(j => { if (!cancelled && Array.isArray(j.brands)) setBrands(j.brands.map((b: any) => ({ id: b.id, name: b.name }))) }).catch(() => {})
     })()
     return () => { cancelled = true }
   }, [])
@@ -53,6 +57,19 @@ export default function SettingsPage() {
       await fetch('/api/notifications/prefs', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) })
       setPrefsSaved(true); setTimeout(() => setPrefsSaved(false), 1800)
     } finally { setPrefsSaving(false) }
+  }
+
+  const enrollAutopilot = async () => {
+    if (!apBrand || apBusy) return
+    setApBusy(true)
+    try {
+      const r = await fetch('/api/autopilot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brandId: apBrand, mediaType: apMedia }) }).then(x => x.json()).catch(() => ({}))
+      if (r?.id) {
+        const j = await fetch('/api/autopilot').then(x => x.json()).catch(() => ({}))
+        if (Array.isArray(j.items)) setAutopilots(j.items)
+        setApBrand(''); toast.success('Daily ads turned on for this brand')
+      } else { toast.error(r?.error || 'Could not turn on autopilot') }
+    } finally { setApBusy(false) }
   }
 
   const stopAutopilot = async (id: string) => {
@@ -178,9 +195,22 @@ export default function SettingsPage() {
           <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>🚀 Daily Ad Autopilot</div>
           <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>A fresh ad for each brand below, generated and emailed every day at $0.15/ad. We skip days you’re out of credits. Runs until you turn it off.</div>
         </div>
-        <div style={{padding:autopilots.length?12:22}}>
+        <div style={{padding:12}}>
+          {/* Turn it on RIGHT HERE — pick a brand + format. (Previously this pointed to a 'Remake screen'
+              step that no longer exists in the new studio flow.) */}
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',padding:'6px 4px 14px'}}>
+            <select value={apBrand} onChange={(e)=>setApBrand(e.target.value)} style={{flex:'1 1 160px',minWidth:150,padding:'9px 12px',borderRadius:10,border:'1.5px solid #e2e8f0',background:'#fff',fontSize:13,fontFamily:'inherit',color:'#1a3a1a'}}>
+              <option value="">{brands.length ? 'Choose a brand…' : 'Add a brand first'}</option>
+              {brands.map(b=> <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            <select value={apMedia} onChange={(e)=>setApMedia(e.target.value as any)} style={{padding:'9px 12px',borderRadius:10,border:'1.5px solid #e2e8f0',background:'#fff',fontSize:13,fontFamily:'inherit',color:'#1a3a1a'}}>
+              <option value="image">Image ad</option>
+              <option value="video">Video ad</option>
+            </select>
+            <button onClick={enrollAutopilot} disabled={!apBrand||apBusy} style={{padding:'9px 18px',borderRadius:100,border:'none',background: apBrand&&!apBusy ? '#1a3a1a':'#e2e8f0',color: apBrand&&!apBusy ? '#dffe95':'#9ca3af',fontSize:13,fontWeight:800,cursor: apBrand&&!apBusy ?'pointer':'default',fontFamily:'inherit',whiteSpace:'nowrap'}}>{apBusy?'Turning on…':'Turn on daily ads'}</button>
+          </div>
           {autopilots.length === 0 ? (
-            <div style={{fontSize:13,color:'#7a9a7a'}}>No brands on autopilot yet. Turn it on from the Remake screen — the last step has a “Put this ad on autopilot” option.</div>
+            <div style={{fontSize:12.5,color:'#9ca3af',padding:'0 4px 4px'}}>No brands on autopilot yet — pick one above and Mello emails a fresh ad every morning.</div>
           ) : autopilots.map((a) => (
             <div key={a.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 10px',borderRadius:12,background:'#f8fcf6',marginBottom:8}}>
               <div>
