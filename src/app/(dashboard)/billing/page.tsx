@@ -104,8 +104,22 @@ export default function BillingPage() {
       <p style={{ fontSize: 13, color: '#7a9a7a', marginBottom: 28 }}>Choose a plan, buy top-ups, or manage your subscription.</p>
 
       {/* Full pricing (shared with the landing page — one source of truth). */}
-      <div style={{ marginBottom: 40 }}>
+      <div style={{ marginBottom: 20 }}>
         <PricingSection variant="dashboard" />
+      </div>
+
+      {/* Pay-as-you-go — buy credit top-ups (the PAYG card was removed from the plan grid, but paid
+          users still need to top up). Opens the credit modal's buy view. */}
+      <div style={{ maxWidth: 680, margin: '0 auto 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+        background: '#152928', border: '1px solid rgba(223,254,149,0.22)', borderRadius: 16, padding: '18px 22px' }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#dffe95' }}>Need more this month?</div>
+          <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>Buy credit top-ups — pay as you go, and they never expire.</div>
+        </div>
+        <button onClick={() => window.dispatchEvent(new CustomEvent('credits:open', { detail: { view: 'buy' } }))}
+          style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          Buy credits →
+        </button>
       </div>
 
       <div style={{ maxWidth: 680 }}>

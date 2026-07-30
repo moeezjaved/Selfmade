@@ -194,9 +194,10 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
         .select('ad_id, page_id, hook_type, format_style, emotion, offer, title, body, caption, topics, created_at, discovery_creatives(asset_type, r2_url, poster_url)')
         .gte('created_at', D7).order('created_at', { ascending: false }).limit(240)
       if (pageIds.length) q = q.in('page_id', pageIds)
-      // Brand view with NO competitors: don't fall back to the global market — that produced
-      // "what's working across your competitors" for a brand watching nobody. Return nothing.
-      else if (scopePages) q = q.in('page_id', [NO_PAGE])
+      // NO competitors watched (brand view OR account-level): NEVER fall back to the global market —
+      // that pulled 240 random ads and fabricated "what's working across your 8 competitors" for a
+      // brand-new user who added nobody. Always constrain to nothing so the playbook simply doesn't show.
+      else q = q.in('page_id', [NO_PAGE])
       const { data } = await q
       return data || []
     })(), [] as any[]),
