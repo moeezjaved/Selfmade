@@ -50,7 +50,7 @@ export default function SettingsPage() {
       fetch('/api/brands').then(r => r.json()).then(j => { if (!cancelled && Array.isArray(j.brands)) setBrands(j.brands.map((b: any) => ({ id: b.id, name: b.name }))) }).catch(() => {})
       // load the competitors already in Brand Spy, so the daily ad can FOLLOW one of them for reference
       fetch('/api/follows').then(r => r.json()).then(j => {
-        const rows: any[] = Array.isArray(j?.follows) ? j.follows : (Array.isArray(j) ? j : [])
+        const rows: any[] = Array.isArray(j?.brands) ? j.brands : []
         const spied = rows.filter(f => f && f.spied && f.page_id && f.brand_name)
           .map(f => ({ pageId: String(f.page_id), name: String(f.brand_name) }))
         if (!cancelled) setCompetitors(spied)

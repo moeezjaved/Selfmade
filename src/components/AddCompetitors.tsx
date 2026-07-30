@@ -49,7 +49,7 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
   // We count what's already watched for this brand so the notice + total are honest before they confirm.
   useEffect(() => {
     fetch('/api/follows').then(r => r.ok ? r.json() : null).then(j => {
-      const rows: any[] = Array.isArray(j?.follows) ? j.follows : (Array.isArray(j) ? j : [])
+      const rows: any[] = Array.isArray(j?.brands) ? j.brands : []
       const mine = rows.filter(f => f && f.spied && (brandId ? f.brand_id === brandId : true))
       setExisting(mine.length)
     }).catch(() => {})
