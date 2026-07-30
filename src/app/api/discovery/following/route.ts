@@ -18,7 +18,11 @@ export async function GET(req: NextRequest) {
   const admin = createReadClient()   // serving reads → replica when SUPABASE_READ_URL set
   const page = parseInt(req.nextUrl.searchParams.get('page') || '0')
 
-  const { data: follows } = await admin.from('followed_brands').select('page_id, brand_name').eq('user_id', user.id)
+  // Following = brands the user ❤️'d, NOT brands they SPY. Spied brands (spied=true) belong in Brand
+  // Spy only — exclude them here so spying a brand doesn't auto-fill Following, and un-spying doesn't
+  // leave a ghost in Following. A plain follow has spied null/false. (Follow and Spy are separate lists.)
+  const { data: follows } = await admin.from('followed_brands').select('page_id, brand_name')
+    .eq('user_id', user.id).or('spied.is.null,spied.eq.false')
   const pageIds = (follows || []).map((f: any) => f.page_id)
   if (!pageIds.length) return NextResponse.json({ ads: [], total: 0, hasMore: false, brands: [] })
 
