@@ -22,7 +22,7 @@ interface Card { id: CardId; tier: string; price: string; per: string; note: str
 const CARDS: Card[] = [
   { id: 'free', tier: 'Free', price: '$0', per: '', note: 'No card needed',
     feats: ['75 free credits (~5 image ads)', 'Browse Discovery + Brand Spy', 'Remake any winning ad', 'Daily brief from Mello'], cta: 'Start free' },
-  { id: 'starter', tier: 'Mello, full-time', price: '$49', per: '/ month', note: 'Everything, every morning',
+  { id: 'starter', tier: 'Creator', price: '$49', per: '/ month', note: 'Mello, full-time — everything, every morning',
     feats: [`6,000 credits / month`, `$${IMG_USD} per image ad · $${VID_USD} per video`, 'Every competitor watched', 'Fresh creatives every morning'], cta: 'Go full-time', popular: true },
   // Pay-as-you-go card retired (2026-07-29) — one plan: Free + $49. Credit top-ups still available
   // in-app via the credit counter for paid users; just not shown as a pricing column.

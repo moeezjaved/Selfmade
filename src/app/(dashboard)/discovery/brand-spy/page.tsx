@@ -201,7 +201,7 @@ export default function BrandSpyList() {
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(440px,96vw)', background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 24px 70px rgba(0,0,0,0.35)' }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: '#111' }}>Spy “{confirmSpy.name}”?</div>
             <div style={{ fontSize: 13.5, color: '#6b7280', marginTop: 8, lineHeight: 1.55 }}>
-              We’ll crawl their full ad archive from the Meta Ad Library and track it over time. This uses one of your plan’s tracked-brand slots — it’s free within your plan.
+              We’ll crawl their full ad archive from the Meta Ad Library and track it over time. This costs <b>50 credits ($0.50)</b> — one-time per brand; re-adding a brand you’ve already spied is free.
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
               <button onClick={() => setConfirmSpy(null)} style={{ background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
