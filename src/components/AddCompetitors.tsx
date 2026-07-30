@@ -41,7 +41,24 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
   const [howOpen, setHowOpen] = useState(false)   // "how to find the Meta Ad Library link" steps
   const [link, setLink] = useState('')            // dedicated Meta Ad Library link box (separate from name search)
   const [saved, setSaved] = useState<string[] | null>(null)   // names just added → show the "on it" confirmation
+  const [existing, setExisting] = useState(0)                  // competitors already watched FOR this brand
+  const [lowCredits, setLowCredits] = useState(false)          // hit insufficient credits mid-confirm
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Pricing: the FIRST competitor for a brand is free (matches onboarding); each one after costs 50cr.
+  // We count what's already watched for this brand so the notice + total are honest before they confirm.
+  useEffect(() => {
+    fetch('/api/follows').then(r => r.ok ? r.json() : null).then(j => {
+      const rows: any[] = Array.isArray(j?.follows) ? j.follows : (Array.isArray(j) ? j : [])
+      const mine = rows.filter(f => f && f.spied && (brandId ? f.brand_id === brandId : true))
+      setExisting(mine.length)
+    }).catch(() => {})
+  }, [brandId])
+
+  // How many of the current picks are free vs paid. free slots = 1 minus what's already there (min 0).
+  const freeSlots = Math.max(0, 1 - existing)
+  const paidCount = Math.max(0, picks.length - freeSlots)
+  const totalCost = paidCount * 50
 
   // Seed from the brand's NICHE, ranked by how much each rival actually advertises — far better
   // than a name fragment ("Bug Shield" once suggested Mountain Buggy). The niche is selectable,
@@ -114,14 +131,27 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
 
   const toggle = (c: Comp) => setPicks(p => p.some(x => x.pageId === c.pageId) ? p.filter(x => x.pageId !== c.pageId) : [...p, c])
 
-  /** Exactly what onboarding does on confirm: crawl the archive, then follow (alerts → the brief). */
+  /**
+   * First competitor for a brand is FREE (crawl + follow, like onboarding); every one after costs 50cr
+   * (the real /brand-spy charge — which also crawls + marks it spied). Either way it lands in Brand Spy.
+   */
   const confirm = async () => {
     if (!picks.length || busy) return
-    setBusy(true)
+    setBusy(true); setLowCredits(false)
     let n = 0
-    for (const p of picks) {
-      await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, name: p.name, crawlOnly: true }) }).catch(() => {})
-      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandId || undefined }) }).catch(() => {})
+    for (let i = 0; i < picks.length; i++) {
+      const p = picks[i]
+      const isFree = i < freeSlots
+      if (isFree) {
+        await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, name: p.name, crawlOnly: true }) }).catch(() => {})
+        await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandId || undefined, spied: true }) }).catch(() => {})
+      } else {
+        // Paid spy: charges 50cr (free if the org already paid for this brand before), crawls, marks spied.
+        const r = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, name: p.name }) }).catch(() => null)
+        if (r && r.status === 402) { setLowCredits(true); setBusy(false); return }   // out of credits → stop, tell them
+        // Attach it to THIS brand so it's watched for the right product (brand-spy doesn't carry brandId).
+        if (brandId) await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId, spied: true }) }).catch(() => {})
+      }
       n++; setDone(n)
     }
     // Also keep a human-readable trail in Mello's notebook (belt-and-suspenders alongside brand_id).
@@ -172,10 +202,15 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
         <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 25, color: INK, lineHeight: 1.2 }}>
           Who should I watch for {brandName}?
         </div>
-        <p style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.6, margin: '6px 0 16px' }}>
+        <p style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.6, margin: '6px 0 10px' }}>
           I’ll read their whole ad archive tonight and tell you the morning they launch something.
           Without this, there’s nothing for me to report on this brand.
         </p>
+        <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.5, margin: '0 0 16px', padding: '8px 11px', background: '#f5f8f0', border: `1px solid ${LINE}`, borderRadius: 10 }}>
+          {existing > 0
+            ? <>You’re already watching {existing} for this brand — <b style={{ color: INK }}>each new competitor is 50 cr</b>.</>
+            : <>Your <b style={{ color: INK }}>first competitor for this brand is free</b> — each one after is <b style={{ color: INK }}>50 cr</b>.</>}
+        </div>
 
         {picks.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
@@ -250,11 +285,19 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
           ))}
         </div>
 
+        {lowCredits && (
+          <div style={{ marginTop: 12, fontSize: 12.5, color: '#a3552b', background: '#fdf3ec', border: '1px solid #f0dcc9', borderRadius: 10, padding: '9px 12px', lineHeight: 1.5 }}>
+            You’re out of credits for the paid competitors. The free one was added — top up to watch the rest.
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 16 }}>
           <button onClick={confirm} disabled={!picks.length || busy}
             style={{ background: picks.length && !busy ? FOREST : '#dfe4de', color: picks.length && !busy ? LIME : '#9aa79a', border: 'none', borderRadius: 100, padding: '12px 22px', fontSize: 14, fontWeight: 800, cursor: picks.length && !busy ? 'pointer' : 'default', fontFamily: 'inherit' }}>
-            {busy ? `Setting up… ${done}/${picks.length}` : picks.length ? `Watch ${picks.length} for me →` : 'Pick at least one'}
+            {busy ? `Setting up… ${done}/${picks.length}` : picks.length ? `Watch ${picks.length} for me${totalCost > 0 ? ` · ${totalCost} cr` : ' · free'} →` : 'Pick at least one'}
           </button>
+          {picks.length > 0 && !busy && totalCost > 0 && (
+            <span style={{ fontSize: 12, color: MUTED, fontWeight: 700 }}>{freeSlots > 0 ? `1 free · ${paidCount} × 50 cr` : `${paidCount} × 50 cr`}</span>
+          )}
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Later</button>
         </div>
         </>)}
