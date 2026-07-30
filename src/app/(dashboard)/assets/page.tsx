@@ -289,7 +289,7 @@ export default function AssetsPage() {
                     )}
                     {/* Video assets: remake into a new video ad with your product (opens the video wizard). */}
                     {a.file_type === 'video' && a.status !== 'processing' && (
-                      <button onClick={() => { window.location.href = `/studio?src=asset&type=video&vid=${encodeURIComponent(a.file_url)}&img=${encodeURIComponent(a.file_url)}` }} title="Remake this video with your product"
+                      <button onClick={() => { window.location.href = `/studio?src=asset&type=video&vid=${encodeURIComponent(a.file_url)}` }} title="Remake this video with your product"
                         style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Sparkles size={11} /> Remake
                       </button>
