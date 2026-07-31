@@ -45,6 +45,15 @@ export type BriefItem = {
       verdictWhy: string
     }
   }
+  /** Real Meta ad-account numbers for the 'meta_ads' card — from the nightly audit (brief_events.payload). */
+  metaAudit?: {
+    total: number
+    spend: number
+    avgRoas: number
+    scale: { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }[]
+    watch: { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }[]
+    pause: { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }[]
+  }
 }
 
 export type Brief = {
@@ -130,6 +139,20 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   ])
 
   for (const e of spine) {
+    // The Meta audit carries structured numbers in payload → render as the dedicated Facebook Ads card
+    // (kind 'meta_ads'), not a generic prose item. Everything else passes through by kind verbatim.
+    if (e.kind === 'meta_audit' && e.payload && typeof e.payload === 'object') {
+      const p: any = e.payload
+      items.push({
+        id: e.id, kind: 'meta_ads', importance: e.importance ?? 96, title: e.title, body: e.body || undefined,
+        cta_label: e.cta_label || 'See the full audit', cta_href: e.cta_href || '/m4', at: e.created_at,
+        metaAudit: {
+          total: Number(p.total || 0), spend: Number(p.spend || 0), avgRoas: Number(p.avgRoas || 0),
+          scale: Array.isArray(p.scale) ? p.scale : [], watch: Array.isArray(p.watch) ? p.watch : [], pause: Array.isArray(p.pause) ? p.pause : [],
+        },
+      })
+      continue
+    }
     items.push({ id: e.id, kind: e.kind, importance: e.importance ?? 50, title: e.title, body: e.body || undefined, cta_label: e.cta_label || undefined, cta_href: e.cta_href || undefined, at: e.created_at })
   }
   if (spine.length) admin.from('brief_events').update({ surfaced_at: new Date().toISOString() }).in('id', spine.map((e: any) => e.id)).is('surfaced_at', null).then(() => {}, () => {})
@@ -386,7 +409,10 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   // The cross-competitor Playbook is a full-width card, not a ranked Today item — keep it out of the
   // top-6 competition so it always survives (it would otherwise lose the slice to a low launch alert).
   const playbookItem = items.find((i) => i.kind === 'market_playbook') || null
-  const rankedItems = items.filter((i) => i.kind !== 'market_playbook')
+  // The Facebook Ads audit card (real ROAS/spend) is the founder's money — pull it out too so it always
+  // survives the slice, and it goes FIRST (before ranked items): for a connected account it leads the brief.
+  const metaItem = items.find((i) => i.kind === 'meta_ads') || null
+  const rankedItems = items.filter((i) => i.kind !== 'market_playbook' && i.kind !== 'meta_ads')
 
   // When Mello last actually did something — the newest real artifact across the spine, the alerts
   // and the creatives. Powers the "last worked 2h ago" presence line: proof of labor, never faked.
@@ -407,7 +433,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     lastCycleAt,
     firstName: firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1) : null,
     headline,
-    items: [...rankedItems.slice(0, 6), ...(playbookItem ? [playbookItem] : [])],
+    items: [...(metaItem ? [metaItem] : []), ...rankedItems.slice(0, 6), ...(playbookItem ? [playbookItem] : [])],
     learning,
     quiet: items.length === 0 && !headline,
   }

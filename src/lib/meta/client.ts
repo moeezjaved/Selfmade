@@ -3,26 +3,46 @@ import axios, { AxiosInstance } from 'axios'
 const META_API_VERSION = process.env.META_API_VERSION || 'v20.0'
 const BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`
 
+import crypto from 'crypto'
+
+// Meta access tokens are LIVE credentials to a user's ad account — they must be encrypted at rest, not
+// merely encoded. We use AES-256-GCM (authenticated) with a key derived from ENCRYPTION_KEY. Format:
+// "gcm:<ivHex>:<authTagHex>:<cipherHex>". decryptToken stays backward-compatible with the legacy
+// base64 ("v1:") and aes-256-cbc formats so tokens stored before this change keep working (they'll be
+// re-encrypted with GCM on the next connect/sync that re-saves the token).
+function encKey(): Buffer {
+  // sha256 → always exactly 32 bytes regardless of the env string's length.
+  return crypto.createHash('sha256').update(String(process.env.ENCRYPTION_KEY || 'selfmade2025secretkey1234567890ab')).digest()
+}
+
 export function encryptToken(token: string): string {
-  const key = (process.env.ENCRYPTION_KEY || 'selfmade2025secretkey1234567890ab').slice(0, 32)
-  const encoded = Buffer.from(token).toString('base64')
-  return `v1:${encoded}:${key.slice(0,4)}`
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', encKey(), iv)
+  const enc = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()])
+  const tag = cipher.getAuthTag()
+  return `gcm:${iv.toString('hex')}:${tag.toString('hex')}:${enc.toString('hex')}`
 }
 
 export function decryptToken(encrypted: string): string {
-  if (encrypted.startsWith('v1:')) {
-    const parts = encrypted.split(':')
-    return Buffer.from(parts[1], 'base64').toString('utf8')
+  // New authenticated format.
+  if (encrypted.startsWith('gcm:')) {
+    try {
+      const [, ivHex, tagHex, dataHex] = encrypted.split(':')
+      const decipher = crypto.createDecipheriv('aes-256-gcm', encKey(), Buffer.from(ivHex, 'hex'))
+      decipher.setAuthTag(Buffer.from(tagHex, 'hex'))
+      return Buffer.concat([decipher.update(Buffer.from(dataHex, 'hex')), decipher.final()]).toString('utf8')
+    } catch { return '' }   // tampered/undecryptable → empty (caller treats as no token), never the ciphertext
   }
+  // Legacy base64 ("encoding") tokens from before real encryption existed.
+  if (encrypted.startsWith('v1:')) {
+    return Buffer.from(encrypted.split(':')[1], 'base64').toString('utf8')
+  }
+  // Legacy aes-256-cbc "<ivHex>:<dataHex>".
   try {
-    const crypto = require('crypto')
     const [ivHex, encryptedData] = encrypted.split(':')
-    const key = (process.env.ENCRYPTION_KEY || 'selfmade2025secretkey1234567890ab').slice(0, 32)
-    const iv = Buffer.from(ivHex, 'hex')
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key, 'utf8'), iv)
-    let decrypted = decipher.update(encryptedData, 'hex', 'utf8')
-    decrypted += decipher.final('utf8')
-    return decrypted
+    const key = String(process.env.ENCRYPTION_KEY || 'selfmade2025secretkey1234567890ab').slice(0, 32)
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key, 'utf8'), Buffer.from(ivHex, 'hex'))
+    return decipher.update(encryptedData, 'hex', 'utf8') + decipher.final('utf8')
   } catch {
     return encrypted
   }
