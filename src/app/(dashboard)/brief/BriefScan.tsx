@@ -24,7 +24,8 @@ import MelloTasks from './MelloTasks'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
-type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string; playbook?: { totalAds: number; brandsCount: number; videoPct: number; formats: { label: string; count: number }[]; hooks: { label: string; count: number }[]; emotions: { label: string; count: number }[]; offers: { label: string; count: number }[]; judgment?: { winner: string; confidence: 'High' | 'Medium' | 'Low'; confidenceWhy: string; verdict: 'Adopt' | 'Test' | 'Watch'; verdictWhy: string } } }
+type MetaCampaign = { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }
+type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string; playbook?: { totalAds: number; brandsCount: number; videoPct: number; formats: { label: string; count: number }[]; hooks: { label: string; count: number }[]; emotions: { label: string; count: number }[]; offers: { label: string; count: number }[]; judgment?: { winner: string; confidence: 'High' | 'Medium' | 'Low'; confidenceWhy: string; verdict: 'Adopt' | 'Test' | 'Watch'; verdictWhy: string } }; metaAudit?: { total: number; spend: number; avgRoas: number; scale: MetaCampaign[]; watch: MetaCampaign[]; pause: MetaCampaign[] } }
 type Brief = {
   summary: { adsScanned: number; brandsWatched: number; spiedBrands: number; creativesReady: number }
   lastCycleAt?: string | null
@@ -116,9 +117,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
   const isPaid = ['starter', 'pro', 'business', 'enterprise'].includes(String(plan || '').toLowerCase())
   const perDay = (49 / 30).toFixed(2)
   const playbook = brief.items.find(i => i.kind === 'market_playbook' && i.playbook) || null
-  const hero = brief.headline || brief.items.find(i => i.kind !== 'market_playbook') || null
+  const metaAds = brief.items.find(i => i.kind === 'meta_ads' && i.metaAudit) || null
+  const hero = brief.headline || brief.items.find(i => i.kind !== 'market_playbook' && i.kind !== 'meta_ads') || null
   const competitors = brief.items.filter(i => i.kind === 'competitor_ads').slice(0, 4)
-  const second = brief.items.find(i => i !== hero && i.kind !== 'competitor_ads' && i.kind !== 'market_playbook') || null
+  const second = brief.items.find(i => i !== hero && i.kind !== 'competitor_ads' && i.kind !== 'market_playbook' && i.kind !== 'meta_ads') || null
   const worked = ago(brief.lastCycleAt)
   const stateWord = brief.quiet ? 'Resting' : melloState === 'delivered' ? 'Delivered' : 'Awake'
 
@@ -193,15 +195,63 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             <MelloTasks brandId={activeBrandId} />
           </div>
 
-          {/* ── Run ads — the direct line into the campaign cockpit (M4). MetaGate prompts connect if
-              the ad account isn't linked yet, so one button covers both first-run and returning users. ── */}
-          <div className="bsx-e" style={{ ...card, background: FOREST, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', animationDelay: '.34s' }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3 }}>Run your ads on Meta</div>
-              <div style={{ fontSize: 13.5, color: '#b8c4b4', lineHeight: 1.5, marginTop: 3 }}>Launch, scale, and manage campaigns from here — Mello audits them every morning.</div>
+          {/* ── Facebook Ads — the money card. When the ad account is CONNECTED and Mello has audited it,
+              show real ROAS/spend + who to scale/pause. Otherwise fall back to the connect-and-run promo. ── */}
+          {metaAds?.metaAudit ? (() => {
+            const m = metaAds.metaAudit!
+            const money = (n: number) => `$${Math.round(n).toLocaleString()}`
+            const Bucket = ({ label, color, dot, rows, suffix }: { label: string; color: string; dot: string; rows: MetaCampaign[]; suffix: (c: MetaCampaign) => string }) => (
+              rows.length ? (
+                <div style={{ flex: '1 1 200px', minWidth: 190 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color, marginBottom: 8 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />{label} · {rows.length}
+                  </div>
+                  {rows.slice(0, 3).map((c, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, padding: '5px 0', borderTop: i ? `1px solid ${LINE}` : 'none' }}>
+                      <span style={{ fontSize: 13, fontWeight: 650, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>{c.name}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap' }}>{suffix(c)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null
+            )
+            return (
+              <div className="bsx-e" style={{ ...card, marginBottom: 24, overflow: 'hidden', animationDelay: '.34s' }}>
+                {/* dark header strip — the numbers that matter, at a glance */}
+                <div style={{ background: FOREST, padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#9db29a' }}>Your Facebook Ads · last 14 days</div>
+                    <div style={{ fontSize: 16.5, fontWeight: 750, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3, marginTop: 4, maxWidth: 460 }}>{metaAds.title.replace(/\.+$/, '')}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 22, flexShrink: 0 }}>
+                    <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{money(m.spend)}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spend</div></div>
+                    <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: LIME }}>{m.avgRoas}x</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>avg ROAS</div></div>
+                    <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{m.total}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>campaigns</div></div>
+                  </div>
+                </div>
+                {/* buckets — scale / watch / pause, only those with entries */}
+                <div style={{ padding: '18px 24px', display: 'flex', gap: 26, flexWrap: 'wrap' }}>
+                  <Bucket label="Scale" color="#2f7d3a" dot={GREEN} rows={m.scale} suffix={(c) => `${c.roas}x`} />
+                  <Bucket label="Watch" color="#9a6a12" dot="#e0a72e" rows={m.watch} suffix={(c) => `${money(c.spend)} · ${c.roas}x`} />
+                  <Bucket label="Pause" color="#a5342c" dot="#d0453a" rows={m.pause} suffix={(c) => `${money(c.spend)} · ${c.conversions} conv`} />
+                  {!m.scale.length && !m.watch.length && !m.pause.length && (
+                    <div style={{ ...body, fontSize: 14 }}>Everything's steady — no campaign needs a move today.</div>
+                  )}
+                </div>
+                <div style={{ padding: '0 24px 18px' }}>
+                  <Link href={metaAds.cta_href || '/m4'} onClick={() => onAct(metaAds)} style={{ display: 'inline-block', background: FOREST, color: LIME, borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>{metaAds.cta_label || 'See the full audit'} →</Link>
+                </div>
+              </div>
+            )
+          })() : (
+            <div className="bsx-e" style={{ ...card, background: FOREST, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', animationDelay: '.34s' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3 }}>Run your ads on Meta</div>
+                <div style={{ fontSize: 13.5, color: '#b8c4b4', lineHeight: 1.5, marginTop: 3 }}>Launch, scale, and manage campaigns from here — Mello audits them every morning.</div>
+              </div>
+              <Link href="/m4" style={{ flexShrink: 0, background: LIME, color: FOREST, borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Run ads →</Link>
             </div>
-            <Link href="/m4" style={{ flexShrink: 0, background: LIME, color: FOREST, borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Run ads →</Link>
-          </div>
+          )}
 
           {/* ── Also today — the one runner-up, a quiet row. ── */}
           {second && (
