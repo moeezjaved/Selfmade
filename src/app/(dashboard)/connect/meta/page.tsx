@@ -136,8 +136,10 @@ export default function ConnectMetaByo() {
             </div>
           )}
 
-          {/* door picker — manual fallbacks (agency partner-share / bring-your-own token) */}
-          {META_LIVE && <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 700, margin: '0 0 10px' }}>Or connect manually</div>}
+          {/* Manual doors (partner-share / BYO token) are the FALLBACK — only shown when one-click OAuth
+              isn't live (flag off). With Meta approved, users get the single clean button above; the code
+              below stays intact so it can be re-exposed instantly if OAuth ever fails for an agency. */}
+          {!META_LIVE && (<>
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             {bizId && <button onClick={() => { setTab('partner'); setErr(null) }} style={{ ...btnS, background: tab === 'partner' ? FOREST : '#eef2ec', color: tab === 'partner' ? LIME : '#3c463c' }}>Share with Selfmade · easiest</button>}
             <button onClick={() => { setTab('token'); setErr(null) }} style={{ ...btnS, background: tab === 'token' ? FOREST : '#eef2ec', color: tab === 'token' ? LIME : '#3c463c' }}>Use your own token</button>
@@ -236,6 +238,7 @@ export default function ConnectMetaByo() {
               </div>
             </>
           )}
+          </>)}
 
           <p style={{ fontSize: 12, color: '#9aa79a', lineHeight: 1.6, marginTop: 14 }}>
             Security: access is validated server-side, encrypted at rest, and used only to read your campaigns and
