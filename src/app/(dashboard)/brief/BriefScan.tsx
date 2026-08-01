@@ -23,6 +23,7 @@ import MelloFace, { type MelloState } from '@/components/MelloFace'
 import MelloTasks from './MelloTasks'
 import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 import BriefOpportunities from '@/components/brief/BriefOpportunities'
+import CompetitorCard from '@/components/brief/CompetitorCard'
 import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
@@ -221,6 +222,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
           {/* ── What Mello would do — ranked action cards. Pre-computed nightly (stored in the audit
               payload) so they auto-show with ZERO live calls; refresh pulls the latest on demand. ── */}
           <BriefOpportunities initial={metaAds?.metaAudit?.opportunities as any} />
+
+          {/* ── Rivals' winning ad — competitor intelligence, a SEPARATE card from the own-account
+              moves above (agreed split: account numbers never mix with rival inference). ── */}
+          <CompetitorCard />
 
           {/* ── Also today — the one runner-up, a quiet row. ── */}
           {second && (

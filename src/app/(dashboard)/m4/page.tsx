@@ -237,6 +237,26 @@ function M4Inner() {
     PAUSE_POOR:{bg:'rgba(248,113,113,.06)',border:'rgba(248,113,113,.15)',color:'#c0392b'},
   }
 
+  // Prefill from Studio ("Run it on Facebook →" after an approved clone): ?img=<creative URL>.
+  // The server pulls the image itself (no CORS) and registers it with Meta, so it lands in the
+  // Creatives step already uploaded. The founder still sets and confirms the budget — the prefill
+  // never launches anything on its own.
+  const [prefilled, setPrefilled] = React.useState(false)
+  React.useEffect(()=>{
+    const img = new URLSearchParams(window.location.search).get('img')
+    if (!img || !/^https:\/\//.test(img)) return
+    setPrefilled(true)
+    const id = 'prefill-' + Date.now()
+    setCreatives(prev => [...prev, { id, name: 'Your approved ad', pack: 1, type: 'image', mimeType: 'image/jpeg', uploading: true }])
+    fetch('/api/m4/upload-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUrl: img }) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.hash) setCreatives(prev => prev.map(x => x.id === id ? { ...x, hash: d.hash, uploading: false, uploaded: true } : x))
+        else setCreatives(prev => prev.filter(x => x.id !== id))
+      })
+      .catch(() => setCreatives(prev => prev.filter(x => x.id !== id)))
+  },[])
+
   React.useEffect(()=>{
     // Auto-detect business context from connected Meta account (runs in background)
     setDetecting(true)
@@ -490,6 +510,11 @@ function M4Inner() {
       {step==='welcome'&&(
         <div style={{...S.card,padding:36,position:'relative'}}>
           <div style={{position:'absolute',top:0,left:'20%',right:'20%',height:'1.5px',background:'linear-gradient(90deg,transparent,#dffe95,transparent)'}}/>
+          {prefilled&&(
+            <div style={{background:'rgba(45,122,45,0.08)',border:'1px solid rgba(45,122,45,0.25)',borderRadius:14,padding:'13px 18px',marginBottom:20,fontSize:13.5,color:'#1a3a1a',lineHeight:1.6}}>
+              <strong style={{color:'#2d7a2d'}}>Your approved ad is loaded.</strong> It&rsquo;s already attached in the Creatives step — walk through setup, set your budget, and confirm to go live. Nothing spends until you do.
+            </div>
+          )}
           <h2 style={{fontSize:24,fontWeight:900,color:'#1a3a1a',marginBottom:8}}>The complete M4 ad system.</h2>
           <p style={{fontSize:14,color:'#5a7a5a',lineHeight:1.8,marginBottom:24}}>4 campaigns. Every customer lifecycle stage. Zero guesswork.</p>
           <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:12,marginBottom:28}}>
