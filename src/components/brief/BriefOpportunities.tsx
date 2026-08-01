@@ -44,7 +44,7 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
   }
 
   if (state === 'done') {
-    return <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 700, color: GOOD }}>✓ Scaled to {cur(budget)}/day. Live on Meta now.</div>
+    return <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 700, color: GOOD }}>✓ Duplicated your winner into a new Scaling campaign at {cur(budget)}/day. Your original keeps running untouched.</div>
   }
 
   if (!open) {
@@ -61,18 +61,18 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
 
   return (
     <div style={{ marginTop: 6, width: '100%' }}>
-      <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>Now {cur(currentMajor)}/day → new daily budget:</div>
+      <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>I'll duplicate this winner into a new Scaling campaign (your original stays untouched). Its daily budget:</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <input type="number" min={1} value={budget} onChange={e => setBudget(Math.max(1, Math.round(Number(e.target.value) || 0)))} disabled={state === 'busy'}
           style={{ width: 92, border: `1px solid ${LINE}`, borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', color: INK }} />
         <span style={{ fontSize: 12, color: MUTED }}>{currency}/day</span>
         <button onClick={run} disabled={state === 'busy'} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 12.5, fontWeight: 800, cursor: state === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit' }}>
-          {state === 'busy' ? 'Scaling…' : `Scale to ${cur(budget)}/day`}
+          {state === 'busy' ? 'Duplicating…' : `Scale to ${cur(budget)}/day`}
         </button>
         <button onClick={() => setOpen(false)} disabled={state === 'busy'} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
       </div>
       {state === 'err' && <div style={{ marginTop: 6, fontSize: 12, color: '#c0392b' }}>{msg}</div>}
-      <div style={{ marginTop: 6, fontSize: 11.5, color: FAINT }}>Raises this campaign's budget on Meta. You can lower it back anytime.</div>
+      <div style={{ marginTop: 6, fontSize: 11.5, color: FAINT }}>Copies your winner into a fresh campaign at this budget — the original is never touched, so its learning stays intact.</div>
     </div>
   )
 }
