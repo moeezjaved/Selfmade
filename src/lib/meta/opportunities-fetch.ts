@@ -20,8 +20,8 @@ export async function fetchLiveOpportunities(token: string, accountId: string, r
   }
 
   const [ov, adsR, plR, agR, geR] = await Promise.all([
-    get({ level: 'account', fields: 'spend,action_values,actions' }),
-    get({ level: 'ad', fields: 'ad_name,spend,action_values,actions', limit: '50' }),
+    get({ level: 'account', fields: 'spend,action_values,actions,impressions,clicks,ctr,cpm' }),
+    get({ level: 'ad', fields: 'ad_name,spend,action_values,actions,frequency,impressions,ctr', limit: '50' }),
     get({ level: 'account', breakdowns: 'publisher_platform,platform_position', fields: 'spend,action_values' }),
     get({ level: 'account', breakdowns: 'age', fields: 'spend,action_values' }),
     get({ level: 'account', breakdowns: 'gender', fields: 'spend,action_values' }),
@@ -31,11 +31,17 @@ export async function fetchLiveOpportunities(token: string, accountId: string, r
   const accSpend = Number(acc.spend || 0)
   const accRoas = accSpend > 0 ? rev(acc) / accSpend : 0
   const accConv = conv(acc)
+  const accClicks = Number(acc.clicks || 0)
+  const accCtr = Number(acc.ctr || 0)
 
-  const adRows = (adsR?.data || []).map((r: any) => { const s = Number(r.spend || 0); return { label: r.ad_name || 'ad', roas: s > 0 ? rev(r) / s : 0, spend: s, conversions: conv(r) } })
+  const adRows = (adsR?.data || []).map((r: any) => { const s = Number(r.spend || 0); return { label: r.ad_name || 'ad', roas: s > 0 ? rev(r) / s : 0, spend: s, conversions: conv(r), frequency: Number(r.frequency || 0) } })
   const byRoas = adRows.filter((r: any) => r.spend > 0).sort((a: any, b: any) => b.roas - a.roas)
   const winners = byRoas.filter((r: any) => r.roas >= Math.max(1, accRoas)).slice(0, 3)
   const losers = [...byRoas].reverse().filter((r: any) => r.roas < 1 && r.spend > 0).slice(0, 3)
+
+  // Ad fatigue: the highest-spend ad your audience has seen too many times (frequency ≥ 3) is burning
+  // budget on people who've already scrolled past it. A fresh creative resets that.
+  const fatigue = [...adRows].filter((r: any) => r.spend > 0 && r.frequency >= 3).sort((a: any, b: any) => b.spend - a.spend)[0] || null
 
   const plRows = (plR?.data || []).map((r: any) => { const s = Number(r.spend || 0); return { label: `${r.publisher_platform || ''} — ${r.platform_position || ''}`.trim(), roas: s > 0 ? rev(r) / s : 0, spend: s } })
   const bestPl = [...plRows].sort((a, b) => b.roas - a.roas)[0] || null
@@ -56,5 +62,7 @@ export async function fetchLiveOpportunities(token: string, accountId: string, r
   return computeOpportunities({
     roas: accRoas, spend: accSpend, conv: accConv, days, winners, losers,
     bestPl, worstPl, bestAge: bestAge ? { label: bestAge.label, roas: bestAge.roas } : null, bestGender, segmentEarns,
+    accClicks, accCtr,
+    fatigue: fatigue ? { label: fatigue.label, frequency: Math.round(fatigue.frequency * 10) / 10, spend: fatigue.spend } : null,
   }, money)
 }

@@ -18,6 +18,9 @@ export type OppInput = {
   bestAge?: { label: string; roas: number } | null
   bestGender?: { label: string } | null
   segmentEarns?: boolean   // true = the best segment actually converts; false = spend-based early read
+  accClicks?: number       // total clicks in range — for the "clicks but no sales" leak diagnosis
+  accCtr?: number          // account CTR (%)
+  fatigue?: { label: string; frequency: number; spend: number } | null   // an over-served, budget-burning ad
 }
 
 /** Map a tone to a hex; renderers call this so color lives with the UI, not the data. */
@@ -27,6 +30,18 @@ export function computeOpportunities(o: OppInput, fmt: (n: number) => string): O
   const recs: Opportunity[] = []
   const daysN = Math.max(1, o.days)
   const { roas, spend, conv, winners, losers } = o
+
+  // ── CONVERSION LEAK — the most important thing to tell a spending-but-not-selling account. People
+  // CLICK (real CTR, real clicks) but nobody BUYS (0 conversions). That's not an ad problem — it's the
+  // landing page, offer, or checkout. Pausing ads treats the symptom; this names the actual cause.
+  // Fires FIRST (top of the list) because it changes what you do with today's budget.
+  if (conv === 0 && spend > 0 && (o.accClicks || 0) >= 20) {
+    recs.push({
+      title: `Clicks, but no sales`,
+      why: `${fmt(spend)} spent and ${(o.accClicks || 0).toLocaleString()} clicks${o.accCtr ? ` (${o.accCtr.toFixed(1)}% CTR)` : ''} — but 0 purchases. Your ads work; the drop-off is after the click, on the landing page, offer, or checkout.`,
+      impact: `the real blocker`, level: 3, href: '/reports', cta: 'See the funnel', tone: 'bad',
+    })
+  }
 
   if (losers[0]) {
     const monthly = (losers[0].spend / daysN) * 30 * (1 - losers[0].roas)
@@ -40,6 +55,11 @@ export function computeOpportunities(o: OppInput, fmt: (n: number) => string): O
     const shift = o.worstPl.spend * 0.5
     recs.push({ title: `Shift budget ${o.worstPl.label} → ${o.bestPl.label}`, why: `${o.bestPl.label} returns ${o.bestPl.roas.toFixed(1)}x; ${o.worstPl.label} only ${o.worstPl.roas.toFixed(1)}x on ${fmt(o.worstPl.spend)}.`, impact: `~+${fmt(shift * (o.bestPl.roas - o.worstPl.roas) / daysN * 30)}/mo`, level: 2, href: '/campaigns', cta: 'Review placements', tone: 'warn' })
   }
+  // AD FATIGUE — an ad your audience has seen too many times (frequency ≥ 3) is spending on people who
+  // already scrolled past it; CPM climbs and CTR fades. A fresh creative resets that. One-click to Studio.
+  if (o.fatigue) {
+    recs.push({ title: `Refresh “${o.fatigue.label}”`, why: `Your audience has seen it ${o.fatigue.frequency}× — that's fatigue. It's still spending ${fmt(o.fatigue.spend)}, but on people who've scrolled past it. A fresh version resets your cost.`, impact: `reverse rising CPM`, level: o.fatigue.frequency >= 4 ? 3 : 2, href: '/creative-studio?studio=1', cta: 'Make a fresh one', tone: 'warn' })
+  }
   if (o.bestAge && o.bestGender && spend > 0) {
     // Honest copy: only call it "highest-revenue" when it actually earned. Otherwise it's where the
     // spend/reach concentrates — a real early read on the audience, not a converted winner.
@@ -51,5 +71,7 @@ export function computeOpportunities(o: OppInput, fmt: (n: number) => string): O
   if (winners[0]) {
     recs.push({ title: `Make 3 variations of “${winners[0].label}”`, why: `Winners fatigue. Variations of a proven ad beat cold new concepts.`, impact: 'extends the winner', level: 2, href: '/creative-studio?studio=1', cta: 'Create in Studio', tone: 'good' })
   }
-  return recs
+  // Highest-confidence / biggest-impact first (stable — ties keep the logical order above), so the
+  // top 3 the brief shows are always the moves that matter most.
+  return recs.sort((a, b) => b.level - a.level)
 }
