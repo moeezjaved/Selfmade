@@ -227,7 +227,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
 
           {/* ── What Mello would do — ranked action cards. Pre-computed nightly (stored in the audit
               payload) so they auto-show with ZERO live calls; refresh pulls the latest on demand. ── */}
-          <BriefOpportunities initial={metaAds?.metaAudit?.opportunities as any} accountId={acctScope} scaleCampaign={(metaAds?.metaAudit as any)?.scale?.[0] || null} currency={(metaAds?.metaAudit as any)?.currency || 'USD'} />
+          <BriefOpportunities initial={metaAds?.metaAudit?.opportunities as any} accountId={acctScope} initialAccountId={(metaAds?.metaAudit as any)?.selected || null} scaleCampaign={(metaAds?.metaAudit as any)?.scale?.[0] || null} currency={(metaAds?.metaAudit as any)?.currency || 'USD'} />
 
           {/* ── Rivals' winning ad — competitor intelligence, a SEPARATE card from the own-account
               moves above (agreed split: account numbers never mix with rival inference). ── */}

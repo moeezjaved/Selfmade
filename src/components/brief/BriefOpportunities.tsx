@@ -77,7 +77,7 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
   )
 }
 
-export default function BriefOpportunities({ initial, onAct, accountId, scaleCampaign, currency }: { initial?: Opportunity[]; onAct?: (o: Opportunity) => void; accountId?: string | null; scaleCampaign?: ScaleCampaign | null; currency?: string }) {
+export default function BriefOpportunities({ initial, onAct, accountId, initialAccountId, scaleCampaign, currency }: { initial?: Opportunity[]; onAct?: (o: Opportunity) => void; accountId?: string | null; initialAccountId?: string | null; scaleCampaign?: ScaleCampaign | null; currency?: string }) {
   // `initial` = the cards computed by the nightly audit and stored in the brief payload. If present, we
   // render them immediately with ZERO live calls. Refresh (or the empty-state button) pulls fresh.
   const hasInitial = !!(initial && initial.length)
@@ -100,20 +100,25 @@ export default function BriefOpportunities({ initial, onAct, accountId, scaleCam
       .finally(() => { setBusy(false); setLoaded(true) })
   }
 
-  // Show the moves by DEFAULT, not behind a click. If the nightly audit already stored them
-  // (`initial`), they render instantly with zero calls; if not, pull them once on mount (the endpoint
-  // is cached server-side, so repeat brief loads don't re-hit Meta). This is the bridge until every
-  // nightly run stores them — the founder should never see an empty "pull it yourself" prompt.
+  // The account these cards are CURRENTLY showing. Stored cards (`initial`) are for `initialAccountId`
+  // (the account the nightly audit ran on). If we don't know it (older payload), treat as unknown.
+  const shownAccount = useRef<string | null>(hasInitial ? (initialAccountId || null) : null)
+
+  // Show the moves by DEFAULT, not behind a click, and NEVER for the wrong account. If nothing is
+  // stored, pull on mount. This is the bridge until every nightly run stores them.
   useEffect(() => {
-    if (!hasInitial) load(accountId || undefined)
+    if (!hasInitial) { load(accountId || undefined); shownAccount.current = accountId || 'unknown' }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Follow the Facebook card's account switch so every number on the brief speaks one currency.
-  // Skips the very first value (mount → primary, already matches `initial` / the mount load above).
-  const firstScope = useRef(true)
+  // Follow whatever account the brief resolved (broadcast by the Facebook card). The cards MUST be for
+  // the same account as the rest of the brief — a stored ROY-1 card showing under an Aura-Bura brief is
+  // exactly the bug we're killing. Refetch whenever the target account differs from what's shown; if it
+  // already matches (stored == resolved primary), no call, so we stay off Meta's rate limit.
   useEffect(() => {
-    if (firstScope.current) { firstScope.current = false; return }
-    if (accountId) load(accountId)
+    if (!accountId) return
+    if (accountId === shownAccount.current) return
+    shownAccount.current = accountId
+    load(accountId)
   }, [accountId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Not loaded yet → a quiet prompt (no Graph call until tapped).
