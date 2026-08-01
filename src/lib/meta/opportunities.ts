@@ -17,6 +17,7 @@ export type OppInput = {
   bestPl?: OppPlacement | null; worstPl?: OppPlacement | null
   bestAge?: { label: string; roas: number } | null
   bestGender?: { label: string } | null
+  segmentEarns?: boolean   // true = the best segment actually converts; false = spend-based early read
 }
 
 /** Map a tone to a hex; renderers call this so color lives with the UI, not the data. */
@@ -40,7 +41,12 @@ export function computeOpportunities(o: OppInput, fmt: (n: number) => string): O
     recs.push({ title: `Shift budget ${o.worstPl.label} → ${o.bestPl.label}`, why: `${o.bestPl.label} returns ${o.bestPl.roas.toFixed(1)}x; ${o.worstPl.label} only ${o.worstPl.roas.toFixed(1)}x on ${fmt(o.worstPl.spend)}.`, impact: `~+${fmt(shift * (o.bestPl.roas - o.worstPl.roas) / daysN * 30)}/mo`, level: 2, href: '/campaigns', cta: 'Review placements', tone: 'warn' })
   }
   if (o.bestAge && o.bestGender && spend > 0) {
-    recs.push({ title: `Lean into ${o.bestGender.label === 'female' ? 'women' : o.bestGender.label === 'male' ? 'men' : o.bestGender.label} ${o.bestAge.label}`, why: `Your highest-revenue segment. Tightening targeting cuts wasted reach.`, impact: 'lower CPA', level: conv >= 10 ? 2 : 1, href: '/m4', cta: 'Target them', tone: 'good' })
+    // Honest copy: only call it "highest-revenue" when it actually earned. Otherwise it's where the
+    // spend/reach concentrates — a real early read on the audience, not a converted winner.
+    const why = o.segmentEarns
+      ? `Your highest-revenue segment. Tightening targeting cuts wasted reach.`
+      : `Where most of your reach and budget land — your core audience so far. Tightening toward it cuts wasted spend while you find what converts.`
+    recs.push({ title: `Lean into ${o.bestGender.label === 'female' ? 'women' : o.bestGender.label === 'male' ? 'men' : o.bestGender.label} ${o.bestAge.label}`, why, impact: o.segmentEarns ? 'lower CPA' : 'less wasted spend', level: o.segmentEarns && conv >= 10 ? 2 : 1, href: '/m4', cta: 'Target them', tone: 'good' })
   }
   if (winners[0]) {
     recs.push({ title: `Make 3 variations of “${winners[0].label}”`, why: `Winners fatigue. Variations of a proven ad beat cold new concepts.`, impact: 'extends the winner', level: 2, href: '/creative-studio?studio=1', cta: 'Create in Studio', tone: 'good' })

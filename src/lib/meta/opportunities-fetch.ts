@@ -41,19 +41,20 @@ export async function fetchLiveOpportunities(token: string, accountId: string, r
   const bestPl = [...plRows].sort((a, b) => b.roas - a.roas)[0] || null
   const worstPl = [...plRows].filter((p) => p.spend >= accSpend * 0.08).sort((a, b) => a.roas - b.roas)[0] || null
 
-  const ages = (agR?.data || []).map((r: any) => { const s = Number(r.spend || 0); return { label: r.age || '', roas: s > 0 ? rev(r) / s : 0, revenue: rev(r) } })
-  const bestAge = [...ages].sort((a, b) => b.revenue - a.revenue)[0] || null
-  const genders = (geR?.data || []).map((r: any) => ({ label: r.gender || '', revenue: rev(r) }))
-  const bestGender = [...genders].sort((a, b) => b.revenue - a.revenue)[0] || null
-
-  // "Lean into <segment>" only makes sense when a segment ACTUALLY earns more. With no conversion
-  // revenue (0 ROAS accounts), every bucket ties at 0 and the sort just returns the FIRST one (18-24),
-  // a meaningless default that reads like a real insight. Only surface a best segment with real revenue.
-  const bestAgeReal = bestAge && bestAge.revenue > 0 ? bestAge : null
-  const bestGenderReal = bestGender && bestGender.revenue > 0 ? bestGender : null
+  // Best segment = highest REVENUE if the account is converting; otherwise the segment absorbing the
+  // most SPEND (where the reach/budget actually concentrates — the founder's real audience). This
+  // surfaces the TRUE top segment (e.g. 35-44), NOT the arbitrary first bucket (18-24) that a
+  // zero-revenue tie used to return. Only skip when a segment has no spend at all (no data to read).
+  const ages = (agR?.data || []).map((r: any) => { const s = Number(r.spend || 0); return { label: r.age || '', roas: s > 0 ? rev(r) / s : 0, revenue: rev(r), spend: s } })
+  const bestAge = [...ages].filter((a) => a.spend > 0).sort((a, b) => (b.revenue - a.revenue) || (b.spend - a.spend))[0] || null
+  const genders = (geR?.data || []).map((r: any) => { const s = Number(r.spend || 0); return { label: r.gender || '', roas: s > 0 ? rev(r) / s : 0, revenue: rev(r), spend: s } })
+  const bestGender = [...genders].filter((g) => g.spend > 0).sort((a, b) => (b.revenue - a.revenue) || (b.spend - a.spend))[0] || null
+  // Tell the card whether this is revenue-backed (strong) or spend-based (an early read), so the copy
+  // is honest — never claim "highest-revenue" for a segment that hasn't earned yet.
+  const segmentEarns = !!(bestAge && bestAge.revenue > 0)
 
   return computeOpportunities({
     roas: accRoas, spend: accSpend, conv: accConv, days, winners, losers,
-    bestPl, worstPl, bestAge: bestAgeReal ? { label: bestAgeReal.label, roas: bestAgeReal.roas } : null, bestGender: bestGenderReal,
+    bestPl, worstPl, bestAge: bestAge ? { label: bestAge.label, roas: bestAge.roas } : null, bestGender, segmentEarns,
   }, money)
 }
