@@ -9,16 +9,21 @@ import React from 'react'
  */
 function inline(text: string, keyBase: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = []
-  // Tokenize **bold**, *italic*, `code`
-  const re = /(\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`)/g
+  // Tokenize ![alt](url) image, **bold**, *italic*, `code`. Image FIRST so ad thumbnails render
+  // (used in Mello's "running ads" table — first cell is the creative).
+  const re = /(!\[([^\]]*)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`)/g
   let last = 0
   let m: RegExpExecArray | null
   let i = 0
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) nodes.push(text.slice(last, m.index))
-    if (m[2] !== undefined) nodes.push(<strong key={`${keyBase}-b${i}`}>{m[2]}</strong>)
-    else if (m[3] !== undefined) nodes.push(<em key={`${keyBase}-i${i}`}>{m[3]}</em>)
-    else if (m[4] !== undefined) nodes.push(<code key={`${keyBase}-c${i}`} style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 4, fontSize: '0.88em' }}>{m[4]}</code>)
+    if (m[3] !== undefined) {
+      // eslint-disable-next-line @next/next/no-img-element
+      nodes.push(<img key={`${keyBase}-img${i}`} src={m[3]} alt={m[2] || ''} style={{ width: 44, height: 44, borderRadius: 7, objectFit: 'cover', verticalAlign: 'middle', display: 'inline-block', background: '#eef2ec' }} onError={(e: any) => { e.currentTarget.style.display = 'none' }} />)
+    }
+    else if (m[4] !== undefined) nodes.push(<strong key={`${keyBase}-b${i}`}>{m[4]}</strong>)
+    else if (m[5] !== undefined) nodes.push(<em key={`${keyBase}-i${i}`}>{m[5]}</em>)
+    else if (m[6] !== undefined) nodes.push(<code key={`${keyBase}-c${i}`} style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 4, fontSize: '0.88em' }}>{m[6]}</code>)
     last = m.index + m[0].length
     i++
   }

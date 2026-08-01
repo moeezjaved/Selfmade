@@ -146,8 +146,25 @@ export async function getAdPerformance(userId: string, params: AdPerfParams) {
       revenue: Math.round(revenue * 100) / 100,
       roas: spend > 0 ? Math.round((revenue / spend) * 100) / 100 : 0,
       cpa: conversions > 0 ? Math.round((spend / conversions) * 100) / 100 : 0,
+      thumbnail_url: null as string | null,
     }
   })
+
+  // Thumbnails for the ads shown, in ONE batched read (`?ids=a,b,c`) — never one call per ad (that
+  // was the rate-limit culprit). Only for ad-level results (adset/campaign rows have no single creative).
+  if (level === 'ad') {
+    try {
+      const ids = rows.map((r: any) => r.ad_id).filter(Boolean).slice(0, 50)
+      if (ids.length) {
+        const burl = `https://graph.facebook.com/${V}/?ids=${ids.join(',')}&fields=creative{thumbnail_url,image_url}&access_token=${encodeURIComponent(token)}`
+        const batch = await fetch(burl).then(r => r.json()).catch(() => ({}))
+        for (const r of rows) {
+          const cre = batch?.[r.ad_id]?.creative
+          r.thumbnail_url = cre?.thumbnail_url || cre?.image_url || null
+        }
+      }
+    } catch { /* thumbnails best-effort */ }
+  }
 
   return {
     account: 'act_' + acc.account_id,
