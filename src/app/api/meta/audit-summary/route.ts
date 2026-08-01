@@ -16,9 +16,10 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const accountId = req.nextUrl.searchParams.get('accountId') || undefined
+  const range = req.nextUrl.searchParams.get('range') || 'last_30d'
   try {
     const admin = createAdminClient()
-    const r = await auditAccount(admin, user.id, accountId)
+    const r = await auditAccount(admin, user.id, accountId, range)
     return NextResponse.json(r || { accounts: [] })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'failed', accounts: [] }, { status: 200 })
