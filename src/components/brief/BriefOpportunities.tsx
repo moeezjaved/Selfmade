@@ -5,7 +5,7 @@
  * ranked action cards with expected impact + a confidence meter. Renders nothing until there's data,
  * so it never clutters a brief for someone without a connected/active ad account.
  */
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { oppColor, type Opportunity } from '@/lib/meta/opportunities'
 
@@ -25,7 +25,7 @@ function Confidence({ level }: { level: 1 | 2 | 3 }) {
   )
 }
 
-export default function BriefOpportunities({ initial, onAct }: { initial?: Opportunity[]; onAct?: (o: Opportunity) => void }) {
+export default function BriefOpportunities({ initial, onAct, accountId }: { initial?: Opportunity[]; onAct?: (o: Opportunity) => void; accountId?: string | null }) {
   // `initial` = the cards computed by the nightly audit and stored in the brief payload. If present, we
   // render them immediately with ZERO live calls. Refresh (or the empty-state button) pulls fresh.
   const hasInitial = !!(initial && initial.length)
@@ -35,15 +35,27 @@ export default function BriefOpportunities({ initial, onAct }: { initial?: Oppor
   const [loaded, setLoaded] = useState(hasInitial)
 
   // Live pull — the nightly cards are usually enough, so this only fires on an explicit tap (refresh /
-  // "See Mello's moves"). Result is cached server-side so re-opening is cheap.
-  const load = () => {
+  // "See Mello's moves") or when the founder switches the account in the Facebook card. Result is
+  // cached server-side so re-opening is cheap. `acct` scopes to the switched account so the currency
+  // and figures match what the Facebook card is showing.
+  const load = (acct?: string | null) => {
     setBusy(true)
-    fetch('/api/meta/opportunities', { cache: 'no-store' })
+    const qs = acct ? `?accountId=${encodeURIComponent(acct)}` : ''
+    fetch(`/api/meta/opportunities${qs}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
       .then(j => { if (j && Array.isArray(j.opportunities)) setOps(j.opportunities) })
       .catch(() => {})
       .finally(() => { setBusy(false); setLoaded(true) })
   }
+
+  // Follow the Facebook card's account switch. The stored `initial` cards are for the primary account;
+  // when the founder flips to another account, refetch these for THAT account so every number on the
+  // brief speaks one currency. Skips the very first value (mount → primary, already matches `initial`).
+  const firstScope = useRef(true)
+  useEffect(() => {
+    if (firstScope.current) { firstScope.current = false; return }
+    if (accountId) load(accountId)
+  }, [accountId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Not loaded yet → a quiet prompt (no Graph call until tapped).
   if (!loaded) {
@@ -53,7 +65,7 @@ export default function BriefOpportunities({ initial, onAct }: { initial?: Oppor
           <div style={{ fontSize: 15.5, fontWeight: 750, color: INK }}>What Mello would do</div>
           <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>The ranked moves to improve your ads — pull the latest when you want it.</div>
         </div>
-        <button onClick={load} disabled={busy} style={{ flexShrink: 0, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+        <button onClick={() => load(accountId)} disabled={busy} style={{ flexShrink: 0, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}>
           {busy ? 'Thinking…' : "See Mello's moves →"}
         </button>
       </div>
@@ -68,7 +80,7 @@ export default function BriefOpportunities({ initial, onAct }: { initial?: Oppor
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
         <div style={{ fontSize: 20, fontWeight: 750, letterSpacing: '-.02em', color: INK }}>What Mello would do</div>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={load} disabled={busy} title="Refresh live from Meta" style={{ background: 'none', border: 'none', color: '#9aa79a', fontSize: 12, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', padding: 0 }}>{busy ? 'refreshing…' : '↻'}</button>
+          <button onClick={() => load(accountId)} disabled={busy} title="Refresh live from Meta" style={{ background: 'none', border: 'none', color: '#9aa79a', fontSize: 12, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', padding: 0 }}>{busy ? 'refreshing…' : '↻'}</button>
           <Link href="/reports" style={{ fontSize: 12.5, color: '#3f8f4f', fontWeight: 800, textDecoration: 'none' }}>See the full report →</Link>
         </span>
       </div>
