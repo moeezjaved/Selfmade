@@ -43,6 +43,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   const [sel, setSel] = useState<string>('')
   const [range, setRange] = useState<string>('last_30d')   // default: 30 days
   const [busy, setBusy] = useState(false)
+  const [healing, setHealing] = useState(false)   // self-heal in progress → blank the stale numbers
 
   // LIVE fetch — only on an explicit user action (switch account / change range / refresh). Never auto.
   const load = (accountId?: string, r: string = range) => {
@@ -62,7 +63,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
         if (j.selected) onAccountChange?.(j.selected, j.currency || 'USD')
       })
       .catch(() => {})
-      .finally(() => setBusy(false))
+      .finally(() => { setBusy(false); setHealing(false) })
   }
   // Pin the currently-viewed account as the org's primary (clears every other is_primary), then
   // refresh the list + numbers. Fixes the multiple-primary drift permanently and makes THIS account
@@ -73,6 +74,9 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
     try {
       await fetch('/api/meta/accounts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: sel }) })
       setAccounts(prev => (prev || []).map(a => ({ ...a, isPrimary: a.accountId === sel })))
+      // Re-run the audit for the NEW primary so the STORED brief data (card numbers + "What Mello would
+      // do") is rewritten now — the next load is clean, no wrong-account flash, everything one account.
+      await fetch('/api/meta/reaudit', { method: 'POST' }).catch(() => {})
     } catch { /* best-effort */ }
     setBusy(false)
     load(sel, range)
@@ -91,7 +95,9 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       // SELF-HEAL a stale nightly: if the stored audit is a DIFFERENT currency than the resolved
       // primary (the €86 ↔ $687k drift, before tonight's re-audit overwrites it), correct the display
       // with one live call so the brief matches /campaigns immediately. Same-currency → no call.
-      if (initial?.currency && p.currency && initial.currency !== p.currency) load(p.accountId)
+      // `healing` blanks the numbers while we fetch, so the founder never READS the wrong figures
+      // (the flash they reported) — they just see a brief loading, then the right ones.
+      if (initial?.currency && p.currency && initial.currency !== p.currency) { setHealing(true); load(p.accountId) }
     }).catch(() => {})
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -152,25 +158,29 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
                 {busy ? 'refreshing…' : '↻ refresh'}
               </button>
             </div>
-            <div style={{ fontSize: 16.5, fontWeight: 750, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3, marginTop: 8, maxWidth: 460 }}>{headline(d).replace(/\.+$/, '')}</div>
+            <div style={{ fontSize: 16.5, fontWeight: 750, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3, marginTop: 8, maxWidth: 460 }}>{healing ? 'Loading your account…' : headline(d).replace(/\.+$/, '')}</div>
           </div>
-          <div style={{ display: 'flex', gap: 20, flexShrink: 0, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 20, flexShrink: 0, flexWrap: 'wrap', opacity: healing ? 0.45 : 1, transition: 'opacity .2s' }}>
             {/* SPEND TODAY — the live pulse, lime + labeled */}
-            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: LIME }}>{typeof d.spendToday === 'number' ? money(d.spendToday) : '—'}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spent today</div></div>
-            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{money(d.spend)}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spend · {RANGE_LABEL[range] || '30d'}</div></div>
-            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: d.avgRoas >= 1 ? LIME : '#f0a19a' }}>{d.avgRoas}x</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>avg ROAS</div></div>
-            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{d.total}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>campaigns</div></div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: LIME }}>{healing ? '—' : (typeof d.spendToday === 'number' ? money(d.spendToday) : '—')}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spent today</div></div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{healing ? '—' : money(d.spend)}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spend · {RANGE_LABEL[range] || '30d'}</div></div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: d.avgRoas >= 1 ? LIME : '#f0a19a' }}>{healing ? '—' : `${d.avgRoas}x`}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>avg ROAS</div></div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{healing ? '—' : d.total}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>campaigns</div></div>
           </div>
         </div>
       </div>
       {/* buckets */}
       <div style={{ padding: '18px 24px', display: 'flex', gap: 26, flexWrap: 'wrap' }}>
+        {healing ? (
+          <div style={{ fontSize: 14, color: MUTED }}>Loading the right account…</div>
+        ) : (<>
         <Bucket label="Scale" color="#2f7d3a" dot={GREEN} rows={d.scale} suffix={(c) => `${c.roas}x`} />
         <Bucket label="Watch" color="#9a6a12" dot="#e0a72e" rows={d.watch} suffix={(c) => `${money(c.spend)} · ${c.roas}x`} />
         <Bucket label="Pause" color="#a5342c" dot="#d0453a" rows={d.pause} suffix={(c) => `${money(c.spend)} · ${c.conversions} conv`} />
         {!d.scale.length && !d.watch.length && !d.pause.length && (
           <div style={{ fontSize: 14, color: MUTED }}>Everything’s steady — no campaign needs a move today.</div>
         )}
+        </>)}
       </div>
 
       {/* Top ads — Polsia-style compact table: thumbnail · spend · impressions · clicks · CTR · CPC */}
