@@ -51,8 +51,10 @@ const B = ({ children, c }: { children: React.ReactNode; c?: string }) => <b sty
 
 function Thumb({ src, size = 44, ring }: { src?: string; size?: number; ring?: string }) {
   return (
-    <span style={{ width: size, height: size, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: '#f0f4ee', display: 'block', boxShadow: ring ? `0 0 0 2px ${ring}` : undefined }}>
-      {src ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} /> : null}
+    <span style={{ width: size, height: size, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: '#eef2ec', display: 'grid', placeItems: 'center', boxShadow: ring ? `0 0 0 2px ${ring}` : undefined }}>
+      {src
+        ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none'; e.target.parentNode.dataset.fallback = '1' }} />
+        : <span style={{ fontSize: size * 0.4, opacity: .5 }}>🎬</span>}
     </span>
   )
 }
@@ -135,7 +137,8 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
   const profit = m.revenue - m.spend
   const maxHourRev = Math.max(...m.hours.map(h => h.revenue), 1)
   const maxDayRev = Math.max(...m.dailies.map(d => d.revenue), 1)
-  const heat = (v: number, max: number) => `rgba(63,143,79,${(0.08 + clamp(v / max) * 0.85).toFixed(2)})`
+  // Cap the tint so dark text ALWAYS reads on top (was going to ~0.93 → green-on-dark-green, unreadable).
+  const heat = (v: number, max: number) => `rgba(63,143,79,${(0.05 + clamp(v / max) * 0.40).toFixed(2)})`
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -154,6 +157,9 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
       {/* ── 02 · HEALTH ── */}
       <Section n={2} question="Account health" tone={m.healthTone}
         answer={<>The account is <B c={m.healthTone}>{m.healthWord}</B>{m.wastedSpend > 0 && <> — {fmt(m.wastedSpend)} of spend sits in ads returning under 1x.</>}</>}>
+        <div style={{ fontSize: 12.5, color: MUTED, marginTop: -6, marginBottom: 14, lineHeight: 1.5, maxWidth: 640 }}>
+          A single <B>0–100 grade</B> of the account, blended from the four scores below — higher is healthier.
+        </div>
         <div style={{ display: 'flex', gap: 26, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* score ring */}
           <div style={{ position: 'relative', width: 108, height: 108, flexShrink: 0 }}>
@@ -267,13 +273,13 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
               ))}
             </div>
           )}
-          {/* gender split */}
-          {m.genders.length > 1 && (
-            <div style={{ display: 'flex', height: 34, borderRadius: 10, overflow: 'hidden', marginTop: 10, gap: 2 }}>
-              {m.genders.map((g, i) => (
-                <div key={i} style={{ flexGrow: Math.max(g.revenue, 0.01), flexBasis: 0, background: g.label === 'female' ? '#b56576' : g.label === 'male' ? '#5b7c99' : '#a8b0a6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 70 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 800, color: '#fff', textTransform: 'capitalize' }}>{g.label}</span>
-                  <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,.85)' }}>{fmt(g.revenue)} · {g.roas.toFixed(1)}x</span>
+          {/* gender split — only segments that actually earned; label wraps so nothing clips */}
+          {m.genders.filter(g => g.revenue > 0).length > 1 && (
+            <div style={{ display: 'flex', height: 40, borderRadius: 10, overflow: 'hidden', marginTop: 10, gap: 2 }}>
+              {m.genders.filter(g => g.revenue > 0).map((g, i) => (
+                <div key={i} style={{ flexGrow: Math.max(g.revenue, 0.01), flexBasis: 0, background: g.label === 'female' ? '#b56576' : g.label === 'male' ? '#5b7c99' : '#8a938a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 96, padding: '0 6px', overflow: 'hidden' }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 800, color: '#fff', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>{g.label} · {g.roas.toFixed(1)}x</span>
+                  <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,.9)', whiteSpace: 'nowrap' }}>{fmt(g.revenue)}</span>
                 </div>
               ))}
             </div>
@@ -289,14 +295,14 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
             {m.placements.slice(0, 6).map((p, i) => {
               const maxR = Math.max(...m.placements.map(x => x.roas), 1)
               return (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 220px) 1fr auto', gap: 12, alignItems: 'center' }}>
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 210px) 1fr 52px 60px', gap: 12, alignItems: 'center' }}>
                   <span style={{ fontSize: 12.5, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.label}</span>
-                  <div style={{ height: 20, background: '#f0f3ee', borderRadius: 6, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${clamp(p.roas / maxR) * 100}%`, background: roasColor(p.roas), opacity: .85, borderRadius: 6, display: 'flex', alignItems: 'center', paddingLeft: 8 }}>
-                      <span style={{ fontSize: 10.5, fontWeight: 800, color: '#fff' }}>{p.roas.toFixed(1)}x</span>
-                    </div>
+                  {/* bar only — the value lives in its own column so it's never clipped */}
+                  <div style={{ height: 14, background: '#f0f3ee', borderRadius: 6, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.max(clamp(p.roas / maxR) * 100, p.roas > 0 ? 3 : 0)}%`, background: roasColor(p.roas), opacity: .9, borderRadius: 6 }} />
                   </div>
-                  <span style={{ fontSize: 11.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{fmt(p.spend)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: roasColor(p.roas), fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{p.roas.toFixed(1)}x</span>
+                  <span style={{ fontSize: 11.5, color: MUTED, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{fmt(p.spend)}</span>
                 </div>
               )
             })}
