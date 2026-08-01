@@ -182,3 +182,38 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
 
   return audit
 }
+
+/**
+ * Fast, read-only audit of ONE account for the brief card's switcher: grades from the already-synced
+ * DB (no Graph sync, no writes), lists all connected accounts for the dropdown, and fetches TODAY's
+ * account-level spend with a single live Graph call. Returns everything the card needs to switch instantly.
+ */
+export async function auditAccount(admin: any, userId: string, accountId?: string) {
+  const { data: accounts } = await admin.from('meta_accounts')
+    .select('id,account_id,account_name,currency,is_primary,access_token')
+    .eq('user_id', userId).eq('status', 'active').order('is_primary', { ascending: false })
+  if (!accounts?.length) return null
+  const acct = (accountId ? accounts.find((a: any) => a.account_id === accountId) : null) || accounts.find((a: any) => a.is_primary) || accounts[0]
+
+  const { data: campaigns } = await admin.from('campaigns')
+    .select('id,name,meta_campaign_id,status,daily_budget,campaign_insights(*)')
+    .eq('user_id', userId).eq('meta_account_id', acct.id)
+  const audit = campaigns?.length ? grade(campaigns) : { total: 0, spend: 0, avgRoas: 0, scale: [] as Graded[], watch: [] as Graded[], pause: [] as Graded[] }
+
+  // Today's account-level spend — one quick live call (this is the "Spend today" figure).
+  let spendToday = 0
+  try {
+    const token = decryptToken(acct.access_token)
+    const j = await graph(`act_${acct.account_id}/insights?fields=spend&date_preset=today&level=account`, token)
+    spendToday = Number(j?.data?.[0]?.spend || 0)
+  } catch { /* today's spend is best-effort */ }
+
+  const slim = (x: Graded) => ({ name: x.name, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })
+  return {
+    accounts: accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })),
+    selected: acct.account_id, currency: acct.currency || 'USD', accountName: acct.account_name || null,
+    total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, spendToday: Math.round(spendToday),
+    counts: { scale: audit.scale.length, watch: audit.watch.length, pause: audit.pause.length },
+    scale: audit.scale.slice(0, 3).map(slim), watch: audit.watch.slice(0, 3).map(slim), pause: audit.pause.slice(0, 3).map(slim),
+  }
+}

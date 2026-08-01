@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
 import MelloTasks from './MelloTasks'
+import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
@@ -195,55 +196,11 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             <MelloTasks brandId={activeBrandId} />
           </div>
 
-          {/* ── Facebook Ads — the money card. When the ad account is CONNECTED and Mello has audited it,
-              show real ROAS/spend + who to scale/pause. Otherwise fall back to the connect-and-run promo. ── */}
-          {metaAds?.metaAudit ? (() => {
-            const m = metaAds.metaAudit!
-            const money = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: m.currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()}` } }
-            const Bucket = ({ label, color, dot, rows, suffix }: { label: string; color: string; dot: string; rows: MetaCampaign[]; suffix: (c: MetaCampaign) => string }) => (
-              rows.length ? (
-                <div style={{ flex: '1 1 200px', minWidth: 190 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color, marginBottom: 8 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />{label} · {rows.length}
-                  </div>
-                  {rows.slice(0, 3).map((c, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, padding: '5px 0', borderTop: i ? `1px solid ${LINE}` : 'none' }}>
-                      <span style={{ fontSize: 13, fontWeight: 650, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>{c.name}</span>
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap' }}>{suffix(c)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null
-            )
-            return (
-              <div className="bsx-e" style={{ ...card, marginBottom: 24, overflow: 'hidden', animationDelay: '.34s' }}>
-                {/* dark header strip — the numbers that matter, at a glance */}
-                <div style={{ background: FOREST, padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#9db29a' }}>Your Facebook Ads · last 14 days</div>
-                    <div style={{ fontSize: 16.5, fontWeight: 750, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3, marginTop: 4, maxWidth: 460 }}>{metaAds.title.replace(/\.+$/, '')}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 22, flexShrink: 0 }}>
-                    <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{money(m.spend)}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spend</div></div>
-                    <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: LIME }}>{m.avgRoas}x</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>avg ROAS</div></div>
-                    <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{m.total}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>campaigns</div></div>
-                  </div>
-                </div>
-                {/* buckets — scale / watch / pause, only those with entries */}
-                <div style={{ padding: '18px 24px', display: 'flex', gap: 26, flexWrap: 'wrap' }}>
-                  <Bucket label="Scale" color="#2f7d3a" dot={GREEN} rows={m.scale} suffix={(c) => `${c.roas}x`} />
-                  <Bucket label="Watch" color="#9a6a12" dot="#e0a72e" rows={m.watch} suffix={(c) => `${money(c.spend)} · ${c.roas}x`} />
-                  <Bucket label="Pause" color="#a5342c" dot="#d0453a" rows={m.pause} suffix={(c) => `${money(c.spend)} · ${c.conversions} conv`} />
-                  {!m.scale.length && !m.watch.length && !m.pause.length && (
-                    <div style={{ ...body, fontSize: 14 }}>Everything's steady — no campaign needs a move today.</div>
-                  )}
-                </div>
-                <div style={{ padding: '0 24px 18px' }}>
-                  <Link href={metaAds.cta_href || '/m4'} onClick={() => onAct(metaAds)} style={{ display: 'inline-block', background: FOREST, color: LIME, borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>{metaAds.cta_label || 'See the full audit'} →</Link>
-                </div>
-              </div>
-            )
-          })() : (
+          {/* ── Facebook Ads — the money card (its own component: account switcher + spend today, fetched
+              live). When connected + audited, show it; otherwise the connect-and-run promo. ── */}
+          {metaAds?.metaAudit ? (
+            <FacebookAdsCard initial={metaAds.metaAudit as any} ctaHref={metaAds.cta_href || '/reports'} ctaLabel={metaAds.cta_label || 'See the full report'} onAct={() => onAct(metaAds)} />
+          ) : (
             <div className="bsx-e" style={{ ...card, background: FOREST, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', animationDelay: '.34s' }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3 }}>Run your ads on Meta</div>
