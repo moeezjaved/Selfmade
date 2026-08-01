@@ -436,14 +436,16 @@ export async function GET(request: NextRequest) {
     if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
     else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
     else if (sort === 'recent') baseQuery = baseQuery.order('last_seen', { ascending: false })
-    // 'Newest' = most recently added to our index (first-seen). Orders by indexed_at DESC — served
-    // straight from the dedicated (indexed_at DESC) index (idx_ads_indexed_at, mig 016/020), so it's
-    // instant AND correct. Earlier attempts failed the whole feed: start_date DESC had no index over
-    // the has-creative set (→ 57014 "index was busy") AND bad values (oldest floating up); days_running
-    // ASC had no covering index for the full-corpus sort either (→ 504 gateway timeout, whole feed on
-    // skeletons). indexed_at is a high-cardinality timestamp (near-unique) so the ad_id tiebreak below
-    // never explodes, and first-seen recency is exactly what a spy feed's "Newest" should surface.
-    else if (sort === 'newest') baseQuery = baseQuery.order('indexed_at', { ascending: false, nullsFirst: false })
+    // 'Newest' = fewest days running (launched most recently). Orders by days_running ASC, ad_id —
+    // covered EXACTLY by the partial index dai_hascre_days_running (days_running, ad_id) WHERE
+    // has_creative (migration 130), so over the has-creative feed it's a pure index scan: instant even
+    // under rollup/drain write load. Empirically every OTHER recency order over WHERE has_creative
+    // wades or full-sorts (indexed_at DESC / start_date DESC / last_seen DESC all 20-60s → the "index
+    // was busy" banner and skeleton grid) because the freshest ads are the un-drained ones with no
+    // creative. days_running ASC is also the SAME column the "last N days" filter (.lte below) keys
+    // off, so one index serves both. The recency-heavy guard below fails this fast (not a 60s hang) if
+    // the index isn't applied yet.
+    else if (sort === 'newest') baseQuery = baseQuery.order('days_running', { ascending: true, nullsFirst: false })
     else if (sort === 'performance') baseQuery = baseQuery.order('performance_score', { ascending: false }).order('is_active', { ascending: false })
     else if (sort === 'most_used') baseQuery = baseQuery.order('creative_reuse_count', { ascending: false })
     else if (sort === 'latest_added') baseQuery = baseQuery.order('indexed_at', { ascending: false })
@@ -540,11 +542,25 @@ export async function GET(request: NextRequest) {
       if (kwErr) { keywordData = null; kwErr = null }
     }
     if (!usedRpc) {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const r = await baseQuery
+      // RECENCY-HEAVY GUARD — a Newest sort or a "last N days" filter keys off days_running, which is a
+      // pure index scan ONCE migration 130 (dai_hascre_days_running) is applied, but a 20-60s wade/
+      // full-sort BEFORE it is. So cap those queries: race against ~9s and, on the cap, return the
+      // graceful "index busy, try again" empty (the client already renders it) instead of leaving the
+      // grid on skeletons for a minute or 504-ing. Non-recency sorts (perf_score/recommended) are index-
+      // backed and fast, so they keep the normal 57014 retry loop.
+      const recencyHeavy = sort === 'newest' || days > 0
+      const cap = <T,>(p: PromiseLike<T>, ms: number): Promise<any> =>
+        Promise.race([p, new Promise(res => setTimeout(() => res({ data: null, error: { code: '57014', message: 'recency_cap' }, count: null }), ms))])
+      if (recencyHeavy) {
+        const r = await cap(baseQuery, 9000)
         keywordData = r.data; kwErr = r.error; kwCount = r.count
-        if (!kwErr || kwErr.code !== '57014') break
-        await new Promise(res => setTimeout(res, 180))
+      } else {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const r = await baseQuery
+          keywordData = r.data; kwErr = r.error; kwCount = r.count
+          if (!kwErr || kwErr.code !== '57014') break
+          await new Promise(res => setTimeout(res, 180))
+        }
       }
     }
 
