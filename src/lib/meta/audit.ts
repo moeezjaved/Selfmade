@@ -17,6 +17,22 @@ import { cacheGet, cacheSet } from '@/lib/meta/cache'
 const V = process.env.META_API_VERSION || 'v20.0'
 const G = `https://graph.facebook.com/${V}`
 
+/**
+ * Resolve the ONE primary account, DETERMINISTICALLY. The bug this kills: when more than one row is
+ * flagged is_primary (data drift from re-connects), `accounts.find(is_primary)` returned different
+ * accounts to the nightly audit vs the live refresh — so the brief card flipped between a small EUR
+ * account (€86) and a big USD one ($687k) on the same "primary" label. A total sort (is_primary, then
+ * most-recently-synced, then account_id) makes every code path pick the SAME account every time.
+ */
+export function resolvePrimary(accounts: any[]): any {
+  return [...accounts].sort((a, b) =>
+    (Number(!!b.is_primary) - Number(!!a.is_primary)) ||
+    String(b.last_synced_at || '').localeCompare(String(a.last_synced_at || '')) ||
+    String(a.account_id || '').localeCompare(String(b.account_id || ''))
+  )[0]
+}
+const sameAcct = (a?: string, b?: string) => String(a || '').replace(/^act_/, '') === String(b || '').replace(/^act_/, '')
+
 type Graded = { campaignId: string; metaCampaignId: string; name: string; grade: 'graduate' | 'catchy' | 'pause' | 'hold'; spend: number; roas: number; ctr: number; conversions: number; dailyBudget: number | null }
 export type AuditResult = {
   total: number; spend: number; avgRoas: number
@@ -121,7 +137,7 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
   // SCOPE TO THE PRIMARY ACCOUNT. Summing spend across accounts in different currencies (EUR+HKD+PKR+
   // USD) produced a meaningless mega-number in the brief. The brief card shows ONE account — the
   // primary, same one Reports defaults to — so the figures match and the currency is real.
-  const primary = accounts.find((a: any) => a.is_primary) || accounts[0]
+  const primary = resolvePrimary(accounts)
   const cur = primary?.currency || 'USD'
   const money = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()} ${cur}` } }
 
@@ -206,10 +222,13 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
   const cached = cacheGet(cacheKey)
   if (cached) return cached
   const { data: accounts } = await admin.from('meta_accounts')
-    .select('id,account_id,account_name,currency,is_primary,access_token')
+    .select('id,account_id,account_name,currency,is_primary,last_synced_at,access_token')
     .eq('user_id', userId).eq('status', 'active').order('is_primary', { ascending: false })
   if (!accounts?.length) return null
-  const acct = (accountId ? accounts.find((a: any) => a.account_id === accountId) : null) || accounts.find((a: any) => a.is_primary) || accounts[0]
+  // Match the requested account tolerantly (act_ prefix drift); otherwise the DETERMINISTIC primary
+  // (same resolver the nightly audit uses) — never a silent fall to a random account with a different
+  // currency, which is what made the card flip €86 ↔ $687k under one "primary" label.
+  const acct = (accountId ? accounts.find((a: any) => sameAcct(a.account_id, accountId)) : null) || resolvePrimary(accounts)
 
   const token = (() => { try { return decryptToken(acct.access_token) } catch { return '' } })()
 

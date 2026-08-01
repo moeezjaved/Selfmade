@@ -48,9 +48,16 @@ export default function BriefOpportunities({ initial, onAct, accountId }: { init
       .finally(() => { setBusy(false); setLoaded(true) })
   }
 
-  // Follow the Facebook card's account switch. The stored `initial` cards are for the primary account;
-  // when the founder flips to another account, refetch these for THAT account so every number on the
-  // brief speaks one currency. Skips the very first value (mount → primary, already matches `initial`).
+  // Show the moves by DEFAULT, not behind a click. If the nightly audit already stored them
+  // (`initial`), they render instantly with zero calls; if not, pull them once on mount (the endpoint
+  // is cached server-side, so repeat brief loads don't re-hit Meta). This is the bridge until every
+  // nightly run stores them — the founder should never see an empty "pull it yourself" prompt.
+  useEffect(() => {
+    if (!hasInitial) load(accountId || undefined)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Follow the Facebook card's account switch so every number on the brief speaks one currency.
+  // Skips the very first value (mount → primary, already matches `initial` / the mount load above).
   const firstScope = useRef(true)
   useEffect(() => {
     if (firstScope.current) { firstScope.current = false; return }
