@@ -1,5 +1,6 @@
 'use client'
 import MetaGate from '@/components/MetaGate'
+import AdsTabs from '@/components/ads/AdsTabs'
 /**
  * /leaderboard — week-over-week creative leaderboard. Two sections:
  *  1) Performance shifts — Scaling / Declining / Newly launched / Recently paused pill tabs, each a
@@ -102,6 +103,7 @@ function LeaderboardPage() {
 
   return (
     <div style={{ padding: 28, maxWidth: 1080, margin: '0 auto', fontFamily: FONT, color: G12 }}>
+      <AdsTabs />
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: G11, marginBottom: 4 }}>
         <span>Leaderboard</span>

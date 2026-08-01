@@ -1,5 +1,6 @@
 'use client'
 import MetaGate from '@/components/MetaGate'
+import AdsTabs from '@/components/ads/AdsTabs'
 /**
  * /snapshots — the archive of "Share once" snapshots: frozen, point-in-time, shareable copies of a
  * report's data. Created via Share report → Share once (NOT Save, which updates the live report).
@@ -31,6 +32,7 @@ function SnapshotsPage() {
 
   return (
     <div style={{ padding: 28, maxWidth: 900, margin: '0 auto', fontFamily: FONT, color: G12 }}>
+      <AdsTabs />
       <div style={{ fontSize: 12.5, color: G11, marginBottom: 4 }}>Snapshots</div>
       <h1 style={{ fontSize: 24, lineHeight: '29px', fontWeight: 600, letterSpacing: '-0.019em', margin: 0 }}>Snapshots</h1>
       <div style={{ fontSize: 14, color: G11, marginTop: 4, marginBottom: 28 }}>Saved, sharable, static versions of your reports.</div>
