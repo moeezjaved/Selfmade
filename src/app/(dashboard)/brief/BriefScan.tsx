@@ -212,8 +212,8 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
           {/* ── Facebook Ads — the money card (its own component: account switcher + spend today, fetched
               live). When connected + audited, show it; otherwise the connect-and-run promo. ── */}
           {metaAds?.metaAudit ? (
-            {/* The audit CTA ALWAYS opens Reports (the full overnight debrief) — never M4. A stale
-                brief_event can still carry an old '/m4' href, so we pin it here. */}
+            // The audit CTA ALWAYS opens Reports (the full overnight debrief) — never M4. A stale
+            // brief_event can still carry an old '/m4' href, so we pin it here.
             <FacebookAdsCard initial={metaAds.metaAudit as any} ctaHref="/reports" ctaLabel="See the full report" onAct={() => onAct(metaAds)} onAccountChange={(acctId) => setAcctScope(acctId)} />
           ) : (
             <div className="bsx-e" style={{ ...card, background: FOREST, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', animationDelay: '.34s' }}>
