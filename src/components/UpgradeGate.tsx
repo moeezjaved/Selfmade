@@ -10,11 +10,13 @@ import { planEntitlements, firstPlanWith, PLANS, type PlanEntitlements, type Pla
 
 const DARK = '#14281a', LIME = '#dffe95', ACCENT = '#3a7000'
 
+// One-plan model: every gated feature unlocks on Creator ($49). Perks describe what Creator turns on.
+const CREATOR_PERKS = ['The full Meta cockpit — Launch, Campaigns, Scale & Insights', 'Winning-ad Patterns & AI Insights + Ask Mello', '10 video ads/mo + free unlimited image ads', 'Deep reports, exports & API access']
 const PERKS: Record<string, string[]> = {
-  aiInsights: ['Winning-ad Patterns & AI Insights', '50 tracked brands in Brand Spy', '500 monthly credits', 'Ask Mello + API access'],
-  launch: ['Launch ads with the M4 method', 'Patterns & AI Insights', '500 monthly credits', '3 team seats'],
-  campaigns: ['Campaign manager + Scale & Insights', 'Deep reports & exports', '2,000 monthly credits', '10 team seats'],
-  api: ['API / MCP access', 'Patterns & AI Insights', '500 monthly credits'],
+  aiInsights: CREATOR_PERKS,
+  launch: CREATOR_PERKS,
+  campaigns: CREATOR_PERKS,
+  api: CREATOR_PERKS,
 }
 
 export default function UpgradeGate({ feature, name, children }: {

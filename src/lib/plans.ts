@@ -47,12 +47,14 @@ export const PLANS: Record<PlanId, PlanEntitlements> = {
     aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: true,
     teamBoards: false, assetsGb: 0.5, videosPerMonth: 0, imagesUnlimited: false,
   },
-  // "Creator" — the everyday plan. 6,000 cr = 10 video ads/mo; image ads free + unlimited.
+  // "Creator" — the ONLY paid plan now (one-plan model, 2026-08-01). It unlocks the whole app:
+  // Patterns/AI Insights, Launch (M4), Campaigns/Scale & Insights, API — the Meta cockpit included.
+  // 6,000 cr = 10 video ads/mo; image ads free + unlimited.
   starter: {
     label: 'Creator', priceMonthly: 49, priceAnnualMonthly: 49,
     monthlyCredits: 6000, seats: 1, brandSpy: 15, expressPulls: 15, discoveryPages: null,
-    aiInsights: false, launch: false, campaigns: false, api: false, exports: true, canBuyCredits: true,
-    teamBoards: false, assetsGb: 5, videosPerMonth: 10, imagesUnlimited: false, mostPopular: true,
+    aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
+    teamBoards: true, assetsGb: 5, videosPerMonth: 10, imagesUnlimited: false, mostPopular: true,
   },
   // Legacy 'pro' — kept valid for any existing subscriber, HIDDEN from the pricing page.
   pro: {
@@ -76,16 +78,18 @@ export const PLANS: Record<PlanId, PlanEntitlements> = {
   },
 }
 
-// Order for upsell math. 'pro' is intentionally OUT (hidden legacy) so nextPlan(Creator) → Agency.
-export const PLAN_ORDER: PlanId[] = ['free', 'starter', 'business', 'enterprise']
+// Order for upsell math. ONE-PLAN model (2026-08-01): only Free → Creator. 'pro'/'business'(Agency)/
+// 'enterprise' stay valid tiers in PLANS (legacy subscribers keep their entitlements) but are OUT of
+// the ladder, so nothing ever upsells to "Agency" and firstPlanWith() resolves gated features to Creator.
+export const PLAN_ORDER: PlanId[] = ['free', 'starter']
 
 /** Plans whose image remakes are free + unlimited (subscribers). Used by reserveCredits. */
 export function imagesAreFree(planId?: string | null): boolean {
   return !!PLANS[normalizePlan(planId)]?.imagesUnlimited
 }
 
-/** The paid plans shown on the pricing page, in order (skips Free, hidden 'pro', and Enterprise card). */
-export const PRICING_PLANS: PlanId[] = ['starter', 'business']
+/** The paid plans shown on the pricing page. One-plan model → just Creator. */
+export const PRICING_PLANS: PlanId[] = ['starter']
 
 /** Map any legacy/unknown plan id to a valid PlanId (trial→free, core→starter, plus→pro). */
 export function normalizePlan(id?: string | null): PlanId {
