@@ -22,6 +22,7 @@ import Link from 'next/link'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
 import MelloTasks from './MelloTasks'
 import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
+import BriefOpportunities from '@/components/brief/BriefOpportunities'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
@@ -209,6 +210,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
               <Link href="/m4" style={{ flexShrink: 0, background: LIME, color: FOREST, borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Run ads →</Link>
             </div>
           )}
+
+          {/* ── What Mello would do — the ranked action cards, same engine as Reports. Renders only when
+              there's a connected/active ad account with opportunities; otherwise nothing. ── */}
+          <BriefOpportunities />
 
           {/* ── Also today — the one runner-up, a quiet row. ── */}
           {second && (

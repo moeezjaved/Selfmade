@@ -22,6 +22,7 @@
  */
 import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { computeOpportunities, oppColor } from '@/lib/meta/opportunities'
 
 const INK = '#17251c', MUTED = '#6f7d70', FAINT = '#9aa79a', LINE = '#e9ece7', FOREST = '#17251c', LIME = '#dffe95'
 const SERIF = "'Instrument Serif', Georgia, serif"
@@ -108,27 +109,16 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
     const healthWord = health >= 75 ? 'in great shape' : health >= 55 ? 'healthy, with leaks to plug' : health >= 35 ? 'needs attention' : 'at risk'
     const healthTone = health >= 75 ? good : health >= 55 ? '#5b8f3e' : health >= 35 ? warn : bad
 
-    // Opportunity cards — deterministic rules, each with an expected impact in currency.
-    const recs: { title: string; why: string; impact: string; level: 1 | 2 | 3; href: string; cta: string; tone: string }[] = []
-    const daysN = Math.max(1, days)
-    if (losers[0]) {
-      const monthly = (losers[0].spend / daysN) * 30 * (1 - losers[0].roas)
-      recs.push({ title: `Pause “${losers[0].label}”`, why: `${fmt(losers[0].spend)} spent → ${losers[0].roas.toFixed(2)}x. Every day it runs, money leaks.`, impact: `saves ~${fmt(monthly)}/mo`, level: losers[0].spend > spend * 0.15 ? 3 : 2, href: '/campaigns', cta: 'Pause it', tone: bad })
-    }
-    if (winners[0] && winners[0].roas >= 1.5) {
-      const extra = (winners[0].spend / daysN) * 30 * 0.2 * winners[0].roas
-      recs.push({ title: `Scale “${winners[0].label}” +20%`, why: `${winners[0].roas.toFixed(2)}x vs ${roas.toFixed(2)}x account average — your proven winner has room.`, impact: `~+${fmt(extra)}/mo revenue`, level: winners[0].conversions >= 5 ? 3 : 2, href: '/campaigns', cta: 'Scale it', tone: good })
-    }
-    if (bestPl && worstPl && bestPl.label !== worstPl.label && bestPl.roas > worstPl.roas * 1.5) {
-      const shift = worstPl.spend * 0.5
-      recs.push({ title: `Shift budget ${worstPl.label} → ${bestPl.label}`, why: `${bestPl.label} returns ${bestPl.roas.toFixed(1)}x; ${worstPl.label} only ${worstPl.roas.toFixed(1)}x on ${fmt(worstPl.spend)}.`, impact: `~+${fmt(shift * (bestPl.roas - worstPl.roas) / daysN * 30)}/mo`, level: 2, href: '/campaigns', cta: 'Review placements', tone: warn })
-    }
-    if (bestAge && bestGender && spend > 0) {
-      recs.push({ title: `Lean into ${bestGender.label === 'female' ? 'women' : bestGender.label === 'male' ? 'men' : bestGender.label} ${bestAge.label}`, why: `Your highest-revenue segment. Tightening targeting cuts wasted reach.`, impact: 'lower CPA', level: conv >= 10 ? 2 : 1, href: '/m4', cta: 'Target them', tone: good })
-    }
-    if (winners[0]) {
-      recs.push({ title: `Make 3 variations of “${winners[0].label}”`, why: `Winners fatigue. Variations of a proven ad beat cold new concepts.`, impact: 'extends the winner', level: 2, href: '/creative-studio?studio=1', cta: 'Create in Studio', tone: good })
-    }
+    // Opportunity cards — "What Mello would do", from the shared engine (same cards on the brief).
+    const recs = computeOpportunities({
+      roas, spend, conv, days,
+      winners: winners.map(w => ({ label: w.label || w.name || 'ad', roas: w.roas, spend: w.spend, conversions: w.conversions })),
+      losers: losers.map(w => ({ label: w.label || w.name || 'ad', roas: w.roas, spend: w.spend, conversions: w.conversions })),
+      bestPl: bestPl ? { label: bestPl.label || '', roas: bestPl.roas, spend: bestPl.spend } : null,
+      worstPl: worstPl ? { label: worstPl.label || '', roas: worstPl.roas, spend: worstPl.spend } : null,
+      bestAge: bestAge ? { label: bestAge.label || '', roas: bestAge.roas } : null,
+      bestGender: bestGender ? { label: bestGender.label || '' } : null,
+    }, fmt)
 
     return { spend, revenue, roas, conv, creatives, byRoas, winners, losers, placements: [...placements].sort((a, b) => b.roas - a.roas), ages, genders, hours, dailies, bestPl, worstPl, bestAge, bestGender, bestDay, bestHour, health, healthWord, healthTone, efficiency, returns, resilience, attention, wastedSpend, recs }
   }, [data, days])   // eslint-disable-line react-hooks/exhaustive-deps
@@ -325,11 +315,11 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
           answer={<>The {m.recs.length} moves that matter, ranked by impact — each with what it's worth and how sure I am.</>}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(290px,100%), 1fr))', gap: 12 }}>
             {(showAllRecs ? m.recs : m.recs.slice(0, 3)).map((r, i) => (
-              <div key={i} style={{ border: `1px solid ${LINE}`, borderLeft: `3px solid ${r.tone}`, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div key={i} style={{ border: `1px solid ${LINE}`, borderLeft: `3px solid ${oppColor(r.tone)}`, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ fontSize: 14, fontWeight: 750, color: INK, letterSpacing: '-.01em' }}>{r.title}</div>
                 <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.5, flex: 1 }}>{r.why}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, color: r.tone }}>{r.impact}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: oppColor(r.tone) }}>{r.impact}</span>
                   <Confidence level={r.level} />
                 </div>
                 <Link href={r.href} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>
