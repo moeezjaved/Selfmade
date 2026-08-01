@@ -11,13 +11,16 @@ import Link from 'next/link'
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
 type Camp = { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }
+type Ad = { adId: string; name: string; spend: number; impressions: number; clicks: number; ctr: number; cpc: number; roas: number; conversions: number; thumbnail_url?: string | null; preview_url?: string | null }
 type Summary = {
   accounts?: { accountId: string; name: string; currency: string; isPrimary: boolean }[]
-  selected?: string; currency?: string; accountName?: string | null
+  selected?: string; currency?: string; accountName?: string | null; range?: string
   total: number; spend: number; avgRoas: number; spendToday?: number
   counts?: { scale: number; watch: number; pause: number }
-  scale: Camp[]; watch: Camp[]; pause: Camp[]
+  scale: Camp[]; watch: Camp[]; pause: Camp[]; ads?: Ad[]
 }
+
+const RANGE_LABEL: Record<string, string> = { last_3d: '3d', last_7d: '7d', last_14d: '14d', last_30d: '30d' }
 
 const headline = (d: Summary) => {
   const c = d.counts || { scale: d.scale.length, watch: d.watch.length, pause: d.pause.length }
@@ -34,16 +37,21 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   const [d, setD] = useState<Summary>(initial)
   const [accounts, setAccounts] = useState<Summary['accounts']>([])
   const [sel, setSel] = useState<string>('')
+  const [range, setRange] = useState<string>('last_30d')   // default: 30 days
   const [busy, setBusy] = useState(false)
 
-  const load = (accountId?: string) => {
+  const load = (accountId?: string, r: string = range) => {
     setBusy(true)
-    fetch(`/api/meta/audit-summary${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`, { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null)
+    const qs = new URLSearchParams()
+    if (accountId) qs.set('accountId', accountId)
+    qs.set('range', r)
+    fetch(`/api/meta/audit-summary?${qs.toString()}`, { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : null)
       .then(j => {
         if (!j || j.error) return
         if (Array.isArray(j.accounts)) setAccounts(j.accounts)
         if (j.selected) setSel(j.selected)
+        if (j.range) setRange(j.range)
         if (typeof j.total === 'number') setD(j)
       })
       .catch(() => {})
@@ -85,6 +93,15 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
                   {accounts.map(a => <option key={a.accountId} value={a.accountId} style={{ color: '#111' }}>{a.name}{a.isPrimary ? ' ·  primary' : ''}</option>)}
                 </select>
               ) : (d.accountName ? <span style={{ fontSize: 12, fontWeight: 700, color: '#cbd7c6', background: 'rgba(255,255,255,.08)', borderRadius: 100, padding: '3px 10px' }}>{d.accountName}</span> : null)}
+              {/* day-range picker — default 30d */}
+              <span style={{ display: 'inline-flex', gap: 2, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: 2 }}>
+                {['last_3d', 'last_7d', 'last_14d', 'last_30d'].map(r => (
+                  <button key={r} onClick={() => { setRange(r); load(sel || undefined, r) }} disabled={busy}
+                    style={{ border: 'none', borderRadius: 100, padding: '3px 9px', fontSize: 11.5, fontWeight: 750, fontFamily: 'inherit', cursor: 'pointer', background: range === r ? LIME : 'transparent', color: range === r ? FOREST : '#cbd7c6' }}>
+                    {RANGE_LABEL[r]}
+                  </button>
+                ))}
+              </span>
               {busy && <span style={{ fontSize: 11, color: '#9db29a' }}>updating…</span>}
             </div>
             <div style={{ fontSize: 16.5, fontWeight: 750, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3, marginTop: 8, maxWidth: 460 }}>{headline(d).replace(/\.+$/, '')}</div>
@@ -92,7 +109,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
           <div style={{ display: 'flex', gap: 20, flexShrink: 0, flexWrap: 'wrap' }}>
             {/* SPEND TODAY — the live pulse, lime + labeled */}
             <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: LIME }}>{money(d.spendToday || 0)}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spent today</div></div>
-            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{money(d.spend)}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spend · 14d</div></div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{money(d.spend)}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spend · {RANGE_LABEL[range] || '30d'}</div></div>
             <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: d.avgRoas >= 1 ? LIME : '#f0a19a' }}>{d.avgRoas}x</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>avg ROAS</div></div>
             <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{d.total}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>campaigns</div></div>
           </div>
@@ -107,7 +124,38 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
           <div style={{ fontSize: 14, color: MUTED }}>Everything’s steady — no campaign needs a move today.</div>
         )}
       </div>
-      <div style={{ padding: '0 24px 18px' }}>
+
+      {/* Top ads — Polsia-style compact table: thumbnail · spend · impressions · clicks · CTR · CPC */}
+      {d.ads && d.ads.length > 0 && (
+        <div style={{ borderTop: `1px solid ${LINE}`, padding: '14px 24px 4px' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9aa79a', marginBottom: 8 }}>Top ads · {RANGE_LABEL[range] || '30d'}</div>
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ minWidth: 520 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 74px 78px 62px 56px 66px', gap: 8, padding: '0 0 6px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#a7b0a5' }}>
+                <span>Ad</span><span style={{ textAlign: 'right' }}>Spend</span><span style={{ textAlign: 'right' }}>Impr.</span><span style={{ textAlign: 'right' }}>Clicks</span><span style={{ textAlign: 'right' }}>CTR</span><span style={{ textAlign: 'right' }}>CPC</span>
+              </div>
+              {d.ads.map((a, i) => (
+                <a key={a.adId || i} href={a.preview_url || '#'} target={a.preview_url ? '_blank' : undefined} rel="noreferrer"
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 74px 78px 62px 56px 66px', gap: 8, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${LINE}`, textDecoration: 'none', color: INK }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                    <span style={{ width: 30, height: 30, borderRadius: 7, overflow: 'hidden', flexShrink: 0, background: '#eef2ec', display: 'grid', placeItems: 'center' }}>
+                      {a.thumbnail_url ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={a.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} /> : <span style={{ fontSize: 13, opacity: .5 }}>🎬</span>}
+                    </span>
+                    <span style={{ fontSize: 12.5, fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+                  </span>
+                  <span style={{ textAlign: 'right', fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(a.spend)}</span>
+                  <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.impressions.toLocaleString()}</span>
+                  <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.clicks.toLocaleString()}</span>
+                  <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.ctr.toFixed(2)}%</span>
+                  <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{money(a.cpc)}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ padding: '16px 24px 18px' }}>
         <Link href={ctaHref} onClick={onAct} style={{ display: 'inline-block', background: FOREST, color: LIME, borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>{ctaLabel} →</Link>
       </div>
     </div>

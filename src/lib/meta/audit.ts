@@ -188,32 +188,73 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
  * DB (no Graph sync, no writes), lists all connected accounts for the dropdown, and fetches TODAY's
  * account-level spend with a single live Graph call. Returns everything the card needs to switch instantly.
  */
-export async function auditAccount(admin: any, userId: string, accountId?: string) {
+const RANGES = new Set(['last_3d', 'last_7d', 'last_14d', 'last_30d'])
+export async function auditAccount(admin: any, userId: string, accountId?: string, rangeIn = 'last_30d') {
+  const range = RANGES.has(rangeIn) ? rangeIn : 'last_30d'
   const { data: accounts } = await admin.from('meta_accounts')
     .select('id,account_id,account_name,currency,is_primary,access_token')
     .eq('user_id', userId).eq('status', 'active').order('is_primary', { ascending: false })
   if (!accounts?.length) return null
   const acct = (accountId ? accounts.find((a: any) => a.account_id === accountId) : null) || accounts.find((a: any) => a.is_primary) || accounts[0]
 
-  const { data: campaigns } = await admin.from('campaigns')
-    .select('id,name,meta_campaign_id,status,daily_budget,campaign_insights(*)')
-    .eq('user_id', userId).eq('meta_account_id', acct.id)
-  const audit = campaigns?.length ? grade(campaigns) : { total: 0, spend: 0, avgRoas: 0, scale: [] as Graded[], watch: [] as Graded[], pause: [] as Graded[] }
+  const token = (() => { try { return decryptToken(acct.access_token) } catch { return '' } })()
+
+  // Campaign metadata (name/status/budget) from the synced DB; performance fetched LIVE for the chosen
+  // range so the day picker (3d/7d/14d/30d) actually changes the numbers.
+  const { data: dbCamps } = await admin.from('campaigns')
+    .select('meta_campaign_id,name,status,daily_budget').eq('user_id', userId).eq('meta_account_id', acct.id)
+  const metaById = new Map((dbCamps || []).map((c: any) => [String(c.meta_campaign_id), c]))
+  let campaigns: any[] = []
+  try {
+    const ci = await graph(`act_${acct.account_id}/insights?level=campaign&fields=campaign_id,campaign_name,spend,impressions,clicks,ctr,actions,action_values&date_preset=${range}&limit=300`, token)
+    campaigns = (ci?.data || []).map((r: any) => {
+      const rev = Number((r.action_values || []).find((a: any) => /purchase/.test(a.action_type))?.value || 0)
+      const conv = Math.round(Number((r.actions || []).filter((a: any) => /purchase|complete_registration|lead/.test(a.action_type)).reduce((s: number, a: any) => s + Number(a.value || 0), 0)))
+      const spend = Number(r.spend || 0)
+      const meta: any = metaById.get(String(r.campaign_id)) || {}
+      return {
+        id: r.campaign_id, meta_campaign_id: r.campaign_id, name: r.campaign_name || meta.name || 'Campaign',
+        status: meta.status || 'ACTIVE', daily_budget: meta.daily_budget ?? null,
+        campaign_insights: [{ spend, conversion_value: rev, roas: spend > 0 ? rev / spend : 0, ctr: Number(r.ctr || 0), impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0), conversions: conv, date_stop: '9999' }],
+      }
+    })
+  } catch { /* live campaign insights are best-effort → empty audit */ }
+  const audit = campaigns.length ? grade(campaigns) : { total: 0, spend: 0, avgRoas: 0, scale: [] as Graded[], watch: [] as Graded[], pause: [] as Graded[] }
 
   // Today's account-level spend — one quick live call (this is the "Spend today" figure).
   let spendToday = 0
   try {
-    const token = decryptToken(acct.access_token)
     const j = await graph(`act_${acct.account_id}/insights?fields=spend&date_preset=today&level=account`, token)
     spendToday = Number(j?.data?.[0]?.spend || 0)
   } catch { /* today's spend is best-effort */ }
 
+  // Top ADS (Polsia-style row): ad-level insights for the last 14d, top by spend, with thumbnails.
+  let ads: any[] = []
+  try {
+    const ai = await graph(`act_${acct.account_id}/insights?level=ad&fields=ad_id,ad_name,spend,impressions,clicks,ctr,cpc,actions,action_values&date_preset=${range}&limit=100`, token)
+    ads = (ai?.data || []).map((r: any) => {
+      const rev = Number((r.action_values || []).find((a: any) => /purchase/.test(a.action_type))?.value || 0)
+      const conv = Number((r.actions || []).filter((a: any) => /purchase|complete_registration|lead/.test(a.action_type)).reduce((s: number, a: any) => s + Number(a.value || 0), 0))
+      const spend = Number(r.spend || 0)
+      return { adId: r.ad_id, name: r.ad_name || 'Ad', spend: Math.round(spend), impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0), ctr: +Number(r.ctr || 0).toFixed(2), cpc: +Number(r.cpc || 0).toFixed(2), roas: +(spend > 0 ? rev / spend : 0).toFixed(2), conversions: conv, thumbnail_url: null as string | null, preview_url: null as string | null }
+    }).sort((a: any, b: any) => b.spend - a.spend).slice(0, 6)
+    // Thumbnails for just those few ads (parallel, best-effort).
+    await Promise.all(ads.map(async (r) => {
+      try {
+        const cj = await graph(`${r.adId}?fields=creative{thumbnail_url},preview_shareable_link`, token)
+        r.thumbnail_url = cj?.creative?.thumbnail_url || null
+        r.preview_url = cj?.preview_shareable_link || null
+      } catch { /* thumbnail is optional */ }
+    }))
+  } catch { /* ad-level is best-effort */ }
+
   const slim = (x: Graded) => ({ name: x.name, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })
   return {
     accounts: accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })),
-    selected: acct.account_id, currency: acct.currency || 'USD', accountName: acct.account_name || null,
+    selected: acct.account_id, currency: acct.currency || 'USD', accountName: acct.account_name || null, range,
     total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, spendToday: Math.round(spendToday),
     counts: { scale: audit.scale.length, watch: audit.watch.length, pause: audit.pause.length },
     scale: audit.scale.slice(0, 3).map(slim), watch: audit.watch.slice(0, 3).map(slim), pause: audit.pause.slice(0, 3).map(slim),
+    ads,
   }
 }
