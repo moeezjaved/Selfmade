@@ -11,7 +11,7 @@ import Link from 'next/link'
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
 type Camp = { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }
-type Ad = { adId: string; name: string; spend: number; impressions: number; clicks: number; ctr: number; cpc: number; roas: number; conversions: number; thumbnail_url?: string | null; preview_url?: string | null }
+type Ad = { adId: string; name: string; campaignName?: string | null; metaCampaignId?: string | null; spend: number; impressions: number; clicks: number; ctr: number; cpc: number; roas: number; conversions: number; thumbnail_url?: string | null; preview_url?: string | null }
 type Summary = {
   accounts?: { accountId: string; name: string; currency: string; isPrimary: boolean }[]
   selected?: string; currency?: string; accountName?: string | null; range?: string
@@ -153,20 +153,25 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
                 <span>Ad</span><span style={{ textAlign: 'right' }}>Spend</span><span style={{ textAlign: 'right' }}>Impr.</span><span style={{ textAlign: 'right' }}>Clicks</span><span style={{ textAlign: 'right' }}>CTR</span><span style={{ textAlign: 'right' }}>CPC</span>
               </div>
               {d.ads.map((a, i) => (
-                <a key={a.adId || i} href={a.preview_url || '#'} target={a.preview_url ? '_blank' : undefined} rel="noreferrer"
+                // Row → the campaign it belongs to (the Ads cockpit), where they can manage it with
+                // Mello. Bigger thumbnail + campaign name under the ad name so it's readable at a glance.
+                <Link key={a.adId || i} href="/campaigns"
                   style={{ display: 'grid', gridTemplateColumns: '1fr 74px 78px 62px 56px 66px', gap: 8, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${LINE}`, textDecoration: 'none', color: INK }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-                    <span style={{ width: 30, height: 30, borderRadius: 7, overflow: 'hidden', flexShrink: 0, background: '#eef2ec', display: 'grid', placeItems: 'center' }}>
-                      {a.thumbnail_url ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={a.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} /> : <span style={{ fontSize: 13, opacity: .5 }}>🎬</span>}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <span style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#eef2ec', display: 'grid', placeItems: 'center' }}>
+                      {a.thumbnail_url ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={a.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} /> : <span style={{ fontSize: 14, opacity: .5 }}>🎬</span>}
                     </span>
-                    <span style={{ fontSize: 12.5, fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#17251c' }}>{a.campaignName || a.name}</span>
+                      {a.campaignName && <span style={{ display: 'block', fontSize: 11, color: '#9aa79a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>}
+                    </span>
                   </span>
                   <span style={{ textAlign: 'right', fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(a.spend)}</span>
                   <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.impressions.toLocaleString()}</span>
                   <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.clicks.toLocaleString()}</span>
                   <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.ctr.toFixed(2)}%</span>
                   <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{money(a.cpc)}</span>
-                </a>
+                </Link>
               ))}
             </div>
           </div>
