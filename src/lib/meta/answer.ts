@@ -1,17 +1,18 @@
 /**
- * The grounded router (Phase 1 of the ads-employee design, docs/design-mello-ads-employee.md).
+ * The ads router — Phase 1 (grounded) + Phase 2 (reasoned), docs/design-mello-ads-employee.md.
  *
- * When a user asks Mello an ad-performance question ("how do I improve my ads", "what should I
- * scale / pause", "how's my account"), we do NOT route through the open tool-loop that hangs. We read
- * the audit we already compute (auditAccount → live grade of the primary account) and answer in one
- * grounded sentence, pointing at the one-click Scale/Pause actions that already exist in the brief.
+ * When a user asks Mello an ad-performance question, we NEVER route through the open tool-loop that
+ * hangs. We read the audit we already compute (auditAccount → live grade of the primary account) and:
+ *   Phase 2: hand that GROUNDED snapshot to a reasoning model that thinks like a media buyer, returns a
+ *            2-4 sentence answer AND concrete pause/scale actions, which we write as one-click
+ *            mello_tasks (confirm → tasks/run executes; the model NEVER touches Meta directly).
+ *   Phase 1: if the model is unavailable / errors / times out, fall back to the deterministic answer
+ *            straight from the audit rules. Either way it is fast and CANNOT hang.
  *
- * Returns { reply } when it handled an ads question, or null when the message isn't one (caller then
- * falls through to its normal path). Fast, deterministic, never hangs — the whole point.
+ * Returns { reply } when it handled an ads question, or null when the message isn't one.
  */
 import { auditAccount } from '@/lib/meta/audit'
 
-// Intent: the message must mention ads/campaigns/spend/ROAS AND ask/act (improve, scale, pause, how, what).
 const ADS_NOUN = /\b(ads?|campaigns?|roas|spend(?:ing)?|budget|meta ads?|facebook ads?|ad account|ad performance)\b/i
 const ADS_VERB = /\b(improve|fix|optimi[sz]e|scale|pause|kill|cut|stop|help|grow|lower|reduce|what should i do|what do i (?:need to )?do|how (?:are|is|'?s|do|should)|which|worst|best|winning|losing|bleeding|wasting)\b/i
 const MY_ADS = /\bmy (?:ads?|campaigns?|roas|ad account|account|spend|performance)\b/i
@@ -22,35 +23,94 @@ export function isAdsQuestion(message: string): boolean {
   return ADS_NOUN.test(q) && ADS_VERB.test(q)
 }
 
-export async function answerAdsQuestion(admin: any, userId: string, message: string): Promise<{ reply: string } | null> {
-  if (!isAdsQuestion(message)) return null
+const fmtMoney = (n: number, currency: string) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()}` } }
 
-  let a: any = null
-  try { a = await auditAccount(admin, userId, undefined, 'last_30d') } catch { /* fall through to a safe reply */ }
-
-  if (!a) {
-    return { reply: `You don't have a Meta ad account connected yet — connect one from Settings and I'll audit it every morning and tell you exactly what to scale and pause.` }
-  }
-
-  const money = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: a.currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()}` } }
-  const acct = a.accountName || 'your account'
-
-  if (!a.total) {
-    return { reply: `I checked ${acct} — no active campaigns with spend in the last 30 days, so there's nothing to tune yet. Launch one and I'll start grading it and flag what to scale or cut.` }
-  }
-
+/** Phase 1 — deterministic answer straight from the audit rules. The fallback, and the safety net. */
+function deterministicAnswer(a: any): string {
+  const money = (n: number) => fmtMoney(n, a.currency)
   const scale = a.scale?.[0], pause = a.pause?.[0], watch = a.watch?.[0]
   let reply = `Across your ${a.total} campaign${a.total === 1 ? '' : 's'} you're at ${a.avgRoas}x on ${money(a.spend)} spend over 30 days (${money(a.spendToday)} today). `
   const moves: string[] = []
   if (scale) moves.push(`scale “${scale.name}” — your winner at ${scale.roas}x`)
   if (pause) moves.push(`pause “${pause.name}” — ${money(pause.spend)} for ${pause.conversions} sale${pause.conversions === 1 ? '' : 's'}, it's bleeding`)
   if (watch && !scale) moves.push(`keep an eye on “${watch.name}” — catchy but not converting yet`)
+  if (moves.length) reply += `Your move${moves.length === 1 ? '' : 's'}: ${moves.join('; ')}. Those are one-click in your Morning Brief — say yes and I'll make the change.`
+  else reply += `Everything's steady — no campaign needs a move today. I'll flag it the moment one does.`
+  return reply
+}
 
-  if (moves.length) {
-    reply += `Your move${moves.length === 1 ? '' : 's'}: ${moves.join('; ')}. `
-    reply += `Those are one-click in your Morning Brief — say yes and I'll make the change.`
-  } else {
-    reply += `Everything's steady — no campaign needs a move today. I'll flag it the moment one does.`
+/** Write the model's proposed actions as one-click mello_tasks (approve → tasks/run executes). */
+async function writeActions(admin: any, userId: string, currency: string, actions: any[], validIds: Set<string>) {
+  const money = (n: number) => fmtMoney(n, currency)
+  const week = (() => { const d = new Date().toISOString().slice(0, 10); return `${d.slice(0, 4)}-W${Math.ceil(new Date().getUTCDate() / 7)}` })()
+  for (const act of (Array.isArray(actions) ? actions : []).slice(0, 4)) {
+    const id = String(act?.metaCampaignId || '')
+    if (!validIds.has(id)) continue                      // never trust a campaign id the model invented
+    const name = String(act?.campaignName || 'campaign')
+    const reason = String(act?.reason || '').slice(0, 240)
+    if (act?.type === 'pause') {
+      await admin.from('mello_tasks').upsert({
+        user_id: userId, kind: 'meta_pause', title: `Pause “${name}”`, why: reason || `Underperforming — pausing stops the bleed.`,
+        evidence: { metaCampaignId: id, campaignName: name }, credits: null, status: 'suggested', suggested_key: `meta_pause:${id}:${week}`,
+      }, { onConflict: 'user_id,suggested_key', ignoreDuplicates: true }).then(() => {}, () => {})
+    } else if (act?.type === 'scale') {
+      const nb = Number(act?.newDailyBudget) || null
+      await admin.from('mello_tasks').upsert({
+        user_id: userId, kind: 'meta_scale', title: `Scale “${name}”${nb ? ` to ${money(nb)}/day` : ' +20%'}`, why: reason || `Proven winner with room to grow.`,
+        evidence: { metaCampaignId: id, campaignName: name, newBudget: nb }, credits: null, status: 'suggested', suggested_key: `meta_scale:${id}:${week}`,
+      }, { onConflict: 'user_id,suggested_key', ignoreDuplicates: true }).then(() => {}, () => {})
+    }
   }
-  return { reply }
+}
+
+/** Phase 2 — reasoning model over the grounded snapshot. Returns the prose answer, or null on any issue. */
+async function reasonedAnswer(admin: any, userId: string, a: any): Promise<string | null> {
+  if (!process.env.OPENAI_API_KEY) return null
+  const { default: OpenAI } = await import('openai')
+  const model = process.env.MELLO_MODEL || 'gpt-4o'
+  const validIds = new Set<string>([...(a.scale || []), ...(a.watch || []), ...(a.pause || [])].map((c: any) => String(c.metaCampaignId)).filter(Boolean))
+
+  const snapshot = {
+    account: a.accountName, currency: a.currency, window: 'last 30 days',
+    spend: a.spend, avgRoas: a.avgRoas, spendToday: a.spendToday, totalCampaigns: a.total,
+    readyToScale: a.scale, catchyButNotConverting: a.watch, burningBudget: a.pause,
+    topAds: (a.ads || []).map((ad: any) => ({ name: ad.name, spend: ad.spend, impressions: ad.impressions, clicks: ad.clicks, ctr: ad.ctr, cpc: ad.cpc, roas: ad.roas })),
+  }
+  const system = `You are Mello, a sharp senior Meta media buyer talking to the founder. Reason over the account snapshot and decide what to do to improve the ads. Think about signal quality (a "winner" with only 1-2 conversions is thin), spend concentration, and cheap CTR that isn't converting.
+Reply ONLY as JSON: {"answer": string, "actions": [{"type":"pause"|"scale","metaCampaignId":string,"campaignName":string,"reason":string,"newDailyBudget":number}]}.
+- "answer": 2-4 sentences, first person, specific, cite the real numbers (${a.currency}). Sound like a media buyer, not a calculator. If nothing needs doing, say so plainly.
+- "actions": only high-confidence moves. metaCampaignId MUST be one from the snapshot (readyToScale/catchyButNotConverting/burningBudget). newDailyBudget only for scale (a sensible ~20% step above current dailyBudget). Never invent a campaign. Empty array is fine.`
+
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const resp = await openai.chat.completions.create({
+    model, temperature: 0.3, response_format: { type: 'json_object' },
+    messages: [{ role: 'system', content: system }, { role: 'user', content: JSON.stringify(snapshot) }],
+  })
+  const raw = resp.choices?.[0]?.message?.content || ''
+  let parsed: any = {}
+  try { parsed = JSON.parse(raw) } catch { return null }
+  const answer = String(parsed.answer || '').trim()
+  if (!answer) return null
+  try { await writeActions(admin, userId, a.currency, parsed.actions, validIds) } catch { /* tasks are best-effort */ }
+  return answer + (Array.isArray(parsed.actions) && parsed.actions.length ? ` I've queued ${parsed.actions.length === 1 ? 'that' : 'those'} as one-click action${parsed.actions.length === 1 ? '' : 's'} in your brief — say yes and I'll make the change.` : '')
+}
+
+export async function answerAdsQuestion(admin: any, userId: string, message: string): Promise<{ reply: string } | null> {
+  if (!isAdsQuestion(message)) return null
+
+  let a: any = null
+  try { a = await auditAccount(admin, userId, undefined, 'last_30d') } catch { /* safe reply below */ }
+  if (!a) return { reply: `You don't have a Meta ad account connected yet — connect one from Settings and I'll audit it every morning and tell you exactly what to scale and pause.` }
+  if (!a.total) return { reply: `I checked ${a.accountName || 'your account'} — no active campaigns with spend in the last 30 days, so there's nothing to tune yet. Launch one and I'll start grading it and flag what to scale or cut.` }
+
+  // Phase 2 first (reasoned), hard-capped so it can never hang; Phase 1 (deterministic) is the fallback.
+  try {
+    const reasoned: string | null = await Promise.race([
+      reasonedAnswer(admin, userId, a),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 22000)),
+    ])
+    if (reasoned) return { reply: reasoned }
+  } catch { /* fall through to deterministic */ }
+
+  return { reply: deterministicAnswer(a) }
 }

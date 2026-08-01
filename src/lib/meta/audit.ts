@@ -143,7 +143,7 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
     (audit.pause[0] ? ` Worst: “${audit.pause[0].name}” — ${money(audit.pause[0].spend)} for ${audit.pause[0].conversions} conversions.` : '')
   // Structured numbers for the brief's dedicated Facebook Ads card (rendered from payload, not the
   // prose body). Keep it compact — top few per bucket is all the card shows.
-  const slim = (x: Graded) => ({ name: x.name, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })
+  const slim = (x: Graded) => ({ name: x.name, metaCampaignId: x.metaCampaignId, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })
   const payload = {
     total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, currency: cur,
     accountName: primary?.account_name || null,
@@ -248,7 +248,7 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
     }))
   } catch { /* ad-level is best-effort */ }
 
-  const slim = (x: Graded) => ({ name: x.name, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })
+  const slim = (x: Graded) => ({ name: x.name, metaCampaignId: x.metaCampaignId, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })
   return {
     accounts: accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })),
     selected: acct.account_id, currency: acct.currency || 'USD', accountName: acct.account_name || null, range,
