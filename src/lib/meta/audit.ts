@@ -12,6 +12,7 @@
  */
 import { M4_CONFIG } from '@/lib/m4/config'
 import { decryptToken } from '@/lib/meta/client'
+import { cacheGet, cacheSet } from '@/lib/meta/cache'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 const G = `https://graph.facebook.com/${V}`
@@ -191,6 +192,10 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
 const RANGES = new Set(['last_3d', 'last_7d', 'last_14d', 'last_30d'])
 export async function auditAccount(admin: any, userId: string, accountId?: string, rangeIn = 'last_30d') {
   const range = RANGES.has(rangeIn) ? rangeIn : 'last_30d'
+  // Cache per (user, account, range) — collapses the redundant re-fetches that were blowing Meta's rate limit.
+  const cacheKey = `audit:${userId}:${accountId || 'primary'}:${range}`
+  const cached = cacheGet(cacheKey)
+  if (cached) return cached
   const { data: accounts } = await admin.from('meta_accounts')
     .select('id,account_id,account_name,currency,is_primary,access_token')
     .eq('user_id', userId).eq('status', 'active').order('is_primary', { ascending: false })
@@ -238,18 +243,12 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
       const spend = Number(r.spend || 0)
       return { adId: r.ad_id, name: r.ad_name || 'Ad', spend: Math.round(spend), impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0), ctr: +Number(r.ctr || 0).toFixed(2), cpc: +Number(r.cpc || 0).toFixed(2), roas: +(spend > 0 ? rev / spend : 0).toFixed(2), conversions: conv, thumbnail_url: null as string | null, preview_url: null as string | null }
     }).sort((a: any, b: any) => b.spend - a.spend).slice(0, 6)
-    // Thumbnails for just those few ads (parallel, best-effort).
-    await Promise.all(ads.map(async (r) => {
-      try {
-        const cj = await graph(`${r.adId}?fields=creative{thumbnail_url},preview_shareable_link`, token)
-        r.thumbnail_url = cj?.creative?.thumbnail_url || null
-        r.preview_url = cj?.preview_shareable_link || null
-      } catch { /* thumbnail is optional */ }
-    }))
+    // NOTE: we deliberately DON'T fetch per-ad thumbnails here (was 6 extra Graph calls every load —
+    // the main cause of the app rate-limit / error 17). The table renders fine with the 🎬 fallback.
   } catch { /* ad-level is best-effort */ }
 
   const slim = (x: Graded) => ({ name: x.name, metaCampaignId: x.metaCampaignId, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })
-  return {
+  const result = {
     accounts: accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })),
     selected: acct.account_id, currency: acct.currency || 'USD', accountName: acct.account_name || null, range,
     total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, spendToday: Math.round(spendToday),
@@ -257,4 +256,6 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
     scale: audit.scale.slice(0, 3).map(slim), watch: audit.watch.slice(0, 3).map(slim), pause: audit.pause.slice(0, 3).map(slim),
     ads,
   }
+  cacheSet(cacheKey, result, 10 * 60 * 1000)   // 10 min — spend-today can lag a few minutes, that's fine
+  return result
 }

@@ -8,6 +8,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 import { resolveScopedAccount } from '@/lib/meta/scope'
 import { computeOpportunities } from '@/lib/meta/opportunities'
+import { cacheGet, cacheSet } from '@/lib/meta/cache'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -37,6 +38,11 @@ export async function GET(req: NextRequest) {
     }
     if (!acct) acct = await resolveScopedAccount(admin, user.id)
     if (!acct) return NextResponse.json({ opportunities: [] })
+
+    // Cache (5 Graph calls) per (user, account, range) — kills the redundant re-fetch on every brief load.
+    const cacheKey = `opp:${user.id}:${acct.account_id}:${range}`
+    const hit = cacheGet(cacheKey)
+    if (hit) return NextResponse.json(hit)
 
     const token = decryptToken(acct.access_token)
     const adAccountId = 'act_' + acct.account_id
@@ -79,7 +85,9 @@ export async function GET(req: NextRequest) {
       bestPl, worstPl, bestAge: bestAge ? { label: bestAge.label, roas: bestAge.roas } : null, bestGender,
     }, money)
 
-    return NextResponse.json({ opportunities, currency, accountName: acct.account_name || null, range })
+    const payload = { opportunities, currency, accountName: acct.account_name || null, range }
+    cacheSet(cacheKey, payload, 10 * 60 * 1000)
+    return NextResponse.json(payload)
   } catch (e: any) {
     return NextResponse.json({ opportunities: [], error: e?.message || 'failed' }, { status: 200 })
   }
