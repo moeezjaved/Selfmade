@@ -436,11 +436,14 @@ export async function GET(request: NextRequest) {
     if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
     else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
     else if (sort === 'recent') baseQuery = baseQuery.order('last_seen', { ascending: false })
-    // 'Newest' = fewest days running (launched most recently). Orders by days_running ASC — an
-    // INDEXED column — so it's instant and correct, unlike start_date DESC which had no index over
-    // the has-creative set (→ 57014 statement timeout → the "index was busy" banner) AND bad values
-    // (→ oldest ads floating to the top even when it did return).
-    else if (sort === 'newest') baseQuery = baseQuery.order('days_running', { ascending: true, nullsFirst: false })
+    // 'Newest' = most recently added to our index (first-seen). Orders by indexed_at DESC — served
+    // straight from the dedicated (indexed_at DESC) index (idx_ads_indexed_at, mig 016/020), so it's
+    // instant AND correct. Earlier attempts failed the whole feed: start_date DESC had no index over
+    // the has-creative set (→ 57014 "index was busy") AND bad values (oldest floating up); days_running
+    // ASC had no covering index for the full-corpus sort either (→ 504 gateway timeout, whole feed on
+    // skeletons). indexed_at is a high-cardinality timestamp (near-unique) so the ad_id tiebreak below
+    // never explodes, and first-seen recency is exactly what a spy feed's "Newest" should surface.
+    else if (sort === 'newest') baseQuery = baseQuery.order('indexed_at', { ascending: false, nullsFirst: false })
     else if (sort === 'performance') baseQuery = baseQuery.order('performance_score', { ascending: false }).order('is_active', { ascending: false })
     else if (sort === 'most_used') baseQuery = baseQuery.order('creative_reuse_count', { ascending: false })
     else if (sort === 'latest_added') baseQuery = baseQuery.order('indexed_at', { ascending: false })
