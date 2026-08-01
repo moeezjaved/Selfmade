@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 import { resolveScopedAccount } from '@/lib/meta/scope'
+import { cacheGet, cacheSet } from '@/lib/meta/cache'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 
@@ -17,6 +18,12 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient()
     const metaAccount = await resolveScopedAccount(admin, user.id)   // org-scoped primary account
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
+
+    // Cache the whole report (many Graph calls) per (user, account, range) — the Reports page + its
+    // tabs + Mello's opportunity fetch all hit this; caching kills the rate-limit blowout (error 17).
+    const cacheKey = `reports:${user.id}:${metaAccount.account_id}:${dateRange}`
+    const hit = cacheGet(cacheKey)
+    if (hit) return NextResponse.json(hit)
 
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = "act_" + metaAccount.account_id
@@ -176,10 +183,12 @@ export async function GET(request: NextRequest) {
       .sort((a:any,b:any) => b.conversions - a.conversions)
       .slice(0, 15)
 
-    return NextResponse.json({
+    const payload = {
       currency, overview, creatives, age, gender,
       placement, device, hourly, daily, geographic,
-    })
+    }
+    cacheSet(cacheKey, payload, 8 * 60 * 1000)   // 8 min
+    return NextResponse.json(payload)
 
   } catch (err: any) {
     console.error('Reports error:', err.message)
