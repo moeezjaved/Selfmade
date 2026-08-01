@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { orgMemberIds, allowedAdAccountIds } from '@/lib/org'
+import { resolvePrimary } from '@/lib/meta/audit'
 
 export async function GET() {
   const supabase = await createClient()
@@ -25,6 +26,14 @@ export async function GET() {
   let accounts = (data || []) as any[]
   const allowed = await allowedAdAccountIds(admin, user.id)
   if (!allowed.all) accounts = accounts.filter(a => allowed.ids.includes(a.account_id))
+
+  // De-dupe the primary flag in the RESPONSE (data drift can leave several rows is_primary=true).
+  // Exactly one is_primary — the SAME deterministic account the audit engine scopes to — so the
+  // brief card defaults to, and refreshes into, the identical account (no more €86 ↔ $687k flip).
+  if (accounts.length) {
+    const primary = resolvePrimary(accounts)
+    accounts = accounts.map(a => ({ ...a, is_primary: a.account_id === primary?.account_id }))
+  }
 
   return NextResponse.json({ accounts })
 }

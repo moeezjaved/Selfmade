@@ -64,6 +64,20 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       .catch(() => {})
       .finally(() => setBusy(false))
   }
+  // Pin the currently-viewed account as the org's primary (clears every other is_primary), then
+  // refresh the list + numbers. Fixes the multiple-primary drift permanently and makes THIS account
+  // the default the brief + nightly audit scope to.
+  const makePrimary = async () => {
+    if (!sel || busy) return
+    setBusy(true)
+    try {
+      await fetch('/api/meta/accounts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: sel }) })
+      setAccounts(prev => (prev || []).map(a => ({ ...a, isPrimary: a.accountId === sel })))
+    } catch { /* best-effort */ }
+    setBusy(false)
+    load(sel, range)
+  }
+
   // On mount we DON'T pull live Graph — we render the nightly-stored audit (`initial`) and only fetch
   // the cheap DB accounts list so the switcher works. Live data (spend today, top ads, fresh grade)
   // loads when the user switches account / changes range / taps refresh. Keeps us off Meta's rate limit.
@@ -108,6 +122,15 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
                   {accounts.map(a => <option key={a.accountId} value={a.accountId} style={{ color: '#111' }}>{a.name}{a.isPrimary ? ' ·  primary' : ''}</option>)}
                 </select>
               ) : (d.accountName ? <span style={{ fontSize: 12, fontWeight: 700, color: '#cbd7c6', background: 'rgba(255,255,255,.08)', borderRadius: 100, padding: '3px 10px' }}>{d.accountName}</span> : null)}
+              {/* Pin the account they actually care about as the DEFAULT everywhere (brief, nightly
+                  audit, Reports). Only shown when they're viewing a non-primary account — one tap sets
+                  it and clears the stale extra "primary" flags that caused the €86 ↔ $687k confusion. */}
+              {accounts && accounts.length > 1 && sel && !accounts.find(a => a.accountId === sel)?.isPrimary && (
+                <button onClick={makePrimary} disabled={busy}
+                  style={{ background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '3px 11px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer' }}>
+                  ★ Set as main
+                </button>
+              )}
               {/* day-range picker — default 30d */}
               <span style={{ display: 'inline-flex', gap: 2, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: 2 }}>
                 {['last_3d', 'last_7d', 'last_14d', 'last_30d'].map(r => (
