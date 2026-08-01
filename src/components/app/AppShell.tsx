@@ -40,8 +40,9 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     ],
   },
   {
-    // The competitor ad library — where you spy brands and find ads to remake.
-    key: 'library', label: 'Competitor Ads', railLabel: 'Ads', railIcon: Radar, defaultHref: '/discovery',
+    // Competitor spying — where you watch brands and find ads to remake. (Renamed 'Ads'→'Spy' so it
+    // no longer collides with the 'Ads' performance area below.)
+    key: 'library', label: 'Spy', railLabel: 'Spy', railIcon: Radar, defaultHref: '/discovery',
     items: [
       { href: '/discovery',           icon: Radar,    label: 'All ads' },
       { href: '/discovery/brand-spy', icon: Eye,      label: 'Spy a brand' },
@@ -50,26 +51,31 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     ],
   },
   {
-    key: 'workspace', label: 'Workspace', railLabel: 'Work', railIcon: LayoutDashboard, defaultHref: '/creative-studio',
+    // STUDIO — the making half of the old 'Work' tab: create creatives + manage brands/assets.
+    key: 'studio', label: 'Studio', railLabel: 'Studio', railIcon: Wand2, defaultHref: '/creative-studio?studio=1',
     items: [
-      { section: 'Create' },
       { href: '/creative-studio?studio=1', icon: Wand2,    label: 'Create Ad' },
       { href: '/creative-studio',          icon: Sparkles, label: 'My Creatives' },
       { href: '/brands',                   icon: Store,    label: 'My Brands' },
       { href: '/assets',                   icon: ImageIcon,label: 'Assets' },
-      { section: 'Launch' },
-      // Connect Meta is the front door — BYO token, no app-review wait. The surfaces below unlock the
-      // moment a connection lands (MetaGate keys off the connection, not the retired META_LIVE flag).
-      { href: '/connect/meta', icon: Plug,      label: 'Connect Meta' },
-      { href: '/m4',          icon: Rocket,    label: 'Launch Ads' },
-      { href: '/campaigns',   icon: Megaphone, label: 'Campaigns' },
-      { href: '/insights',    icon: LineChart, label: 'Scale & Insights' },
+    ],
+  },
+  {
+    // ADS — the running/measuring half: your live Meta ads. Reports is the ONE analytics home (Scale &
+    // Insights / Leaderboard / Snapshots are folded IN as tabs on /reports, not separate nav items).
+    key: 'ads', label: 'Ads', railLabel: 'Ads', railIcon: BarChart2, defaultHref: '/reports',
+    items: [
       { href: '/reports',     icon: BarChart2, label: 'Reports' },
-      { href: '/leaderboard', icon: Trophy,    label: 'Leaderboard' },
-      { href: '/snapshots',   icon: Camera,    label: 'Snapshots' },
+      { href: '/campaigns',   icon: Megaphone, label: 'Campaigns' },
+      { href: '/m4',          icon: Rocket,    label: 'Launch Ads' },
+      { href: '/connect/meta', icon: Plug,     label: 'Connect Meta' },
     ],
   },
 ]
+
+// Analytics pages folded into Reports (reachable via the Reports tab strip, not the rail) — but they
+// still belong to the 'ads' area for rail highlighting when visited directly.
+const ADS_AREA_EXTRA_PATHS = ['/insights', '/leaderboard', '/snapshots', '/dashboard']
 
 const RAIL_W = 72
 
@@ -114,7 +120,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     .filter(h => pathname === h || pathname.startsWith(h + '/'))
     .sort((a, b) => b.length - a.length)[0]
   const melloActive = pathname === '/mello' || pathname.startsWith('/mello/')
-  const activeArea = AREAS.find(a => a.items.some(i => i.href === activeHref))
+  // Reports-folded analytics pages have no nav item but belong to the 'ads' area → keep it highlighted.
+  const inAdsExtra = ADS_AREA_EXTRA_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
+  const activeArea = inAdsExtra ? AREAS.find(a => a.key === 'ads') : AREAS.find(a => a.items.some(i => i.href === activeHref))
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)

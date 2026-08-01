@@ -1,5 +1,6 @@
 'use client'
 import MetaGate from '@/components/MetaGate'
+import AdsTabs from '@/components/ads/AdsTabs'
 import React, { useState, useEffect } from 'react'
 import { useIsMobile } from '@/lib/useIsMobile'
 
@@ -106,6 +107,7 @@ function InsightsPage() {
   return (
     <div style={{padding:28, maxWidth:1100, margin:'0 auto'}}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <AdsTabs />
 
       <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:28, flexWrap:'wrap', gap:16}}>
         <div>

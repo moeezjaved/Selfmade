@@ -1,5 +1,6 @@
 'use client'
 import MetaGate from '@/components/MetaGate'
+import AdsTabs from '@/components/ads/AdsTabs'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import AccountSelector from '@/components/AccountSelector'
@@ -143,6 +144,8 @@ function ReportsPage() {
   return (
     <div style={{ padding: 28, maxWidth: 1200, margin: '0 auto' }}>
       {showCreate && <CreateReportModal onClose={() => setShowCreate(false)} onCreate={(k) => { setShowCreate(false); setActiveReport({ templateKey: k }) }} />}
+
+      <AdsTabs />
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
