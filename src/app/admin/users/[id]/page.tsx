@@ -45,6 +45,74 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
+const money = (n: number, cur: string) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0)} ${cur}` } }
+
+// Admin view of a user's connected Meta ad accounts + how each is performing (same audit the founder
+// sees). Lazy — only fetches when this section mounts, so the user page stays fast.
+function MetaAdsSection({ userId }: { userId: string }) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    fetch(`/api/admin/users/${userId}/meta`).then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
+  }, [userId])
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e8e8e8', padding: 24, marginBottom: 20 }}>
+      <h3 style={{ fontSize: 14, fontWeight: 700, color: '#111', margin: '0 0 18px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        Facebook Ads {data?.connected ? <span style={{ color: '#1877F2' }}>· {data.accounts.length} account{data.accounts.length === 1 ? '' : 's'}</span> : ''}
+      </h3>
+      {loading ? <div style={{ fontSize: 13, color: '#aaa' }}>Loading live performance…</div>
+        : !data?.connected ? <div style={{ fontSize: 13, color: '#9ca3af' }}>Not connected — this user hasn&rsquo;t linked a Facebook ad account.</div>
+        : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {(data.performance || []).map((p: any) => (
+            <div key={p.accountId} style={{ border: '1px solid #eef0ee', borderRadius: 10, padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, color: '#111', fontSize: 14 }}>{p.name}</span>
+                {p.isPrimary && <span style={{ fontSize: 10, fontWeight: 800, color: '#1877F2', background: '#1877F218', borderRadius: 20, padding: '2px 8px' }}>PRIMARY</span>}
+                <span style={{ fontSize: 11, color: '#9ca3af' }}>{p.currency}</span>
+              </div>
+              {p.error ? <div style={{ fontSize: 12, color: '#dc2626' }}>Couldn&rsquo;t load: {p.error}</div> : (<>
+                <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginBottom: 14 }}>
+                  {[['Spend · 30d', money(p.spend, p.currency)], ['Spent today', money(p.spendToday, p.currency)], ['Avg ROAS', `${p.avgRoas}x`], ['Campaigns', p.campaigns], ['Scale/Watch/Pause', `${p.counts?.scale || 0} / ${p.counts?.watch || 0} / ${p.counts?.pause || 0}`]].map(([k, v]) => (
+                    <div key={String(k)}><div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{v as any}</div><div style={{ fontSize: 11, color: '#9ca3af' }}>{k as any}</div></div>
+                  ))}
+                </div>
+                {(p.topAds || []).length > 0 && (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead><tr style={{ color: '#9ca3af', textAlign: 'left' }}>
+                        {['Ad', 'Campaign', 'Spend', 'ROAS', 'CTR', 'Impr.', 'Clicks'].map(h => <th key={h} style={{ padding: '4px 8px', fontWeight: 700 }}>{h}</th>)}
+                      </tr></thead>
+                      <tbody>
+                        {p.topAds.map((a: any, i: number) => (
+                          <tr key={i} style={{ borderTop: '1px solid #f2f4f2' }}>
+                            <td style={{ padding: '5px 8px', color: '#111', fontWeight: 600 }}>{a.name}</td>
+                            <td style={{ padding: '5px 8px', color: '#555' }}>{a.campaignName || '—'}</td>
+                            <td style={{ padding: '5px 8px' }}>{money(a.spend, p.currency)}</td>
+                            <td style={{ padding: '5px 8px', color: a.roas >= 1 ? '#16a34a' : '#111' }}>{a.roas ? a.roas.toFixed(2) + 'x' : '—'}</td>
+                            <td style={{ padding: '5px 8px' }}>{a.ctr ? a.ctr.toFixed(2) + '%' : '—'}</td>
+                            <td style={{ padding: '5px 8px', color: '#555' }}>{(a.impressions || 0).toLocaleString()}</td>
+                            <td style={{ padding: '5px 8px', color: '#555' }}>{(a.clicks || 0).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>)}
+            </div>
+          ))}
+          {/* Accounts with no live audit (disconnected/errored tokens) still get listed. */}
+          {(data.accounts || []).filter((a: any) => a.status !== 'active').map((a: any) => (
+            <div key={a.accountId} style={{ fontSize: 12, color: '#9ca3af' }}>{a.name} — {a.status}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function UserProfile({ params }: { params: { id: string } }) {
   const [user, setUser] = useState<UserDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -123,6 +191,9 @@ export default function UserProfile({ params }: { params: { id: string } }) {
           </button>
         </div>
       </div>
+
+      {/* Facebook Ads — connection + live per-account performance (the founder's own numbers). */}
+      <MetaAdsSection userId={params.id} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         {/* Account Info */}
