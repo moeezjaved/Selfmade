@@ -7,14 +7,23 @@ import AccountSelector from '@/components/AccountSelector'
 import CreateReportModal from '@/components/reports/CreateReportModal'
 import GeneratedReport from '@/components/reports/GeneratedReport'
 import LaunchReport from '@/components/reports/LaunchReport'
+import { TEMPLATES } from '@/lib/reports/templates'
 
 export const dynamic = 'force-dynamic'
+
+// ── Theme (matches the app: cream page, ink text, forest/lime, soft-elevation cards) ──
+const INK = '#17251c', MUTED = '#6f7d70', FAINT = '#9aa79a', LINE = '#e9ece7', FOREST = '#17251c', LIME = '#dffe95', GREEN = '#3f8f4f'
+const SERIF = "'Instrument Serif', Georgia, serif"
+// One card look everywhere — white on the cream page, separated by elevation, not a hairline border.
+const CARD: React.CSSProperties = { background: '#fff', borderRadius: 18, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 12px 32px -20px rgba(17,24,17,.14)' }
+// Semantic performance colors (deeper, less neon than before — reads premium on white).
+const good = '#2f7d3a', warn = '#b7791f', bad = '#c0392b'
 
 const fmt = (n: number, currency = 'PKR') =>
   new Intl.NumberFormat('en-PK', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
 
-const roasColor = (r: number) => r >= 2 ? '#86efac' : r >= 1 ? '#fbbf24' : '#f87171'
-const roasBg = (r: number) => r >= 2 ? 'rgba(134,239,172,0.12)' : r >= 1 ? 'rgba(251,191,36,0.12)' : 'rgba(248,113,113,0.12)'
+const roasColor = (r: number) => r >= 2 ? good : r >= 1 ? warn : bad
+const roasBg = (r: number) => r >= 2 ? 'rgba(47,125,58,0.09)' : r >= 1 ? 'rgba(183,121,31,0.10)' : 'rgba(192,57,43,0.08)'
 
 type SortKey = 'roas' | 'spend' | 'revenue' | 'conversions' | 'ctr' | 'cpa' | 'cpm'
 
@@ -147,32 +156,35 @@ function ReportsPage() {
 
       <AdsTabs />
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      {/* Header — editorial serif title, quiet controls */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 22, flexWrap: 'wrap', gap: 14 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: '#1a3a1a' }}>Reports</div>
-          <div style={{ fontSize: 13, color: '#7a9a7a', marginTop: 2 }}>Deep insights from your Meta Ads</div>
+          <h1 style={{ fontFamily: SERIF, fontSize: 34, fontWeight: 400, color: INK, letterSpacing: '-.01em', lineHeight: 1.05, margin: 0 }}>Reports</h1>
+          <div style={{ fontSize: 13.5, color: MUTED, marginTop: 4 }}>Deep insights from your Meta ads.</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={() => setShowCreate(true)} style={{ padding: '9px 18px', borderRadius: 100, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>＋ Create report</button>
           {/* Which ad account this report is for — switch to re-scope (sets the org primary account). */}
           <AccountSelector onAccountChange={() => setTimeout(() => { loadReports(); loadCreativeAudience() }, 600)} />
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 4, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: 3 }}>
             {['last_3d', 'last_7d', 'last_14d', 'last_30d'].map(r => (
-              <button key={r} onClick={() => setDateRange(r)} style={{ padding: '7px 14px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.1)', fontFamily: 'inherit', fontWeight: 700, fontSize: 12, cursor: 'pointer', background: dateRange === r ? '#1a3a1a' : '#f0f7ee', color: dateRange === r ? '#dffe95' : '#5a7a5a' }}>
-                {r.replace('last_', '').replace('d', 'd')}
+              <button key={r} onClick={() => setDateRange(r)} style={{ padding: '6px 14px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 750, fontSize: 12.5, cursor: 'pointer', background: dateRange === r ? FOREST : 'transparent', color: dateRange === r ? LIME : MUTED, transition: 'all .12s' }}>
+                {r.replace('last_', '')}
               </button>
             ))}
           </div>
         </div>
       </div>
 
+      {/* ── The report library, VISIBLE (not hidden behind a button) — every report type as a card you
+          click to generate. This is the "lots of sections" surfaced up front, Motion-style. ── */}
+      <TemplateLibrary onOpen={(k) => setActiveReport({ templateKey: k })} onMore={() => setShowCreate(true)} />
+
       {/* Sort Filter Bar */}
       {data && !loading && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, background: '#ffffff', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '10px 16px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#7a9a7a', textTransform: 'uppercase', letterSpacing: '.06em', marginRight: 4 }}>Sort by:</span>
+        <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 7, marginBottom: 20, padding: '10px 16px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.07em', marginRight: 4 }}>Sort by</span>
           {sortBtns.map(b => (
-            <button key={b.key} onClick={() => setSortKey(b.key)} style={{ padding: '5px 12px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.1)', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, cursor: 'pointer', background: sortKey === b.key ? '#1a3a1a' : '#f0f7ee', color: sortKey === b.key ? '#dffe95' : '#5a7a5a', transition: 'all .15s' }}>
+            <button key={b.key} onClick={() => setSortKey(b.key)} style={{ padding: '6px 13px', borderRadius: 100, border: `1px solid ${sortKey === b.key ? FOREST : LINE}`, fontFamily: 'inherit', fontWeight: 750, fontSize: 12, cursor: 'pointer', background: sortKey === b.key ? FOREST : '#fff', color: sortKey === b.key ? LIME : MUTED, transition: 'all .12s' }}>
               {b.label}
             </button>
           ))}
@@ -189,17 +201,18 @@ function ReportsPage() {
       ) : data && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* Overview KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px,100%), 1fr))', gap: 12 }}>
+          {/* Overview KPIs — the four numbers that matter, big and calm */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(170px,100%), 1fr))', gap: 12 }}>
             {[
-              { label: 'Total Spend', value: fmt(data.overview?.spend || 0, data.currency), color: '#c0392b' },
-              { label: 'Total Revenue', value: fmt(data.overview?.revenue || 0, data.currency), color: '#2d7a2d' },
+              { label: 'Total spend', value: fmt(data.overview?.spend || 0, data.currency), color: bad },
+              { label: 'Total revenue', value: fmt(data.overview?.revenue || 0, data.currency), color: good },
               { label: 'Blended ROAS', value: (data.overview?.roas || 0).toFixed(2) + 'x', color: roasColor(data.overview?.roas || 0) },
-              { label: 'Conversions', value: String(data.overview?.conversions || 0), color: '#2563eb' },
+              { label: 'Conversions', value: String(data.overview?.conversions || 0), color: INK },
             ].map(k => (
-              <div key={k.label} style={{ background: '#ffffff', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 20px' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#7a9a7a', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>{k.label}</div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: k.color }}>{k.value}</div>
+              <div key={k.label} style={{ ...CARD, padding: '16px 20px', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: k.color, opacity: .85 }} />
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 8 }}>{k.label}</div>
+                <div style={{ fontFamily: SERIF, fontSize: 32, fontWeight: 400, color: k.color, letterSpacing: '-.01em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{k.value}</div>
               </div>
             ))}
           </div>
@@ -346,6 +359,35 @@ function ReportsPage() {
       )}
 
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+}
+
+// The visible report library — featured report types as premium cards. Click = generate that report.
+const TILE_BG = ['#eef6e4', '#e7f0ee', '#f3eee6', '#e9eef5', '#f5ece9', '#eaf1ea']
+function TemplateLibrary({ onOpen, onMore }: { onOpen: (k: string) => void; onMore: () => void }) {
+  const featured = (TEMPLATES as any[]).filter((t) => t.featured).slice(0, 6)
+  if (!featured.length) return null
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT }}>Build a report</div>
+        <button onClick={onMore} style={{ background: 'none', border: 'none', color: GREEN, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>All report types →</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 12 }}>
+        {featured.map((t, i) => (
+          <button key={t.key} onClick={() => onOpen(t.key)}
+            style={{ ...CARD, textAlign: 'left', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '15px 16px', display: 'flex', alignItems: 'flex-start', gap: 12, transition: 'transform .12s, box-shadow .12s' }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(17,24,17,.05), 0 18px 40px -22px rgba(17,24,17,.22)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = CARD.boxShadow as string }}>
+            <span style={{ width: 40, height: 40, borderRadius: 11, background: TILE_BG[i % TILE_BG.length], display: 'grid', placeItems: 'center', fontSize: 20, flexShrink: 0 }}>{t.emoji}</span>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: 14, fontWeight: 750, color: INK, letterSpacing: '-.01em' }}>{t.title}</span>
+              <span style={{ display: 'block', fontSize: 12, color: MUTED, lineHeight: 1.45, marginTop: 2 }}>{t.description}</span>
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -621,14 +663,14 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
   if (!items.length) return null
 
   return (
-    <div style={{ background: '#ffffff', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, overflow: 'hidden' }}>
+    <div style={{ ...CARD, overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: '15px 20px', borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#1a3a1a' }}>{title}</div>
-          <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1 }}>{subtitle}</div>
+          <div style={{ fontSize: 14.5, fontWeight: 750, color: INK, letterSpacing: '-.01em' }}>{title}</div>
+          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{subtitle}</div>
         </div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#8aaa8a', background: '#f8fcf6', padding: '3px 10px', borderRadius: 100 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 750, color: FAINT, background: '#f5f8f2', padding: '3px 10px', borderRadius: 100 }}>
           {items.length} items
         </div>
       </div>
