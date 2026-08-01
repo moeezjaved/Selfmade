@@ -25,7 +25,59 @@ function Confidence({ level }: { level: 1 | 2 | 3 }) {
   )
 }
 
-export default function BriefOpportunities({ initial, onAct, accountId }: { initial?: Opportunity[]; onAct?: (o: Opportunity) => void; accountId?: string | null }) {
+type ScaleCampaign = { metaCampaignId?: string | null; name?: string; dailyBudget?: number | null; roas?: number }
+
+// Inline budget-confirm for the "Scale it" card — the approve→act loop, right on the brief. Shows the
+// current daily budget, a proposed +20% (editable), and one confirm button. Nothing spends until the
+// founder hits Scale. This is the whole product: recommend → confirm a budget → act on Meta.
+function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: string }) {
+  const cur = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0)}` } }
+  const currentMajor = Math.max(1, Math.round((Number(camp.dailyBudget) || 0) / 100)) // dailyBudget is in cents
+  const [open, setOpen] = useState(false)
+  const [budget, setBudget] = useState<number>(Math.max(currentMajor + 1, Math.round(currentMajor * 1.2)))
+  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'err'>('idle')
+  const [msg, setMsg] = useState('')
+
+  if (!camp.metaCampaignId) {
+    // No campaign id (older audit) → fall back to the campaigns page.
+    return <Link href="/campaigns" style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>Scale it →</Link>
+  }
+
+  if (state === 'done') {
+    return <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 700, color: GOOD }}>✓ Scaled to {cur(budget)}/day. Live on Meta now.</div>
+  }
+
+  if (!open) {
+    return <button onClick={() => setOpen(true)} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 2 }}>Scale it →</button>
+  }
+
+  const run = () => {
+    setState('busy'); setMsg('')
+    fetch('/api/meta/scale', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ metaCampaignId: camp.metaCampaignId, newDailyBudget: budget }) })
+      .then(r => r.json())
+      .then(j => { if (j?.ok) { setState('done') } else { setState('err'); setMsg(j?.error || 'Scaling failed — try again.') } })
+      .catch(() => { setState('err'); setMsg('Scaling failed — try again.') })
+  }
+
+  return (
+    <div style={{ marginTop: 6, width: '100%' }}>
+      <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>Now {cur(currentMajor)}/day → new daily budget:</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <input type="number" min={1} value={budget} onChange={e => setBudget(Math.max(1, Math.round(Number(e.target.value) || 0)))} disabled={state === 'busy'}
+          style={{ width: 92, border: `1px solid ${LINE}`, borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', color: INK }} />
+        <span style={{ fontSize: 12, color: MUTED }}>{currency}/day</span>
+        <button onClick={run} disabled={state === 'busy'} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 12.5, fontWeight: 800, cursor: state === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+          {state === 'busy' ? 'Scaling…' : `Scale to ${cur(budget)}/day`}
+        </button>
+        <button onClick={() => setOpen(false)} disabled={state === 'busy'} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+      </div>
+      {state === 'err' && <div style={{ marginTop: 6, fontSize: 12, color: '#c0392b' }}>{msg}</div>}
+      <div style={{ marginTop: 6, fontSize: 11.5, color: FAINT }}>Raises this campaign's budget on Meta. You can lower it back anytime.</div>
+    </div>
+  )
+}
+
+export default function BriefOpportunities({ initial, onAct, accountId, scaleCampaign, currency }: { initial?: Opportunity[]; onAct?: (o: Opportunity) => void; accountId?: string | null; scaleCampaign?: ScaleCampaign | null; currency?: string }) {
   // `initial` = the cards computed by the nightly audit and stored in the brief payload. If present, we
   // render them immediately with ZERO live calls. Refresh (or the empty-state button) pulls fresh.
   const hasInitial = !!(initial && initial.length)
@@ -102,7 +154,11 @@ export default function BriefOpportunities({ initial, onAct, accountId }: { init
               <span style={{ fontSize: 12.5, fontWeight: 800, color: oppColor(r.tone) }}>{r.impact}</span>
               <Confidence level={r.level} />
             </div>
-            <Link href={r.href} onClick={() => onAct?.(r)} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>
+            {/* The "Scale it" card ACTS — inline budget-confirm → scales on Meta. Every other card
+                still links to where the founder finishes the move. */}
+            {r.cta === 'Scale it' && scaleCampaign
+              ? <ScaleConfirm camp={scaleCampaign} currency={currency || 'USD'} />
+              : <Link href={r.href} onClick={() => onAct?.(r)} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>}
           </div>
         ))}
       </div>
