@@ -439,11 +439,14 @@ function M4Inner() {
   }
 
   const launch = async () => {
-    // Guard: you can't launch ads without a creative. Every ad set (Broad + one per Interest) reuses
-    // an uploaded image/video, so with none the server returns one error PER interest — a confusing
-    // wall. Catch it here with ONE clear message before we ever call Meta.
-    const hasMedia = creatives.some(c => c.uploaded && c.hash)
-    if (!hasMedia) {
+    // Only creatives that ACTUALLY have uploaded media (a Meta hash) can become ads. Placeholder rows
+    // (e.g. an auto-added "<brand>-<date>" with no upload) must be FILTERED OUT — otherwise the server
+    // tries to build an ad from them and every interest ad set (which reuses the first creative) fails
+    // with "no image/video uploaded". Filtering here is the real fix for that wall of errors.
+    const validCreatives = creatives.filter(c => c.uploaded && c.hash)
+    const validRetargeting = retargetingCreatives.filter(c => c.uploaded && c.hash)
+    const validRetainer = retainerCreatives.filter(c => c.uploaded && c.hash)
+    if (!validCreatives.length) {
       alert('Upload at least one image or video before launching — every ad needs a creative. Add one in the Creatives step, then launch.')
       goTo('creatives')
       return
@@ -452,7 +455,7 @@ function M4Inner() {
     if (!adCopy.destinationUrl?.trim()) { alert('Add a destination URL (where the ad sends people) before launching.'); return }
     setLoading(true)
     try{
-      const res=await fetch('/api/m4/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:form.campaignName||'M4',creatives,retargetingCreatives,retainerCreatives,interests:selectedInterests,budget:form.budget,location:form.location,ageMin:form.ageMin,ageMax:form.ageMax,gender:form.gender,pixelId,objective:form.objective,pageId:selectedPageId,instagramActorId:selectedInstagramId,primaryText:adCopy.primaryText,headline:adCopy.headline,cta:adCopy.cta,websiteUrl:adCopy.destinationUrl,retargetingCopy,retainerCopy,includeRetainer})})
+      const res=await fetch('/api/m4/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:form.campaignName||'M4',creatives:validCreatives,retargetingCreatives:validRetargeting,retainerCreatives:validRetainer,interests:selectedInterests,budget:form.budget,location:form.location,ageMin:form.ageMin,ageMax:form.ageMax,gender:form.gender,pixelId,objective:form.objective,pageId:selectedPageId,instagramActorId:selectedInstagramId,primaryText:adCopy.primaryText,headline:adCopy.headline,cta:adCopy.cta,websiteUrl:adCopy.destinationUrl,retargetingCopy,retainerCopy,includeRetainer})})
       const data=await res.json()
       if(data.error)alert('Launch failed: '+data.error)
       else{
