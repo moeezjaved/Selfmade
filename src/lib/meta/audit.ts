@@ -117,9 +117,16 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
     }
   }
 
+  // SCOPE TO THE PRIMARY ACCOUNT. Summing spend across accounts in different currencies (EUR+HKD+PKR+
+  // USD) produced a meaningless mega-number in the brief. The brief card shows ONE account — the
+  // primary, same one Reports defaults to — so the figures match and the currency is real.
+  const primary = accounts.find((a: any) => a.is_primary) || accounts[0]
+  const cur = primary?.currency || 'USD'
+  const money = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()} ${cur}` } }
+
   const { data: campaigns } = await admin.from('campaigns')
     .select('id,name,meta_campaign_id,status,daily_budget,campaign_insights(*)')
-    .eq('user_id', userId)
+    .eq('user_id', userId).eq('meta_account_id', primary.id)
   if (!campaigns?.length) return null
   const audit = grade(campaigns)
   if (!audit.total) return null
@@ -131,14 +138,15 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
   if (audit.watch.length) parts.push(`${audit.watch.length} catchy but not converting`)
   if (audit.pause.length) parts.push(`${audit.pause.length} burning budget`)
   const title = `I audited your ${audit.total} campaigns — ${parts.length ? parts.join(', ') : 'all steady'}.`
-  const body = `$${audit.spend.toLocaleString()} spend · ${audit.avgRoas}x average ROAS over the last 14 days.` +
+  const body = `${money(audit.spend)} spend · ${audit.avgRoas}x average ROAS over the last 14 days.` +
     (audit.scale[0] ? ` Best: “${audit.scale[0].name}” at ${audit.scale[0].roas.toFixed(1)}x.` : '') +
-    (audit.pause[0] ? ` Worst: “${audit.pause[0].name}” — $${Math.round(audit.pause[0].spend)} for ${audit.pause[0].conversions} conversions.` : '')
+    (audit.pause[0] ? ` Worst: “${audit.pause[0].name}” — ${money(audit.pause[0].spend)} for ${audit.pause[0].conversions} conversions.` : '')
   // Structured numbers for the brief's dedicated Facebook Ads card (rendered from payload, not the
   // prose body). Keep it compact — top few per bucket is all the card shows.
   const slim = (x: Graded) => ({ name: x.name, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })
   const payload = {
-    total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas,
+    total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, currency: cur,
+    accountName: primary?.account_name || null,
     scale: audit.scale.slice(0, 3).map(slim),
     watch: audit.watch.slice(0, 3).map(slim),
     pause: audit.pause.slice(0, 3).map(slim),
@@ -146,7 +154,7 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
   await admin.from('brief_events').delete().eq('user_id', userId).eq('kind', 'meta_audit').gte('created_at', `${today}T00:00:00Z`).then(() => {}, () => {})
   await admin.from('brief_events').insert({
     user_id: userId, kind: 'meta_audit', importance: 96, title, body, payload,
-    cta_label: 'See the full audit', cta_href: '/m4',
+    cta_label: 'See the full report', cta_href: '/reports',
   }).then(() => {}, () => {})
 
   // ── One-click actions: the top pause + the top scale, as approval-gated task suggestions.

@@ -158,7 +158,7 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
       <Section n={2} question="Account health" tone={m.healthTone}
         answer={<>The account is <B c={m.healthTone}>{m.healthWord}</B>{m.wastedSpend > 0 && <> — {fmt(m.wastedSpend)} of spend sits in ads returning under 1x.</>}</>}>
         <div style={{ fontSize: 12.5, color: MUTED, marginTop: -6, marginBottom: 14, lineHeight: 1.5, maxWidth: 640 }}>
-          A single <B>0–100 grade</B> of the account, blended from the four scores below — higher is healthier.
+          Think of it like a credit score for your ad account — <B>higher is healthier</B>. It’s four simple checks, each Good, Okay, or Weak:
         </div>
         <div style={{ display: 'flex', gap: 26, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* score ring */}
@@ -174,15 +174,24 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
           </div>
           {/* component bars */}
           <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[{ l: 'Returns', s: m.returns, d: 'how far each dollar goes' }, { l: 'Efficiency', s: m.efficiency, d: '% of spend in profitable ads' }, { l: 'Resilience', s: m.resilience, d: 'not hostage to one ad' }, { l: 'Attention', s: m.attention, d: 'how hard creatives stop the scroll' }].map(c => (
-              <div key={c.l}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>{c.l} <span style={{ color: FAINT, fontWeight: 500 }}>· {c.d}</span></span>
-                  <span style={{ fontSize: 12.5, fontWeight: 750, color: c.s >= 70 ? good : c.s >= 40 ? warn : bad, fontVariantNumeric: 'tabular-nums' }}>{c.s}</span>
+            {[
+              { l: 'Are you making money?', s: m.returns, d: 'how much you earn back on spend' },
+              { l: 'Is the budget spent wisely?', s: m.efficiency, d: 'how much goes to ads that actually sell' },
+              { l: 'Spread across winners?', s: m.resilience, d: 'not betting everything on one ad' },
+              { l: 'Do the ads grab attention?', s: m.attention, d: 'how well they stop the scroll' },
+            ].map(c => {
+              const word = c.s >= 70 ? 'Good' : c.s >= 40 ? 'Okay' : 'Weak'
+              const col = c.s >= 70 ? good : c.s >= 40 ? warn : bad
+              return (
+                <div key={c.l}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3, gap: 10 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: INK }}>{c.l} <span style={{ color: FAINT, fontWeight: 500, fontSize: 12 }}>· {c.d}</span></span>
+                    <span style={{ fontSize: 11.5, fontWeight: 800, color: col, textTransform: 'uppercase', letterSpacing: '.03em', flexShrink: 0 }}>{word}</span>
+                  </div>
+                  <div style={{ height: 7, background: '#eef1ec', borderRadius: 100 }}><div style={{ height: '100%', width: `${Math.max(c.s, 3)}%`, borderRadius: 100, background: col, transition: 'width .4s' }} /></div>
                 </div>
-                <div style={{ height: 6, background: '#eef1ec', borderRadius: 100 }}><div style={{ height: '100%', width: `${c.s}%`, borderRadius: 100, background: c.s >= 70 ? good : c.s >= 40 ? warn : bad, transition: 'width .4s' }} /></div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </Section>

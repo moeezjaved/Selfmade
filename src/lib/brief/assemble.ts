@@ -50,6 +50,8 @@ export type BriefItem = {
     total: number
     spend: number
     avgRoas: number
+    currency?: string
+    accountName?: string | null
     scale: { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }[]
     watch: { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }[]
     pause: { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }[]
@@ -145,9 +147,10 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
       const p: any = e.payload
       items.push({
         id: e.id, kind: 'meta_ads', importance: e.importance ?? 96, title: e.title, body: e.body || undefined,
-        cta_label: e.cta_label || 'See the full audit', cta_href: e.cta_href || '/m4', at: e.created_at,
+        cta_label: e.cta_label || 'See the full report', cta_href: e.cta_href || '/reports', at: e.created_at,
         metaAudit: {
           total: Number(p.total || 0), spend: Number(p.spend || 0), avgRoas: Number(p.avgRoas || 0),
+          currency: typeof p.currency === 'string' ? p.currency : 'USD', accountName: p.accountName || null,
           scale: Array.isArray(p.scale) ? p.scale : [], watch: Array.isArray(p.watch) ? p.watch : [], pause: Array.isArray(p.pause) ? p.pause : [],
         },
       })
