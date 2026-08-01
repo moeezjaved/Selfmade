@@ -20,24 +20,44 @@ export async function POST(request: NextRequest) {
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = 'act_' + metaAccount.account_id
 
-    // Parse multipart form data
-    const formData = await request.formData()
-    const file = formData.get('file') as File
-    const isVideo = formData.get('isVideo') === 'true'
+    // Two input shapes:
+    //  · multipart form (file)          — the classic browser upload
+    //  · JSON { imageUrl }              — a generated creative (Studio clone → "Run it") pulled
+    //    SERVER-side, so R2/storage CORS never gets a say. Image-only.
+    let buffer: Buffer
+    let isVideo = false
+    let contentType = 'image/jpeg'
+    let fileExt = 'jpg'
+    const ctype = request.headers.get('content-type') || ''
+    if (ctype.includes('application/json')) {
+      const { imageUrl } = await request.json()
+      if (!imageUrl || typeof imageUrl !== 'string' || !/^https:\/\//.test(imageUrl)) {
+        return NextResponse.json({ error: 'imageUrl required' }, { status: 400 })
+      }
+      const imgRes = await fetch(imageUrl)
+      if (!imgRes.ok) return NextResponse.json({ error: `Could not fetch image (${imgRes.status})` }, { status: 400 })
+      buffer = Buffer.from(await imgRes.arrayBuffer())
+      contentType = imgRes.headers.get('content-type') || 'image/jpeg'
+      fileExt = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
+    } else {
+      // Parse multipart form data
+      const formData = await request.formData()
+      const file = formData.get('file') as File
+      isVideo = formData.get('isVideo') === 'true'
 
-    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+      if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+      fileExt = file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg')
+      contentType = file.type
+      buffer = Buffer.from(await file.arrayBuffer())
+    }
 
     // Step 1: Upload to Supabase Storage
-    const fileExt = file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg')
     const fileName = `${user.id}/${Date.now()}.${fileExt}`
     const bucket = 'ads-media'
 
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
     const { error: uploadError } = await admin.storage
       .from(bucket)
-      .upload(fileName, buffer, { contentType: file.type, upsert: false })
+      .upload(fileName, buffer, { contentType, upsert: false })
 
     if (uploadError) return NextResponse.json({ error: 'Storage upload failed: ' + uploadError.message }, { status: 400 })
 

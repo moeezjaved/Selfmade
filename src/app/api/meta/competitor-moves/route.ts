@@ -1,0 +1,127 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { cacheGet, cacheSet } from '@/lib/meta/cache'
+
+/**
+ * Competitor moves — "your rivals' winning ad right now", ranked by the public-signal proxy.
+ *
+ * We can NEVER see a competitor's ROAS. What we CAN see (Ad Library via our crawl) is how they
+ * BEHAVE: advertisers kill losers within days, so an ad that is (a) still live, (b) has been
+ * running a long time, and (c) exists as many near-variants is one they keep paying for — the
+ * strongest outside evidence it converts. Rank = daysRunning × (1 + log2(variants)) × liveBoost.
+ * The card is honest about this ("live 47 days, 6 variants — they keep paying for it").
+ *
+ * Pure-DB endpoint: reads followed_brands + discovery_ads_index only. ZERO Graph calls, so it
+ * can't touch the Meta rate budget. Cached 30 min per user (the crawl only moves every 6h anyway).
+ */
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 30
+
+type Move = {
+  adId: string
+  pageId: string
+  brandName: string
+  title: string | null
+  hook: string | null
+  daysRunning: number
+  variants: number
+  isActive: boolean
+  isVideo: boolean
+  image: string | null      // poster (video) or the image itself
+  videoUrl: string | null   // mp4 when the winner is a video
+  why: string               // plain-English evidence line
+}
+
+// Variant key: advertisers duplicate the same concept with identical copy — group by normalized
+// title+body head. Cheap, no embeddings, and it matches how dupes actually look in the library.
+const conceptKey = (a: any) =>
+  `${String(a.title || '').toLowerCase().trim().slice(0, 80)}|${String(a.body || '').toLowerCase().trim().slice(0, 120)}`
+
+export async function GET(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const cacheKey = `competitor-moves:${user.id}`
+  const cached = cacheGet<{ moves: Move[] }>(cacheKey)
+  if (cached && !req.nextUrl.searchParams.get('refresh')) return NextResponse.json(cached)
+
+  const admin = createAdminClient()
+
+  // Watched (spied) competitors — same source of truth as the brief's playbook.
+  const { data: follows } = await admin.from('followed_brands')
+    .select('page_id, brand_name').eq('user_id', user.id).eq('spied', true).limit(20)
+  const pages = (follows || []).filter((f: any) => f.page_id)
+  if (!pages.length) return NextResponse.json({ moves: [] })
+
+  // Bounded per-brand fetch (a single .in() gets swallowed by the highest-volume brand).
+  // Longest-running first — that's the signal we rank on, so the sample IS the candidates.
+  const perBrand = await Promise.all(pages.slice(0, 12).map((p: any) =>
+    admin.from('discovery_ads_index')
+      .select('ad_id, page_id, page_name, title, body, hook_type, days_running, is_active, discovery_creatives(asset_type, r2_url, poster_url, position)')
+      .eq('page_id', p.page_id)
+      .order('days_running', { ascending: false, nullsFirst: false })
+      .limit(30)
+      .then((r: any) => (r.data || []).map((a: any) => ({ ...a, _brand: p.brand_name || a.page_name })))
+      .catch(() => [] as any[])
+  ))
+
+  // Group each brand's ads into concepts, count variants, score.
+  const candidates: Move[] = []
+  for (const rows of perBrand) {
+    const groups = new Map<string, any[]>()
+    for (const a of rows) {
+      const k = conceptKey(a)
+      groups.set(k, [...(groups.get(k) || []), a])
+    }
+    for (const g of Array.from(groups.values())) {
+      // The face of the concept: prefer a live ad with media.
+      const withMedia = g.filter((a: any) => {
+        const cres = Array.isArray(a.discovery_creatives) ? a.discovery_creatives : (a.discovery_creatives ? [a.discovery_creatives] : [])
+        return cres.some((c: any) => c.r2_url || c.poster_url)
+      })
+      const face = withMedia.find((a: any) => a.is_active) || withMedia[0]
+      if (!face) continue
+      const days = Math.max(...g.map((a: any) => Number(a.days_running) || 0))
+      if (days < 7) continue // under a week live proves nothing — skip noise
+      const live = g.some((a: any) => a.is_active)
+      const cres = Array.isArray(face.discovery_creatives) ? face.discovery_creatives : [face.discovery_creatives]
+      const vid = cres.find((c: any) => c?.asset_type === 'video' && c?.r2_url)
+      const img = cres.find((c: any) => c?.asset_type !== 'video' && c?.r2_url)
+      const isVideo = !!vid && !img // an image variant of the same concept beats the video for the clone path
+      candidates.push({
+        adId: String(face.ad_id),
+        pageId: String(face.page_id),
+        brandName: String(face._brand || face.page_name || 'Competitor'),
+        title: face.title || null,
+        hook: face.hook_type || null,
+        daysRunning: days,
+        variants: g.length,
+        isActive: live,
+        isVideo,
+        image: isVideo ? (vid?.poster_url || null) : (img?.r2_url || vid?.poster_url || null),
+        videoUrl: isVideo ? (vid?.r2_url || null) : null,
+        why: `${live ? 'Live' : 'Ran'} ${days} days${g.length > 1 ? ` · ${g.length} variants` : ''} — ${live ? 'they keep paying for it, which almost always means it converts' : 'a long run like this usually means it converted'}.`,
+      })
+    }
+  }
+
+  // Score: longevity × duplication, live ads boosted, dead ones discounted.
+  const score = (m: Move) => m.daysRunning * (1 + Math.log2(Math.max(1, m.variants))) * (m.isActive ? 1.5 : 0.6)
+  candidates.sort((a, b) => score(b) - score(a))
+
+  // One hero per rival max in the top set — variety beats 3 ads from the same brand.
+  const seen = new Set<string>()
+  const moves: Move[] = []
+  for (const m of candidates) {
+    if (seen.has(m.pageId)) continue
+    seen.add(m.pageId)
+    moves.push(m)
+    if (moves.length >= 3) break
+  }
+
+  const payload = { moves }
+  cacheSet(cacheKey, payload, 30 * 60 * 1000)
+  return NextResponse.json(payload)
+}

@@ -572,6 +572,9 @@ function StudioInner() {
                 <div style={{ fontSize: 13, color: MUTED, margin: '5px 0 16px', lineHeight: 1.55 }}>Love it? Approve and download. Want a change? Tell Mello and she’ll tweak this exact image.</div>
                 <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
                   <button onClick={download} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><Download size={15} /> Approve &amp; download</button>
+                  {/* Approved → straight into launch: M4 opens with THIS image already attached; the
+                      founder still sets + confirms the budget there (nothing ever auto-spends). */}
+                  <a href={`/m4?img=${encodeURIComponent(result.url)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>Run it on Facebook →</a>
                   <button onClick={() => { setResult(null); setVersions([]); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><ImageIcon size={15} /> Another</button>
                 </div>
                 <div style={{ marginTop: 18 }}>
