@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const admin = createAdminClient()
   const userId = params.id
 
-  const [authRes, profileRes, campaignsRes, draftsRes, scaleRes, errorsRes, followsRes, creativesRes, brandsRes] = await Promise.all([
+  const [authRes, profileRes, campaignsRes, draftsRes, scaleRes, errorsRes, followsRes, creativesRes, brandsRes, m4Res] = await Promise.all([
     admin.auth.admin.getUserById(userId),
     admin.from('user_profiles').select('*').eq('user_id', userId).single(),
     admin.from('campaigns').select('id, name, status, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
@@ -21,6 +21,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     admin.from('followed_brands').select('page_id, brand_name, email_alerts, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
     admin.from('creative_generations').select('id, type, tier, media_type, status, prompt, image_url, brand_id, source_ad_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(60),
     admin.from('brands').select('id, name').eq('user_id', userId),
+    // Did they engage the M4 launch flow at all (even a failed attempt)? Newly tracked as an activity.
+    admin.from('activity_logs').select('id').eq('user_id', userId).ilike('action_type', 'M4%').limit(1),
   ])
 
   const authUser = authRes.data?.user
@@ -28,8 +30,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   const campaigns = campaignsRes.data || []
   const launched = campaigns.some((c: any) => c.status === 'ACTIVE' || c.status === 'PAUSED')
-  const adPlanClicked = (draftsRes.data?.length || 0) > 0
   const scaleClicked = (scaleRes.data?.length || 0) > 0
+  // "Clicked Ad Plan (M4)" = engaged the M4 launch flow at all: a saved draft, a tracked M4 attempt,
+  // OR (for attempts before we tracked them) an M4-launch error in their logs. A user who tried to
+  // launch — even one that failed on a missing creative — has clearly reached M4.
+  const errs = errorsRes.data || []
+  const m4Attempted = (m4Res.data?.length || 0) > 0 || errs.some((e: any) => /^M4 Launch/i.test(e.error_message || '') || String(e.page_url || '') === '/m4')
+  const adPlanClicked = (draftsRes.data?.length || 0) > 0 || m4Attempted
 
   // Map brand_id → name so each creative shows which brand it belongs to.
   const brandNames = new Map<string, string>((brandsRes.data || []).map((b: any) => [b.id, b.name]))
