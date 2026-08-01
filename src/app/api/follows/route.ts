@@ -15,6 +15,23 @@ export async function GET() {
   const admin = createAdminClient()
   const { data } = await admin.from('followed_brands').select('page_id, brand_name, email_alerts, spied, brand_id').eq('user_id', user.id)
   const brands = (data || []) as any[]
+
+  // Resolve any missing brand_name from the crawled ads (page_name) — a follow saved without a name
+  // was showing the raw page id ("Facebook Page 244668702070242") instead of the real brand.
+  const blank = (n?: string) => { const t = String(n ?? '').trim(); return !t || /^\d+$/.test(t) || /^facebook page/i.test(t) }
+  const missing = brands.filter(b => blank(b.brand_name)).map(b => String(b.page_id))
+  if (missing.length) {
+    const { data: named } = await admin.from('discovery_ads_index').select('page_id, page_name').in('page_id', missing).not('page_name', 'is', null).limit(500)
+    const nameByPage = new Map<string, string>()
+    for (const r of (named || [])) { const pid = String((r as any).page_id); if (!nameByPage.has(pid) && (r as any).page_name) nameByPage.set(pid, String((r as any).page_name)) }
+    for (const b of brands) {
+      if (blank(b.brand_name) && nameByPage.has(String(b.page_id))) {
+        b.brand_name = nameByPage.get(String(b.page_id))
+        // Persist so it's fixed everywhere (Brand Spy, alerts, admin) — best-effort, don't block.
+        admin.from('followed_brands').update({ brand_name: b.brand_name }).eq('user_id', user.id).eq('page_id', b.page_id).then(() => {}, () => {})
+      }
+    }
+  }
   return NextResponse.json({ pageIds: brands.map(b => b.page_id), brands })
 }
 
