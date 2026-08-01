@@ -409,7 +409,7 @@ function CampaignsInner() {
                   <button onClick={() => openChat(camp)}
                     style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '7px 13px', borderRadius: 9, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
                     <span style={{ fontSize: 14 }}>✨</span>
-                    <span>Manage with AI</span>
+                    <span>Manage with Mello</span>
                   </button>
                 </div>
               </div>

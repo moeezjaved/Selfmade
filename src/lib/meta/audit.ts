@@ -245,15 +245,27 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
   // Top ADS (Polsia-style row): ad-level insights for the last 14d, top by spend, with thumbnails.
   let ads: any[] = []
   try {
-    const ai = await graph(`act_${acct.account_id}/insights?level=ad&fields=ad_id,ad_name,spend,impressions,clicks,ctr,cpc,actions,action_values&date_preset=${range}&limit=100`, token)
+    // campaign_name comes free with the insights call (no extra request) — the ad names are all
+    // identical ("New Sales ad"), so the campaign is what actually tells them apart.
+    const ai = await graph(`act_${acct.account_id}/insights?level=ad&fields=ad_id,ad_name,campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,actions,action_values&date_preset=${range}&limit=100`, token)
     ads = (ai?.data || []).map((r: any) => {
       const rev = Number((r.action_values || []).find((a: any) => /purchase/.test(a.action_type))?.value || 0)
       const conv = Number((r.actions || []).filter((a: any) => /purchase|complete_registration|lead/.test(a.action_type)).reduce((s: number, a: any) => s + Number(a.value || 0), 0))
       const spend = Number(r.spend || 0)
-      return { adId: r.ad_id, name: r.ad_name || 'Ad', spend: Math.round(spend), impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0), ctr: +Number(r.ctr || 0).toFixed(2), cpc: +Number(r.cpc || 0).toFixed(2), roas: +(spend > 0 ? rev / spend : 0).toFixed(2), conversions: conv, thumbnail_url: null as string | null, preview_url: null as string | null }
+      return { adId: r.ad_id, name: r.ad_name || 'Ad', campaignName: r.campaign_name || null, metaCampaignId: r.campaign_id || null, spend: Math.round(spend), impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0), ctr: +Number(r.ctr || 0).toFixed(2), cpc: +Number(r.cpc || 0).toFixed(2), roas: +(spend > 0 ? rev / spend : 0).toFixed(2), conversions: conv, thumbnail_url: null as string | null, preview_url: null as string | null }
     }).sort((a: any, b: any) => b.spend - a.spend).slice(0, 6)
-    // NOTE: we deliberately DON'T fetch per-ad thumbnails here (was 6 extra Graph calls every load —
-    // the main cause of the app rate-limit / error 17). The table renders fine with the 🎬 fallback.
+    // Thumbnails for JUST the top 6, in ONE batched read (`?ids=a,b,c`), NOT one call per ad. The
+    // per-ad fetch was the rate-limit culprit (error 17); a single batch keeps the visuals cheap.
+    try {
+      const ids = ads.map((a: any) => a.adId).filter(Boolean)
+      if (ids.length) {
+        const batch = await graph(`?ids=${ids.join(',')}&fields=creative{thumbnail_url,image_url}`, token)
+        for (const a of ads) {
+          const cre = batch?.[a.adId]?.creative
+          a.thumbnail_url = cre?.thumbnail_url || cre?.image_url || null
+        }
+      }
+    } catch { /* thumbnails best-effort — the 🎬 fallback still renders */ }
   } catch { /* ad-level is best-effort */ }
 
   const slim = (x: Graded) => ({ name: x.name, metaCampaignId: x.metaCampaignId, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })

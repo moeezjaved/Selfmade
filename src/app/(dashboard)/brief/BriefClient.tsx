@@ -24,6 +24,7 @@ import dynamic from 'next/dynamic'
 import Working from '@/components/Working'
 import { mello } from '@/lib/design/voice'
 import { openCredits } from '@/components/credits/CreditModal'
+import { Markdown } from '@/components/mello/Markdown'
 const AddCompetitors = dynamic(() => import('@/components/AddCompetitors'), { ssr: false })
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
@@ -584,8 +585,10 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
               ) : (
                 <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', maxWidth: '90%', minWidth: 0 }}>
                   <MelloFace size={26} />
-                  <div style={{ fontSize: 14.5, lineHeight: 1.6, color: INK, paddingTop: 2, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                    {(t as any).pending ? <span style={{ color: MUTED }}>Mello is thinking<span style={{ animation: 'mp 1.2s infinite' }}>…</span></span> : (t as any).text}
+                  <div style={{ fontSize: 14.5, lineHeight: 1.6, color: INK, paddingTop: 2, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                    {/* Render Mello's reply as Markdown so a grounded answer (tables, bullets, bold
+                        numbers) looks as good here as it does in /mello — not a wall of plain text. */}
+                    {(t as any).pending ? <span style={{ color: MUTED }}>Mello is thinking<span style={{ animation: 'mp 1.2s infinite' }}>…</span></span> : <Markdown content={String((t as any).text || '')} />}
                   </div>
                 </div>
               ))}
