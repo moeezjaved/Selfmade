@@ -84,7 +84,14 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   useEffect(() => {
     fetch('/api/meta/accounts', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
       const list = Array.isArray(j?.accounts) ? j.accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })) : []
-      if (list.length) { setAccounts(list); const p = list.find((x: any) => x.isPrimary) || list[0]; setSel(p.accountId) }
+      if (!list.length) return
+      setAccounts(list)
+      const p = list.find((x: any) => x.isPrimary) || list[0]
+      setSel(p.accountId)
+      // SELF-HEAL a stale nightly: if the stored audit is a DIFFERENT currency than the resolved
+      // primary (the €86 ↔ $687k drift, before tonight's re-audit overwrites it), correct the display
+      // with one live call so the brief matches /campaigns immediately. Same-currency → no call.
+      if (initial?.currency && p.currency && initial.currency !== p.currency) load(p.accountId)
     }).catch(() => {})
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 

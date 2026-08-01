@@ -172,7 +172,7 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
 
   const payload = {
     total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, currency: cur,
-    accountName: primary?.account_name || null, opportunities,
+    selected: primary?.account_id || null, accountName: primary?.account_name || null, opportunities,
     scale: audit.scale.slice(0, 3).map(slim),
     watch: audit.watch.slice(0, 3).map(slim),
     pause: audit.pause.slice(0, 3).map(slim),

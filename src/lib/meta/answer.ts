@@ -29,14 +29,32 @@ const fmtMoney = (n: number, currency: string) => { try { return new Intl.Number
 function deterministicAnswer(a: any): string {
   const money = (n: number) => fmtMoney(n, a.currency)
   const scale = a.scale?.[0], pause = a.pause?.[0], watch = a.watch?.[0]
-  let reply = `Across your ${a.total} campaign${a.total === 1 ? '' : 's'} you're at ${a.avgRoas}x on ${money(a.spend)} spend over 30 days (${money(a.spendToday)} today). `
+  const cur = a.currency || 'USD'
+
+  // Rich, grounded breakdown — same shape as the full Mello analysis, but computed straight from the
+  // audit (no LLM, can't hang). Renders as Markdown in both the brief and /mello.
+  let out = `**${a.accountName || 'Your account'}** — ${money(a.spend)} spent over 30 days at **${a.avgRoas}x** ROAS across ${a.total} campaign${a.total === 1 ? '' : 's'} (${money(a.spendToday)} today).\n\n`
+
+  const ads = Array.isArray(a.ads) ? a.ads.slice(0, 5) : []
+  if (ads.length) {
+    out += `**Top ads**\n\n`
+    out += `| Ad | Campaign | Spend | ROAS | CTR |\n|---|---|---|---|---|\n`
+    for (const ad of ads) {
+      out += `| ${ad.name || 'Ad'} | ${ad.campaignName || '—'} | ${money(ad.spend)} | ${ad.roas ? ad.roas.toFixed(2) + 'x' : '—'} | ${ad.ctr ? ad.ctr.toFixed(2) + '%' : '—'} |\n`
+    }
+    out += `\n`
+  }
+
   const moves: string[] = []
-  if (scale) moves.push(`scale “${scale.name}” — your winner at ${scale.roas}x`)
-  if (pause) moves.push(`pause “${pause.name}” — ${money(pause.spend)} for ${pause.conversions} sale${pause.conversions === 1 ? '' : 's'}, it's bleeding`)
-  if (watch && !scale) moves.push(`keep an eye on “${watch.name}” — catchy but not converting yet`)
-  if (moves.length) reply += `Your move${moves.length === 1 ? '' : 's'}: ${moves.join('; ')}. Those are one-click in your Morning Brief — say yes and I'll make the change.`
-  else reply += `Everything's steady — no campaign needs a move today. I'll flag it the moment one does.`
-  return reply
+  if (scale) moves.push(`**Scale “${scale.name}”** — your winner at ${scale.roas}x vs ${a.avgRoas}x account average. It has room.`)
+  if (pause) moves.push(`**Pause “${pause.name}”** — ${money(pause.spend)} for ${pause.conversions} sale${pause.conversions === 1 ? '' : 's'}. It's bleeding.`)
+  if (watch && !scale) moves.push(`**Watch “${watch.name}”** — catchy but not converting yet; give it another day.`)
+  if (moves.length) {
+    out += `**What I'd do**\n\n${moves.map(m => `- ${m}`).join('\n')}\n\nThese are one-click in your Morning Brief — say yes and I'll make the change on Meta.`
+  } else {
+    out += `Everything's steady — no campaign needs a move today. I'll flag it the moment one does.`
+  }
+  return out
 }
 
 /** Write the model's proposed actions as one-click mello_tasks (approve → tasks/run executes). */
