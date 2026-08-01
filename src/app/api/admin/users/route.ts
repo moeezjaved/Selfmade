@@ -27,6 +27,17 @@ export async function GET(request: NextRequest) {
   type Profile = { user_id: string; full_name: string | null; subscription_status: string | null; created_at: string | null }
   const profileMap = Object.fromEntries((profiles || []).map((p: Profile) => [p.user_id, p]))
 
+  // Facebook-connected? Count active Meta ad accounts per user so the list shows who's linked (and how
+  // many accounts) at a glance — the thing you want to see next to every user.
+  const { data: metaRows } = await admin
+    .from('meta_accounts')
+    .select('user_id, status')
+    .in('user_id', userIds)
+  const metaCount: Record<string, number> = {}
+  for (const m of (metaRows || [])) {
+    if (String((m as any).status) === 'active') metaCount[(m as any).user_id] = (metaCount[(m as any).user_id] || 0) + 1
+  }
+
   let users = authUsers.map((u: User) => ({
     id: u.id,
     email: u.email || '',
@@ -34,6 +45,8 @@ export async function GET(request: NextRequest) {
     subscription_status: profileMap[u.id]?.subscription_status || 'trialing',
     created_at: profileMap[u.id]?.created_at || u.created_at,
     last_sign_in_at: u.last_sign_in_at || null,
+    meta_accounts: metaCount[u.id] || 0,
+    meta_connected: (metaCount[u.id] || 0) > 0,
   }))
 
   if (search) {
