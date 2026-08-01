@@ -46,8 +46,14 @@ export async function fetchLiveOpportunities(token: string, accountId: string, r
   const genders = (geR?.data || []).map((r: any) => ({ label: r.gender || '', revenue: rev(r) }))
   const bestGender = [...genders].sort((a, b) => b.revenue - a.revenue)[0] || null
 
+  // "Lean into <segment>" only makes sense when a segment ACTUALLY earns more. With no conversion
+  // revenue (0 ROAS accounts), every bucket ties at 0 and the sort just returns the FIRST one (18-24),
+  // a meaningless default that reads like a real insight. Only surface a best segment with real revenue.
+  const bestAgeReal = bestAge && bestAge.revenue > 0 ? bestAge : null
+  const bestGenderReal = bestGender && bestGender.revenue > 0 ? bestGender : null
+
   return computeOpportunities({
     roas: accRoas, spend: accSpend, conv: accConv, days, winners, losers,
-    bestPl, worstPl, bestAge: bestAge ? { label: bestAge.label, roas: bestAge.roas } : null, bestGender,
+    bestPl, worstPl, bestAge: bestAgeReal ? { label: bestAgeReal.label, roas: bestAgeReal.roas } : null, bestGender: bestGenderReal,
   }, money)
 }
