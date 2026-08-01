@@ -145,9 +145,18 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
   // Structured numbers for the brief's dedicated Facebook Ads card (rendered from payload, not the
   // prose body). Keep it compact — top few per bucket is all the card shows.
   const slim = (x: Graded) => ({ name: x.name, metaCampaignId: x.metaCampaignId, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })
+
+  // Compute "What Mello would do" ONCE here (nightly cron / on-connect) and STORE it, so the brief
+  // renders the cards with ZERO live Graph calls on load. Best-effort — the card is fine without it.
+  let opportunities: any[] = []
+  try {
+    const { fetchLiveOpportunities } = await import('@/lib/meta/opportunities-fetch')
+    opportunities = await fetchLiveOpportunities(decryptToken(primary.access_token), primary.account_id, 'last_30d', cur)
+  } catch (e: any) { console.error('[meta audit] opportunities', e?.message) }
+
   const payload = {
     total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, currency: cur,
-    accountName: primary?.account_name || null,
+    accountName: primary?.account_name || null, opportunities,
     scale: audit.scale.slice(0, 3).map(slim),
     watch: audit.watch.slice(0, 3).map(slim),
     pause: audit.pause.slice(0, 3).map(slim),
