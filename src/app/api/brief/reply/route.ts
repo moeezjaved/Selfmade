@@ -74,6 +74,32 @@ export async function POST(req: NextRequest) {
     if (ads) return NextResponse.json(ads)
   } catch (e: any) { console.error('[brief/reply] ads-router', e?.message) }
 
+  // FAST REFLECT — "Why this?" / any reaction to a brief item Mello already wrote. This used to run the
+  // full tool-loop agent, which stalls (~30s) and returned "that's taking me longer than it should".
+  // Mello already KNOWS why (it's the item's own reasoning) — so answer with one quick, no-tools LLM
+  // call (12s cap), falling back to the item's own text. Never the hang-prone loop for a "why".
+  if (item && (item.title || item.body)) {
+    try {
+      const { default: OpenAI } = await import('openai')
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+      const model = process.env.MELLO_MODEL || 'gpt-4o'
+      const resp: any = await Promise.race([
+        openai.chat.completions.create({
+          model, temperature: 0.4, max_tokens: 220,
+          messages: [
+            { role: 'system', content: `You are Mello, the founder's in-house AI marketer, at your daily standup. First person, warm, 2-3 sentences, specific — never a lecture, never a list.` },
+            { role: 'user', content: `${watchLine}This morning you told the founder:\n"${String(item.title || '').slice(0, 300)}"${item.body ? `\n${String(item.body).slice(0, 500)}` : ''}\n\nThey asked: "${q}"\n\nAnswer it — explain why it matters and what you'd do next, grounded in what you already said.` },
+          ],
+        }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('reflect_timeout')), 12000)),
+      ])
+      const text = (resp?.choices?.[0]?.message?.content || '').trim()
+      if (text) return NextResponse.json({ reply: text })
+    } catch (e: any) { console.error('[brief/reply] reflect', e?.message) }
+    // Fallback: the item's own reasoning — always something, never a hang.
+    return NextResponse.json({ reply: String(item.body || item.title || `It's on today's brief because it moves your numbers. Want me to go deeper?`) })
+  }
+
   // Frame the reply as a standup exchange: Mello already SAID something this morning, the founder is
   // reacting to it. Keep answers short, specific, first-person, and action-oriented.
   const ctx = item && (item.title || item.body)
