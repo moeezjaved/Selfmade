@@ -23,6 +23,7 @@ import MelloFace, { type MelloState } from '@/components/MelloFace'
 import MelloTasks from './MelloTasks'
 import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 import BriefOpportunities from '@/components/brief/BriefOpportunities'
+import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
@@ -79,13 +80,19 @@ function Count({ n }: { n: number }) {
 /** A creative, shown. Video renders as poster + badge (never live) so clicks always reach the link. */
 function Shot({ image, videoUrl, w, h }: { image?: string | null; videoUrl?: string | null; w: number; h: number }) {
   const box: React.CSSProperties = { width: w, height: h, borderRadius: 10, objectFit: 'contain', background: '#0d120e', display: 'block', pointerEvents: 'none' }
-  const badge = <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 13, textShadow: '0 2px 8px rgba(0,0,0,.55)', pointerEvents: 'none' }}>▶</span>
   // Mello's own video creatives arrive via `thumbs` (an r2 .mp4 URL) — an <img> with a video src
-  // renders the broken-image glyph. Detect and show the first frame instead.
+  // renders the broken-image glyph. Detect and show the video instead.
   const imgIsVideo = !!image && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(image)
-  if (image && !imgIsVideo) return <span style={{ position: 'relative', display: 'inline-block' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={image} alt="" style={box} />{videoUrl ? badge : null}</span>
+  if (image && !imgIsVideo && !videoUrl) return <span style={{ position: 'relative', display: 'inline-block' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={image} alt="" style={box} /></span>
   const vsrc = imgIsVideo ? image! : videoUrl
-  if (vsrc) return <span style={{ position: 'relative', display: 'inline-block' }}><video src={vsrc} muted playsInline preload="metadata" style={box} />{badge}</span>
+  // Playable — the SAME Discovery player (hover-scrub, white line, lime play), so competitor videos on
+  // the brief behave exactly like they do in Discovery instead of a dead first-frame.
+  if (vsrc) return (
+    <span style={{ position: 'relative', display: 'inline-block', width: w, height: h, borderRadius: 10, overflow: 'hidden', background: '#0d120e', verticalAlign: 'top' }}>
+      <HoverScrubVideo src={vsrc} poster={!imgIsVideo && image ? image : undefined} />
+    </span>
+  )
+  if (image) return <span style={{ position: 'relative', display: 'inline-block' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={image} alt="" style={box} /></span>
   return null
 }
 
@@ -297,16 +304,29 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             <div className="bsx-e" style={{ marginTop: 40, animationDelay: '.6s' }}>
               <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
                 <div>
-                  <div style={section}>The playbook across your {playbook.playbook.brandsCount} competitor{playbook.playbook.brandsCount === 1 ? '' : 's'}</div>
-                  <div style={{ ...sectionSub, margin: 0 }}>Combined from {playbook.playbook.totalAds} fresh ads — the patterns to copy before they saturate.</div>
+                  <div style={section}>What&rsquo;s working across your {playbook.playbook.brandsCount} competitor{playbook.playbook.brandsCount === 1 ? '' : 's'}</div>
+                  <div style={{ ...sectionSub, margin: 0 }}>Decoded from {playbook.playbook.totalAds} fresh ads — the formula to copy before it saturates.</div>
                 </div>
-                {playbook.cta_href && (
-                  <Link href={playbook.cta_href} onClick={() => onAct(playbook)}
-                    style={{ background: FOREST, color: LIME, borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                    {playbook.cta_label || 'Make one like this'} →
-                  </Link>
-                )}
+                {/* "Make one like this" ACTS — opens the ad creator, seeded with the winning pattern. */}
+                <Link href={`/creative-studio?studio=1&seed=${encodeURIComponent([playbook.playbook.formats[0]?.label, playbook.playbook.hooks[0]?.label && `${playbook.playbook.hooks[0]?.label} hook`, playbook.playbook.offers[0]?.label && `${playbook.playbook.offers[0]?.label} offer`].filter(Boolean).join(', '))}`} onClick={() => onAct(playbook)}
+                  style={{ background: FOREST, color: LIME, borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  Make one like this →
+                </Link>
               </div>
+
+              {/* Plain-English insight FIRST — the whole playbook in one sentence, before any numbers. */}
+              {(() => {
+                const p = playbook.playbook!
+                const topFmt = p.formats[0]?.label, topHook = p.hooks[0]?.label, topOffer = p.offers[0]?.label, topEmo = p.emotions[0]?.label
+                const bold: React.CSSProperties = { fontWeight: 600 }
+                return (
+                  <div style={{ ...card, padding: '20px 24px', marginTop: 16 }}>
+                    <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 21, color: INK, lineHeight: 1.4, letterSpacing: '-.005em' }}>
+                      The winning formula right now: a <b style={bold}>{p.videoPct >= 50 ? 'video' : 'graphic'}</b> ad{topFmt ? <>, <b style={bold}>{topFmt}</b> style</> : ''}{topHook ? <>, opening on a <b style={bold}>“{topHook}”</b> hook</> : ''}{topOffer ? <>, with a <b style={bold}>{topOffer}</b> offer</> : ''}{topEmo ? <> — built to trigger <b style={bold}>{topEmo}</b></> : ''}.
+                    </div>
+                  </div>
+                )
+              })()}
 
               {playbook.playbook.judgment && (() => {
                 const j = playbook.playbook.judgment!
@@ -337,54 +357,34 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                 )
               })()}
 
-              <div className="bsx-pb" style={{ marginTop: 14 }}>
-                {/* Format */}
-                <div className="bsx-pb-c" style={{ ...card }}>
-                  <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 8 }}>Format</div>
-                  {playbook.playbook.videoPct > 0 && (
-                    <>
-                      <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>{playbook.playbook.videoPct}%<span style={{ fontSize: 12.5, color: MUTED, fontWeight: 500, marginLeft: 6 }}>video</span></div>
-                      <div style={{ height: 6, borderRadius: 100, background: '#eef0ea', overflow: 'hidden', margin: '6px 0 10px' }}>
-                        <div style={{ width: `${playbook.playbook.videoPct}%`, height: '100%', background: GREEN }} />
-                      </div>
-                    </>
-                  )}
-                  {playbook.playbook.formats.map(f => (
-                    <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, color: '#33402f', padding: '3px 0' }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.label}</span>
-                      <b style={{ color: '#66755d', fontVariantNumeric: 'tabular-nums' }}>{f.count}</b>
+              {/* Visual bars — ranked, share-of-ads, so it reads at a glance instead of raw counts. */}
+              {(() => {
+                const p = playbook.playbook!
+                const pct = (n: number) => Math.round((n / Math.max(p.totalAds, 1)) * 100)
+                const Bars = ({ title, rows, tone }: { title: string; rows: { label: string; count: number }[]; tone: string }) => {
+                  const max = Math.max(...rows.map(r => r.count), 1)
+                  return (
+                    <div style={{ ...card, padding: '18px 20px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: MUTED, marginBottom: 12 }}>{title}</div>
+                      {rows.length ? rows.slice(0, 4).map((r, i) => (
+                        <div key={r.label} style={{ marginBottom: 9 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 3 }}>
+                            <span style={{ fontWeight: 700, color: INK, textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+                            <span style={{ color: MUTED, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{pct(r.count)}%</span>
+                          </div>
+                          <div style={{ height: 8, background: '#eef1ec', borderRadius: 100 }}><div style={{ height: '100%', width: `${Math.round((r.count / max) * 100)}%`, background: i === 0 ? tone : `${tone}99`, borderRadius: 100 }} /></div>
+                        </div>
+                      )) : <div style={{ fontSize: 13, color: MUTED }}>Still decoding.</div>}
                     </div>
-                  ))}
-                </div>
-                {/* Hooks */}
-                <div className="bsx-pb-c" style={{ ...card }}>
-                  <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 8 }}>Top hooks</div>
-                  {playbook.playbook.hooks.length ? playbook.playbook.hooks.map(h => (
-                    <div key={h.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, color: '#33402f', padding: '3px 0' }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.label}</span>
-                      <b style={{ color: '#66755d', fontVariantNumeric: 'tabular-nums' }}>{h.count}</b>
-                    </div>
-                  )) : <div style={{ fontSize: 13, color: MUTED }}>Still decoding.</div>}
-                </div>
-                {/* Emotions */}
-                <div className="bsx-pb-c" style={{ ...card }}>
-                  <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 8 }}>Emotions they pull</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {playbook.playbook.emotions.length ? playbook.playbook.emotions.map(e => (
-                      <span key={e.label} style={{ fontSize: 12, color: '#20321c', background: '#eef7d6', borderRadius: 100, padding: '3px 10px', textTransform: 'capitalize' }}>{e.label} <b style={{ color: '#66755d' }}>{e.count}</b></span>
-                    )) : <div style={{ fontSize: 13, color: MUTED }}>Still decoding.</div>}
+                  )
+                }
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px,100%), 1fr))', gap: 14, marginTop: 14 }}>
+                    <Bars title="How they hook you" rows={p.hooks} tone={GREEN} />
+                    <Bars title="What they offer" rows={p.offers} tone="#b7791f" />
                   </div>
-                </div>
-                {/* Offers */}
-                <div className="bsx-pb-c" style={{ ...card }}>
-                  <div style={{ fontSize: 13, fontWeight: 650, color: MUTED, marginBottom: 8 }}>Offers they run</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {playbook.playbook.offers.length ? playbook.playbook.offers.map(o => (
-                      <span key={o.label} style={{ fontSize: 12, color: '#20321c', background: '#eef7d6', borderRadius: 100, padding: '3px 10px', textTransform: 'capitalize' }}>{o.label} <b style={{ color: '#66755d' }}>{o.count}</b></span>
-                    )) : <div style={{ fontSize: 13, color: MUTED }}>None surfaced in copy yet.</div>}
-                  </div>
-                </div>
-              </div>
+                )
+              })()}
             </div>
           )}
         </div>
