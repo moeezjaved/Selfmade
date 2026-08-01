@@ -16,7 +16,17 @@ export async function GET(request: NextRequest) {
     const days = parseInt(dateRange.replace('last_','').replace('d','')) || 7
 
     const admin = createAdminClient()
-    const metaAccount = await resolveScopedAccount(admin, user.id)   // org-scoped primary account
+    // Honor an explicit ?account (from the brief's "See the full report" — so the report opens on the
+    // SAME account the founder was viewing, not always the primary). Validate it belongs to them;
+    // otherwise fall back to the org-scoped primary.
+    const wantAccount = (request.nextUrl.searchParams.get('account') || '').replace(/^act_/, '')
+    let metaAccount: any = null
+    if (wantAccount) {
+      const { data } = await admin.from('meta_accounts').select('*')
+        .eq('user_id', user.id).eq('account_id', wantAccount).eq('status', 'active').maybeSingle()
+      metaAccount = data || null
+    }
+    if (!metaAccount) metaAccount = await resolveScopedAccount(admin, user.id)   // org-scoped primary account
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     // Cache the whole report (many Graph calls) per (user, account, range) — the Reports page + its
