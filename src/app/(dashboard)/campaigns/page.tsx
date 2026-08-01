@@ -394,8 +394,11 @@ function CampaignsInner() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>{camp.daily_budget ? fmt(Math.round(camp.daily_budget / 100), currency) : '—'}</div>
                   <div style={{ fontSize: 10, color: '#8aaa8a' }}>daily</div>
                 </div>
-                {/* Spent */}
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>{camp.spend > 0 ? fmt(camp.spend, currency) : '—'}</div>
+                {/* Spent + ROAS — the return on that spend, right where it belongs. Green ≥ break-even. */}
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>
+                  {camp.spend > 0 ? fmt(camp.spend, currency) : '—'}
+                  {camp.spend > 0 && camp.roas > 0 && <div style={{ fontSize: 10.5, fontWeight: 800, color: camp.roas >= 1 ? '#2e7d32' : '#c0392b', marginTop: 1 }}>{camp.roas.toFixed(2)}x ROAS</div>}
+                </div>
                 {/* Impressions */}
                 <div style={{ fontSize: 13, color: camp.impressions > 0 ? '#1a3a1a' : '#9e9e9e' }}>
                   {camp.impressions > 0 ? camp.impressions.toLocaleString() : '—'}
@@ -406,9 +409,9 @@ function CampaignsInner() {
                 </div>
                 {/* Actions */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                  <button onClick={() => openChat(camp)}
-                    style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '7px 13px', borderRadius: 9, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
-                    <span style={{ fontSize: 14 }}>✨</span>
+                  <button onClick={() => openChat(camp)} className="mello-manage"
+                    style={{ background: 'linear-gradient(135deg, #17251c 0%, #24382a 100%)', color: '#dffe95', border: '1px solid rgba(223,254,149,.18)', padding: '8px 15px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(17,24,17,.10), 0 8px 20px -10px rgba(17,24,17,.35)', transition: 'transform .12s, box-shadow .12s' }}>
+                    <span style={{ width: 17, height: 17, borderRadius: '50%', background: '#dffe95', color: '#17251c', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0 }}>✦</span>
                     <span>Manage with Mello</span>
                   </button>
                 </div>
@@ -444,9 +447,10 @@ function CampaignsInner() {
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a' }}>{fmtCPA(adset.cpa, currency)}</div>
                     {/* Budget */}
                     <div style={{ fontSize: 12, color: '#616161' }}>{adset.daily_budget ? fmt(Math.round(adset.daily_budget / 100), currency) : '—'}</div>
-                    {/* Spent */}
+                    {/* Spent + ROAS */}
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a' }}>{adset.spend > 0 ? fmt(adset.spend, currency) : '—'}</div>
+                      {adset.spend > 0 && adset.roas > 0 && <div style={{ fontSize: 10, fontWeight: 800, color: adset.roas >= 1 ? '#2e7d32' : '#c0392b', marginTop: 1 }}>{adset.roas.toFixed(2)}x</div>}
                     </div>
                     {/* Impressions */}
                     <div>
@@ -812,6 +816,7 @@ function CampaignsInner() {
       <style>{`
         @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
         @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .4 } }
+        .mello-manage:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(17,24,17,.12), 0 14px 28px -12px rgba(17,24,17,.45) !important; }
       `}</style>
     </div>
   )

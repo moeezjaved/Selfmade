@@ -51,6 +51,11 @@ export async function GET(request: NextRequest) {
     const px = (raw: any) => {
       const spend = parseFloat(raw?.spend || '0')
       const conv = parseInt(raw?.actions?.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || '0')
+      // Revenue (purchase conversion value) → ROAS. Already fetched via action_values; just wasn't
+      // surfaced. This is the number that tells a founder a campaign is worth scaling.
+      const revenue = (raw?.action_values || [])
+        .filter((a: any) => /purchase/.test(a.action_type))
+        .reduce((s: number, a: any) => s + parseFloat(a.value || '0'), 0)
       return {
         spend,
         conversions: conv,
@@ -58,6 +63,8 @@ export async function GET(request: NextRequest) {
         ctr: parseFloat(raw?.ctr || '0'),
         impressions: parseInt(raw?.impressions || '0'),
         reach: parseInt(raw?.reach || '0'),
+        revenue,
+        roas: spend > 0 ? revenue / spend : 0,
       }
     }
     const ci: Record<string, any> = {}; for (const i of (ciRes.data || [])) ci[i.campaign_id] = px(i)
@@ -101,9 +108,11 @@ export async function GET(request: NextRequest) {
             ctr: adsetIns.ctr,
             impressions: adsetIns.impressions,
             reach: adsetIns.reach,
+            revenue: adsetIns.revenue || 0,
+            roas: adsetIns.roas || 0,
           }
         })
-        const campIns = ci[camp.id] || { spend: 0, conversions: 0, cpa: 0, ctr: 0, impressions: 0, reach: 0 }
+        const campIns = ci[camp.id] || { spend: 0, conversions: 0, cpa: 0, ctr: 0, impressions: 0, reach: 0, revenue: 0, roas: 0 }
         return {
           id: camp.id,
           name: camp.name,
@@ -119,6 +128,8 @@ export async function GET(request: NextRequest) {
           ctr: campIns.ctr,
           impressions: campIns.impressions,
           reach: campIns.reach,
+          revenue: campIns.revenue || 0,
+          roas: campIns.roas || 0,
         }
       })
 
