@@ -89,7 +89,8 @@ function ReportsPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/reports?dateRange=${dateRange}`)
+      const acct = new URLSearchParams(searchParams?.toString() || '').get('account')
+      const res = await fetch(`/api/reports?dateRange=${dateRange}${acct ? `&account=${encodeURIComponent(acct)}` : ''}`)
       const json = await res.json()
       if (json.error) setError(json.error)
       else setData(json)

@@ -33,7 +33,7 @@ export function resolvePrimary(accounts: any[]): any {
 }
 const sameAcct = (a?: string, b?: string) => String(a || '').replace(/^act_/, '') === String(b || '').replace(/^act_/, '')
 
-type Graded = { campaignId: string; metaCampaignId: string; name: string; grade: 'graduate' | 'catchy' | 'pause' | 'hold'; spend: number; roas: number; ctr: number; conversions: number; dailyBudget: number | null }
+type Graded = { campaignId: string; metaCampaignId: string; name: string; grade: 'graduate' | 'catchy' | 'pause' | 'hold'; spend: number; roas: number; ctr: number; conversions: number; dailyBudget: number | null; active?: boolean }
 export type AuditResult = {
   total: number; spend: number; avgRoas: number
   scale: Graded[]; watch: Graded[]; pause: Graded[]
@@ -96,19 +96,23 @@ function grade(campaigns: any[]): AuditResult {
   const totImpr = rows.reduce((s, r) => s + Number(r.i.impressions || 0), 0)
   const avgCtr = totImpr > 0 ? (totClicks / totImpr) * 100 : 0
   const g = M4_CONFIG.grading
+  const isActive = (c: any) => String(c.status || '').toUpperCase() === 'ACTIVE'
   const graded: Graded[] = rows.map(({ c, i }) => {
     const roas = Number(i.roas || 0), spend = Number(i.spend || 0), ctr = Number(i.ctr || 0), conv = Number(i.conversions || 0)
     let tier: Graded['grade'] = 'hold'
     if (avgRoas > 0 && roas >= avgRoas * g.graduate.roas_above_avg_pct && spend >= avgSpend * g.graduate.min_spend_pct && conv >= g.graduate.min_conversions) tier = 'graduate'
     else if ((ctr >= avgCtr * g.catchy_not_converting.ctr_above_avg_multiplier || spend >= avgSpend * g.catchy_not_converting.spend_above_avg_multiplier) && (avgRoas === 0 || roas < avgRoas * g.catchy_not_converting.roas_below_avg_pct)) tier = 'catchy'
-    else if (spend < avgSpend * g.pause_poor.spend_below_avg_pct && (avgRoas === 0 || roas < avgRoas * g.pause_poor.roas_below_avg_pct) && String(c.status).toUpperCase() === 'ACTIVE') tier = 'pause'
-    return { campaignId: c.id, metaCampaignId: c.meta_campaign_id, name: c.name, grade: tier, spend, roas, ctr, conversions: conv, dailyBudget: c.daily_budget != null ? Number(c.daily_budget) : null }
+    else if (spend < avgSpend * g.pause_poor.spend_below_avg_pct && (avgRoas === 0 || roas < avgRoas * g.pause_poor.roas_below_avg_pct)) tier = 'pause'
+    return { campaignId: c.id, metaCampaignId: c.meta_campaign_id, name: c.name, grade: tier, spend, roas, ctr, conversions: conv, dailyBudget: c.daily_budget != null ? Number(c.daily_budget) : null, active: isActive(c) }
   })
+  // The Scale / Watch / Pause buckets ONLY show currently-DELIVERING campaigns — you can't scale, watch,
+  // or pause one that's already off. This kills the "Mello says pause an ad that's already paused" bug.
+  const live = graded.filter((x) => x.active)
   return {
     total: rows.length, spend: Math.round(totSpend), avgRoas: +avgRoas.toFixed(2),
-    scale: graded.filter((x) => x.grade === 'graduate').sort((a, b) => b.roas - a.roas),
-    watch: graded.filter((x) => x.grade === 'catchy').sort((a, b) => b.spend - a.spend),
-    pause: graded.filter((x) => x.grade === 'pause').sort((a, b) => b.spend - a.spend),
+    scale: live.filter((x) => x.grade === 'graduate').sort((a, b) => b.roas - a.roas),
+    watch: live.filter((x) => x.grade === 'catchy').sort((a, b) => b.spend - a.spend),
+    pause: live.filter((x) => x.grade === 'pause').sort((a, b) => b.spend - a.spend),
   }
 }
 
@@ -232,8 +236,14 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
 
   const token = (() => { try { return decryptToken(acct.access_token) } catch { return '' } })()
 
-  // Campaign metadata (name/status/budget) from the synced DB; performance fetched LIVE for the chosen
-  // range so the day picker (3d/7d/14d/30d) actually changes the numbers.
+  // LIVE current status + budget (not the synced DB, which goes stale — a campaign paused on Meta was
+  // still showing as "active" in the brief, so Mello recommended pausing an already-off campaign).
+  // effective_status is the source of truth for "is this actually delivering right now".
+  const liveById = new Map<string, any>()
+  try {
+    const cm = await graph(`act_${acct.account_id}/campaigns?fields=id,name,effective_status,status,daily_budget&limit=300`, token)
+    for (const c of (cm?.data || [])) liveById.set(String(c.id), c)
+  } catch { /* fall back to synced status below */ }
   const { data: dbCamps } = await admin.from('campaigns')
     .select('meta_campaign_id,name,status,daily_budget').eq('user_id', userId).eq('meta_account_id', acct.id)
   const metaById = new Map((dbCamps || []).map((c: any) => [String(c.meta_campaign_id), c]))
@@ -244,10 +254,14 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
       const rev = Number((r.action_values || []).find((a: any) => /purchase/.test(a.action_type))?.value || 0)
       const conv = Math.round(Number((r.actions || []).filter((a: any) => /purchase|complete_registration|lead/.test(a.action_type)).reduce((s: number, a: any) => s + Number(a.value || 0), 0)))
       const spend = Number(r.spend || 0)
+      const live: any = liveById.get(String(r.campaign_id))
       const meta: any = metaById.get(String(r.campaign_id)) || {}
+      // 'ACTIVE' only when Meta says it's actually delivering; otherwise the live effective_status
+      // (CAMPAIGN_PAUSED, PAUSED, etc.). Falls back to synced status only if the live call failed.
+      const status = live?.effective_status || meta.status || 'ACTIVE'
       return {
-        id: r.campaign_id, meta_campaign_id: r.campaign_id, name: r.campaign_name || meta.name || 'Campaign',
-        status: meta.status || 'ACTIVE', daily_budget: meta.daily_budget ?? null,
+        id: r.campaign_id, meta_campaign_id: r.campaign_id, name: r.campaign_name || live?.name || meta.name || 'Campaign',
+        status, daily_budget: live?.daily_budget ?? meta.daily_budget ?? null,
         campaign_insights: [{ spend, conversion_value: rev, roas: spend > 0 ? rev / spend : 0, ctr: Number(r.ctr || 0), impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0), conversions: conv, date_stop: '9999' }],
       }
     })

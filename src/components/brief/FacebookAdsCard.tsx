@@ -219,7 +219,9 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       )}
 
       <div style={{ padding: '16px 24px 18px' }}>
-        <Link href={ctaHref} onClick={onAct} style={{ display: 'inline-block', background: FOREST, color: LIME, borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>{ctaLabel} →</Link>
+        {/* Carry the account the founder is VIEWING into Reports, so "the full report" is for THIS
+            account (PKR/ROY/…), not always the primary. */}
+        <Link href={sel ? `${ctaHref}${ctaHref.includes('?') ? '&' : '?'}account=${encodeURIComponent(sel)}` : ctaHref} onClick={onAct} style={{ display: 'inline-block', background: FOREST, color: LIME, borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>{ctaLabel} →</Link>
       </div>
     </div>
   )
