@@ -60,23 +60,40 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           send({ type: 'title_update', title })
         }
 
-        const result = await runAgent({ userId, history, userMessage: message, send, surface, context })
+        // GROUNDED ROUTER (Phase 1) — an ad-performance question is answered straight from the audit
+        // engine and streamed as a normal reply, bypassing the tool-loop that hangs. This is the fix
+        // for "Mello isn't answering": the money question is deterministic and instant.
+        let adsAns: { reply: string } | null = null
+        try { const { answerAdsQuestion } = await import('@/lib/meta/answer'); adsAns = await answerAdsQuestion(admin, userId, message) } catch (e: any) { console.error('[mello] ads-router', e?.message) }
 
-        const { data: saved } = await admin.from('agent_messages').insert({
-          conversation_id: conversationId,
-          role: 'assistant',
-          content: result.text || '',
-          tool_calls: result.toolCalls.length ? result.toolCalls : null,
-          thinking_steps: result.thinkingSteps.length ? result.thinkingSteps : null,
-          interactive_widget: result.widget || null,
-        }).select('id').single()
+        if (adsAns) {
+          send({ type: 'text_delta', delta: adsAns.reply })
+          send({ type: 'text_done', content: adsAns.reply })
+          const { data: saved } = await admin.from('agent_messages').insert({
+            conversation_id: conversationId, role: 'assistant', content: adsAns.reply,
+          }).select('id').single()
+          await admin.from('agent_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId)
+          if (saved?.id) send({ type: 'feedback_prompt', message_id: saved.id })
+          send({ type: 'done' })
+        } else {
+          const result = await runAgent({ userId, history, userMessage: message, send, surface, context })
 
-        await admin.from('agent_conversations')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', conversationId)
+          const { data: saved } = await admin.from('agent_messages').insert({
+            conversation_id: conversationId,
+            role: 'assistant',
+            content: result.text || '',
+            tool_calls: result.toolCalls.length ? result.toolCalls : null,
+            thinking_steps: result.thinkingSteps.length ? result.thinkingSteps : null,
+            interactive_widget: result.widget || null,
+          }).select('id').single()
 
-        if (saved?.id) send({ type: 'feedback_prompt', message_id: saved.id })
-        send({ type: 'done' })
+          await admin.from('agent_conversations')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', conversationId)
+
+          if (saved?.id) send({ type: 'feedback_prompt', message_id: saved.id })
+          send({ type: 'done' })
+        }
       } catch (err: any) {
         console.error('[mello] agent error:', err?.message)
         send({ type: 'error', message: err?.message || 'Something went wrong' })
