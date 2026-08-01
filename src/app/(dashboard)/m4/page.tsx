@@ -439,6 +439,17 @@ function M4Inner() {
   }
 
   const launch = async () => {
+    // Guard: you can't launch ads without a creative. Every ad set (Broad + one per Interest) reuses
+    // an uploaded image/video, so with none the server returns one error PER interest — a confusing
+    // wall. Catch it here with ONE clear message before we ever call Meta.
+    const hasMedia = creatives.some(c => c.uploaded && c.hash)
+    if (!hasMedia) {
+      alert('Upload at least one image or video before launching — every ad needs a creative. Add one in the Creatives step, then launch.')
+      goTo('creatives')
+      return
+    }
+    if (!selectedPageId) { alert('Pick the Facebook Page to run these ads from (in the setup steps), then launch.'); return }
+    if (!adCopy.destinationUrl?.trim()) { alert('Add a destination URL (where the ad sends people) before launching.'); return }
     setLoading(true)
     try{
       const res=await fetch('/api/m4/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:form.campaignName||'M4',creatives,retargetingCreatives,retainerCreatives,interests:selectedInterests,budget:form.budget,location:form.location,ageMin:form.ageMin,ageMax:form.ageMax,gender:form.gender,pixelId,objective:form.objective,pageId:selectedPageId,instagramActorId:selectedInstagramId,primaryText:adCopy.primaryText,headline:adCopy.headline,cta:adCopy.cta,websiteUrl:adCopy.destinationUrl,retargetingCopy,retainerCopy,includeRetainer})})
