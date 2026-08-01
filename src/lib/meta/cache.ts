@@ -20,10 +20,10 @@ export function cacheGet<T = any>(key: string): T | null {
 
 export function cacheSet(key: string, v: any, ttlMs: number) {
   store.set(key, { v, exp: Date.now() + ttlMs })
-  if (store.size > 800) { const now = Date.now(); for (const [k, e] of store) if (e.exp < now) store.delete(k) }
+  if (store.size > 800) { const now = Date.now(); store.forEach((e, k) => { if (e.exp < now) store.delete(k) }) }
 }
 
 /** Drop everything under a prefix — e.g. after an action changes an account, so the next read is fresh. */
 export function cacheInvalidate(prefix: string) {
-  for (const k of store.keys()) if (k.startsWith(prefix)) store.delete(k)
+  Array.from(store.keys()).forEach((k) => { if (k.startsWith(prefix)) store.delete(k) })
 }

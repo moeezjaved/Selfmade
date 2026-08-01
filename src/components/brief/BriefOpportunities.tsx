@@ -5,7 +5,7 @@
  * ranked action cards with expected impact + a confidence meter. Renders nothing until there's data,
  * so it never clutters a brief for someone without a connected/active ad account.
  */
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { oppColor, type Opportunity } from '@/lib/meta/opportunities'
 
@@ -28,15 +28,34 @@ function Confidence({ level }: { level: 1 | 2 | 3 }) {
 export default function BriefOpportunities({ onAct }: { onAct?: (o: Opportunity) => void }) {
   const [ops, setOps] = useState<Opportunity[] | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [loaded, setLoaded] = useState(false)
 
-  useEffect(() => {
-    let live = true
+  // On-demand ONLY — this hits Meta (placement/age/gender), so we never auto-fire it. The founder taps
+  // "See Mello's moves" when they want it; result is cached server-side so it's cheap to re-open.
+  const load = () => {
+    setBusy(true)
     fetch('/api/meta/opportunities', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
-      .then(j => { if (live && j && Array.isArray(j.opportunities)) setOps(j.opportunities) })
+      .then(j => { if (j && Array.isArray(j.opportunities)) setOps(j.opportunities) })
       .catch(() => {})
-    return () => { live = false }
-  }, [])
+      .finally(() => { setBusy(false); setLoaded(true) })
+  }
+
+  // Not loaded yet → a quiet prompt (no Graph call until tapped).
+  if (!loaded) {
+    return (
+      <div className="bsx-e" style={{ ...card, marginBottom: 24, padding: '16px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', animationDelay: '.36s' }}>
+        <div>
+          <div style={{ fontSize: 15.5, fontWeight: 750, color: INK }}>What Mello would do</div>
+          <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>The ranked moves to improve your ads — pull the latest when you want it.</div>
+        </div>
+        <button onClick={load} disabled={busy} style={{ flexShrink: 0, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+          {busy ? 'Thinking…' : "See Mello's moves →"}
+        </button>
+      </div>
+    )
+  }
 
   if (!ops || ops.length === 0) return null
   const shown = showAll ? ops : ops.slice(0, 3)

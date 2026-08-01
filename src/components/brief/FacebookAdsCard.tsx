@@ -40,6 +40,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   const [range, setRange] = useState<string>('last_30d')   // default: 30 days
   const [busy, setBusy] = useState(false)
 
+  // LIVE fetch — only on an explicit user action (switch account / change range / refresh). Never auto.
   const load = (accountId?: string, r: string = range) => {
     setBusy(true)
     const qs = new URLSearchParams()
@@ -57,7 +58,15 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       .catch(() => {})
       .finally(() => setBusy(false))
   }
-  useEffect(() => { load() }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  // On mount we DON'T pull live Graph — we render the nightly-stored audit (`initial`) and only fetch
+  // the cheap DB accounts list so the switcher works. Live data (spend today, top ads, fresh grade)
+  // loads when the user switches account / changes range / taps refresh. Keeps us off Meta's rate limit.
+  useEffect(() => {
+    fetch('/api/meta/accounts', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
+      const list = Array.isArray(j?.accounts) ? j.accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })) : []
+      if (list.length) { setAccounts(list); const p = list.find((x: any) => x.isPrimary) || list[0]; setSel(p.accountId) }
+    }).catch(() => {})
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const money = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: d.currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()}` } }
   const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
@@ -102,13 +111,16 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
                   </button>
                 ))}
               </span>
-              {busy && <span style={{ fontSize: 11, color: '#9db29a' }}>updating…</span>}
+              <button onClick={() => load(sel || undefined, range)} disabled={busy} title="Refresh live from Meta"
+                style={{ background: 'rgba(255,255,255,.08)', color: '#cbd7c6', border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: '3px 10px', fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer' }}>
+                {busy ? 'refreshing…' : '↻ refresh'}
+              </button>
             </div>
             <div style={{ fontSize: 16.5, fontWeight: 750, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3, marginTop: 8, maxWidth: 460 }}>{headline(d).replace(/\.+$/, '')}</div>
           </div>
           <div style={{ display: 'flex', gap: 20, flexShrink: 0, flexWrap: 'wrap' }}>
             {/* SPEND TODAY — the live pulse, lime + labeled */}
-            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: LIME }}>{money(d.spendToday || 0)}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spent today</div></div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: LIME }}>{typeof d.spendToday === 'number' ? money(d.spendToday) : '—'}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spent today</div></div>
             <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{money(d.spend)}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spend · {RANGE_LABEL[range] || '30d'}</div></div>
             <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: d.avgRoas >= 1 ? LIME : '#f0a19a' }}>{d.avgRoas}x</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>avg ROAS</div></div>
             <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{d.total}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>campaigns</div></div>
