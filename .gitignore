@@ -17,3 +17,4 @@ worker/.env
 .env.probe
 .env*.local
 selfmade-extension.zip
+.gstack/
