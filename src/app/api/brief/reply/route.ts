@@ -65,6 +65,15 @@ export async function POST(req: NextRequest) {
       : `You're watching ${names.length}: ${list}. I track every ad each one launches and roll the patterns into your brief. Want the latest from any of them?` })
   }
 
+  // GROUNDED ROUTER (Phase 1) — an ad-performance question ("how do I improve my ads", "what should I
+  // scale/pause", "how's my account") is answered straight from the audit engine, NOT the tool-loop.
+  // This is the fix for "Mello isn't answering": the money question never touches the loop that hangs.
+  try {
+    const { answerAdsQuestion } = await import('@/lib/meta/answer')
+    const ads = await answerAdsQuestion(createAdminClient(), user.id, q)
+    if (ads) return NextResponse.json(ads)
+  } catch (e: any) { console.error('[brief/reply] ads-router', e?.message) }
+
   // Frame the reply as a standup exchange: Mello already SAID something this morning, the founder is
   // reacting to it. Keep answers short, specific, first-person, and action-oriented.
   const ctx = item && (item.title || item.body)
