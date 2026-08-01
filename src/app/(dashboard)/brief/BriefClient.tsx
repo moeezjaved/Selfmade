@@ -345,6 +345,25 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   const logDecision = (content: string) =>
     fetch('/api/interview/notebook', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entries: [{ kind: 'decision', content }], source: 'standup' }) }).catch(() => {})
 
+  // The conversation bubbles — ONE render used by both views. The scan view (the default brief) had a
+  // composer but no thread, so asking Mello sent the message into a void (the answer only rendered in
+  // the standup view). This makes the reply show wherever you ask.
+  const threadBubbles = (
+    <>
+      {thread.map((t, i) => t.who === 'user' ? (
+        <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '82%', background: '#eef4ea', borderRadius: '16px 16px 4px 16px', padding: '9px 14px', fontSize: 14, fontWeight: 550, color: INK, overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{t.text}</div>
+      ) : (
+        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', maxWidth: '90%', minWidth: 0 }}>
+          <MelloFace size={26} />
+          <div style={{ fontSize: 14.5, lineHeight: 1.6, color: INK, paddingTop: 2, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+            {(t as any).pending ? <span style={{ color: MUTED }}>Mello is thinking<span style={{ animation: 'mp 1.2s infinite' }}>…</span></span> : <Markdown content={String((t as any).text || '')} />}
+          </div>
+        </div>
+      ))}
+      <div ref={endRef} />
+    </>
+  )
+
   return (
     // 620 is the reading measure for the narrative brief; the scan is the founder's workspace —
     // it breathes at 1440 with real gutters (the 70/30 grid needs the room).
@@ -577,22 +596,10 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
             {brief.quiet ? 'Enjoy the quiet. I’ll break it the moment something moves. — Mello' : 'That’s everything. I’m here if anything moves. — Mello'}
           </div>
 
-          {/* ── the conversation after the agenda ── */}
+          {/* ── the conversation after the agenda (standup view) ── */}
           {thread.length > 0 && (
             <div style={{ marginTop: 26, paddingTop: 22, borderTop: `1px dashed ${LINE}`, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {thread.map((t, i) => t.who === 'user' ? (
-                <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '82%', background: '#eef4ea', borderRadius: '16px 16px 4px 16px', padding: '9px 14px', fontSize: 14, fontWeight: 550, color: INK, overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{t.text}</div>
-              ) : (
-                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', maxWidth: '90%', minWidth: 0 }}>
-                  <MelloFace size={26} />
-                  <div style={{ fontSize: 14.5, lineHeight: 1.6, color: INK, paddingTop: 2, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-                    {/* Render Mello's reply as Markdown so a grounded answer (tables, bullets, bold
-                        numbers) looks as good here as it does in /mello — not a wall of plain text. */}
-                    {(t as any).pending ? <span style={{ color: MUTED }}>Mello is thinking<span style={{ animation: 'mp 1.2s infinite' }}>…</span></span> : <Markdown content={String((t as any).text || '')} />}
-                  </div>
-                </div>
-              ))}
-              <div ref={endRef} />
+              {threadBubbles}
             </div>
           )}
         </>
@@ -631,6 +638,23 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
       {/* The scan already carries the capability menu as its fourth column — don't print it twice. */}
       {brief && view !== 'scan' && <TryMello compact />}
       {brief && <BriefWishlist />}
+
+      {/* ── the conversation in the SCAN view — a floating panel just above the composer, so asking
+          Mello on the brief actually shows the answer (it used to render only in the standup view, so
+          the scan brief's composer sent into a void). Fixed + scrollable, sits over the desk. ── */}
+      {brief && view === 'scan' && thread.length > 0 && (
+        <div className="brief-thread" style={{ position: 'fixed', left: 0, right: 0, bottom: 92, display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 45, paddingLeft: 20, paddingRight: 20 }}>
+          <div style={{ width: 'min(680px, 100%)', maxHeight: '58vh', overflowY: 'auto', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, boxShadow: '0 24px 70px -24px rgba(16,24,15,.35)', padding: '16px 18px', pointerEvents: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+              <span style={{ fontSize: 12, fontWeight: 750, color: MUTED }}>Mello</span>
+              <button onClick={() => setThread([])} aria-label="Close" style={{ background: 'none', border: 'none', color: '#9aa79a', fontSize: 18, lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>×</button>
+            </div>
+            {threadBubbles}
+          </div>
+        </div>
+      )}
+      {/* The app rail (72px) offsets the content column on desktop; nudge the thread panel to match. */}
+      <style>{`@media(min-width:769px){.brief-thread{padding-left:92px}}`}</style>
 
       {/* ── composer: interrupt anytime, in plain language ── */}
       {/* The bar is viewport-fixed; the app rail (72px) offsets the content column, so pad the bar's
