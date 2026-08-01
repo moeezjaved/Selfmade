@@ -92,6 +92,10 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       setAccounts(list)
       const p = list.find((x: any) => x.isPrimary) || list[0]
       setSel(p.accountId)
+      // ALWAYS tell the brief which account is resolved as primary, on mount — so "What Mello would do"
+      // scopes to the SAME account (a stored ROY-1 card must not show under an Aura-Bura brief). The
+      // opportunities card refetches only if its stored cards were for a different account; otherwise no call.
+      onAccountChange?.(p.accountId, p.currency)
       // SELF-HEAL a stale nightly: if the stored audit is a DIFFERENT currency than the resolved
       // primary (the €86 ↔ $687k drift, before tonight's re-audit overwrites it), correct the display
       // with one live call so the brief matches /campaigns immediately. Same-currency → no call.
