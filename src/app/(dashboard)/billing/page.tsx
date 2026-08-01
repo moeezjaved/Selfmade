@@ -31,6 +31,7 @@ export default function BillingPage() {
   const [inviteCode, setInviteCode] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [showCancel, setShowCancel] = useState(false)   // in-app cancel confirm (not the browser dialog)
   const searchParams = useSearchParams()
   const router = useRouter()
   const expired = searchParams.get('expired') === '1'
@@ -79,12 +80,13 @@ export default function BillingPage() {
   }
 
   // Cancel the PayFast subscription — access continues until period end, then downgrades to Free.
+  // Confirmed via an in-APP modal (not the browser's window.confirm, which looked like a scam popup).
   const cancelPlan = async () => {
-    if (!confirm('Cancel your subscription? You’ll keep full access until the end of your current billing period, then move to Free.')) return
+    setShowCancel(false)
     setLoading(true)
     try {
       const r = await fetch('/api/billing/cancel', { method: 'POST' }).then((x) => x.json()).catch(() => ({}))
-      if (r?.ok) { alert('Your subscription is cancelled — access continues until the end of this period.'); window.location.reload() }
+      if (r?.ok) { window.location.reload() }
       else { alert(r?.error || 'Could not cancel — please contact support.'); setLoading(false) }
     } catch { alert('Could not cancel — please try again.'); setLoading(false) }
   }
@@ -105,7 +107,7 @@ export default function BillingPage() {
 
       {/* Full pricing (shared with the landing page — one source of truth). */}
       <div style={{ marginBottom: 40 }}>
-        <PricingSection variant="dashboard" />
+        <PricingSection variant="dashboard" subscriptionStatus={status} />
       </div>
 
       <div style={{ maxWidth: 680 }}>
@@ -140,20 +142,16 @@ export default function BillingPage() {
             </div>
             <span style={{ background: '#dffe9520', border: '1px solid #dffe9540', color: '#dffe95', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 100 }}>✓ Active</span>
           </div>
+          {/* No Stripe "Manage subscription" portal — we bill through PayFast, which has no hosted
+              portal, so that button dead-ended on an empty Stripe page. The plan cards above + Cancel
+              here ARE the management. */}
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
             <button
-              onClick={() => checkout('portal')}
-              disabled={loading}
-              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              {loading ? 'Loading…' : 'Manage subscription →'}
-            </button>
-            <button
-              onClick={cancelPlan}
+              onClick={() => setShowCancel(true)}
               disabled={loading}
               style={{ background: 'transparent', border: '1px solid rgba(220,38,38,0.35)', color: '#f87171', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit' }}
             >
-              Cancel subscription
+              {loading ? 'Working…' : 'Cancel subscription'}
             </button>
           </div>
           <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 10, marginBottom: 0 }}>
@@ -199,6 +197,23 @@ export default function BillingPage() {
         </div>
       )}
       </div>
+
+      {/* In-app cancel confirmation — replaces the browser's window.confirm (which read like a scam
+          popup: "www.tryselfmade.ai says…"). On-brand, clear, reversible. */}
+      {showCancel && (
+        <div onClick={() => !loading && setShowCancel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,24,15,0.55)', display: 'grid', placeItems: 'center', zIndex: 1000, padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, padding: '26px 28px', maxWidth: 420, width: '100%', boxShadow: '0 30px 80px -20px rgba(16,24,15,0.5)' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#1a3a1a', marginBottom: 8 }}>Cancel your subscription?</div>
+            <div style={{ fontSize: 13.5, color: '#5a7a5a', lineHeight: 1.6, marginBottom: 20 }}>
+              You keep full access until the end of your current billing period, then move to Free. You can reactivate anytime before then — nothing is lost.
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowCancel(false)} disabled={loading} style={{ background: '#f2f4ef', color: '#1a3a1a', border: 'none', borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Keep my plan</button>
+              <button onClick={cancelPlan} disabled={loading} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit' }}>{loading ? 'Cancelling…' : 'Cancel subscription'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -37,10 +37,13 @@ const FAQS: { q: string; a: string }[] = [
   { q: 'How much does an agency charge for the same thing?', a: `A UGC video from a freelancer runs $200–300 and takes a week. Here it's $${VID_USD} and about two minutes.` },
 ]
 
-export default function PricingSection({ variant = 'landing' }: { variant?: 'landing' | 'dashboard' }) {
+export default function PricingSection({ variant = 'landing', subscriptionStatus }: { variant?: 'landing' | 'dashboard'; subscriptionStatus?: string }) {
   const [current, setCurrent] = useState<PlanId | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [faq, setFaq] = useState<number | null>(0)
+  // Cancel-at-period-end: still the current paid plan, but scheduled to drop to Free. The current-plan
+  // button becomes "Reactivate" so the founder can undo the cancel before the period ends.
+  const canceledCurrent = variant === 'dashboard' && subscriptionStatus === 'canceled'
 
   useEffect(() => {
     if (variant !== 'dashboard') return
@@ -55,6 +58,16 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
     // dashboard
     if (c.id === 'free') return
     if (c.id === 'payg') { openCredits('buy'); return }
+    // Reactivate a scheduled cancel — flip status back to active, no re-checkout.
+    if (current === c.id && canceledCurrent) {
+      setBusy(c.id)
+      try {
+        const j = await fetch('/api/billing/reactivate', { method: 'POST' }).then((r) => r.json()).catch(() => ({}))
+        if (j?.ok) window.location.reload()
+        else alert(j?.error || 'Could not reactivate — try again or contact support.')
+      } finally { setBusy(null) }
+      return
+    }
     if (current === c.id) return
     setBusy(c.id)
     try {
@@ -74,7 +87,7 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
 
   const label = (c: Card) => {
     if (busy === c.id) return '…'
-    if (variant === 'dashboard' && current === c.id) return 'Current plan'
+    if (variant === 'dashboard' && current === c.id) return canceledCurrent ? 'Reactivate' : 'Current plan'
     return c.cta
   }
 
@@ -101,7 +114,7 @@ export default function PricingSection({ variant = 'landing' }: { variant?: 'lan
               {c.per && <span style={{ fontSize: 14, color: '#999', fontWeight: 600 }}>{c.per}</span>}
             </div>
             <div style={{ fontSize: 12, color: MUTED, minHeight: 16, marginBottom: 4 }}>{c.note}</div>
-            <button onClick={() => cta(c)} disabled={busy === c.id || (variant === 'dashboard' && current === c.id)} style={{
+            <button onClick={() => cta(c)} disabled={busy === c.id || (variant === 'dashboard' && current === c.id && !canceledCurrent)} style={{
               margin: '14px 0', padding: '11px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
               background: (variant === 'dashboard' && current === c.id) ? '#eef2ec' : c.popular ? LIME : (c.id === 'business' || c.id === 'payg') ? DARK : '#f2f6ee',
               color: (variant === 'dashboard' && current === c.id) ? '#6b7280' : (c.id === 'business' || c.id === 'payg') ? LIME : DARK,
