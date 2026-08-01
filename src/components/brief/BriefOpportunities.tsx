@@ -25,14 +25,17 @@ function Confidence({ level }: { level: 1 | 2 | 3 }) {
   )
 }
 
-export default function BriefOpportunities({ onAct }: { onAct?: (o: Opportunity) => void }) {
-  const [ops, setOps] = useState<Opportunity[] | null>(null)
+export default function BriefOpportunities({ initial, onAct }: { initial?: Opportunity[]; onAct?: (o: Opportunity) => void }) {
+  // `initial` = the cards computed by the nightly audit and stored in the brief payload. If present, we
+  // render them immediately with ZERO live calls. Refresh (or the empty-state button) pulls fresh.
+  const hasInitial = !!(initial && initial.length)
+  const [ops, setOps] = useState<Opportunity[] | null>(hasInitial ? initial! : null)
   const [showAll, setShowAll] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [loaded, setLoaded] = useState(false)
+  const [loaded, setLoaded] = useState(hasInitial)
 
-  // On-demand ONLY — this hits Meta (placement/age/gender), so we never auto-fire it. The founder taps
-  // "See Mello's moves" when they want it; result is cached server-side so it's cheap to re-open.
+  // Live pull — the nightly cards are usually enough, so this only fires on an explicit tap (refresh /
+  // "See Mello's moves"). Result is cached server-side so re-opening is cheap.
   const load = () => {
     setBusy(true)
     fetch('/api/meta/opportunities', { cache: 'no-store' })
@@ -64,7 +67,10 @@ export default function BriefOpportunities({ onAct }: { onAct?: (o: Opportunity)
     <div className="bsx-e" style={{ marginBottom: 24, animationDelay: '.36s' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
         <div style={{ fontSize: 20, fontWeight: 750, letterSpacing: '-.02em', color: INK }}>What Mello would do</div>
-        <Link href="/reports" style={{ fontSize: 12.5, color: '#3f8f4f', fontWeight: 800, textDecoration: 'none' }}>See the full report →</Link>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={load} disabled={busy} title="Refresh live from Meta" style={{ background: 'none', border: 'none', color: '#9aa79a', fontSize: 12, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', padding: 0 }}>{busy ? 'refreshing…' : '↻'}</button>
+          <Link href="/reports" style={{ fontSize: 12.5, color: '#3f8f4f', fontWeight: 800, textDecoration: 'none' }}>See the full report →</Link>
+        </span>
       </div>
       <div style={{ fontSize: 13.5, color: MUTED, margin: '0 0 16px' }}>The {ops.length} move{ops.length === 1 ? '' : 's'} that matter — each with what it's worth and how sure I am.</div>
 

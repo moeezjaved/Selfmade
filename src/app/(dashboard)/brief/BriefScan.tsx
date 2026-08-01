@@ -27,7 +27,7 @@ import BriefOpportunities from '@/components/brief/BriefOpportunities'
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
 type MetaCampaign = { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }
-type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string; playbook?: { totalAds: number; brandsCount: number; videoPct: number; formats: { label: string; count: number }[]; hooks: { label: string; count: number }[]; emotions: { label: string; count: number }[]; offers: { label: string; count: number }[]; judgment?: { winner: string; confidence: 'High' | 'Medium' | 'Low'; confidenceWhy: string; verdict: 'Adopt' | 'Test' | 'Watch'; verdictWhy: string } }; metaAudit?: { total: number; spend: number; avgRoas: number; currency?: string; accountName?: string | null; scale: MetaCampaign[]; watch: MetaCampaign[]; pause: MetaCampaign[] } }
+type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string; playbook?: { totalAds: number; brandsCount: number; videoPct: number; formats: { label: string; count: number }[]; hooks: { label: string; count: number }[]; emotions: { label: string; count: number }[]; offers: { label: string; count: number }[]; judgment?: { winner: string; confidence: 'High' | 'Medium' | 'Low'; confidenceWhy: string; verdict: 'Adopt' | 'Test' | 'Watch'; verdictWhy: string } }; metaAudit?: { total: number; spend: number; avgRoas: number; currency?: string; accountName?: string | null; scale: MetaCampaign[]; watch: MetaCampaign[]; pause: MetaCampaign[]; opportunities?: { title: string; why: string; impact: string; level: number; href: string; cta: string; tone: string }[] } }
 type Brief = {
   summary: { adsScanned: number; brandsWatched: number; spiedBrands: number; creativesReady: number }
   lastCycleAt?: string | null
@@ -211,9 +211,9 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             </div>
           )}
 
-          {/* ── What Mello would do — the ranked action cards, same engine as Reports. Renders only when
-              there's a connected/active ad account with opportunities; otherwise nothing. ── */}
-          <BriefOpportunities />
+          {/* ── What Mello would do — ranked action cards. Pre-computed nightly (stored in the audit
+              payload) so they auto-show with ZERO live calls; refresh pulls the latest on demand. ── */}
+          <BriefOpportunities initial={metaAds?.metaAudit?.opportunities as any} />
 
           {/* ── Also today — the one runner-up, a quiet row. ── */}
           {second && (

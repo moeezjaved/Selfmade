@@ -55,6 +55,8 @@ export type BriefItem = {
     scale: { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }[]
     watch: { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }[]
     pause: { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }[]
+    /** Pre-computed "What Mello would do" cards (nightly) so the brief renders them with no live call. */
+    opportunities?: { title: string; why: string; impact: string; level: number; href: string; cta: string; tone: string }[]
   }
 }
 
@@ -152,6 +154,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
           total: Number(p.total || 0), spend: Number(p.spend || 0), avgRoas: Number(p.avgRoas || 0),
           currency: typeof p.currency === 'string' ? p.currency : 'USD', accountName: p.accountName || null,
           scale: Array.isArray(p.scale) ? p.scale : [], watch: Array.isArray(p.watch) ? p.watch : [], pause: Array.isArray(p.pause) ? p.pause : [],
+          opportunities: Array.isArray(p.opportunities) ? p.opportunities : [],
         },
       })
       continue
