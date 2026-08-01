@@ -38,9 +38,10 @@ function deterministicAnswer(a: any): string {
   const ads = Array.isArray(a.ads) ? a.ads.slice(0, 5) : []
   if (ads.length) {
     out += `**Top ads**\n\n`
-    out += `| Ad | Campaign | Spend | ROAS | CTR |\n|---|---|---|---|---|\n`
+    out += `| Ad | Name | Campaign | Spend | ROAS | CTR |\n|---|---|---|---|---|---|\n`
     for (const ad of ads) {
-      out += `| ${ad.name || 'Ad'} | ${ad.campaignName || '—'} | ${money(ad.spend)} | ${ad.roas ? ad.roas.toFixed(2) + 'x' : '—'} | ${ad.ctr ? ad.ctr.toFixed(2) + '%' : '—'} |\n`
+      const thumb = ad.thumbnail_url ? `![](${ad.thumbnail_url})` : '🎬'
+      out += `| ${thumb} | ${ad.name || 'Ad'} | ${ad.campaignName || '—'} | ${money(ad.spend)} | ${ad.roas ? ad.roas.toFixed(2) + 'x' : '—'} | ${ad.ctr ? ad.ctr.toFixed(2) + '%' : '—'} |\n`
     }
     out += `\n`
   }
