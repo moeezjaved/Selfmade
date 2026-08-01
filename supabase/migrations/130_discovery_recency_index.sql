@@ -1,0 +1,31 @@
+-- 130 — Discovery "Newest" sort + "last N days" filter: composite partial index.
+--
+-- The Discovery feed reads discovery_ads_index WHERE has_creative = true (the drained ads that have
+-- a creative to show). Sorting or filtering that set by RECENCY had NO supporting index:
+--
+--   • sort=newest  (ORDER BY days_running ASC)         → full sort of the whole has-creative set, OR
+--     a wade down the (days_running) index skipping has_creative=false rows (the freshest ads are the
+--     ~815K un-drained ones with no creative yet). Either way: 20-60s → the grid sat on skeletons and
+--     the API 504'd. This is the "Newest shows oldest / index was busy" bug.
+--   • days=7 / days=30  (WHERE days_running <= N)       → same wade: the planner walked whatever sort
+--     index it had, filtering days_running<=N + has_creative row-by-row → 21s+ (only ~3 ads surfaced
+--     before the client gave up).
+--
+-- Only perf_score-ordered queries were fast, because discovery_ads_perf_score_idx (mig 038) is hot AND
+-- high-perf ads are older/established → already drained → have creatives (no wade).
+--
+-- This partial composite index makes the has-creative recency path a PURE index scan:
+--   WHERE has_creative ORDER BY days_running ASC, ad_id ASC LIMIT 60        (Newest)
+--   WHERE has_creative AND days_running <= N ORDER BY days_running, ad_id   (last N days)
+-- Both read only the matching leaf pages and stop at LIMIT — instant, even under rollup/drain write
+-- load. `where has_creative` keeps the index tiny (only the servable rows) and skips the un-drained
+-- wade entirely. ad_id is the stable pagination tiebreaker, so the ORDER BY is fully index-covered
+-- (no separate sort node).
+--
+-- CONCURRENTLY = no table lock (safe on the live serving table). Still: PAUSE crawl + drain first
+-- (system_flags 'crawl_paused' / stop the drain worker) per the standing pause-before-DDL rule — a
+-- schema change under heavy write load has 503'd the API before. Build takes a few minutes on the
+-- current corpus; the feed keeps serving (the route degrades Newest/date filters to a fast graceful
+-- "try again" until this lands, instead of hanging).
+create index concurrently if not exists dai_hascre_days_running
+  on discovery_ads_index (days_running, ad_id) where has_creative;
