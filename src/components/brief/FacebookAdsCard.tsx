@@ -31,8 +31,12 @@ const headline = (d: Summary) => {
   return `I audited your ${d.total} campaign${d.total === 1 ? '' : 's'} — ${parts.length ? parts.join(', ') : 'all steady'}.`
 }
 
-export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabel = 'See the full report', onAct }: {
+export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabel = 'See the full report', onAct, onAccountChange }: {
   initial: Summary; ctaHref?: string; ctaLabel?: string; onAct?: () => void
+  // Broadcast which account (and its currency) this card is showing, so the rest of the brief
+  // ("What Mello would do", etc.) follows the SAME account and every figure agrees. Fired on the
+  // user's explicit switch — never on mount — to stay off Meta's rate limit.
+  onAccountChange?: (accountId: string, currency: string) => void
 }) {
   const [d, setD] = useState<Summary>(initial)
   const [accounts, setAccounts] = useState<Summary['accounts']>([])
@@ -54,6 +58,8 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
         if (j.selected) setSel(j.selected)
         if (j.range) setRange(j.range)
         if (typeof j.total === 'number') setD(j)
+        // Tell the brief which account we're now showing so the other cards match the currency.
+        if (j.selected) onAccountChange?.(j.selected, j.currency || 'USD')
       })
       .catch(() => {})
       .finally(() => setBusy(false))

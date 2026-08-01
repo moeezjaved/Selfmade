@@ -124,6 +124,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
   credits?: number | null; plan?: string | null; onGoFullTime?: () => void; subscribing?: boolean; onBuyCredits?: () => void
   activeBrandId?: string | null; activeBrandName?: string | null; onAddCompetitor?: () => void
 }) {
+  // Which Meta account the brief is scoped to. The Facebook card owns the switcher; when the founder
+  // flips accounts, this lifts up so "What Mello would do" refetches for the SAME account — one
+  // currency, one truth, across every card. null = the nightly-stored primary (no live call).
+  const [acctScope, setAcctScope] = useState<string | null>(null)
   const isPaid = ['starter', 'pro', 'business', 'enterprise'].includes(String(plan || '').toLowerCase())
   const perDay = (49 / 30).toFixed(2)
   const playbook = brief.items.find(i => i.kind === 'market_playbook' && i.playbook) || null
@@ -208,7 +212,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
           {/* ── Facebook Ads — the money card (its own component: account switcher + spend today, fetched
               live). When connected + audited, show it; otherwise the connect-and-run promo. ── */}
           {metaAds?.metaAudit ? (
-            <FacebookAdsCard initial={metaAds.metaAudit as any} ctaHref={metaAds.cta_href || '/reports'} ctaLabel={metaAds.cta_label || 'See the full report'} onAct={() => onAct(metaAds)} />
+            <FacebookAdsCard initial={metaAds.metaAudit as any} ctaHref={metaAds.cta_href || '/reports'} ctaLabel={metaAds.cta_label || 'See the full report'} onAct={() => onAct(metaAds)} onAccountChange={(acctId) => setAcctScope(acctId)} />
           ) : (
             <div className="bsx-e" style={{ ...card, background: FOREST, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', animationDelay: '.34s' }}>
               <div style={{ minWidth: 0 }}>
@@ -221,7 +225,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
 
           {/* ── What Mello would do — ranked action cards. Pre-computed nightly (stored in the audit
               payload) so they auto-show with ZERO live calls; refresh pulls the latest on demand. ── */}
-          <BriefOpportunities initial={metaAds?.metaAudit?.opportunities as any} />
+          <BriefOpportunities initial={metaAds?.metaAudit?.opportunities as any} accountId={acctScope} />
 
           {/* ── Rivals' winning ad — competitor intelligence, a SEPARATE card from the own-account
               moves above (agreed split: account numbers never mix with rival inference). ── */}
