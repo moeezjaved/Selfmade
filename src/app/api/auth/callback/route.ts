@@ -8,6 +8,10 @@ const META_API_VERSION = process.env.META_API_VERSION || 'v20.0'
 const APP_URL = 'https://www.tryselfmade.ai'
 const REDIRECT_URI = `${APP_URL}/api/auth/callback`
 
+// The OAuth exchange + inline audit (Graph calls) needs headroom past the 10s default, same as the BYO route.
+export const dynamic = 'force-dynamic'
+export const maxDuration = 120
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
@@ -181,10 +185,14 @@ export async function GET(request: NextRequest) {
       console.log('PRUNE:', pruneErr ? JSON.stringify(pruneErr) : 'OK')
     }
 
-    return NextResponse.redirect(`${APP_URL}/connect-meta?success=true`)
+    // Read the account immediately so the Facebook Ads card is waiting in the brief the moment they
+    // land (same instant-gratification the BYO path gives). Best-effort — never block the redirect.
+    try { const { runMetaAudit } = await import('@/lib/meta/audit'); await runMetaAudit(admin, userId, { syncFirst: true }) } catch (e) { console.error('post-oauth audit:', e) }
+
+    return NextResponse.redirect(`${APP_URL}/brief?connected=meta`)
   } catch (err) {
     console.error('ERROR:', err)
     const message = err instanceof Error ? err.message : 'Connection failed'
-    return NextResponse.redirect(`${APP_URL}/connect-meta?error=${encodeURIComponent(message)}`)
+    return NextResponse.redirect(`${APP_URL}/connect/meta?error=${encodeURIComponent(message)}`)
   }
 }

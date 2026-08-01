@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Check, ExternalLink, Copy } from 'lucide-react'
+import { META_LIVE } from '@/lib/flags'
 
 const FOREST = '#17251c', LIME = '#dffe95', INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', GREEN = '#3f8f4f'
 type Acct = { account_id: string; name: string; currency: string; timezone: string; active: boolean }
@@ -119,7 +120,24 @@ export default function ConnectMetaByo() {
         </div>
       ) : (
         <>
-          {/* door picker */}
+          {/* ── ONE-CLICK OAuth — the easiest door now that the Meta app is approved. Sends the founder
+              straight to Facebook's permission dialog (/api/meta/init → dialog/oauth), then the callback
+              stores the account and lands them back here connected. Manual doors stay below as fallback. ── */}
+          {META_LIVE && (
+            <div style={{ background: FOREST, borderRadius: 16, padding: '22px 24px', marginBottom: 18 }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-.02em' }}>Connect with Meta — one click</div>
+              <p style={{ fontSize: 13.5, color: '#b8c4b4', lineHeight: 1.6, margin: '6px 0 16px', maxWidth: 460 }}>
+                Sign in with Facebook and approve — Mello reads your ad account and puts the first audit in tomorrow&rsquo;s brief. No tokens, no setup.
+              </p>
+              <a href="/api/meta/init" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: '#1877F2', color: '#fff', borderRadius: 100, padding: '12px 24px', fontSize: 14.5, fontWeight: 800, textDecoration: 'none' }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="#fff" aria-hidden><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07Z"/></svg>
+                Continue with Facebook
+              </a>
+            </div>
+          )}
+
+          {/* door picker — manual fallbacks (agency partner-share / bring-your-own token) */}
+          {META_LIVE && <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 700, margin: '0 0 10px' }}>Or connect manually</div>}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             {bizId && <button onClick={() => { setTab('partner'); setErr(null) }} style={{ ...btnS, background: tab === 'partner' ? FOREST : '#eef2ec', color: tab === 'partner' ? LIME : '#3c463c' }}>Share with Selfmade · easiest</button>}
             <button onClick={() => { setTab('token'); setErr(null) }} style={{ ...btnS, background: tab === 'token' ? FOREST : '#eef2ec', color: tab === 'token' ? LIME : '#3c463c' }}>Use your own token</button>
