@@ -14,6 +14,17 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    // Record that this user reached M4 and tried to launch — even if it fails validation below. The
+    // admin funnel ("Clicked Ad Plan (M4)") reads this, so a user who engaged M4 counts as engaged,
+    // not as "never touched it" (the mismatch: error logs showed the attempt but the funnel didn't).
+    try {
+      const { createAdminClient } = await import('@/lib/supabase/server')
+      await createAdminClient().from('activity_logs').insert({
+        user_id: user.id, action_type: 'M4_LAUNCH_ATTEMPT', entity_type: 'campaign',
+        description: 'Started an M4 campaign launch', performed_by: 'user',
+      })
+    } catch { /* best-effort tracking */ }
+
     const body = await request.json().catch(() => ({}))
     const {
       campaignName = 'M4 Campaign',
