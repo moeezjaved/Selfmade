@@ -357,7 +357,16 @@ function ChannelsSection() {
 
   const load = () => fetch('/api/channels/link').then(r => r.json())
     .then(j => { if (Array.isArray(j.identities)) setIds(j.identities) }).catch(() => {})
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    // After the "Add to Slack" OAuth round-trip we come back with ?slack=connected|error|…
+    const p = new URLSearchParams(window.location.search).get('slack')
+    if (p) {
+      const msg: Record<string, string> = { connected: '✅ Slack connected — decisions land in your DM.', cancelled: 'Slack connect cancelled.', expired: 'That link expired — try again.', notconfigured: 'Slack isn’t set up on the server yet.', error: 'Slack connect failed — try again.' }
+      if (p === 'connected') toast.success(msg[p]); else toast.error(msg[p] || 'Slack connect issue.')
+      window.history.replaceState({}, '', '/settings')
+    }
+  }, [])
 
   const connect = async (provider: 'slack' | 'whatsapp') => {
     setBusy(provider); setCode(null)
@@ -385,6 +394,9 @@ function ChannelsSection() {
           </div>
           {c ? (
             <button onClick={() => disconnect(c.id)} style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e2e8f0', background: '#fff', color: '#b91c1c', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Disconnect</button>
+          ) : provider === 'slack' ? (
+            // One-click OAuth — no code to copy.
+            <a href="/api/channels/slack/start" style={{ background: '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Add to Slack →</a>
           ) : (
             <button onClick={() => connect(provider)} disabled={busy === provider} style={{ background: '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>{busy === provider ? 'Creating…' : 'Connect →'}</button>
           )}
