@@ -38,6 +38,9 @@ export async function POST(req: NextRequest) {
         if (identity) {
           let botToken: string | undefined
           try { botToken = (identity as any).meta?.bot_token ? decryptToken((identity as any).meta.bot_token) : undefined } catch { botToken = undefined }
+          // Rate-limit chat so a spammer can't run up the OpenAI bill (the web path already does this).
+          const { isRateLimited } = await import('@/lib/rateLimit')
+          if (await isRateLimited(identity.user_id)) { await slackPost(ev.channel, 'One moment — give me a few seconds and ask again.', undefined, botToken); return NextResponse.json({ ok: true }) }
           try {
             const { askMello } = await import('@/lib/mello/ask')
             const out = await askMello(admin, identity.user_id, ev.text)
