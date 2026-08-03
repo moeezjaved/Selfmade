@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { slackVerify, slackUpdate, slackRespond, slackOpenDm } from '@/lib/channels/providers'
 import { redeemCode } from '@/lib/channels/link'
 import { runTask } from '@/lib/mello/run-task'
+import { decryptToken } from '@/lib/meta/client'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -61,9 +62,11 @@ export async function POST(req: NextRequest) {
 
   // Resolve the Slack user → the linked account. No link → no action (security boundary).
   const { data: identity } = await admin.from('channel_identities')
-    .select('user_id').eq('provider', 'slack').eq('external_id', slackUserId).eq('active', true).maybeSingle()
-  if (!identity) { await slackRespond(responseUrl, '⚠️ This Slack isn’t linked to a Selfmade account. Run `/selfmade <code>` first.'); return NextResponse.json({ ok: true }) }
+    .select('user_id, meta').eq('provider', 'slack').eq('external_id', slackUserId).eq('active', true).maybeSingle()
+  if (!identity) { await slackRespond(responseUrl, '⚠️ This Slack isn’t linked to a Selfmade account. Connect it from Selfmade → Settings.'); return NextResponse.json({ ok: true }) }
   const userId = identity.user_id
+  let botToken: string | undefined
+  try { botToken = (identity as any).meta?.bot_token ? decryptToken((identity as any).meta.bot_token) : undefined } catch { botToken = undefined }
 
   const { data: task } = await admin.from('mello_tasks').select('*').eq('id', String(taskId)).eq('user_id', userId).maybeSingle()
   if (!task) { await slackRespond(responseUrl, '⚠️ I can’t find that task anymore — it may have expired.'); return NextResponse.json({ ok: true }) }
@@ -71,7 +74,7 @@ export async function POST(req: NextRequest) {
   if (action.action_id === 'skip') {
     await admin.from('mello_tasks').update({ status: 'dismissed', updated_at: new Date().toISOString() }).eq('id', task.id)
     await admin.from('channel_messages').update({ status: 'skipped' }).eq('task_id', task.id).eq('provider', 'slack')
-    if (channel && ts) await slackUpdate(channel, ts, `~${task.title}~  ·  skipped`, [{ type: 'section', text: { type: 'mrkdwn', text: `~*${task.title}*~\n_Skipped — I’ll leave it._` } }])
+    if (channel && ts) await slackUpdate(channel, ts, `~${task.title}~  ·  skipped`, [{ type: 'section', text: { type: 'mrkdwn', text: `~*${task.title}*~\n_Skipped — I’ll leave it._` } }], botToken)
     return NextResponse.json({ ok: true })
   }
 
@@ -85,7 +88,7 @@ export async function POST(req: NextRequest) {
     const line = done
       ? `✅ *${task.title}*\n_Done.${updated.result?.newBudget ? ` Now at $${updated.result.newBudget}/day.` : ''} I’m watching it._`
       : `⚠️ *${task.title}*\n_${updated.error || 'That didn’t go through.'}${updated.needsApp ? ' Open it in the app to finish.' : ''}_`
-    if (channel && ts) await slackUpdate(channel, ts, done ? `${task.title} · done` : `${task.title} · needs attention`, [{ type: 'section', text: { type: 'mrkdwn', text: line } }])
+    if (channel && ts) await slackUpdate(channel, ts, done ? `${task.title} · done` : `${task.title} · needs attention`, [{ type: 'section', text: { type: 'mrkdwn', text: line } }], botToken)
     else await slackRespond(responseUrl, line)
     return NextResponse.json({ ok: true })
   }

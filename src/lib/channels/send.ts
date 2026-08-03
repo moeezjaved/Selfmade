@@ -5,6 +5,12 @@
  */
 import { slackPost, whatsappSend } from '@/lib/channels/providers'
 import { formatApproval, formatReport } from '@/lib/channels/format'
+import { decryptToken } from '@/lib/meta/client'
+
+/** The workspace bot token for this identity (OAuth installs store their own, encrypted); env fallback. */
+const botTokenFor = (id: any): string | undefined => {
+  try { return id?.meta?.bot_token ? decryptToken(id.meta.bot_token) : undefined } catch { return undefined }
+}
 
 const APPROVAL_TTL_MS = 24 * 60 * 60 * 1000   // a "yes" 2 days later shouldn't fire
 
@@ -27,7 +33,7 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
     if (id.provider === 'slack') {
       const channel = id.meta?.channel_id
       if (!channel) continue
-      const r = await slackPost(channel, `Decision: ${task.title}`, slackBlocks)
+      const r = await slackPost(channel, `Decision: ${task.title}`, slackBlocks, botTokenFor(id))
       if (r.ok) {
         sent++
         await admin.from('channel_messages').insert({
@@ -63,7 +69,7 @@ export async function sendReportToChannels(admin: any, userId: string, brief: an
   let sent = 0
   for (const id of ids) {
     if (id.provider === 'slack' && id.meta?.channel_id) {
-      const r = await slackPost(id.meta.channel_id, 'Your brief', slackBlocks)
+      const r = await slackPost(id.meta.channel_id, 'Your brief', slackBlocks, botTokenFor(id))
       if (r.ok) { sent++; await admin.from('channel_messages').insert({ user_id: userId, provider: 'slack', external_id: r.ts, channel_ref: id.meta.channel_id, kind: 'report', status: 'sent' }) }
     } else if (id.provider === 'whatsapp') {
       const chatId = id.meta?.chat_id
