@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runMetaAudit } from '@/lib/meta/audit'
+import { pushNewApprovals } from '@/lib/channels/send'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -33,6 +34,9 @@ export async function GET(req: NextRequest) {
       const r = await runMetaAudit(admin, uid, { syncFirst: true })
       if (r) audited++
       else skipped++
+      // Auto-push: any fresh approval the audit just suggested lands in the founder's Slack/WhatsApp
+      // on its own (deduped; no-op if no channel linked). Best-effort — never fails the audit.
+      await pushNewApprovals(admin, uid).catch(() => {})
     } catch { skipped++ }
   }
   return NextResponse.json({ ok: true, users: users.length, audited, skipped })
