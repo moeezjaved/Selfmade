@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { slackVerify, slackUpdate, slackRespond, slackOpenDm } from '@/lib/channels/providers'
+import { slackVerify, slackUpdate, slackRespond, slackOpenDm, slackPost } from '@/lib/channels/providers'
 import { redeemCode } from '@/lib/channels/link'
 import { runTask } from '@/lib/mello/run-task'
 import { decryptToken } from '@/lib/meta/client'
@@ -22,10 +22,31 @@ export async function POST(req: NextRequest) {
   const ct = req.headers.get('content-type') || ''
   const admin = createAdminClient()
 
-  // 1) Events API URL verification (JSON body)
+  // 1) Events API — URL verification + typed DMs to Mello (JSON body)
   if (ct.includes('application/json')) {
     const body = JSON.parse(raw || '{}')
     if (body.type === 'url_verification') return NextResponse.json({ challenge: body.challenge })
+
+    if (body.type === 'event_callback') {
+      // Ignore Slack retries so a slow answer doesn't post twice.
+      if (req.headers.get('x-slack-retry-num')) return NextResponse.json({ ok: true })
+      const ev = body.event || {}
+      // Only plain user DMs (not the bot's own messages, edits, joins, etc.).
+      if (ev.type === 'message' && !ev.bot_id && !ev.subtype && ev.channel_type === 'im' && ev.text) {
+        const { data: identity } = await admin.from('channel_identities')
+          .select('user_id, meta').eq('provider', 'slack').eq('external_id', ev.user).eq('active', true).maybeSingle()
+        if (identity) {
+          let botToken: string | undefined
+          try { botToken = (identity as any).meta?.bot_token ? decryptToken((identity as any).meta.bot_token) : undefined } catch { botToken = undefined }
+          try {
+            const { askMello } = await import('@/lib/mello/ask')
+            const out = await askMello(admin, identity.user_id, ev.text)
+            await slackPost(ev.channel, out.reply, undefined, botToken)
+          } catch { await slackPost(ev.channel, 'I hit a snag — try me again in a moment.', undefined, botToken) }
+        }
+      }
+      return NextResponse.json({ ok: true })
+    }
     return NextResponse.json({ ok: true })
   }
 

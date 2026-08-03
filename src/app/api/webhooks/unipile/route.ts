@@ -74,17 +74,17 @@ export async function POST(req: NextRequest) {
   // A code from an already-linked sender → just re-confirm.
   if (extractCode(text) && !YES.test(text) && !NO.test(text)) { await reply('You’re already connected ✅'); return NextResponse.json({ ok: true }) }
 
+  // yes/no ONLY act on a pending approval. Anything else is a normal chat with Mello.
   const approval = await latestOpenApproval(admin, userId, 'whatsapp')
-  if (!approval) { await reply('Nothing’s waiting on you right now — I’ll message when there is. 🌱'); return NextResponse.json({ ok: true }) }
 
-  if (NO.test(text)) {
+  if (approval && NO.test(text)) {
     if (approval.task_id) await admin.from('mello_tasks').update({ status: 'dismissed', updated_at: new Date().toISOString() }).eq('id', approval.task_id)
     await admin.from('channel_messages').update({ status: 'skipped' }).eq('id', approval.id)
     await reply('Skipped — I’ll leave it. 👍')
     return NextResponse.json({ ok: true })
   }
 
-  if (YES.test(text)) {
+  if (approval && YES.test(text)) {
     const { data: task } = await admin.from('mello_tasks').select('*').eq('id', approval.task_id).eq('user_id', userId).maybeSingle()
     if (!task) { await reply('That one expired — I’ll resend next time.'); return NextResponse.json({ ok: true }) }
     if (task.status === 'done') { await reply('Already done ✅'); return NextResponse.json({ ok: true }) }
@@ -97,7 +97,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  // Unclear reply → nudge with the pending decision.
-  await reply(`I’ve got one thing waiting: “${approval.task_id ? '' : ''}”. Reply YES to approve or NO to skip.`.replace('“”', 'a pending decision'))
+  // Anything else → a normal conversation with Mello (his one brain, same as the app + Slack).
+  try {
+    const { askMello } = await import('@/lib/mello/ask')
+    const out = await askMello(admin, userId, text)
+    await reply(out.reply)
+  } catch { await reply('I hit a snag pulling that together — try me again in a moment.') }
   return NextResponse.json({ ok: true })
 }

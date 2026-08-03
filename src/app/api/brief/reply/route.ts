@@ -9,14 +9,12 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { runAgentToText } from '@/lib/mello/agent'
+import { askMello } from '@/lib/mello/ask'
 import { isRateLimited } from '@/lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 export const runtime = 'nodejs'
-
-const isBlankName = (b?: string) => { const t = String(b ?? '').trim(); return !t || /^\d+$/.test(t) }
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -28,124 +26,7 @@ export async function POST(req: NextRequest) {
   const q = String(question || '').trim().slice(0, 800)
   if (!q) return NextResponse.json({ error: 'question required' }, { status: 400 })
 
-  // TEACH THE COMPANY (Company Brain L2) — a belief stated in plain words ("never discount", "always
-  // British English", "from now on don't spend over Rs300 without asking") becomes a standing rule the
-  // whole company obeys. Conservative match: an imperative belief, not a question.
-  const TEACH = /^(never|always|from now on|don'?t|do not|only|we (?:never|always|only)|make sure|remember (?:to|that)|keep in mind|by default)\b/i
-  if (!item && TEACH.test(q) && !q.includes('?')) {
-    try {
-      const { teachRule } = await import('@/lib/brain')
-      await teachRule(createAdminClient(), { userId: user.id, rule: q, createdBy: 'founder', source: 'chat' })
-      return NextResponse.json({ reply: `Got it — I've made that a company rule: “${q}”. The whole team follows it from now on. Say “forget that rule” any time to remove it.` })
-    } catch (e: any) { console.error('[brief/reply] teach', e?.message) /* fall through to normal handling */ }
-  }
-
-  // LISTEN & REMEMBER (Company Brain L3/L5) — the founder reveals durable signal just by what they
-  // say ("our audience is busy parents", "we're premium not budget"). Capture it as a LOW-confidence
-  // inferred note (not a taught belief) so recall() and the reflection loop can use/promote it. Cheap
-  // heuristic, no LLM, best-effort — never blocks or shapes the reply.
-  const SIGNAL = /\b((our|my) (audience|customers?|buyers?|brand|market|product|tone|voice|goal|niche|focus)|we (are|sell|target|focus on|prefer|value|care about))\b/i
-  if (!item && !q.includes('?') && SIGNAL.test(q) && q.length <= 200) {
-    try {
-      createAdminClient().from('mello_memory').insert({
-        user_id: user.id, content: q, category: 'signal', confidence: 40, source: 'inferred',
-      }).then(() => {}, () => {})
-    } catch { /* best-effort */ }
-  }
-
-  // Ground the answer in WHO the founder actually watches (spied/followed brands) so "which competitor
-  // am I watching / what did they launch" is answered from real data — not deflected to "connect Meta".
-  let watchLine = ''
-  let watchCount = 0
-  try {
-    const admin = createAdminClient()
-    const { data: follows } = await admin.from('followed_brands')
-      .select('brand_name, spied').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20)
-    const names = (follows || []).map((f: any) => f.brand_name).filter((n: string) => !isBlankName(n))
-    watchCount = names.length
-    if (names.length) watchLine = `The founder is watching these competitors (their ads are in your crawled library — pull specifics with search_ad_library / get_competitor_ads): ${names.join(', ')}.\n\n`
-  } catch { /* best-effort */ }
-
-  const asksCompetitors = /competitor|rival|who\s+(?:am|are)\s+i\s+watch|who\s+do\s+i\s+watch|my\s+brands?\b/i.test(q)
-
-  // No competitors yet + they're asking ABOUT competitors → answer directly, DON'T run the agent
-  // (its prompt forbids saying "I can't find them", so with zero watched it spins/hangs/hallucinates).
-  if (watchCount === 0 && asksCompetitors) {
-    return NextResponse.json({ reply: `You're not watching any competitors yet — add one from Discovery → Spy a brand, and I'll track every ad they launch and pull the patterns into your brief.` })
-  }
-
-  // FAST PATH — a plain identity/list question ("tell me my competitor name", "who am I watching")
-  // is answered from data we ALREADY have. Routing it through the full LLM tool-loop is what made a
-  // one-word answer sit on "Mello is thinking…" — this returns instantly, no model call, no stall.
-  const isListQuestion = asksCompetitors && /\b(name|names|list|who|which|what)\b/i.test(q) && q.length < 90
-  if (watchCount > 0 && isListQuestion) {
-    const admin = createAdminClient()
-    const { data: follows } = await admin.from('followed_brands')
-      .select('brand_name, spied').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20)
-    const names = (follows || []).map((f: any) => f.brand_name).filter((n: string) => !isBlankName(n))
-    const list = names.length === 1 ? names[0]
-      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-    return NextResponse.json({ reply: names.length === 1
-      ? `You're watching ${list} — I read their whole ad archive and flag every new ad they launch. Want me to pull their latest, or add another?`
-      : `You're watching ${names.length}: ${list}. I track every ad each one launches and roll the patterns into your brief. Want the latest from any of them?` })
-  }
-
-  // GROUNDED ROUTER (Phase 1) — an ad-performance question ("how do I improve my ads", "what should I
-  // scale/pause", "how's my account") is answered straight from the audit engine, NOT the tool-loop.
-  // This is the fix for "Mello isn't answering": the money question never touches the loop that hangs.
-  try {
-    const { answerAdsQuestion } = await import('@/lib/meta/answer')
-    const ads = await answerAdsQuestion(createAdminClient(), user.id, q)
-    if (ads) return NextResponse.json(ads)
-  } catch (e: any) { console.error('[brief/reply] ads-router', e?.message) }
-
-  // FAST REFLECT — "Why this?" / any reaction to a brief item Mello already wrote. This used to run the
-  // full tool-loop agent, which stalls (~30s) and returned "that's taking me longer than it should".
-  // Mello already KNOWS why (it's the item's own reasoning) — so answer with one quick, no-tools LLM
-  // call (12s cap), falling back to the item's own text. Never the hang-prone loop for a "why".
-  if (item && (item.title || item.body)) {
-    try {
-      const { default: OpenAI } = await import('openai')
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-      const model = process.env.MELLO_MODEL || 'gpt-4o'
-      const resp: any = await Promise.race([
-        openai.chat.completions.create({
-          model, temperature: 0.4, max_tokens: 220,
-          messages: [
-            { role: 'system', content: `You are Mello, the founder's in-house AI marketer, at your daily standup. First person, warm, 2-3 sentences, specific — never a lecture, never a list.` },
-            { role: 'user', content: `${watchLine}This morning you told the founder:\n"${String(item.title || '').slice(0, 300)}"${item.body ? `\n${String(item.body).slice(0, 500)}` : ''}\n\nThey asked: "${q}"\n\nAnswer it — explain why it matters and what you'd do next, grounded in what you already said.` },
-          ],
-        }),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('reflect_timeout')), 12000)),
-      ])
-      const text = (resp?.choices?.[0]?.message?.content || '').trim()
-      if (text) return NextResponse.json({ reply: text })
-    } catch (e: any) { console.error('[brief/reply] reflect', e?.message) }
-    // Fallback: the item's own reasoning — always something, never a hang.
-    return NextResponse.json({ reply: String(item.body || item.title || `It's on today's brief because it moves your numbers. Want me to go deeper?`) })
-  }
-
-  // Frame the reply as a standup exchange: Mello already SAID something this morning, the founder is
-  // reacting to it. Keep answers short, specific, first-person, and action-oriented.
-  const ctx = item && (item.title || item.body)
-    ? `This morning in your standup you told the founder:\n"${String(item.title || '').slice(0, 300)}"${item.body ? `\n${String(item.body).slice(0, 400)}` : ''}\n\n`
-    : `You're in your daily standup with the founder.\n\n`
-  const prompt = `${ctx}${watchLine}The founder just replied: "${q}"\n\nAnswer as Mello, their AI marketer — first person, 2–4 sentences, specific and grounded. Use your ad-library tools (search_ad_library, get_competitor_ads, find_winning_ads, analyze_niche_patterns) to pull real specifics about the brands above or their niche. If they're redirecting you ("make it warmer", "watch this brand", "kill it"), acknowledge concretely and say exactly what you'll do next; if they want a creative made, tell them to hit Create / the studio.\n\nHARD RULES: This is Selfmade's clone-first product — it does NOT require a connected Meta ad account, and everything you need is in the crawled ad library. NEVER tell the founder to "connect Meta" or that you can't find their competitors — you already know who they watch (listed above) and their ads are in your library. Never say you couldn't retrieve data without first trying your library tools. Never verbose, never a lecture. You're a colleague at standup, not a chatbot.`
-
-  try {
-    // Hard server-side cap — the agent loops over tools + the LLM and can occasionally stall. Race it
-    // so we ALWAYS return a reply fast (never leave the client on "Mello is thinking…").
-    const result: any = await Promise.race([
-      runAgentToText(user.id, prompt),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('agent_timeout')), 30000)),
-    ])
-    const reply = (result?.text || '').trim() || `Got it — I'm on it.`
-    return NextResponse.json({ reply })
-  } catch (e: any) {
-    console.error('[brief/reply]', e?.message)
-    const msg = e?.message === 'agent_timeout'
-      ? `That one's taking me longer than it should — ask again and I'll be quicker.`
-      : `I hit a snag pulling that together — try me again in a moment.`
-    return NextResponse.json({ reply: msg }, { status: 200 })
-  }
+  // Mello's one brain (shared with Slack + WhatsApp).
+  const out = await askMello(createAdminClient(), user.id, q, { item, email: user.email })
+  return NextResponse.json(out)
 }
