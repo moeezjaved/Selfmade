@@ -16,9 +16,11 @@ export default function BrainPage() {
   const [loading, setLoading] = useState(true)
   const [rule, setRule] = useState(''); const [dept, setDept] = useState(''); const [busy, setBusy] = useState(false)
   const [reflecting, setReflecting] = useState(false)
+  const [culture, setCulture] = useState<{ aggressive: string; premium: string; tone: string; risk: string }>({ aggressive: 'balanced', premium: 'premium', tone: 'friendly', risk: 'ask' })
 
   const load = () => fetch('/api/brain/overview').then(r => r.json()).then(j => { if (!j.error) setOv(j) }).catch(() => {}).finally(() => setLoading(false))
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); fetch('/api/brain/culture').then(r => r.json()).then(j => { if (j.culture) setCulture(j.culture) }).catch(() => {}) }, [])
+  const saveCulture = (next: typeof culture) => { setCulture(next); fetch('/api/brain/culture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) }).then(() => toast.success('Culture updated')).catch(() => {}) }
 
   const teach = async () => {
     if (!rule.trim() || busy) return
@@ -65,6 +67,29 @@ export default function BrainPage() {
                   {ov.identity.brand_type && <div>Type — {ov.identity.brand_type}</div>}
                 </div>
               ) : <p style={{ color: '#9ca3af', fontSize: 13 }}>No brand set up yet.</p>}
+            </div>
+          )}
+
+          {tab === 'Identity' && (
+            <div style={card}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a', marginBottom: 3 }}>Culture</div>
+              <div style={{ fontSize: 12.5, color: '#7a9a7a', marginBottom: 14 }}>The temperament every department follows. Change any time.</div>
+              {([
+                { k: 'aggressive', q: 'How aggressive', opts: [['conservative', 'Conservative'], ['balanced', 'Balanced'], ['aggressive', 'Aggressive']] },
+                { k: 'premium', q: 'How premium', opts: [['mass', 'Mass'], ['premium', 'Premium'], ['luxury', 'Luxury']] },
+                { k: 'tone', q: 'Tone', opts: [['professional', 'Professional'], ['friendly', 'Friendly'], ['funny', 'Funny']] },
+                { k: 'risk', q: 'Autonomy', opts: [['ask', 'Always ask'], ['sometimes', 'Sometimes'], ['auto', 'Decide for me']] },
+              ] as { k: 'aggressive' | 'premium' | 'tone' | 'risk'; q: string; opts: [string, string][] }[]).map(row => (
+                <div key={row.k} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 13.5, color: '#1a3a1a', width: 120, flex: 'none' }}>{row.q}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {row.opts.map(([val, label]) => (
+                      <button key={val} onClick={() => saveCulture({ ...culture, [row.k]: val })}
+                        style={{ fontSize: 12.5, padding: '5px 12px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, background: culture[row.k] === val ? '#1a3a1a' : '#eef3ea', color: culture[row.k] === val ? '#dffe95' : '#5a705a' }}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
