@@ -36,6 +36,7 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     key: 'home', label: 'Home', railLabel: 'Home', railIcon: Sun, defaultHref: '/brief',
     items: [
       { href: '/brief', icon: Sun, label: 'Morning Brief' },
+      { href: '/company', icon: Users, label: 'Your Team' },
       { href: '/brain', icon: Brain, label: 'Company Brain' },
       { href: '/documents', icon: FileText, label: 'Documents' },
     ],
