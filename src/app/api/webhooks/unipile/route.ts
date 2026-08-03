@@ -98,6 +98,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Anything else → a normal conversation with Mello (his one brain, same as the app + Slack).
+  // Rate-limit so chatter can't run up the OpenAI bill (parity with the web + Slack paths).
+  const { isRateLimited } = await import('@/lib/rateLimit')
+  if (await isRateLimited(userId)) { await reply('One moment — give me a few seconds and ask again.'); return NextResponse.json({ ok: true }) }
   try {
     const { askMello } = await import('@/lib/mello/ask')
     const out = await askMello(admin, userId, text)
