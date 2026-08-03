@@ -43,7 +43,7 @@ async function writeObservation(ctx: { brand: string; niche: string | null; drop
         model: 'gpt-4o-mini', max_tokens: 180, temperature: 0.4, response_format: { type: 'json_object' },
         messages: [{
           role: 'user',
-          content: `You are Mello, an AI marketer closing out the day for the brand "${ctx.brand}". From tonight's signal, write ONE short observation in your own first-person voice — what you noticed and, if warranted, one concrete next step. Ground it in the signal; never invent numbers. If there is genuinely nothing worth the founder's attention, return {"skip":true}.
+          content: `You are Mello, the in-house AI marketer for the founder's OWN brand, "${ctx.brand}". From tonight's signal, write ONE short observation in your own first-person voice — what you noticed and, if warranted, one concrete next step. The "competitor moves" below are RIVALS you watch — never write as if a competitor is the founder's own brand; the only brand you represent is "${ctx.brand}". Ground it in the signal; never invent numbers or brand names. If there is genuinely nothing worth the founder's attention, return {"skip":true}.
 
 TONIGHT'S SIGNAL:
 ${signal}
@@ -84,10 +84,13 @@ export async function GET(request: NextRequest) {
     processed++
     const watched = byUser.get(userId) || []
     const pageIds = watched.map((w: any) => w.page_id).filter(Boolean).slice(0, 60)
-    const [prof, drops, rulesRows] = await Promise.all([
+    const [prof, drops, rulesRows, ownBrand] = await Promise.all([
       soft(admin.from('user_profiles').select('niche').eq('user_id', userId).maybeSingle().then((r: any) => r.data), null),
       soft(admin.from('notifications').select('brand_name, ad_count').eq('user_id', userId).eq('type', 'new_ad').gte('created_at', H24).order('created_at', { ascending: false }).limit(5).then((r: any) => r.data || []), []),
       soft(admin.from('mello_memory').select('content').eq('user_id', userId).in('kind', ['rule', 'scar']).is('retired_at', null).limit(4).then((r: any) => r.data || []), []),
+      // The user's OWN brand (brands table) — NOT a followed competitor. This is the fix for the note
+      // being written as if a spied brand ("Leesa") were the founder's company.
+      soft(admin.from('brands').select('name').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle().then((r: any) => r.data), null),
     ])
     const niche = (prof as any)?.niche || null
     // Rising angle among the freshest ads from watched pages this week.
@@ -103,7 +106,8 @@ export async function GET(request: NextRequest) {
     const dropList = (drops as any[]).map((d: any) => `${d.brand_name && !/^\d+$/.test(String(d.brand_name)) ? d.brand_name : 'a watched brand'} launched ${Math.max(1, d.ad_count || 1)} new ad${(d.ad_count || 1) > 1 ? 's' : ''}`)
     if (!dropList.length && !risingTag) continue   // nothing to say → say nothing (silence is a service)
 
-    const brandName = watched[0]?.brand_name && !/^\d+$/.test(String(watched[0].brand_name)) ? watched[0].brand_name : 'your brand'
+    // The founder's OWN brand — never a followed/spied competitor (that was the "Leesa" bug).
+    const brandName = (ownBrand as any)?.name?.trim() || 'your brand'
     const obs = await writeObservation({ brand: brandName, niche, drops: dropList, risingTag, rules: (rulesRows as any[]).map((r: any) => r.content) })
     if (!obs) continue
     await soft(admin.from('daily_observations').insert({ user_id: userId, obs_date: today, observation: obs.observation, action: obs.action, confidence: obs.confidence, source: 'mello' }).then(() => {}), undefined)
