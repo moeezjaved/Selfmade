@@ -6,6 +6,7 @@
 import { slackPost, whatsappSend } from '@/lib/channels/providers'
 import { formatApproval, formatReport } from '@/lib/channels/format'
 import { decryptToken } from '@/lib/meta/client'
+import { computeCompanyStatus } from '@/lib/company/status'
 
 /** The workspace bot token for this identity (OAuth installs store their own, encrypted); env fallback. */
 const botTokenFor = (id: any): string | undefined => {
@@ -65,7 +66,10 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
 export async function sendReportToChannels(admin: any, userId: string, brief: any): Promise<{ sent: number }> {
   const ids = await getIdentities(admin, userId)
   if (!ids.length) return { sent: 0 }
-  const { text, slackBlocks } = formatReport(brief)
+  // The overnight-shift report is grounded in the live company status + the top pending decision.
+  const { departments, tasks } = await computeCompanyStatus(admin, userId)
+  const pending = (tasks as any[]).find(t => t.status === 'suggested') || null
+  const { text, slackBlocks } = formatReport(brief, departments, pending)
   let sent = 0
   for (const id of ids) {
     if (id.provider === 'slack' && id.meta?.channel_id) {
