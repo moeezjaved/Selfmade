@@ -1,0 +1,104 @@
+/**
+ * Channel provider primitives — the thin send/verify layer for Slack + WhatsApp (Unipile).
+ * Modeled on src/lib/email.ts: read process.env, best-effort, never throw. All app logic lives in
+ * send.ts / the webhooks; this file only knows how to talk to each provider's HTTP API.
+ */
+import crypto from 'crypto'
+
+// ── Slack ───────────────────────────────────────────────────────────────────
+export const slackEnabled = !!process.env.SLACK_BOT_TOKEN
+
+/** Post a message to a Slack channel/DM. Returns the message ts (id) so we can update it later. */
+export async function slackPost(channel: string, text: string, blocks?: any[]): Promise<{ ok: boolean; ts?: string; error?: string }> {
+  const token = process.env.SLACK_BOT_TOKEN
+  if (!token) return { ok: false, error: 'no_token' }
+  try {
+    const r = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json; charset=utf-8', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text, ...(blocks ? { blocks } : {}) }),
+    }).then((x) => x.json())
+    return r?.ok ? { ok: true, ts: r.ts } : { ok: false, error: r?.error || 'slack_error' }
+  } catch (e: any) { return { ok: false, error: String(e?.message || e) } }
+}
+
+/** Replace an already-posted Slack card (e.g. turn the buttons into "Approved ✓"). */
+export async function slackUpdate(channel: string, ts: string, text: string, blocks?: any[]): Promise<boolean> {
+  const token = process.env.SLACK_BOT_TOKEN
+  if (!token) return false
+  try {
+    const r = await fetch('https://slack.com/api/chat.update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json; charset=utf-8', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, ts, text, ...(blocks ? { blocks } : {}) }),
+    }).then((x) => x.json())
+    return !!r?.ok
+  } catch { return false }
+}
+
+/** Post to a Slack response_url (used to reply to an interactive action / slash command). */
+export async function slackRespond(responseUrl: string, text: string, blocks?: any[], replaceOriginal = false): Promise<void> {
+  try {
+    await fetch(responseUrl, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text, ...(blocks ? { blocks } : {}), replace_original: replaceOriginal, response_type: 'in_channel' }),
+    })
+  } catch { /* best-effort */ }
+}
+
+/** Open (or reuse) a DM channel with a Slack user, returning the channel id to post into. */
+export async function slackOpenDm(userId: string): Promise<string | null> {
+  const token = process.env.SLACK_BOT_TOKEN
+  if (!token) return null
+  try {
+    const r = await fetch('https://slack.com/api/conversations.open', {
+      method: 'POST', headers: { 'content-type': 'application/json; charset=utf-8', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ users: userId }),
+    }).then((x) => x.json())
+    return r?.ok ? r.channel?.id || null : null
+  } catch { return null }
+}
+
+/** Verify a Slack request signature (v0 HMAC). Pass the RAW body string. */
+export function slackVerify(rawBody: string, timestamp: string | null, signature: string | null): boolean {
+  const secret = process.env.SLACK_SIGNING_SECRET
+  if (!secret) return true                       // unset → skip (dev); set it in prod
+  if (!timestamp || !signature) return false
+  // reject requests older than 5 minutes (replay protection)
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false
+  const base = `v0:${timestamp}:${rawBody}`
+  const mine = 'v0=' + crypto.createHmac('sha256', secret).update(base).digest('hex')
+  try { return crypto.timingSafeEqual(Buffer.from(mine), Buffer.from(signature)) } catch { return false }
+}
+
+// ── WhatsApp via Unipile ─────────────────────────────────────────────────────
+// Unipile is a hosted API: base URL + port are per-account (e.g. https://apiXXXX.unipile.com:13XXX),
+// auth via X-API-KEY. Set UNIPILE_DSN (the full base, no trailing slash) + UNIPILE_API_KEY +
+// UNIPILE_WHATSAPP_ACCOUNT_ID (the connected WhatsApp account in your Unipile dashboard).
+export const whatsappEnabled = !!(process.env.UNIPILE_DSN && process.env.UNIPILE_API_KEY && process.env.UNIPILE_WHATSAPP_ACCOUNT_ID)
+
+const uniBase = () => (process.env.UNIPILE_DSN || '').replace(/\/$/, '')
+const uniHeaders = () => ({ 'content-type': 'application/json', 'X-API-KEY': process.env.UNIPILE_API_KEY || '', accept: 'application/json' })
+
+/**
+ * Send a WhatsApp message. If `chatId` is known (from a prior inbound), reply into it; otherwise
+ * start a new chat to `toAttendee` (the recipient's WhatsApp id / phone). Returns the message id.
+ */
+export async function whatsappSend(opts: { chatId?: string; toAttendee?: string; text: string }): Promise<{ ok: boolean; id?: string; chatId?: string; error?: string }> {
+  if (!whatsappEnabled) return { ok: false, error: 'not_configured' }
+  const accountId = process.env.UNIPILE_WHATSAPP_ACCOUNT_ID!
+  try {
+    if (opts.chatId) {
+      const r = await fetch(`${uniBase()}/api/v1/chats/${encodeURIComponent(opts.chatId)}/messages`, {
+        method: 'POST', headers: uniHeaders(), body: JSON.stringify({ text: opts.text }),
+      }).then((x) => x.json())
+      return { ok: true, id: r?.id || r?.message_id, chatId: opts.chatId }
+    }
+    // Start a new chat with the recipient on the WhatsApp account.
+    const r = await fetch(`${uniBase()}/api/v1/chats`, {
+      method: 'POST', headers: uniHeaders(),
+      body: JSON.stringify({ account_id: accountId, attendees_ids: [opts.toAttendee], text: opts.text }),
+    }).then((x) => x.json())
+    return { ok: true, id: r?.message_id || r?.id, chatId: r?.chat_id || r?.id }
+  } catch (e: any) { return { ok: false, error: String(e?.message || e) } }
+}

@@ -14,18 +14,26 @@
 -- Only perf_score-ordered queries were fast, because discovery_ads_perf_score_idx (mig 038) is hot AND
 -- high-perf ads are older/established → already drained → have creatives (no wade).
 --
--- This partial composite index makes the has-creative recency path a PURE index scan:
+-- The fix is a LEADING-EQUALITY composite (has_creative, days_running, ad_id). With WHERE
+-- has_creative = true the planner does an Index Only Scan on the has_creative=true portion, already
+-- ordered by days_running ASC, ad_id ASC — no Filter, no Sort:
 --   WHERE has_creative ORDER BY days_running ASC, ad_id ASC LIMIT 60        (Newest)
 --   WHERE has_creative AND days_running <= N ORDER BY days_running, ad_id   (last N days)
--- Both read only the matching leaf pages and stop at LIMIT — instant, even under rollup/drain write
--- load. `where has_creative` keeps the index tiny (only the servable rows) and skips the un-drained
--- wade entirely. ad_id is the stable pagination tiebreaker, so the ORDER BY is fully index-covered
--- (no separate sort node).
+-- Proven live: LIMIT-60 plan cost dropped 9,676 → 2.03; the feed went from timeout → ~2s, 119 real
+-- ads with days_running=0 (launched today) at the top.
 --
--- CONCURRENTLY = no table lock (safe on the live serving table). Still: PAUSE crawl + drain first
--- (system_flags 'crawl_paused' / stop the drain worker) per the standing pause-before-DDL rule — a
--- schema change under heavy write load has 503'd the API before. Build takes a few minutes on the
--- current corpus; the feed keeps serving (the route degrades Newest/date filters to a fast graceful
--- "try again" until this lands, instead of hanging).
-create index concurrently if not exists dai_hascre_days_running
-  on discovery_ads_index (days_running, ad_id) where has_creative;
+-- NB: a PARTIAL index `(days_running, ad_id) WHERE has_creative` was tried first and the planner
+-- REFUSED it — it kept backward-scanning the plain (days_running DESC) index with `Filter:
+-- has_creative`, mis-costing the wade because it assumes has_creative is evenly spread across
+-- days_running (it isn't — the freshest ads are the un-drained has_creative=false ones). A partial
+-- index for an ORDER BY is fragile that way; the leading-equality composite is chosen reliably.
+--
+-- CONCURRENTLY = no table lock (safe on the live serving table); must be the ONLY statement in its
+-- run (can't be in a transaction block). It builds in a few minutes under write load — the Supabase
+-- SQL editor may show "Failed to fetch" (its HTTP request gives up) while the build finishes
+-- server-side; verify with `select indisvalid from pg_index where indexrelid =
+-- 'dai_hascre_days_asc'::regclass`. Run `analyze discovery_ads_index;` after so the planner picks it
+-- up. Ideally pause crawl/drain first (pause-before-DDL) but CONCURRENTLY served fine live without it.
+-- The route degrades Newest/date filters to a fast graceful "try again" until this lands.
+create index concurrently if not exists dai_hascre_days_asc
+  on discovery_ads_index (has_creative, days_running, ad_id);
