@@ -17,10 +17,13 @@ import { recall } from '@/lib/brain'
 const ADS_NOUN = /\b(ads?|campaigns?|roas|spend(?:ing)?|budget|meta ads?|facebook ads?|ad account|ad performance)\b/i
 const ADS_VERB = /\b(improve|fix|optimi[sz]e|scale|pause|kill|cut|stop|help|grow|lower|reduce|what should i do|what do i (?:need to )?do|how (?:are|is|'?s|do|should)|which|worst|best|winning|losing|bleeding|wasting)\b/i
 const MY_ADS = /\bmy (?:ads?|campaigns?|roas|ad account|account|spend|performance)\b/i
+// Money/performance phrasings that mean "how are we doing" — route to the FAST grounded audit answer,
+// not the slow agent (which timed out on "what is sales today"). Grounded on the Meta audit today.
+const PERF = /\b(sales|revenue|profit|how much (?:did|have|are|is)|how (?:are|'?s|is) (?:we|things|business|it going)|today'?s?\s+(?:numbers|sales|revenue|spend)|this (?:week|month)|are we (?:doing )?(?:ok|okay|good|profitable))\b/i
 
 export function isAdsQuestion(message: string): boolean {
   const q = String(message || '')
-  if (MY_ADS.test(q)) return true
+  if (MY_ADS.test(q) || PERF.test(q)) return true
   return ADS_NOUN.test(q) && ADS_VERB.test(q)
 }
 
