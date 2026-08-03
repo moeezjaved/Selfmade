@@ -44,13 +44,26 @@ export function formatReport(brief: any): { text: string; slackBlocks: any[] } {
   const hi = brief?.headline
   const items: any[] = (brief?.items || []).slice(0, 5)
   const greeting = brief?.firstName ? `Morning, ${brief.firstName}.` : 'Morning.'
-  const head = hi ? `${greeting} ${hi.title}` : greeting
+  const head = hi?.title ? `${greeting} ${String(hi.title)}` : greeting
 
-  const bullets = items.map((it) => `• ${it.title}${it.why ? ` — ${it.why}` : ''}`)
-  const text = [head, brief?.summary || '', ...bullets].filter(Boolean).join('\n')
+  // summary can be a string OR a stats object ({adsScanned, brandsWatched, …}). Render either cleanly.
+  const s = brief?.summary
+  let summaryLine = ''
+  if (typeof s === 'string') summaryLine = s.trim()
+  else if (s && typeof s === 'object') {
+    const parts: string[] = []
+    if (s.adsScanned) parts.push(`${s.adsScanned} ads scanned`)
+    if (s.brandsWatched) parts.push(`${s.brandsWatched} brands watched`)
+    if (s.spiedBrands) parts.push(`${s.spiedBrands} spied`)
+    if (s.creativesReady) parts.push(`${s.creativesReady} creatives ready`)
+    summaryLine = parts.join(' · ')
+  }
+
+  const bullets = items.map((it) => `• ${String(it.title || '')}${it.why ? ` — ${String(it.why)}` : ''}`)
+  const text = [head, summaryLine, ...bullets].filter(Boolean).join('\n')
 
   const slackBlocks: any[] = [
-    { type: 'section', text: { type: 'mrkdwn', text: `*${head}*${brief?.summary ? `\n${brief.summary}` : ''}` } },
+    { type: 'section', text: { type: 'mrkdwn', text: `*${head}*${summaryLine ? `\n${summaryLine}` : ''}` } },
   ]
   if (bullets.length) slackBlocks.push({ type: 'section', text: { type: 'mrkdwn', text: bullets.join('\n') } })
   if (brief?.quiet) slackBlocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: 'Quiet day — nothing needs you. 🌱' }] })
