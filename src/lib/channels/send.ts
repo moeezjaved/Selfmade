@@ -7,6 +7,7 @@ import { slackPost, whatsappSend } from '@/lib/channels/providers'
 import { formatApproval, formatReport } from '@/lib/channels/format'
 import { decryptToken } from '@/lib/meta/client'
 import { computeCompanyStatus } from '@/lib/company/status'
+import { runMetaAudit } from '@/lib/meta/audit'
 
 /** The workspace bot token for this identity (OAuth installs store their own, encrypted); env fallback. */
 const botTokenFor = (id: any): string | undefined => {
@@ -66,6 +67,11 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
 export async function sendReportToChannels(admin: any, userId: string, brief: any): Promise<{ sent: number }> {
   const ids = await getIdentities(admin, userId)
   if (!ids.length) return { sent: 0 }
+  // Ground the report in the SAME live account state the brief shows: the brief computes moves on
+  // page-load (fetchLiveOpportunities) but writes nothing, while tasks are only written by the audit.
+  // Running the audit here (idempotent, week-keyed upserts) closes that gap so the report's decision
+  // matches "What Mello would do" instead of saying "nothing needs you" while the brief has moves.
+  try { await runMetaAudit(admin, userId) } catch { /* report still sends without a fresh audit */ }
   // The overnight-shift report is grounded in the live company status + the top pending decision.
   const { departments, tasks } = await computeCompanyStatus(admin, userId)
   const pending = (tasks as any[]).find(t => t.status === 'suggested') || null
