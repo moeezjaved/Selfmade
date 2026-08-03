@@ -9,6 +9,16 @@ import toast from 'react-hot-toast'
 type Overview = any
 const DEPT_LABEL: Record<string, string> = { research: 'Research', creative: 'Creative', media: 'Media Buying', growth: 'Growth', customer: 'Customer', store: 'Store', finance: 'Finance' }
 const TABS = ['Identity', 'Beliefs', 'Departments', 'Learning', 'Playbook', 'Teach'] as const
+// Empty-state starters — so a blank Brain isn't intimidating. Founder taps → edits → teaches.
+const SUGGESTIONS = [
+  'Never discount below 15%',
+  'Always use British English',
+  'Ask before spending over $300/day',
+  'Our audience is busy parents',
+  'We are premium, not budget',
+  'No emojis in our copy',
+  'Speak like a trusted advisor',
+]
 
 export default function BrainPage() {
   const [ov, setOv] = useState<Overview | null>(null)
@@ -119,7 +129,17 @@ export default function BrainPage() {
                     <div style={{ fontSize: 14, color: '#1a3a1a' }}>{b.rule}{b.department && pill(DEPT_LABEL[b.department] || b.department)}{b.created_by === 'mello' && pill('learned')}</div>
                     <button onClick={() => retire(b.id)} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Retire</button>
                   </div>
-                )) : <p style={{ color: '#9ca3af', fontSize: 13 }}>No beliefs yet. Teach one in the Teach tab, or just tell Mello “never discount” in chat.</p>}
+                )) : (
+                  <div>
+                    <p style={{ color: '#7a9a7a', fontSize: 13.5, margin: '2px 0 12px' }}>Nothing taught yet. Not sure where to start? Tap one to edit &amp; teach it — or just tell Mello “never discount” in chat.</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {SUGGESTIONS.map(s => (
+                        <button key={s} onClick={() => { setRule(s); setTab('Teach') }}
+                          style={{ fontSize: 13, padding: '7px 13px', borderRadius: 100, border: '1px dashed #cfe6b8', background: '#f8fcf6', color: '#3b6d11', cursor: 'pointer', fontFamily: 'inherit' }}>+ {s}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
