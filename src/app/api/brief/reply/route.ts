@@ -40,6 +40,19 @@ export async function POST(req: NextRequest) {
     } catch (e: any) { console.error('[brief/reply] teach', e?.message) /* fall through to normal handling */ }
   }
 
+  // LISTEN & REMEMBER (Company Brain L3/L5) — the founder reveals durable signal just by what they
+  // say ("our audience is busy parents", "we're premium not budget"). Capture it as a LOW-confidence
+  // inferred note (not a taught belief) so recall() and the reflection loop can use/promote it. Cheap
+  // heuristic, no LLM, best-effort — never blocks or shapes the reply.
+  const SIGNAL = /\b((our|my) (audience|customers?|buyers?|brand|market|product|tone|voice|goal|niche|focus)|we (are|sell|target|focus on|prefer|value|care about))\b/i
+  if (!item && !q.includes('?') && SIGNAL.test(q) && q.length <= 200) {
+    try {
+      createAdminClient().from('mello_memory').insert({
+        user_id: user.id, content: q, category: 'signal', confidence: 40, source: 'inferred',
+      }).then(() => {}, () => {})
+    } catch { /* best-effort */ }
+  }
+
   // Ground the answer in WHO the founder actually watches (spied/followed brands) so "which competitor
   // am I watching / what did they launch" is answered from real data — not deflected to "connect Meta".
   let watchLine = ''
