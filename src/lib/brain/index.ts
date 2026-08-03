@@ -103,7 +103,13 @@ export async function recall(admin: any, opts: { userId: string; department: Dep
   if (dna.length) lines.push(`Company beliefs (never break):\n${dna.map(d => `• ${d.rule}`).join('\n')}`)
   if (deptMemory.length) lines.push(`What ${opts.department} knows:\n${deptMemory.map(m => `• ${m.content}`).join('\n')}`)
   if (learnings.length) lines.push(`What ${opts.department} has learned:\n${learnings.map(l => `• ${l.event}${l.result ? ` → ${l.result}` : ''}`).join('\n')}`)
-  const prefLines = Object.entries(prefs).map(([k, v]) => `• ${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+  const prefLines = Object.entries(prefs).map(([k, v]) => {
+    if (k === 'culture' && v && typeof v === 'object') {
+      const c: any = v
+      return `• Culture: ${c.aggressive || 'balanced'} on risk, ${c.premium || 'premium'} positioning, ${c.tone || 'friendly'} tone, autonomy = ${c.risk === 'auto' ? 'decide alone' : c.risk === 'sometimes' ? 'decide small things' : 'always ask first'}.`
+    }
+    return `• ${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`
+  })
   if (prefLines.length) lines.push(`Working with the founder:\n${prefLines.join('\n')}`)
 
   return { dna, deptMemory, learnings, prefs, prompt: lines.join('\n\n') }

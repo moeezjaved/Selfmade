@@ -23,7 +23,7 @@ import MelloFace, { type MelloState } from '@/components/MelloFace'
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95'
 const GREEN = '#3f8f4f', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f', PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
 
-type Phase = 'welcome' | 'homework' | 'guess' | 'competitors' | 'questions' | 'integrations' | 'offer' | 'night' | 'plan'
+type Phase = 'welcome' | 'homework' | 'guess' | 'competitors' | 'questions' | 'culture' | 'integrations' | 'offer' | 'night' | 'plan'
 type Note = { kind: string; content: string }
 type Comp = { pageId: string; name: string; avatar?: string | null; adCount?: number | null; country?: string | null }
 
@@ -188,6 +188,9 @@ export default function InterviewPage() {
   const [qi, setQi] = useState(0)
   const [redline, setRedline] = useState('')
   const [freeText, setFreeText] = useState('')
+  // culture — the 4 dials that tune every department (Company Brain)
+  const [culture, setCulture] = useState<{ aggressive: string; premium: string; tone: string; risk: string }>({ aggressive: 'balanced', premium: 'premium', tone: 'friendly', risk: 'ask' })
+  const [cultureSaving, setCultureSaving] = useState(false)
   // notebook
   const [notes, setNotes] = useState<Note[]>([])
   const [nbOpen, setNbOpen] = useState(false)
@@ -317,7 +320,15 @@ export default function InterviewPage() {
     if (cur.key === 'worry') note('fact', `Worries them most: ${v} — watch closest.`)
     setFreeText('')
     if (qi < QUESTIONS.length - 1) setQi(qi + 1)
-    else setPhase('integrations')
+    else setPhase('culture')
+  }
+
+  // ── Culture: 4 dials that tune every department. Saved to the Company Brain (CEO prefs). ──
+  const saveCulture = async () => {
+    if (cultureSaving) return
+    setCultureSaving(true)
+    try { await fetch('/api/brain/culture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(culture) }).catch(() => {}) }
+    finally { setCultureSaving(false); setPhase('integrations') }
   }
 
   // ── Beat 7 → 9: sign → create the brand, enroll the watch, start the night. All real work. ──
@@ -497,6 +508,35 @@ export default function InterviewPage() {
               <div style={{ display: 'flex', gap: 8, maxWidth: 430, margin: '0 auto' }}>
                 <input value={freeText} onChange={e => setFreeText(e.target.value)} onKeyDown={e => e.key === 'Enter' && answerQ(freeText)} placeholder="…or say it your way" style={{ ...inputCss, borderRadius: 100, padding: '11px 18px' }} />
                 <button style={{ ...btnGhost, padding: '10px 16px' }} onClick={() => answerQ(freeText)}>↵</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── BEAT 4b · CULTURE — the 4 dials that tune every department ── */}
+          {phase === 'culture' && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.12em', color: MUTED, textTransform: 'uppercase', textAlign: 'center', marginBottom: 14 }}>Last thing — how should the team behave?</div>
+              <div style={say}>Set the company&rsquo;s temperament. Every part of the team follows it.</div>
+              <p style={{ ...sub, fontStyle: 'italic' }}>You can change any of these later in the Company Brain.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 460, margin: '22px auto 0' }}>
+                {([
+                  { k: 'aggressive', q: 'How aggressive are we?', opts: [['conservative', 'Conservative'], ['balanced', 'Balanced'], ['aggressive', 'Aggressive']] },
+                  { k: 'premium', q: 'How premium are we?', opts: [['mass', 'Mass market'], ['premium', 'Premium'], ['luxury', 'Luxury']] },
+                  { k: 'tone', q: 'Our tone?', opts: [['professional', 'Professional'], ['friendly', 'Friendly'], ['funny', 'Funny']] },
+                  { k: 'risk', q: 'How much can I decide alone?', opts: [['ask', 'Always ask me'], ['sometimes', 'Sometimes decide'], ['auto', 'Decide for me']] },
+                ] as { k: 'aggressive' | 'premium' | 'tone' | 'risk'; q: string; opts: [string, string][] }[]).map(row => (
+                  <div key={row.k}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 8 }}>{row.q}</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {row.opts.map(([val, label]) => (
+                        <button key={val} style={chip(culture[row.k] === val)} onClick={() => setCulture(c => ({ ...c, [row.k]: val }))}>{label}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ textAlign: 'center', marginTop: 24 }}>
+                <button style={btnMain} onClick={saveCulture} disabled={cultureSaving}>{cultureSaving ? 'Saving…' : 'That&rsquo;s us →'}</button>
               </div>
             </div>
           )}
