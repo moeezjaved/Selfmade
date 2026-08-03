@@ -20,6 +20,7 @@ export interface Responsibility { label: string; built: boolean }
 export interface Department {
   key: DeptKey
   name: string          // functional label shown to the founder
+  emoji: string         // the department's face in Slack/WhatsApp
   division: Division
   role: string          // one line: what it owns
   personality: string   // how Mello refers to it (Chief-of-Staff voice)
@@ -27,6 +28,8 @@ export interface Department {
   unlockedBy?: string   // the integration that turns it on (for non-live)
   taskKinds: string[]   // mello_tasks kinds this department executes (for status + routing)
   responsibilities: Responsibility[]  // the 116, mapped to this department
+  // how this department speaks (stays in character): Research FINDS, Creative BUILDS, Media LAUNCHES…
+  verb: string
 }
 
 /** The Chief of Staff — the one the founder talks to; speaks for the whole company. Not a department. */
@@ -38,7 +41,7 @@ export const MELLO = {
 
 export const DEPARTMENTS: Department[] = [
   {
-    key: 'research', name: 'Research', division: 'Marketing',
+    key: 'research', name: 'Research', emoji: '🔍', verb: 'found', division: 'Marketing',
     role: 'Watches competitors, trends, and the market so you never get blindsided.',
     personality: 'Endlessly curious, never blinks.',
     live: true, taskKinds: ['research'],
@@ -53,7 +56,7 @@ export const DEPARTMENTS: Department[] = [
     ],
   },
   {
-    key: 'creative', name: 'Creative', division: 'Marketing',
+    key: 'creative', name: 'Creative', emoji: '🎨', verb: 'built', division: 'Marketing',
     role: 'Makes the ads, kills the ugly ones before you see them.',
     personality: 'The tasteful one.',
     live: true, taskKinds: ['creative', 'video'],
@@ -69,7 +72,7 @@ export const DEPARTMENTS: Department[] = [
     ],
   },
   {
-    key: 'media', name: 'Media Buying', division: 'Marketing',
+    key: 'media', name: 'Media Buying', emoji: '📈', verb: 'wants to launch', division: 'Marketing',
     role: 'Runs the ad accounts — scales winners, kills bleeders, launches.',
     personality: 'Numbers-cold, unsentimental.',
     live: true, taskKinds: ['meta_pause', 'meta_scale'],
@@ -85,7 +88,7 @@ export const DEPARTMENTS: Department[] = [
     ],
   },
   {
-    key: 'growth', name: 'Growth', division: 'Marketing',
+    key: 'growth', name: 'Growth', emoji: '✉️', verb: 'sent', division: 'Marketing',
     role: 'Owned channels — email, SMS, organic, SEO — the quiet compounding revenue.',
     personality: 'Runs everything you already own.',
     live: false, unlockedBy: 'Klaviyo + publishing APIs', taskKinds: [],
@@ -99,7 +102,7 @@ export const DEPARTMENTS: Department[] = [
     ],
   },
   {
-    key: 'customer', name: 'Customer', division: 'Operations',
+    key: 'customer', name: 'Customer', emoji: '💬', verb: 'handled', division: 'Operations',
     role: 'Answers everyone, turns comments into sales, angry reviews into loyalty.',
     personality: 'Never sleeps on a DM.',
     live: false, unlockedBy: 'Unipile', taskKinds: [],
@@ -113,7 +116,7 @@ export const DEPARTMENTS: Department[] = [
     ],
   },
   {
-    key: 'store', name: 'Store', division: 'Operations',
+    key: 'store', name: 'Store', emoji: '🛍️', verb: 'flagged', division: 'Operations',
     role: 'Watches stock vs ad spend, guards margins, keeps the plumbing working.',
     personality: 'The operator.',
     live: false, unlockedBy: 'Shopify', taskKinds: [],
@@ -126,7 +129,7 @@ export const DEPARTMENTS: Department[] = [
     ],
   },
   {
-    key: 'finance', name: 'Finance', division: 'Operations',
+    key: 'finance', name: 'Finance', emoji: '💰', verb: 'reported', division: 'Operations',
     role: 'Tells you the one true number — real profit — and sees the cash crunch early.',
     personality: 'Tells you what’s actually true.',
     live: false, unlockedBy: 'Shopify + cost model', taskKinds: [],
