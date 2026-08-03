@@ -278,6 +278,9 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Mello on Slack & WhatsApp — connect a channel to get the brief + approve from chat */}
+      <ChannelsSection />
+
       {/* Save Ads Anywhere — Chrome extension + (coming soon) mobile Instagram save */}
       <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
         <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>
@@ -341,6 +344,72 @@ export default function SettingsPage() {
         <div style={{fontSize:15,fontWeight:700,color:'#c0392b',marginBottom:8}}>Danger Zone</div>
         <div style={{fontSize:13,color:'#7a9a7a',marginBottom:14}}>Sign out of your Selfmade account.</div>
         <button onClick={signOut} style={{background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.25)',color:'#c0392b',padding:'8px 18px',borderRadius:100,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Sign Out</button>
+      </div>
+    </div>
+  )
+}
+
+/** Connect Slack / WhatsApp: mint a login-proven code, the founder pastes it to the bot, they're linked. */
+function ChannelsSection() {
+  const [ids, setIds] = useState<{ id: string; provider: string; display?: string }[]>([])
+  const [code, setCode] = useState<{ provider: string; code: string; instructions: string } | null>(null)
+  const [busy, setBusy] = useState('')
+
+  const load = () => fetch('/api/channels/link').then(r => r.json())
+    .then(j => { if (Array.isArray(j.identities)) setIds(j.identities) }).catch(() => {})
+  useEffect(() => { load() }, [])
+
+  const connect = async (provider: 'slack' | 'whatsapp') => {
+    setBusy(provider); setCode(null)
+    try {
+      const j = await fetch('/api/channels/link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider }) }).then(r => r.json())
+      if (j?.code) setCode({ provider, code: j.code, instructions: j.instructions })
+      else toast.error('Could not create a code')
+    } finally { setBusy('') }
+  }
+  const disconnect = async (id: string) => {
+    await fetch('/api/channels/link', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).catch(() => {})
+    setIds(a => a.filter(x => x.id !== id)); setCode(null); toast.success('Disconnected')
+  }
+  const connected = (p: string) => ids.find(i => i.provider === p)
+
+  const Row = ({ provider, label, emoji, how }: { provider: 'slack' | 'whatsapp'; label: string; emoji: string; how: string }) => {
+    const c = connected(provider)
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{emoji}</div>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1a3a1a' }}>{label}{c && <span style={{ fontSize: 11, fontWeight: 700, color: '#3b6d11', background: '#eaf3de', borderRadius: 20, padding: '2px 8px', marginLeft: 8 }}>Connected ✓</span>}</div>
+            <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 2 }}>{how}</div>
+          </div>
+          {c ? (
+            <button onClick={() => disconnect(c.id)} style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e2e8f0', background: '#fff', color: '#b91c1c', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Disconnect</button>
+          ) : (
+            <button onClick={() => connect(provider)} disabled={busy === provider} style={{ background: '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>{busy === provider ? 'Creating…' : 'Connect →'}</button>
+          )}
+        </div>
+        {code?.provider === provider && (
+          <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 12, background: '#f8fcf6', border: '1px dashed #cfe6b8' }}>
+            <div style={{ fontSize: 12.5, color: '#7a9a7a' }}>Your code (expires in 15 min):</div>
+            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: 1, color: '#1a3a1a', margin: '4px 0', fontFamily: 'ui-monospace, monospace' }}>{code.code}</div>
+            <div style={{ fontSize: 12.5, color: '#1a3a1a' }}>{code.instructions}</div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 18, overflow: 'hidden', marginBottom: 16 }}>
+      <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(223,254,149,0.08)' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a' }}>Mello on Slack &amp; WhatsApp</div>
+        <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 3 }}>Get your morning brief and approve Mello&rsquo;s work right from chat — one tap, no dashboard.</div>
+      </div>
+      <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Row provider="slack" label="Slack" emoji="💬" how="Approve with buttons and get reports in a channel or DM." />
+        <div style={{ height: 1, background: '#f1f5f9' }} />
+        <Row provider="whatsapp" label="WhatsApp" emoji="🟢" how="Reply YES to approve. Best for solo founders on the go." />
       </div>
     </div>
   )
