@@ -15,6 +15,7 @@
  */
 import { authorCompetitorReport } from '@/lib/mello/tools'
 import { sendEmail } from '@/lib/email'
+import { recordLearning, departmentForKind } from '@/lib/brain'
 
 const APP = (process.env.APP_URL || 'https://www.tryselfmade.ai').replace(/\/$/, '')
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -141,6 +142,22 @@ export async function runTask(admin: any, ctx: RunTaskCtx, task: any): Promise<a
   }
 
   await admin.from('mello_tasks').update({ status: 'done', result, updated_at: new Date().toISOString() }).eq('id', task.id)
+
+  // ── Company Brain (L4): the action just happened + why — write it to the learning log. The OUTCOME
+  // (did the scale hold? did the report convert?) is appended later by the audit; this seeds the fact
+  // with the signal that justified it, so the department starts compounding what it does. Best-effort.
+  {
+    const ev = task.evidence || {}
+    const metric: Record<string, any> = {}
+    if (ev.roas != null) metric.roas = ev.roas
+    if (result?.newBudget != null) metric.newBudget = result.newBudget
+    if (ev.spend != null) metric.spend = ev.spend
+    recordLearning(admin, {
+      userId, brandId: task.brand_id, department: departmentForKind(task.kind),
+      event: task.title, result: `approved via ${source}`, metric,
+      confidence: 65, source: 'auto',
+    })
+  }
 
   // Email the founder that Mello finished (proof of labor + a link straight to the work).
   if (email && result?.url) {
