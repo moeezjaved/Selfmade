@@ -23,7 +23,7 @@ import type { UserProfile } from '@/types'
 import {
   Settings, LogOut, Menu, X, LifeBuoy, Zap, Sparkles, CreditCard, Users, Plus,
   Eye, TrendingUp, Star, Bookmark, Image as ImageIcon, Heart, Radar,
-  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, ClipboardList, Trophy, Camera, Sun, Newspaper, BookOpen, FileText, Plug,
+  Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, ClipboardList, Trophy, Camera, Sun, Newspaper, BookOpen, FileText, Plug, Brain,
 } from 'lucide-react'
 import SearchPalette from '@/components/SearchPalette'
 import { cn } from '@/lib/utils'
@@ -36,6 +36,7 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     key: 'home', label: 'Home', railLabel: 'Home', railIcon: Sun, defaultHref: '/brief',
     items: [
       { href: '/brief', icon: Sun, label: 'Morning Brief' },
+      { href: '/brain', icon: Brain, label: 'Company Brain' },
       { href: '/documents', icon: FileText, label: 'Documents' },
     ],
   },

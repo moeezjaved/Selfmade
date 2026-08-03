@@ -28,6 +28,18 @@ export async function POST(req: NextRequest) {
   const q = String(question || '').trim().slice(0, 800)
   if (!q) return NextResponse.json({ error: 'question required' }, { status: 400 })
 
+  // TEACH THE COMPANY (Company Brain L2) — a belief stated in plain words ("never discount", "always
+  // British English", "from now on don't spend over Rs300 without asking") becomes a standing rule the
+  // whole company obeys. Conservative match: an imperative belief, not a question.
+  const TEACH = /^(never|always|from now on|don'?t|do not|only|we (?:never|always|only)|make sure|remember (?:to|that)|keep in mind|by default)\b/i
+  if (!item && TEACH.test(q) && !q.includes('?')) {
+    try {
+      const { teachRule } = await import('@/lib/brain')
+      await teachRule(createAdminClient(), { userId: user.id, rule: q, createdBy: 'founder', source: 'chat' })
+      return NextResponse.json({ reply: `Got it — I've made that a company rule: “${q}”. The whole team follows it from now on. Say “forget that rule” any time to remove it.` })
+    } catch (e: any) { console.error('[brief/reply] teach', e?.message) /* fall through to normal handling */ }
+  }
+
   // Ground the answer in WHO the founder actually watches (spied/followed brands) so "which competitor
   // am I watching / what did they launch" is answered from real data — not deflected to "connect Meta".
   let watchLine = ''

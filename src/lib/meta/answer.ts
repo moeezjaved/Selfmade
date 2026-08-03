@@ -12,6 +12,7 @@
  * Returns { reply } when it handled an ads question, or null when the message isn't one.
  */
 import { auditAccount } from '@/lib/meta/audit'
+import { recall } from '@/lib/brain'
 
 const ADS_NOUN = /\b(ads?|campaigns?|roas|spend(?:ing)?|budget|meta ads?|facebook ads?|ad account|ad performance)\b/i
 const ADS_VERB = /\b(improve|fix|optimi[sz]e|scale|pause|kill|cut|stop|help|grow|lower|reduce|what should i do|what do i (?:need to )?do|how (?:are|is|'?s|do|should)|which|worst|best|winning|losing|bleeding|wasting)\b/i
@@ -100,10 +101,18 @@ Reply ONLY as JSON: {"answer": string, "actions": [{"type":"pause"|"scale","meta
 - "answer": 2-4 sentences, first person, specific, cite the real numbers (${a.currency}). Sound like a media buyer, not a calculator. If nothing needs doing, say so plainly.
 - "actions": only high-confidence moves. metaCampaignId MUST be one from the snapshot (readyToScale/catchyButNotConverting/burningBudget). newDailyBudget only for scale (a sensible ~20% step above current dailyBudget). Never invent a campaign. Empty array is fine.`
 
+  // Company Brain: reason THROUGH the company's memory. Beliefs (DNA) are hard constraints; learnings
+  // and CEO prefs shape the call. This is what turns a generic media-buyer answer into THIS company's.
+  let memory = ''
+  try { memory = (await recall(admin, { userId, department: 'media' })).prompt } catch { /* memory is best-effort */ }
+  const systemWithMemory = memory
+    ? `${system}\n\n--- This company's memory (obey the beliefs, use the learnings) ---\n${memory}`
+    : system
+
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const resp = await openai.chat.completions.create({
     model, temperature: 0.3, response_format: { type: 'json_object' },
-    messages: [{ role: 'system', content: system }, { role: 'user', content: JSON.stringify(snapshot) }],
+    messages: [{ role: 'system', content: systemWithMemory }, { role: 'user', content: JSON.stringify(snapshot) }],
   })
   const raw = resp.choices?.[0]?.message?.content || ''
   let parsed: any = {}
