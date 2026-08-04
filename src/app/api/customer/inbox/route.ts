@@ -154,10 +154,17 @@ export async function POST(req: NextRequest) {
             delivered = !!r.ok
             note = r.ok ? 'Email sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : 'Saved, but sending failed — try again.')
           } else {
-            const { unipileSend } = await import('@/lib/channels/providers')
-            const r = await unipileSend(String(accountId), { chatId: thread.chat_ref || undefined, toAttendee: thread.contact_ref, text })
+            const { unipileSend, resolveChatId } = await import('@/lib/channels/providers')
+            // Reply INTO the existing conversation. If we don't have its id (older backfill), resolve it
+            // from Unipile now and store it for next time.
+            let chatId = thread.chat_ref || undefined
+            if (!chatId && thread.contact_ref) {
+              const resolved = await resolveChatId(String(accountId), thread.contact_ref)
+              if (resolved) { chatId = resolved; await admin.from('customer_threads').update({ chat_ref: resolved }).eq('id', msg.thread_id) }
+            }
+            const r = await unipileSend(String(accountId), { chatId, toAttendee: thread.contact_ref, text })
             delivered = !!r.ok
-            note = r.ok ? 'Sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : 'Saved, but delivery failed — try again.')
+            note = r.ok ? 'Sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : `Saved, but delivery failed: ${r.error || 'unknown'}`)
           }
         }
       } else if (thread?.channel === 'simulated') {
