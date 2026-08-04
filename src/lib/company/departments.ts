@@ -75,7 +75,7 @@ export const DEPARTMENTS: Department[] = [
     key: 'media', name: 'Media Buying', emoji: '📈', verb: 'wants to launch', division: 'Marketing',
     role: 'Runs the ad accounts — scales winners, kills bleeders, launches.',
     personality: 'Numbers-cold, unsentimental.',
-    live: true, taskKinds: ['meta_pause', 'meta_scale'],
+    live: true, taskKinds: ['meta_pause', 'meta_scale', 'meta_audience', 'meta_placement'],
     responsibilities: [
       { label: 'Scale a proven winner', built: true },
       { label: 'Kill a bleeding ad', built: true },

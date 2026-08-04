@@ -37,7 +37,8 @@ export function formatApproval(task: any): { text: string; slackBlocks: any[] } 
   const title = task.title || 'A decision for you'
   const why = task.why || ''
   const conf = confidence(task)
-  const approveLabel = task.kind === 'meta_scale' && ev.newBudget ? `Approve $${ev.newBudget}/day` : task.kind === 'meta_pause' ? 'Pause it' : 'Approve'
+  const budgeted = (task.kind === 'meta_scale' || task.kind === 'meta_audience' || task.kind === 'meta_placement') && ev.newBudget
+  const approveLabel = budgeted ? `Approve $${ev.newBudget}/day` : task.kind === 'meta_pause' ? 'Pause it' : 'Approve'
 
   const lines = [`*${who}*`, title]
   if (why) lines.push(`_${why}_`)
@@ -49,7 +50,7 @@ export function formatApproval(task: any): { text: string; slackBlocks: any[] } 
       { type: 'button', action_id: 'skip', text: { type: 'plain_text', text: 'Not now' }, value: task.id },
     ] },
   ]
-  const waActionHint = task.kind === 'meta_scale' && ev.newBudget ? `Reply YES to approve $${ev.newBudget}/day, or NO to skip.` : 'Reply YES to approve, or NO to skip.'
+  const waActionHint = budgeted ? `Reply YES to approve $${ev.newBudget}/day, or NO to skip.` : 'Reply YES to approve, or NO to skip.'
   const waText = [`${who}`, title, why, conf ? `Confidence: ${conf}` : '', waActionHint].filter(Boolean).join('\n')
   return { text: waText, slackBlocks }
 }

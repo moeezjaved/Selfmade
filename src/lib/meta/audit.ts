@@ -210,6 +210,34 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
     }, { onConflict: 'user_id,suggested_key', ignoreDuplicates: true }).then(() => {}, () => {})
   }
 
+  // ── "Target them" (audience) + "Review placements" (placement) as approvable tasks, so they surface
+  // in Slack/WhatsApp too. Anchored on the winner: approve → safe duplicate-and-tune (applyTune), the
+  // original never touched. Only when there IS a winner to duplicate + a budget to seed the copy with.
+  if (audit.scale[0]?.metaCampaignId && audit.scale[0].dailyBudget) {
+    const winner = audit.scale[0]
+    const budget = Math.max(5, Math.round(winner.dailyBudget as number))
+    const audienceOpp = opportunities.find((o: any) => o?.apply?.kind === 'audience')
+    const placementOpp = opportunities.find((o: any) => o?.apply?.kind === 'placement')
+    if (audienceOpp?.apply) {
+      await admin.from('mello_tasks').upsert({
+        user_id: userId, kind: 'meta_audience',
+        title: `Focus a copy of “${winner.name}” on ${audienceOpp.apply.label}`,
+        why: audienceOpp.why,
+        evidence: { metaCampaignId: winner.metaCampaignId, campaignName: winner.name, apply: audienceOpp.apply, newBudget: budget },
+        credits: null, status: 'suggested', suggested_key: `meta_audience:${winner.metaCampaignId}:${week}`,
+      }, { onConflict: 'user_id,suggested_key', ignoreDuplicates: true }).then(() => {}, () => {})
+    }
+    if (placementOpp?.apply) {
+      await admin.from('mello_tasks').upsert({
+        user_id: userId, kind: 'meta_placement',
+        title: `Focus a copy of “${winner.name}” on ${placementOpp.apply.label}`,
+        why: placementOpp.why,
+        evidence: { metaCampaignId: winner.metaCampaignId, campaignName: winner.name, apply: placementOpp.apply, newBudget: budget },
+        credits: null, status: 'suggested', suggested_key: `meta_placement:${winner.metaCampaignId}:${week}`,
+      }, { onConflict: 'user_id,suggested_key', ignoreDuplicates: true }).then(() => {}, () => {})
+    }
+  }
+
   return audit
 }
 
