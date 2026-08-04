@@ -1,11 +1,69 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 
 // Chrome Web Store listing (approved 2026-07-08).
 const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi'
+
+const INK = '#17251c', SUB = '#7a9a7a', LIME = '#dffe95', FOREST = '#1a3a1a', LINE = 'rgba(0,0,0,0.07)'
+
+/* ── Real brand marks (inline SVG, self-contained) ─────────────────────────────────────────────── */
+function SlackLogo({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 122.8 122.8" aria-hidden="true">
+      <path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9z" fill="#E01E5A" />
+      <path d="M32.3 77.6c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#E01E5A" />
+      <path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2z" fill="#36C5F0" />
+      <path d="M45.2 32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36C5F0" />
+      <path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2z" fill="#2EB67D" />
+      <path d="M90.5 45.2c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2EB67D" />
+      <path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9z" fill="#ECB22E" />
+      <path d="M77.6 90.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ECB22E" />
+    </svg>
+  )
+}
+function WhatsAppLogo({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
+      <path fill="#25D366" d="M16 0C7.2 0 0 7.2 0 16c0 2.8.7 5.5 2.1 7.9L0 32l8.3-2.2C10.6 31.2 13.2 32 16 32c8.8 0 16-7.2 16-16S24.8 0 16 0z" />
+      <path fill="#FFF" d="M23.9 19.4c-.4-.2-2.4-1.2-2.7-1.3-.4-.1-.6-.2-.9.2-.3.4-1 1.3-1.2 1.5-.2.2-.4.3-.8.1-.4-.2-1.7-.6-3.3-2-1.2-1.1-2-2.4-2.3-2.8-.2-.4 0-.6.2-.8.2-.2.4-.4.5-.7.2-.2.2-.4.4-.6.1-.3.1-.5 0-.7-.1-.2-.9-2.1-1.2-2.9-.3-.8-.6-.6-.9-.7h-.7c-.2 0-.6.1-.9.5-.3.4-1.2 1.2-1.2 2.9 0 1.7 1.2 3.4 1.4 3.6.2.2 2.5 3.8 6 5.3.8.4 1.5.6 2 .7.8.3 1.6.2 2.2.1.7-.1 2.1-.9 2.4-1.7.3-.8.3-1.6.2-1.7-.1-.2-.3-.2-.7-.4z" />
+    </svg>
+  )
+}
+function ChromeLogo({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M24 24 L5.81 13.5 A21 21 0 0 1 42.19 13.5 Z" fill="#EA4335" />
+      <path d="M24 24 L42.19 13.5 A21 21 0 0 1 24 45 Z" fill="#34A853" />
+      <path d="M24 24 L24 45 A21 21 0 0 1 5.81 13.5 Z" fill="#FBBC05" />
+      <circle cx="24" cy="24" r="9.2" fill="#fff" />
+      <circle cx="24" cy="24" r="7" fill="#4285F4" />
+    </svg>
+  )
+}
+
+/* A soft rounded tile that frames a logo, consistent across every integration row. */
+function LogoTile({ children }: { children: ReactNode }) {
+  return (
+    <div style={{ width: 46, height: 46, borderRadius: 13, background: '#fff', border: '1px solid #e8efe4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 1px 2px rgba(17,37,28,.05)' }}>
+      {children}
+    </div>
+  )
+}
+
+/* ── Minimal stroke icons for the left nav (currentColor so active/inactive just work) ──────────── */
+const svg = (children: ReactNode) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
+)
+const NAV = [
+  { key: 'account', label: 'Account', icon: svg(<><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" /></>) },
+  { key: 'notifications', label: 'Notifications', icon: svg(<><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 01-3.4 0" /></>) },
+  { key: 'autopilot', label: 'Daily ads', icon: svg(<><path d="M13 2L4.5 12.5H11l-1 9L19.5 11H13l0-9z" /></>) },
+  { key: 'channels', label: 'Slack & WhatsApp', icon: svg(<><path d="M21 11.5a8.5 8.5 0 01-12.5 7.5L3 21l2-5.5A8.5 8.5 0 1121 11.5z" /></>) },
+  { key: 'integrations', label: 'Integrations', icon: svg(<><path d="M10 3v5M14 3v5M6 8h12v4a6 6 0 01-12 0V8zM12 18v3" /></>) },
+] as const
 
 export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
@@ -25,6 +83,7 @@ export default function SettingsPage() {
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)  // null = still loading
   const [disconnecting, setDisconnecting] = useState(false)
   const [newPw, setNewPw] = useState(''); const [confirmPw, setConfirmPw] = useState(''); const [pwSaving, setPwSaving] = useState(false)
+  const [tab, setTab] = useState<'account' | 'notifications' | 'autopilot' | 'channels' | 'integrations'>('account')
   const supabase = createClient()
   const router = useRouter()
 
@@ -128,11 +187,29 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{padding:28,maxWidth:640}}>
-      <h1 style={{fontSize:22,fontWeight:800,color:'#1a3a1a',marginBottom:6}}>Settings</h1>
-      <p style={{fontSize:13,color:'#7a9a7a',marginBottom:24}}>Manage your account preferences.</p>
+    <div style={{padding:'32px 28px',maxWidth:980,margin:'0 auto'}}>
+      <h1 style={{fontSize:24,fontWeight:800,color:INK,marginBottom:4,letterSpacing:'-.02em'}}>Settings</h1>
+      <p style={{fontSize:13.5,color:SUB,marginBottom:26}}>Manage your account, alerts, and connected tools.</p>
 
-      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
+      <div style={{display:'flex',gap:26,alignItems:'flex-start',flexWrap:'wrap'}}>
+        {/* Left category nav — sticky on desktop, wraps above content on mobile */}
+        <nav style={{position:'sticky',top:24,flex:'0 0 212px',display:'flex',flexDirection:'column',gap:3}}>
+          {NAV.map((n) => {
+            const on = tab === n.key
+            return (
+              <button key={n.key} onClick={() => setTab(n.key as typeof tab)}
+                style={{display:'flex',alignItems:'center',gap:11,padding:'11px 14px',borderRadius:12,border:'none',cursor:'pointer',fontFamily:'inherit',fontSize:13.5,fontWeight:750,textAlign:'left',background:on?FOREST:'transparent',color:on?LIME:INK,transition:'background .15s,color .15s'}}>
+                <span style={{display:'flex',opacity:on?1:0.65}}>{n.icon}</span>{n.label}
+              </button>
+            )
+          })}
+        </nav>
+
+        {/* Content panel */}
+        <div style={{flex:'1 1 340px',minWidth:0,display:'flex',flexDirection:'column',gap:16}}>
+
+      {tab==='account' && (<>
+      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden'}}>
         <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>
           <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Profile</div>
         </div>
@@ -167,7 +244,7 @@ export default function SettingsPage() {
 
       {/* Change password — Supabase updateUser({password}); works for email users and lets Google
           sign-in users SET a password too. No current-password field (the session already proves identity). */}
-      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
+      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden'}}>
         <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>
           <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Change Password</div>
         </div>
@@ -198,9 +275,11 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+      </>)}
 
-      {/* Daily Ad Autopilot — one fresh ad per enrolled brand, emailed daily ($0.15/ad) */}
-      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
+      {tab==='autopilot' && (
+      /* Daily Ad Autopilot — one fresh ad per enrolled brand, emailed daily ($0.15/ad) */
+      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden'}}>
         <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>
           <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>🚀 Daily Ad Autopilot</div>
           <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>A fresh ad for each brand below, generated and emailed every day at $0.15/ad. We skip days you’re out of credits. Runs until you turn it off.</div>
@@ -238,9 +317,11 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+      )}
 
-      {/* Notifications — controls the new-ad alerts + weekly digest for followed brands */}
-      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
+      {tab==='notifications' && (
+      /* Notifications — controls the new-ad alerts + weekly digest for followed brands */
+      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden'}}>
         <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Notifications</div>
           <span style={{fontSize:12,color:prefsSaved?'#16a34a':'#9ca3af'}}>{prefsSaving ? 'Saving…' : prefsSaved ? '✓ Saved' : ''}</span>
@@ -278,11 +359,14 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Mello on Slack & WhatsApp — connect a channel to get the brief + approve from chat */}
-      <ChannelsSection />
+      )}
 
+      {/* Mello on Slack & WhatsApp — connect a channel to get the brief + approve from chat */}
+      {tab==='channels' && <ChannelsSection />}
+
+      {tab==='integrations' && (<>
       {/* Save Ads Anywhere — Chrome extension + (coming soon) mobile Instagram save */}
-      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
+      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden'}}>
         <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>
           <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Save ads anywhere</div>
           <div style={{fontSize:12.5,color:'#7a9a7a',marginTop:3}}>Grab winning ads while you browse — they land in your boards.</div>
@@ -290,9 +374,9 @@ export default function SettingsPage() {
         <div style={{padding:22,display:'flex',flexDirection:'column',gap:16}}>
           {/* Browser extension */}
           <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-            <div style={{width:42,height:42,borderRadius:12,background:'#f0fdf4',border:'1px solid #bbf7d0',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>🧩</div>
+            <LogoTile><ChromeLogo size={26} /></LogoTile>
             <div style={{flex:1,minWidth:180}}>
-              <div style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>Browser extension</div>
+              <div style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>Chrome extension</div>
               <div style={{fontSize:12.5,color:'#7a9a7a',marginTop:2}}>One-click save on Instagram, the Facebook Ad Library & TikTok. Sign in once with your Selfmade account.</div>
             </div>
             <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer"
@@ -313,7 +397,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden',marginBottom:16}}>
+      <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden'}}>
         <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>
           <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Connected Accounts</div>
         </div>
@@ -339,11 +423,17 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      </>)}
 
+      {tab==='account' && (
       <div style={{background:'rgba(248,113,113,0.05)',border:'1px solid rgba(248,113,113,0.15)',borderRadius:18,padding:22}}>
         <div style={{fontSize:15,fontWeight:700,color:'#c0392b',marginBottom:8}}>Danger Zone</div>
         <div style={{fontSize:13,color:'#7a9a7a',marginBottom:14}}>Sign out of your Selfmade account.</div>
         <button onClick={signOut} style={{background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.25)',color:'#c0392b',padding:'8px 18px',borderRadius:100,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Sign Out</button>
+      </div>
+      )}
+
+        </div>
       </div>
     </div>
   )
@@ -395,12 +485,12 @@ function ChannelsSection() {
   }
   const connected = (p: string) => ids.find(i => i.provider === p)
 
-  const Row = ({ provider, label, emoji, how }: { provider: 'slack' | 'whatsapp'; label: string; emoji: string; how: string }) => {
+  const Row = ({ provider, label, logo, how }: { provider: 'slack' | 'whatsapp'; label: string; logo: ReactNode; how: string }) => {
     const c = connected(provider)
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{emoji}</div>
+          <LogoTile>{logo}</LogoTile>
           <div style={{ flex: 1, minWidth: 180 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#1a3a1a' }}>{label}{c && <span style={{ fontSize: 11, fontWeight: 700, color: '#3b6d11', background: '#eaf3de', borderRadius: 20, padding: '2px 8px', marginLeft: 8 }}>Connected ✓</span>}</div>
             <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 2 }}>{how}</div>
@@ -435,9 +525,9 @@ function ChannelsSection() {
         <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 3 }}>Get your morning brief and approve Mello&rsquo;s work right from chat — one tap, no dashboard.</div>
       </div>
       <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Row provider="slack" label="Slack" emoji="💬" how="Approve with buttons and get reports in a channel or DM." />
+        <Row provider="slack" label="Slack" logo={<SlackLogo size={24} />} how="Approve with buttons and get reports in a channel or DM." />
         <div style={{ height: 1, background: '#f1f5f9' }} />
-        <Row provider="whatsapp" label="WhatsApp" emoji="🟢" how="Reply YES to approve. Best for solo founders on the go." />
+        <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Reply YES to approve. Best for solo founders on the go." />
       </div>
     </div>
   )
