@@ -48,10 +48,12 @@ export async function fetchAccountType(accountId: string): Promise<string> {
   } catch { return '' }
 }
 
-/** Create a hosted-auth link the founder visits to connect one channel. `name` carries userId:provider. */
-export async function createHostedAuthLink(userId: string, provider: string): Promise<{ url: string } | { error: string }> {
+/** Create a hosted-auth link the founder visits to connect one channel. `name` carries userId:provider.
+ *  `returnTo` is the in-app path to come back to (e.g. /inbox or /settings). */
+export async function createHostedAuthLink(userId: string, provider: string, returnTo?: string): Promise<{ url: string } | { error: string }> {
   if (!unipileConfigured()) return { error: 'Channels aren’t set up on the server yet.' }
   const provs = PROVIDER_MAP[provider] || ['*']
+  const back = returnTo && returnTo.startsWith('/') ? returnTo : '/settings'
   try {
     const res = await fetch(`${DSN()}/api/v1/hosted/accounts/link`, {
       method: 'POST',
@@ -63,8 +65,8 @@ export async function createHostedAuthLink(userId: string, provider: string): Pr
         expiresOn: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         name: `${userId}:${provider}`,
         notify_url: `${APP}/api/channels/unipile/callback${process.env.UNIPILE_WEBHOOK_SECRET ? `?secret=${encodeURIComponent(process.env.UNIPILE_WEBHOOK_SECRET)}` : ''}`,
-        success_redirect_url: `${APP}/settings?connected=${provider}`,
-        failure_redirect_url: `${APP}/settings?connect_error=${provider}`,
+        success_redirect_url: `${APP}${back}?connected=${provider}`,
+        failure_redirect_url: `${APP}${back}?connect_error=${provider}`,
       }),
     })
     const j = await res.json().catch(() => ({}))

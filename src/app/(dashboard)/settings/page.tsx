@@ -588,7 +588,7 @@ function CustomerChannelsSection() {
   const connect = async (provider: string) => {
     setBusy(provider)
     try {
-      const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider }) }).then(r => r.json())
+      const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, returnTo: '/settings' }) }).then(r => r.json())
       if (j?.url) { window.location.href = j.url }        // to Unipile's hosted login
       else { toast.error(j?.error || 'Channels aren’t set up yet.'); setBusy('') }
     } catch { toast.error('Something went wrong.'); setBusy('') }
