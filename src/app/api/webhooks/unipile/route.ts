@@ -47,12 +47,8 @@ function parseInbound(b: any): { sender?: string; senderName?: string; text: str
 
 export async function POST(req: NextRequest) {
   const url = new URL(req.url)
+  if (!authed(req, url)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({}))
-  // TEMP diagnostic: log EVERY incoming POST (before auth) so an empty log definitively means Unipile
-  // isn't calling us — vs a 401 hiding a real delivery. Records whether auth passed too.
-  const authOk = authed(req, url)
-  try { await createAdminClient().from('unipile_webhook_log').insert({ kind: 'messaging', payload: { authOk, hasSecret: !!process.env.UNIPILE_WEBHOOK_SECRET, event: body?.event || body?.type || null, body } }) } catch { /* ignore */ }
-  if (!authOk) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const { sender, senderName, text, chatId, accountId, isInbound } = parseInbound(body)
   if (!isInbound || !sender) return NextResponse.json({ ok: true })   // ack non-actionable events
 
