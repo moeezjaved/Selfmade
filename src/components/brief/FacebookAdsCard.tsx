@@ -10,7 +10,7 @@ import Link from 'next/link'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
-type Camp = { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null; metaCampaignId?: string | null }
+type Camp = { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null; metaCampaignId?: string | null; ctr?: number; impressions?: number; clicks?: number }
 type Ad = { adId: string; name: string; campaignName?: string | null; metaCampaignId?: string | null; spend: number; impressions: number; clicks: number; ctr: number; cpc: number; roas: number; conversions: number; thumbnail_url?: string | null; preview_url?: string | null }
 type Summary = {
   accounts?: { accountId: string; name: string; currency: string; isPrimary: boolean }[]
@@ -129,7 +129,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
 
   const Bucket = ({ label, color, dot, rows, suffix, scalable }: { label: string; color: string; dot: string; rows: Camp[]; suffix: (c: Camp) => string; scalable?: boolean }) => (
     rows.length ? (
-      <div style={{ flex: '1 1 200px', minWidth: 190 }}>
+      <div style={{ flex: scalable ? '1 1 100%' : '1 1 200px', minWidth: 190 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color, marginBottom: 8 }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />{label} · {rows.length}
         </div>
@@ -138,24 +138,58 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
           const done = c.metaCampaignId ? scaled[c.metaCampaignId] : false
           const busyRow = c.metaCampaignId ? scaling === c.metaCampaignId : false
           const newBudget = c.dailyBudget != null ? Math.max(1, Math.round(c.dailyBudget * 1.2)) : null
+          // Scale rows get the full campaign treatment: the thumbnail of its top-spend ad + every stat
+          // we show on a normal campaign — not just a lonely ROAS.
+          const ad = scalable ? (d.ads || []).filter(a => a.metaCampaignId && c.metaCampaignId && String(a.metaCampaignId) === String(c.metaCampaignId)).sort((a, b) => b.spend - a.spend)[0] : null
+          const num = (n?: number) => (n == null ? '—' : Math.round(n).toLocaleString())
+          const cpc = (c.clicks && c.clicks > 0) ? c.spend / c.clicks : null
+          const Stat = ({ label, value }: { label: string; value: string }) => (
+            <span style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 0 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 750, color: INK, whiteSpace: 'nowrap' }}>{value}</span>
+              <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: '#a7b0a5' }}>{label}</span>
+            </span>
+          )
           return (
-            <div key={i} style={{ padding: '5px 0', borderTop: i ? `1px solid ${LINE}` : 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 650, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>{c.name}</span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap' }}>{suffix(c)}</span>
-              </div>
+            <div key={i} style={{ padding: scalable ? '10px 0' : '5px 0', borderTop: i ? `1px solid ${LINE}` : 'none' }}>
+              {scalable ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#eef2ec', display: 'grid', placeItems: 'center' }}>
+                      {ad?.thumbnail_url ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={ad.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} /> : <span style={{ fontSize: 15, opacity: .5 }}>🎬</span>}
+                    </span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 750, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+                      <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 600 }}>{c.dailyBudget != null ? `${money(c.dailyBudget)}/day` : 'live campaign'}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8 }}>
+                    <Stat label="Spend" value={money(c.spend)} />
+                    <Stat label="ROAS" value={`${c.roas}x`} />
+                    <Stat label="CTR" value={c.ctr != null ? `${c.ctr}%` : '—'} />
+                    <Stat label="Impr." value={num(c.impressions)} />
+                    <Stat label="Clicks" value={num(c.clicks)} />
+                    <Stat label="CPC" value={cpc != null ? money(cpc) : '—'} />
+                    <Stat label="Conv." value={num(c.conversions)} />
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 650, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>{c.name}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap' }}>{suffix(c)}</span>
+                </div>
+              )}
               {canScale && (
                 done ? (
-                  <div style={{ marginTop: 6, fontSize: 12, fontWeight: 750, color: GREEN }}>✓ Scaled to {money(newBudget!)}/day</div>
+                  <div style={{ marginTop: 8, fontSize: 12, fontWeight: 750, color: GREEN }}>✓ Scaled to {money(newBudget!)}/day</div>
                 ) : (
                   <button onClick={() => scaleCampaign(c)} disabled={busyRow}
-                    style={{ marginTop: 6, border: 'none', borderRadius: 100, padding: '6px 14px', fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit', cursor: busyRow ? 'default' : 'pointer', background: FOREST, color: LIME, opacity: busyRow ? 0.6 : 1 }}>
+                    style={{ marginTop: 8, border: 'none', borderRadius: 100, padding: '7px 16px', fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit', cursor: busyRow ? 'default' : 'pointer', background: FOREST, color: LIME, opacity: busyRow ? 0.6 : 1 }}>
                     {busyRow ? 'Scaling…' : `Scale it → ${money(newBudget!)}/day`}
                   </button>
                 )
               )}
               {scalable && c.metaCampaignId && c.dailyBudget == null && (
-                <Link href="/campaigns" style={{ display: 'inline-block', marginTop: 6, fontSize: 12, fontWeight: 700, color: GREEN, textDecoration: 'none' }}>Scale in Campaigns →</Link>
+                <Link href="/campaigns" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 700, color: GREEN, textDecoration: 'none' }}>Scale in Campaigns →</Link>
               )}
             </div>
           )

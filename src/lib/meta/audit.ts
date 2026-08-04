@@ -33,7 +33,7 @@ export function resolvePrimary(accounts: any[]): any {
 }
 const sameAcct = (a?: string, b?: string) => String(a || '').replace(/^act_/, '') === String(b || '').replace(/^act_/, '')
 
-type Graded = { campaignId: string; metaCampaignId: string; name: string; grade: 'graduate' | 'catchy' | 'pause' | 'hold'; spend: number; roas: number; ctr: number; conversions: number; dailyBudget: number | null; active?: boolean }
+type Graded = { campaignId: string; metaCampaignId: string; name: string; grade: 'graduate' | 'catchy' | 'pause' | 'hold'; spend: number; roas: number; ctr: number; conversions: number; impressions: number; clicks: number; dailyBudget: number | null; active?: boolean }
 export type AuditResult = {
   total: number; spend: number; avgRoas: number
   scale: Graded[]; watch: Graded[]; pause: Graded[]
@@ -103,7 +103,7 @@ function grade(campaigns: any[]): AuditResult {
     if (avgRoas > 0 && roas >= avgRoas * g.graduate.roas_above_avg_pct && spend >= avgSpend * g.graduate.min_spend_pct && conv >= g.graduate.min_conversions) tier = 'graduate'
     else if ((ctr >= avgCtr * g.catchy_not_converting.ctr_above_avg_multiplier || spend >= avgSpend * g.catchy_not_converting.spend_above_avg_multiplier) && (avgRoas === 0 || roas < avgRoas * g.catchy_not_converting.roas_below_avg_pct)) tier = 'catchy'
     else if (spend < avgSpend * g.pause_poor.spend_below_avg_pct && (avgRoas === 0 || roas < avgRoas * g.pause_poor.roas_below_avg_pct)) tier = 'pause'
-    return { campaignId: c.id, metaCampaignId: c.meta_campaign_id, name: c.name, grade: tier, spend, roas, ctr, conversions: conv, dailyBudget: c.daily_budget != null ? Number(c.daily_budget) : null, active: isActive(c) }
+    return { campaignId: c.id, metaCampaignId: c.meta_campaign_id, name: c.name, grade: tier, spend, roas, ctr, conversions: conv, impressions: Number(i.impressions || 0), clicks: Number(i.clicks || 0), dailyBudget: c.daily_budget != null ? Number(c.daily_budget) : null, active: isActive(c) }
   })
   // The Scale / Watch / Pause buckets ONLY show currently-DELIVERING campaigns — you can't scale, watch,
   // or pause one that's already off. This kills the "Mello says pause an ad that's already paused" bug.
