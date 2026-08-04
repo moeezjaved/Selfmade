@@ -7,7 +7,12 @@
  * (spend/day × 30 × (1 − ROAS), etc.), so every "~+€X/mo" is defensible.
  */
 export type OppTone = 'good' | 'warn' | 'bad'
-export type Opportunity = { title: string; why: string; impact: string; level: 1 | 2 | 3; href: string; cta: string; tone: OppTone }
+// A structured, one-click action for a card. When present, the brief renders a confirm+act button that
+// DUPLICATES the winner (never touches the original — same safety as Scale) tuned to this target.
+export type ApplyPlan =
+  | { kind: 'audience'; genders: number[]; ageMin: number; ageMax: number; label: string }
+  | { kind: 'placement'; platform: string; label: string }
+export type Opportunity = { title: string; why: string; impact: string; level: 1 | 2 | 3; href: string; cta: string; tone: OppTone; apply?: ApplyPlan }
 
 export type OppCampaign = { label: string; roas: number; spend: number; conversions: number }
 export type OppPlacement = { label: string; roas: number; spend: number }
@@ -17,6 +22,10 @@ export type OppInput = {
   bestPl?: OppPlacement | null; worstPl?: OppPlacement | null
   bestAge?: { label: string; roas: number } | null
   bestGender?: { label: string } | null
+  // Structured targets for one-click apply (Meta codes). Present only when we could resolve them.
+  bestGenderCode?: number | null       // 1 = male, 2 = female (omit "unknown")
+  bestAgeRange?: { min: number; max: number } | null
+  bestPlatform?: string | null         // publisher_platform of the best placement (e.g. 'facebook')
   segmentEarns?: boolean   // true = the best segment actually converts; false = spend-based early read
   accClicks?: number       // total clicks in range — for the "clicks but no sales" leak diagnosis
   accCtr?: number          // account CTR (%)
@@ -53,7 +62,8 @@ export function computeOpportunities(o: OppInput, fmt: (n: number) => string): O
   }
   if (o.bestPl && o.worstPl && o.bestPl.label !== o.worstPl.label && o.bestPl.roas > o.worstPl.roas * 1.5) {
     const shift = o.worstPl.spend * 0.5
-    recs.push({ title: `Shift budget ${o.worstPl.label} → ${o.bestPl.label}`, why: `${o.bestPl.label} returns ${o.bestPl.roas.toFixed(1)}x; ${o.worstPl.label} only ${o.worstPl.roas.toFixed(1)}x on ${fmt(o.worstPl.spend)}.`, impact: `~+${fmt(shift * (o.bestPl.roas - o.worstPl.roas) / daysN * 30)}/mo`, level: 2, href: '/campaigns', cta: 'Review placements', tone: 'warn' })
+    recs.push({ title: `Shift budget ${o.worstPl.label} → ${o.bestPl.label}`, why: `${o.bestPl.label} returns ${o.bestPl.roas.toFixed(1)}x; ${o.worstPl.label} only ${o.worstPl.roas.toFixed(1)}x on ${fmt(o.worstPl.spend)}.`, impact: `~+${fmt(shift * (o.bestPl.roas - o.worstPl.roas) / daysN * 30)}/mo`, level: 2, href: '/campaigns', cta: 'Review placements', tone: 'warn',
+      apply: o.bestPlatform ? { kind: 'placement', platform: o.bestPlatform, label: o.bestPl.label } : undefined })
   }
   // AD FATIGUE — an ad your audience has seen too many times (frequency ≥ 3) is spending on people who
   // already scrolled past it; CPM climbs and CTR fades. A fresh creative resets that. One-click to Studio.
@@ -66,7 +76,9 @@ export function computeOpportunities(o: OppInput, fmt: (n: number) => string): O
     const why = o.segmentEarns
       ? `Your highest-revenue segment. Tightening targeting cuts wasted reach.`
       : `Where most of your reach and budget land — your core audience so far. Tightening toward it cuts wasted spend while you find what converts.`
-    recs.push({ title: `Lean into ${o.bestGender.label === 'female' ? 'women' : o.bestGender.label === 'male' ? 'men' : o.bestGender.label} ${o.bestAge.label}`, why, impact: o.segmentEarns ? 'lower CPA' : 'less wasted spend', level: o.segmentEarns && conv >= 10 ? 2 : 1, href: '/m4', cta: 'Target them', tone: 'good' })
+    const label = `${o.bestGender.label === 'female' ? 'women' : o.bestGender.label === 'male' ? 'men' : o.bestGender.label} ${o.bestAge.label}`
+    recs.push({ title: `Lean into ${label}`, why, impact: o.segmentEarns ? 'lower CPA' : 'less wasted spend', level: o.segmentEarns && conv >= 10 ? 2 : 1, href: '/m4', cta: 'Target them', tone: 'good',
+      apply: (o.bestGenderCode && o.bestAgeRange) ? { kind: 'audience', genders: [o.bestGenderCode], ageMin: o.bestAgeRange.min, ageMax: o.bestAgeRange.max, label } : undefined })
   }
   if (winners[0]) {
     recs.push({ title: `Make 3 variations of “${winners[0].label}”`, why: `Winners fatigue. Variations of a proven ad beat cold new concepts.`, impact: 'extends the winner', level: 2, href: '/creative-studio?studio=1', cta: 'Create in Studio', tone: 'good' })
