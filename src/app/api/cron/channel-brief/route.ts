@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   // Distinct founders with a linked FOUNDER comms channel (Slack/WhatsApp, not a connected customer one).
   const { data: ids } = await admin.from('channel_identities')
     .select('user_id, provider, meta').eq('active', true).in('provider', ['slack', 'whatsapp']).limit(2000)
-  const users = Array.from(new Set((ids || []).filter((i: any) => !i.meta?.customer_channel).map((i: any) => String(i.user_id))))
+  const users = Array.from(new Set<string>((ids || []).filter((i: any) => !i.meta?.customer_channel).map((i: any) => String(i.user_id))))
 
   let sent = 0, skipped = 0
   for (const uid of users) {
