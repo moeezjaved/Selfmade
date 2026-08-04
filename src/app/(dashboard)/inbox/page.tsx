@@ -53,12 +53,19 @@ export default function InboxPage() {
   const loadChannels = () => fetch('/api/channels/unipile/connect').then(r => r.ok ? r.json() : null)
     .then(j => setChannels(Array.isArray(j?.connected) ? j.connected.filter((c: any) => c.kind !== 'founder').map((c: any) => c.provider) : []))
     .catch(() => setChannels([]))
-  useEffect(() => { load(); loadChannels() }, [])
+  useEffect(() => {
+    load(); loadChannels()
+    // Returned here from a channel connect (?connected=…) → toast + refresh the strip (reconcile binds it).
+    const p = new URLSearchParams(window.location.search)
+    const ok = p.get('connected'); const err = p.get('connect_error')
+    if (ok) { toast.success(`${ok[0].toUpperCase()}${ok.slice(1)} connected — messages will land here.`); window.history.replaceState({}, '', '/inbox'); setTimeout(loadChannels, 400) }
+    else if (err) { toast.error(`Couldn’t connect ${err} — try again.`); window.history.replaceState({}, '', '/inbox') }
+  }, [])
 
   const connectChannel = async (provider: string) => {
     setConnecting(provider)
     try {
-      const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider }) }).then(r => r.json())
+      const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider, returnTo: '/inbox' }) }).then(r => r.json())
       if (j?.url) { window.location.href = j.url }
       else { toast.error(j?.error || 'Channels aren’t set up yet.'); setConnecting('') }
     } catch { toast.error('Something went wrong.'); setConnecting('') }
