@@ -46,6 +46,8 @@ export async function POST(req: NextRequest) {
   const url = new URL(req.url)
   if (!authed(req, url)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({}))
+  // TEMP diagnostic: record every raw payload so we can see the real message shape (remove after verify).
+  try { await createAdminClient().from('unipile_webhook_log').insert({ kind: 'messaging', payload: body }) } catch { /* ignore */ }
   const { sender, senderName, text, chatId, accountId, isInbound } = parseInbound(body)
   if (!isInbound || !sender) return NextResponse.json({ ok: true })   // ack non-actionable events
 
