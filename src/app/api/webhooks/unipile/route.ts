@@ -26,18 +26,21 @@ function authed(req: NextRequest, url: URL): boolean {
   return req.headers.get('x-unipile-secret') === secret || url.searchParams.get('secret') === secret
 }
 
-/** Pull sender id / text / chat id / account out of Unipile's payload, defensively (shapes vary). */
+/** Pull sender id / text / chat id / account out of Unipile's MESSAGING webhook, defensively. Real shape
+ *  (verified): { event:'message_received', message:'hi', sender:{attendee_provider_id,attendee_name},
+ *  chat_id, account_id, is_sender:false, timestamp }. `message` is the TEXT (a string), not an object. */
 function parseInbound(b: any): { sender?: string; senderName?: string; text: string; chatId?: string; accountId?: string; isInbound: boolean } {
-  const msg = b?.message || b?.data || b
-  const text = msg?.text ?? msg?.body ?? b?.text ?? ''
-  const chatId = msg?.chat_id ?? msg?.chatId ?? b?.chat_id
-  const sender = msg?.from?.attendee_provider_id ?? msg?.from?.id ?? msg?.sender?.attendee_provider_id
-    ?? msg?.sender_id ?? msg?.attendee_provider_id ?? b?.from
-  const senderName = msg?.from?.attendee_name ?? msg?.from?.name ?? msg?.sender?.name ?? b?.sender_name
-  const accountId = b?.account_id ?? msg?.account_id ?? b?.data?.account_id
-  // Ignore our own outbound echoes / delivery receipts.
-  const dir = b?.event || b?.type || msg?.direction || ''
-  const isInbound = !/sent|delivery|read|outbound/i.test(String(dir)) && (msg?.is_sender === false || msg?.from_me === false || !!text)
+  const msg = (b?.message && typeof b.message === 'object') ? b.message : (b?.data && typeof b.data === 'object' ? b.data : b)
+  const text = (typeof b?.message === 'string' ? b.message : '') || msg?.text || msg?.body || b?.text || b?.body || ''
+  const chatId = b?.chat_id ?? msg?.chat_id ?? msg?.chatId ?? b?.provider_chat_id
+  const s = b?.sender || msg?.sender || msg?.from || {}
+  const sender = s?.attendee_provider_id ?? s?.attendee_id ?? s?.id ?? s?.attendee_public_identifier ?? msg?.sender_id ?? b?.from
+  const senderName = s?.attendee_name ?? s?.name ?? b?.sender_name
+  const accountId = b?.account_id ?? msg?.account_id
+  const dir = String(b?.event || b?.type || msg?.direction || '')
+  // Inbound = not our own message + not a receipt. is_sender:true means WE sent it.
+  const isSenderMe = b?.is_sender === true || msg?.is_sender === true || b?.from_me === true
+  const isInbound = !/sent|delivery|read/i.test(dir) && !isSenderMe && (/received/i.test(dir) || !!text)
   return { sender: sender ? String(sender) : undefined, senderName: senderName ? String(senderName) : undefined, text: String(text || ''), chatId: chatId ? String(chatId) : undefined, accountId: accountId ? String(accountId) : undefined, isInbound }
 }
 
