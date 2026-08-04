@@ -41,39 +41,6 @@ function parseInbound(b: any): { sender?: string; senderName?: string; text: str
   return { sender: sender ? String(sender) : undefined, senderName: senderName ? String(senderName) : undefined, text: String(text || ''), chatId: chatId ? String(chatId) : undefined, accountId: accountId ? String(accountId) : undefined, isInbound }
 }
 
-/** A message from someone who ISN'T the founder → a customer. Land it in the Customer Inbox (triaged +
- *  drafted), never auto-replied. Returns true if it was handled as a customer message. */
-async function routeCustomerInbound(admin: any, accountId: string | undefined, sender: string, senderName: string | undefined, text: string): Promise<boolean> {
-  if (!accountId) return false
-  // Which founder owns the connected account this message arrived on?
-  const { data: chan } = await admin.from('channel_identities').select('*').eq('external_id', accountId).eq('active', true).maybeSingle()
-  if (!chan || !chan.meta?.customer_channel) return false
-  const ownerId = chan.user_id
-  const provider = chan.provider   // 'whatsapp' | 'instagram'
-
-  let brandName = ''
-  try { const { data } = await admin.from('brands').select('name').eq('user_id', ownerId).order('created_at', { ascending: true }).limit(1).maybeSingle(); brandName = data?.name || '' } catch { /* ok */ }
-  const { triageMessage } = await import('@/lib/customer/triage')
-  const tr = await triageMessage(admin, ownerId, { body: text, brand: brandName })
-  const now = new Date().toISOString()
-
-  let { data: thread } = await admin.from('customer_threads').select('*')
-    .eq('user_id', ownerId).eq('channel', provider).eq('contact_ref', sender).order('created_at', { ascending: false }).limit(1).maybeSingle()
-  if (!thread) {
-    const { data: created } = await admin.from('customer_threads').insert({
-      user_id: ownerId, channel: provider, contact_ref: sender, contact_name: senderName || null,
-      priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now,
-    }).select().single()
-    thread = created
-  } else {
-    await admin.from('customer_threads').update({ priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now }).eq('id', thread.id)
-  }
-  await admin.from('customer_messages').insert({
-    thread_id: thread.id, user_id: ownerId, direction: 'in', body: text,
-    intent: tr.intent, priority: tr.priority, suggested_reply: tr.draft, status: 'pending',
-  })
-  return true
-}
 
 export async function POST(req: NextRequest) {
   const url = new URL(req.url)
@@ -91,7 +58,8 @@ export async function POST(req: NextRequest) {
 
   // Not the founder → it's a CUSTOMER messaging a connected company channel. Land it in the inbox.
   if (!identity) {
-    if (await routeCustomerInbound(admin, accountId, sender, senderName, text)) return NextResponse.json({ ok: true })
+    const { ingestCustomerMessage } = await import('@/lib/customer/ingest')
+    if (await ingestCustomerMessage(admin, { accountId, sender, senderName, text })) return NextResponse.json({ ok: true })
   }
 
   // Not linked yet → the only thing we accept is a link code.

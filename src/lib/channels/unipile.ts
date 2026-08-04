@@ -68,6 +68,35 @@ export async function createHostedAuthLink(userId: string, provider: string): Pr
   }
 }
 
+/** The founder's next upcoming calendar event, via Unipile's calendar API. Defensive — shapes vary by
+ *  version, so any hiccup returns null and the Standup falls back to a connect/no-meeting line. */
+export async function getNextEvent(accountId: string): Promise<{ title: string; start: string } | null> {
+  if (!unipileConfigured() || !accountId) return null
+  const H = { accept: 'application/json', 'X-API-KEY': process.env.UNIPILE_API_KEY || '' }
+  try {
+    const now = new Date()
+    const end = new Date(now.getTime() + 24 * 3600 * 1000)
+    const qs = new URLSearchParams({ account_id: accountId, after: now.toISOString(), before: end.toISOString(), limit: '1' })
+    // Try a direct events endpoint first; fall back to listing a calendar then its events.
+    let items: any[] = []
+    const direct = await fetch(`${DSN()}/api/v1/calendar_events?${qs}`, { headers: H }).then(r => r.ok ? r.json() : null).catch(() => null)
+    items = direct?.items || direct?.data || []
+    if (!items.length) {
+      const cals = await fetch(`${DSN()}/api/v1/calendars?account_id=${encodeURIComponent(accountId)}`, { headers: H }).then(r => r.ok ? r.json() : null).catch(() => null)
+      const calId = (cals?.items || cals?.data || [])[0]?.id
+      if (calId) {
+        const evs = await fetch(`${DSN()}/api/v1/calendars/${encodeURIComponent(calId)}/events?${qs}`, { headers: H }).then(r => r.ok ? r.json() : null).catch(() => null)
+        items = evs?.items || evs?.data || []
+      }
+    }
+    const e = items[0]
+    if (!e) return null
+    const title = String(e.title || e.summary || e.subject || 'a meeting')
+    const start = String(e.start?.date_time || e.start_time || e.start || e.when || '')
+    return { title, start }
+  } catch { return null }
+}
+
 /** Bind a freshly-connected Unipile account to the founder (called from the notify callback). */
 export async function bindUnipileAccount(admin: any, userId: string, provider: string, accountId: string, display?: string) {
   await admin.from('channel_identities').upsert({
