@@ -48,8 +48,28 @@ export async function assembleStandup(admin: any, userId: string, firstName?: st
     }
   } catch { /* inbox is best-effort */ }
 
-  // Calendar — the one input we don't have yet. Show it as a connect prompt, not a blank.
-  lines.push({ key: 'calendar', emoji: '📅', name: 'Calendar', text: 'Connect your calendar to see today’s meetings.', connect: true })
+  // Calendar — if a calendar/Google account is connected, show the next meeting; else a connect prompt.
+  let calendarConnected = false
+  try {
+    const { data: cal } = await admin.from('channel_identities').select('external_id, meta, provider')
+      .eq('user_id', userId).in('provider', ['calendar', 'email']).eq('active', true)
+      .order('provider', { ascending: true }).limit(1).maybeSingle()   // 'calendar' sorts before 'email'
+    const acct = cal?.meta?.unipile_account_id || cal?.external_id
+    if (acct) {
+      calendarConnected = true
+      const { getNextEvent } = await import('@/lib/channels/unipile')
+      const ev = await getNextEvent(String(acct))
+      if (ev) {
+        const t = ev.start ? new Date(ev.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }) : ''
+        lines.push({ key: 'calendar', emoji: '📅', name: 'Calendar', text: `${ev.title}${t ? ` at ${t}` : ''}.` })
+      } else {
+        lines.push({ key: 'calendar', emoji: '📅', name: 'Calendar', text: 'No meetings on your calendar today.' })
+      }
+    }
+  } catch { /* calendar is best-effort */ }
+  if (!calendarConnected) {
+    lines.push({ key: 'calendar', emoji: '📅', name: 'Calendar', text: 'Connect your calendar to see today’s meetings.', connect: true })
+  }
 
   const pending = (tasks as any[]).filter(t => t.status === 'suggested')
   return {

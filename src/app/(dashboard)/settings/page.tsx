@@ -556,11 +556,16 @@ function ChannelsSection() {
  *  land in the Customer Inbox. Unipile stays invisible; the founder just clicks Connect. */
 function CustomerChannelsSection() {
   const [busy, setBusy] = useState('')
+  const [connected, setConnected] = useState<string[]>([])
+
+  const loadConnected = () => fetch('/api/channels/unipile/connect').then(r => r.ok ? r.json() : null)
+    .then(j => { if (Array.isArray(j?.connected)) setConnected(j.connected.map((c: any) => c.provider)) }).catch(() => {})
 
   useEffect(() => {
+    loadConnected()
     const p = new URLSearchParams(window.location.search)
     const ok = p.get('connected'); const err = p.get('connect_error')
-    if (ok) { toast.success(`${ok[0].toUpperCase()}${ok.slice(1)} connected — customer messages will land in your inbox.`); window.history.replaceState({}, '', '/settings') }
+    if (ok) { toast.success(`${ok[0].toUpperCase()}${ok.slice(1)} connected — customer messages will land in your inbox.`); window.history.replaceState({}, '', '/settings'); loadConnected() }
     else if (err) { toast.error(`Couldn’t connect ${err} — try again.`); window.history.replaceState({}, '', '/settings') }
   }, [])
 
@@ -573,19 +578,22 @@ function CustomerChannelsSection() {
     } catch { toast.error('Something went wrong.'); setBusy('') }
   }
 
-  const Row = ({ provider, label, logo, how }: { provider: string; label: string; logo: ReactNode; how: string }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-      <LogoTile>{logo}</LogoTile>
-      <div style={{ flex: 1, minWidth: 180 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#1a3a1a' }}>{label}</div>
-        <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 2 }}>{how}</div>
+  const Row = ({ provider, label, logo, how }: { provider: string; label: string; logo: ReactNode; how: string }) => {
+    const on = connected.includes(provider)
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <LogoTile>{logo}</LogoTile>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1a3a1a' }}>{label}{on && <span style={{ fontSize: 11, fontWeight: 700, color: '#3b6d11', background: '#eaf3de', borderRadius: 20, padding: '2px 8px', marginLeft: 8 }}>Connected ✓</span>}</div>
+          <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 2 }}>{how}</div>
+        </div>
+        <button onClick={() => connect(provider)} disabled={busy === provider}
+          style={{ background: on ? '#fff' : '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: on ? 700 : 800, border: on ? '1.5px solid #e2e8f0' : 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>
+          {busy === provider ? 'Opening…' : on ? 'Reconnect' : 'Connect →'}
+        </button>
       </div>
-      <button onClick={() => connect(provider)} disabled={busy === provider}
-        style={{ background: '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>
-        {busy === provider ? 'Opening…' : 'Connect →'}
-      </button>
-    </div>
-  )
+    )
+  }
 
   return (
     <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 18, overflow: 'hidden' }}>
