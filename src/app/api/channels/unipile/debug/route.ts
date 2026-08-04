@@ -51,7 +51,8 @@ export async function GET(req: NextRequest) {
   try { unipile = await (await fetch(`${DSN()}/api/v1/accounts`, { headers: H() })).json() } catch (e: any) { fetchError = String(e?.message || e) }
   const { data: bound } = await admin.from('channel_identities').select('provider, external_id, active, meta').eq('user_id', user.id)
   const { data: threads } = await admin.from('customer_threads').select('id, channel, contact_ref, chat_ref, status, last_message_at').eq('user_id', user.id).order('last_message_at', { ascending: false }).limit(10)
-  const { data: hooks } = await admin.from('unipile_webhook_log').select('kind, payload, created_at').order('created_at', { ascending: false }).limit(8)
+  const hookRes = await admin.from('unipile_webhook_log').select('kind, payload, created_at').order('created_at', { ascending: false }).limit(8)
+  const logTable = hookRes.error ? `MISSING/ERROR: ${hookRes.error.message}` : `ok (${(hookRes.data || []).length} recent)`
 
-  return NextResponse.json({ myUserId: user.id, dsn: DSN(), fetchError, unipileAccounts: unipile, boundInDb: bound || [], recentThreads: threads || [], recentWebhooks: hooks || [] })
+  return NextResponse.json({ myUserId: user.id, dsn: DSN(), fetchError, logTable, unipileAccounts: unipile, boundInDb: bound || [], recentThreads: threads || [], recentWebhooks: hookRes.data || [] })
 }
