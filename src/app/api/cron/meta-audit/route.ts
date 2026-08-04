@@ -8,7 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runMetaAudit } from '@/lib/meta/audit'
-import { pushNewApprovals } from '@/lib/channels/send'
+import { pushNewApprovals, sendReportToChannels } from '@/lib/channels/send'
+import { assembleBrief } from '@/lib/brief/assemble'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -34,8 +35,16 @@ export async function GET(req: NextRequest) {
       const r = await runMetaAudit(admin, uid, { syncFirst: true })
       if (r) audited++
       else skipped++
-      // Auto-push: any fresh approval the audit just suggested lands in the founder's Slack/WhatsApp
-      // on its own (deduped; no-op if no channel linked). Best-effort — never fails the audit.
+      // The morning message: the "🌙 Overnight shift complete" office report — the status board + the
+      // top decision on the desk (with its Approve button). This is what the founder actually receives
+      // each morning; without it, only lone approval cards ever fired. Best-effort, per user.
+      try {
+        const { data: u } = await admin.auth.admin.getUserById(uid)
+        const brief = await assembleBrief(admin, uid, { email: u?.user?.email || null, full_name: (u?.user?.user_metadata as any)?.full_name }, {})
+        await sendReportToChannels(admin, uid, brief)
+      } catch { /* report is best-effort — never fails the audit */ }
+      // Auto-push any ADDITIONAL fresh approvals beyond the one the report already delivered (deduped
+      // via channel_messages; no-op if no channel linked). Best-effort — never fails the audit.
       await pushNewApprovals(admin, uid).catch(() => {})
     } catch { skipped++ }
   }
