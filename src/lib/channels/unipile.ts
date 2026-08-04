@@ -126,12 +126,64 @@ export async function reconcileUnipileAccounts(admin: any, userId: string): Prom
     let n = 0
     for (const a of items) {
       const id = a?.id || a?.account_id
-      if (!id || bound.has(String(id))) continue
-      const provider = labelForType(a?.type || a?.provider || '')
-      try { await bindUnipileAccount(admin, userId, provider, String(id)); bound.add(String(id)); n++ } catch { /* skip one */ }
+      if (!id) continue
+      if (!bound.has(String(id))) {
+        const provider = labelForType(a?.type || a?.provider || '')
+        try { await bindUnipileAccount(admin, userId, provider, String(id)); bound.add(String(id)); n++ } catch { /* skip one */ }
+      }
+      // First time only: pull recent unanswered chats into the inbox so it isn't empty on connect.
+      try { await backfillOnce(admin, String(id)) } catch { /* best-effort */ }
     }
     return n
   } catch { return 0 }
+}
+
+/** Backfill recent UNANSWERED conversations on a just-connected account into the Customer Inbox, so the
+ *  founder immediately sees who's waiting (not an empty box). Bounded + defensive; last ~14 days, most
+ *  recent 20 chats, only threads where the last message is from the customer. */
+async function backfillUnipileAccount(admin: any, accountId: string): Promise<number> {
+  if (!unipileConfigured() || !accountId) return 0
+  const H = { accept: 'application/json', 'X-API-KEY': KEY() }
+  const since = Date.now() - 14 * 24 * 3600 * 1000
+  const { ingestCustomerMessage } = await import('@/lib/customer/ingest')
+  try {
+    const res = await fetch(`${DSN()}/api/v1/chats?account_id=${encodeURIComponent(accountId)}&limit=20`, { headers: H })
+    const j = await res.json().catch(() => ({}))
+    const chats: any[] = j?.items || j?.data || []
+    let n = 0
+    for (const c of chats.slice(0, 20)) {
+      const chatId = c?.id || c?.chat_id
+      if (!chatId) continue
+      let last: any = c?.last_message || c?.lastMessage || null
+      if (!last) {
+        const m = await fetch(`${DSN()}/api/v1/chats/${encodeURIComponent(chatId)}/messages?limit=1`, { headers: H }).then(r => r.ok ? r.json() : null).catch(() => null)
+        last = (m?.items || m?.data || [])[0] || null
+      }
+      if (!last) continue
+      // Only UNANSWERED — skip if the last message was ours.
+      const fromMe = last.is_sender === true || last.from_me === true || /out|sent/i.test(String(last.direction || ''))
+      if (fromMe) continue
+      const ts = Date.parse(last.timestamp || last.created_at || c.timestamp || c.updated_at || '') || 0
+      if (ts && ts < since) continue
+      const sender = c.attendee_provider_id || c.provider_id || last?.from?.attendee_provider_id || last?.sender?.attendee_provider_id || last?.sender_id
+      const senderName = c.name || c.attendee_name || last?.from?.attendee_name
+      const text = last.text || last.body || ''
+      if (!sender || !text) continue
+      const ok = await ingestCustomerMessage(admin, { accountId, sender: String(sender), senderName, text })
+      if (ok) n++
+    }
+    return n
+  } catch { return 0 }
+}
+
+/** Run the backfill exactly once per account (marked in meta.backfilled). Idempotent — safe to call on
+ *  every reconcile; only the first call actually pulls history. */
+export async function backfillOnce(admin: any, accountId: string): Promise<number> {
+  const { data: id } = await admin.from('channel_identities').select('id, meta').eq('external_id', accountId).maybeSingle()
+  if (!id || id.meta?.backfilled) return 0
+  const n = await backfillUnipileAccount(admin, accountId)
+  await admin.from('channel_identities').update({ meta: { ...(id.meta || {}), backfilled: true }, updated_at: new Date().toISOString() }).eq('id', id.id).then(() => {}, () => {})
+  return n
 }
 
 /** Bind a freshly-connected Unipile account to the founder (called from the notify callback). */
