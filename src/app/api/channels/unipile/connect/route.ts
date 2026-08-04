@@ -4,7 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { createHostedAuthLink } from '@/lib/channels/unipile'
+import { createHostedAuthLink, reconcileUnipileAccounts } from '@/lib/channels/unipile'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -14,7 +14,11 @@ export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { data } = await createAdminClient().from('channel_identities')
+  const admin = createAdminClient()
+  // Self-heal: pull the founder's real connected accounts from Unipile and bind any we're missing, so
+  // the ✓ badges are right even when the connect redirect/notify didn't persist.
+  try { await reconcileUnipileAccounts(admin, user.id) } catch { /* best-effort */ }
+  const { data } = await admin.from('channel_identities')
     .select('provider, display, meta').eq('user_id', user.id).eq('active', true)
   const connected = (data || [])
     .filter((r: any) => r?.meta?.customer_channel || r?.meta?.founder_tool)

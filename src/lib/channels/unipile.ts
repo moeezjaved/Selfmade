@@ -108,6 +108,28 @@ export async function getNextEvent(accountId: string): Promise<{ title: string; 
 // channel (support inbox → Customer Inbox), same as Instagram/WhatsApp/Messenger.
 export const isFounderTool = (provider: string) => provider === 'calendar'
 
+/** Reconcile: read the founder's actual connected accounts from Unipile (matched by the `userId:…` tag
+ *  we set on the hosted-auth link) and bind any we don't have yet. Self-heals when the redirect/notify
+ *  didn't persist. Returns how many are now bound for this founder. */
+export async function reconcileUnipileAccounts(admin: any, userId: string): Promise<number> {
+  if (!unipileConfigured()) return 0
+  try {
+    const res = await fetch(`${DSN()}/api/v1/accounts`, { headers: { accept: 'application/json', 'X-API-KEY': KEY() } })
+    const j = await res.json().catch(() => ({}))
+    const items: any[] = j?.items || j?.data || (Array.isArray(j) ? j : [])
+    let n = 0
+    for (const a of items) {
+      const id = a?.id || a?.account_id
+      const name = String(a?.name || '')
+      if (!id || !name.startsWith(`${userId}:`)) continue   // only THIS founder's accounts
+      const requested = name.split(':')[1]
+      const provider = labelForType(a?.type || a?.provider || '', requested)
+      try { await bindUnipileAccount(admin, userId, provider, String(id)); n++ } catch { /* skip one */ }
+    }
+    return n
+  } catch { return 0 }
+}
+
 /** Bind a freshly-connected Unipile account to the founder (called from the notify callback). */
 export async function bindUnipileAccount(admin: any, userId: string, provider: string, accountId: string, display?: string) {
   const founder = isFounderTool(provider)

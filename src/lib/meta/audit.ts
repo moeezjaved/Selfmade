@@ -289,7 +289,9 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
       const status = live?.effective_status || meta.status || 'ACTIVE'
       return {
         id: r.campaign_id, meta_campaign_id: r.campaign_id, name: r.campaign_name || live?.name || meta.name || 'Campaign',
-        status, daily_budget: live?.daily_budget ?? meta.daily_budget ?? null,
+        // Meta's live daily_budget is in MINOR units (cents); the synced meta.daily_budget is already
+        // major (syncAccount ÷100). Normalize the live one so the whole app treats budgets as MAJOR.
+        status, daily_budget: live?.daily_budget != null ? Number(live.daily_budget) / 100 : (meta.daily_budget ?? null),
         campaign_insights: [{ spend, conversion_value: rev, roas: spend > 0 ? rev / spend : 0, ctr: Number(r.ctr || 0), impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0), conversions: conv, date_stop: '9999' }],
       }
     })
