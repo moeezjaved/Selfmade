@@ -31,9 +31,17 @@ export async function ingestCustomerMessage(admin: any, opts: { accountId?: stri
   } else {
     await admin.from('customer_threads').update({ priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now, ...(chatId ? { chat_ref: chatId } : {}) }).eq('id', thread.id)
   }
-  await admin.from('customer_messages').insert({
+  const { data: inserted } = await admin.from('customer_messages').insert({
     thread_id: thread.id, user_id: ownerId, direction: 'in', body: text,
     intent: tr.intent, priority: tr.priority, suggested_reply: tr.draft, status: 'pending',
-  })
+  }).select('id').single()
+
+  // Push it to the founder's Slack/WhatsApp so they can approve from chat (not just the web inbox).
+  try {
+    if (inserted?.id) {
+      const { pushCustomerMessage } = await import('@/lib/channels/send')
+      await pushCustomerMessage(admin, ownerId, { messageId: inserted.id, contactName: senderName, channel, priority: tr.priority, intent: tr.intent, body: text, draft: tr.draft })
+    }
+  } catch { /* push is best-effort */ }
   return true
 }

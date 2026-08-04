@@ -36,6 +36,7 @@ export default function InboxPage() {
   const [threads, setThreads] = useState<Thread[]>([])
   const [outbound, setOutbound] = useState<Outbound[]>([])
   const [rollup, setRollup] = useState<Record<string, number>>({})
+  const [stats, setStats] = useState<{ handled: number; sales: number; revenue: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [drafts, setDrafts] = useState<Record<string, string>>({})   // keyed by message id
   const [busy, setBusy] = useState<string>('')
@@ -49,7 +50,16 @@ export default function InboxPage() {
     if (Array.isArray(j.threads)) setThreads(j.threads)
     if (Array.isArray(j.outbound)) setOutbound(j.outbound)
     if (j.rollup) setRollup(j.rollup)
+    if (j.stats) setStats(j.stats)
   }).catch(() => {}).finally(() => setLoading(false))
+
+  const markSale = async (threadId: string) => {
+    const raw = window.prompt('Mark this as a sale — order value? (optional, just press OK to skip)')
+    if (raw === null) return
+    const amount = Number(String(raw).replace(/[^0-9.]/g, ''))
+    await fetch('/api/customer/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'mark_sale', threadId, amount }) }).catch(() => {})
+    toast.success('Counted as a sale 💰'); load()
+  }
   const loadChannels = () => fetch('/api/channels/unipile/connect').then(r => r.ok ? r.json() : null)
     .then(j => setChannels(Array.isArray(j?.connected) ? j.connected.filter((c: any) => c.kind !== 'founder').map((c: any) => c.provider) : []))
     .catch(() => setChannels([]))
@@ -131,6 +141,20 @@ export default function InboxPage() {
     <div style={{ padding: '32px 28px', maxWidth: 820, margin: '0 auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: INK, letterSpacing: '-.02em', marginBottom: 4 }}>Customer Inbox</h1>
       <p style={{ fontSize: 13.5, color: SUB, marginBottom: 18 }}>Messages sorted by what matters, and proactive nudges Mello wants to send — each with a draft ready. You approve; nothing sends on its own.</p>
+
+      {/* Attribution — what the Customer Employee did this month + revenue it's credited with. */}
+      {stats && (stats.handled > 0 || stats.sales > 0) && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, background: FOREST, color: '#fff', borderRadius: 12, padding: '8px 14px', fontSize: 13, fontWeight: 700 }}>
+            <b style={{ color: LIME, fontSize: 15 }}>{stats.handled}</b> handled this month
+          </span>
+          {stats.sales > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, background: '#eaf3de', color: '#3b6d11', borderRadius: 12, padding: '8px 14px', fontSize: 13, fontWeight: 700 }}>
+              <b style={{ fontSize: 15 }}>{stats.sales}</b> led to sales{stats.revenue > 0 ? ` · €${Math.round(stats.revenue).toLocaleString()}` : ''} 💰
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Your channels — what's connected, what's still pending, connect right here. */}
       {channels !== null && (() => {
@@ -220,7 +244,10 @@ export default function InboxPage() {
                     <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#3f8f4f', marginBottom: 6 }}>Mello&rsquo;s suggested reply</div>
                     <DraftBox messageId={msg.id} fallback={msg.suggested_reply || ''} />
                   </div>
-                  <ActionRow messageId={msg.id} fallback={msg.suggested_reply || ''} from="inbox" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <ActionRow messageId={msg.id} fallback={msg.suggested_reply || ''} from="inbox" />
+                    <button onClick={() => markSale(t.id)} style={{ background: 'none', border: 'none', color: '#3b6d11', fontSize: 12, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>💰 Mark sale</button>
+                  </div>
                 </div>
               )
             })}
