@@ -85,9 +85,21 @@ export function SlackLogo({ size = 24 }: { size?: number }) {
   )
 }
 
+export function CalendarLogo({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="4.5" width="18" height="16.5" rx="3" fill="#fff" stroke="#e2534b" strokeWidth="1.6" />
+      <rect x="3" y="4.5" width="18" height="4.6" rx="3" fill="#e2534b" />
+      <rect x="7" y="2.5" width="1.8" height="4" rx="0.9" fill="#c0392b" />
+      <rect x="15.2" y="2.5" width="1.8" height="4" rx="0.9" fill="#c0392b" />
+      <circle cx="8" cy="13" r="1.3" fill="#4285F4" /><circle cx="12" cy="13" r="1.3" fill="#34A853" /><circle cx="16" cy="13" r="1.3" fill="#FBBC05" /><circle cx="8" cy="17" r="1.3" fill="#e2534b" /><circle cx="12" cy="17" r="1.3" fill="#4285F4" />
+    </svg>
+  )
+}
+
 const MAP: Record<string, (p: { size?: number }) => ReactNode> = {
   instagram: InstagramLogo, whatsapp: WhatsAppLogo, messenger: MessengerLogo,
-  telegram: TelegramLogo, linkedin: LinkedInLogo, x: XLogo, email: EmailLogo, slack: SlackLogo,
+  telegram: TelegramLogo, linkedin: LinkedInLogo, x: XLogo, email: EmailLogo, slack: SlackLogo, calendar: CalendarLogo,
 }
 
 /** Dispatch a logo by provider key. Falls back to a neutral chat glyph. */

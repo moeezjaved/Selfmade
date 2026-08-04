@@ -24,6 +24,7 @@ import MelloTasks from './MelloTasks'
 import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 import BriefOpportunities from '@/components/brief/BriefOpportunities'
 import StandupCard from '@/components/brief/StandupCard'
+import { ChannelLogo } from '@/components/brand/logos'
 import CompetitorCard from '@/components/brief/CompetitorCard'
 import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
@@ -461,6 +462,21 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             <Row href="/discovery/brand-spy" title="Spy on a competitor" desc="I'll watch every ad they launch." right={ARROW} />
             <Row href="/settings" title="Make ads for me daily" desc="Pick how many — delivered every morning."
               right={<span style={{ fontSize: 11, fontWeight: 750, color: FOREST, background: '#f2f8ea', border: `1px solid #a8cf6f`, borderRadius: 100, padding: '2px 9px' }}>Auto</span>} />
+
+            {/* Finish setup — connect WhatsApp / Slack / Calendar, one small line each. */}
+            <div style={{ height: 1, background: LINE, margin: '14px 0 10px' }} />
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9aa79a', marginBottom: 4 }}>Finish setup</div>
+            {[
+              { p: 'whatsapp', label: 'Get your brief on WhatsApp' },
+              { p: 'slack', label: 'Get your brief on Slack' },
+              { p: 'calendar', label: 'Connect your calendar' },
+            ].map(x => (
+              <Link key={x.p} href="/settings" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', textDecoration: 'none' }}>
+                <span style={{ display: 'inline-flex', flexShrink: 0 }}><ChannelLogo provider={x.p} size={18} /></span>
+                <span style={{ fontSize: 13, fontWeight: 650, color: INK, flex: 1, minWidth: 0 }}>{x.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#3f8f4f', whiteSpace: 'nowrap' }}>Connect →</span>
+              </Link>
+            ))}
           </div>
         </aside>
       </div>
