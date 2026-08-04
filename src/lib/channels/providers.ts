@@ -105,6 +105,24 @@ const uniHeaders = () => ({ 'content-type': 'application/json', 'X-API-KEY': (pr
 
 export const unipileReady = () => !!(process.env.UNIPILE_DSN && process.env.UNIPILE_API_KEY)
 
+/** Find the existing conversation id for a customer on a connected account (so we can reply INTO it).
+ *  Needed when the thread was stored without a chat id (e.g. older backfill). Best-effort. */
+export async function resolveChatId(accountId: string, attendeeId: string): Promise<string | null> {
+  if (!unipileReady() || !accountId || !attendeeId) return null
+  try {
+    const res = await fetch(`${uniBase()}/api/v1/chats?account_id=${encodeURIComponent(accountId)}&limit=100`, { headers: uniHeaders() })
+    const j = await res.json().catch(() => ({}))
+    const chats: any[] = j?.items || j?.data || []
+    for (const c of chats) {
+      const direct = c?.attendee_provider_id || c?.provider_id
+      if (direct && String(direct) === String(attendeeId)) return String(c.id || c.chat_id)
+      const atts = c?.attendees || c?.attendee_ids || []
+      if (Array.isArray(atts) && atts.some((a: any) => String(a?.provider_id || a?.attendee_provider_id || a) === String(attendeeId))) return String(c.id || c.chat_id)
+    }
+    return null
+  } catch { return null }
+}
+
 /**
  * Send a message from ANY connected Unipile account (WhatsApp, Instagram, …) — used for customer
  * replies where the account is dynamic (bound per-founder via hosted auth), not the env one. Reply into
