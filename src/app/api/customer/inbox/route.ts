@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
     let delivered = false
     let note = 'Approved. Connect Instagram/WhatsApp in Settings to auto-deliver.'
     try {
-      const { data: thread } = await admin.from('customer_threads').select('channel, contact_ref').eq('id', msg.thread_id).maybeSingle()
+      const { data: thread } = await admin.from('customer_threads').select('channel, contact_ref, chat_ref').eq('id', msg.thread_id).maybeSingle()
       if (thread && thread.channel !== 'simulated' && thread.contact_ref) {
         const { data: chan } = await admin.from('channel_identities').select('external_id, meta')
           .eq('user_id', user.id).eq('provider', thread.channel).eq('active', true).maybeSingle()
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
             note = r.ok ? 'Email sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : 'Saved, but sending failed — try again.')
           } else {
             const { unipileSend } = await import('@/lib/channels/providers')
-            const r = await unipileSend(String(accountId), { toAttendee: thread.contact_ref, text })
+            const r = await unipileSend(String(accountId), { chatId: thread.chat_ref || undefined, toAttendee: thread.contact_ref, text })
             delivered = !!r.ok
             note = r.ok ? 'Sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : 'Saved, but delivery failed — try again.')
           }

@@ -6,8 +6,8 @@
  */
 import { triageMessage } from '@/lib/customer/triage'
 
-export async function ingestCustomerMessage(admin: any, opts: { accountId?: string; sender: string; senderName?: string; text: string; channel?: string }): Promise<boolean> {
-  const { accountId, sender, senderName, text } = opts
+export async function ingestCustomerMessage(admin: any, opts: { accountId?: string; sender: string; senderName?: string; text: string; channel?: string; chatId?: string }): Promise<boolean> {
+  const { accountId, sender, senderName, text, chatId } = opts
   if (!accountId || !sender || !text) return false
   // Which founder owns the connected account this arrived on?
   const { data: chan } = await admin.from('channel_identities').select('*').eq('external_id', accountId).eq('active', true).maybeSingle()
@@ -25,11 +25,11 @@ export async function ingestCustomerMessage(admin: any, opts: { accountId?: stri
   if (!thread) {
     const { data: created } = await admin.from('customer_threads').insert({
       user_id: ownerId, channel, contact_ref: sender, contact_name: senderName || null,
-      priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now,
+      priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now, chat_ref: chatId || null,
     }).select().single()
     thread = created
   } else {
-    await admin.from('customer_threads').update({ priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now }).eq('id', thread.id)
+    await admin.from('customer_threads').update({ priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now, ...(chatId ? { chat_ref: chatId } : {}) }).eq('id', thread.id)
   }
   await admin.from('customer_messages').insert({
     thread_id: thread.id, user_id: ownerId, direction: 'in', body: text,

@@ -169,7 +169,7 @@ async function backfillUnipileAccount(admin: any, accountId: string): Promise<nu
       const senderName = c.name || c.attendee_name || last?.from?.attendee_name
       const text = last.text || last.body || ''
       if (!sender || !text) continue
-      const ok = await ingestCustomerMessage(admin, { accountId, sender: String(sender), senderName, text })
+      const ok = await ingestCustomerMessage(admin, { accountId, sender: String(sender), senderName, text, chatId: String(chatId) })
       if (ok) n++
     }
     return n

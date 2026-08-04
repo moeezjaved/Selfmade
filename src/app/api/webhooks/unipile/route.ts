@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   // Not the founder → it's a CUSTOMER messaging a connected company channel. Land it in the inbox.
   if (!identity) {
     const { ingestCustomerMessage } = await import('@/lib/customer/ingest')
-    if (await ingestCustomerMessage(admin, { accountId, sender, senderName, text })) return NextResponse.json({ ok: true })
+    if (await ingestCustomerMessage(admin, { accountId, sender, senderName, text, chatId })) return NextResponse.json({ ok: true })
   }
 
   // Not linked yet → the only thing we accept is a link code.
