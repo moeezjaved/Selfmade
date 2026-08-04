@@ -11,7 +11,8 @@ import Link from 'next/link'
 const INK = '#17251c', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#1a3a1a', LIME = '#dffe95'
 
 type Line = { key: string; emoji: string; name: string; text: string; connect?: boolean }
-type Standup = { greeting: string; dateLabel: string; lines: Line[]; pendingCount: number; pendingTitles: string[]; calendarConnected: boolean }
+type Prompt = { key: string; emoji: string; label: string }
+type Standup = { greeting: string; dateLabel: string; lines: Line[]; pendingCount: number; pendingTitles: string[]; calendarConnected: boolean; connectPrompts?: Prompt[] }
 type Prep = { prepared: { dept: string; detail: string }[]; awaiting: { title: string; kind: string; cost: string }[]; summary: string }
 
 export default function StandupCard() {
@@ -47,11 +48,22 @@ export default function StandupCard() {
             <span style={{ fontSize: 16, width: 22, textAlign: 'center', flexShrink: 0 }}>{l.emoji}</span>
             <div style={{ minWidth: 0, flex: 1 }}>
               <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9db29a' }}>{l.name}</span>
-              <div style={{ fontSize: 13.5, color: '#eaf3e6', lineHeight: 1.45, marginTop: 1 }}>{l.text}{l.connect && <> <Link href="/settings" style={{ color: LIME, fontWeight: 700, textDecoration: 'none' }}>Connect →</Link></>}</div>
+              <div style={{ fontSize: 13.5, color: '#eaf3e6', lineHeight: 1.45, marginTop: 1 }}>{l.text}</div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Small "finish setup" chips — calendar / comms — quiet, not a big banner. */}
+      {!!(s.connectPrompts && s.connectPrompts.length) && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+          {s.connectPrompts.map(p => (
+            <Link key={p.key} href="/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: '5px 11px', fontSize: 12, fontWeight: 700, color: '#eaf3e6', textDecoration: 'none' }}>
+              <span>{p.emoji}</span>{p.label}<span style={{ color: LIME }}>→</span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Prepare everything — one tap fans out the free prep and lines up what needs your OK. */}
       <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid rgba(255,255,255,.12)` }}>

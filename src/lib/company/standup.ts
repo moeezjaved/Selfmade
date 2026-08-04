@@ -8,7 +8,8 @@
 import { computeCompanyStatus } from '@/lib/company/status'
 
 export type StandupLine = { key: string; emoji: string; name: string; text: string; connect?: boolean }
-export type Standup = { greeting: string; dateLabel: string; lines: StandupLine[]; pendingCount: number; pendingTitles: string[]; calendarConnected: boolean }
+export type ConnectPrompt = { key: string; emoji: string; label: string }
+export type Standup = { greeting: string; dateLabel: string; lines: StandupLine[]; pendingCount: number; pendingTitles: string[]; calendarConnected: boolean; connectPrompts: ConnectPrompt[] }
 
 export async function assembleStandup(admin: any, userId: string, firstName?: string | null): Promise<Standup> {
   const now = new Date()
@@ -48,7 +49,9 @@ export async function assembleStandup(admin: any, userId: string, firstName?: st
     }
   } catch { /* inbox is best-effort */ }
 
-  // Calendar — if a calendar/Google account is connected, show the next meeting; else a connect prompt.
+  // Calendar — only shows as a department line when CONNECTED (with the real next meeting). If not
+  // connected, it becomes a small chip in connectPrompts instead of a big line.
+  const connectPrompts: ConnectPrompt[] = []
   let calendarConnected = false
   try {
     const { data: cal } = await admin.from('channel_identities').select('external_id, meta, provider')
@@ -66,15 +69,21 @@ export async function assembleStandup(admin: any, userId: string, firstName?: st
       }
     }
   } catch { /* calendar is best-effort */ }
-  if (!calendarConnected) {
-    lines.push({ key: 'calendar', emoji: '📅', name: 'Calendar', text: 'Connect your calendar to see today’s meetings.', connect: true })
-  }
+  if (!calendarConnected) connectPrompts.push({ key: 'calendar', emoji: '📅', label: 'Add your calendar' })
+
+  // Founder comms for the brief itself — Slack (teams) or WhatsApp (solo). Small chip if neither linked.
+  try {
+    const { data: comms } = await admin.from('channel_identities').select('provider, meta')
+      .eq('user_id', userId).in('provider', ['slack', 'whatsapp']).eq('active', true)
+    const hasFounderComms = (comms || []).some((c: any) => !c?.meta?.customer_channel)
+    if (!hasFounderComms) connectPrompts.push({ key: 'comms', emoji: '💬', label: 'Get briefs on Slack or WhatsApp' })
+  } catch { /* best-effort */ }
 
   const pending = (tasks as any[]).filter(t => t.status === 'suggested')
   return {
     greeting, dateLabel, lines,
     pendingCount: pending.length,
     pendingTitles: pending.slice(0, 6).map(t => String(t.title || 'A decision')),
-    calendarConnected: false,
+    calendarConnected, connectPrompts,
   }
 }
