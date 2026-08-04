@@ -92,6 +92,21 @@ export async function POST(req: NextRequest) {
   let botToken: string | undefined
   try { botToken = (identity as any).meta?.bot_token ? decryptToken((identity as any).meta.bot_token) : undefined } catch { botToken = undefined }
 
+  // Customer-message buttons (from a pushed inbox message) — approve/skip a customer reply from Slack.
+  if (action.action_id === 'cust_approve' || action.action_id === 'cust_skip') {
+    const messageId = String(taskId)
+    if (action.action_id === 'cust_skip') {
+      const { skipCustomerMessage } = await import('@/lib/customer/reply')
+      await skipCustomerMessage(admin, userId, messageId)
+      if (channel && ts) await slackUpdate(channel, ts, 'Skipped', [{ type: 'section', text: { type: 'mrkdwn', text: '_Skipped — I’ll leave it._' } }], botToken)
+    } else {
+      const { sendCustomerReply } = await import('@/lib/customer/reply')
+      const r = await sendCustomerReply(admin, userId, messageId)
+      if (channel && ts) await slackUpdate(channel, ts, r.note, [{ type: 'section', text: { type: 'mrkdwn', text: r.delivered ? '✅ *Replied* — sent to the customer.' : `⚠️ ${r.note}` } }], botToken)
+    }
+    return NextResponse.json({ ok: true })
+  }
+
   const { data: task } = await admin.from('mello_tasks').select('*').eq('id', String(taskId)).eq('user_id', userId).maybeSingle()
   if (!task) { await slackRespond(responseUrl, '⚠️ I can’t find that task anymore — it may have expired.'); return NextResponse.json({ ok: true }) }
 

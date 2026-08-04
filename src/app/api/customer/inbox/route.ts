@@ -45,6 +45,16 @@ export async function GET() {
   const rollup: Record<string, number> = {}
   for (const t of list) if (t.status === 'open' && t.intent) rollup[t.intent] = (rollup[t.intent] || 0) + 1
 
+  // Attribution — this month: how many messages the Customer Employee handled + sales it's credited with.
+  const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0)
+  const since = monthStart.toISOString()
+  const { count: handled } = await admin.from('customer_messages').select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id).eq('direction', 'out').eq('status', 'sent').gte('created_at', since)
+  const { data: won } = await admin.from('customer_threads').select('sale_value').eq('user_id', user.id).eq('converted', true).gte('converted_at', since)
+  const sales = (won || []).length
+  const revenue = (won || []).reduce((s: number, t: any) => s + (Number(t.sale_value) || 0), 0)
+  const stats = { handled: handled || 0, sales, revenue }
+
   // Outbound proposals awaiting the founder's approval (Mello wants to reach out first).
   const { data: outMsgs } = await admin.from('customer_messages').select('*')
     .eq('user_id', user.id).eq('direction', 'out').eq('status', 'pending').order('created_at', { ascending: false }).limit(50)
@@ -56,7 +66,7 @@ export async function GET() {
   }
   const outbound = (outMsgs || []).map((m: any) => ({ ...m, thread: outThreads[m.thread_id] || null }))
 
-  return NextResponse.json({ threads: threadsOut, rollup, outbound })
+  return NextResponse.json({ threads: threadsOut, rollup, outbound, stats })
 }
 
 export async function POST(req: NextRequest) {
@@ -112,69 +122,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, outbound: { ...msg, thread } })
   }
 
-  if (action === 'approve' || action === 'skip') {
+  if (action === 'mark_sale') {
+    const threadId = String(body.threadId || '')
+    if (!threadId) return NextResponse.json({ error: 'threadId required' }, { status: 400 })
+    const converted = body.converted !== false
+    const amount = Number(body.amount)
+    await admin.from('customer_threads').update({
+      converted, sale_value: Number.isFinite(amount) && amount > 0 ? amount : null,
+      converted_at: converted ? new Date().toISOString() : null,
+    }).eq('id', threadId).eq('user_id', user.id)
+    return NextResponse.json({ ok: true })
+  }
+
+  if (action === 'skip') {
     const messageId = String(body.messageId || '')
     if (!messageId) return NextResponse.json({ error: 'messageId required' }, { status: 400 })
-    const { data: msg } = await admin.from('customer_messages').select('*').eq('id', messageId).eq('user_id', user.id).maybeSingle()
-    if (!msg) return NextResponse.json({ error: 'Message not found' }, { status: 404 })
+    const { skipCustomerMessage } = await import('@/lib/customer/reply')
+    const r = await skipCustomerMessage(admin, user.id, messageId)
+    return NextResponse.json(r.ok ? { ok: true } : { error: 'Message not found' }, { status: r.ok ? 200 : 404 })
+  }
 
-    if (action === 'skip') {
-      await admin.from('customer_messages').update({ status: 'skipped' }).eq('id', messageId)
-      await admin.from('customer_threads').update({ status: 'skipped' }).eq('id', msg.thread_id)
-      return NextResponse.json({ ok: true })
-    }
-
-    // approve: record the (optionally edited) message, then actually SEND it if the thread is on a real
-    // connected channel (simulated threads just record). Money/credits are unrelated here — this is a
-    // customer message, free to send.
-    const text = String(body.reply || (msg.direction === 'out' ? msg.body : msg.suggested_reply) || '').trim()
-    if (!text) return NextResponse.json({ error: 'Nothing to send.' }, { status: 400 })
-    const now = new Date().toISOString()
-    if (msg.direction === 'out') {
-      await admin.from('customer_messages').update({ status: 'sent', body: text }).eq('id', messageId)
-    } else {
-      await admin.from('customer_messages').update({ status: 'approved' }).eq('id', messageId)
-      await admin.from('customer_messages').insert({ thread_id: msg.thread_id, user_id: user.id, direction: 'out', body: text, status: 'sent' })
-    }
-    await admin.from('customer_threads').update({ status: 'replied', last_message_at: now }).eq('id', msg.thread_id)
-
-    // Real delivery: send from the founder's connected account for this thread's channel to the customer.
-    let delivered = false
-    let note = 'Approved. Connect Instagram/WhatsApp in Settings to auto-deliver.'
-    try {
-      const { data: thread } = await admin.from('customer_threads').select('channel, contact_ref, chat_ref').eq('id', msg.thread_id).maybeSingle()
-      if (thread && thread.channel !== 'simulated' && thread.contact_ref) {
-        const { data: chan } = await admin.from('channel_identities').select('external_id, meta')
-          .eq('user_id', user.id).eq('provider', thread.channel).eq('active', true).maybeSingle()
-        const accountId = chan?.meta?.unipile_account_id || chan?.external_id
-        if (accountId) {
-          if (thread.channel === 'email') {
-            const { unipileSendEmail } = await import('@/lib/channels/providers')
-            const r = await unipileSendEmail(String(accountId), { to: thread.contact_ref, subject: 'Re: your message', text })
-            delivered = !!r.ok
-            note = r.ok ? 'Email sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : 'Saved, but sending failed — try again.')
-          } else {
-            const { unipileSend, resolveChatId } = await import('@/lib/channels/providers')
-            // Reply INTO the existing conversation. If we don't have its id (older backfill), resolve it
-            // from Unipile now and store it for next time.
-            let chatId = thread.chat_ref || undefined
-            if (!chatId && thread.contact_ref) {
-              const resolved = await resolveChatId(String(accountId), thread.contact_ref)
-              if (resolved) { chatId = resolved; await admin.from('customer_threads').update({ chat_ref: resolved }).eq('id', msg.thread_id) }
-            }
-            const r = await unipileSend(String(accountId), { chatId, toAttendee: thread.contact_ref, text })
-            delivered = !!r.ok
-            note = r.ok ? 'Sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : `Saved, but delivery failed: ${r.error || 'unknown'}`)
-          }
-        }
-      } else if (thread?.channel === 'simulated') {
-        note = 'Approved ✓ (test message — not sent)'
-      }
-    } catch { /* delivery best-effort; the reply is already recorded */ }
-
-    // Teach the Customer Employee from what the founder actually approved.
-    try { await recordLearning(admin, { userId: user.id, department: 'customer', event: `Approved a ${msg.direction === 'out' ? OUTBOUND_LABEL[msg.intent as OutboundType] || 'proactive' : (msg.intent || 'customer')} message`, result: text.slice(0, 300), source: 'founder', metric: { intent: msg.intent, direction: msg.direction } }) } catch { /* best-effort */ }
-    return NextResponse.json({ ok: true, delivered, note })
+  if (action === 'approve') {
+    const messageId = String(body.messageId || '')
+    if (!messageId) return NextResponse.json({ error: 'messageId required' }, { status: 400 })
+    const { sendCustomerReply } = await import('@/lib/customer/reply')
+    const r = await sendCustomerReply(admin, user.id, messageId, body.reply)
+    if (!r.ok) return NextResponse.json({ error: r.note }, { status: r.error === 'not_found' ? 404 : 400 })
+    return NextResponse.json({ ok: true, delivered: r.delivered, note: r.note })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

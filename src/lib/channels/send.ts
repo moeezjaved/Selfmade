@@ -122,6 +122,28 @@ export async function pushNewApprovals(admin: any, userId: string): Promise<{ pu
   return { pushed }
 }
 
+/** Push a new customer message to the founder's Slack (+ WhatsApp) with Approve/Skip buttons, so they can
+ *  handle it from chat. Only fires for the founder's OWN comms channels (never a connected customer one). */
+export async function pushCustomerMessage(admin: any, userId: string, m: { messageId: string; contactName?: string; channel: string; priority?: string; intent?: string; body: string; draft: string }): Promise<void> {
+  const ids = await getIdentities(admin, userId)
+  const founderChans = ids.filter((i: any) => (i.provider === 'slack' || i.provider === 'whatsapp') && !i.meta?.customer_channel)
+  if (!founderChans.length) return
+  const PRI: Record<string, string> = { high: '🔴 HIGH', med: '🟡 MEDIUM', low: '🟢 LOW' }
+  const head = `💬 *New ${m.channel} message*${m.priority ? ` · ${PRI[m.priority] || m.priority}` : ''}${m.intent ? ` · ${m.intent}` : ''}`
+  const bodyTxt = `${head}\n*From ${m.contactName || 'a customer'}:*\n> ${m.body}\n\n*Mello's draft:*\n_${m.draft}_`
+  const slackBlocks = [
+    { type: 'section', text: { type: 'mrkdwn', text: bodyTxt } },
+    { type: 'actions', block_id: `cust_${m.messageId}`, elements: [
+      { type: 'button', action_id: 'cust_approve', style: 'primary', text: { type: 'plain_text', text: 'Approve & send' }, value: m.messageId },
+      { type: 'button', action_id: 'cust_skip', text: { type: 'plain_text', text: 'Skip' }, value: m.messageId },
+    ] },
+  ]
+  for (const id of founderChans) {
+    if (id.provider === 'slack' && id.meta?.channel_id) await slackPost(id.meta.channel_id, `New ${m.channel} message`, slackBlocks, botTokenFor(id)).catch(() => {})
+    else if (id.provider === 'whatsapp') { const chatId = id.meta?.chat_id; await whatsappSend({ chatId, toAttendee: chatId ? undefined : id.external_id, text: `${bodyTxt}\n\nReply in Selfmade to send.` }).catch(() => {}) }
+  }
+}
+
 /** The most recent still-open approval for this user on a channel — what a free-text "yes" resolves to. */
 export async function latestOpenApproval(admin: any, userId: string, provider: string) {
   const { data } = await admin.from('channel_messages')
