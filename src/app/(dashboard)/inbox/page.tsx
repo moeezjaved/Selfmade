@@ -41,13 +41,27 @@ export default function InboxPage() {
   const [simText, setSimText] = useState('')
   const [simBusy, setSimBusy] = useState(false)
   const [outBusy, setOutBusy] = useState('')
+  const [channels, setChannels] = useState<string[] | null>(null)   // connected customer-channel providers
+  const [connecting, setConnecting] = useState('')
 
   const load = () => fetch('/api/customer/inbox', { cache: 'no-store' }).then(r => r.json()).then(j => {
     if (Array.isArray(j.threads)) setThreads(j.threads)
     if (Array.isArray(j.outbound)) setOutbound(j.outbound)
     if (j.rollup) setRollup(j.rollup)
   }).catch(() => {}).finally(() => setLoading(false))
-  useEffect(() => { load() }, [])
+  const loadChannels = () => fetch('/api/channels/unipile/connect').then(r => r.ok ? r.json() : null)
+    .then(j => setChannels(Array.isArray(j?.connected) ? j.connected.filter((c: any) => c.kind !== 'founder').map((c: any) => c.provider) : []))
+    .catch(() => setChannels([]))
+  useEffect(() => { load(); loadChannels() }, [])
+
+  const connectChannel = async (provider: string) => {
+    setConnecting(provider)
+    try {
+      const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider }) }).then(r => r.json())
+      if (j?.url) { window.location.href = j.url }
+      else { toast.error(j?.error || 'Channels aren’t set up yet.'); setConnecting('') }
+    } catch { toast.error('Something went wrong.'); setConnecting('') }
+  }
 
   // Approve/skip a message by id. `fallback` = the draft to send if the founder didn't edit.
   const act = async (messageId: string, fallback: string, action: 'approve' | 'skip', from: 'inbox' | 'outbound') => {
@@ -109,6 +123,44 @@ export default function InboxPage() {
     <div style={{ padding: '32px 28px', maxWidth: 820, margin: '0 auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: INK, letterSpacing: '-.02em', marginBottom: 4 }}>Customer Inbox</h1>
       <p style={{ fontSize: 13.5, color: SUB, marginBottom: 18 }}>Messages sorted by what matters, and proactive nudges Mello wants to send — each with a draft ready. You approve; nothing sends on its own.</p>
+
+      {/* Your channels — what's connected, what's still pending, connect right here. */}
+      {channels !== null && (() => {
+        const CH = [
+          { k: 'instagram', label: 'Instagram', emoji: '📷' },
+          { k: 'whatsapp', label: 'WhatsApp', emoji: '🟢' },
+          { k: 'messenger', label: 'Messenger', emoji: '💬' },
+          { k: 'email', label: 'Email', emoji: '✉️' },
+        ]
+        const pending = CH.filter(c => !channels.includes(c.k)).length
+        return (
+          <div style={{ ...card, padding: '12px 14px', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 800, color: INK }}>Your channels</span>
+              <span style={{ fontSize: 12, color: SUB }}>{channels.length} connected{pending ? ` · ${pending} to connect` : ' · all set 🌱'}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {CH.map(c => {
+                const on = channels.includes(c.k)
+                return (
+                  <div key={c.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: `1px solid ${on ? '#cfe6b8' : LINE}`, background: on ? '#f6fbef' : '#fff', borderRadius: 100, padding: '6px 10px 6px 11px' }}>
+                    <span style={{ fontSize: 14 }}>{c.emoji}</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>{c.label}</span>
+                    {on ? (
+                      <span style={{ fontSize: 11.5, fontWeight: 800, color: '#3b6d11' }}>✓</span>
+                    ) : (
+                      <button onClick={() => connectChannel(c.k)} disabled={connecting === c.k}
+                        style={{ marginLeft: 2, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '3px 10px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: connecting === c.k ? 'default' : 'pointer', opacity: connecting === c.k ? 0.6 : 1 }}>
+                        {connecting === c.k ? '…' : 'Connect'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       <div style={{ display: 'flex', gap: 22, borderBottom: `1px solid ${LINE}`, marginBottom: 20 }}>
         <Tab id="inbox" label="Inbox" count={threads.length} />
