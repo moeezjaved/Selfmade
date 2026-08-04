@@ -99,6 +99,30 @@ export const whatsappEnabled = !!(process.env.UNIPILE_DSN && process.env.UNIPILE
 const uniBase = () => (process.env.UNIPILE_DSN || '').replace(/\/$/, '')
 const uniHeaders = () => ({ 'content-type': 'application/json', 'X-API-KEY': process.env.UNIPILE_API_KEY || '', accept: 'application/json' })
 
+export const unipileReady = () => !!(process.env.UNIPILE_DSN && process.env.UNIPILE_API_KEY)
+
+/**
+ * Send a message from ANY connected Unipile account (WhatsApp, Instagram, …) — used for customer
+ * replies where the account is dynamic (bound per-founder via hosted auth), not the env one. Reply into
+ * a known chat, or start one with `toAttendee` (the customer's provider id). Same Unipile endpoints.
+ */
+export async function unipileSend(accountId: string, opts: { chatId?: string; toAttendee?: string; text: string }): Promise<{ ok: boolean; id?: string; chatId?: string; error?: string }> {
+  if (!unipileReady()) return { ok: false, error: 'not_configured' }
+  try {
+    if (opts.chatId) {
+      const r = await fetch(`${uniBase()}/api/v1/chats/${encodeURIComponent(opts.chatId)}/messages`, {
+        method: 'POST', headers: uniHeaders(), body: JSON.stringify({ text: opts.text }),
+      }).then((x) => x.json())
+      return { ok: true, id: r?.id || r?.message_id, chatId: opts.chatId }
+    }
+    const r = await fetch(`${uniBase()}/api/v1/chats`, {
+      method: 'POST', headers: uniHeaders(),
+      body: JSON.stringify({ account_id: accountId, attendees_ids: [opts.toAttendee], text: opts.text }),
+    }).then((x) => x.json())
+    return { ok: true, id: r?.message_id || r?.id, chatId: r?.chat_id || r?.id }
+  } catch (e: any) { return { ok: false, error: String(e?.message || e) } }
+}
+
 /**
  * Send a WhatsApp message. If `chatId` is known (from a prior inbound), reply into it; otherwise
  * start a new chat to `toAttendee` (the recipient's WhatsApp id / phone). Returns the message id.

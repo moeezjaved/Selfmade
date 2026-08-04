@@ -124,22 +124,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // approve: record the (optionally edited) message. Real delivery attaches when Unipile is on.
+    // approve: record the (optionally edited) message, then actually SEND it if the thread is on a real
+    // connected channel (simulated threads just record). Money/credits are unrelated here — this is a
+    // customer message, free to send.
     const text = String(body.reply || (msg.direction === 'out' ? msg.body : msg.suggested_reply) || '').trim()
     if (!text) return NextResponse.json({ error: 'Nothing to send.' }, { status: 400 })
     const now = new Date().toISOString()
     if (msg.direction === 'out') {
-      // An outbound proposal Mello wrote — approve = send it (record the edited body, mark sent).
       await admin.from('customer_messages').update({ status: 'sent', body: text }).eq('id', messageId)
     } else {
-      // An inbound message — approve = send the reply (mark the inbound handled, log the outbound).
       await admin.from('customer_messages').update({ status: 'approved' }).eq('id', messageId)
       await admin.from('customer_messages').insert({ thread_id: msg.thread_id, user_id: user.id, direction: 'out', body: text, status: 'sent' })
     }
     await admin.from('customer_threads').update({ status: 'replied', last_message_at: now }).eq('id', msg.thread_id)
+
+    // Real delivery: send from the founder's connected account for this thread's channel to the customer.
+    let delivered = false
+    let note = 'Approved. Connect Instagram/WhatsApp in Settings to auto-deliver.'
+    try {
+      const { data: thread } = await admin.from('customer_threads').select('channel, contact_ref').eq('id', msg.thread_id).maybeSingle()
+      if (thread && thread.channel !== 'simulated' && thread.contact_ref) {
+        const { data: chan } = await admin.from('channel_identities').select('external_id, meta')
+          .eq('user_id', user.id).eq('provider', thread.channel).eq('active', true).maybeSingle()
+        const accountId = chan?.meta?.unipile_account_id || chan?.external_id
+        if (accountId) {
+          const { unipileSend } = await import('@/lib/channels/providers')
+          const r = await unipileSend(String(accountId), { toAttendee: thread.contact_ref, text })
+          delivered = !!r.ok
+          note = r.ok ? 'Sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : 'Saved, but delivery failed — try again.')
+        }
+      } else if (thread?.channel === 'simulated') {
+        note = 'Approved ✓ (test message — not sent)'
+      }
+    } catch { /* delivery best-effort; the reply is already recorded */ }
+
     // Teach the Customer Employee from what the founder actually approved.
     try { await recordLearning(admin, { userId: user.id, department: 'customer', event: `Approved a ${msg.direction === 'out' ? OUTBOUND_LABEL[msg.intent as OutboundType] || 'proactive' : (msg.intent || 'customer')} message`, result: text.slice(0, 300), source: 'founder', metric: { intent: msg.intent, direction: msg.direction } }) } catch { /* best-effort */ }
-    return NextResponse.json({ ok: true, delivered: false, note: 'Approved. Connect WhatsApp/Instagram in Settings to auto-deliver.' })
+    return NextResponse.json({ ok: true, delivered, note })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
