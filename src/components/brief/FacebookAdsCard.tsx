@@ -114,8 +114,8 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   const scaleCampaign = async (c: Camp) => {
     const id = c.metaCampaignId
     if (!id || c.dailyBudget == null || scaling) return
-    // Meta stores daily_budget in MINOR units (cents): 2500 = €25. Show + scale in major units.
-    const currentMajor = (Number(c.dailyBudget) || 0) / 100
+    // dailyBudget is normalized to MAJOR units server-side (audit). Scale +20% off it.
+    const currentMajor = Number(c.dailyBudget) || 0
     const newBudget = Math.max(1, Math.round(currentMajor * 1.2))
     if (!window.confirm(`Scale “${c.name}” from ${money(currentMajor)}/day to ${money(newBudget)}/day (+20%)?\n\nThis raises spend on Meta right now.`)) return
     setScaling(id)
@@ -139,7 +139,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
           const canScale = scalable && !!c.metaCampaignId && c.dailyBudget != null
           const done = c.metaCampaignId ? scaled[c.metaCampaignId] : false
           const busyRow = c.metaCampaignId ? scaling === c.metaCampaignId : false
-          const currentMajor = c.dailyBudget != null ? (c.dailyBudget / 100) : null   // Meta budgets are in cents
+          const currentMajor = c.dailyBudget != null ? c.dailyBudget : null   // normalized to major server-side
           const newBudget = currentMajor != null ? Math.max(1, Math.round(currentMajor * 1.2)) : null
           // Scale rows get the full campaign treatment: the thumbnail of its top-spend ad + every stat
           // we show on a normal campaign — not just a lonely ROAS.
