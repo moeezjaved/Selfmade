@@ -108,23 +108,27 @@ export async function getNextEvent(accountId: string): Promise<{ title: string; 
 // channel (support inbox → Customer Inbox), same as Instagram/WhatsApp/Messenger.
 export const isFounderTool = (provider: string) => provider === 'calendar'
 
-/** Reconcile: read the founder's actual connected accounts from Unipile (matched by the `userId:…` tag
- *  we set on the hosted-auth link) and bind any we don't have yet. Self-heals when the redirect/notify
- *  didn't persist. Returns how many are now bound for this founder. */
+/** Reconcile: Unipile overwrites the hosted-auth `name` with the account's own handle, so we can't match
+ *  by our userId tag. Instead we CLAIM any Unipile account not yet bound to anyone, for this founder.
+ *  (The connect redirect's account_id is the precise per-founder attribution; this backfills accounts
+ *  that were connected before that landed / when notify didn't fire.)
+ *  NOTE: "claim unbound" is safe while onboarding one workspace at a time; a true multi-tenant setup
+ *  should rely solely on the redirect account_id + notify tag, not this backfill. */
 export async function reconcileUnipileAccounts(admin: any, userId: string): Promise<number> {
   if (!unipileConfigured()) return 0
   try {
     const res = await fetch(`${DSN()}/api/v1/accounts`, { headers: { accept: 'application/json', 'X-API-KEY': KEY() } })
     const j = await res.json().catch(() => ({}))
     const items: any[] = j?.items || j?.data || (Array.isArray(j) ? j : [])
+    if (!items.length) return 0
+    const { data: existing } = await admin.from('channel_identities').select('external_id')
+    const bound = new Set((existing || []).map((r: any) => String(r.external_id)))
     let n = 0
     for (const a of items) {
       const id = a?.id || a?.account_id
-      const name = String(a?.name || '')
-      if (!id || !name.startsWith(`${userId}:`)) continue   // only THIS founder's accounts
-      const requested = name.split(':')[1]
-      const provider = labelForType(a?.type || a?.provider || '', requested)
-      try { await bindUnipileAccount(admin, userId, provider, String(id)); n++ } catch { /* skip one */ }
+      if (!id || bound.has(String(id))) continue
+      const provider = labelForType(a?.type || a?.provider || '')
+      try { await bindUnipileAccount(admin, userId, provider, String(id)); bound.add(String(id)); n++ } catch { /* skip one */ }
     }
     return n
   } catch { return 0 }
