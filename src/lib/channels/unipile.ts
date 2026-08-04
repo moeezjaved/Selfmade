@@ -26,7 +26,7 @@ export async function createHostedAuthLink(userId: string, provider: string): Pr
         api_url: DSN(),
         expiresOn: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         name: `${userId}:${provider}`,
-        notify_url: `${APP}/api/channels/unipile/callback`,
+        notify_url: `${APP}/api/channels/unipile/callback${process.env.UNIPILE_WEBHOOK_SECRET ? `?secret=${encodeURIComponent(process.env.UNIPILE_WEBHOOK_SECRET)}` : ''}`,
         success_redirect_url: `${APP}/settings?connected=${provider}`,
         failure_redirect_url: `${APP}/settings?connect_error=${provider}`,
       }),
