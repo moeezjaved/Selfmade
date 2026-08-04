@@ -113,17 +113,14 @@ export const unipileReady = () => !!(process.env.UNIPILE_DSN && process.env.UNIP
 export async function unipileSend(accountId: string, opts: { chatId?: string; toAttendee?: string; text: string }): Promise<{ ok: boolean; id?: string; chatId?: string; error?: string }> {
   if (!unipileReady()) return { ok: false, error: 'not_configured' }
   try {
-    if (opts.chatId) {
-      const r = await fetch(`${uniBase()}/api/v1/chats/${encodeURIComponent(opts.chatId)}/messages`, {
-        method: 'POST', headers: uniHeaders(), body: JSON.stringify({ text: opts.text }),
-      }).then((x) => x.json())
-      return { ok: true, id: r?.id || r?.message_id, chatId: opts.chatId }
-    }
-    const r = await fetch(`${uniBase()}/api/v1/chats`, {
-      method: 'POST', headers: uniHeaders(),
-      body: JSON.stringify({ account_id: accountId, attendees_ids: [opts.toAttendee], text: opts.text }),
-    }).then((x) => x.json())
-    return { ok: true, id: r?.message_id || r?.id, chatId: r?.chat_id || r?.id }
+    // Reply into the existing conversation when we have its chat id (required for IG/WhatsApp replies);
+    // only start a new chat when we don't.
+    const res = opts.chatId
+      ? await fetch(`${uniBase()}/api/v1/chats/${encodeURIComponent(opts.chatId)}/messages`, { method: 'POST', headers: uniHeaders(), body: JSON.stringify({ text: opts.text }) })
+      : await fetch(`${uniBase()}/api/v1/chats`, { method: 'POST', headers: uniHeaders(), body: JSON.stringify({ account_id: accountId, attendees_ids: [opts.toAttendee], text: opts.text }) })
+    const r = await res.json().catch(() => ({}))
+    if (!res.ok || r?.error || r?.type === 'error') return { ok: false, error: r?.detail || r?.message || r?.error?.message || `send failed (${res.status})` }
+    return { ok: true, id: r?.id || r?.message_id, chatId: opts.chatId || r?.chat_id || r?.id }
   } catch (e: any) { return { ok: false, error: String(e?.message || e) } }
 }
 
