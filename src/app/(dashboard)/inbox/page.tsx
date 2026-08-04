@@ -1,9 +1,11 @@
 'use client'
 /**
- * Customer Inbox — the founder's priority-sorted inbox. Every customer message becomes a thread Mello
- * has already triaged (priority + intent) and drafted a reply for. The founder reads the top one, tweaks
- * if needed, and taps Approve. Nothing sends on its own. Testable today via "Simulate a message"; the
- * real IG/WhatsApp feed attaches once Unipile is connected in Settings.
+ * Customer Inbox — the founder's Customer Employee. Two sides:
+ *   Inbox    — messages customers sent, triaged (priority + intent) with a reply Mello already drafted.
+ *   Outbound — messages Mello wants to send FIRST (cart recovery, win-back, review requests), drafted
+ *              and waiting for approval.
+ * Nothing sends on its own. Testable today via the Simulate controls; real IG/WhatsApp attaches once
+ * Unipile is connected in Settings.
  */
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -14,6 +16,7 @@ const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LIN
 
 type Msg = { id: string; body: string; intent?: string; priority?: string; suggested_reply?: string; status: string }
 type Thread = { id: string; contact_name?: string; contact_ref?: string; channel: string; priority: 'high' | 'med' | 'low'; intent?: string; status: string; last_message_at: string; latest: Msg | null }
+type Outbound = Msg & { thread?: { contact_name?: string; channel?: string } | null }
 
 const PRI: Record<string, { label: string; bg: string; fg: string }> = {
   high: { label: 'HIGH', bg: '#fdecec', fg: '#c0392b' },
@@ -21,39 +24,47 @@ const PRI: Record<string, { label: string; bg: string; fg: string }> = {
   low: { label: 'LOW', bg: '#eef2ec', fg: '#6b8f6b' },
 }
 const INTENT_EMOJI: Record<string, string> = { shipping: '📦', refund: '↩️', price: '💸', complaint: '⚠️', question: '❓', other: '💬' }
+const OUT_TYPES: { type: string; label: string; emoji: string }[] = [
+  { type: 'cart_recovery', label: 'Abandoned cart', emoji: '🛒' },
+  { type: 'winback', label: 'Win-back', emoji: '👋' },
+  { type: 'review_request', label: 'Review request', emoji: '⭐' },
+]
 
 export default function InboxPage() {
+  const [tab, setTab] = useState<'inbox' | 'outbound'>('inbox')
   const [threads, setThreads] = useState<Thread[]>([])
+  const [outbound, setOutbound] = useState<Outbound[]>([])
   const [rollup, setRollup] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [drafts, setDrafts] = useState<Record<string, string>>({})   // keyed by message id
   const [busy, setBusy] = useState<string>('')
   const [simText, setSimText] = useState('')
   const [simBusy, setSimBusy] = useState(false)
+  const [outBusy, setOutBusy] = useState('')
 
   const load = () => fetch('/api/customer/inbox', { cache: 'no-store' }).then(r => r.json()).then(j => {
     if (Array.isArray(j.threads)) setThreads(j.threads)
+    if (Array.isArray(j.outbound)) setOutbound(j.outbound)
     if (j.rollup) setRollup(j.rollup)
   }).catch(() => {}).finally(() => setLoading(false))
   useEffect(() => { load() }, [])
 
-  const act = async (thread: Thread, action: 'approve' | 'skip') => {
-    const msg = thread.latest
-    if (!msg) return
-    setBusy(thread.id)
+  // Approve/skip a message by id. `fallback` = the draft to send if the founder didn't edit.
+  const act = async (messageId: string, fallback: string, action: 'approve' | 'skip', from: 'inbox' | 'outbound') => {
+    setBusy(messageId)
     try {
-      const reply = action === 'approve' ? (drafts[thread.id] ?? msg.suggested_reply ?? '') : undefined
-      const r = await fetch('/api/customer/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, messageId: msg.id, reply }) }).then(x => x.json())
+      const reply = action === 'approve' ? (drafts[messageId] ?? fallback ?? '') : undefined
+      const r = await fetch('/api/customer/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, messageId, reply }) }).then(x => x.json())
       if (r?.ok) {
-        setThreads(ts => ts.filter(t => t.id !== thread.id))
-        toast.success(action === 'approve' ? (r.note || 'Reply approved ✓') : 'Skipped')
+        if (from === 'inbox') setThreads(ts => ts.filter(t => t.latest?.id !== messageId))
+        else setOutbound(os => os.filter(o => o.id !== messageId))
+        toast.success(action === 'approve' ? (r.note || 'Approved ✓') : 'Skipped')
       } else toast.error(r?.error || 'Something went wrong')
     } catch { toast.error('Something went wrong') } finally { setBusy('') }
   }
 
   const simulate = async () => {
-    const body = simText.trim()
-    if (!body) return
+    const body = simText.trim(); if (!body) return
     setSimBusy(true)
     try {
       const r = await fetch('/api/customer/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'simulate', body }) }).then(x => x.json())
@@ -62,72 +73,138 @@ export default function InboxPage() {
     } catch { toast.error('Could not simulate') } finally { setSimBusy(false) }
   }
 
+  const simulateOutbound = async (type: string) => {
+    setOutBusy(type)
+    try {
+      const r = await fetch('/api/customer/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'simulate_outbound', type }) }).then(x => x.json())
+      if (r?.ok) { load(); toast.success('Mello drafted it — approve to send') }
+      else toast.error(r?.error || 'Could not draft')
+    } catch { toast.error('Could not draft') } finally { setOutBusy('') }
+  }
+
+  const Tab = ({ id, label, count }: { id: 'inbox' | 'outbound'; label: string; count: number }) => (
+    <button onClick={() => setTab(id)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 800, padding: '4px 2px', color: tab === id ? INK : '#9aa79a', borderBottom: `2px solid ${tab === id ? FOREST : 'transparent'}` }}>
+      {label}{count > 0 && <span style={{ marginLeft: 6, fontSize: 11.5, fontWeight: 800, background: tab === id ? FOREST : '#eef2ec', color: tab === id ? LIME : SUB, borderRadius: 100, padding: '1px 7px' }}>{count}</span>}
+    </button>
+  )
+
+  const ActionRow = ({ messageId, fallback, from }: { messageId: string; fallback: string; from: 'inbox' | 'outbound' }) => {
+    const draft = drafts[messageId] ?? fallback ?? ''
+    return (
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={() => act(messageId, fallback, 'approve', from)} disabled={busy === messageId || !draft.trim()} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: busy === messageId ? 'default' : 'pointer', opacity: busy === messageId || !draft.trim() ? 0.6 : 1 }}>
+          {busy === messageId ? 'Sending…' : 'Approve & send →'}
+        </button>
+        <button onClick={() => act(messageId, fallback, 'skip', from)} disabled={busy === messageId} style={{ background: '#fff', color: SUB, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>Skip</button>
+      </div>
+    )
+  }
+
+  const DraftBox = ({ messageId, fallback }: { messageId: string; fallback: string }) => (
+    <textarea value={drafts[messageId] ?? fallback ?? ''} onChange={e => setDrafts(d => ({ ...d, [messageId]: e.target.value }))} rows={3}
+      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#fff', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none', resize: 'vertical', lineHeight: 1.5 }} />
+  )
+
   return (
     <div style={{ padding: '32px 28px', maxWidth: 820, margin: '0 auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: INK, letterSpacing: '-.02em', marginBottom: 4 }}>Customer Inbox</h1>
-      <p style={{ fontSize: 13.5, color: SUB, marginBottom: 20 }}>Every message, sorted by what matters — with a reply Mello already drafted. You approve; nothing sends on its own.</p>
+      <p style={{ fontSize: 13.5, color: SUB, marginBottom: 18 }}>Messages sorted by what matters, and proactive nudges Mello wants to send — each with a draft ready. You approve; nothing sends on its own.</p>
 
-      {/* Today's trends — the intent rollup */}
-      {Object.keys(rollup).length > 0 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-          {Object.entries(rollup).sort((a, b) => b[1] - a[1]).map(([intent, n]) => (
-            <span key={intent} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, color: INK }}>
-              <span>{INTENT_EMOJI[intent] || '💬'}</span>{intent}<span style={{ color: SUB }}>{n}</span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Simulate — test the whole flow now, before Unipile is connected */}
-      <div style={{ ...card, padding: 14, marginBottom: 20, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input value={simText} onChange={e => setSimText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') simulate() }}
-          placeholder="Try a customer message — e.g. “my order hasn't arrived” or “can I get a refund?”"
-          style={{ flex: '1 1 320px', minWidth: 200, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#f8fcf6', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }} />
-        <button onClick={simulate} disabled={simBusy || !simText.trim()} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: simBusy || !simText.trim() ? 'default' : 'pointer', opacity: simBusy || !simText.trim() ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-          {simBusy ? 'Triaging…' : 'Simulate a message'}
-        </button>
+      <div style={{ display: 'flex', gap: 22, borderBottom: `1px solid ${LINE}`, marginBottom: 20 }}>
+        <Tab id="inbox" label="Inbox" count={threads.length} />
+        <Tab id="outbound" label="Outbound" count={outbound.length} />
       </div>
 
-      {loading ? (
-        <div style={{ fontSize: 14, color: SUB, padding: 20 }}>Loading your inbox…</div>
-      ) : threads.length === 0 ? (
-        <div style={{ ...card, padding: '32px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: 15, fontWeight: 750, color: INK, marginBottom: 6 }}>Nothing waiting on you 🌱</div>
-          <div style={{ fontSize: 13, color: SUB, lineHeight: 1.6, maxWidth: 440, margin: '0 auto' }}>
-            Connect Instagram or WhatsApp in <Link href="/settings" style={{ color: '#3f8f4f', fontWeight: 700, textDecoration: 'none' }}>Settings</Link> and every customer message will land here — triaged, prioritized, with a reply ready to approve. Or try the box above to see it work now.
+      {tab === 'inbox' ? (<>
+        {Object.keys(rollup).length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+            {Object.entries(rollup).sort((a, b) => b[1] - a[1]).map(([intent, n]) => (
+              <span key={intent} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, color: INK }}>
+                <span>{INTENT_EMOJI[intent] || '💬'}</span>{intent}<span style={{ color: SUB }}>{n}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        <div style={{ ...card, padding: 14, marginBottom: 20, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input value={simText} onChange={e => setSimText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') simulate() }}
+            placeholder="Try a customer message — e.g. “my order hasn't arrived” or “can I get a refund?”"
+            style={{ flex: '1 1 320px', minWidth: 200, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#f8fcf6', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }} />
+          <button onClick={simulate} disabled={simBusy || !simText.trim()} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: simBusy || !simText.trim() ? 'default' : 'pointer', opacity: simBusy || !simText.trim() ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+            {simBusy ? 'Triaging…' : 'Simulate a message'}
+          </button>
+        </div>
+
+        {loading ? <div style={{ fontSize: 14, color: SUB, padding: 20 }}>Loading your inbox…</div>
+        : threads.length === 0 ? (
+          <div style={{ ...card, padding: '32px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: 15, fontWeight: 750, color: INK, marginBottom: 6 }}>Nothing waiting on you 🌱</div>
+            <div style={{ fontSize: 13, color: SUB, lineHeight: 1.6, maxWidth: 440, margin: '0 auto' }}>Connect Instagram or WhatsApp in <Link href="/settings" style={{ color: '#3f8f4f', fontWeight: 700, textDecoration: 'none' }}>Settings</Link> and every customer message lands here — triaged, prioritized, reply ready. Or try the box above.</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {threads.map(t => {
+              const pri = PRI[t.priority] || PRI.low; const msg = t.latest; if (!msg) return null
+              return (
+                <div key={t.id} style={{ ...card, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ background: pri.bg, color: pri.fg, borderRadius: 6, padding: '3px 8px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em' }}>{pri.label}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 750, color: INK }}>{t.contact_name || 'Customer'}</span>
+                    {t.intent && <span style={{ fontSize: 12, color: SUB, fontWeight: 650 }}>{INTENT_EMOJI[t.intent] || '💬'} {t.intent}</span>}
+                    <span style={{ fontSize: 11.5, color: '#a7b0a5', fontWeight: 600, marginLeft: 'auto', textTransform: 'capitalize' }}>{t.channel}</span>
+                  </div>
+                  <div style={{ fontSize: 13.5, color: INK, lineHeight: 1.5, background: '#f6f8f4', borderRadius: 10, padding: '10px 12px' }}>{msg.body}</div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#3f8f4f', marginBottom: 6 }}>Mello&rsquo;s suggested reply</div>
+                    <DraftBox messageId={msg.id} fallback={msg.suggested_reply || ''} />
+                  </div>
+                  <ActionRow messageId={msg.id} fallback={msg.suggested_reply || ''} from="inbox" />
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </>) : (<>
+        {/* Outbound — proactive nudges Mello wants to send */}
+        <div style={{ ...card, padding: 14, marginBottom: 20 }}>
+          <div style={{ fontSize: 12.5, color: SUB, marginBottom: 10 }}>Ask Mello to draft a proactive message — it never sends without your OK.</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {OUT_TYPES.map(o => (
+              <button key={o.type} onClick={() => simulateOutbound(o.type)} disabled={outBusy === o.type}
+                style={{ background: '#f8fcf6', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '8px 14px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: outBusy === o.type ? 'default' : 'pointer', opacity: outBusy === o.type ? 0.6 : 1 }}>
+                {outBusy === o.type ? 'Drafting…' : `${o.emoji} ${o.label}`}
+              </button>
+            ))}
           </div>
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {threads.map(t => {
-            const pri = PRI[t.priority] || PRI.low
-            const msg = t.latest
-            const draft = drafts[t.id] ?? msg?.suggested_reply ?? ''
-            return (
-              <div key={t.id} style={{ ...card, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ background: pri.bg, color: pri.fg, borderRadius: 6, padding: '3px 8px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em' }}>{pri.label}</span>
-                  <span style={{ fontSize: 13.5, fontWeight: 750, color: INK }}>{t.contact_name || 'Customer'}</span>
-                  {t.intent && <span style={{ fontSize: 12, color: SUB, fontWeight: 650 }}>{INTENT_EMOJI[t.intent] || '💬'} {t.intent}</span>}
-                  <span style={{ fontSize: 11.5, color: '#a7b0a5', fontWeight: 600, marginLeft: 'auto', textTransform: 'capitalize' }}>{t.channel}</span>
+
+        {loading ? <div style={{ fontSize: 14, color: SUB, padding: 20 }}>Loading…</div>
+        : outbound.length === 0 ? (
+          <div style={{ ...card, padding: '32px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: 15, fontWeight: 750, color: INK, marginBottom: 6 }}>No nudges queued</div>
+            <div style={{ fontSize: 13, color: SUB, lineHeight: 1.6, maxWidth: 460, margin: '0 auto' }}>When a cart is abandoned or a customer goes quiet, Mello will draft the reach-out here for you to approve. Try one above to see how it reads.</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {outbound.map(o => {
+              const meta = OUT_TYPES.find(x => x.type === o.intent)
+              return (
+                <div key={o.id} style={{ ...card, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ background: '#eaf3de', color: '#3b6d11', borderRadius: 6, padding: '3px 8px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em' }}>{meta ? `${meta.emoji} ${meta.label.toUpperCase()}` : 'OUTBOUND'}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 750, color: INK }}>{o.thread?.contact_name || 'Customer'}</span>
+                    <span style={{ fontSize: 11.5, color: '#a7b0a5', fontWeight: 600, marginLeft: 'auto', textTransform: 'capitalize' }}>{o.thread?.channel || 'outbound'}</span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#3f8f4f', marginBottom: 6 }}>Mello wants to send</div>
+                    <DraftBox messageId={o.id} fallback={o.body || ''} />
+                  </div>
+                  <ActionRow messageId={o.id} fallback={o.body || ''} from="outbound" />
                 </div>
-                {msg && <div style={{ fontSize: 13.5, color: INK, lineHeight: 1.5, background: '#f6f8f4', borderRadius: 10, padding: '10px 12px' }}>{msg.body}</div>}
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#3f8f4f', marginBottom: 6 }}>Mello's suggested reply</div>
-                  <textarea value={draft} onChange={e => setDrafts(d => ({ ...d, [t.id]: e.target.value }))} rows={3}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#fff', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none', resize: 'vertical', lineHeight: 1.5 }} />
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button onClick={() => act(t, 'approve')} disabled={busy === t.id || !draft.trim()} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: busy === t.id ? 'default' : 'pointer', opacity: busy === t.id || !draft.trim() ? 0.6 : 1 }}>
-                    {busy === t.id ? 'Sending…' : 'Approve & send →'}
-                  </button>
-                  <button onClick={() => act(t, 'skip')} disabled={busy === t.id} style={{ background: '#fff', color: SUB, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>Skip</button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+              )
+            })}
+          </div>
+        )}
+      </>)}
     </div>
   )
 }
