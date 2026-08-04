@@ -101,7 +101,11 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       // with one live call so the brief matches /campaigns immediately. Same-currency → no call.
       // `healing` blanks the numbers while we fetch, so the founder never READS the wrong figures
       // (the flash they reported) — they just see a brief loading, then the right ones.
-      if (initial?.currency && p.currency && initial.currency !== p.currency) { setHealing(true); load(p.accountId) }
+      // Pull the LIVE numbers once on open so the card is right without a manual refresh (correct ROAS,
+      // thumbnails, CTR/impr/clicks — the nightly snapshot is stale/partial). auditAccount is cached
+      // server-side for 10 min, so repeated opens don't hammer Meta. `healing` blanks the stale figures
+      // during the fetch so the founder never reads the wrong number, then it settles on the real ones.
+      setHealing(true); load(p.accountId)
     }).catch(() => {})
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
