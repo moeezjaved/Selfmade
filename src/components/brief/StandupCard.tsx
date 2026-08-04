@@ -12,14 +12,25 @@ const INK = '#17251c', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#1a
 
 type Line = { key: string; emoji: string; name: string; text: string; connect?: boolean }
 type Standup = { greeting: string; dateLabel: string; lines: Line[]; pendingCount: number; pendingTitles: string[]; calendarConnected: boolean }
+type Prep = { prepared: { dept: string; detail: string }[]; awaiting: { title: string; kind: string; cost: string }[]; summary: string }
 
 export default function StandupCard() {
   const [s, setS] = useState<Standup | null>(null)
   const [open, setOpen] = useState(false)
+  const [preparing, setPreparing] = useState(false)
+  const [prep, setPrep] = useState<Prep | null>(null)
 
   useEffect(() => {
     fetch('/api/company/standup', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { if (j && Array.isArray(j.lines)) setS(j) }).catch(() => {})
   }, [])
+
+  const prepareEverything = () => {
+    setPreparing(true); setOpen(true)
+    fetch('/api/company/prepare', { method: 'POST' }).then(r => r.json())
+      .then(j => { if (j?.ok) setPrep(j) })
+      .catch(() => {})
+      .finally(() => setPreparing(false))
+  }
 
   if (!s || s.lines.length === 0) return null
 
@@ -42,28 +53,42 @@ export default function StandupCard() {
         ))}
       </div>
 
-      {/* Prepare everything — reveals the queued approvals (one-tap fan-out arrives with the coordinator) */}
-      {s.pendingCount > 0 && (
-        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid rgba(255,255,255,.12)` }}>
-          {!open ? (
-            <button onClick={() => setOpen(true)} style={{ background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
-              Should I prepare everything? →
-            </button>
-          ) : (
-            <div>
-              <div style={{ fontSize: 12.5, color: '#eaf3e6', marginBottom: 8 }}>Here&rsquo;s what&rsquo;s ready for your OK — approve each below on your desk:</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {s.pendingTitles.map((t, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#fff' }}>
-                    <span style={{ color: LIME }}>›</span>{t}
+      {/* Prepare everything — one tap fans out the free prep and lines up what needs your OK. */}
+      <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid rgba(255,255,255,.12)` }}>
+        {!open ? (
+          <button onClick={prepareEverything} style={{ background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
+            Should I prepare everything? →
+          </button>
+        ) : preparing ? (
+          <div style={{ fontSize: 13, color: '#eaf3e6' }}>Mello is preparing everything…</div>
+        ) : prep ? (
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 750, color: '#fff', marginBottom: 10 }}>Done — {prep.summary}</div>
+            {prep.prepared.length > 0 && (
+              <div style={{ marginBottom: prep.awaiting.length ? 12 : 0 }}>
+                {prep.prepared.map((p, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#eaf3e6', padding: '3px 0' }}>
+                    <span style={{ color: LIME }}>✓</span><b style={{ color: '#fff', fontWeight: 700 }}>{p.dept}</b> — {p.detail}
                   </div>
                 ))}
               </div>
-              <div style={{ fontSize: 11.5, color: '#9db29a', marginTop: 8 }}>One-tap “do it all” arrives when Mello&rsquo;s coordinator is on.</div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+            {prep.awaiting.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#9db29a', marginBottom: 6 }}>Needs your OK</div>
+                {prep.awaiting.map((a, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 13, color: '#fff', padding: '3px 0' }}>
+                    <span style={{ color: LIME }}>›</span><span style={{ flex: 1 }}>{a.title}</span><span style={{ fontSize: 11, color: (a.cost.includes('spend') || a.cost.includes('credit')) ? '#f0c86a' : '#9db29a', fontWeight: 700, whiteSpace: 'nowrap' }}>{a.cost}</span>
+                  </div>
+                ))}
+                <div style={{ fontSize: 11.5, color: '#9db29a', marginTop: 8 }}>Money stays behind the button — approve each on your desk below.</div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, color: '#eaf3e6' }}>Nothing needs prep right now. 🌱</div>
+        )}
+      </div>
     </div>
   )
 }
