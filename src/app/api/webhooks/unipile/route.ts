@@ -26,32 +26,73 @@ function authed(req: NextRequest, url: URL): boolean {
   return req.headers.get('x-unipile-secret') === secret || url.searchParams.get('secret') === secret
 }
 
-/** Pull sender id / text / chat id out of Unipile's payload, defensively (shapes vary by version). */
-function parseInbound(b: any): { sender?: string; text: string; chatId?: string; isInbound: boolean } {
+/** Pull sender id / text / chat id / account out of Unipile's payload, defensively (shapes vary). */
+function parseInbound(b: any): { sender?: string; senderName?: string; text: string; chatId?: string; accountId?: string; isInbound: boolean } {
   const msg = b?.message || b?.data || b
   const text = msg?.text ?? msg?.body ?? b?.text ?? ''
   const chatId = msg?.chat_id ?? msg?.chatId ?? b?.chat_id
   const sender = msg?.from?.attendee_provider_id ?? msg?.from?.id ?? msg?.sender?.attendee_provider_id
     ?? msg?.sender_id ?? msg?.attendee_provider_id ?? b?.from
+  const senderName = msg?.from?.attendee_name ?? msg?.from?.name ?? msg?.sender?.name ?? b?.sender_name
+  const accountId = b?.account_id ?? msg?.account_id ?? b?.data?.account_id
   // Ignore our own outbound echoes / delivery receipts.
   const dir = b?.event || b?.type || msg?.direction || ''
   const isInbound = !/sent|delivery|read|outbound/i.test(String(dir)) && (msg?.is_sender === false || msg?.from_me === false || !!text)
-  return { sender: sender ? String(sender) : undefined, text: String(text || ''), chatId: chatId ? String(chatId) : undefined, isInbound }
+  return { sender: sender ? String(sender) : undefined, senderName: senderName ? String(senderName) : undefined, text: String(text || ''), chatId: chatId ? String(chatId) : undefined, accountId: accountId ? String(accountId) : undefined, isInbound }
+}
+
+/** A message from someone who ISN'T the founder → a customer. Land it in the Customer Inbox (triaged +
+ *  drafted), never auto-replied. Returns true if it was handled as a customer message. */
+async function routeCustomerInbound(admin: any, accountId: string | undefined, sender: string, senderName: string | undefined, text: string): Promise<boolean> {
+  if (!accountId) return false
+  // Which founder owns the connected account this message arrived on?
+  const { data: chan } = await admin.from('channel_identities').select('*').eq('external_id', accountId).eq('active', true).maybeSingle()
+  if (!chan || !chan.meta?.customer_channel) return false
+  const ownerId = chan.user_id
+  const provider = chan.provider   // 'whatsapp' | 'instagram'
+
+  let brandName = ''
+  try { const { data } = await admin.from('brands').select('name').eq('user_id', ownerId).order('created_at', { ascending: true }).limit(1).maybeSingle(); brandName = data?.name || '' } catch { /* ok */ }
+  const { triageMessage } = await import('@/lib/customer/triage')
+  const tr = await triageMessage(admin, ownerId, { body: text, brand: brandName })
+  const now = new Date().toISOString()
+
+  let { data: thread } = await admin.from('customer_threads').select('*')
+    .eq('user_id', ownerId).eq('channel', provider).eq('contact_ref', sender).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (!thread) {
+    const { data: created } = await admin.from('customer_threads').insert({
+      user_id: ownerId, channel: provider, contact_ref: sender, contact_name: senderName || null,
+      priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now,
+    }).select().single()
+    thread = created
+  } else {
+    await admin.from('customer_threads').update({ priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now }).eq('id', thread.id)
+  }
+  await admin.from('customer_messages').insert({
+    thread_id: thread.id, user_id: ownerId, direction: 'in', body: text,
+    intent: tr.intent, priority: tr.priority, suggested_reply: tr.draft, status: 'pending',
+  })
+  return true
 }
 
 export async function POST(req: NextRequest) {
   const url = new URL(req.url)
   if (!authed(req, url)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({}))
-  const { sender, text, chatId, isInbound } = parseInbound(body)
+  const { sender, senderName, text, chatId, accountId, isInbound } = parseInbound(body)
   if (!isInbound || !sender) return NextResponse.json({ ok: true })   // ack non-actionable events
 
   const admin = createAdminClient()
   const reply = (t: string) => whatsappSend({ chatId, toAttendee: chatId ? undefined : sender, text: t }).catch(() => {})
 
-  // Resolve sender → linked account.
+  // Resolve sender → the FOUNDER's linked account (their own number, from the code link).
   const { data: identity } = await admin.from('channel_identities')
     .select('*').eq('provider', 'whatsapp').eq('external_id', sender).eq('active', true).maybeSingle()
+
+  // Not the founder → it's a CUSTOMER messaging a connected company channel. Land it in the inbox.
+  if (!identity) {
+    if (await routeCustomerInbound(admin, accountId, sender, senderName, text)) return NextResponse.json({ ok: true })
+  }
 
   // Not linked yet → the only thing we accept is a link code.
   if (!identity) {
