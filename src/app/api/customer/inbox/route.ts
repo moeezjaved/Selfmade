@@ -148,10 +148,17 @@ export async function POST(req: NextRequest) {
           .eq('user_id', user.id).eq('provider', thread.channel).eq('active', true).maybeSingle()
         const accountId = chan?.meta?.unipile_account_id || chan?.external_id
         if (accountId) {
-          const { unipileSend } = await import('@/lib/channels/providers')
-          const r = await unipileSend(String(accountId), { toAttendee: thread.contact_ref, text })
-          delivered = !!r.ok
-          note = r.ok ? 'Sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : 'Saved, but delivery failed — try again.')
+          if (thread.channel === 'email') {
+            const { unipileSendEmail } = await import('@/lib/channels/providers')
+            const r = await unipileSendEmail(String(accountId), { to: thread.contact_ref, subject: 'Re: your message', text })
+            delivered = !!r.ok
+            note = r.ok ? 'Email sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : 'Saved, but sending failed — try again.')
+          } else {
+            const { unipileSend } = await import('@/lib/channels/providers')
+            const r = await unipileSend(String(accountId), { toAttendee: thread.contact_ref, text })
+            delivered = !!r.ok
+            note = r.ok ? 'Sent ✓' : (r.error === 'not_configured' ? 'Saved — set your Unipile keys to deliver.' : 'Saved, but delivery failed — try again.')
+          }
         }
       } else if (thread?.channel === 'simulated') {
         note = 'Approved ✓ (test message — not sent)'

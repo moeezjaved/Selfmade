@@ -123,6 +123,19 @@ export async function unipileSend(accountId: string, opts: { chatId?: string; to
   } catch (e: any) { return { ok: false, error: String(e?.message || e) } }
 }
 
+/** Send an email from a connected Unipile mail account (Gmail/Outlook/IMAP). */
+export async function unipileSendEmail(accountId: string, opts: { to: string; subject?: string; text: string }): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (!unipileReady()) return { ok: false, error: 'not_configured' }
+  try {
+    const r = await fetch(`${uniBase()}/api/v1/emails`, {
+      method: 'POST', headers: uniHeaders(),
+      body: JSON.stringify({ account_id: accountId, to: [{ identifier: opts.to }], subject: opts.subject || 'Re: your message', body: opts.text }),
+    }).then((x) => x.json())
+    if (r?.error) return { ok: false, error: r.error?.message || String(r.error) }
+    return { ok: true, id: r?.id || r?.message_id }
+  } catch (e: any) { return { ok: false, error: String(e?.message || e) } }
+}
+
 /**
  * Send a WhatsApp message. If `chatId` is known (from a prior inbound), reply into it; otherwise
  * start a new chat to `toAttendee` (the recipient's WhatsApp id / phone). Returns the message id.

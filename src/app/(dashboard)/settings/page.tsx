@@ -606,11 +606,18 @@ function CustomerChannelsSection() {
         <div style={{ height: 1, background: '#f1f5f9' }} />
         <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Customer chats → your inbox. Replies go out from your number." />
         <div style={{ height: 1, background: '#f1f5f9' }} />
-        <Row provider="email" label="Email" logo={<span style={{ fontSize: 22 }}>✉️</span>} how="Gmail, Outlook or IMAP — customer emails, triaged with a draft." />
-        <div style={{ height: 1, background: '#f1f5f9' }} />
         <Row provider="messenger" label="Facebook Messenger" logo={<span style={{ fontSize: 22 }}>💬</span>} how="Page messages → your inbox, reply from your Page." />
         <div style={{ height: 1, background: '#f1f5f9' }} />
-        <Row provider="calendar" label="Calendar" logo={<span style={{ fontSize: 22 }}>📅</span>} how="Connect Google so Mello can show your meetings in the Morning Standup." />
+        <Row provider="email" label="Email" logo={<span style={{ fontSize: 22 }}>✉️</span>} how="Gmail, Outlook or IMAP — customer emails, triaged with a reply ready." />
+      </div>
+
+      {/* Founder's own — calendar powers the Morning Brief, NOT the customer inbox. */}
+      <div style={{ padding: '18px 22px', borderTop: '1px solid #f1f5f9', borderBottom: '1px solid rgba(223,254,149,0.08)' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a' }}>Your calendar</div>
+        <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 3 }}>Your own calendar — powers your Morning Standup. Never goes to the customer inbox.</div>
+      </div>
+      <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Row provider="calendar" label="Calendar" logo={<span style={{ fontSize: 22 }}>📅</span>} how="Connect Google so Mello shows today’s meetings in your Morning Standup." />
       </div>
     </div>
   )

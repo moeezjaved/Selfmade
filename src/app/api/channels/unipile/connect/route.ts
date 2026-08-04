@@ -16,7 +16,9 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { data } = await createAdminClient().from('channel_identities')
     .select('provider, display, meta').eq('user_id', user.id).eq('active', true)
-  const connected = (data || []).filter((r: any) => r?.meta?.customer_channel).map((r: any) => ({ provider: r.provider, display: r.display || null }))
+  const connected = (data || [])
+    .filter((r: any) => r?.meta?.customer_channel || r?.meta?.founder_tool)
+    .map((r: any) => ({ provider: r.provider, display: r.display || null, kind: r?.meta?.founder_tool ? 'founder' : 'customer' }))
   return NextResponse.json({ connected })
 }
 
