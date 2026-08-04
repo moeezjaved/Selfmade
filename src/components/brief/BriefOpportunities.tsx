@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { oppColor, type Opportunity } from '@/lib/meta/opportunities'
+import { oppColor, type Opportunity, type ApplyPlan } from '@/lib/meta/opportunities'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', FOREST = '#17251c', LIME = '#dffe95', FAINT = '#9aa79a'
 const GOOD = '#2f7d3a', WARN = '#b7791f'
@@ -73,6 +73,55 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
       </div>
       {state === 'err' && <div style={{ marginTop: 6, fontSize: 12, color: '#c0392b' }}>{msg}</div>}
       <div style={{ marginTop: 6, fontSize: 11.5, color: FAINT }}>Copies your winner into a fresh campaign at this budget — the original is never touched, so its learning stays intact.</div>
+    </div>
+  )
+}
+
+// Inline confirm for the "Target them" / "Review placements" cards — the SAME approve→act loop as
+// Scale, but the copy is tuned to the best segment/placement. We DUPLICATE the winner (original never
+// touched, so no learning-phase reset) and the founder sets the new campaign's budget. Nothing spends
+// until they confirm.
+function TuneConfirm({ apply, camp, currency, cta, onDone }: { apply: ApplyPlan; camp: ScaleCampaign; currency: string; cta: string; onDone?: () => void }) {
+  const cur = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0)}` } }
+  const currentMajor = Math.max(1, Math.round((Number(camp.dailyBudget) || 0) / 100)) // dailyBudget is in cents
+  const [open, setOpen] = useState(false)
+  const [budget, setBudget] = useState<number>(Math.max(5, currentMajor))
+  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'err'>('idle')
+  const [msg, setMsg] = useState('')
+  const [newName, setNewName] = useState('')
+
+  if (!camp.metaCampaignId) {
+    return <Link href={cta === 'Review placements' ? '/campaigns' : '/m4'} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{cta} →</Link>
+  }
+  if (state === 'done') {
+    return <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 700, color: GOOD }}>✓ Launched “{newName}” at {cur(budget)}/day, focused on {apply.label}. Your winner keeps running untouched.</div>
+  }
+  if (!open) {
+    return <button onClick={() => setOpen(true)} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 2 }}>{cta} →</button>
+  }
+
+  const run = () => {
+    setState('busy'); setMsg('')
+    fetch('/api/meta/tune', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ metaCampaignId: camp.metaCampaignId, apply, newDailyBudget: budget }) })
+      .then(r => r.json())
+      .then(j => { if (j?.ok) { setNewName(j.newCampaign || `Focus: ${apply.label}`); setState('done'); onDone?.() } else { setState('err'); setMsg(j?.error || 'Couldn’t apply it — try again.') } })
+      .catch(() => { setState('err'); setMsg('Couldn’t apply it — try again.') })
+  }
+
+  return (
+    <div style={{ marginTop: 6, width: '100%' }}>
+      <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>I'll duplicate your winner into a new campaign focused on <b>{apply.label}</b> — your original keeps running untouched. Its daily budget:</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <input type="number" min={1} value={budget} onChange={e => setBudget(Math.max(1, Math.round(Number(e.target.value) || 0)))} disabled={state === 'busy'}
+          style={{ width: 92, border: `1px solid ${LINE}`, borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', color: INK }} />
+        <span style={{ fontSize: 12, color: MUTED }}>{currency}/day</span>
+        <button onClick={run} disabled={state === 'busy'} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 12.5, fontWeight: 800, cursor: state === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+          {state === 'busy' ? 'Launching…' : `Launch at ${cur(budget)}/day`}
+        </button>
+        <button onClick={() => setOpen(false)} disabled={state === 'busy'} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+      </div>
+      {state === 'err' && <div style={{ marginTop: 6, fontSize: 12, color: '#c0392b' }}>{msg}</div>}
+      <div style={{ marginTop: 6, fontSize: 11.5, color: FAINT }}>A fresh campaign focused on {apply.label} — the original is never edited, so its learning stays intact.</div>
     </div>
   )
 }
@@ -163,6 +212,8 @@ export default function BriefOpportunities({ initial, onAct, accountId, initialA
                 still links to where the founder finishes the move. */}
             {r.cta === 'Scale it' && scaleCampaign
               ? <ScaleConfirm camp={scaleCampaign} currency={currency || 'USD'} />
+              : r.apply && scaleCampaign
+              ? <TuneConfirm apply={r.apply} camp={scaleCampaign} currency={currency || 'USD'} cta={r.cta} onDone={() => onAct?.(r)} />
               : <Link href={r.href} onClick={() => onAct?.(r)} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>}
           </div>
         ))}

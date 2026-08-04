@@ -43,9 +43,12 @@ export async function fetchLiveOpportunities(token: string, accountId: string, r
   // budget on people who've already scrolled past it. A fresh creative resets that.
   const fatigue = [...adRows].filter((r: any) => r.spend > 0 && r.frequency >= 3).sort((a: any, b: any) => b.spend - a.spend)[0] || null
 
-  const plRows = (plR?.data || []).map((r: any) => { const s = Number(r.spend || 0); return { label: `${r.publisher_platform || ''} — ${r.platform_position || ''}`.trim(), roas: s > 0 ? rev(r) / s : 0, spend: s } })
+  const plRows = (plR?.data || []).map((r: any) => { const s = Number(r.spend || 0); return { label: `${r.publisher_platform || ''} — ${r.platform_position || ''}`.trim(), platform: String(r.publisher_platform || ''), roas: s > 0 ? rev(r) / s : 0, spend: s } })
   const bestPl = [...plRows].sort((a, b) => b.roas - a.roas)[0] || null
   const worstPl = [...plRows].filter((p) => p.spend >= accSpend * 0.08).sort((a, b) => a.roas - b.roas)[0] || null
+  // Publisher platform to restrict the duplicated adset to — only when it's a real placement Meta accepts.
+  const PLATFORMS = new Set(['facebook', 'instagram', 'audience_network', 'messenger'])
+  const bestPlatform = bestPl && PLATFORMS.has(bestPl.platform) ? bestPl.platform : null
 
   // Best segment = highest REVENUE if the account is converting; otherwise the segment absorbing the
   // most SPEND (where the reach/budget actually concentrates — the founder's real audience). This
@@ -59,9 +62,20 @@ export async function fetchLiveOpportunities(token: string, accountId: string, r
   // is honest — never claim "highest-revenue" for a segment that hasn't earned yet.
   const segmentEarns = !!(bestAge && bestAge.revenue > 0)
 
+  // Structured, apply-ready targets (Meta codes) from the same winning segment the copy names.
+  const genderCode = bestGender?.label === 'male' ? 1 : bestGender?.label === 'female' ? 2 : null
+  const ageRange = (() => {
+    const m = /^(\d{2})\s*-\s*(\d{2})$/.exec(bestAge?.label || '')
+    if (m) return { min: Math.max(13, +m[1]), max: Math.min(65, +m[2]) }
+    const plus = /^(\d{2})\s*\+$/.exec(bestAge?.label || '')
+    if (plus) return { min: Math.max(13, +plus[1]), max: 65 }
+    return null
+  })()
+
   return computeOpportunities({
     roas: accRoas, spend: accSpend, conv: accConv, days, winners, losers,
     bestPl, worstPl, bestAge: bestAge ? { label: bestAge.label, roas: bestAge.roas } : null, bestGender, segmentEarns,
+    bestGenderCode: genderCode, bestAgeRange: ageRange, bestPlatform,
     accClicks, accCtr,
     fatigue: fatigue ? { label: fatigue.label, frequency: Math.round(fatigue.frequency * 10) / 10, spend: fatigue.spend } : null,
   }, money)
