@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
+import { ChannelLogo } from '@/components/brand/logos'
 
 // Chrome Web Store listing (approved 2026-07-08).
 const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi'
@@ -602,13 +603,19 @@ function CustomerChannelsSection() {
         <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 3 }}>Connect where your customers message you — every DM lands in your Customer Inbox, triaged with a reply ready.</div>
       </div>
       <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Row provider="instagram" label="Instagram" logo={<InstagramLogo size={26} />} how="Customer DMs → your inbox. Replies go out from your Instagram." />
+        <Row provider="instagram" label="Instagram" logo={<ChannelLogo provider="instagram" size={24} />} how="Customer DMs → your inbox. Replies go out from your Instagram." />
         <div style={{ height: 1, background: '#f1f5f9' }} />
-        <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Customer chats → your inbox. Replies go out from your number." />
+        <Row provider="whatsapp" label="WhatsApp" logo={<ChannelLogo provider="whatsapp" size={26} />} how="Customer chats → your inbox. Replies go out from your number." />
         <div style={{ height: 1, background: '#f1f5f9' }} />
-        <Row provider="messenger" label="Facebook Messenger" logo={<span style={{ fontSize: 22 }}>💬</span>} how="Page messages → your inbox, reply from your Page." />
+        <Row provider="messenger" label="Facebook Messenger" logo={<ChannelLogo provider="messenger" size={26} />} how="Page messages → your inbox, reply from your Page." />
         <div style={{ height: 1, background: '#f1f5f9' }} />
-        <Row provider="email" label="Email" logo={<span style={{ fontSize: 22 }}>✉️</span>} how="Gmail, Outlook or IMAP — customer emails, triaged with a reply ready." />
+        <Row provider="telegram" label="Telegram" logo={<ChannelLogo provider="telegram" size={26} />} how="Customer chats → your inbox, reply on your OK." />
+        <div style={{ height: 1, background: '#f1f5f9' }} />
+        <Row provider="linkedin" label="LinkedIn" logo={<ChannelLogo provider="linkedin" size={24} />} how="DMs from prospects → your inbox with a draft." />
+        <div style={{ height: 1, background: '#f1f5f9' }} />
+        <Row provider="x" label="X (Twitter)" logo={<ChannelLogo provider="x" size={24} />} how="DMs → your inbox, reply from your X account." />
+        <div style={{ height: 1, background: '#f1f5f9' }} />
+        <Row provider="email" label="Email" logo={<ChannelLogo provider="email" size={24} />} how="Gmail, Outlook or IMAP — customer emails, triaged with a reply ready." />
       </div>
 
       {/* Founder's own — calendar powers the Morning Brief, NOT the customer inbox. */}
