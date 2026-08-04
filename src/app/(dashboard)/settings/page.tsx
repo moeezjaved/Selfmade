@@ -32,6 +32,22 @@ function WhatsAppLogo({ size = 24 }: { size?: number }) {
     </svg>
   )
 }
+function InstagramLogo({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <radialGradient id="ig-g" cx="30%" cy="107%" r="150%">
+          <stop offset="0%" stopColor="#fdf497" /><stop offset="5%" stopColor="#fdf497" /><stop offset="45%" stopColor="#fd5949" />
+          <stop offset="60%" stopColor="#d6249f" /><stop offset="90%" stopColor="#285AEB" />
+        </radialGradient>
+      </defs>
+      <rect x="1" y="1" width="22" height="22" rx="6" fill="url(#ig-g)" />
+      <rect x="5.2" y="5.2" width="13.6" height="13.6" rx="4.4" fill="none" stroke="#fff" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="3.3" fill="none" stroke="#fff" strokeWidth="1.8" />
+      <circle cx="16.4" cy="7.6" r="1.1" fill="#fff" />
+    </svg>
+  )
+}
 function ChromeLogo({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
@@ -361,8 +377,11 @@ export default function SettingsPage() {
 
       )}
 
-      {/* Mello on Slack & WhatsApp — connect a channel to get the brief + approve from chat */}
-      {tab==='channels' && <ChannelsSection />}
+      {/* Channels — your customer channels (inbox) + Mello on Slack/WhatsApp (your own chat with Mello) */}
+      {tab==='channels' && (<>
+        <CustomerChannelsSection />
+        <ChannelsSection />
+      </>)}
 
       {tab==='integrations' && (<>
       {/* Save Ads Anywhere — Chrome extension + (coming soon) mobile Instagram save */}
@@ -528,6 +547,56 @@ function ChannelsSection() {
         <Row provider="slack" label="Slack" logo={<SlackLogo size={24} />} how="Approve with buttons and get reports in a channel or DM." />
         <div style={{ height: 1, background: '#f1f5f9' }} />
         <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Reply YES to approve. Best for solo founders on the go." />
+      </div>
+    </div>
+  )
+}
+
+/** Connect the founder's CUSTOMER channels (Instagram, WhatsApp) via Unipile hosted auth — messages
+ *  land in the Customer Inbox. Unipile stays invisible; the founder just clicks Connect. */
+function CustomerChannelsSection() {
+  const [busy, setBusy] = useState('')
+
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    const ok = p.get('connected'); const err = p.get('connect_error')
+    if (ok) { toast.success(`${ok[0].toUpperCase()}${ok.slice(1)} connected — customer messages will land in your inbox.`); window.history.replaceState({}, '', '/settings') }
+    else if (err) { toast.error(`Couldn’t connect ${err} — try again.`); window.history.replaceState({}, '', '/settings') }
+  }, [])
+
+  const connect = async (provider: 'instagram' | 'whatsapp') => {
+    setBusy(provider)
+    try {
+      const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider }) }).then(r => r.json())
+      if (j?.url) { window.location.href = j.url }        // to Unipile's hosted login
+      else { toast.error(j?.error || 'Channels aren’t set up yet.'); setBusy('') }
+    } catch { toast.error('Something went wrong.'); setBusy('') }
+  }
+
+  const Row = ({ provider, label, logo, how }: { provider: 'instagram' | 'whatsapp'; label: string; logo: ReactNode; how: string }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+      <LogoTile>{logo}</LogoTile>
+      <div style={{ flex: 1, minWidth: 180 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#1a3a1a' }}>{label}</div>
+        <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 2 }}>{how}</div>
+      </div>
+      <button onClick={() => connect(provider)} disabled={busy === provider}
+        style={{ background: '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>
+        {busy === provider ? 'Opening…' : 'Connect →'}
+      </button>
+    </div>
+  )
+
+  return (
+    <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 18, overflow: 'hidden' }}>
+      <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(223,254,149,0.08)' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a' }}>Your customer channels</div>
+        <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 3 }}>Connect where your customers message you — every DM lands in your Customer Inbox, triaged with a reply ready.</div>
+      </div>
+      <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Row provider="instagram" label="Instagram" logo={<InstagramLogo size={26} />} how="Customer DMs → your inbox. Reply, approved by you." />
+        <div style={{ height: 1, background: '#f1f5f9' }} />
+        <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Customer chats → your inbox. Nudges + replies go out on your OK." />
       </div>
     </div>
   )
