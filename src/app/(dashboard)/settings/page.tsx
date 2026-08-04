@@ -102,6 +102,13 @@ export default function SettingsPage() {
   const [newPw, setNewPw] = useState(''); const [confirmPw, setConfirmPw] = useState(''); const [pwSaving, setPwSaving] = useState(false)
   const [tab, setTab] = useState<'account' | 'notifications' | 'autopilot' | 'channels' | 'integrations'>('account')
   const supabase = createClient()
+
+  // Coming back from a channel connect (?connected / ?connect_error) → open the Channels tab so the
+  // founder sees the confirmation + the ✓ badge (the toast lives in that tab's component).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    if (p.get('connected') || p.get('connect_error')) setTab('channels')
+  }, [])
   const router = useRouter()
 
   useEffect(() => {
