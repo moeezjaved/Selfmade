@@ -96,8 +96,12 @@ export function slackVerify(rawBody: string, timestamp: string | null, signature
 // UNIPILE_WHATSAPP_ACCOUNT_ID (the connected WhatsApp account in your Unipile dashboard).
 export const whatsappEnabled = !!(process.env.UNIPILE_DSN && process.env.UNIPILE_API_KEY && process.env.UNIPILE_WHATSAPP_ACCOUNT_ID)
 
-const uniBase = () => (process.env.UNIPILE_DSN || '').replace(/\/$/, '')
-const uniHeaders = () => ({ 'content-type': 'application/json', 'X-API-KEY': process.env.UNIPILE_API_KEY || '', accept: 'application/json' })
+const uniBase = () => {
+  let d = (process.env.UNIPILE_DSN || '').trim().replace(/\/+$/, '')
+  if (d && !/^https?:\/\//i.test(d)) d = `https://${d}`
+  return d
+}
+const uniHeaders = () => ({ 'content-type': 'application/json', 'X-API-KEY': (process.env.UNIPILE_API_KEY || '').trim(), accept: 'application/json' })
 
 export const unipileReady = () => !!(process.env.UNIPILE_DSN && process.env.UNIPILE_API_KEY)
 

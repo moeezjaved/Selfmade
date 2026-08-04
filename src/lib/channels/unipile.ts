@@ -5,7 +5,14 @@
  * bind to the founder in channel_identities. That account_id is how inbound customer DMs route to them.
  */
 const APP = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://www.tryselfmade.ai').replace(/\/$/, '')
-const DSN = () => (process.env.UNIPILE_DSN || '').replace(/\/$/, '')
+// Tolerate a pasted DSN with stray whitespace / newline / missing scheme / trailing slash — otherwise
+// fetch throws "Failed to parse URL". This is the #1 cause of connect failing.
+const DSN = () => {
+  let d = (process.env.UNIPILE_DSN || '').trim().replace(/\/+$/, '')
+  if (d && !/^https?:\/\//i.test(d)) d = `https://${d}`
+  return d
+}
+const KEY = () => (process.env.UNIPILE_API_KEY || '').trim()
 
 export const unipileConfigured = () => !!(process.env.UNIPILE_DSN && process.env.UNIPILE_API_KEY)
 
@@ -34,7 +41,7 @@ export function labelForType(type: string, requested?: string): string {
 export async function fetchAccountType(accountId: string): Promise<string> {
   try {
     const res = await fetch(`${DSN()}/api/v1/accounts/${encodeURIComponent(accountId)}`, {
-      headers: { accept: 'application/json', 'X-API-KEY': process.env.UNIPILE_API_KEY || '' },
+      headers: { accept: 'application/json', 'X-API-KEY': KEY() },
     })
     const j = await res.json().catch(() => ({}))
     return String(j?.type || j?.provider || j?.account_type || '')
@@ -48,7 +55,7 @@ export async function createHostedAuthLink(userId: string, provider: string): Pr
   try {
     const res = await fetch(`${DSN()}/api/v1/hosted/accounts/link`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json', 'X-API-KEY': process.env.UNIPILE_API_KEY || '' },
+      headers: { 'content-type': 'application/json', accept: 'application/json', 'X-API-KEY': KEY() },
       body: JSON.stringify({
         type: 'create',
         providers: provs,
@@ -72,7 +79,7 @@ export async function createHostedAuthLink(userId: string, provider: string): Pr
  *  version, so any hiccup returns null and the Standup falls back to a connect/no-meeting line. */
 export async function getNextEvent(accountId: string): Promise<{ title: string; start: string } | null> {
   if (!unipileConfigured() || !accountId) return null
-  const H = { accept: 'application/json', 'X-API-KEY': process.env.UNIPILE_API_KEY || '' }
+  const H = { accept: 'application/json', 'X-API-KEY': KEY() }
   try {
     const now = new Date()
     const end = new Date(now.getTime() + 24 * 3600 * 1000)
