@@ -76,15 +76,26 @@ export async function sendReportToChannels(admin: any, userId: string, brief: an
   const { departments, tasks } = await computeCompanyStatus(admin, userId)
   const pending = (tasks as any[]).find(t => t.status === 'suggested') || null
   const { text, slackBlocks } = formatReport(brief, departments, pending)
+  // The report renders the top decision WITH its Approve button, so it counts as delivering that
+  // approval — record it so pushNewApprovals doesn't then send the same task again as a lone card.
+  const expires_at = new Date(Date.now() + APPROVAL_TTL_MS).toISOString()
   let sent = 0
   for (const id of ids) {
     if (id.provider === 'slack' && id.meta?.channel_id) {
       const r = await slackPost(id.meta.channel_id, 'Your brief', slackBlocks, botTokenFor(id))
-      if (r.ok) { sent++; await admin.from('channel_messages').insert({ user_id: userId, provider: 'slack', external_id: r.ts, channel_ref: id.meta.channel_id, kind: 'report', status: 'sent' }) }
+      if (r.ok) {
+        sent++
+        await admin.from('channel_messages').insert({ user_id: userId, provider: 'slack', external_id: r.ts, channel_ref: id.meta.channel_id, kind: 'report', status: 'sent' })
+        if (pending) await admin.from('channel_messages').insert({ user_id: userId, provider: 'slack', external_id: r.ts, channel_ref: id.meta.channel_id, kind: 'approval', task_id: pending.id, status: 'sent', expires_at }).then(() => {}, () => {})
+      }
     } else if (id.provider === 'whatsapp') {
       const chatId = id.meta?.chat_id
       const r = await whatsappSend({ chatId, toAttendee: chatId ? undefined : id.external_id, text })
-      if (r.ok) { sent++; await admin.from('channel_messages').insert({ user_id: userId, provider: 'whatsapp', external_id: r.id, channel_ref: r.chatId || chatId, kind: 'report', status: 'sent' }) }
+      if (r.ok) {
+        sent++
+        await admin.from('channel_messages').insert({ user_id: userId, provider: 'whatsapp', external_id: r.id, channel_ref: r.chatId || chatId, kind: 'report', status: 'sent' })
+        if (pending) await admin.from('channel_messages').insert({ user_id: userId, provider: 'whatsapp', external_id: r.id, channel_ref: r.chatId || chatId, kind: 'approval', task_id: pending.id, status: 'sent', expires_at }).then(() => {}, () => {})
+      }
     }
   }
   return { sent }

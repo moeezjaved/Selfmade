@@ -10,7 +10,7 @@ import Link from 'next/link'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
-type Camp = { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null }
+type Camp = { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null; metaCampaignId?: string | null }
 type Ad = { adId: string; name: string; campaignName?: string | null; metaCampaignId?: string | null; spend: number; impressions: number; clicks: number; ctr: number; cpc: number; roas: number; conversions: number; thumbnail_url?: string | null; preview_url?: string | null }
 type Summary = {
   accounts?: { accountId: string; name: string; currency: string; isPrimary: boolean }[]
@@ -106,20 +106,60 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const money = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: d.currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()}` } }
+
+  // One-click Scale, money-gated: the founder confirms the EXACT new daily budget before a cent moves
+  // (never auto-spend). +20% on the campaign's current daily budget — the same step the audit suggests.
+  const [scaling, setScaling] = useState<string | null>(null)
+  const [scaled, setScaled] = useState<Record<string, boolean>>({})
+  const scaleCampaign = async (c: Camp) => {
+    const id = c.metaCampaignId
+    if (!id || c.dailyBudget == null || scaling) return
+    const newBudget = Math.max(1, Math.round(c.dailyBudget * 1.2))
+    if (!window.confirm(`Scale “${c.name}” from ${money(c.dailyBudget)}/day to ${money(newBudget)}/day (+20%)?\n\nThis raises spend on Meta right now.`)) return
+    setScaling(id)
+    try {
+      const res = await fetch('/api/campaigns/manage', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'update_budget', id, budget: newBudget }) })
+      const j = await res.json().catch(() => null)
+      if (res.ok && j?.success) { setScaled(s => ({ ...s, [id]: true })); onAct?.() }
+      else window.alert(j?.error || 'Could not scale — open Campaigns to do it manually.')
+    } catch { window.alert('Could not scale — open Campaigns to do it manually.') }
+    finally { setScaling(null) }
+  }
   const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
 
-  const Bucket = ({ label, color, dot, rows, suffix }: { label: string; color: string; dot: string; rows: Camp[]; suffix: (c: Camp) => string }) => (
+  const Bucket = ({ label, color, dot, rows, suffix, scalable }: { label: string; color: string; dot: string; rows: Camp[]; suffix: (c: Camp) => string; scalable?: boolean }) => (
     rows.length ? (
       <div style={{ flex: '1 1 200px', minWidth: 190 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color, marginBottom: 8 }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />{label} · {rows.length}
         </div>
-        {rows.slice(0, 3).map((c, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, padding: '5px 0', borderTop: i ? `1px solid ${LINE}` : 'none' }}>
-            <span style={{ fontSize: 13, fontWeight: 650, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>{c.name}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap' }}>{suffix(c)}</span>
-          </div>
-        ))}
+        {rows.slice(0, 3).map((c, i) => {
+          const canScale = scalable && !!c.metaCampaignId && c.dailyBudget != null
+          const done = c.metaCampaignId ? scaled[c.metaCampaignId] : false
+          const busyRow = c.metaCampaignId ? scaling === c.metaCampaignId : false
+          const newBudget = c.dailyBudget != null ? Math.max(1, Math.round(c.dailyBudget * 1.2)) : null
+          return (
+            <div key={i} style={{ padding: '5px 0', borderTop: i ? `1px solid ${LINE}` : 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 650, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>{c.name}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap' }}>{suffix(c)}</span>
+              </div>
+              {canScale && (
+                done ? (
+                  <div style={{ marginTop: 6, fontSize: 12, fontWeight: 750, color: GREEN }}>✓ Scaled to {money(newBudget!)}/day</div>
+                ) : (
+                  <button onClick={() => scaleCampaign(c)} disabled={busyRow}
+                    style={{ marginTop: 6, border: 'none', borderRadius: 100, padding: '6px 14px', fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit', cursor: busyRow ? 'default' : 'pointer', background: FOREST, color: LIME, opacity: busyRow ? 0.6 : 1 }}>
+                    {busyRow ? 'Scaling…' : `Scale it → ${money(newBudget!)}/day`}
+                  </button>
+                )
+              )}
+              {scalable && c.metaCampaignId && c.dailyBudget == null && (
+                <Link href="/campaigns" style={{ display: 'inline-block', marginTop: 6, fontSize: 12, fontWeight: 700, color: GREEN, textDecoration: 'none' }}>Scale in Campaigns →</Link>
+              )}
+            </div>
+          )
+        })}
       </div>
     ) : null
   )
@@ -178,7 +218,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
         {healing ? (
           <div style={{ fontSize: 14, color: MUTED }}>Loading the right account…</div>
         ) : (<>
-        <Bucket label="Scale" color="#2f7d3a" dot={GREEN} rows={d.scale} suffix={(c) => `${money(c.spend)} · ${c.roas}x`} />
+        <Bucket label="Scale" color="#2f7d3a" dot={GREEN} rows={d.scale} suffix={(c) => `${money(c.spend)} · ${c.roas}x`} scalable />
         <Bucket label="Watch" color="#9a6a12" dot="#e0a72e" rows={d.watch} suffix={(c) => `${money(c.spend)} · ${c.roas}x`} />
         <Bucket label="Pause" color="#a5342c" dot="#d0453a" rows={d.pause} suffix={(c) => `${money(c.spend)} · ${c.conversions} conv`} />
         {!d.scale.length && !d.watch.length && !d.pause.length && (
