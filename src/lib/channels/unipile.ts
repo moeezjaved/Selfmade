@@ -97,11 +97,16 @@ export async function getNextEvent(accountId: string): Promise<{ title: string; 
   } catch { return null }
 }
 
+// Calendar is the FOUNDER's own (for the brief/EA), never a customer channel. Email counts as a customer
+// channel (support inbox → Customer Inbox), same as Instagram/WhatsApp/Messenger.
+export const isFounderTool = (provider: string) => provider === 'calendar'
+
 /** Bind a freshly-connected Unipile account to the founder (called from the notify callback). */
 export async function bindUnipileAccount(admin: any, userId: string, provider: string, accountId: string, display?: string) {
+  const founder = isFounderTool(provider)
   await admin.from('channel_identities').upsert({
     user_id: userId, provider, external_id: accountId, display: display || null,
-    active: true, meta: { unipile_account_id: accountId, source: 'unipile', customer_channel: true },
+    active: true, meta: { unipile_account_id: accountId, source: 'unipile', customer_channel: !founder, founder_tool: founder },
     updated_at: new Date().toISOString(),
   }, { onConflict: 'provider,external_id' })
 }

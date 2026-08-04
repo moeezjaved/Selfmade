@@ -52,8 +52,7 @@ export async function assembleStandup(admin: any, userId: string, firstName?: st
   let calendarConnected = false
   try {
     const { data: cal } = await admin.from('channel_identities').select('external_id, meta, provider')
-      .eq('user_id', userId).in('provider', ['calendar', 'email']).eq('active', true)
-      .order('provider', { ascending: true }).limit(1).maybeSingle()   // 'calendar' sorts before 'email'
+      .eq('user_id', userId).eq('provider', 'calendar').eq('active', true).limit(1).maybeSingle()
     const acct = cal?.meta?.unipile_account_id || cal?.external_id
     if (acct) {
       calendarConnected = true
