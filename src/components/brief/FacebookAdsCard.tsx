@@ -114,8 +114,10 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   const scaleCampaign = async (c: Camp) => {
     const id = c.metaCampaignId
     if (!id || c.dailyBudget == null || scaling) return
-    const newBudget = Math.max(1, Math.round(c.dailyBudget * 1.2))
-    if (!window.confirm(`Scale “${c.name}” from ${money(c.dailyBudget)}/day to ${money(newBudget)}/day (+20%)?\n\nThis raises spend on Meta right now.`)) return
+    // Meta stores daily_budget in MINOR units (cents): 2500 = €25. Show + scale in major units.
+    const currentMajor = (Number(c.dailyBudget) || 0) / 100
+    const newBudget = Math.max(1, Math.round(currentMajor * 1.2))
+    if (!window.confirm(`Scale “${c.name}” from ${money(currentMajor)}/day to ${money(newBudget)}/day (+20%)?\n\nThis raises spend on Meta right now.`)) return
     setScaling(id)
     try {
       const res = await fetch('/api/campaigns/manage', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'update_budget', id, budget: newBudget }) })
@@ -137,7 +139,8 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
           const canScale = scalable && !!c.metaCampaignId && c.dailyBudget != null
           const done = c.metaCampaignId ? scaled[c.metaCampaignId] : false
           const busyRow = c.metaCampaignId ? scaling === c.metaCampaignId : false
-          const newBudget = c.dailyBudget != null ? Math.max(1, Math.round(c.dailyBudget * 1.2)) : null
+          const currentMajor = c.dailyBudget != null ? (c.dailyBudget / 100) : null   // Meta budgets are in cents
+          const newBudget = currentMajor != null ? Math.max(1, Math.round(currentMajor * 1.2)) : null
           // Scale rows get the full campaign treatment: the thumbnail of its top-spend ad + every stat
           // we show on a normal campaign — not just a lonely ROAS.
           const ad = scalable ? (d.ads || []).filter(a => a.metaCampaignId && c.metaCampaignId && String(a.metaCampaignId) === String(c.metaCampaignId)).sort((a, b) => b.spend - a.spend)[0] : null
@@ -159,7 +162,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
                     </span>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 750, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
-                      <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 600 }}>{c.dailyBudget != null ? `${money(c.dailyBudget)}/day` : 'live campaign'}</div>
+                      <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 600 }}>{currentMajor != null ? `${money(currentMajor)}/day` : 'live campaign'}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8 }}>

@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
+import { ChannelLogo } from '@/components/brand/logos'
 
 const INK = '#17251c', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#1a3a1a', LIME = '#dffe95'
 const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(17,37,28,.04), 0 10px 30px -20px rgba(17,37,28,.10)' }
@@ -127,10 +128,13 @@ export default function InboxPage() {
       {/* Your channels — what's connected, what's still pending, connect right here. */}
       {channels !== null && (() => {
         const CH = [
-          { k: 'instagram', label: 'Instagram', emoji: '📷' },
-          { k: 'whatsapp', label: 'WhatsApp', emoji: '🟢' },
-          { k: 'messenger', label: 'Messenger', emoji: '💬' },
-          { k: 'email', label: 'Email', emoji: '✉️' },
+          { k: 'instagram', label: 'Instagram' },
+          { k: 'whatsapp', label: 'WhatsApp' },
+          { k: 'messenger', label: 'Messenger' },
+          { k: 'telegram', label: 'Telegram' },
+          { k: 'linkedin', label: 'LinkedIn' },
+          { k: 'x', label: 'X' },
+          { k: 'email', label: 'Email' },
         ]
         const pending = CH.filter(c => !channels.includes(c.k)).length
         return (
@@ -143,8 +147,8 @@ export default function InboxPage() {
               {CH.map(c => {
                 const on = channels.includes(c.k)
                 return (
-                  <div key={c.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: `1px solid ${on ? '#cfe6b8' : LINE}`, background: on ? '#f6fbef' : '#fff', borderRadius: 100, padding: '6px 10px 6px 11px' }}>
-                    <span style={{ fontSize: 14 }}>{c.emoji}</span>
+                  <div key={c.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: `1px solid ${on ? '#cfe6b8' : LINE}`, background: on ? '#f6fbef' : '#fff', borderRadius: 100, padding: '6px 10px 6px 9px' }}>
+                    <span style={{ display: 'inline-flex' }}><ChannelLogo provider={c.k} size={17} /></span>
                     <span style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>{c.label}</span>
                     {on ? (
                       <span style={{ fontSize: 11.5, fontWeight: 800, color: '#3b6d11' }}>✓</span>
