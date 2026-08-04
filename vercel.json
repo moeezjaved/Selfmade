@@ -53,6 +53,9 @@
     },
     "src/app/api/cron/payfast-renewals/route.ts": {
       "maxDuration": 120
+    },
+    "src/app/api/cron/channel-brief/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -106,6 +109,10 @@
     },
     {
       "path": "/api/cron/payfast-renewals",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/channel-brief",
       "schedule": "0 6 * * *"
     }
   ]
