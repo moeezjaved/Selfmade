@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
+import { ChannelLogo } from '@/components/brand/logos'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95'
 const GREEN = '#3f8f4f', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f', PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
@@ -544,7 +545,21 @@ export default function InterviewPage() {
           {/* ── BEAT 5 · INTEGRATIONS (honest SOON — Meta app in review) ── */}
           {phase === 'integrations' && (
             <div>
-              <div style={say}>I’ve learned enough to start.<br />One day soon, I’d like to see your past work too.</div>
+              <div style={say}>Run your whole company from your phone.</div>
+              <p style={sub}>I’ll send your daily brief to WhatsApp or Slack — and you can approve my work, ask me anything, and handle the whole company right from chat. No dashboard needed.</p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', margin: '20px 0 6px' }}>
+                <a href="/api/channels/slack/start" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', textDecoration: 'none', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit' }}>
+                  <ChannelLogo provider="slack" size={22} /> Add to Slack
+                </a>
+                <a href="/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', textDecoration: 'none', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit' }}>
+                  <ChannelLogo provider="whatsapp" size={22} /> Connect WhatsApp
+                </a>
+              </div>
+              <div style={{ textAlign: 'center', fontSize: 12, color: MUTED, marginBottom: 6 }}>Teams love Slack · solo founders love WhatsApp · connect both if you like.</div>
+
+              <div style={{ height: 1, background: LINE, margin: '22px 0 18px' }} />
+
+              <div style={{ ...say, fontSize: 22 }}>And soon — your past work.</div>
               <p style={sub}>I learn faster from your previous campaigns than from zero. These connections are almost ready — when they are, I’ll ask again and tell you exactly what I’d learn from each.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, margin: '20px 0 4px' }}>
                 {[['Meta Ads', 'your past campaigns — what already worked'], ['Shopify', 'your products and what actually sells'], ['TikTok', 'your short-video performance'], ['Google', 'what people search to find you']].map(([n, d]) => (
