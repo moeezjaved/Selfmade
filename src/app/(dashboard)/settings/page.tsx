@@ -572,9 +572,17 @@ function CustomerChannelsSection() {
   useEffect(() => {
     loadConnected()
     const p = new URLSearchParams(window.location.search)
-    const ok = p.get('connected'); const err = p.get('connect_error')
-    if (ok) { toast.success(`${ok[0].toUpperCase()}${ok.slice(1)} connected — customer messages will land in your inbox.`); window.history.replaceState({}, '', '/settings'); loadConnected() }
-    else if (err) { toast.error(`Couldn’t connect ${err} — try again.`); window.history.replaceState({}, '', '/settings') }
+    const ok = p.get('connected'); const err = p.get('connect_error'); const acct = p.get('account_id')
+    if (ok) {
+      // Bind straight from the redirect (reliable — doesn't wait on Unipile's notify webhook), then refresh.
+      const finish = () => { window.history.replaceState({}, '', '/settings'); loadConnected() }
+      if (acct) {
+        fetch('/api/channels/unipile/bind', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: ok, accountId: acct }) })
+          .then(() => toast.success(`${ok[0].toUpperCase()}${ok.slice(1)} connected — customer messages will land in your inbox.`))
+          .catch(() => toast.error('Connected, but saving failed — try Reconnect.'))
+          .finally(finish)
+      } else { toast.success(`${ok[0].toUpperCase()}${ok.slice(1)} connected.`); finish() }
+    } else if (err) { toast.error(`Couldn’t connect ${err} — try again.`); window.history.replaceState({}, '', '/settings') }
   }, [])
 
   const connect = async (provider: string) => {
