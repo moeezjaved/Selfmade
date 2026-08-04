@@ -564,7 +564,7 @@ function CustomerChannelsSection() {
     else if (err) { toast.error(`Couldn’t connect ${err} — try again.`); window.history.replaceState({}, '', '/settings') }
   }, [])
 
-  const connect = async (provider: 'instagram' | 'whatsapp') => {
+  const connect = async (provider: string) => {
     setBusy(provider)
     try {
       const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider }) }).then(r => r.json())
@@ -573,7 +573,7 @@ function CustomerChannelsSection() {
     } catch { toast.error('Something went wrong.'); setBusy('') }
   }
 
-  const Row = ({ provider, label, logo, how }: { provider: 'instagram' | 'whatsapp'; label: string; logo: ReactNode; how: string }) => (
+  const Row = ({ provider, label, logo, how }: { provider: string; label: string; logo: ReactNode; how: string }) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
       <LogoTile>{logo}</LogoTile>
       <div style={{ flex: 1, minWidth: 180 }}>
@@ -594,9 +594,15 @@ function CustomerChannelsSection() {
         <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 3 }}>Connect where your customers message you — every DM lands in your Customer Inbox, triaged with a reply ready.</div>
       </div>
       <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Row provider="instagram" label="Instagram" logo={<InstagramLogo size={26} />} how="Customer DMs → your inbox. Reply, approved by you." />
+        <Row provider="instagram" label="Instagram" logo={<InstagramLogo size={26} />} how="Customer DMs → your inbox. Replies go out from your Instagram." />
         <div style={{ height: 1, background: '#f1f5f9' }} />
-        <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Customer chats → your inbox. Nudges + replies go out on your OK." />
+        <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Customer chats → your inbox. Replies go out from your number." />
+        <div style={{ height: 1, background: '#f1f5f9' }} />
+        <Row provider="email" label="Email" logo={<span style={{ fontSize: 22 }}>✉️</span>} how="Gmail, Outlook or IMAP — customer emails, triaged with a draft." />
+        <div style={{ height: 1, background: '#f1f5f9' }} />
+        <Row provider="messenger" label="Facebook Messenger" logo={<span style={{ fontSize: 22 }}>💬</span>} how="Page messages → your inbox, reply from your Page." />
+        <div style={{ height: 1, background: '#f1f5f9' }} />
+        <Row provider="calendar" label="Calendar" logo={<span style={{ fontSize: 22 }}>📅</span>} how="Connect Google so Mello can show your meetings in the Morning Standup." />
       </div>
     </div>
   )

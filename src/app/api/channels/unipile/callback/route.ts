@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { bindUnipileAccount } from '@/lib/channels/unipile'
+import { bindUnipileAccount, fetchAccountType, labelForType } from '@/lib/channels/unipile'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -23,12 +23,16 @@ export async function POST(req: NextRequest) {
   const status = String(body.status || '')
   const accountId = String(body.account_id || body.accountId || '')
   const name = String(body.name || '')
-  const [userId, provider] = name.split(':')
+  const [userId, requested] = name.split(':')
 
   // Only bind on a successful creation with everything we need.
-  if (!/success/i.test(status) || !accountId || !userId || !provider) {
+  if (!/success/i.test(status) || !accountId || !userId) {
     return NextResponse.json({ ok: true, ignored: true })
   }
+  // Label by the REAL connected type (the founder may pick a different one on Unipile's page than the
+  // button offered), falling back to what the button requested.
+  const type = await fetchAccountType(accountId)
+  const provider = labelForType(type, requested)
   try { await bindUnipileAccount(createAdminClient(), userId, provider, accountId) } catch { /* best-effort */ }
   return NextResponse.json({ ok: true })
 }
