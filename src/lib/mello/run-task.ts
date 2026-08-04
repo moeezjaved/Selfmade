@@ -129,6 +129,22 @@ export async function runTask(admin: any, ctx: RunTaskCtx, task: any): Promise<a
         }).then(() => {}, () => {})
       }
 
+    } else if (task.kind === 'meta_audience' || task.kind === 'meta_placement') {
+      // "Target them" / "Review placements" — approve→act. Same safe duplicate-and-tune as the brief:
+      // copy the winner into a focused campaign at the founder's budget, tune only the copy. Original
+      // untouched (no learning-phase reset). The founder's approval IS the authorization.
+      const { applyTune } = await import('@/lib/meta/tune')
+      const r = await applyTune(admin, userId, { metaCampaignId: ev.metaCampaignId, apply: ev.apply, newDailyBudget: Number(ev.newBudget) })
+      if (!r.ok) failed = r.error
+      else result = { url: '/m4', title: task.title, cta: 'See your campaigns →', emailNoun: task.kind === 'meta_audience' ? 'audience focus' : 'placement focus', campaign: r.newCampaign, newBudget: r.newDailyBudget }
+      if (!failed) {
+        await admin.from('activity_logs').insert({
+          user_id: userId, action_type: task.kind.toUpperCase(), entity_type: 'campaign',
+          description: `Duplicated a winner into a focused campaign (${ev.apply?.label || 'best segment'}) at $${ev.newBudget}/day — approved via ${source}`,
+          performed_by: 'mello',
+        }).then(() => {}, () => {})
+      }
+
     } else {
       failed = `Task kind "${task.kind}" isn't runnable yet.`
     }
