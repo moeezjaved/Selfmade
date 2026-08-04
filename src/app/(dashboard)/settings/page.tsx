@@ -354,6 +354,19 @@ function ChannelsSection() {
   const [ids, setIds] = useState<{ id: string; provider: string; display?: string }[]>([])
   const [code, setCode] = useState<{ provider: string; code: string; instructions: string } | null>(null)
   const [busy, setBusy] = useState('')
+  const [testing, setTesting] = useState('')
+
+  // Send a real report (with the top Approve button) to this channel right now, so the founder can
+  // check the buttons work end-to-end without waiting for the morning cron.
+  const sendTest = async (provider: string) => {
+    setTesting(provider)
+    try {
+      const r = await fetch('/api/channels/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'report' }) }).then(res => res.json())
+      if (r?.delivered) toast.success(`Sent — check your ${provider === 'slack' ? 'Slack' : 'WhatsApp'} ${provider === 'slack' ? '💬' : '🟢'}`)
+      else toast.error(r?.error || 'Nothing was delivered — reconnect the channel and try again.')
+    } catch { toast.error('Could not send — try again.') }
+    setTesting('')
+  }
 
   const load = () => fetch('/api/channels/link').then(r => r.json())
     .then(j => { if (Array.isArray(j.identities)) setIds(j.identities) }).catch(() => {})
@@ -393,7 +406,10 @@ function ChannelsSection() {
             <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 2 }}>{how}</div>
           </div>
           {c ? (
-            <button onClick={() => disconnect(c.id)} style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e2e8f0', background: '#fff', color: '#b91c1c', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Disconnect</button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={() => sendTest(provider)} disabled={testing === provider} style={{ padding: '7px 14px', borderRadius: 100, border: 'none', background: '#dffe95', color: '#1a3a1a', fontSize: 13, fontWeight: 800, cursor: testing === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: testing === provider ? 0.6 : 1 }}>{testing === provider ? 'Sending…' : 'Send test →'}</button>
+              <button onClick={() => disconnect(c.id)} style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e2e8f0', background: '#fff', color: '#b91c1c', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Disconnect</button>
+            </div>
           ) : provider === 'slack' ? (
             // One-click OAuth — no code to copy.
             <a href="/api/channels/slack/start" style={{ background: '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Add to Slack →</a>
