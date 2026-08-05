@@ -23,7 +23,7 @@ export async function computeCompanyStatus(admin: any, userId: string): Promise<
     admin.from('learnings').select('department, event, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(200),
     count(() => admin.from('followed_brands').select('id', { count: 'exact', head: true }).eq('user_id', userId)),
     count(() => admin.from('creative_generations').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', weekAgo)),
-    count(() => admin.from('campaigns').select('id', { count: 'exact', head: true }).eq('user_id', userId)),
+    count(() => admin.from('campaigns').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'ACTIVE')),
     count(() => admin.from('customer_threads').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'open')),
   ])
   const ongoing: Record<string, { detail: string } | undefined> = {
