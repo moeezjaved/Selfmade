@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 45
 
-type Payload = { alerts: GuardianAlert[]; mentions: Mention[]; siteAlerts: SiteAlert[]; generatedAt: string }
+type Payload = { alerts: GuardianAlert[]; mentions: Mention[]; siteAlerts: SiteAlert[]; crawl?: { lastCheckedAt: string | null; hours: number | null }; generatedAt: string }
 const cache = new Map<string, { at: number; data: Payload }>()
 const TTL = 30 * 60 * 1000
 
@@ -38,7 +38,22 @@ export async function GET(req: NextRequest) {
     let siteAlerts: SiteAlert[] = []
     try { [mentions, siteAlerts] = await Promise.all([scanMentions(brand, rivals), scanRivalSites(admin, user.id, { brandId })]) } catch { /* best-effort */ }
 
-    const data: Payload = { alerts, mentions, siteAlerts, generatedAt: new Date().toISOString() }
+    // Crawl freshness — when were the spied competitors last re-crawled? A stale value = the droplet
+    // crawler stalled, which is why "a competitor launched new ads" wouldn't be noticed.
+    let crawl: Payload['crawl'] = { lastCheckedAt: null, hours: null }
+    try {
+      let fq = admin.from('followed_brands').select('page_id').eq('user_id', user.id).eq('spied', true)
+      if (brandId) fq = fq.eq('brand_id', brandId)
+      const { data: f } = await fq.limit(50)
+      const ids = (f || []).map((x: any) => x.page_id).filter(Boolean)
+      if (ids.length) {
+        const { data: terms } = await admin.from('discovery_crawl_terms').select('last_crawled_at').in('page_id', ids).order('last_crawled_at', { ascending: false, nullsFirst: false }).limit(1)
+        const last = terms?.[0]?.last_crawled_at || null
+        crawl = { lastCheckedAt: last, hours: last ? Math.round((Date.now() - Date.parse(last)) / 3600000) : null }
+      }
+    } catch { /* freshness is best-effort */ }
+
+    const data: Payload = { alerts, mentions, siteAlerts, crawl, generatedAt: new Date().toISOString() }
     cache.set(key, { at: Date.now(), data })
     return NextResponse.json(data)
   } catch (e: any) {
