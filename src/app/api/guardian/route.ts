@@ -22,20 +22,21 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const key = user.id
+  const brandId = req.nextUrl.searchParams.get('brand') || undefined
+  const key = `${user.id}:${brandId || 'all'}`
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < TTL && req.nextUrl.searchParams.get('fresh') !== '1') return NextResponse.json(hit.data)
 
   const admin = createAdminClient()
   try {
-    const alerts = await scanBrandGuardian(admin, user.id)
-    // Brand name for reputation search + a couple of rival names for switch-intent.
+    const alerts = await scanBrandGuardian(admin, user.id, { brandId })
+    // Brand name for reputation search — the picked brand, else the first.
     let brand = ''
-    try { const { data } = await admin.from('brands').select('name').eq('user_id', user.id).order('created_at', { ascending: true }).limit(1).maybeSingle(); brand = data?.name || '' } catch { /* ok */ }
+    try { const { data } = await admin.from('brands').select('name').eq(brandId ? 'id' : 'user_id', brandId || user.id).order('created_at', { ascending: true }).limit(1).maybeSingle(); brand = data?.name || '' } catch { /* ok */ }
     const rivals = alerts.map(a => a.brand).filter(b => b && b !== 'A competitor').slice(0, 2)
     let mentions: Mention[] = []
     let siteAlerts: SiteAlert[] = []
-    try { [mentions, siteAlerts] = await Promise.all([scanMentions(brand, rivals), scanRivalSites(admin, user.id)]) } catch { /* best-effort */ }
+    try { [mentions, siteAlerts] = await Promise.all([scanMentions(brand, rivals), scanRivalSites(admin, user.id, { brandId })]) } catch { /* best-effort */ }
 
     const data: Payload = { alerts, mentions, siteAlerts, generatedAt: new Date().toISOString() }
     cache.set(key, { at: Date.now(), data })

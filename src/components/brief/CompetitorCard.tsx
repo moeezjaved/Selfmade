@@ -34,15 +34,15 @@ const mineHref = (m: Move) => {
   return `/studio?${q.toString()}`
 }
 
-export default function CompetitorCard() {
+export default function CompetitorCard({ brandId }: { brandId?: string | null }) {
   const [moves, setMoves] = useState<Move[] | null>(null)
   useEffect(() => {
     let alive = true
-    fetch('/api/meta/competitor-moves', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
+    fetch(`/api/meta/competitor-moves${brandId ? `?brand=${encodeURIComponent(brandId)}` : ''}`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
       .then(j => { if (alive && j && Array.isArray(j.moves)) setMoves(j.moves) })
       .catch(() => {})
     return () => { alive = false }
-  }, [])
+  }, [brandId])
 
   // Nothing to show (no watched rivals, or none with a real run) → render nothing, never clutter.
   if (!moves || !moves.length) return null

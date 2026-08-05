@@ -19,13 +19,14 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const cacheKey = `competitor-moves:${user.id}`
+  const brandId = req.nextUrl.searchParams.get('brand') || undefined
+  const cacheKey = `competitor-moves:${user.id}:${brandId || 'all'}`
   const cached = cacheGet<{ moves: Move[] }>(cacheKey)
   if (cached && !req.nextUrl.searchParams.get('refresh')) return NextResponse.json(cached)
 
   const admin = createAdminClient()
 
-  const distinct = await getCompetitorWinners(admin, user.id, { poolSize: 8 })
+  const distinct = await getCompetitorWinners(admin, user.id, { poolSize: 8, brandId })
   if (!distinct.length) return NextResponse.json({ moves: [] })
 
   // Rotate the pool by the day so the hero isn't the SAME longest-running ad (e.g. Leesa's 814-day

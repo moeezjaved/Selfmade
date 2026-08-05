@@ -14,9 +14,10 @@ const hostOf = (u: string) => { try { return new URL(u.startsWith('http') ? u : 
 const PRICE = /(?:Rs\.?|PKR|USD|\$|€|£)\s?[\d,]{2,}(?:\.\d{2})?/i
 const OFFER = /(free shipping|free delivery|\d{1,2}%\s*off|flat\s*\d{1,2}%|sale\b|clearance|discount|buy\s*\d\s*get|bundle deal)/i
 
-export async function scanRivalSites(admin: any, userId: string): Promise<SiteAlert[]> {
-  const { data: follows } = await admin.from('followed_brands')
-    .select('page_id, brand_name').eq('user_id', userId).eq('spied', true).limit(15)
+export async function scanRivalSites(admin: any, userId: string, opts: { brandId?: string | null } = {}): Promise<SiteAlert[]> {
+  let q = admin.from('followed_brands').select('page_id, brand_name').eq('user_id', userId).eq('spied', true)
+  if (opts.brandId) q = q.eq('brand_id', opts.brandId)
+  const { data: follows } = await q.limit(15)
   const rivals = (follows || []).filter((f: any) => f.page_id).slice(0, 8)
   if (!rivals.length) return []
 

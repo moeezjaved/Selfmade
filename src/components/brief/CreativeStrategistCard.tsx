@@ -22,17 +22,20 @@ const BADGE: Record<string, { bg: string; fg: string; label: string }> = {
   competitor: { bg: '#eef4ff', fg: '#2f5bd0', label: 'STEAL A RIVAL ANGLE' },
 }
 
-export default function CreativeStrategistCard() {
+export default function CreativeStrategistCard({ brandId }: { brandId?: string | null }) {
   const [data, setData] = useState<Strategy | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = (fresh = false) => {
     setLoading(true)
-    fetch(`/api/creative/strategy${fresh ? '?fresh=1' : ''}`, { cache: 'no-store' })
+    const q = new URLSearchParams()
+    if (brandId) q.set('brand', brandId)
+    if (fresh) q.set('fresh', '1')
+    fetch(`/api/creative/strategy${q.toString() ? `?${q}` : ''}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null).then(j => { if (j && !j.error) setData(j) })
       .catch(() => {}).finally(() => setLoading(false))
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hide the card entirely until there's something to say (keeps the brief calm on empty accounts).
   if (!loading && (!data || data.ideas.length === 0)) return null
