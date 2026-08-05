@@ -7,12 +7,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { scanBrandGuardian, type GuardianAlert } from '@/lib/guardian/scan'
 import { scanMentions, type Mention } from '@/lib/guardian/social'
+import { scanRivalSites, type SiteAlert } from '@/lib/guardian/web'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 45
 
-type Payload = { alerts: GuardianAlert[]; mentions: Mention[]; generatedAt: string }
+type Payload = { alerts: GuardianAlert[]; mentions: Mention[]; siteAlerts: SiteAlert[]; generatedAt: string }
 const cache = new Map<string, { at: number; data: Payload }>()
 const TTL = 30 * 60 * 1000
 
@@ -33,9 +34,10 @@ export async function GET(req: NextRequest) {
     try { const { data } = await admin.from('brands').select('name').eq('user_id', user.id).order('created_at', { ascending: true }).limit(1).maybeSingle(); brand = data?.name || '' } catch { /* ok */ }
     const rivals = alerts.map(a => a.brand).filter(b => b && b !== 'A competitor').slice(0, 2)
     let mentions: Mention[] = []
-    try { mentions = await scanMentions(brand, rivals) } catch { /* best-effort */ }
+    let siteAlerts: SiteAlert[] = []
+    try { [mentions, siteAlerts] = await Promise.all([scanMentions(brand, rivals), scanRivalSites(admin, user.id)]) } catch { /* best-effort */ }
 
-    const data: Payload = { alerts, mentions, generatedAt: new Date().toISOString() }
+    const data: Payload = { alerts, mentions, siteAlerts, generatedAt: new Date().toISOString() }
     cache.set(key, { at: Date.now(), data })
     return NextResponse.json(data)
   } catch (e: any) {
