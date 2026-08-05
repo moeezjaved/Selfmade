@@ -151,7 +151,7 @@ async function storedPerformance(admin: any, userId: string): Promise<{ winner: 
   return { winner, bleeder: (bleeder && bleeder.name !== winner.name) ? bleeder : null }
 }
 
-export async function generateCreativeStrategy(admin: any, userId: string, opts: { accountId?: string; brand?: string } = {}): Promise<CreativeStrategy> {
+export async function generateCreativeStrategy(admin: any, userId: string, opts: { accountId?: string; brand?: string; brandId?: string | null } = {}): Promise<CreativeStrategy> {
   // Our account signal (cached server-side — no extra Graph hit on repeat opens).
   let ourWinner: any = null, fatigue: any = null
   try {
@@ -172,7 +172,7 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
     } catch { /* ok */ }
   }
 
-  const rivals = await getCompetitorWinners(admin, userId, { poolSize: 6 })
+  const rivals = await getCompetitorWinners(admin, userId, { poolSize: 6, brandId: opts.brandId })
 
   let brand = opts.brand || ''
   if (!brand) { try { const { data } = await admin.from('brands').select('name').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle(); brand = data?.name || '' } catch { /* ok */ } }

@@ -32,9 +32,10 @@ const conceptKey = (a: any) =>
 const score = (m: CompetitorWinner) => m.daysRunning * (1 + Math.log2(Math.max(1, m.variants))) * (m.isActive ? 1.5 : 0.6)
 
 /** The ranked pool of distinct rivals' winning ads (one hero per rival). Empty when nothing is spied. */
-export async function getCompetitorWinners(admin: any, userId: string, opts: { poolSize?: number } = {}): Promise<CompetitorWinner[]> {
-  const { data: follows } = await admin.from('followed_brands')
-    .select('page_id, brand_name').eq('user_id', userId).eq('spied', true).limit(20)
+export async function getCompetitorWinners(admin: any, userId: string, opts: { poolSize?: number; brandId?: string | null } = {}): Promise<CompetitorWinner[]> {
+  let q = admin.from('followed_brands').select('page_id, brand_name').eq('user_id', userId).eq('spied', true)
+  if (opts.brandId) q = q.eq('brand_id', opts.brandId)   // scope to ONE of the founder's brands when picked
+  const { data: follows } = await q.limit(20)
   const pages = (follows || []).filter((f: any) => f.page_id)
   if (!pages.length) return []
 

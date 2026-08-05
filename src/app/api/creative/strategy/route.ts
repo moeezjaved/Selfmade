@@ -20,13 +20,14 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const accountId = req.nextUrl.searchParams.get('account') || undefined
-  const key = `${user.id}:${accountId || 'primary'}`
+  const brandId = req.nextUrl.searchParams.get('brand') || undefined
+  const key = `${user.id}:${accountId || 'primary'}:${brandId || 'all'}`
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < TTL && req.nextUrl.searchParams.get('fresh') !== '1') return NextResponse.json(hit.data)
 
   const admin = createAdminClient()
   try {
-    const data = await generateCreativeStrategy(admin, user.id, { accountId })
+    const data = await generateCreativeStrategy(admin, user.id, { accountId, brandId })
     cache.set(key, { at: Date.now(), data })
     return NextResponse.json(data)
   } catch (e: any) {

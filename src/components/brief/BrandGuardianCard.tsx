@@ -14,17 +14,20 @@ type Mention = { source: string; title: string; url: string; where: string; kind
 type SiteAlert = { pageId: string; brand: string; kind: 'price' | 'offer'; headline: string; detail: string; url: string }
 type Data = { alerts: Alert[]; mentions: Mention[]; siteAlerts?: SiteAlert[]; generatedAt: string }
 
-export default function BrandGuardianCard() {
+export default function BrandGuardianCard({ brandId }: { brandId?: string | null }) {
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = (fresh = false) => {
     setLoading(true)
-    fetch(`/api/guardian${fresh ? '?fresh=1' : ''}`, { cache: 'no-store' })
+    const q = new URLSearchParams()
+    if (brandId) q.set('brand', brandId)
+    if (fresh) q.set('fresh', '1')
+    fetch(`/api/guardian${q.toString() ? `?${q}` : ''}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null).then(j => { if (j && !j.error) setData(j) })
       .catch(() => {}).finally(() => setLoading(false))
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!loading && (!data || (data.alerts.length === 0 && data.mentions.length === 0 && (data.siteAlerts || []).length === 0))) return null
   const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }

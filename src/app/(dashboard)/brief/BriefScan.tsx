@@ -238,16 +238,16 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
 
           {/* ── Rivals' winning ad — competitor intelligence, a SEPARATE card from the own-account
               moves above (agreed split: account numbers never mix with rival inference). ── */}
-          <CompetitorCard />
+          <CompetitorCard brandId={activeBrandId} />
 
           {/* ── What to make next — the Creative Strategist fuses your ad performance (winners + fatigue)
               with rivals' winning angles into concrete ideas, one click into the Studio. Self-hides on
               an empty account. ── */}
-          <CreativeStrategistCard />
+          <CreativeStrategistCard brandId={activeBrandId} />
 
           {/* ── Brand Guardian — the defensive watch: rivals launching new ads (our crawl) + public
               chatter about you / shoppers leaving rivals (Reddit). Self-hides when quiet. ── */}
-          <BrandGuardianCard />
+          <BrandGuardianCard brandId={activeBrandId} />
 
           {/* ── Also today — the one runner-up, a quiet row. ── */}
           {second && (

@@ -20,12 +20,13 @@ export type GuardianAlert = {
 
 const H = 3600_000
 
-export async function scanBrandGuardian(admin: any, userId: string, opts: { days?: number } = {}): Promise<GuardianAlert[]> {
+export async function scanBrandGuardian(admin: any, userId: string, opts: { days?: number; brandId?: string | null } = {}): Promise<GuardianAlert[]> {
   const days = opts.days || 7
   const since = new Date(Date.now() - days * 24 * H).toISOString()
 
-  const { data: follows } = await admin.from('followed_brands')
-    .select('page_id, brand_name').eq('user_id', userId).eq('spied', true).limit(20)
+  let q = admin.from('followed_brands').select('page_id, brand_name').eq('user_id', userId).eq('spied', true)
+  if (opts.brandId) q = q.eq('brand_id', opts.brandId)   // scope to the picked brand's competitors
+  const { data: follows } = await q.limit(20)
   const pages = (follows || []).filter((f: any) => f.page_id)
   if (!pages.length) return []
 
