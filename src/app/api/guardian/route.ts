@@ -1,0 +1,44 @@
+/**
+ * GET /api/guardian — Brand Guardian: competitor moves from our own crawl (rivals launching new ads) +
+ * public conversation (Reddit) about you and shoppers leaving your rivals. Read-only, advisory. Cached so
+ * the brief card doesn't re-scan on every open.
+ */
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { scanBrandGuardian, type GuardianAlert } from '@/lib/guardian/scan'
+import { scanMentions, type Mention } from '@/lib/guardian/social'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const maxDuration = 45
+
+type Payload = { alerts: GuardianAlert[]; mentions: Mention[]; generatedAt: string }
+const cache = new Map<string, { at: number; data: Payload }>()
+const TTL = 30 * 60 * 1000
+
+export async function GET(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const key = user.id
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.at < TTL && req.nextUrl.searchParams.get('fresh') !== '1') return NextResponse.json(hit.data)
+
+  const admin = createAdminClient()
+  try {
+    const alerts = await scanBrandGuardian(admin, user.id)
+    // Brand name for reputation search + a couple of rival names for switch-intent.
+    let brand = ''
+    try { const { data } = await admin.from('brands').select('name').eq('user_id', user.id).order('created_at', { ascending: true }).limit(1).maybeSingle(); brand = data?.name || '' } catch { /* ok */ }
+    const rivals = alerts.map(a => a.brand).filter(b => b && b !== 'A competitor').slice(0, 2)
+    let mentions: Mention[] = []
+    try { mentions = await scanMentions(brand, rivals) } catch { /* best-effort */ }
+
+    const data: Payload = { alerts, mentions, generatedAt: new Date().toISOString() }
+    cache.set(key, { at: Date.now(), data })
+    return NextResponse.json(data)
+  } catch (e: any) {
+    return NextResponse.json({ error: 'guardian_failed', message: String(e?.message || e) }, { status: 500 })
+  }
+}

@@ -49,6 +49,7 @@ export const DEPARTMENTS: Department[] = [
       { label: 'Competitor launches & scaling alerts', built: true },
       { label: 'Competitor intel report', built: true },
       { label: 'New-entrant detection', built: true },
+      { label: 'Brand Guardian: overnight rival moves + chatter', built: true },
       { label: 'Rival offer/price-change watch', built: true },
       { label: 'Trend & seasonality signals', built: false },
       { label: 'Press/opportunity monitoring', built: false },
