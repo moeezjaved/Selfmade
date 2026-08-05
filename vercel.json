@@ -56,6 +56,9 @@
     },
     "src/app/api/cron/channel-brief/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/sales-followup/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -114,6 +117,10 @@
     {
       "path": "/api/cron/channel-brief",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/sales-followup",
+      "schedule": "0 9 * * *"
     }
   ]
 }

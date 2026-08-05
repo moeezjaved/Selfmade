@@ -6,12 +6,13 @@
  */
 import { recall } from '@/lib/brain'
 
-export type OutboundType = 'cart_recovery' | 'winback' | 'review_request' | 'reengage'
+export type OutboundType = 'cart_recovery' | 'winback' | 'review_request' | 'reengage' | 'follow_up'
 export const OUTBOUND_LABEL: Record<OutboundType, string> = {
   cart_recovery: 'Abandoned cart',
   winback: 'Win-back',
   review_request: 'Review request',
   reengage: 'Re-engage',
+  follow_up: 'Sales follow-up',
 }
 
 /** Phase 1 — safe, human template per trigger. Always available. */
@@ -26,6 +27,8 @@ function template(type: OutboundType, name: string, brand: string, product: stri
       return `Hey ${who}! It's been a little while — thought you might be running low on ${p}. Want me to set up a quick reorder? I can throw in a little thank-you for coming back.`
     case 'review_request':
       return `Hi ${who}! Hope you're loving ${p} 💛 Would you mind leaving a quick review? It takes 20 seconds and genuinely helps ${b} a lot. Thank you!`
+    case 'follow_up':
+      return `Hi ${who}! Just circling back about ${p} — did you have any questions before you decide? Happy to help you get sorted whenever you're ready. 😊`
     case 'reengage':
     default:
       return `Hi ${who}! Just checking in from ${b} — anything I can help you with today? New arrivals just dropped if you'd like a peek.`
@@ -45,6 +48,7 @@ async function reasoned(admin: any, userId: string, type: OutboundType, name: st
     winback: 'win back a customer who has gone quiet — warm, personal, a small reason to return.',
     review_request: 'ask a happy customer for a quick review — grateful, low-effort, no pressure.',
     reengage: 're-engage a quiet contact — friendly check-in, a light reason to look again.',
+    follow_up: 'follow up on a customer who asked about buying but went quiet — warm nudge, offer to answer questions, a gentle reason to decide now; NOT pushy or spammy.',
   }
   const system = `You are Mello, the customer voice for ${brand || 'this brand'}. Write ONE short outbound message to a customer whose name is "${name || 'the customer'}" about "${product || 'their order'}". Goal: ${goal[type]}
 Rules: 1-3 sentences, first person, warm and human (never salesy or robotic), on-brand. Do NOT invent discounts, order numbers, or delivery dates you can't know — offer to check or keep it soft. Return ONLY the message text, no quotes, no preamble.${memory ? `\n\n--- Company memory (obey the beliefs) ---\n${memory}` : ''}`
