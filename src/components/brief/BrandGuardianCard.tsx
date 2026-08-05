@@ -6,13 +6,14 @@
  */
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 
 const INK = '#17251c', MUTED = '#6b6b6b', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#17251c', LIME = '#dffe95'
 
 type Alert = { pageId: string; brand: string; kind: string; newCount: number; activeCount: number; headline: string; detail: string; image?: string | null; href: string }
 type Mention = { source: string; title: string; url: string; where: string; kind: 'you' | 'shoppers' }
 type SiteAlert = { pageId: string; brand: string; kind: 'price' | 'offer'; headline: string; detail: string; url: string }
-type Data = { alerts: Alert[]; mentions: Mention[]; siteAlerts?: SiteAlert[]; generatedAt: string }
+type Data = { alerts: Alert[]; mentions: Mention[]; siteAlerts?: SiteAlert[]; crawl?: { lastCheckedAt: string | null; hours: number | null }; generatedAt: string }
 
 export default function BrandGuardianCard({ brandId }: { brandId?: string | null }) {
   const [data, setData] = useState<Data | null>(null)
@@ -29,7 +30,18 @@ export default function BrandGuardianCard({ brandId }: { brandId?: string | null
   }
   useEffect(() => { load() }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!loading && (!data || (data.alerts.length === 0 && data.mentions.length === 0 && (data.siteAlerts || []).length === 0))) return null
+  const [rechecking, setRechecking] = useState(false)
+  const recheck = async () => {
+    setRechecking(true)
+    try {
+      const j = await fetch('/api/guardian/recheck', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brandId }) }).then(r => r.json())
+      if (j?.ok) toast.success(`Queued a fresh crawl of ${j.queued} competitor${j.queued === 1 ? '' : 's'} — new ads show within a couple of hours.`)
+      else toast.error('Could not queue a re-check.')
+    } catch { toast.error('Could not queue a re-check.') } finally { setRechecking(false) }
+  }
+
+  const staleCrawl = !!(data?.crawl && data.crawl.hours != null && data.crawl.hours >= 24)
+  if (!loading && (!data || (data.alerts.length === 0 && data.mentions.length === 0 && (data.siteAlerts || []).length === 0 && !staleCrawl))) return null
   const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
 
   return (
@@ -80,6 +92,17 @@ export default function BrandGuardianCard({ brandId }: { brandId?: string | null
                   </a>
                 ))}
               </div>
+            </div>
+          )}
+          {/* Crawl freshness — so a stalled crawler (why new ads aren't noticed) is visible + fixable. */}
+          {data?.crawl && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
+              <span style={{ fontSize: 11.5, color: staleCrawl ? '#b7791f' : '#a7b0a5', fontWeight: staleCrawl ? 700 : 500 }}>
+                {data.crawl.hours == null ? 'Competitors not checked yet' : `Competitors last checked ${data.crawl.hours}h ago`}{staleCrawl ? ' — that’s stale' : ''}
+              </span>
+              <button onClick={recheck} disabled={rechecking} style={{ background: staleCrawl ? FOREST : '#f2f4ef', color: staleCrawl ? LIME : INK, border: 'none', borderRadius: 100, padding: '4px 12px', fontSize: 11.5, fontWeight: 750, fontFamily: 'inherit', cursor: rechecking ? 'default' : 'pointer', opacity: rechecking ? 0.6 : 1 }}>
+                {rechecking ? 'Queuing…' : '↻ Re-check now'}
+              </button>
             </div>
           )}
           <div style={{ fontSize: 11, color: '#a7b0a5' }}>From your spied competitors’ ads + sites + public Reddit/YouTube chatter. Watch-only — no action taken.</div>
