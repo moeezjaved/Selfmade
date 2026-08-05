@@ -13,7 +13,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { triageMessage } from '@/lib/customer/triage'
 import { draftOutbound, OUTBOUND_LABEL, type OutboundType } from '@/lib/customer/outbound'
-import { recordLearning } from '@/lib/brain'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
