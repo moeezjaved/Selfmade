@@ -100,7 +100,7 @@ function StudioInner() {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [headline, setHeadline] = useState('')
-  const [angle, setAngle] = useState('')
+  const [angle, setAngle] = useState(params.get('angle') || '')   // seeded from a "What to make next" idea
   const [niches, setNiches] = useState<string[]>([])
   const [niche, setNiche] = useState('')
   const [aspect, setAspect] = useState<'original' | '4:5' | '1:1' | '9:16' | '16:9'>('4:5')
@@ -146,7 +146,12 @@ function StudioInner() {
       setMode('remake'); setSource({ adId, img: img || null, brand: bnd || null }); setAspect('original')
       chat.setHistory([{ role: 'assistant', content: 'Let me study this winning ad and adapt it for your brand…' }])
     } else {
-      chat.setHistory([{ role: 'assistant', content: 'This is your studio. Analyze your website on the right so I know your brand — then pick product photos, set the angle, and hit Create. Or ask me here for an angle and a hook first.' }])
+      // Seeded from a "What to make next" idea (?angle=…) — carry the concept in so the studio never
+      // opens blank; the angle field is already prefilled from the URL.
+      const seededAngle = params.get('angle')
+      chat.setHistory([{ role: 'assistant', content: seededAngle
+        ? `Let’s make this: “${seededAngle}”. I’ve set it as your angle — analyze your website on the right so I know your brand, pick your product photos, then hit Create.`
+        : 'This is your studio. Analyze your website on the right so I know your brand — then pick product photos, set the angle, and hit Create. Or ask me here for an angle and a hook first.' }])
     }
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -28,41 +28,51 @@ export type CreativeStrategy = {
   generatedAt: string
 }
 
-/** The Studio deep-link — seeded with a competitor ad when the idea is built off one (same as "Make it mine"). */
-function studioHref(ref?: CompetitorWinner | null): string {
-  if (!ref) return '/studio?studio=1'
-  const q = new URLSearchParams({ ad: ref.adId, brand: ref.brandName })
-  if (ref.image) q.set('img', ref.image)
-  if (ref.isVideo) { q.set('type', 'video'); if (ref.videoUrl) q.set('vid', ref.videoUrl) }
-  return `/studio?${q.toString()}`
+/** The Studio deep-link. When the idea is a faithful rebuild of a rival ad we seed that ad (the remake
+ *  flow, same as "Make it mine"). Otherwise we open the studio FRESH but carry the idea's angle so it's
+ *  never blank — the angle field prefills from ?angle=. `ref` is set ONLY for a genuine clone. */
+function studioHref(ref: CompetitorWinner | null, angle: string): string {
+  const q = new URLSearchParams()
+  if (ref) {
+    q.set('ad', ref.adId); q.set('brand', ref.brandName)
+    if (ref.image) q.set('img', ref.image)
+    if (ref.isVideo) { q.set('type', 'video'); if (ref.videoUrl) q.set('vid', ref.videoUrl) }
+  }
+  const a = angle.replace(/\s+/g, ' ').trim().slice(0, 160)
+  if (a) q.set('angle', a)
+  const qs = q.toString()
+  return qs ? `/studio?${qs}` : '/studio?studio=1'
 }
 
 /** Deterministic ideas straight from the signals — the always-works fallback (no model). */
 function fallbackIdeas(ourWinner: any, fatigue: any, rivals: CompetitorWinner[]): CreativeIdea[] {
   const ideas: CreativeIdea[] = []
   if (fatigue) {
+    const angle = `Fresh creative for “${fatigue.name}”, same offer`
     ideas.push({
       title: `Fresh version of “${fatigue.name}”`,
       format: 'new creative, same offer',
       why: `“${fatigue.name}” is tiring out (${fatigue.roas}x ROAS, your audience has seen it too often). A fresh creative on the same offer resets your cost before it bleeds.`,
-      basedOn: 'fatigue', reference: { kind: 'ours', label: fatigue.name }, priority: 'high', studioHref: studioHref(null),
+      basedOn: 'fatigue', reference: { kind: 'ours', label: fatigue.name, image: null }, priority: 'high', studioHref: studioHref(null, angle),
     })
   }
   if (ourWinner) {
+    const angle = `New variant of “${ourWinner.name}” — new hook, same winning angle`
     ideas.push({
       title: `More variants of “${ourWinner.name}”`,
       format: 'variant batch',
       why: `“${ourWinner.name}” is your best performer (${ourWinner.roas}x). Spin 3–4 variants (new hook, new opener) to scale the angle that already works for you.`,
-      basedOn: 'winner', reference: { kind: 'ours', label: ourWinner.name }, priority: 'med', studioHref: studioHref(null),
+      basedOn: 'winner', reference: { kind: 'ours', label: ourWinner.name, image: null }, priority: 'med', studioHref: studioHref(null, angle),
     })
   }
   const r = rivals[0]
   if (r) {
+    // A genuine clone of THIS rival ad → seed the remake flow with it (image shown, ad seeded).
     ideas.push({
       title: `Rebuild ${r.brandName}’s winning angle for your brand`,
       format: r.isVideo ? 'video' : 'static',
       why: `${r.brandName} has run this ${r.daysRunning} days${r.variants > 1 ? ` across ${r.variants} variants` : ''} — strong evidence it converts. Rebuild the concept with your product.`,
-      basedOn: 'competitor', reference: { kind: 'competitor', label: r.title || 'their winning ad', brand: r.brandName, image: r.image }, priority: 'med', studioHref: studioHref(r),
+      basedOn: 'competitor', reference: { kind: 'competitor', label: r.title || 'their winning ad', brand: r.brandName, image: r.image }, priority: 'med', studioHref: studioHref(r, `Rebuild of ${r.brandName}’s winning ad`),
     })
   }
   return ideas.slice(0, 3)
@@ -83,7 +93,9 @@ Rivals' winning ads (public signal — long run + many variants ≈ it converts)
 ${rivalLines || '(none spied yet)'}
 
 Give 1–3 specific, buildable ideas. For each: a concrete title, the format (UGC video, testimonial, static offer, founder talking-head…), and a WHY that cites the real signal (name the fatiguing ad or the rival). Prioritise: replacing a fatiguing winner = high; a proven rival angle = med; more variants of a winner = med.
-Return ONLY JSON: {"ideas":[{"title","format","why","basedOn":"fatigue|winner|competitor","priority":"high|med|low","rivalIndex": <1-based index into the rivals list, or 0 if not based on a rival>}]}. No prose.`
+"rivalIndex" = the 1-based index of the single rival this idea draws on, or 0 if none.
+"cloneRivalAd" = true ONLY when the idea is a faithful REBUILD of that ONE specific rival ad (we'd clone it directly). Set false when it's a NEW creative in a proven format/angle (even if rivals inspired it) or an idea for your own brand — those get built fresh, not cloned.
+Return ONLY JSON: {"ideas":[{"title","format","why","basedOn":"fatigue|winner|competitor","priority":"high|med|low","rivalIndex": <int>,"cloneRivalAd": <bool>}]}. No prose.`
   try {
     const resp = await openai.chat.completions.create({
       model, temperature: 0.4, response_format: { type: 'json_object' },
@@ -95,16 +107,21 @@ Return ONLY JSON: {"ideas":[{"title","format","why","basedOn":"fatigue|winner|co
       const ri = Math.round(Number(it.rivalIndex) || 0)
       const rival = ri >= 1 && ri <= rivals.length ? rivals[ri - 1] : null
       const basedOn = (['fatigue', 'winner', 'competitor'].includes(it.basedOn) ? it.basedOn : (rival ? 'competitor' : 'winner')) as CreativeIdea['basedOn']
+      const title = String(it.title || '').slice(0, 100)
+      const format = String(it.format || '').slice(0, 60)
+      // Seed the exact rival ad ONLY for a faithful clone — otherwise a mismatched thumbnail (a random
+      // rival ad) reads as "this is the creative", which it isn't. Non-clones open fresh with the angle.
+      const seedRef = (it.cloneRivalAd === true && rival) ? rival : null
+      const angle = [title, format].filter(Boolean).join(' — ')
+      const reference: CreativeIdea['reference'] =
+        seedRef ? { kind: 'competitor', label: seedRef.title || 'their winning ad', brand: seedRef.brandName, image: seedRef.image }
+        : rival ? { kind: 'competitor', label: `inspired by ${rival.brandName}`, brand: rival.brandName, image: null }
+        : (fatigue && basedOn === 'fatigue') ? { kind: 'ours', label: fatigue.name, image: null }
+        : (ourWinner && basedOn === 'winner') ? { kind: 'ours', label: ourWinner.name, image: null } : null
       return {
-        title: String(it.title || '').slice(0, 100),
-        format: String(it.format || '').slice(0, 60),
-        why: String(it.why || '').slice(0, 320),
-        basedOn,
-        reference: rival ? { kind: 'competitor', label: rival.title || 'their winning ad', brand: rival.brandName, image: rival.image }
-          : (fatigue && basedOn === 'fatigue') ? { kind: 'ours', label: fatigue.name }
-          : (ourWinner && basedOn === 'winner') ? { kind: 'ours', label: ourWinner.name } : null,
+        title, format, why: String(it.why || '').slice(0, 320), basedOn, reference,
         priority: (['high', 'med', 'low'].includes(it.priority) ? it.priority : 'med') as CreativeIdea['priority'],
-        studioHref: studioHref(rival),
+        studioHref: studioHref(seedRef, angle),
       }
     }).filter((i: CreativeIdea) => i.title && i.why)
     return ideas.length ? ideas.slice(0, 3) : null
