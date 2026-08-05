@@ -25,15 +25,35 @@ async function redditSearch(query: string, kind: Mention['kind']): Promise<Menti
   } catch { return [] }
 }
 
+/** YouTube — OPTIONAL, only with a free Google Data API key. New videos reviewing you / your rivals =
+ *  where category demand concentrates. No key → skipped (never fabricated). */
+async function youtubeSearch(query: string, kind: Mention['kind']): Promise<Mention[]> {
+  const key = process.env.YOUTUBE_API_KEY
+  if (!key) return []
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&order=date&maxResults=2&q=${encodeURIComponent(query)}&key=${key}`
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000) })
+    if (!r.ok) return []
+    const j = await r.json().catch(() => null)
+    return (j?.items || []).filter((it: any) => it?.id?.videoId).map((it: any) => ({
+      source: 'youtube' as const,
+      title: String(it.snippet?.title || '').slice(0, 160),
+      url: `https://youtube.com/watch?v=${it.id.videoId}`,
+      where: String(it.snippet?.channelTitle || 'YouTube'),
+      kind,
+    })).slice(0, 2)
+  } catch { return [] }
+}
+
 /**
- * Watch: your own brand (reputation) + the top rival's "alternative" search (shoppers leaving them).
- * `rivals` = a few competitor names to check for switch-intent.
+ * Watch: your own brand (reputation) + the top rival's "alternative" search (shoppers leaving them), across
+ * Reddit and — if a key is set — YouTube. `rivals` = a few competitor names to check for switch-intent.
  */
 export async function scanMentions(brand: string, rivals: string[] = []): Promise<Mention[]> {
   const jobs: Promise<Mention[]>[] = []
-  if (brand) jobs.push(redditSearch(`"${brand}"`, 'you'))
+  if (brand) { jobs.push(redditSearch(`"${brand}"`, 'you')); jobs.push(youtubeSearch(`${brand} review`, 'you')) }
   const rival = rivals.find(Boolean)
-  if (rival) jobs.push(redditSearch(`${rival} alternative`, 'shoppers'))
+  if (rival) { jobs.push(redditSearch(`${rival} alternative`, 'shoppers')); jobs.push(youtubeSearch(`best ${rival} alternative`, 'shoppers')) }
   const all = (await Promise.all(jobs)).flat()
   // Dedup by url.
   const seen = new Set<string>()

@@ -11,7 +11,8 @@ const INK = '#17251c', MUTED = '#6b6b6b', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.
 
 type Alert = { pageId: string; brand: string; kind: string; newCount: number; activeCount: number; headline: string; detail: string; image?: string | null; href: string }
 type Mention = { source: string; title: string; url: string; where: string; kind: 'you' | 'shoppers' }
-type Data = { alerts: Alert[]; mentions: Mention[]; generatedAt: string }
+type SiteAlert = { pageId: string; brand: string; kind: 'price' | 'offer'; headline: string; detail: string; url: string }
+type Data = { alerts: Alert[]; mentions: Mention[]; siteAlerts?: SiteAlert[]; generatedAt: string }
 
 export default function BrandGuardianCard() {
   const [data, setData] = useState<Data | null>(null)
@@ -25,7 +26,7 @@ export default function BrandGuardianCard() {
   }
   useEffect(() => { load() }, [])
 
-  if (!loading && (!data || (data.alerts.length === 0 && data.mentions.length === 0))) return null
+  if (!loading && (!data || (data.alerts.length === 0 && data.mentions.length === 0 && (data.siteAlerts || []).length === 0))) return null
   const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
 
   return (
@@ -52,6 +53,18 @@ export default function BrandGuardianCard() {
             </div>
           ))}
 
+          {/* rival price / offer moves (website watch) */}
+          {(data?.siteAlerts || []).map((s, i) => (
+            <div key={`s${i}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <span style={{ width: 46, height: 46, borderRadius: 8, flexShrink: 0, background: '#fef6e7', display: 'grid', placeItems: 'center', fontSize: 18 }}>{s.kind === 'price' ? '🏷️' : '🎯'}</span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 750, color: INK, lineHeight: 1.35 }}>{s.headline}</div>
+                <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.5, marginTop: 3 }}>{s.detail}</div>
+                <a href={s.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '6px 14px', fontSize: 12, fontWeight: 750, textDecoration: 'none' }}>See their site ↗</a>
+              </div>
+            </div>
+          ))}
+
           {/* mentions */}
           {(data?.mentions || []).length > 0 && (
             <div style={{ marginTop: 2 }}>
@@ -66,7 +79,7 @@ export default function BrandGuardianCard() {
               </div>
             </div>
           )}
-          <div style={{ fontSize: 11, color: '#a7b0a5' }}>From your spied competitors + public Reddit chatter. Watch-only — no action taken.</div>
+          <div style={{ fontSize: 11, color: '#a7b0a5' }}>From your spied competitors’ ads + sites + public Reddit/YouTube chatter. Watch-only — no action taken.</div>
         </div>
       )}
     </div>
