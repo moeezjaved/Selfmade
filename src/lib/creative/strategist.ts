@@ -113,11 +113,14 @@ Return ONLY JSON: {"ideas":[{"title","format","why","basedOn":"fatigue|winner|co
       // rival ad) reads as "this is the creative", which it isn't. Non-clones open fresh with the angle.
       const seedRef = (it.cloneRivalAd === true && rival) ? rival : null
       const angle = [title, format].filter(Boolean).join(' — ')
+      // Label by what the idea is actually about — gate the "inspired by rival" tag on basedOn=competitor
+      // so a fatigue/winner idea with a stray rivalIndex still names YOUR ad, not a rival's.
       const reference: CreativeIdea['reference'] =
         seedRef ? { kind: 'competitor', label: seedRef.title || 'their winning ad', brand: seedRef.brandName, image: seedRef.image }
-        : rival ? { kind: 'competitor', label: `inspired by ${rival.brandName}`, brand: rival.brandName, image: null }
         : (fatigue && basedOn === 'fatigue') ? { kind: 'ours', label: fatigue.name, image: null }
-        : (ourWinner && basedOn === 'winner') ? { kind: 'ours', label: ourWinner.name, image: null } : null
+        : (ourWinner && basedOn === 'winner') ? { kind: 'ours', label: ourWinner.name, image: null }
+        : (rival && basedOn === 'competitor') ? { kind: 'competitor', label: `inspired by ${rival.brandName}`, brand: rival.brandName, image: null }
+        : null
       return {
         title, format, why: String(it.why || '').slice(0, 320), basedOn, reference,
         priority: (['high', 'med', 'low'].includes(it.priority) ? it.priority : 'med') as CreativeIdea['priority'],
