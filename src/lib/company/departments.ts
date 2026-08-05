@@ -62,6 +62,7 @@ export const DEPARTMENTS: Department[] = [
     live: true, taskKinds: ['creative', 'video'],
     responsibilities: [
       { label: 'Nightly creative batch', built: true },
+      { label: 'What to make next (fatigue + rival angles)', built: true },
       { label: 'Clone a competitor winner', built: true },
       { label: 'Variants of a winning ad', built: true },
       { label: 'Video / storyboard build', built: true },

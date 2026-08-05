@@ -26,6 +26,7 @@ import BriefOpportunities from '@/components/brief/BriefOpportunities'
 import StandupCard from '@/components/brief/StandupCard'
 import { ChannelLogo } from '@/components/brand/logos'
 import CompetitorCard from '@/components/brief/CompetitorCard'
+import CreativeStrategistCard from '@/components/brief/CreativeStrategistCard'
 import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
@@ -237,6 +238,11 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
           {/* ── Rivals' winning ad — competitor intelligence, a SEPARATE card from the own-account
               moves above (agreed split: account numbers never mix with rival inference). ── */}
           <CompetitorCard />
+
+          {/* ── What to make next — the Creative Strategist fuses your ad performance (winners + fatigue)
+              with rivals' winning angles into concrete ideas, one click into the Studio. Self-hides on
+              an empty account. ── */}
+          <CreativeStrategistCard />
 
           {/* ── Also today — the one runner-up, a quiet row. ── */}
           {second && (
