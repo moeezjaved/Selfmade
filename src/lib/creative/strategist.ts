@@ -109,17 +109,20 @@ Return ONLY JSON: {"ideas":[{"title","format","why","basedOn":"fatigue|winner|co
       const basedOn = (['fatigue', 'winner', 'competitor'].includes(it.basedOn) ? it.basedOn : (rival ? 'competitor' : 'winner')) as CreativeIdea['basedOn']
       const title = String(it.title || '').slice(0, 100)
       const format = String(it.format || '').slice(0, 60)
-      // Seed the exact rival ad ONLY for a faithful clone — otherwise a mismatched thumbnail (a random
-      // rival ad) reads as "this is the creative", which it isn't. Non-clones open fresh with the angle.
+      // TWO separate things (don't conflate):
+      //  • seedRef → the exact rival ad we CLONE into the Studio. Only for a faithful clone, else a
+      //    mismatched ad would open in the remake flow.
+      //  • refRival → the rival thumbnail we SHOW on the card as inspiration. Fine for any competitor
+      //    idea (matched rival, else the top rival) so the card looks alive instead of a blank clapperboard.
       const seedRef = (it.cloneRivalAd === true && rival) ? rival : null
+      const refRival = rival || (basedOn === 'competitor' ? rivals[0] || null : null)
       const angle = [title, format].filter(Boolean).join(' — ')
-      // Label by what the idea is actually about — gate the "inspired by rival" tag on basedOn=competitor
-      // so a fatigue/winner idea with a stray rivalIndex still names YOUR ad, not a rival's.
+      // Own-account ideas name YOUR ad; competitor ideas show the rival's thumbnail as the inspiration.
       const reference: CreativeIdea['reference'] =
         seedRef ? { kind: 'competitor', label: seedRef.title || 'their winning ad', brand: seedRef.brandName, image: seedRef.image }
         : (fatigue && basedOn === 'fatigue') ? { kind: 'ours', label: fatigue.name, image: null }
         : (ourWinner && basedOn === 'winner') ? { kind: 'ours', label: ourWinner.name, image: null }
-        : (rival && basedOn === 'competitor') ? { kind: 'competitor', label: `inspired by ${rival.brandName}`, brand: rival.brandName, image: null }
+        : refRival ? { kind: 'competitor', label: `inspired by ${refRival.brandName}`, brand: refRival.brandName, image: refRival.image }
         : null
       return {
         title, format, why: String(it.why || '').slice(0, 320), basedOn, reference,
