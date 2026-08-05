@@ -29,16 +29,21 @@ export type CustomerInsights = {
 
 const KNOWN = ['shipping', 'refund', 'price', 'complaint', 'question', 'other']
 
+/** The deterministic fix per intent — a full recommendation (report) + a short one-liner (brief). Shared
+ *  so the Trends tab, the fallback, and the Morning Brief all say the same thing. */
+export const INTENT_FIX: Record<string, { rec: string; short: string; pri: Theme['priority'] }> = {
+  shipping: { rec: 'Add expected delivery times + a tracking link to your product page and FAQ.', short: 'add delivery times to your FAQ', pri: 'high' },
+  refund: { rec: 'Publish a clear, easy refund/return policy and link it in order confirmations.', short: 'make your return policy clear', pri: 'high' },
+  price: { rec: 'Make pricing, discounts and shipping cost obvious before checkout — buyers are asking.', short: 'show pricing clearly before checkout', pri: 'med' },
+  complaint: { rec: 'These are unhappy customers — reply fast and look for the root cause to fix.', short: 'reply fast and find the root cause', pri: 'high' },
+  question: { rec: 'Turn the most common questions into an FAQ so people self-serve.', short: 'turn these into an FAQ', pri: 'med' },
+  other: { rec: 'Skim these for anything recurring worth putting on the site.', short: '', pri: 'low' },
+}
+/** A short fix hint for an intent — used in the Morning Brief one-liner. '' when there's nothing crisp. */
+export function quickFixShort(intent: string): string { return (INTENT_FIX[intent] || INTENT_FIX.other).short }
+
 /** Deterministic themes from the intent counts — the always-works fallback, one suggested fix per intent. */
 function fallbackThemes(curC: Record<string, number>, exampleFor: Record<string, string>): Theme[] {
-  const REC: Record<string, { rec: string; pri: Theme['priority'] }> = {
-    shipping: { rec: 'Add expected delivery times + a tracking link to your product page and FAQ.', pri: 'high' },
-    refund: { rec: 'Publish a clear, easy refund/return policy and link it in order confirmations.', pri: 'high' },
-    price: { rec: 'Make pricing, discounts and shipping cost obvious before checkout — buyers are asking.', pri: 'med' },
-    complaint: { rec: 'These are unhappy customers — reply fast and look for the root cause to fix.', pri: 'high' },
-    question: { rec: 'Turn the most common questions into an FAQ so people self-serve.', pri: 'med' },
-    other: { rec: 'Skim these for anything recurring worth putting on the site.', pri: 'low' },
-  }
   return Object.entries(curC)
     .filter(([, n]) => n > 0)
     .sort((a, b) => b[1] - a[1])
@@ -46,8 +51,8 @@ function fallbackThemes(curC: Record<string, number>, exampleFor: Record<string,
       title: intent === 'other' ? 'Other messages' : `${intent.charAt(0).toUpperCase()}${intent.slice(1)} questions`,
       count: n,
       example: exampleFor[intent] || '',
-      recommendation: (REC[intent] || REC.other).rec,
-      priority: (REC[intent] || REC.other).pri,
+      recommendation: (INTENT_FIX[intent] || INTENT_FIX.other).rec,
+      priority: (INTENT_FIX[intent] || INTENT_FIX.other).pri,
     }))
 }
 
