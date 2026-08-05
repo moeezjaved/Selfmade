@@ -12,12 +12,18 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { ChannelLogo } from '@/components/brand/logos'
 
-const INK = '#17251c', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#1a3a1a', LIME = '#dffe95'
+const INK = '#17251c', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#1a3a1a', LIME = '#dffe95', MUTED = '#6b6b6b'
 const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(17,37,28,.04), 0 10px 30px -20px rgba(17,37,28,.10)' }
 
 type Msg = { id: string; body: string; intent?: string; priority?: string; suggested_reply?: string; status: string }
 type Thread = { id: string; contact_name?: string; contact_ref?: string; channel: string; priority: 'high' | 'med' | 'low'; intent?: string; status: string; last_message_at: string; latest: Msg | null }
 type Outbound = Msg & { thread?: { contact_name?: string; channel?: string } | null }
+type Theme = { title: string; count: number; example: string; recommendation: string; priority: 'high' | 'med' | 'low' }
+type Insights = {
+  days: number; totalMessages: number; totalThreads: number
+  intents: { intent: string; count: number; delta: number }[]
+  themes: Theme[]; summary: string; reasoned: boolean; generatedAt: string
+}
 
 const PRI: Record<string, { label: string; bg: string; fg: string }> = {
   high: { label: 'HIGH', bg: '#fdecec', fg: '#c0392b' },
@@ -33,7 +39,7 @@ const OUT_TYPES: { type: string; label: string; emoji: string }[] = [
 ]
 
 export default function InboxPage() {
-  const [tab, setTab] = useState<'inbox' | 'outbound'>('inbox')
+  const [tab, setTab] = useState<'inbox' | 'outbound' | 'insights'>('inbox')
   const [threads, setThreads] = useState<Thread[]>([])
   const [outbound, setOutbound] = useState<Outbound[]>([])
   const [rollup, setRollup] = useState<Record<string, number>>({})
@@ -47,9 +53,20 @@ export default function InboxPage() {
   const [channels, setChannels] = useState<string[] | null>(null)   // connected customer-channel providers
   const [connecting, setConnecting] = useState('')
   const [intentFilter, setIntentFilter] = useState<string | null>(null)   // click a rollup chip to filter the inbox
+  const [insights, setInsights] = useState<Insights | null>(null)
+  const [insightsLoading, setInsightsLoading] = useState(false)
 
   // The threads shown after the intent-chip filter (null = show all).
   const shownThreads = intentFilter ? threads.filter(t => t.intent === intentFilter) : threads
+
+  // Lazy-load the Customer Success trends report the first time the Insights tab is opened.
+  const loadInsights = (fresh = false) => {
+    setInsightsLoading(true)
+    fetch(`/api/customer/insights${fresh ? '?fresh=1' : ''}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null).then(j => { if (j && !j.error) setInsights(j) })
+      .catch(() => {}).finally(() => setInsightsLoading(false))
+  }
+  useEffect(() => { if (tab === 'insights' && !insights && !insightsLoading) loadInsights() }, [tab])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = () => fetch('/api/customer/inbox', { cache: 'no-store' }).then(r => r.json()).then(j => {
     if (Array.isArray(j.threads)) setThreads(j.threads)
@@ -119,7 +136,7 @@ export default function InboxPage() {
     } catch { toast.error('Could not draft') } finally { setOutBusy('') }
   }
 
-  const Tab = ({ id, label, count }: { id: 'inbox' | 'outbound'; label: string; count: number }) => (
+  const Tab = ({ id, label, count }: { id: 'inbox' | 'outbound' | 'insights'; label: string; count: number }) => (
     <button onClick={() => setTab(id)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 800, padding: '4px 2px', color: tab === id ? INK : '#9aa79a', borderBottom: `2px solid ${tab === id ? FOREST : 'transparent'}` }}>
       {label}{count > 0 && <span style={{ marginLeft: 6, fontSize: 11.5, fontWeight: 800, background: tab === id ? FOREST : '#eef2ec', color: tab === id ? LIME : SUB, borderRadius: 100, padding: '1px 7px' }}>{count}</span>}
     </button>
@@ -205,9 +222,12 @@ export default function InboxPage() {
       <div style={{ display: 'flex', gap: 22, borderBottom: `1px solid ${LINE}`, marginBottom: 20 }}>
         <Tab id="inbox" label="Inbox" count={threads.length} />
         <Tab id="outbound" label="Outbound" count={outbound.length} />
+        <Tab id="insights" label="Trends" count={0} />
       </div>
 
-      {tab === 'inbox' ? (<>
+      {tab === 'insights' ? (
+        <InsightsPanel data={insights} loading={insightsLoading} onRefresh={() => loadInsights(true)} />
+      ) : tab === 'inbox' ? (<>
         {Object.keys(rollup).length > 0 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
             {Object.entries(rollup).sort((a, b) => b[1] - a[1]).map(([intent, n]) => {
@@ -310,6 +330,70 @@ export default function InboxPage() {
             })}
           </div>
         )}
+      </>)}
+    </div>
+  )
+}
+
+/** Customer Success trends — the report Mello writes from the inbox: what people keep asking, and the fix. */
+function InsightsPanel({ data, loading, onRefresh }: { data: Insights | null; loading: boolean; onRefresh: () => void }) {
+  const PRIB: Record<string, { bg: string; fg: string; label: string }> = {
+    high: { bg: '#fdecec', fg: '#c0392b', label: 'FIX SOON' },
+    med: { bg: '#fef6e7', fg: '#b7791f', label: 'WORTH DOING' },
+    low: { bg: '#eef2ec', fg: '#6b8f6b', label: 'NICE TO HAVE' },
+  }
+  if (loading && !data) return <div style={{ fontSize: 14, color: SUB, padding: 20 }}>Reading your conversations…</div>
+  if (!data) return <div style={{ ...card, padding: '32px 24px', textAlign: 'center', fontSize: 13.5, color: SUB }}>Couldn’t build the report right now. <button onClick={onRefresh} style={{ background: 'none', border: 'none', color: '#3f8f4f', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', fontSize: 13.5 }}>Try again</button></div>
+  const arrow = (d: number) => d > 0 ? <span style={{ color: '#c0392b', fontWeight: 800 }}>↑{d}</span> : d < 0 ? <span style={{ color: '#3b6d11', fontWeight: 800 }}>↓{Math.abs(d)}</span> : <span style={{ color: '#a7b0a5' }}>—</span>
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Summary + refresh */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ maxWidth: 560 }}>
+          <div style={{ fontSize: 15, fontWeight: 750, color: INK, lineHeight: 1.5 }}>{data.summary}</div>
+          <div style={{ fontSize: 11.5, color: '#a7b0a5', marginTop: 4 }}>Last {data.days} days · {data.reasoned ? 'themes read by Mello' : 'grouped by type'}</div>
+        </div>
+        <button onClick={onRefresh} disabled={loading} style={{ background: '#f8fcf6', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '7px 14px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1 }}>{loading ? 'Refreshing…' : '↻ Refresh'}</button>
+      </div>
+
+      {data.totalMessages === 0 ? (
+        <div style={{ ...card, padding: '32px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 750, color: INK, marginBottom: 6 }}>No trends yet 🌱</div>
+          <div style={{ fontSize: 13, color: SUB, lineHeight: 1.6, maxWidth: 440, margin: '0 auto' }}>Once customers start messaging, Mello reads every conversation and tells you what they keep asking about — and what to fix.</div>
+        </div>
+      ) : (<>
+        {/* intent trend strip */}
+        {data.intents.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {data.intents.map(it => (
+              <span key={it.intent} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, color: INK }}>
+                <span>{INTENT_EMOJI[it.intent] || '💬'}</span>{it.intent}<span style={{ color: SUB }}>{it.count}</span>{arrow(it.delta)}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* themes → recommendation */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {data.themes.map((t, i) => {
+            const p = PRIB[t.priority] || PRIB.med
+            return (
+              <div key={i} style={{ ...card, padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ background: p.bg, color: p.fg, borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 800, letterSpacing: '.05em' }}>{p.label}</span>
+                  <span style={{ fontSize: 14, fontWeight: 750, color: INK }}>{t.title}</span>
+                  <span style={{ fontSize: 12, color: SUB, fontWeight: 700, marginLeft: 'auto' }}>{t.count} message{t.count === 1 ? '' : 's'}</span>
+                </div>
+                {t.example && <div style={{ fontSize: 12.5, color: MUTED, fontStyle: 'italic', background: '#f6f8f4', borderRadius: 10, padding: '8px 12px', lineHeight: 1.5 }}>“{t.example}”</div>}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ fontSize: 13.5, color: '#3f8f4f', fontWeight: 800, flexShrink: 0 }}>→</span>
+                  <span style={{ fontSize: 13.5, color: INK, fontWeight: 650, lineHeight: 1.5 }}>{t.recommendation}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </>)}
     </div>
   )

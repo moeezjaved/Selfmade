@@ -112,6 +112,7 @@ export const DEPARTMENTS: Department[] = [
       { label: 'Outbound: cart recovery, win-back, reviews', built: true },
       { label: 'Sales follow-up on quiet buying-intent chats', built: true },
       { label: 'Sales attribution (handled / sales / revenue)', built: true },
+      { label: 'Customer Success trends report (what to fix)', built: true },
       { label: 'Comment → DM sales loop', built: false },
       { label: 'Creator shortlist & outreach', built: false },
       { label: 'Affiliate invitations', built: false },
