@@ -432,7 +432,9 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
           // is null even though they DO have a brand — that's why "+ Add a competitor" used to bounce
           // to the brand page instead of opening the modal). Only fall back to /brands when there's no
           // brand at all (create one first) or 2+ brands and none picked (go choose).
-          const target = activeBrandId || (brands.length === 1 ? brands[0].id : null)
+          // Open the add-competitor modal for the selected brand, or the first brand when on "All brands"
+          // (the modal shows which brand it's for). Only bounce to /brands when there's NO brand yet.
+          const target = activeBrandId || brands[0]?.id || null
           if (target) { setAddBrandId(target); setAddOpen(true) }
           else router.push('/brands')
         }} />}
