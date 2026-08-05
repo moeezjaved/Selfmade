@@ -15,6 +15,13 @@ export async function ingestCustomerMessage(admin: any, opts: { accountId?: stri
   const ownerId = chan.user_id
   const channel = opts.channel || chan.provider   // whatsapp | instagram | messenger | telegram | email
 
+  // If this is a reply from a creator we're already recruiting, route it to the Creators pipeline instead
+  // of the Customer Inbox (best-effort; falls through on a miss).
+  try {
+    const { routeCreatorInbound } = await import('@/lib/creators/inbound')
+    if (await routeCreatorInbound(admin, ownerId, { sender, chatId, text, channel, senderName })) return true
+  } catch { /* fall through to the customer inbox */ }
+
   let brandName = ''
   try { const { data } = await admin.from('brands').select('name').eq('user_id', ownerId).order('created_at', { ascending: true }).limit(1).maybeSingle(); brandName = data?.name || '' } catch { /* ok */ }
   const tr = await triageMessage(admin, ownerId, { body: text, brand: brandName })
