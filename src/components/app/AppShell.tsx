@@ -46,6 +46,7 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     key: 'inbox', label: 'Inbox', railLabel: 'Inbox', railIcon: Inbox, defaultHref: '/inbox',
     items: [
       { href: '/inbox', icon: Inbox, label: 'Customer Inbox' },
+      { href: '/creators', icon: Camera, label: 'UGC Creators' },
     ],
   },
   {
