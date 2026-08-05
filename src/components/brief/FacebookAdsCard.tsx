@@ -43,7 +43,10 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   const [sel, setSel] = useState<string>('')
   const [range, setRange] = useState<string>('last_30d')   // default: 30 days
   const [busy, setBusy] = useState(false)
-  const [healing, setHealing] = useState(false)   // self-heal in progress → blank the stale numbers
+  // Start in the healing (loading) state: the card ALWAYS pulls live numbers on mount, so we must never
+  // paint the stale nightly-stored `initial` figures for even one frame — that first frame was the
+  // "wrong numbers, then blink, then correct" the founder saw. Open on "Loading…", settle on the truth.
+  const [healing, setHealing] = useState(true)   // self-heal in progress → blank the stale numbers
 
   // LIVE fetch — only on an explicit user action (switch account / change range / refresh). Never auto.
   const load = (accountId?: string, r: string = range) => {
@@ -88,7 +91,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   useEffect(() => {
     fetch('/api/meta/accounts', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
       const list = Array.isArray(j?.accounts) ? j.accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })) : []
-      if (!list.length) return
+      if (!list.length) { setHealing(false); return }   // nothing to load live → fall back to the stored paint
       setAccounts(list)
       const p = list.find((x: any) => x.isPrimary) || list[0]
       setSel(p.accountId)
@@ -106,7 +109,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       // server-side for 10 min, so repeated opens don't hammer Meta. `healing` blanks the stale figures
       // during the fetch so the founder never reads the wrong number, then it settles on the real ones.
       setHealing(true); load(p.accountId)
-    }).catch(() => {})
+    }).catch(() => setHealing(false))   // accounts call failed → clear loading, keep the stored paint
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const money = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: d.currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()}` } }
