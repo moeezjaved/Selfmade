@@ -111,15 +111,21 @@ export async function GET(req: NextRequest) {
   const score = (m: Move) => m.daysRunning * (1 + Math.log2(Math.max(1, m.variants))) * (m.isActive ? 1.5 : 0.6)
   candidates.sort((a, b) => score(b) - score(a))
 
-  // One hero per rival max in the top set — variety beats 3 ads from the same brand.
+  // One hero per rival — the ranked pool of distinct rivals (variety beats 3 ads from one brand).
   const seen = new Set<string>()
-  const moves: Move[] = []
+  const distinct: Move[] = []
   for (const m of candidates) {
     if (seen.has(m.pageId)) continue
     seen.add(m.pageId)
-    moves.push(m)
-    if (moves.length >= 3) break
+    distinct.push(m)
+    if (distinct.length >= 8) break
   }
+  // Rotate the pool by the day so the hero isn't the SAME longest-running ad (e.g. Leesa's 814-day
+  // mattress) every single day — "winning ad right now" should feel alive. Score still gates who's in
+  // the pool; the day decides who leads. Stable within a day (matches the 30-min cache), fresh daily.
+  const dayIndex = Math.floor(Date.now() / 86_400_000)
+  const offset = distinct.length ? dayIndex % distinct.length : 0
+  const moves = [...distinct.slice(offset), ...distinct.slice(0, offset)].slice(0, 3)
 
   const payload = { moves }
   cacheSet(cacheKey, payload, 30 * 60 * 1000)

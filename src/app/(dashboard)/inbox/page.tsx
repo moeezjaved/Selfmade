@@ -46,6 +46,10 @@ export default function InboxPage() {
   const [outBusy, setOutBusy] = useState('')
   const [channels, setChannels] = useState<string[] | null>(null)   // connected customer-channel providers
   const [connecting, setConnecting] = useState('')
+  const [intentFilter, setIntentFilter] = useState<string | null>(null)   // click a rollup chip to filter the inbox
+
+  // The threads shown after the intent-chip filter (null = show all).
+  const shownThreads = intentFilter ? threads.filter(t => t.intent === intentFilter) : threads
 
   const load = () => fetch('/api/customer/inbox', { cache: 'no-store' }).then(r => r.json()).then(j => {
     if (Array.isArray(j.threads)) setThreads(j.threads)
@@ -206,11 +210,18 @@ export default function InboxPage() {
       {tab === 'inbox' ? (<>
         {Object.keys(rollup).length > 0 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-            {Object.entries(rollup).sort((a, b) => b[1] - a[1]).map(([intent, n]) => (
-              <span key={intent} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, color: INK }}>
-                <span>{INTENT_EMOJI[intent] || '💬'}</span>{intent}<span style={{ color: SUB }}>{n}</span>
-              </span>
-            ))}
+            {Object.entries(rollup).sort((a, b) => b[1] - a[1]).map(([intent, n]) => {
+              const on = intentFilter === intent
+              return (
+                <button key={intent} onClick={() => setIntentFilter(f => f === intent ? null : intent)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: on ? FOREST : '#fff', border: `1px solid ${on ? FOREST : LINE}`, borderRadius: 100, padding: '6px 12px', fontSize: 12.5, fontWeight: 700, color: on ? LIME : INK, fontFamily: 'inherit', cursor: 'pointer' }}>
+                  <span>{INTENT_EMOJI[intent] || '💬'}</span>{intent}<span style={{ color: on ? '#cfe6b8' : SUB }}>{n}</span>
+                </button>
+              )
+            })}
+            {intentFilter && (
+              <button onClick={() => setIntentFilter(null)} style={{ background: 'none', border: 'none', color: SUB, fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>Clear ✕</button>
+            )}
           </div>
         )}
         <div style={{ ...card, padding: 14, marginBottom: 20, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -230,7 +241,10 @@ export default function InboxPage() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {threads.map(t => {
+            {shownThreads.length === 0 && (
+              <div style={{ ...card, padding: '20px 24px', textAlign: 'center', fontSize: 13.5, color: SUB }}>No <b style={{ color: INK }}>{intentFilter}</b> messages right now. <button onClick={() => setIntentFilter(null)} style={{ background: 'none', border: 'none', color: '#3f8f4f', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', fontSize: 13.5 }}>Show all</button></div>
+            )}
+            {shownThreads.map(t => {
               const pri = PRI[t.priority] || PRI.low; const msg = t.latest; if (!msg) return null
               return (
                 <div key={t.id} style={{ ...card, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
