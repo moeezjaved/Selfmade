@@ -25,7 +25,8 @@ export async function getIdentities(admin: any, userId: string, provider?: strin
 
 /** Send a pending task to the founder on every linked channel. Records one channel_messages per send. */
 export async function sendApprovalToChannels(admin: any, userId: string, task: any): Promise<{ sent: number }> {
-  const ids = await getIdentities(admin, userId)
+  // Founder comms only — approvals never go to a connected customer channel.
+  const ids = (await getIdentities(admin, userId)).filter((i: any) => !i.meta?.customer_channel)
   if (!ids.length) return { sent: 0 }
   const { text, slackBlocks } = formatApproval(task)
   const expires_at = new Date(Date.now() + APPROVAL_TTL_MS).toISOString()
@@ -65,7 +66,9 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
 
 /** Send a read-only report (brief) to every linked channel. */
 export async function sendReportToChannels(admin: any, userId: string, brief: any): Promise<{ sent: number }> {
-  const ids = await getIdentities(admin, userId)
+  // Founder comms only — the brief must reach the founder's own Slack/WhatsApp, NEVER a connected
+  // customer channel (a Unipile customer WhatsApp shares provider 'whatsapp').
+  const ids = (await getIdentities(admin, userId)).filter((i: any) => !i.meta?.customer_channel)
   if (!ids.length) return { sent: 0 }
   // Ground the report in the SAME live account state the brief shows: the brief computes moves on
   // page-load (fetchLiveOpportunities) but writes nothing, while tasks are only written by the audit.
