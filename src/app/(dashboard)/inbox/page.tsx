@@ -26,6 +26,7 @@ const PRI: Record<string, { label: string; bg: string; fg: string }> = {
 }
 const INTENT_EMOJI: Record<string, string> = { shipping: '📦', refund: '↩️', price: '💸', complaint: '⚠️', question: '❓', other: '💬' }
 const OUT_TYPES: { type: string; label: string; emoji: string }[] = [
+  { type: 'follow_up', label: 'Sales follow-up', emoji: '💬' },
   { type: 'cart_recovery', label: 'Abandoned cart', emoji: '🛒' },
   { type: 'winback', label: 'Win-back', emoji: '👋' },
   { type: 'review_request', label: 'Review request', emoji: '⭐' },

@@ -64,7 +64,7 @@ Rules: 1-3 sentences, first person, warm and human (never salesy or robotic), on
 
 /** Draft one proactive outbound message: reasoned if we can, template otherwise. Capped so it can't hang. */
 export async function draftOutbound(admin: any, userId: string, input: { type: OutboundType; name?: string; brand?: string; product?: string }): Promise<string> {
-  const type = (['cart_recovery', 'winback', 'review_request', 'reengage'].includes(input.type) ? input.type : 'reengage') as OutboundType
+  const type = (['cart_recovery', 'winback', 'review_request', 'reengage', 'follow_up'].includes(input.type) ? input.type : 'reengage') as OutboundType
   const name = String(input.name || '').trim()
   const brand = String(input.brand || '').trim()
   const product = String(input.product || '').trim()
