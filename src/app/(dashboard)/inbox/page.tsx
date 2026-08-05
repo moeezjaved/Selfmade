@@ -236,7 +236,8 @@ export default function InboxPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ background: pri.bg, color: pri.fg, borderRadius: 6, padding: '3px 8px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em' }}>{pri.label}</span>
                     <span style={{ fontSize: 13.5, fontWeight: 750, color: INK }}>{t.contact_name || 'Customer'}</span>
-                    {t.intent && <span style={{ fontSize: 12, color: SUB, fontWeight: 650 }}>{INTENT_EMOJI[t.intent] || '💬'} {t.intent}</span>}
+                    {t.intent === 'price' && <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', color: '#3b6d11', background: '#eaf3de', borderRadius: 6, padding: '2px 7px' }}>💰 SALES</span>}
+                    {t.intent && t.intent !== 'price' && <span style={{ fontSize: 12, color: SUB, fontWeight: 650 }}>{INTENT_EMOJI[t.intent] || '💬'} {t.intent}</span>}
                     <span style={{ fontSize: 11.5, color: '#a7b0a5', fontWeight: 600, marginLeft: 'auto', textTransform: 'capitalize' }}>{t.channel}</span>
                   </div>
                   <div style={{ fontSize: 13.5, color: INK, lineHeight: 1.5, background: '#f6f8f4', borderRadius: 10, padding: '10px 12px' }}>{msg.body}</div>
