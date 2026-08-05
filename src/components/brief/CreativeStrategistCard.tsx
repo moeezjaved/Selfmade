@@ -67,6 +67,7 @@ export default function CreativeStrategistCard() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
                     <span style={{ background: b.bg, color: b.fg, borderRadius: 6, padding: '2px 7px', fontSize: 9.5, fontWeight: 800, letterSpacing: '.04em' }}>{b.label}</span>
                     <span style={{ fontSize: 11, color: SUB, fontWeight: 700 }}>{idea.format}</span>
+                    {idea.reference?.label && <span style={{ fontSize: 10.5, color: '#a7b0a5', fontWeight: 600 }}>· {idea.reference.label}</span>}
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 750, color: INK, lineHeight: 1.35 }}>{idea.title}</div>
                   <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.5, marginTop: 4 }}>{idea.why}</div>

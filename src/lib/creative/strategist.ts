@@ -134,6 +134,23 @@ Return ONLY JSON: {"ideas":[{"title","format","why","basedOn":"fatigue|winner|co
   } catch { return null }
 }
 
+/** Winner + bleeder from STORED campaign data (campaigns + campaign_insights) — the fallback when the live
+ *  Meta audit can't run (expired token / no Graph). Shapes match the audit's Graded ({ name, roas }). */
+async function storedPerformance(admin: any, userId: string): Promise<{ winner: any; bleeder: any }> {
+  const { data: camps } = await admin.from('campaigns').select('id, name, status').eq('user_id', userId).eq('status', 'ACTIVE').limit(300)
+  const list = (camps || []) as any[]
+  if (!list.length) return { winner: null, bleeder: null }
+  const byId: Record<string, any> = {}; for (const c of list) byId[c.id] = c
+  const { data: ins } = await admin.from('campaign_insights').select('campaign_id, roas, spend').in('campaign_id', list.map(c => c.id))
+  const rows = (ins || []).filter((r: any) => byId[r.campaign_id] && Number(r.spend) > 0)
+    .map((r: any) => ({ name: byId[r.campaign_id].name, roas: Math.round((Number(r.roas) || 0) * 100) / 100, spend: Number(r.spend) || 0 }))
+  if (!rows.length) return { winner: null, bleeder: null }
+  const byRoas = [...rows].sort((a, b) => b.roas - a.roas)
+  const winner = byRoas[0]
+  const bleeder = byRoas[byRoas.length - 1]
+  return { winner, bleeder: (bleeder && bleeder.name !== winner.name) ? bleeder : null }
+}
+
 export async function generateCreativeStrategy(admin: any, userId: string, opts: { accountId?: string; brand?: string } = {}): Promise<CreativeStrategy> {
   // Our account signal (cached server-side — no extra Graph hit on repeat opens).
   let ourWinner: any = null, fatigue: any = null
@@ -146,6 +163,14 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
       if (ourWinner && fatigue && ourWinner.name === fatigue.name) fatigue = (audit.pause || [])[1] || null
     }
   } catch { /* account signal is best-effort */ }
+  // Fallback to STORED campaign performance when the live audit is empty/failing (expired token, no Graph):
+  // the whole point is "your ads + rivals", so we must not silently drop the your-ads half.
+  if (!ourWinner && !fatigue) {
+    try {
+      const stored = await storedPerformance(admin, userId)
+      ourWinner = stored.winner; fatigue = stored.bleeder
+    } catch { /* ok */ }
+  }
 
   const rivals = await getCompetitorWinners(admin, userId, { poolSize: 6 })
 
@@ -153,7 +178,13 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
   if (!brand) { try { const { data } = await admin.from('brands').select('name').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle(); brand = data?.name || '' } catch { /* ok */ } }
 
   const reasoned = (ourWinner || fatigue || rivals.length) ? await reasonedIdeas(ourWinner, fatigue, rivals, brand) : null
-  const ideas = reasoned || fallbackIdeas(ourWinner, fatigue, rivals)
+  let ideas = reasoned || fallbackIdeas(ourWinner, fatigue, rivals)
+  // Guarantee the "your ads" half is represented when we have the signal — the model sometimes returns
+  // only rival ideas. Prepend a deterministic own-account idea (replace-a-tiring / scale-a-winner) if none.
+  if ((ourWinner || fatigue) && !ideas.some(i => i.basedOn === 'fatigue' || i.basedOn === 'winner')) {
+    const own = fallbackIdeas(ourWinner, fatigue, []).find(Boolean)
+    if (own) ideas = [own, ...ideas].slice(0, 3)
+  }
 
   const summary = ideas.length === 0
     ? (rivals.length === 0 ? 'Spy a competitor or two and connect your ad account — then I’ll tell you exactly what to make next.' : 'Nothing urgent to make right now — your account looks steady.')
