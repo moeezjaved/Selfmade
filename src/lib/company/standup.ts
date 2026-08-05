@@ -42,8 +42,12 @@ export async function assembleStandup(admin: any, userId: string, firstName?: st
       for (const m of inbound) if (m.intent) by[m.intent] = (by[m.intent] || 0) + 1
       const top = Object.entries(by).sort((a, b) => b[1] - a[1])[0]
       const cust = departments.find(d => d.key === 'customer')
+      // When one thing clearly dominates (a real trend, not a single stray message), append the fix —
+      // "12 about shipping → add delivery times to your FAQ" — the Customer Success trends signal, in one line.
+      const { quickFixShort } = await import('@/lib/customer/insights')
+      const fix = top && top[1] >= 3 ? quickFixShort(top[0]) : ''
       const text = top
-        ? `${inbound.length} message${inbound.length === 1 ? '' : 's'} — mostly about ${top[0]} (${top[1]}).`
+        ? `${inbound.length} message${inbound.length === 1 ? '' : 's'} — mostly about ${top[0]} (${top[1]})${fix ? ` → ${fix}` : ''}.`
         : `${inbound.length} new message${inbound.length === 1 ? '' : 's'} to handle.`
       lines.push({ key: 'customer', emoji: cust?.emoji || '💬', name: cust?.name || 'Customer', text })
     }
