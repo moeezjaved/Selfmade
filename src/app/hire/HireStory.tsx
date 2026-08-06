@@ -66,12 +66,25 @@ export default function HireStory() {
         <div className="eyebrow rv">Introducing Selfmade</div>
         <h1 className="rv d2">You just hired a<br />marketing company.</h1>
         <p className="hero-sub rv d3">A whole team — Research, Creative, Media Buying, Customer care — run by
-        Mello, your marketing co&#8209;founder. They do the work. You make the decisions.</p>
+        Mello, your marketing manager. They do the work. You make the decisions.</p>
+
+        {/* four tiny numbers — credibility, early. "This isn't ChatGPT." */}
+        <div className="stats rv d3" aria-hidden="true">
+          {[
+            ['3.2M', 'ads studied'],
+            ['611K', 'brands watched'],
+            ['24/7', 'research'],
+            ['1', 'morning report'],
+          ].map(([n, l]) => (
+            <div className="stat" key={l}><div className="stat-n">{n}</div><div className="stat-l">{l}</div></div>
+          ))}
+        </div>
+
         <div className="hero-cta rv d3">
           <a href="#agreement" className="btn-forest">Hire the team</a>
           <a href="#night" className="quiet-link">Watch a day of work ↓</a>
         </div>
-        <div className="fine rv d3">$49/month · the whole department · starts tonight · no card to start</div>
+        <div className="fine rv d3">$49/month · the whole company · starts tonight · no card to start</div>
 
         {/* the org chart — you at the top, departments reporting to you */}
         <div className="org rv d3" aria-hidden="true">
@@ -150,22 +163,24 @@ export default function HireStory() {
 
       {/* ── 2 · WHAT HAPPENS WHILE I SLEEP? — your departments work. ── */}
       <section className="night" id="night">
-        <div className="n-time rv">3:47 AM · the office is open</div>
-        <h2 className="rv d2">While you sleep,<br />your departments work.</h2>
-        <p className="n-sub rv d3">The team has studied <b>3,127,442</b> winning ads across <b>611,000</b> brands.
-        Every night they put that education to work on your business.</p>
+        <div className="n-time rv">Last night · while you slept</div>
+        <h2 className="rv d2">While you sleep,<br />your company works.</h2>
+        <p className="n-sub rv d3">One real night. Your team catches a competitor, rebuilds the ad, and has
+        it ready to launch — before your alarm goes off.</p>
         <div className="nightlog rv d3">
           {[
-            ['02:14', 'Research', 'read 1,001 new ads across your market'],
-            ['03:02', 'Creative', 'drafted 4 ads from what’s winning'],
-            ['04:40', 'Customer', 'sorted the inbox — 3 replies ready for you'],
-            ['06:15', 'Media Buying', 'found one campaign worth scaling'],
+            ['3:17 AM', 'Research', 'found a competitor testing a new hook'],
+            ['3:42 AM', 'Creative', 'already rebuilt it — in your brand'],
+            ['5:11 AM', 'Media Buying', 'ready to launch · est. +$510 / week'],
           ].map(([t, dept, line], i) => (
-            <div className="nl" key={t} style={{ animationDelay: `${i * 0.08}s` }}>
+            <div className="nl" key={t} style={{ animationDelay: `${i * 0.09}s` }}>
               <span className="nl-t">{t}</span><span className="nl-d">{dept}</span><span className="nl-l">{line}</span>
             </div>
           ))}
-          <div className="workline">still working<span className="cur" /></div>
+          <div className="nl-morning">
+            <span className="nl-t">8:01 AM</span>
+            <span className="nl-wake">Good morning. It&rsquo;s all ready — <b>approve?</b></span>
+          </div>
         </div>
       </section>
 
@@ -294,36 +309,38 @@ export default function HireStory() {
         <span className="turn-sub">Nobody has. Which is why Mello would like to make the first move.</span></p>
       </section>
 
-      {/* THE AGREEMENT — the conversion is a countersignature, kept exactly as loved. */}
+      {/* THE AGREEMENT — the conversion is a signature. Employment terms, not a co-founder deal —
+          the ridiculous 24/7 / never-on-vacation clauses are the screenshot. */}
       <div className="stage" id="agreement">
         <div className="paper rv">
-          <div className="p-eyebrow">Co-founder agreement · for your countersignature</div>
-          <div className="p-title">Co-founder Agreement</div>
+          <div className="p-eyebrow">Employment agreement · for your signature</div>
+          <div className="p-title">Employment Agreement</div>
           <div className="p-date">{today ? `Prepared ${today}` : 'Prepared this morning'}</div>
           {[
-            ['Candidate', 'Mello'],
-            ['Role', 'Marketing co-founder — your first'],
-            ['Hours', 'All of them'],
-            ['Education', '3,127,442 winning ads'],
-            ['References', '611,000 brands, studied'],
-            ['Equity', 'None — $49 / month'],
-            ['Start date', 'Tonight'],
+            ['Employee', 'Mello & your marketing team'],
+            ['Reports to', 'You'],
+            ['Working hours', '24/7 — nights included'],
+            ['Vacation', 'Never'],
+            ['Performance review', 'Every morning'],
+            ['Training', '3,127,442 ads · 611,000 brands'],
+            ['Notice period', 'None — end it any time'],
+            ['Salary', '$49 / month'],
+            ['Starts', 'Tonight'],
           ].map(([k, v]) => (
             <div className="p-row" key={k}><span>{k}</span><b>{v}</b></div>
           ))}
           <div className="p-note">I will study your market every night and report every morning. I will
-          bring you the work already done. Nothing ships without your approval. You may end this
-          arrangement at any time, effective immediately, no questions asked. <b>— I only ask for the
-          nights.</b></div>
+          bring you the work already done. Nothing ships without your approval. Let me go at any time,
+          effective immediately, no questions asked. <b>— I only ask for the nights.</b></div>
           <div className="sigs">
-            <div className="sig"><div className="line">Mello</div><div className="who">Mello · Co-founder</div></div>
+            <div className="sig"><div className="line">Mello</div><div className="who">Mello · Your marketing manager</div></div>
             <div className="sig">
               <div className="line"><input value={name} onChange={e => setName(e.target.value)} placeholder="Type your name to sign" autoComplete="name" /></div>
-              <div className="who">You · Founder</div>
+              <div className="who">You · Employer</div>
             </div>
           </div>
           <button className="hirebtn" disabled={name.trim().length < 2} onClick={hire}>
-            {hired ? '✓ Signed. Mello starts tonight.' : 'Countersign & hire Mello'}
+            {hired ? '✓ Signed. Your team starts tonight.' : 'Sign & put the team to work'}
           </button>
           <div className="p-fine">No card to start · your first brief is free · effective tonight</div>
         </div>
@@ -377,6 +394,11 @@ export default function HireStory() {
         .quiet-link{font-size:14px;font-weight:650;color:#68756b;text-decoration:none;border-bottom:1px solid #d8ddd2;padding-bottom:2px;transition:color .2s,border-color .2s}
         .quiet-link:hover{color:#171d18;border-color:#171d18}
         .fine{margin-top:24px;font-size:12.5px;color:#8a927f;font-weight:600}
+        /* four tiny credibility numbers under the headline */
+        .stats{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(22px,5vw,56px);margin-top:34px}
+        .stat{text-align:center}
+        .stat-n{font:800 clamp(23px,3vw,31px)/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:-.02em;color:#171d18;font-variant-numeric:tabular-nums}
+        .stat-l{font:650 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#8a927f;margin-top:9px}
         /* the org chart — the visual proof that this is a company */
         .org{margin-top:64px;width:min(920px,100%)}
         .org-you{display:inline-block;font:800 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.18em;color:#171d18;background:#fff;border:1px solid #e6e4da;border-radius:100px;padding:10px 18px}
@@ -405,6 +427,12 @@ export default function HireStory() {
         @media(max-width:520px){.nl{flex-wrap:wrap}.nl-d{width:auto}}
         .workline{margin-top:20px;font:600 13px/1 ui-monospace,'SF Mono',Menlo,monospace;color:#5d675c;letter-spacing:.02em}
         .workline .cur{display:inline-block;width:7px;height:13px;background:#dffe95;vertical-align:-2px;margin-left:6px;animation:blink 1.1s step-start infinite}
+        /* the morning payoff — the emotional close of the night */
+        .nl-morning{display:flex;gap:14px;align-items:baseline;margin-top:14px;padding-top:16px;border-top:1px solid rgba(238,242,236,.14);font:600 13px/1.5 ui-monospace,'SF Mono',Menlo,monospace}
+        .nl-morning .nl-t{color:#dffe95}
+        .nl-wake{color:#eef2ec;font-weight:600}
+        .nl-wake b{color:#dffe95;font-weight:800}
+        @media(max-width:520px){.nl-morning{flex-wrap:wrap}}
         @keyframes blink{50%{opacity:0}}
 
         /* ── 3 · morning: the brief ── */
