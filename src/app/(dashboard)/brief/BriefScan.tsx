@@ -25,6 +25,7 @@ import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 import BriefOpportunities from '@/components/brief/BriefOpportunities'
 import StandupCard from '@/components/brief/StandupCard'
 import { ChannelLogo } from '@/components/brand/logos'
+import { planEntitlements } from '@/lib/plans'
 import CompetitorCard from '@/components/brief/CompetitorCard'
 import CreativeStrategistCard from '@/components/brief/CreativeStrategistCard'
 import WatchingCompetitors from '@/components/brief/WatchingCompetitors'
@@ -134,6 +135,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
   // currency, one truth, across every card. null = the nightly-stored primary (no live call).
   const [acctScope, setAcctScope] = useState<string | null>(null)
   const isPaid = ['starter', 'pro', 'business', 'enterprise'].includes(String(plan || '').toLowerCase())
+  const canLaunch = planEntitlements(plan).launch   // Meta = the `launch` entitlement (same gate as /m4, /connect/meta)
   const perDay = (49 / 30).toFixed(2)
   // Which brief channels are already connected — so "Finish setup" drops the ones that are done.
   const [connectedChannels, setConnectedChannels] = useState<string[]>([])
@@ -234,10 +236,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             <div className="bsx-e" style={{ ...card, background: FOREST, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', animationDelay: '.34s' }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3 }}>Run your ads on Meta</div>
-                <div style={{ fontSize: 13.5, color: '#b8c4b4', lineHeight: 1.5, marginTop: 3 }}>{isPaid ? 'Launch, scale, and manage campaigns from here — Mello audits them every morning.' : 'Connecting a Meta ad account is a Creator feature — upgrade to launch, scale and get the morning audit.'}</div>
+                <div style={{ fontSize: 13.5, color: '#b8c4b4', lineHeight: 1.5, marginTop: 3 }}>{canLaunch ? 'Launch, scale, and manage campaigns from here — Mello audits them every morning.' : 'Connecting a Meta ad account is a Creator feature — upgrade to launch, scale and get the morning audit.'}</div>
               </div>
               {/* Meta is a paid feature — Free users are sent to upgrade, not into an OAuth flow that dead-ends. */}
-              <Link href={isPaid ? '/m4' : '/billing'} style={{ flexShrink: 0, background: LIME, color: FOREST, borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>{isPaid ? 'Run ads →' : 'Upgrade to Creator →'}</Link>
+              <Link href={canLaunch ? '/m4' : '/billing'} style={{ flexShrink: 0, background: LIME, color: FOREST, borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>{canLaunch ? 'Run ads →' : 'Upgrade to Creator →'}</Link>
             </div>
           )}
 
