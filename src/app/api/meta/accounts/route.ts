@@ -18,7 +18,7 @@ export async function GET() {
 
   const { data } = await admin
     .from('meta_accounts')
-    .select('id,account_id,account_name,currency,is_primary,last_synced_at')
+    .select('id,account_id,account_name,currency,is_primary,last_synced_at,brand_id')
     .in('user_id', userIds.length ? userIds : [user.id])
     .eq('status', 'active')
     .order('is_primary', { ascending: false })
@@ -43,12 +43,18 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { account_id } = await request.json()
+  const body = await request.json()
+  const { account_id } = body
   const admin = createAdminClient()
 
-  // Set all to not primary
+  // Assign this account to a brand (the "project" link) — brand_id null clears it.
+  if ('brand_id' in body) {
+    await admin.from('meta_accounts').update({ brand_id: body.brand_id || null }).eq('user_id', user.id).eq('account_id', account_id)
+    return NextResponse.json({ success: true })
+  }
+
+  // Otherwise: set this account as the primary.
   await admin.from('meta_accounts').update({ is_primary: false }).eq('user_id', user.id)
-  // Set selected as primary
   await admin.from('meta_accounts').update({ is_primary: true }).eq('user_id', user.id).eq('account_id', account_id)
 
   return NextResponse.json({ success: true })
