@@ -234,9 +234,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             <div className="bsx-e" style={{ ...card, background: FOREST, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', animationDelay: '.34s' }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3 }}>Run your ads on Meta</div>
-                <div style={{ fontSize: 13.5, color: '#b8c4b4', lineHeight: 1.5, marginTop: 3 }}>Launch, scale, and manage campaigns from here — Mello audits them every morning.</div>
+                <div style={{ fontSize: 13.5, color: '#b8c4b4', lineHeight: 1.5, marginTop: 3 }}>{isPaid ? 'Launch, scale, and manage campaigns from here — Mello audits them every morning.' : 'Connecting a Meta ad account is a Creator feature — upgrade to launch, scale and get the morning audit.'}</div>
               </div>
-              <Link href="/m4" style={{ flexShrink: 0, background: LIME, color: FOREST, borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Run ads →</Link>
+              {/* Meta is a paid feature — Free users are sent to upgrade, not into an OAuth flow that dead-ends. */}
+              <Link href={isPaid ? '/m4' : '/billing'} style={{ flexShrink: 0, background: LIME, color: FOREST, borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>{isPaid ? 'Run ads →' : 'Upgrade to Creator →'}</Link>
             </div>
           )}
 
