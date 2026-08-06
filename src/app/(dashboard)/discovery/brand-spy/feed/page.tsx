@@ -17,20 +17,25 @@ const daysAgo = (d: string | null) => { if (!d) return null; const n = Math.floo
 export default function BrandSpyFeed() {
   const [ads, setAds] = useState<Ad[]>([])
   const [loading, setLoading] = useState(true)
+  const [noFollows, setNoFollows] = useState(false)
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setLoading(true); setNoFollows(false)
     try {
-      // Use sort=recent (last_seen DESC) — the ONE index-backed browse sort (~0.2s). sort=newest
-      // (start_date DESC) has no index for the has-creative browse set → it times out server-side and
-      // the route returns ads:[] (the "No recent ads" you saw). last_seen DESC = most-recently-active
-      // ads, exactly right for a "what are competitors running now" monitor; each card still shows the
-      // real launch-age badge from start_date.
-      // A "competitor feed" is about BREADTH across brands, so widen the window and cap each brand
-      // to 2 (the default 3-per-brand cap + a thin drained pool collapsed this to ~3 brands).
-      const res = await fetch('/api/discovery/db-search?sort=recent&limit=120&ads_per_brand=2&country=ALL')
-      const j = await res.json()
-      setAds((j.ads || j.results || []).filter((a: Ad) => thumbOf(a)))
+      // Scope to the founder's OWN competitors — this is "what MY rivals launched", not a global demo
+      // feed (a new account was seeing Heinz/Foreplay it never followed). Fetch their follows, then pull
+      // each one's newest ads. No follows → an empty CTA, not someone else's brands.
+      const f = await fetch('/api/follows').then(r => r.ok ? r.json() : null).catch(() => null)
+      const pageIds: string[] = Array.isArray(f?.pageIds) ? f.pageIds.map(String) : []
+      if (!pageIds.length) { setAds([]); setNoFollows(true); return }
+      const perBrand = await Promise.all(pageIds.slice(0, 15).map(pid =>
+        fetch(`/api/discovery/db-search?pageId=${encodeURIComponent(pid)}&sort=recent&limit=6&country=ALL`).then(r => r.json()).catch(() => ({}))
+      ))
+      const seen = new Set<string>()
+      const merged = perBrand.flatMap((j: any) => (j.ads || j.results || []) as Ad[])
+        .filter(a => thumbOf(a) && !seen.has(a.id) && seen.add(a.id))
+        .sort((a, b) => (+new Date(b.startDate || 0)) - (+new Date(a.startDate || 0)))
+      setAds(merged)
     } catch { setAds([]) } finally { setLoading(false) }
   }, [])
   useEffect(() => { load() }, [load])
@@ -46,9 +51,16 @@ export default function BrandSpyFeed() {
       </div>
 
       <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111', marginBottom: 2 }}>Competitor Feed</h1>
-      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 18 }}>Newest ads launched across every brand we track — your daily “what are competitors testing today” monitor.</div>
+      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 18 }}>The newest ads from the competitors you watch — your daily “what are they testing today” monitor.</div>
 
       {loading && <div style={{ color: '#9ca3af', fontSize: 14 }}>Loading feed…</div>}
+      {!loading && noFollows && (
+        <div style={{ border: '1px dashed #d6ddd4', borderRadius: 12, padding: '28px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 4 }}>You’re not watching any competitors yet.</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 14 }}>Follow a brand and their newest ads land here — nobody else’s.</div>
+          <Link href="/discovery/brand-spy" style={{ background: '#17251c', color: '#dffe95', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>+ Find a competitor to spy</Link>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 14 }}>
         {ads.map((a) => {
           const d = daysAgo(a.startDate)
@@ -72,7 +84,7 @@ export default function BrandSpyFeed() {
           )
         })}
       </div>
-      {!loading && ads.length === 0 && <div style={{ color: '#9ca3af', fontSize: 14 }}>No recent ads.</div>}
+      {!loading && !noFollows && ads.length === 0 && <div style={{ color: '#9ca3af', fontSize: 14 }}>No recent ads from your competitors yet — I’ll fill this as they launch.</div>}
     </div>
   )
 }
