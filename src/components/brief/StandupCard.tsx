@@ -58,7 +58,9 @@ export default function StandupCard({ brandId }: { brandId?: string | null }) {
       {!!(s.connectPrompts && s.connectPrompts.length) && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
           {s.connectPrompts.map(p => (
-            <Link key={p.key} href="/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: '5px 11px', fontSize: 12, fontWeight: 700, color: '#eaf3e6', textDecoration: 'none' }}>
+            // Deep-link to the right Settings tab — comms + calendar both live under Channels — instead of
+            // dumping the founder on the Account/profile tab.
+            <Link key={p.key} href="/settings?tab=channels" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: '5px 11px', fontSize: 12, fontWeight: 700, color: '#eaf3e6', textDecoration: 'none' }}>
               <span>{p.emoji}</span>{p.label}<span style={{ color: LIME }}>→</span>
             </Link>
           ))}
