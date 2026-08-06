@@ -376,8 +376,15 @@ function M4Inner() {
         fd.append('file', fileToUpload, file.name)
         fd.append('isVideo', 'false')
         const res = await fetch('/api/m4/upload-image', { method: 'POST', body: fd })
-        const data = await res.json()
-        setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:!!(data.hash||data.videoId)}:x))
+        const data = await res.json().catch(() => ({}))
+        // Surface the REAL failure instead of leaving a dead creative row that then blocks launch with a
+        // misleading "upload an image" alert. (The video path already did this; the image path swallowed it.)
+        if (data.error || !(data.hash || data.videoId)) {
+          alert('Couldn’t register this image with Meta: ' + (data.error || 'no image hash came back. This usually means the connected Meta ad account is missing ads-management permission — reconnect it, then try again.'))
+          setter(prev=>prev.filter(x=>x.id!==id))
+          return
+        }
+        setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:true}:x))
       }
     } catch(err: any) {
       alert('Upload error: ' + err.message)
