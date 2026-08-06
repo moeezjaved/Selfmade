@@ -160,9 +160,18 @@ export async function POST(req: NextRequest) {
     // Link a connected customer channel to a brand — messages that arrive on it become that brand's threads.
     const provider = String(body.provider || '')
     if (!provider) return NextResponse.json({ error: 'provider required' }, { status: 400 })
-    await admin.from('channel_identities').update({ brand_id: body.brandId || null })
+    const brandId = body.brandId || null
+    await admin.from('channel_identities').update({ brand_id: brandId })
       .eq('user_id', user.id).eq('provider', provider).eq('active', true)
-    return NextResponse.json({ ok: true })
+    // Separate-channel-per-brand model: the channel IS the brand, so adopt its existing UNASSIGNED
+    // conversations too (never restamp threads already tagged to a brand). Only when linking (not clearing).
+    let moved = 0
+    if (brandId) {
+      const { data: mv } = await admin.from('customer_threads').update({ brand_id: brandId })
+        .eq('user_id', user.id).eq('channel', provider).is('brand_id', null).select('id')
+      moved = (mv || []).length
+    }
+    return NextResponse.json({ ok: true, moved })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
