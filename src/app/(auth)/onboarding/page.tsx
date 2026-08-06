@@ -635,27 +635,47 @@ export default function InterviewPage() {
             </div>
           )}
 
-          {/* ── BEAT 5 · INTEGRATIONS (honest SOON — Meta app in review) ── */}
+          {/* ── BEAT 5 · INTEGRATIONS — channels connectable; Meta Ads AVAILABLE now (BYO /connect/meta),
+                the rest still honest SOON. ── */}
           {phase === 'integrations' && (
             <div>
               <div style={say}>Give your team their tools.</div>
               <p style={sub}>Your company works through the apps you already use — no dashboard to check. First, where should the team reach you? I’ll send the daily brief here, and you approve, ask, or redirect right from chat.</p>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', margin: '20px 0 6px' }}>
-                <a href="/api/channels/slack/start" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', textDecoration: 'none', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit' }}>
-                  <ChannelLogo provider="slack" size={22} /> Add to Slack
-                </a>
-                <button onClick={connectWhatsApp} disabled={waBusy} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: waBusy ? 'default' : 'pointer', opacity: waBusy ? 0.6 : 1 }}>
-                  <ChannelLogo provider="whatsapp" size={22} /> {waBusy ? 'Opening…' : 'Connect WhatsApp'}
-                </button>
+              <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', margin: '20px 0 6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
+                  <a href="/api/channels/slack/start" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', textDecoration: 'none', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit' }}>
+                    <ChannelLogo provider="slack" size={22} /> Add to Slack
+                  </a>
+                  <span style={{ fontSize: 11.5, fontWeight: 750, color: MUTED }}>For teams</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
+                  <button onClick={connectWhatsApp} disabled={waBusy} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: waBusy ? 'default' : 'pointer', opacity: waBusy ? 0.6 : 1 }}>
+                    <ChannelLogo provider="whatsapp" size={22} /> {waBusy ? 'Opening…' : 'Connect WhatsApp'}
+                  </button>
+                  <span style={{ fontSize: 11.5, fontWeight: 750, color: MUTED }}>For solo founders</span>
+                </div>
               </div>
-              <div style={{ textAlign: 'center', fontSize: 12, color: MUTED, marginBottom: 6 }}>Teams love Slack · solo founders love WhatsApp · connect both if you like.</div>
+              <div style={{ textAlign: 'center', fontSize: 12, color: MUTED, marginBottom: 6 }}>Connect both if you like.</div>
 
               <div style={{ height: 1, background: LINE, margin: '22px 0 18px' }} />
 
-              <div style={{ ...say, fontSize: 22 }}>And soon — access for the team.</div>
+              {/* Meta Ads — available now via the BYO connect wizard, so Media Buying starts with your history */}
+              <div style={{ ...say, fontSize: 22 }}>Give Media Buying your ad account.</div>
+              <p style={sub}>Connect Meta Ads and Media Buying sees what already worked — and builds on it from night one.</p>
+              <a href="/connect/meta" target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'left', background: '#fff', border: `1.5px solid ${SELBORDER}`, borderRadius: 14, padding: '15px 18px', textDecoration: 'none', maxWidth: 430, margin: '18px auto 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <b style={{ fontSize: 14.5, color: INK }}>Connect Meta Ads →</b>
+                  <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '.08em', background: LIME, color: FOREST, borderRadius: 6, padding: '3px 8px' }}>AVAILABLE</span>
+                </div>
+                <div style={{ fontSize: 12, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>So Media Buying sees what already worked.</div>
+              </a>
+
+              <div style={{ height: 1, background: LINE, margin: '22px 0 18px' }} />
+
+              <div style={{ ...say, fontSize: 22 }}>And soon — more for the team.</div>
               <p style={sub}>Each department works better with your own history. These are almost ready — when they are, I’ll ask again and tell you exactly what each one unlocks.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, margin: '20px 0 4px' }}>
-                {[['Meta Ads', 'so Media Buying sees what already worked'], ['Shopify', 'so the team knows what actually sells'], ['TikTok', 'so Creative learns your short-video wins'], ['Google', 'so Research sees what people search']].map(([n, d]) => (
+                {[['Shopify', 'so the team knows what actually sells'], ['TikTok', 'so Creative learns your short-video wins'], ['Google', 'so Research sees what people search']].map(([n, d]) => (
                   <div key={n} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: '13px 15px', opacity: .75 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <b style={{ fontSize: 13.5, color: INK }}>{n}</b>
