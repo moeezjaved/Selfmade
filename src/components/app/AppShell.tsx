@@ -291,10 +291,6 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
             <div style={{ width: 34, height: 34, borderRadius: 11, background: '#17251c', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 18, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</div>
           </Link>
 
-          {/* Project switcher — pick a brand once, the whole app scopes to it. Seeded from server data so
-              the tile is in the HTML and survives a broken hydration (extensions). */}
-          <ProjectSwitcher initialBrands={brands} initialActive={activeBrand} />
-
           {/* Create — the ONE bold thing on the rail; opens the full 3-way chooser */}
           <div onMouseEnter={() => setFlyout(null)} style={{ marginBottom: 6 }}>
             <RemakeStarter variant="icon" />
@@ -346,6 +342,13 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
       {/* ── MAIN — the content owns the screen ── */}
       <div style={{ flex: 1, marginLeft: isMobile ? 0 : RAIL_W, marginTop: isMobile ? 52 : 0, display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#fbfcfa', minWidth: 0, maxWidth: isMobile ? '100vw' : `calc(100vw - ${RAIL_W}px)`, overflowX: 'hidden' }}>
         <div id="topbar-portal" />
+        {/* Project switcher — top-left of the content, labeled so it's obvious which project you're in
+            and that you can switch. Scopes the whole app (sf_brand cookie). */}
+        {brands.length > 0 && (
+          <div style={{ padding: isMobile ? '12px 16px 0' : '16px 24px 0' }}>
+            <ProjectSwitcher initialBrands={brands} initialActive={activeBrand} />
+          </div>
+        )}
         <main className="flex-1" style={{ minWidth: 0, overflowX: 'hidden' }}>{children}</main>
         <UpsellModalHost />
         <CreditModal />
