@@ -82,6 +82,23 @@ export async function POST(request: NextRequest) {
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = `act_${metaAccount.account_id}`
     const currency = metaAccount.currency || 'USD'
+
+    // Pre-flight: is this ad account actually ready to run ads? Catches the "campaign created but no ads /
+    // Account overview" dead-end BEFORE we build anything. Never hard-blocks on a check that itself fails.
+    try {
+      const acctRes = await fetch(`https://graph.facebook.com/${V}/${adAccountId}?fields=account_status,disable_reason,funding_source&access_token=${encodeURIComponent(token)}`)
+      const acct = await acctRes.json()
+      const SETUP_MSG = 'Your Meta ad account isn’t set up to run ads yet. Open Meta Ads Manager → Account overview, add a payment method and confirm your account details, then launch again.'
+      // account_status: 1 = ACTIVE. Anything else (disabled/unsettled/pending/closed) can't run ads.
+      if (acct?.account_status != null && Number(acct.account_status) !== 1) {
+        return NextResponse.json({ error: SETUP_MSG + ` (account status ${acct.account_status})`, needsSetup: true }, { status: 400 })
+      }
+      // No funding source id = no payment method attached yet (the classic new-account block).
+      if (acct?.account_status != null && !acct.funding_source) {
+        return NextResponse.json({ error: SETUP_MSG, needsSetup: true }, { status: 400 })
+      }
+    } catch { /* check failed → don't block; ad creation will still surface any real error */ }
+
     const budgetAmount = parseFloat(budget) || 500
     const budgetCents = Math.round(budgetAmount * 100)
     const currencyMinimums: Record<string,number> = { USD:100, PKR:28100, GBP:100, EUR:100, AED:400, SAR:400, INR:8000 }
