@@ -1,9 +1,9 @@
 'use client'
 /**
  * The project switcher on the rail — pick a brand once and the WHOLE app scopes to it (brief, inbox,
- * everything reads the same `sf_brand` cookie). Shows only when the founder has 2+ brands (pointless for
- * one). Compact for the 72px rail: a rounded tile with the active brand's initial; hover opens a flyout
- * to switch or jump back to All brands. Switching writes the cookie + reloads so every surface re-scopes.
+ * everything reads the same `sf_brand` cookie). Rendered as a labeled pill at the TOP-LEFT of the page
+ * content ("● Aura ▾") so it's obvious which project you're in and that you can switch. Click opens a
+ * dropdown below. Switching writes the cookie + soft-refreshes so every surface re-scopes without a reload.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -64,17 +64,16 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
   }
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', marginBottom: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+    <div ref={wrapRef} style={{ position: 'relative', display: 'inline-flex' }}>
       <button aria-label={`Project: ${label}`} title={`Switch project — currently ${label}`} onClick={() => setOpen(o => !o)}
-        style={{ width: 34, height: 34, borderRadius: 11, border: `1px solid ${open ? '#9fb98a' : '#d6ddd4'}`, background: current ? '#17251c' : '#fff', color: current ? '#dffe95' : '#5b6b5b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15, cursor: 'pointer', padding: 0, position: 'relative' }}>
-        {tile}
-        {/* chevron so it reads as a switch, not just a logo */}
-        <span style={{ position: 'absolute', right: -2, bottom: -2, width: 12, height: 12, borderRadius: 6, background: '#fff', border: '1px solid #d6ddd4', color: '#5b6b5b', fontSize: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>▾</span>
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: `1px solid ${open ? '#9fb98a' : '#e2e8dd'}`, borderRadius: 100, padding: '5px 12px 5px 6px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(23,37,28,0.04)' }}>
+        <span style={{ width: 22, height: 22, borderRadius: 7, background: '#17251c', color: '#dffe95', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12 }}>{tile}</span>
+        <span style={{ fontSize: 13, fontWeight: 750, color: '#17251c', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+        <span style={{ color: '#8a968a', fontSize: 10, marginLeft: -2 }}>▾</span>
       </button>
-      <span className="rail-label" style={{ maxWidth: 62, color: '#5b6b5b', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>{label}</span>
       {open && (
-        <div style={{ position: 'absolute', left: '100%', top: -6, paddingLeft: 10, zIndex: 70 }}>
-          <div style={{ width: 210, background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, boxShadow: '0 18px 50px rgba(23,37,28,0.16)', padding: '10px 8px' }}>
+        <div style={{ position: 'absolute', left: 0, top: '100%', paddingTop: 6, zIndex: 70 }}>
+          <div style={{ width: 220, background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, boxShadow: '0 18px 50px rgba(23,37,28,0.16)', padding: '10px 8px' }}>
             <div style={{ padding: '2px 10px 7px', fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#a2aca2' }}>Project</div>
             <div style={{ maxHeight: 320, overflowY: 'auto' }}>
               {multi && <button onClick={() => pick('')} style={rowStyle(!active)}>◎&nbsp;&nbsp;All brands</button>}
