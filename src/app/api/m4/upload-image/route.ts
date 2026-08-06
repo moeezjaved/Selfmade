@@ -52,10 +52,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (isVideo) {
-      // Video needs a URL Meta can pull, so it goes via Supabase Storage first (bucket must exist).
+      // Video needs a URL Meta can pull, so it goes via Supabase Storage first. Self-heal: create the
+      // bucket if it doesn't exist yet (service-role key), so no manual Supabase step is ever needed.
       const fileName = `${user.id}/${Date.now()}.${fileExt}`
       const bucket = 'ads-media'
-      const { error: uploadError } = await admin.storage.from(bucket).upload(fileName, buffer, { contentType, upsert: false })
+      let { error: uploadError } = await admin.storage.from(bucket).upload(fileName, buffer, { contentType, upsert: false })
+      if (uploadError && /bucket not found/i.test(uploadError.message || '')) {
+        await admin.storage.createBucket(bucket, { public: true }).catch(() => {})   // idempotent; ignore "already exists"
+        ;({ error: uploadError } = await admin.storage.from(bucket).upload(fileName, buffer, { contentType, upsert: false }))
+      }
       if (uploadError) return NextResponse.json({ error: 'Storage upload failed: ' + uploadError.message }, { status: 400 })
       const { data: urlData } = admin.storage.from(bucket).getPublicUrl(fileName)
       const publicUrl = urlData.publicUrl
