@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateCreativeStrategy, type CreativeStrategy } from '@/lib/creative/strategist'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -19,13 +20,14 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const admin = createAdminClient()
   const accountId = req.nextUrl.searchParams.get('account') || undefined
-  const brandId = req.nextUrl.searchParams.get('brand') || undefined
+  // Scope to the active project: explicit ?brand= wins, else the app-wide sf_brand cookie (rail switcher).
+  const brandId = (await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand'))) || undefined
   const key = `${user.id}:${accountId || 'primary'}:${brandId || 'all'}`
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < TTL && req.nextUrl.searchParams.get('fresh') !== '1') return NextResponse.json(hit.data)
 
-  const admin = createAdminClient()
   try {
     const data = await generateCreativeStrategy(admin, user.id, { accountId, brandId })
     cache.set(key, { at: Date.now(), data })

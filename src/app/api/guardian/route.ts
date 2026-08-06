@@ -8,6 +8,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { scanBrandGuardian, type GuardianAlert } from '@/lib/guardian/scan'
 import { scanMentions, type Mention } from '@/lib/guardian/social'
 import { scanRivalSites, type SiteAlert } from '@/lib/guardian/web'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -22,12 +23,13 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const brandId = req.nextUrl.searchParams.get('brand') || undefined
+  const admin = createAdminClient()
+  // Scope to the active project: explicit ?brand= wins, else the app-wide sf_brand cookie (rail switcher).
+  const brandId = (await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand'))) || undefined
   const key = `${user.id}:${brandId || 'all'}`
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < TTL && req.nextUrl.searchParams.get('fresh') !== '1') return NextResponse.json(hit.data)
 
-  const admin = createAdminClient()
   try {
     const alerts = await scanBrandGuardian(admin, user.id, { brandId })
     // Brand name for reputation search — the picked brand, else the first.

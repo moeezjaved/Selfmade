@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { assembleBrief } from '@/lib/brief/assemble'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,14 +17,9 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  // Brand switcher: scope to one of the user's brands. Validate ownership so ?brand= can't point at
-  // someone else's brand id.
-  const reqBrand = req.nextUrl.searchParams.get('brand')
-  let brandId: string | null = null
-  if (reqBrand) {
-    const { data: b } = await admin.from('brands').select('id').eq('user_id', user.id).eq('id', reqBrand).maybeSingle()
-    if (b) brandId = reqBrand
-  }
+  // Active project: explicit ?brand= (deep link) wins, else the app-wide sf_brand cookie (rail switcher).
+  // Ownership-validated inside resolveActiveBrandId so it can't point at someone else's brand.
+  const brandId = await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand'))
   const brief = await assembleBrief(admin, user.id, { ...(user.user_metadata || {}), email: user.email }, { brandId })
   return NextResponse.json(brief)
 }

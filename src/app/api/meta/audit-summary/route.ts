@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { auditAccount } from '@/lib/meta/audit'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,10 +17,11 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   let accountId = req.nextUrl.searchParams.get('accountId') || undefined
-  const brandId = req.nextUrl.searchParams.get('brand') || undefined
   const range = req.nextUrl.searchParams.get('range') || 'last_30d'
   try {
     const admin = createAdminClient()
+    // Scope to the active project: explicit ?brand= wins, else the app-wide sf_brand cookie (rail switcher).
+    const brandId = (await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand'))) || undefined
     // When a brand is selected and no explicit account, show THAT brand's linked ad account (the
     // "project" link). Falls back to the primary account when the brand has none linked yet.
     if (!accountId && brandId) {
