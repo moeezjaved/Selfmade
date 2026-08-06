@@ -1,16 +1,17 @@
 /**
- * Homepage at the root `/`. The landing is a client component (HomeLanding), so this thin SERVER
- * wrapper supplies the real head — keyword title, self-canonical `/`, Open Graph + Twitter (image
- * auto-wired from ./opengraph-image), and Organization + WebSite + SoftwareApplication JSON-LD.
- * (The previous root landing was moved to src/legacy/old-root-landing.tsx.bak — kept, not deleted.)
+ * Homepage at the root `/`. The landing is a client component (HireStory — "you hired a marketing
+ * company"), so this thin SERVER wrapper supplies the real head — keyword title, self-canonical `/`,
+ * Open Graph + Twitter (image auto-wired from ./opengraph-image), and Organization + WebSite +
+ * SoftwareApplication JSON-LD. The prior landing (HireKeynote) is kept on disk at ./hire/HireKeynote
+ * for rollback, not deleted; /story renders the same HireStory as a noindex preview.
  */
 import type { Metadata } from 'next'
-import HireKeynote from './hire/HireKeynote'
+import HireStory from './hire/HireStory'
 
 const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
-const TITLE = 'Selfmade — The Marketing Co-founder'
-const DESC = 'Meet Mello, the marketing co-founder. It studies your market all night — every competitor ad, every winning angle across 3M+ ads and 611K brands — and walks in every morning with the work already done. Nothing ships without your yes.'
-const OG_DESC = 'The Marketing Co-founder. Mello studies your market all night and brings you the work every morning — already done. You approve; it ships.'
+const TITLE = 'Selfmade — Hire your marketing company'
+const DESC = 'You just hired a marketing company. No employees, no agency, no freelancers. Research, Creative, Media Buying and Customer care — a whole team run by Mello. They study your market every night across 3M+ ads and 611K brands and bring you the work every morning, already done. Nothing ships without your yes.'
+const OG_DESC = 'Hire a marketing company, not software. Your team works every night and brings you the work every morning — already done. You approve; it ships.'
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
@@ -39,7 +40,7 @@ export default function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <HireKeynote />
+      <HireStory />
     </>
   )
 }
