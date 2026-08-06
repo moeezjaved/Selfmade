@@ -151,6 +151,50 @@ async function storedPerformance(admin: any, userId: string): Promise<{ winner: 
   return { winner, bleeder: (bleeder && bleeder.name !== winner.name) ? bleeder : null }
 }
 
+/** Lenient rivals — when the scored winners engine returns nothing, pull the brand's spied competitors'
+ *  top ads (with media) directly, so we still have competitor material to build ideas from. */
+async function lenientRivals(admin: any, userId: string, brandId?: string | null): Promise<CompetitorWinner[]> {
+  let fq = admin.from('followed_brands').select('page_id, brand_name').eq('user_id', userId).eq('spied', true)
+  if (brandId) fq = fq.eq('brand_id', brandId)
+  const { data: follows } = await fq.limit(10)
+  const rivals = (follows || []).filter((f: any) => f.page_id)
+  const out: CompetitorWinner[] = []
+  for (const f of rivals) {
+    try {
+      const { data: ads } = await admin.from('discovery_ads_index')
+        .select('ad_id, page_id, title, hook_type, days_running, is_active, discovery_creatives(asset_type, r2_url, poster_url)')
+        .eq('page_id', f.page_id).order('days_running', { ascending: false, nullsFirst: false }).limit(8)
+      for (const a of (ads || [])) {
+        const cres = Array.isArray(a.discovery_creatives) ? a.discovery_creatives : (a.discovery_creatives ? [a.discovery_creatives] : [])
+        const vid = cres.find((c: any) => c?.asset_type === 'video' && c?.r2_url)
+        const img = cres.find((c: any) => c?.asset_type !== 'video' && c?.r2_url)
+        const isVideo = !!vid && !img
+        const image = isVideo ? (vid?.poster_url || null) : (img?.r2_url || vid?.poster_url || null)
+        if (!image) continue
+        const days = Number(a.days_running) || 0
+        out.push({ adId: String(a.ad_id), pageId: String(a.page_id), brandName: f.brand_name || 'Competitor', title: a.title || null, hook: a.hook_type || null, daysRunning: days, variants: 1, isActive: !!a.is_active, isVideo, image, videoUrl: isVideo ? (vid?.r2_url || null) : null, why: `${a.is_active ? 'Live' : 'Ran'} ${days} days — a proven angle worth rebuilding.` })
+        if (out.length >= 5) break
+      }
+    } catch { /* skip */ }
+    if (out.length >= 5) break
+  }
+  return out
+}
+
+/** A deterministic "rebuild this rival's winning ad" idea (seeds the Studio with that ad). */
+function competitorIdea(r: CompetitorWinner): CreativeIdea {
+  const angleName = r.title || r.hook || 'winning angle'
+  return {
+    title: `Rebuild ${r.brandName}’s “${String(angleName).slice(0, 40)}”`,
+    format: r.isVideo ? 'video' : 'static',
+    why: `${r.brandName} has run this ${r.daysRunning} days — strong evidence it converts. Rebuild the concept with your product.`,
+    basedOn: 'competitor',
+    reference: { kind: 'competitor', label: `inspired by ${r.brandName}`, brand: r.brandName, image: r.image },
+    priority: 'med',
+    studioHref: studioHref(r, `Rebuild of ${r.brandName}’s winning ad`),
+  }
+}
+
 export async function generateCreativeStrategy(admin: any, userId: string, opts: { accountId?: string; brand?: string; brandId?: string | null } = {}): Promise<CreativeStrategy> {
   // Our account signal (cached server-side — no extra Graph hit on repeat opens).
   let ourWinner: any = null, fatigue: any = null, ownAds: any[] = []
@@ -180,7 +224,8 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
     } catch { /* ok */ }
   }
 
-  const rivals = await getCompetitorWinners(admin, userId, { poolSize: 6, brandId: opts.brandId })
+  let rivals = await getCompetitorWinners(admin, userId, { poolSize: 6, brandId: opts.brandId })
+  if (!rivals.length) { try { rivals = await lenientRivals(admin, userId, opts.brandId) } catch { /* ok */ } }
 
   let brand = opts.brand || ''
   if (!brand) { try { const { data } = await admin.from('brands').select('name').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle(); brand = data?.name || '' } catch { /* ok */ } }
@@ -217,6 +262,24 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
     }
     return i
   })
+
+  // Enforce the mix the founder wants: 2 competitor + 1 own when we have rival material — so it's genuinely
+  // "your ads + rivals", not three variations of your own campaign.
+  if (rivals.length) {
+    const ownI = ideas.filter(i => i.basedOn === 'fatigue' || i.basedOn === 'winner')
+    const compI = ideas.filter(i => i.basedOn === 'competitor')
+    const usedAds = new Set(compI.map(i => i.reference?.label))
+    for (const r of rivals) {
+      if (compI.length >= 2) break
+      const key = `inspired by ${r.brandName}`
+      if (usedAds.has(r.title || '') || usedAds.has(key)) continue
+      usedAds.add(key)
+      compI.push(competitorIdea(r))
+    }
+    const composed = [...compI.slice(0, 2), ...ownI.slice(0, 1)]
+    for (const extra of [...ownI.slice(1), ...compI.slice(2)]) { if (composed.length >= 3) break; composed.push(extra) }
+    if (composed.length) ideas = composed.slice(0, 3)
+  }
 
   const summary = ideas.length === 0
     ? (rivals.length === 0 ? 'Spy a competitor or two and connect your ad account — then I’ll tell you exactly what to make next.' : 'Nothing urgent to make right now — your account looks steady.')
