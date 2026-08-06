@@ -203,6 +203,30 @@ export default function InterviewPage() {
   const homeworkFired = useRef(false)
   const nightFired = useRef(false)
 
+  // Resume, don't restart — persist progress so a browser back/refresh returns to the same step with the
+  // same answers, instead of throwing the founder back to the welcome screen. (#5)
+  const RESTORE_KEY = 'sm_onb_state_v1'
+  const RESUMABLE: Phase[] = ['homework', 'guess', 'competitors', 'questions', 'culture', 'integrations', 'offer']
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(RESTORE_KEY); if (!raw) return
+      const s = JSON.parse(raw)
+      if (!s || !RESUMABLE.includes(s.phase)) return
+      if (s.url) setUrl(s.url); if (s.detect) setDetect(s.detect); if (s.analysis) setAnalysis(s.analysis)
+      if (s.gName != null) setGName(s.gName); if (s.gSells != null) setGSells(s.gSells); if (s.gBuyer != null) setGBuyer(s.gBuyer)
+      if (s.gVoice != null) setGVoice(s.gVoice); if (s.gDiff != null) setGDiff(s.gDiff)
+      if (Array.isArray(s.markets)) setMarkets(s.markets); if (Array.isArray(s.suggested)) setSuggested(s.suggested)
+      if (Array.isArray(s.picks)) setPicks(s.picks); if (s.culture) setCulture(s.culture); if (Array.isArray(s.notes)) setNotes(s.notes)
+      if (s.brandId) brandIdRef.current = s.brandId
+      homeworkFired.current = true   // don't re-run the crawl on resume
+      setPhase(s.phase)
+    } catch { /* ignore corrupt snapshot */ }
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (phase === 'welcome' || phase === 'night' || phase === 'plan') return   // don't snapshot entry/terminal steps
+    try { sessionStorage.setItem(RESTORE_KEY, JSON.stringify({ phase, url, detect, analysis, gName, gSells, gBuyer, gVoice, gDiff, markets, suggested, picks, culture, notes, brandId: brandIdRef.current })) } catch { /* quota/private mode */ }
+  }, [phase, url, detect, analysis, gName, gSells, gBuyer, gVoice, gDiff, markets, suggested, picks, culture, notes])
+
   const addLog = (t: string, done = false) => setLog(l => [...l.map(x => ({ ...x, done: true })), { t, done }])
   const note = (kind: string, content: string) => {
     const c = content.trim(); if (!c) return
@@ -371,12 +395,18 @@ export default function InterviewPage() {
       }
     } catch { /* keep original names */ }
 
-    // real work: enqueue each competitor's full-archive crawl + follow them (feeds the alert pipeline → the brief)
-    for (const p of resolved) {
+    // real work: crawl EVERY competitor (data's ready if they upgrade), but only FOLLOW the plan-allowed
+    // count. Free tracks 1 — the rest are saved and surfaced as an upgrade nudge, never silently dropped.
+    const TRACK_LIMIT = 1   // Free plan; upgrading lifts this and the extras can be followed from the app
+    for (let i = 0; i < resolved.length; i++) {
+      const p = resolved[i]
       setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: `starting on ${p.name} — pulling their live ads`, done: false }])
       await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, name: p.name, crawlOnly: true }) }).catch(() => {})
-      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandIdRef.current || undefined, spied: true }) }).catch(() => {})
+      if (i < TRACK_LIMIT) {
+        await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandIdRef.current || undefined, spied: true }) }).catch(() => {})
+      }
     }
+    if (resolved.length > TRACK_LIMIT) note('fact', `Watching ${TRACK_LIMIT} of ${resolved.length} competitors on Free (${resolved.slice(0, TRACK_LIMIT).map(p => p.name).join(', ')}). Upgrade to track them all: ${resolved.slice(TRACK_LIMIT).map(p => p.name).join(', ')}.`)
     setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: 'studying what wins in your market', done: false }])
     // Auto-author the first Competitor Intelligence Report on the primary competitor — the show-then-sell
     // wow that greets them on the brief. Fire-and-forget on gpt-4o (~$0.04 vs Opus ~$0.25) so a wave of
@@ -393,6 +423,7 @@ export default function InterviewPage() {
       // Stamp the same cookie the middleware onboarding-gate reads, so the very next navigation to
       // /brief passes instantly — never bounced back by a read that hasn't caught the write yet.
       try { document.cookie = `sm_onb=1; path=/; max-age=${60 * 60 * 24 * 30}; samesite=lax` } catch { /* ignore */ }
+      try { sessionStorage.removeItem(RESTORE_KEY) } catch { /* ignore */ }   // onboarding done — clear the resume snapshot
     } catch { /* non-blocking */ }
     setNightLog(l => l.map(x => ({ ...x, done: true })))
     setNightDone(true)
@@ -520,6 +551,11 @@ export default function InterviewPage() {
               </div>
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.09em', color: MUTED, textTransform: 'uppercase', marginBottom: 10, textAlign: 'left' }}>Pick who I should watch — click to choose</div>
               <BrandPalette q={q} setQ={setQ} suggested={suggested} results={results} picks={picks} loading={loadingComp} onToggle={togglePick} extractId={extractPageId} />
+              {picks.length > 1 && (
+                <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12.5, color: MUTED }}>
+                  Free tracks <b style={{ color: INK }}>1 competitor</b> — I’ll start with <b style={{ color: INK }}>{picks[0].name}</b>. The other {picks.length - 1} unlock when you upgrade.
+                </div>
+              )}
               <div style={{ textAlign: 'center', marginTop: 18 }}>
                 <button style={{ ...btnMain, opacity: picks.length ? 1 : 0.5 }} disabled={!picks.length} onClick={confirmCompetitors}>
                   Watch {picks.length ? `these ${picks.length}` : 'them'} for me →
