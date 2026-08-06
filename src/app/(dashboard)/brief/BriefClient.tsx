@@ -219,7 +219,7 @@ function DeskView({ brief, greet, onAct, onDecision }: { brief: Brief; greet: st
   )
 }
 
-export default function BriefClient({ initialBrief, initialView = 'standup', brands = [], activeBrandId = null, welcome = false }: { initialBrief: Brief | null; initialView?: 'standup' | 'desk' | 'scan'; brands?: { id: string; name: string }[]; activeBrandId?: string | null; welcome?: boolean }) {
+export default function BriefClient({ initialBrief, initialView = 'standup', brands = [], activeBrandId = null, initialPlan = null, initialCredits = null, welcome = false }: { initialBrief: Brief | null; initialView?: 'standup' | 'desk' | 'scan'; brands?: { id: string; name: string }[]; activeBrandId?: string | null; initialPlan?: string | null; initialCredits?: number | null; welcome?: boolean }) {
   // Seeded from the SERVER render — the brief content is already in the HTML, so it shows even if the
   // client never hydrates (broken extensions). We only fetch as a fallback when the server had nothing.
   const [brief, setBrief] = useState<Brief | null>(initialBrief)
@@ -230,8 +230,8 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   const [focusItem, setFocusItem] = useState<Item | null>(initialBrief?.headline || initialBrief?.items?.[0] || null)   // what the composer is "about"
   const [headlineState, setHeadlineState] = useState<null | 'approved' | 'passed'>(null)
   const [view, setView] = useState<'standup' | 'desk' | 'scan'>(initialView)   // conversation · prepared desk · one-page scan
-  const [credits, setCredits] = useState<number | null>(null)
-  const [plan, setPlan] = useState<string | null>(null)
+  const [credits, setCredits] = useState<number | null>(initialCredits)
+  const [plan, setPlan] = useState<string | null>(initialPlan)   // server-seeded so the right-rail card is right on first paint
   const [addOpen, setAddOpen] = useState(false)
   const [addBrandId, setAddBrandId] = useState<string | null>(null)   // which brand the add-competitor modal targets
   const [planDismissed, setPlanDismissed] = useState(false)
