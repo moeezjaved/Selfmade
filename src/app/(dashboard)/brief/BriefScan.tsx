@@ -135,6 +135,13 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
   const [acctScope, setAcctScope] = useState<string | null>(null)
   const isPaid = ['starter', 'pro', 'business', 'enterprise'].includes(String(plan || '').toLowerCase())
   const perDay = (49 / 30).toFixed(2)
+  // Which brief channels are already connected — so "Finish setup" drops the ones that are done.
+  const [connectedChannels, setConnectedChannels] = useState<string[]>([])
+  useEffect(() => {
+    fetch('/api/channels/unipile/connect').then(r => r.ok ? r.json() : null)
+      .then(j => { if (Array.isArray(j?.connected)) setConnectedChannels(j.connected.map((c: any) => String(c.provider))) })
+      .catch(() => {})
+  }, [])
   const playbook = brief.items.find(i => i.kind === 'market_playbook' && i.playbook) || null
   const metaAds = brief.items.find(i => i.kind === 'meta_ads' && i.metaAudit) || null
   const hero = brief.headline || brief.items.find(i => i.kind !== 'market_playbook' && i.kind !== 'meta_ads') || null
@@ -325,6 +332,15 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                   </button>
                 )
             )}
+            {/* Free plan tracks 1 competitor — nudge to upgrade to watch more, right where rivals live. */}
+            {!isPaid && brief.summary.brandsWatched >= 1 && (
+              <div style={{ marginTop: 10, fontSize: 12.5, color: MUTED }}>
+                Free tracks <b style={{ color: INK }}>1 competitor</b>.{' '}
+                {onGoFullTime
+                  ? <button onClick={onGoFullTime} style={{ background: 'none', border: 'none', color: GREEN, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Upgrade to watch them all →</button>
+                  : <Link href="/billing" style={{ color: GREEN, fontWeight: 800, textDecoration: 'none' }}>Upgrade to watch them all →</Link>}
+              </div>
+            )}
             {/* Confirmation + progress: which competitors are being watched and whether their ads have loaded. */}
             <WatchingCompetitors brandId={activeBrandId} brandName={activeBrandName} />
           </div>
@@ -477,20 +493,29 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             <Row href="/settings" title="Make ads for me daily" desc="Pick how many — delivered every morning."
               right={<span style={{ fontSize: 11, fontWeight: 750, color: FOREST, background: '#f2f8ea', border: `1px solid #a8cf6f`, borderRadius: 100, padding: '2px 9px' }}>Auto</span>} />
 
-            {/* Finish setup — connect WhatsApp / Slack / Calendar, one small line each. */}
-            <div style={{ height: 1, background: LINE, margin: '14px 0 10px' }} />
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9aa79a', marginBottom: 4 }}>Finish setup</div>
-            {[
-              { p: 'whatsapp', label: 'Get your brief on WhatsApp' },
-              { p: 'slack', label: 'Get your brief on Slack' },
-              { p: 'calendar', label: 'Connect your calendar' },
-            ].map(x => (
-              <Link key={x.p} href="/settings" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', textDecoration: 'none' }}>
-                <span style={{ display: 'inline-flex', flexShrink: 0 }}><ChannelLogo provider={x.p} size={18} /></span>
-                <span style={{ fontSize: 13, fontWeight: 650, color: INK, flex: 1, minWidth: 0 }}>{x.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 800, color: '#3f8f4f', whiteSpace: 'nowrap' }}>Connect →</span>
-              </Link>
-            ))}
+            {/* Finish setup — only the steps NOT done yet. A channel that's already connected drops off
+                (it was still showing "Connect" after WhatsApp was linked). */}
+            {(() => {
+              const steps = [
+                { p: 'whatsapp', label: 'Get your brief on WhatsApp' },
+                { p: 'slack', label: 'Get your brief on Slack' },
+                { p: 'calendar', label: 'Connect your calendar' },
+              ].filter(x => !connectedChannels.includes(x.p))
+              if (!steps.length) return null
+              return (
+                <>
+                  <div style={{ height: 1, background: LINE, margin: '14px 0 10px' }} />
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9aa79a', marginBottom: 4 }}>Finish setup</div>
+                  {steps.map(x => (
+                    <Link key={x.p} href="/settings" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', textDecoration: 'none' }}>
+                      <span style={{ display: 'inline-flex', flexShrink: 0 }}><ChannelLogo provider={x.p} size={18} /></span>
+                      <span style={{ fontSize: 13, fontWeight: 650, color: INK, flex: 1, minWidth: 0 }}>{x.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: '#3f8f4f', whiteSpace: 'nowrap' }}>Connect →</span>
+                    </Link>
+                  ))}
+                </>
+              )
+            })()}
           </div>
         </aside>
       </div>
