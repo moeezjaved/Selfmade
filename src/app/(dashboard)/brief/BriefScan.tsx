@@ -27,6 +27,7 @@ import StandupCard from '@/components/brief/StandupCard'
 import { ChannelLogo } from '@/components/brand/logos'
 import CompetitorCard from '@/components/brief/CompetitorCard'
 import CreativeStrategistCard from '@/components/brief/CreativeStrategistCard'
+import WatchingCompetitors from '@/components/brief/WatchingCompetitors'
 import BrandGuardianCard from '@/components/brief/BrandGuardianCard'
 import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
@@ -324,6 +325,8 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                   </button>
                 )
             )}
+            {/* Confirmation + progress: which competitors are being watched and whether their ads have loaded. */}
+            <WatchingCompetitors brandId={activeBrandId} brandName={activeBrandName} />
           </div>
 
           {/* ── The playbook — what's working across every watched brand, with Mello's judgment. ── */}
