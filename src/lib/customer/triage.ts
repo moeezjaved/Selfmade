@@ -34,10 +34,10 @@ function deterministic(body: string, brand: string): Triage {
 }
 
 /** Phase 2 — the model classifies + drafts in the brand's voice, grounded in Company Brain. */
-async function reasoned(admin: any, userId: string, body: string, brand: string): Promise<Triage | null> {
+async function reasoned(admin: any, userId: string, body: string, brand: string, brandId?: string | null): Promise<Triage | null> {
   if (!process.env.OPENAI_API_KEY) return null
   let memory = ''
-  try { memory = (await recall(admin, { userId, department: 'customer' })).prompt } catch { /* best-effort */ }
+  try { memory = (await recall(admin, { userId, department: 'customer', brandId })).prompt } catch { /* best-effort */ }
   const { default: OpenAI } = await import('openai')
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const model = process.env.MELLO_MODEL || 'gpt-4o'
@@ -61,13 +61,13 @@ async function reasoned(admin: any, userId: string, body: string, brand: string)
 }
 
 /** Triage one inbound message: reasoned if we can, deterministic otherwise. Capped so it can't hang. */
-export async function triageMessage(admin: any, userId: string, input: { body: string; brand?: string }): Promise<Triage> {
+export async function triageMessage(admin: any, userId: string, input: { body: string; brand?: string; brandId?: string | null }): Promise<Triage> {
   const body = String(input.body || '').trim()
   const brand = String(input.brand || '').trim()
   if (!body) return { priority: 'low', intent: 'other', draft: '' }
   try {
     const r = await Promise.race([
-      reasoned(admin, userId, body, brand),
+      reasoned(admin, userId, body, brand, input.brandId),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
     ])
     if (r) return r

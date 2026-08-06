@@ -25,10 +25,10 @@ function inviteTemplate(handle: string, name: string, brand: string, type: Offer
 }
 
 /** Model-drafted invite, grounded in Company Brain. Null on failure. */
-async function reasonedInvite(admin: any, userId: string, input: { handle: string; name: string; brand: string; type: OfferType; details: string; bio?: string; category?: string }): Promise<string | null> {
+async function reasonedInvite(admin: any, userId: string, input: { handle: string; name: string; brand: string; type: OfferType; details: string; bio?: string; category?: string; brandId?: string | null }): Promise<string | null> {
   if (!process.env.OPENAI_API_KEY) return null
   let memory = ''
-  try { memory = (await recall(admin, { userId, department: 'customer' })).prompt } catch { /* ok */ }
+  try { memory = (await recall(admin, { userId, department: 'customer', brandId: input.brandId })).prompt } catch { /* ok */ }
   const { default: OpenAI } = await import('openai')
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const model = process.env.MELLO_MODEL || 'gpt-4o'
@@ -41,14 +41,14 @@ Rules: 2-4 sentences, warm and specific (not a mass blast), first person, on-bra
   } catch { return null }
 }
 
-export async function draftCreatorOffer(admin: any, userId: string, input: { handle: string; name?: string; brand?: string; type?: OfferType; details?: string; bio?: string; category?: string }): Promise<string> {
+export async function draftCreatorOffer(admin: any, userId: string, input: { handle: string; name?: string; brand?: string; type?: OfferType; details?: string; bio?: string; category?: string; brandId?: string | null }): Promise<string> {
   const type = (['gifted', 'paid', 'affiliate'].includes(input.type || '') ? input.type : 'gifted') as OfferType
   const name = String(input.name || '').trim()
   const brand = String(input.brand || '').trim()
   const details = String(input.details || '').trim()
   try {
     const r = await Promise.race([
-      reasonedInvite(admin, userId, { handle: input.handle, name, brand, type, details, bio: input.bio, category: input.category }),
+      reasonedInvite(admin, userId, { handle: input.handle, name, brand, type, details, bio: input.bio, category: input.category, brandId: input.brandId }),
       new Promise<null>((res) => setTimeout(() => res(null), 15000)),
     ])
     if (r) return r

@@ -16,7 +16,7 @@ const INK = '#17251c', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#1a
 const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(17,37,28,.04), 0 10px 30px -20px rgba(17,37,28,.10)' }
 
 type Msg = { id: string; body: string; intent?: string; priority?: string; suggested_reply?: string; status: string }
-type Thread = { id: string; contact_name?: string; contact_ref?: string; channel: string; priority: 'high' | 'med' | 'low'; intent?: string; status: string; last_message_at: string; latest: Msg | null }
+type Thread = { id: string; contact_name?: string; contact_ref?: string; channel: string; priority: 'high' | 'med' | 'low'; intent?: string; status: string; last_message_at: string; latest: Msg | null; brand_id?: string | null; brand_name?: string | null }
 type Outbound = Msg & { thread?: { contact_name?: string; channel?: string } | null }
 type Theme = { title: string; count: number; example: string; recommendation: string; priority: 'high' | 'med' | 'low' }
 type Insights = {
@@ -51,10 +51,13 @@ export default function InboxPage() {
   const [simBusy, setSimBusy] = useState(false)
   const [outBusy, setOutBusy] = useState('')
   const [channels, setChannels] = useState<string[] | null>(null)   // connected customer-channel providers
+  const [chanBrand, setChanBrand] = useState<Record<string, string>>({})   // provider → brand_id it's linked to
   const [connecting, setConnecting] = useState('')
   const [intentFilter, setIntentFilter] = useState<string | null>(null)   // click a rollup chip to filter the inbox
   const [insights, setInsights] = useState<Insights | null>(null)
   const [insightsLoading, setInsightsLoading] = useState(false)
+  const [brands, setBrands] = useState<{ id: string; name: string }[]>([])
+  const [brandFilter, setBrandFilter] = useState<string>('')   // '' = all brands
 
   // The threads shown after the intent-chip filter (null = show all).
   const shownThreads = intentFilter ? threads.filter(t => t.intent === intentFilter) : threads
@@ -68,12 +71,14 @@ export default function InboxPage() {
   }
   useEffect(() => { if (tab === 'insights' && !insights && !insightsLoading) loadInsights() }, [tab])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const load = () => fetch('/api/customer/inbox', { cache: 'no-store' }).then(r => r.json()).then(j => {
+  const load = () => fetch(`/api/customer/inbox${brandFilter ? `?brand=${encodeURIComponent(brandFilter)}` : ''}`, { cache: 'no-store' }).then(r => r.json()).then(j => {
     if (Array.isArray(j.threads)) setThreads(j.threads)
     if (Array.isArray(j.outbound)) setOutbound(j.outbound)
     if (j.rollup) setRollup(j.rollup)
     if (j.stats) setStats(j.stats)
   }).catch(() => {}).finally(() => setLoading(false))
+  useEffect(() => { load() }, [brandFilter])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetch('/api/brands').then(r => r.ok ? r.json() : null).then(j => setBrands((j?.brands || []).map((b: any) => ({ id: String(b.id), name: String(b.name) })))).catch(() => {}) }, [])
 
   const markSale = async (threadId: string) => {
     const raw = window.prompt('Mark this as a sale — order value? (optional, just press OK to skip)')
@@ -83,8 +88,18 @@ export default function InboxPage() {
     toast.success('Counted as a sale 💰'); load()
   }
   const loadChannels = () => fetch('/api/channels/unipile/connect').then(r => r.ok ? r.json() : null)
-    .then(j => setChannels(Array.isArray(j?.connected) ? j.connected.filter((c: any) => c.kind !== 'founder').map((c: any) => c.provider) : []))
+    .then(j => {
+      const cust = Array.isArray(j?.connected) ? j.connected.filter((c: any) => c.kind !== 'founder') : []
+      setChannels(cust.map((c: any) => c.provider))
+      const m: Record<string, string> = {}; for (const c of cust) if (c.brand_id) m[c.provider] = String(c.brand_id); setChanBrand(m)
+    })
     .catch(() => setChannels([]))
+  // Link a connected channel to a brand — future messages on it become that brand's threads.
+  const assignChannel = async (provider: string, brandId: string) => {
+    setChanBrand(prev => ({ ...prev, [provider]: brandId }))
+    await fetch('/api/customer/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'assign_channel', provider, brandId: brandId || null }) }).catch(() => {})
+    toast.success(brandId ? 'Channel linked to brand.' : 'Channel unlinked.')
+  }
   useEffect(() => {
     load(); loadChannels()
     // Returned here from a channel connect (?connected=…) → toast + refresh the strip (reconcile binds it).
@@ -204,7 +219,17 @@ export default function InboxPage() {
                     <span style={{ display: 'inline-flex' }}><ChannelLogo provider={c.k} size={17} /></span>
                     <span style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>{c.label}</span>
                     {on ? (
-                      <span style={{ fontSize: 11.5, fontWeight: 800, color: '#3b6d11' }}>✓</span>
+                      <>
+                        <span style={{ fontSize: 11.5, fontWeight: 800, color: '#3b6d11' }}>✓</span>
+                        {brands.length > 1 && (
+                          <select value={chanBrand[c.k] || ''} onChange={e => assignChannel(c.k, e.target.value)}
+                            title="Which brand does this channel serve?"
+                            style={{ marginLeft: 4, background: '#fff', color: INK, border: `1px solid ${LINE}`, borderRadius: 100, padding: '2px 6px', fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+                            <option value="">Any brand</option>
+                            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                          </select>
+                        )}
+                      </>
                     ) : (
                       <button onClick={() => connectChannel(c.k)} disabled={connecting === c.k}
                         style={{ marginLeft: 2, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '3px 10px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: connecting === c.k ? 'default' : 'pointer', opacity: connecting === c.k ? 0.6 : 1 }}>
@@ -218,6 +243,18 @@ export default function InboxPage() {
           </div>
         )
       })()}
+
+      {/* Per-brand filter — one inbox, scoped to whichever brand you're working on. */}
+      {brands.length > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <span style={{ fontSize: 12.5, color: SUB }}>Showing</span>
+          <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)}
+            style={{ background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '5px 12px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: 'pointer' }}>
+            <option value="">All brands</option>
+            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 22, borderBottom: `1px solid ${LINE}`, marginBottom: 20 }}>
         <Tab id="inbox" label="Inbox" count={threads.length} />
@@ -271,6 +308,7 @@ export default function InboxPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ background: pri.bg, color: pri.fg, borderRadius: 6, padding: '3px 8px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em' }}>{pri.label}</span>
                     <span style={{ fontSize: 13.5, fontWeight: 750, color: INK }}>{t.contact_name || 'Customer'}</span>
+                    {t.brand_name && <span style={{ fontSize: 10.5, fontWeight: 700, color: '#3f5b8f', background: '#eef2fb', borderRadius: 6, padding: '2px 7px' }}>{t.brand_name}</span>}
                     {t.intent === 'price' && <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', color: '#3b6d11', background: '#eaf3de', borderRadius: 6, padding: '2px 7px' }}>💰 SALES</span>}
                     {t.intent && t.intent !== 'price' && <span style={{ fontSize: 12, color: SUB, fontWeight: 650 }}>{INTENT_EMOJI[t.intent] || '💬'} {t.intent}</span>}
                     <span style={{ fontSize: 11.5, color: '#a7b0a5', fontWeight: 600, marginLeft: 'auto', textTransform: 'capitalize' }}>{t.channel}</span>

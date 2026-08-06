@@ -36,10 +36,10 @@ function template(type: OutboundType, name: string, brand: string, product: stri
 }
 
 /** Phase 2 — the model drafts in the brand's voice, grounded in Company Brain. */
-async function reasoned(admin: any, userId: string, type: OutboundType, name: string, brand: string, product: string): Promise<string | null> {
+async function reasoned(admin: any, userId: string, type: OutboundType, name: string, brand: string, product: string, brandId?: string | null): Promise<string | null> {
   if (!process.env.OPENAI_API_KEY) return null
   let memory = ''
-  try { memory = (await recall(admin, { userId, department: 'customer' })).prompt } catch { /* best-effort */ }
+  try { memory = (await recall(admin, { userId, department: 'customer', brandId })).prompt } catch { /* best-effort */ }
   const { default: OpenAI } = await import('openai')
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const model = process.env.MELLO_MODEL || 'gpt-4o'
@@ -63,14 +63,14 @@ Rules: 1-3 sentences, first person, warm and human (never salesy or robotic), on
 }
 
 /** Draft one proactive outbound message: reasoned if we can, template otherwise. Capped so it can't hang. */
-export async function draftOutbound(admin: any, userId: string, input: { type: OutboundType; name?: string; brand?: string; product?: string }): Promise<string> {
+export async function draftOutbound(admin: any, userId: string, input: { type: OutboundType; name?: string; brand?: string; product?: string; brandId?: string | null }): Promise<string> {
   const type = (['cart_recovery', 'winback', 'review_request', 'reengage', 'follow_up'].includes(input.type) ? input.type : 'reengage') as OutboundType
   const name = String(input.name || '').trim()
   const brand = String(input.brand || '').trim()
   const product = String(input.product || '').trim()
   try {
     const r = await Promise.race([
-      reasoned(admin, userId, type, name, brand, product),
+      reasoned(admin, userId, type, name, brand, product, input.brandId),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
     ])
     if (r) return r

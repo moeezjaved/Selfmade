@@ -19,16 +19,22 @@ export const runtime = 'nodejs'
 
 const RANK: Record<string, number> = { high: 0, med: 1, low: 2 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
+  const brandId = req.nextUrl.searchParams.get('brand') || undefined
 
-  const { data: threads } = await admin.from('customer_threads').select('*')
+  let tq = admin.from('customer_threads').select('*')
     .eq('user_id', user.id).in('status', ['open', 'replied']).order('last_message_at', { ascending: false }).limit(100)
+  if (brandId) tq = tq.eq('brand_id', brandId)   // per-brand inbox (mig 143)
+  const { data: threads } = await tq
   const list = (threads || []) as any[]
   list.sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3) || (b.last_message_at > a.last_message_at ? 1 : -1))
+  // Brand names for the per-thread chip.
+  const brandMap: Record<string, string> = {}
+  try { const { data: bs } = await admin.from('brands').select('id, name').eq('user_id', user.id); for (const b of (bs || []) as any[]) brandMap[String(b.id)] = b.name } catch { /* ok */ }
 
   // Attach each thread's latest inbound message (the one awaiting a reply) + its draft.
   const ids = list.map(t => t.id)
@@ -38,7 +44,7 @@ export async function GET() {
       .in('thread_id', ids).eq('direction', 'in').order('created_at', { ascending: false })
     for (const m of (msgs || []) as any[]) if (!msgsByThread[m.thread_id]) msgsByThread[m.thread_id] = m
   }
-  const threadsOut = list.map(t => ({ ...t, latest: msgsByThread[t.id] || null }))
+  const threadsOut = list.map(t => ({ ...t, latest: msgsByThread[t.id] || null, brand_name: t.brand_id ? (brandMap[String(t.brand_id)] || null) : null }))
 
   // Intent rollup across open threads — the "today's trends" view.
   const rollup: Record<string, number> = {}
@@ -108,7 +114,7 @@ export async function POST(req: NextRequest) {
     else { const { data } = await admin.from('brands').select('id,name').eq('user_id', user.id).order('created_at', { ascending: true }).limit(1).maybeSingle(); brandId = data?.id || null; brandName = data?.name || '' }
     const name = String(body.name || 'Test Customer')
     const product = String(body.product || '')
-    const draft = await draftOutbound(admin, user.id, { type, name, brand: brandName, product })
+    const draft = await draftOutbound(admin, user.id, { type, name, brand: brandName, product, brandId })
     const now = new Date().toISOString()
     const { data: thread } = await admin.from('customer_threads').insert({
       user_id: user.id, brand_id: brandId, channel: 'simulated',
@@ -148,6 +154,15 @@ export async function POST(req: NextRequest) {
     const r = await sendCustomerReply(admin, user.id, messageId, body.reply)
     if (!r.ok) return NextResponse.json({ error: r.note }, { status: r.error === 'not_found' ? 404 : 400 })
     return NextResponse.json({ ok: true, delivered: r.delivered, note: r.note })
+  }
+
+  if (action === 'assign_channel') {
+    // Link a connected customer channel to a brand — messages that arrive on it become that brand's threads.
+    const provider = String(body.provider || '')
+    if (!provider) return NextResponse.json({ error: 'provider required' }, { status: 400 })
+    await admin.from('channel_identities').update({ brand_id: body.brandId || null })
+      .eq('user_id', user.id).eq('provider', provider).eq('active', true)
+    return NextResponse.json({ ok: true })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
