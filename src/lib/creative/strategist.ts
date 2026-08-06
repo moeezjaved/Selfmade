@@ -225,7 +225,15 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
   }
 
   let rivals = await getCompetitorWinners(admin, userId, { poolSize: 6, brandId: opts.brandId })
-  if (!rivals.length) { try { rivals = await lenientRivals(admin, userId, opts.brandId) } catch { /* ok */ } }
+  // Need at least 2 rivals to compose 2 competitor ideas. getCompetitorWinners returns one hero PER brand,
+  // so with a single competitor it returns 1 — supplement with that brand's other top ads (distinct adIds).
+  if (rivals.length < 2) {
+    try {
+      const extra = await lenientRivals(admin, userId, opts.brandId)
+      const seen = new Set(rivals.map(r => r.adId))
+      for (const e of extra) { if (!seen.has(e.adId)) { rivals.push(e); seen.add(e.adId) } }
+    } catch { /* ok */ }
+  }
 
   let brand = opts.brand || ''
   if (!brand) { try { const { data } = await admin.from('brands').select('name').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle(); brand = data?.name || '' } catch { /* ok */ } }
@@ -268,12 +276,13 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
   if (rivals.length) {
     const ownI = ideas.filter(i => i.basedOn === 'fatigue' || i.basedOn === 'winner')
     const compI = ideas.filter(i => i.basedOn === 'competitor')
-    const usedAds = new Set(compI.map(i => i.reference?.label))
+    // Backfill from distinct rival ADS (by adId) — dedup by brand would stop at 1 when there's a single
+    // competitor, so we could never reach 2 competitor ideas from one rival's multiple winning ads.
+    const usedAdIds = new Set<string>()
     for (const r of rivals) {
       if (compI.length >= 2) break
-      const key = `inspired by ${r.brandName}`
-      if (usedAds.has(r.title || '') || usedAds.has(key)) continue
-      usedAds.add(key)
+      if (usedAdIds.has(r.adId)) continue
+      usedAdIds.add(r.adId)
       compI.push(competitorIdea(r))
     }
     const composed = [...compI.slice(0, 2), ...ownI.slice(0, 1)]
