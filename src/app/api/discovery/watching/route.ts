@@ -35,15 +35,34 @@ export async function GET(req: NextRequest) {
   const termMap: Record<string, any> = {}
   for (const t of (terms || []) as any[]) termMap[String(t.page_id)] = t
 
+  const H48 = new Date(Date.now() - 48 * 3600 * 1000).toISOString()
+  const media = (a: any) => {
+    const cres = Array.isArray(a.discovery_creatives) ? a.discovery_creatives : (a.discovery_creatives ? [a.discovery_creatives] : [])
+    const vid = cres.find((c: any) => c?.asset_type === 'video' && c?.r2_url)
+    const img = cres.find((c: any) => c?.asset_type !== 'video' && c?.r2_url)
+    const isVideo = !!vid && !img
+    return { adId: String(a.ad_id), image: isVideo ? (vid?.poster_url || null) : (img?.r2_url || vid?.poster_url || null), isVideo, videoUrl: isVideo ? (vid?.r2_url || null) : null }
+  }
+  const SEL = 'ad_id, discovery_creatives(asset_type, r2_url, poster_url, position)'
+
   const watching = await Promise.all(rivals.map(async (r: any) => {
     const pid = String(r.page_id)
-    let adCount = 0
+    let adCount = 0, topAds: any[] = [], newAds: any[] = []
     try { const { count } = await admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', pid); adCount = count || 0 } catch { /* ok */ }
+    try {
+      // Top ads (longest-running = proven), and separately the ones first-seen in 48h (new launches).
+      const [topR, newR] = await Promise.all([
+        admin.from('discovery_ads_index').select(SEL).eq('page_id', pid).order('days_running', { ascending: false, nullsFirst: false }).limit(6),
+        admin.from('discovery_ads_index').select(`${SEL}, first_seen_at`).eq('page_id', pid).gte('first_seen_at', H48).order('first_seen_at', { ascending: false }).limit(6),
+      ])
+      topAds = (topR.data || []).map(media).filter((a: any) => a.image).slice(0, 4)
+      newAds = (newR.data || []).map(media).filter((a: any) => a.image).slice(0, 4)
+    } catch { /* media is best-effort */ }
     const t = termMap[pid]
     const crawling = !!t?.crawling_at
     const everCrawled = !!t?.last_crawled_at
     const status = adCount > 0 ? 'live' : (crawling ? 'crawling' : (everCrawled ? 'empty' : 'queued'))
-    return { pageId: pid, brand: r.brand_name || 'Competitor', adCount, status, lastCrawledAt: t?.last_crawled_at || null }
+    return { pageId: pid, brand: r.brand_name || 'Competitor', adCount, status, lastCrawledAt: t?.last_crawled_at || null, topAds, newAds }
   }))
   // Newest-added (queued/crawling) first so a just-added rival is right at the top.
   const order: Record<string, number> = { crawling: 0, queued: 1, empty: 2, live: 3 }
