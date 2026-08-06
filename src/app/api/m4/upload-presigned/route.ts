@@ -17,10 +17,11 @@ export async function POST(request: NextRequest) {
     const bucket = 'ads-media'
 
     const admin = createAdminClient()
-    const { data, error } = await admin.storage
-      .from(bucket)
-      .createSignedUploadUrl(storagePath)
-
+    let { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(storagePath)
+    if (error && /bucket not found/i.test(error.message || '')) {
+      await admin.storage.createBucket(bucket, { public: true }).catch(() => {})   // self-heal: no manual Supabase step
+      ;({ data, error } = await admin.storage.from(bucket).createSignedUploadUrl(storagePath))
+    }
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
     return NextResponse.json({
