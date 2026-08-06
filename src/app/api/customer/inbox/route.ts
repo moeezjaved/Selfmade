@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { triageMessage } from '@/lib/customer/triage'
 import { draftOutbound, OUTBOUND_LABEL, type OutboundType } from '@/lib/customer/outbound'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -24,7 +25,8 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  const brandId = req.nextUrl.searchParams.get('brand') || undefined
+  // The active project: explicit ?brand= wins, else the app-wide `sf_brand` cookie (sidebar switcher).
+  const brandId = (await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand'))) || undefined
 
   let tq = admin.from('customer_threads').select('*')
     .eq('user_id', user.id).in('status', ['open', 'replied']).order('last_message_at', { ascending: false }).limit(100)
