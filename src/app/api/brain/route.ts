@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { recall } from '@/lib/brain'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +16,8 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { searchParams } = new URL(req.url)
   const department = searchParams.get('department') || 'media'
-  const brandId = searchParams.get('brand') || null
-  const bundle = await recall(createAdminClient(), { userId: user.id, department, brandId })
+  const admin = createAdminClient()
+  const brandId = await resolveActiveBrandId(admin, user.id, searchParams.get('brand'))
+  const bundle = await recall(admin, { userId: user.id, department, brandId })
   return NextResponse.json(bundle)
 }

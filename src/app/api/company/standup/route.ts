@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { assembleStandup } from '@/lib/company/standup'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +14,8 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const firstName = ((user.user_metadata as any)?.full_name || '').split(' ')[0] || null
-  const brandId = req.nextUrl.searchParams.get('brand') || undefined
-  const standup = await assembleStandup(createAdminClient(), user.id, firstName, brandId)
+  const admin = createAdminClient()
+  const brandId = (await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand'))) || undefined
+  const standup = await assembleStandup(admin, user.id, firstName, brandId)
   return NextResponse.json(standup)
 }

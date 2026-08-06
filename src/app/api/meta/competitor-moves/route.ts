@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { cacheGet, cacheSet } from '@/lib/meta/cache'
 import { getCompetitorWinners, type CompetitorWinner } from '@/lib/meta/competitor-winners'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 /**
  * Competitor moves — "your rivals' winning ad right now", ranked by the public-signal proxy. The scoring
@@ -19,12 +20,11 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const brandId = req.nextUrl.searchParams.get('brand') || undefined
+  const admin = createAdminClient()
+  const brandId = (await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand'))) || undefined
   const cacheKey = `competitor-moves:${user.id}:${brandId || 'all'}`
   const cached = cacheGet<{ moves: Move[] }>(cacheKey)
   if (cached && !req.nextUrl.searchParams.get('refresh')) return NextResponse.json(cached)
-
-  const admin = createAdminClient()
 
   const distinct = await getCompetitorWinners(admin, user.id, { poolSize: 8, brandId })
   if (!distinct.length) return NextResponse.json({ moves: [] })
