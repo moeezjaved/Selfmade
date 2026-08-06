@@ -66,10 +66,12 @@ export default function HireStory() {
           <div className="org-stem" />
           <div className="org-row">
             {[
-              ['Research', 'watches every competitor ad', 'on duty'],
-              ['Creative', 'makes your image, video & UGC ads', '4 drafts ready'],
-              ['Media Buying', 'runs & tunes your campaigns', 'asks before spending'],
-              ['Customer', 'answers every DM, reply ready', 'inbox clear'],
+              ['Research', 'Never sleeps. Reads every competitor.', 'on duty'],
+              ['Creative', 'Turns research into ads.', '4 drafts ready'],
+              ['Media Buying', 'Finds winners. Kills losers.', 'asks first'],
+              ['Growth', 'Email, SEO, funnels.', 'building'],
+              ['Finance', 'Measures profit, not vanity.', 'tracking'],
+              ['Customer', 'Answers every message.', 'inbox clear'],
             ].map(([t, d, s], i) => (
               <div className="dept" key={t} style={{ animationDelay: `${0.15 * i}s` }}>
                 <div className="dept-name"><span className="dot" />{t}</div>
@@ -94,7 +96,7 @@ export default function HireStory() {
             ['04:40', 'Customer', 'sorted the inbox — 3 replies ready for you'],
             ['06:15', 'Media Buying', 'found one campaign worth scaling'],
           ].map(([t, dept, line], i) => (
-            <div className="nl" key={t} style={{ animationDelay: `${0.35 + i * 0.5}s` }}>
+            <div className="nl" key={t} style={{ animationDelay: `${i * 0.09}s` }}>
               <span className="nl-t">{t}</span><span className="nl-d">{dept}</span><span className="nl-l">{line}</span>
             </div>
           ))}
@@ -148,22 +150,29 @@ export default function HireStory() {
         </div>
       </section>
 
-      {/* ── 5 · HOW DO THEY WORK TOGETHER? — like a real team. ── */}
+      {/* ── 5 · HOW DO THEY WORK TOGETHER? — a real relay, shown not told. ── */}
       <section className="beat beat--tint">
         <div className="beat-eyebrow rv">One company</div>
-        <h2 className="rv d2">They work together,<br />like a real team.</h2>
-        <p className="beat-sub rv d3">Research finds the angle. Creative turns it into an ad. Media Buying gets
-        it ready to run. It lands on your desk as one finished piece of work.</p>
-        <div className="handoff rv d3" aria-hidden="true">
+        <h2 className="rv d2">One finds it.<br />The next one runs with it.</h2>
+        <p className="beat-sub rv d3">Watch a single decision travel through the company — and land on your desk
+        as one finished thing to approve.</p>
+        {/* the relay — each department hands the work to the next, revealed top-to-bottom */}
+        <div className="relay rv d3" aria-hidden="true">
+          <span className="relay-spine" />
           {[
-            ['Research', 'found the angle', '“Discipline over motivation” is winning in your niche.'],
-            ['Creative', 'made the ad', 'Drafted it in your brand — image + a 15s video.'],
-            ['Media Buying', 'prepared the launch', 'Budget set, audience set. Waiting on you.'],
-          ].map(([t, s, d], i) => (
-            <div className="ho" key={t} style={{ animationDelay: `${0.15 * i}s` }}>
-              <div className="ho-head"><span className="ho-num">{i + 1}</span><b>{t}</b><span className="ho-sub">{s}</span></div>
-              <div className="ho-d">{d}</div>
-              {i < 2 && <div className="ho-arrow">→</div>}
+            ['Research', 'Country Delight just launched 9 new ads.', false],
+            ['Creative', 'Already rebuilt them in your brand. Concept B wins.', false],
+            ['Media Buying', 'Ready to scale. Increase budget 20%?', false],
+            ['Finance', 'Worth it — estimated +$320 / week.', false],
+            ['Mello', 'Everything’s ready. Approve?', true],
+          ].map(([dept, line, isMello], i) => (
+            <div className={`relay-step${isMello ? ' relay-step--mello' : ''}`} key={dept as string} style={{ animationDelay: `${i * 0.14}s` }}>
+              <span className="relay-node">{isMello ? '●●' : i + 1}</span>
+              <div className="relay-card">
+                <div className="relay-dept">{dept}{!isMello && ' Department'}</div>
+                <div className="relay-line">{line}</div>
+                {isMello && <span className="b-btn relay-approve">Approve →</span>}
+              </div>
             </div>
           ))}
         </div>
@@ -206,18 +215,19 @@ export default function HireStory() {
 
       {/* ── 8 · WHERE DO THEY LIVE? — WhatsApp & Slack. The software disappears. ── */}
       <section className="beat">
-        <div className="beat-eyebrow rv">Where they live</div>
-        <h2 className="rv d2">The whole company,<br />in your pocket.</h2>
-        <p className="beat-sub rv d3">Your departments message you on WhatsApp or Slack — the brief, the
-        questions, the approvals. The software disappears. The team appears.</p>
+        <div className="beat-eyebrow rv">One conversation runs the company</div>
+        <h2 className="rv d2">The software disappears.<br />The team appears.</h2>
+        <p className="beat-sub rv d3">No dashboards. No logins. Nobody opens Selfmade every day — your
+        departments just message you on WhatsApp or Slack, and you reply. That&rsquo;s the whole product.</p>
         <div className="chat rv d3" aria-hidden="true">
           <div className="chat-head"><span className="chat-dot" />Selfmade — your team</div>
           <div className="chat-body">
-            <div className="cb them" style={{ animationDelay: '.2s' }}><b>Research</b>Gymshark launched 5 new ads. Their angle: &ldquo;discipline over motivation.&rdquo;</div>
-            <div className="cb them" style={{ animationDelay: '.6s' }}><b>Creative</b>Made 3 ads from it in your brand. The first one looks strong. 🖼️</div>
-            <div className="cb them" style={{ animationDelay: '1s' }}><b>Media Buying</b>Ready to run it. Reply YES to approve.</div>
-            <div className="cb you" style={{ animationDelay: '1.5s' }}>YES</div>
-            <div className="cb them" style={{ animationDelay: '1.9s' }}><b>Media Buying</b>✓ Done. It&rsquo;s live. Report in the morning.</div>
+            <div className="cb them" style={{ animationDelay: '0s' }}><b>Research</b>Country Delight launched 9 new ads.</div>
+            <div className="cb them" style={{ animationDelay: '.1s' }}><b>Creative</b>Already rebuilt them in your brand. Concept B wins. 🖼️</div>
+            <div className="cb them" style={{ animationDelay: '.2s' }}><b>Media Buying</b>Ready to scale. Increase budget 20%? Reply YES.</div>
+            <div className="cb them" style={{ animationDelay: '.3s' }}><b>Finance</b>Worth it — estimated +$320/week.</div>
+            <div className="cb you" style={{ animationDelay: '.42s' }}>YES</div>
+            <div className="cb them" style={{ animationDelay: '.54s' }}><b>Media Buying</b>✓ Done. It&rsquo;s live. Report in the morning.</div>
           </div>
         </div>
       </section>
@@ -321,14 +331,14 @@ export default function HireStory() {
         .quiet-link:hover{color:#171d18;border-color:#171d18}
         .fine{margin-top:24px;font-size:12.5px;color:#8a927f;font-weight:600}
         /* the org chart — the visual proof that this is a company */
-        .org{margin-top:64px;width:min(860px,100%)}
+        .org{margin-top:64px;width:min(920px,100%)}
         .org-you{display:inline-block;font:800 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.18em;color:#171d18;background:#fff;border:1px solid #e6e4da;border-radius:100px;padding:10px 18px}
         .org-stem{width:1px;height:26px;background:#d8ddd2;margin:0 auto}
-        .org-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-        @media(max-width:760px){.org-row{grid-template-columns:1fr 1fr}}
+        .org-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+        @media(max-width:720px){.org-row{grid-template-columns:1fr 1fr}}
         @media(max-width:420px){.org-row{grid-template-columns:1fr}}
         .dept{background:#fff;border:1px solid #e6e4da;border-radius:14px;padding:16px 16px 14px;text-align:left}
-        .rv.in .dept{animation:riseIn .8s cubic-bezier(0,0,.2,1) both}
+        .rv.in .dept{animation:riseIn .6s cubic-bezier(0,0,.2,1) both}
         .dept-name{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:800;letter-spacing:-.01em;color:#171d18}
         .dot{width:7px;height:7px;border-radius:50%;background:#3f8f4f;animation:pulse 2.4s ease-in-out infinite}
         @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
@@ -343,7 +353,7 @@ export default function HireStory() {
         .n-sub b{color:#eef2ec;font-variant-numeric:tabular-nums;font-weight:750}
         .nightlog{margin-top:48px;width:min(560px,100%);text-align:left;font:600 13px/1.6 ui-monospace,'SF Mono',Menlo,monospace}
         .nl{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid rgba(238,242,236,.07)}
-        .rv.in .nl{animation:riseIn .7s cubic-bezier(0,0,.2,1) both}
+        .rv.in .nl{animation:riseIn .55s cubic-bezier(0,0,.2,1) both}
         .nl-t{color:#5d675c;flex-shrink:0}
         .nl-d{color:#dffe95;flex-shrink:0;width:104px}
         .nl-l{color:#9aa598;font-weight:500}
@@ -384,21 +394,23 @@ export default function HireStory() {
         .brain-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
         @media(max-width:640px){.brain-row{grid-template-columns:1fr 1fr}}
         .brain-chip{background:#fff;border:1px solid #e6e4da;border-radius:100px;padding:11px 8px;font-size:12.5px;font-weight:700;color:#171d18}
-        .rv.in .brain-chip{animation:riseIn .7s cubic-bezier(0,0,.2,1) both}
+        .rv.in .brain-chip{animation:riseIn .55s cubic-bezier(0,0,.2,1) both}
         .tick{color:#3f8f4f;font-weight:900;margin-right:6px}
 
-        /* 5 · handoff — the team working together */
-        .handoff{margin-top:54px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:min(880px,100%)}
-        @media(max-width:760px){.handoff{grid-template-columns:1fr}}
-        .ho{position:relative;background:#fff;border:1px solid #e6e4da;border-radius:14px;padding:20px;text-align:left}
-        .rv.in .ho{animation:riseIn .8s cubic-bezier(0,0,.2,1) both}
-        .ho-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-        .ho-num{width:22px;height:22px;border-radius:50%;background:#17251c;color:#dffe95;font-size:11.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
-        .ho-head b{font-size:14.5px;letter-spacing:-.01em}
-        .ho-sub{font:650 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#8a927f}
-        .ho-d{font-size:13.5px;color:#4c5347;line-height:1.6;margin-top:10px}
-        .ho-arrow{position:absolute;right:-14px;top:50%;transform:translateY(-50%);color:#c9cfc2;font-size:18px;z-index:2}
-        @media(max-width:760px){.ho-arrow{display:none}}
+        /* 5 · relay — one decision travels down the company, top to bottom */
+        .relay{position:relative;margin-top:54px;width:min(560px,100%);display:flex;flex-direction:column;gap:14px;text-align:left}
+        .relay-spine{position:absolute;left:19px;top:20px;bottom:40px;width:2px;background:linear-gradient(#d8ddd2,#d8ddd2);z-index:0}
+        .relay-step{position:relative;z-index:1;display:flex;gap:16px;align-items:flex-start}
+        .rv.in .relay-step{animation:riseIn .55s cubic-bezier(0,0,.2,1) both}
+        .relay-node{flex-shrink:0;width:40px;height:40px;border-radius:50%;background:#fff;border:2px solid #d8ddd2;color:#68756b;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center}
+        .relay-step--mello .relay-node{background:#17251c;border-color:#17251c;color:#dffe95;font-size:11px;letter-spacing:1px}
+        .relay-card{flex:1;background:#fff;border:1px solid #e6e4da;border-radius:14px;padding:14px 18px}
+        .relay-step--mello .relay-card{background:#17251c;border-color:#17251c}
+        .relay-dept{font:700 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#8a927f}
+        .relay-step--mello .relay-dept{color:#9fb98a}
+        .relay-line{font-size:14.5px;font-weight:600;letter-spacing:-.01em;color:#171d18;line-height:1.5;margin-top:7px}
+        .relay-step--mello .relay-line{color:#f2f5ef}
+        .relay-approve{margin-top:12px}
 
         /* 6 · the ask — approval card */
         .ask{margin-top:54px;width:min(520px,100%)}
@@ -410,7 +422,7 @@ export default function HireStory() {
 
         /* 7 · teach the company */
         .teach{margin-top:54px;width:min(560px,100%);display:flex;flex-direction:column;gap:14px}
-        .rv.in .tch{animation:riseIn .8s cubic-bezier(0,0,.2,1) both}
+        .rv.in .tch{animation:riseIn .55s cubic-bezier(0,0,.2,1) both}
         .tch-you{margin-left:auto;width:fit-content;max-width:88%;background:#17251c;color:#f2f5ef;border-radius:16px 16px 4px 16px;padding:12px 18px;font-size:14.5px;font-weight:600;text-align:left}
         .tch-team{margin-right:auto;width:fit-content;max-width:88%;background:#fff;border:1px solid #e6e4da;border-radius:16px 16px 16px 4px;padding:11px 16px;font-size:13.5px;font-weight:600;color:#4c5347;margin-top:8px;text-align:left}
 
@@ -420,7 +432,7 @@ export default function HireStory() {
         .chat-dot{width:8px;height:8px;border-radius:50%;background:#dffe95;animation:pulse 2.4s ease-in-out infinite}
         .chat-body{padding:16px;display:flex;flex-direction:column;gap:9px;background:#f7f6f0}
         .cb{max-width:86%;border-radius:14px;padding:10px 14px;font-size:13.5px;line-height:1.5;color:#171d18}
-        .rv.in .cb{animation:riseIn .7s cubic-bezier(0,0,.2,1) both}
+        .rv.in .cb{animation:riseIn .55s cubic-bezier(0,0,.2,1) both}
         .cb b{display:block;font:700 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#8a927f;margin-bottom:5px}
         .cb.them{background:#fff;border:1px solid #ecebe2;border-bottom-left-radius:4px;margin-right:auto}
         .cb.you{background:#dffe95;color:#17251c;font-weight:800;border-bottom-right-radius:4px;margin-left:auto}
@@ -479,7 +491,7 @@ export default function HireStory() {
            .in = everything shows). When the parent .rv enters, each child replays riseIn with its own
            inline animation-delay — fill-mode:both holds the hidden "from" frame during the delay, which
            is what creates the one-by-one typing feel without ever risking stuck-invisible content. */
-        @media (prefers-reduced-motion: reduce){.rv.in{animation:none}.rv.in .dept,.rv.in .nl,.rv.in .brain-chip,.rv.in .ho,.rv.in .tch,.rv.in .cb{animation:none!important}}
+        @media (prefers-reduced-motion: reduce){.rv.in{animation:none}.rv.in .dept,.rv.in .nl,.rv.in .brain-chip,.rv.in .relay-step,.rv.in .tch,.rv.in .cb{animation:none!important}}
       `}</style>
     </div>
   )
