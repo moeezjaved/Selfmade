@@ -16,12 +16,11 @@ export async function GET() {
     .select('org_id').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
   const userIds = mem?.org_id ? await orgMemberIds(admin, mem.org_id) : [user.id]
 
-  const { data } = await admin
-    .from('meta_accounts')
-    .select('id,account_id,account_name,currency,is_primary,last_synced_at,brand_id')
-    .in('user_id', userIds.length ? userIds : [user.id])
-    .eq('status', 'active')
-    .order('is_primary', { ascending: false })
+  const sel = (cols: string) => admin.from('meta_accounts').select(cols)
+    .in('user_id', userIds.length ? userIds : [user.id]).eq('status', 'active').order('is_primary', { ascending: false })
+  // brand_id may not exist yet (mig 142 not applied) — fall back to the base columns so the card never breaks.
+  let { data, error } = await sel('id,account_id,account_name,currency,is_primary,last_synced_at,brand_id')
+  if (error) ({ data } = await sel('id,account_id,account_name,currency,is_primary,last_synced_at'))
 
   let accounts = (data || []) as any[]
   const allowed = await allowedAdAccountIds(admin, user.id)
