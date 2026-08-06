@@ -358,8 +358,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                   <div style={section}>What&rsquo;s working across your {playbook.playbook.brandsCount} competitor{playbook.playbook.brandsCount === 1 ? '' : 's'}</div>
                   <div style={{ ...sectionSub, margin: 0 }}>Decoded from {playbook.playbook.totalAds} fresh ads — the formula to copy before it saturates.</div>
                 </div>
-                {/* "Make one like this" ACTS — opens the ad creator, seeded with the winning pattern. */}
-                <Link href={`/creative-studio?studio=1&seed=${encodeURIComponent([playbook.playbook.formats[0]?.label, playbook.playbook.hooks[0]?.label && `${playbook.playbook.hooks[0]?.label} hook`, playbook.playbook.offers[0]?.label && `${playbook.playbook.offers[0]?.label} offer`].filter(Boolean).join(', '))}`} onClick={() => onAct(playbook)}
+                {/* "Make one like this" ACTS — opens the NEW studio (/studio), seeded with the winning
+                    pattern via ?angle= (the fresh-create convention, same as studioHref). The old
+                    /creative-studio?studio=1&seed= opened the legacy My-Creatives modal. */}
+                <Link href={`/studio?angle=${encodeURIComponent([playbook.playbook.formats[0]?.label, playbook.playbook.hooks[0]?.label && `${playbook.playbook.hooks[0]?.label} hook`, playbook.playbook.offers[0]?.label && `${playbook.playbook.offers[0]?.label} offer`].filter(Boolean).join(', '))}`} onClick={() => onAct(playbook)}
                   style={{ background: FOREST, color: LIME, borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
                   Make one like this →
                 </Link>

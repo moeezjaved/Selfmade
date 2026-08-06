@@ -251,7 +251,10 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
 
   // In a brand view, "the brands you watch" means only this brand's competitors.
   const scopedFollows = scopePages ? follows.filter((f: any) => scopePages.includes(String(f.page_id))) : follows
-  const pageIds = scopedFollows.map((f: any) => f.page_id).filter(Boolean).slice(0, 60)
+  // Count/scope the playbook to SPIED brands only — the exact set shown in Brand Spy (which filters
+  // spied=true). Plain ❤️ follows (spied=false) live under "Following" and must not inflate the
+  // "what's working across your N competitors" count (was showing 7 when the user spies 5).
+  const pageIds = scopedFollows.filter((f: any) => f.spied).map((f: any) => f.page_id).filter(Boolean).slice(0, 60)
   const [marketAds, globalAds, playbookAds] = await Promise.all([
     soft((async () => {
       let q = admin.from('discovery_ads_index')

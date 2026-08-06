@@ -598,6 +598,16 @@ function CustomerChannelsSection() {
     } catch { toast.error('Something went wrong.'); setBusy('') }
   }
 
+  const disconnect = async (provider: string) => {
+    setBusy(provider)
+    try {
+      const res = await fetch('/api/channels/unipile/connect', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider }) })
+      if (res.ok) { setConnected(prev => prev.filter(p => p !== provider)); toast.success('Disconnected') }
+      else toast.error('Couldn’t disconnect — try again.')
+    } catch { toast.error('Something went wrong.') }
+    setBusy('')
+  }
+
   const Row = ({ provider, label, logo, how }: { provider: string; label: string; logo: ReactNode; how: string }) => {
     const on = connected.includes(provider)
     return (
@@ -607,10 +617,23 @@ function CustomerChannelsSection() {
           <div style={{ fontSize: 14, fontWeight: 700, color: '#1a3a1a' }}>{label}{on && <span style={{ fontSize: 11, fontWeight: 700, color: '#3b6d11', background: '#eaf3de', borderRadius: 20, padding: '2px 8px', marginLeft: 8 }}>Connected ✓</span>}</div>
           <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 2 }}>{how}</div>
         </div>
-        <button onClick={() => connect(provider)} disabled={busy === provider}
-          style={{ background: on ? '#fff' : '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: on ? 700 : 800, border: on ? '1.5px solid #e2e8f0' : 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>
-          {busy === provider ? 'Opening…' : on ? 'Reconnect' : 'Connect →'}
-        </button>
+        {on ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
+            <button onClick={() => connect(provider)} disabled={busy === provider}
+              style={{ background: 'none', border: 'none', color: '#7a9a7a', fontSize: 12.5, fontWeight: 700, cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', textDecoration: 'underline', padding: 0, opacity: busy === provider ? 0.6 : 1 }}>
+              {busy === provider ? 'Opening…' : 'Reconnect'}
+            </button>
+            <button onClick={() => disconnect(provider)} disabled={busy === provider}
+              style={{ background: '#fff', color: '#b42318', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, border: '1.5px solid #f3d3cf', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy === provider ? 0.6 : 1 }}>
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => connect(provider)} disabled={busy === provider}
+            style={{ background: '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>
+            {busy === provider ? 'Opening…' : 'Connect →'}
+          </button>
+        )}
       </div>
     )
   }

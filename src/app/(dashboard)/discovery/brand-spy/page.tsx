@@ -9,6 +9,15 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { refreshCredits } from '@/components/credits/CreditCounter'
 import { showUpsell } from '@/components/UpsellModal'
+import { BRAND_COOKIE } from '@/lib/brand/cookie'
+
+// Read a cookie client-side — same as ProjectSwitcher, to default the "link to your brand" picker
+// to the active project (?brand / sf_brand cookie) so a new spy attaches to the right brand.
+function readCookie(name: string): string {
+  if (typeof document === 'undefined') return ''
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
+  return m ? decodeURIComponent(m[1]) : ''
+}
 
 type Brand = { pageId: string; name: string; adCount: number; active: number | null; inactive: number | null; video: number | null; image: number | null; carousel: number | null; crawled?: boolean }
 
@@ -32,6 +41,19 @@ export default function BrandSpyList() {
   const [msg, setMsg] = useState('')
   const [confirmSpy, setConfirmSpy] = useState<{ payload: { url?: string; pageId?: string; name?: string }; busyKey: string; name: string } | null>(null)  // in-app dialog
   const [confirmUnspy, setConfirmUnspy] = useState<Brand | null>(null)  // un-spy confirmation
+
+  // "Link to your brand" — a spied competitor attaches to one of the user's own brands (followed_brands
+  // .brand_id, mig 117) so it scopes the right brief. Defaults to the active project (sf_brand cookie).
+  const [myBrands, setMyBrands] = useState<{ id: string; name: string }[]>([])
+  const [linkBrandId, setLinkBrandId] = useState<string>('')
+  useEffect(() => {
+    fetch('/api/brands').then(r => r.ok ? r.json() : null).then(j => {
+      const list: { id: string; name: string }[] = (j?.brands || []).map((b: any) => ({ id: String(b.id), name: b.name || 'Untitled' }))
+      setMyBrands(list)
+      const active = readCookie(BRAND_COOKIE)
+      setLinkBrandId(list.find(b => b.id === active)?.id || (list.length === 1 ? list[0].id : ''))
+    }).catch(() => {})
+  }, [])
 
   const fetchBrands = useCallback(async (query: string, scope: 'mine' | 'all'): Promise<Brand[]> => {
     const p = new URLSearchParams({ scope }); if (query) p.set('q', query)
@@ -58,6 +80,11 @@ export default function BrandSpyList() {
       const res = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
       const j = await res.json()
       if (!res.ok) { if (showUpsell(j)) { setBusy(null); return } setMsg(j.message || j.error || 'Failed'); setBusy(null); return }
+      // Attach the follow to the chosen brand — brand-spy's insert doesn't carry brand_id, so /api/follows
+      // does the first-assignment link (same pattern as AddCompetitors / WatchingCompetitors). Best-effort.
+      if (linkBrandId && j.pageId) {
+        await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: String(j.pageId), brandName: confirmSpy.name, action: 'follow', brandId: linkBrandId, spied: true }) }).catch(() => {})
+      }
       refreshCredits()
       router.push(`/discovery/brand-spy/${j.pageId}`)
     } catch (e) { setMsg(String(e)); setBusy(null) }
@@ -150,6 +177,18 @@ export default function BrandSpyList() {
               <button onClick={() => setModalTab('search')} style={tab(modalTab === 'search')}>Search Brand</button>
               <button onClick={() => setModalTab('manual')} style={tab(modalTab === 'manual')}>Add Manually</button>
             </div>
+
+            {/* Link the new competitor to one of your own brands so it scopes the right brief. */}
+            {myBrands.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 14px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>Spy for</span>
+                <select value={linkBrandId} onChange={(e) => setLinkBrandId(e.target.value)}
+                  style={{ flex: 1, minWidth: 160, padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, background: '#fff', color: '#111', outline: 'none', cursor: 'pointer' }}>
+                  <option value="">All brands (not linked)</option>
+                  {myBrands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+            )}
 
             {modalTab === 'search' ? (
               <div>
