@@ -13,7 +13,7 @@ const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FO
 type Camp = { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null; metaCampaignId?: string | null; ctr?: number; impressions?: number; clicks?: number }
 type Ad = { adId: string; name: string; campaignName?: string | null; metaCampaignId?: string | null; spend: number; impressions: number; clicks: number; ctr: number; cpc: number; roas: number; conversions: number; thumbnail_url?: string | null; preview_url?: string | null }
 type Summary = {
-  accounts?: { accountId: string; name: string; currency: string; isPrimary: boolean }[]
+  accounts?: { accountId: string; name: string; currency: string; isPrimary: boolean; brandId?: string | null }[]
   selected?: string; currency?: string; accountName?: string | null; range?: string
   total: number; spend: number; avgRoas: number; spendToday?: number
   counts?: { scale: number; watch: number; pause: number }
@@ -31,13 +31,15 @@ const headline = (d: Summary) => {
   return `I audited your ${d.total} campaign${d.total === 1 ? '' : 's'} — ${parts.length ? parts.join(', ') : 'all steady'}.`
 }
 
-export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabel = 'See the full report', onAct, onAccountChange }: {
+export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabel = 'See the full report', onAct, onAccountChange, brandId, brandName }: {
   initial: Summary; ctaHref?: string; ctaLabel?: string; onAct?: () => void
   // Broadcast which account (and its currency) this card is showing, so the rest of the brief
   // ("What Mello would do", etc.) follows the SAME account and every figure agrees. Fired on the
   // user's explicit switch — never on mount — to stay off Meta's rate limit.
   onAccountChange?: (accountId: string, currency: string) => void
+  brandId?: string | null; brandName?: string | null   // the selected project/brand — the card scopes to its linked account
 }) {
+  const [brands, setBrands] = useState<{ id: string; name: string }[]>([])
   const [d, setD] = useState<Summary>(initial)
   const [accounts, setAccounts] = useState<Summary['accounts']>([])
   const [sel, setSel] = useState<string>('')
@@ -53,6 +55,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
     setBusy(true)
     const qs = new URLSearchParams()
     if (accountId) qs.set('accountId', accountId)
+    else if (brandId) qs.set('brand', brandId)   // no explicit account → the selected brand's linked account
     qs.set('range', r)
     fetch(`/api/meta/audit-summary?${qs.toString()}`, { cache: 'no-store' })
       .then(res => res.ok ? res.json() : null)
@@ -85,15 +88,26 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
     load(sel, range)
   }
 
+  // Link the currently-viewed ad account to a brand/project — so picking that brand on the brief shows
+  // THIS account's Facebook numbers. Optimistic; the brand switcher then drives the card.
+  const assignBrand = async (bid: string) => {
+    if (!sel) return
+    setAccounts(prev => (prev || []).map(a => a.accountId === sel ? { ...a, brandId: bid || null } : a))
+    await fetch('/api/meta/accounts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: sel, brand_id: bid || null }) }).catch(() => {})
+  }
+
   // On mount we DON'T pull live Graph — we render the nightly-stored audit (`initial`) and only fetch
   // the cheap DB accounts list so the switcher works. Live data (spend today, top ads, fresh grade)
   // loads when the user switches account / changes range / taps refresh. Keeps us off Meta's rate limit.
   useEffect(() => {
+    // Brands for the "this account is for [brand]" assignment control.
+    fetch('/api/brands', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => setBrands((j?.brands || []).map((b: any) => ({ id: String(b.id), name: String(b.name) })))).catch(() => {})
     fetch('/api/meta/accounts', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
-      const list = Array.isArray(j?.accounts) ? j.accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })) : []
+      const list = Array.isArray(j?.accounts) ? j.accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary, brandId: a.brand_id || null })) : []
       if (!list.length) { setHealing(false); return }   // nothing to load live → fall back to the stored paint
       setAccounts(list)
-      const p = list.find((x: any) => x.isPrimary) || list[0]
+      // Default to the SELECTED brand's linked account (the project link); else the primary.
+      const p = (brandId && list.find((x: any) => x.brandId === brandId)) || list.find((x: any) => x.isPrimary) || list[0]
       setSel(p.accountId)
       // ALWAYS tell the brief which account is resolved as primary, on mount — so "What Mello would do"
       // scopes to the SAME account (a stored ROY-1 card must not show under an Aura-Bura brief). The
@@ -110,7 +124,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       // during the fetch so the founder never reads the wrong number, then it settles on the real ones.
       setHealing(true); load(p.accountId)
     }).catch(() => setHealing(false))   // accounts call failed → clear loading, keep the stored paint
-  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps  — re-resolve the account when the brand switches
 
   const money = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: d.currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()}` } }
 
@@ -231,6 +245,15 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
                   style={{ background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '3px 11px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer' }}>
                   ★ Set as main
                 </button>
+              )}
+              {/* Project link — which brand this ad account is for, so the brand switcher shows it. */}
+              {brands.length > 0 && sel && (
+                <select value={accounts?.find(a => a.accountId === sel)?.brandId || ''} onChange={(e) => assignBrand(e.target.value)}
+                  title="Which brand is this ad account for?"
+                  style={{ background: 'rgba(255,255,255,.08)', color: '#cbd7c6', border: '1px solid rgba(255,255,255,.18)', borderRadius: 100, padding: '3px 10px', fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', maxWidth: 170 }}>
+                  <option value="" style={{ color: '#111' }}>— link to a brand —</option>
+                  {brands.map(b => <option key={b.id} value={b.id} style={{ color: '#111' }}>for {b.name}</option>)}
+                </select>
               )}
               {/* day-range picker — default 30d */}
               <span style={{ display: 'inline-flex', gap: 2, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: 2 }}>
