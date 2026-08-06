@@ -108,6 +108,9 @@ export default function SettingsPage() {
   useEffect(() => {
     const p = new URLSearchParams(window.location.search)
     if (p.get('connected') || p.get('connect_error')) setTab('channels')
+    // Deep-link straight to a tab, e.g. /settings?tab=channels from the brief's "Get briefs on Slack…".
+    const t = p.get('tab')
+    if (t && ['account', 'notifications', 'autopilot', 'channels', 'integrations'].includes(t)) setTab(t as typeof tab)
   }, [])
   const router = useRouter()
 

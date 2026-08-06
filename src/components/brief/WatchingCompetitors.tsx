@@ -70,6 +70,16 @@ export default function WatchingCompetitors({ brandId, brandName }: { brandId?: 
       else toast.error('Could not start the fetch.')
     } catch { toast.error('Could not start the fetch.') } finally { setBusy(false) }
   }
+  const [linking, setLinking] = useState('')
+  const linkOne = async (u: { pageId: string; brand: string }) => {
+    if (!brandId) return
+    setLinking(u.pageId)
+    try {
+      await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: u.pageId, brandName: u.brand, action: 'follow', brandId, spied: true }) })
+      toast.success(`Linked ${u.brand} to ${brandName || 'this brand'}.`)
+      load()
+    } catch { toast.error('Could not link.') } finally { setLinking('') }
+  }
   const linkAll = async () => {
     if (!brandId || !unlinked.length) return
     setBusy(true)
@@ -117,9 +127,18 @@ export default function WatchingCompetitors({ brandId, brandName }: { brandId?: 
 
       {rows.length === 0 && unlinked.length > 0 && brandId && (
         <div style={{ background: '#fef6e7', border: '1px solid #f2e3c0', borderRadius: 12, padding: '12px 14px', marginTop: 4 }}>
-          <div style={{ fontSize: 13, fontWeight: 750, color: '#9a6a12', marginBottom: 4 }}>You’re watching {unlinked.length} competitor{unlinked.length === 1 ? '' : 's'}, but {unlinked.length === 1 ? 'it isn’t' : 'they aren’t'} linked to {brandName || 'this brand'}.</div>
-          <div style={{ fontSize: 12, color: '#7a6a4a', marginBottom: 8 }}>{unlinked.map(u => u.brand).join(', ')}</div>
-          <button onClick={linkAll} disabled={busy} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '6px 14px', fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Linking…' : `Link to ${brandName || 'this brand'} →`}</button>
+          <div style={{ fontSize: 13, fontWeight: 750, color: '#9a6a12', marginBottom: 8 }}>You’re watching {unlinked.length} competitor{unlinked.length === 1 ? '' : 's'} not linked to {brandName || 'this brand'}. Link the ones that actually compete with it:</div>
+          {/* Per-competitor — choose which belong to THIS brand (linking all at once was wrong for
+              multi-brand founders). */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+            {unlinked.map(u => (
+              <div key={u.pageId} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #f2e3c0', borderRadius: 9, padding: '6px 8px 6px 11px' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.brand}</span>
+                <button onClick={() => linkOne(u)} disabled={!!linking} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '4px 12px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: linking ? 'default' : 'pointer', opacity: linking && linking !== u.pageId ? 0.5 : 1, whiteSpace: 'nowrap' }}>{linking === u.pageId ? 'Linking…' : `Link → ${brandName || ''}`.trim()}</button>
+              </div>
+            ))}
+          </div>
+          {unlinked.length > 1 && <button onClick={linkAll} disabled={busy} style={{ background: 'none', border: 'none', color: GREEN, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer', padding: 0 }}>{busy ? 'Linking…' : `Link all ${unlinked.length} to ${brandName || 'this brand'}`}</button>}
         </div>
       )}
     </div>
