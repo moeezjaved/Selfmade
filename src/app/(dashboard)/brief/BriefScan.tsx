@@ -137,11 +137,13 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
   const isPaid = ['starter', 'pro', 'business', 'enterprise'].includes(String(plan || '').toLowerCase())
   const canLaunch = planEntitlements(plan).launch   // Meta = the `launch` entitlement (same gate as /m4, /connect/meta)
   const perDay = (49 / 30).toFixed(2)
-  // Which brief channels are already connected — so "Finish setup" drops the ones that are done.
+  // Which FOUNDER brief channels are connected — so "Finish setup" (get your brief on Slack/WhatsApp)
+  // drops the done ones. Only `kind:'founder'` counts: a CUSTOMER-inbox WhatsApp is a different channel
+  // and must NOT hide the founder-brief prompt.
   const [connectedChannels, setConnectedChannels] = useState<string[]>([])
   useEffect(() => {
     fetch('/api/channels/unipile/connect').then(r => r.ok ? r.json() : null)
-      .then(j => { if (Array.isArray(j?.connected)) setConnectedChannels(j.connected.map((c: any) => String(c.provider))) })
+      .then(j => { if (Array.isArray(j?.connected)) setConnectedChannels(j.connected.filter((c: any) => c.kind === 'founder').map((c: any) => String(c.provider))) })
       .catch(() => {})
   }, [])
   const playbook = brief.items.find(i => i.kind === 'market_playbook' && i.playbook) || null
