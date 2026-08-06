@@ -65,6 +65,7 @@ export default function HireStory() {
       <header className="hero">
         <div className="eyebrow rv">Introducing Selfmade</div>
         <h1 className="rv d2">You just hired a<br />marketing company.</h1>
+        <p className="hero-neg rv d2">No employees. No agency. No freelancers.</p>
         <p className="hero-sub rv d3">A whole team — Research, Creative, Media Buying, Customer care — run by
         Mello, your marketing manager. They do the work. You make the decisions.</p>
 
@@ -240,11 +241,11 @@ export default function HireStory() {
         <div className="relay rv d3" aria-hidden="true">
           <span className="relay-spine" />
           {[
-            ['Research', 'A new rival just entered your category — 6 ads live.', false],
-            ['Creative', 'Countered with 3 concepts in your voice.', false],
-            ['Media Buying', 'Test budget ready. Start at $30 / day?', false],
-            ['Finance', 'Low risk — worst case is $210 / week.', false],
-            ['Mello', 'Everything’s ready. Approve?', true],
+            ['Research', 'A rival just launched a new hook.', false],
+            ['Creative', 'Already made three versions.', false],
+            ['Media Buying', 'Version B is ready to launch.', false],
+            ['Finance', 'Estimated +$210 / week.', false],
+            ['Mello', 'Ready. Approve?', true],
           ].map(([dept, line, isMello], i) => (
             <div className={`relay-step${isMello ? ' relay-step--mello' : ''}`} key={dept as string} style={{ animationDelay: `${i * 0.12}s` }}>
               <span className="relay-node">{isMello ? '●●' : i + 1}</span>
@@ -387,7 +388,8 @@ export default function HireStory() {
         /* ── 1 · hero ── */
         .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:130px 24px 90px}
         .hero h1{font-size:clamp(48px,9vw,116px);line-height:1;margin-top:26px;color:#171d18}
-        .hero-sub{margin-top:32px;max-width:54ch;font-size:clamp(16px,1.8vw,19px);line-height:1.7;color:#4c5347;font-weight:500}
+        .hero-neg{margin-top:20px;font-size:clamp(15px,1.95vw,20px);font-weight:750;letter-spacing:-.012em;color:#1f2a20}
+        .hero-sub{margin-top:22px;max-width:54ch;font-size:clamp(16px,1.8vw,19px);line-height:1.7;color:#4c5347;font-weight:500}
         .hero-cta{display:flex;align-items:center;gap:26px;margin-top:40px;flex-wrap:wrap;justify-content:center}
         .btn-forest{background:#17251c;color:#dffe95;border-radius:100px;padding:18px 42px;font-size:15.5px;font-weight:800;text-decoration:none;letter-spacing:-.01em;transition:transform .15s,box-shadow .15s}
         .btn-forest:hover{transform:translateY(-2px);box-shadow:0 18px 44px -14px rgba(23,37,28,.45)}
