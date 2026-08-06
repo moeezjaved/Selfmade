@@ -66,15 +66,16 @@ export async function POST(req: NextRequest) {
       // spied:true (from onboarding) puts the competitor in Brand Spy immediately — free here, since
       // it's a follow, not the paid /brand-spy action. Default follows stay spied=false (Following only).
       await admin.from('followed_brands').insert({ user_id: user.id, page_id: String(pageId), brand_name: brandName || null, email_alerts: !!email_alerts, brand_id, ...(spied === true ? { spied: true } : {}) })
-    } else if (spied === true) {
-      // Already followed (e.g. account-level) → promote to spied so it shows in Brand Spy.
-      await admin.from('followed_brands').update({ spied: true }).eq('user_id', user.id).eq('page_id', String(pageId))
-    } else if (brand_id && !(existing as any).brand_id) {
-      // Already following (e.g. added account-level in onboarding), and now assigned to a brand via
-      // "Watch competitors". Attach it. Only when currently unassigned — first-assignment wins, so we
-      // never silently move a rival off a brand it's already tied to (the single-row limit; migration
-      // 117 header). This is the common path: every legacy follow starts NULL.
-      await admin.from('followed_brands').update({ brand_id }).eq('user_id', user.id).eq('page_id', String(pageId))
+    } else if (spied === true || (brand_id && !(existing as any).brand_id)) {
+      // Already following (e.g. the brand-spy crawl call created the row first, or an account-level
+      // onboarding follow). Apply BOTH: promote to spied AND attach the brand. These used to be separate
+      // else-if branches, so `spied:true` won and the brand_id was silently dropped — leaving the
+      // competitor with brand_id NULL, invisible to a brand-scoped brief. First-assignment wins for
+      // brand_id (never move a rival off a brand it's already tied to; migration 117).
+      const upd: Record<string, any> = {}
+      if (spied === true) upd.spied = true
+      if (brand_id && !(existing as any).brand_id) upd.brand_id = brand_id
+      if (Object.keys(upd).length) await admin.from('followed_brands').update(upd).eq('user_id', user.id).eq('page_id', String(pageId))
     }
     following = true
   } else {
