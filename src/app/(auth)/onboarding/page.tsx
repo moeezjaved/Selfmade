@@ -280,7 +280,15 @@ export default function InterviewPage() {
     return () => clearTimeout(t)
   }, [q])
 
-  const togglePick = (c: Comp) => setPicks(p => p.some(x => x.pageId === c.pageId) ? p.filter(x => x.pageId !== c.pageId) : p.length >= 5 ? p : [...p, c])
+  const togglePick = (c: Comp) => {
+    setPicks(p => p.some(x => x.pageId === c.pageId) ? p.filter(x => x.pageId !== c.pageId) : p.length >= 5 ? p : [...p, c])
+    // Added by a raw page id ("Facebook page <id>")? Resolve the real brand name so the chip shows it.
+    if (/^facebook page \d+$/i.test(c.name) || /^\d+$/.test(c.name.trim())) {
+      fetch('/api/discovery/resolve-names', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageIds: [c.pageId] }) })
+        .then(r => r.json()).then(j => { const nm = j?.names?.[c.pageId]; if (nm) setPicks(p => p.map(x => x.pageId === c.pageId ? { ...x, name: nm } : x)) })
+        .catch(() => {})
+    }
+  }
 
   const confirmCompetitors = () => {
     if (markets.length) note('fact', `Markets: ${markets.map(m => COUNTRIES.find(c => c[0] === m)?.[1] || m).join(', ')}.`)
@@ -352,8 +360,19 @@ export default function InterviewPage() {
     note('fact', `Hired on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} — agreement signed by ${signName.trim()}.`)
     setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: 'agreement filed', done: false }])
 
+    // Resolve any competitor added by a raw page id ("Facebook page <id>") to its real brand name, so the
+    // follow, brand-spy crawl, the first report AND the brief all show the name — never the numeric id.
+    let resolved = picks
+    try {
+      const fallbackIds = picks.filter(p => /^facebook page \d+$/i.test(p.name) || /^\d+$/.test(p.name.trim())).map(p => p.pageId)
+      if (fallbackIds.length) {
+        const { names } = await fetch('/api/discovery/resolve-names', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageIds: fallbackIds }) }).then(r => r.json()).catch(() => ({ names: {} }))
+        resolved = picks.map(p => (names && names[p.pageId]) ? { ...p, name: names[p.pageId] } : p)
+      }
+    } catch { /* keep original names */ }
+
     // real work: enqueue each competitor's full-archive crawl + follow them (feeds the alert pipeline → the brief)
-    for (const p of picks) {
+    for (const p of resolved) {
       setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: `starting on ${p.name} — pulling their live ads`, done: false }])
       await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, name: p.name, crawlOnly: true }) }).catch(() => {})
       await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandIdRef.current || undefined, spied: true }) }).catch(() => {})
@@ -362,10 +381,10 @@ export default function InterviewPage() {
     // Auto-author the first Competitor Intelligence Report on the primary competitor — the show-then-sell
     // wow that greets them on the brief. Fire-and-forget on gpt-4o (~$0.04 vs Opus ~$0.25) so a wave of
     // signups stays cheap; it runs server-side even after they navigate to /brief. Never blocks the night.
-    if (picks[0]?.name) {
+    if (resolved[0]?.name) {
       void fetch('/api/mello/documents/competitor-report', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ competitor: picks[0].name, brandId: brandIdRef.current || undefined, preferModel: 'gpt-4o', charge: false }),
+        body: JSON.stringify({ competitor: resolved[0].name, brandId: brandIdRef.current || undefined, preferModel: 'gpt-4o', charge: false }),
       }).catch(() => {})
     }
     try {
@@ -398,6 +417,18 @@ export default function InterviewPage() {
       if (j?.url) { window.location.href = j.url; return }
     } catch { /* fall through */ }
     setPlanBusy(''); router.push('/brief')
+  }
+
+  // Connect WhatsApp as a customer/brief channel — starts the Unipile hosted-auth flow and returns here.
+  // (Previously this button just linked to /settings, which looked like it landed on the profile page.)
+  const [waBusy, setWaBusy] = useState(false)
+  async function connectWhatsApp() {
+    setWaBusy(true)
+    try {
+      const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider: 'whatsapp', returnTo: '/onboarding' }) }).then(r => r.json())
+      if (j?.url) { window.location.href = j.url; return }
+    } catch { /* fall through */ }
+    setWaBusy(false); router.push('/settings')   // fallback if channels aren't configured
   }
 
   return (
@@ -537,7 +568,7 @@ export default function InterviewPage() {
                 ))}
               </div>
               <div style={{ textAlign: 'center', marginTop: 24 }}>
-                <button style={btnMain} onClick={saveCulture} disabled={cultureSaving}>{cultureSaving ? 'Saving…' : 'That&rsquo;s us →'}</button>
+                <button style={btnMain} onClick={saveCulture} disabled={cultureSaving}>{cultureSaving ? 'Saving…' : 'That’s us →'}</button>
               </div>
             </div>
           )}
@@ -551,9 +582,9 @@ export default function InterviewPage() {
                 <a href="/api/channels/slack/start" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', textDecoration: 'none', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit' }}>
                   <ChannelLogo provider="slack" size={22} /> Add to Slack
                 </a>
-                <a href="/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', textDecoration: 'none', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit' }}>
-                  <ChannelLogo provider="whatsapp" size={22} /> Connect WhatsApp
-                </a>
+                <button onClick={connectWhatsApp} disabled={waBusy} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: waBusy ? 'default' : 'pointer', opacity: waBusy ? 0.6 : 1 }}>
+                  <ChannelLogo provider="whatsapp" size={22} /> {waBusy ? 'Opening…' : 'Connect WhatsApp'}
+                </button>
               </div>
               <div style={{ textAlign: 'center', fontSize: 12, color: MUTED, marginBottom: 6 }}>Teams love Slack · solo founders love WhatsApp · connect both if you like.</div>
 
