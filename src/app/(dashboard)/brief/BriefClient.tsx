@@ -387,21 +387,8 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
           @media(prefers-reduced-motion:reduce){.brief-say{animation:none;opacity:1;transform:none}}`}</style>
       </div>
 
-      {/* brand switcher — only with 2+ brands (pointless for one). Scopes the whole brief to one
-          brand's world; "All brands" is the pooled default. */}
-      {brands.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 2px' }}>
-          <span style={{ fontSize: 12.5, fontWeight: 650, color: '#9aa79a' }}>Showing</span>
-          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-            <select value={activeBrandId || ''} onChange={e => goBrand(e.target.value)}
-              style={{ appearance: 'none', WebkitAppearance: 'none', background: activeBrandId ? '#eef6e4' : '#fff', border: `1px solid ${activeBrandId ? '#d3e6b8' : PAPERLINE}`, borderRadius: 100, color: INK, fontWeight: 750, fontSize: 13, fontFamily: 'inherit', padding: '5px 30px 5px 13px', cursor: 'pointer', outline: 'none' }}>
-              <option value="">All brands</option>
-              {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            <span style={{ position: 'absolute', right: 12, pointerEvents: 'none', color: MUTED, fontSize: 10 }}>▾</span>
-          </div>
-        </div>
-      )}
+      {/* The active project now lives on the rail's ProjectSwitcher (app-wide), not a per-page picker —
+          the brief is server-rendered scoped to that brand. */}
 
       {/* First arrival from onboarding — the reveal, sequenced BEFORE the ask (Section 4). A calm
           serif line, not a banner-ad: proof the night's work was real, then straight into the brief. */}

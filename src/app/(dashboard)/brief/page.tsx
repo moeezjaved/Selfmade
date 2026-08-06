@@ -6,6 +6,7 @@
  */
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { assembleBrief, type Brief } from '@/lib/brief/assemble'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 import BriefClient from './BriefClient'
 
 export const dynamic = 'force-dynamic'
@@ -32,8 +33,9 @@ export default async function BriefPage({ searchParams }: { searchParams?: { vie
       const admin = createAdminClient()
       const { data: bs } = await admin.from('brands').select('id, name').eq('user_id', user.id).order('created_at', { ascending: true })
       brands = (bs || []).map((b: any) => ({ id: String(b.id), name: String(b.name) }))
-      // Only honour ?brand= if it's really one of the user's brands (no scoping to someone else's id).
-      activeBrandId = searchParams?.brand && brands.some(b => b.id === searchParams.brand) ? searchParams.brand! : null
+      // The active project: explicit ?brand= (deep link) wins, else the app-wide `sf_brand` cookie set by
+      // the rail's ProjectSwitcher. Validated against the user's own brands.
+      activeBrandId = await resolveActiveBrandId(admin, user.id, searchParams?.brand || null)
       initialBrief = await assembleBrief(admin, user.id, { ...(user.user_metadata || {}), email: user.email }, { brandId: activeBrandId })
     } catch { initialBrief = null }
   }

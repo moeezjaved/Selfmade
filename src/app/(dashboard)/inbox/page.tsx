@@ -56,8 +56,7 @@ export default function InboxPage() {
   const [intentFilter, setIntentFilter] = useState<string | null>(null)   // click a rollup chip to filter the inbox
   const [insights, setInsights] = useState<Insights | null>(null)
   const [insightsLoading, setInsightsLoading] = useState(false)
-  const [brands, setBrands] = useState<{ id: string; name: string }[]>([])
-  const [brandFilter, setBrandFilter] = useState<string>('')   // '' = all brands
+  const [brands, setBrands] = useState<{ id: string; name: string }[]>([])   // for the channel→brand assign + thread chips
 
   // The threads shown after the intent-chip filter (null = show all).
   const shownThreads = intentFilter ? threads.filter(t => t.intent === intentFilter) : threads
@@ -71,13 +70,14 @@ export default function InboxPage() {
   }
   useEffect(() => { if (tab === 'insights' && !insights && !insightsLoading) loadInsights() }, [tab])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const load = () => fetch(`/api/customer/inbox${brandFilter ? `?brand=${encodeURIComponent(brandFilter)}` : ''}`, { cache: 'no-store' }).then(r => r.json()).then(j => {
+  // The inbox scopes to the app-wide project (the sidebar switcher's `sf_brand` cookie) — the API reads it,
+  // so there's no per-page brand picker here.
+  const load = () => fetch('/api/customer/inbox', { cache: 'no-store' }).then(r => r.json()).then(j => {
     if (Array.isArray(j.threads)) setThreads(j.threads)
     if (Array.isArray(j.outbound)) setOutbound(j.outbound)
     if (j.rollup) setRollup(j.rollup)
     if (j.stats) setStats(j.stats)
   }).catch(() => {}).finally(() => setLoading(false))
-  useEffect(() => { load() }, [brandFilter])   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { fetch('/api/brands').then(r => r.ok ? r.json() : null).then(j => setBrands((j?.brands || []).map((b: any) => ({ id: String(b.id), name: String(b.name) })))).catch(() => {}) }, [])
 
   const markSale = async (threadId: string) => {
@@ -247,18 +247,6 @@ export default function InboxPage() {
           </div>
         )
       })()}
-
-      {/* Per-brand filter — one inbox, scoped to whichever brand you're working on. */}
-      {brands.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <span style={{ fontSize: 12.5, color: SUB }}>Showing</span>
-          <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)}
-            style={{ background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '5px 12px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: 'pointer' }}>
-            <option value="">All brands</option>
-            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </div>
-      )}
 
       <div style={{ display: 'flex', gap: 22, borderBottom: `1px solid ${LINE}`, marginBottom: 20 }}>
         <Tab id="inbox" label="Inbox" count={threads.length} />

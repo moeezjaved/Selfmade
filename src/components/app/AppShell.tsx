@@ -26,6 +26,7 @@ import {
   Rocket, Megaphone, LineChart, BarChart2, Wand2, Store, LayoutDashboard, ClipboardList, Trophy, Camera, Sun, Newspaper, BookOpen, FileText, Plug, Brain, Inbox,
 } from 'lucide-react'
 import SearchPalette from '@/components/SearchPalette'
+import ProjectSwitcher from '@/components/app/ProjectSwitcher'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
 import BootMotion from '@/components/motion/BootMotion'
@@ -289,6 +290,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/brief" title="Home" style={{ marginBottom: 8 }} onMouseEnter={() => setFlyout(null)}>
             <div style={{ width: 34, height: 34, borderRadius: 11, background: '#17251c', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 18, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</div>
           </Link>
+
+          {/* Project switcher — pick a brand once, the whole app scopes to it (hidden with <2 brands) */}
+          <ProjectSwitcher />
 
           {/* Create — the ONE bold thing on the rail; opens the full 3-way chooser */}
           <div onMouseEnter={() => setFlyout(null)} style={{ marginBottom: 6 }}>
