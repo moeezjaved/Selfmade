@@ -123,7 +123,7 @@ function ItemLink({ item, active, onClick }: { item: NavItem; active: boolean; o
   )
 }
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({ children, brands = [], activeBrand = '' }: { children: React.ReactNode; brands?: { id: string; name: string }[]; activeBrand?: string }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -291,8 +291,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div style={{ width: 34, height: 34, borderRadius: 11, background: '#17251c', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 18, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</div>
           </Link>
 
-          {/* Project switcher — pick a brand once, the whole app scopes to it (hidden with <2 brands) */}
-          <ProjectSwitcher />
+          {/* Project switcher — pick a brand once, the whole app scopes to it. Seeded from server data so
+              the tile is in the HTML and survives a broken hydration (extensions). */}
+          <ProjectSwitcher initialBrands={brands} initialActive={activeBrand} />
 
           {/* Create — the ONE bold thing on the rail; opens the full 3-way chooser */}
           <div onMouseEnter={() => setFlyout(null)} style={{ marginBottom: 6 }}>

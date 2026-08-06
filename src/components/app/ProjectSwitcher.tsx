@@ -17,17 +17,19 @@ function readCookie(name: string): string {
   return m ? decodeURIComponent(m[1]) : ''
 }
 
-export default function ProjectSwitcher() {
+export default function ProjectSwitcher({ initialBrands = [], initialActive = '' }: { initialBrands?: Brand[]; initialActive?: string }) {
   const router = useRouter()
-  const [brands, setBrands] = useState<Brand[]>([])
-  const [active, setActive] = useState<string>('')
+  // Seed from server-rendered props so the tile is in the HTML immediately and survives a broken
+  // hydration (browser extensions). The client fetch below only refreshes the list.
+  const [brands, setBrands] = useState<Brand[]>(initialBrands)
+  const [active, setActive] = useState<string>(initialActive)
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setActive(readCookie(BRAND_COOKIE))
+    const c = readCookie(BRAND_COOKIE); if (c) setActive(c)
     fetch('/api/brands').then(r => r.ok ? r.json() : null)
-      .then(j => setBrands((j?.brands || []).map((b: any) => ({ id: String(b.id), name: String(b.name) }))))
+      .then(j => { const list = (j?.brands || []).map((b: any) => ({ id: String(b.id), name: String(b.name) })); if (list.length) setBrands(list) })
       .catch(() => {})
   }, [])
 
