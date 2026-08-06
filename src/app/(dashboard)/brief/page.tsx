@@ -7,6 +7,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { assembleBrief, type Brief } from '@/lib/brief/assemble'
 import { resolveActiveBrandId } from '@/lib/brand/active'
+import { getBalance } from '@/lib/credits'
 import BriefClient from './BriefClient'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,11 @@ export default async function BriefPage({ searchParams }: { searchParams?: { vie
   let initialBrief: Brief | null = null
   let brands: { id: string; name: string }[] = []
   let activeBrandId: string | null = null
+  // Plan + credits resolved on the SERVER so the right-rail card ("Hire Mello full-time" for free vs
+  // "Buy credits"/balance for subscribers) is correct on first paint — no flash of the upsell for a
+  // paying founder while a client fetch loads the plan.
+  let initialPlan: string | null = null
+  let initialCredits: number | null = null
   if (user) {
     try {
       const admin = createAdminClient()
@@ -37,7 +43,8 @@ export default async function BriefPage({ searchParams }: { searchParams?: { vie
       // the rail's ProjectSwitcher. Validated against the user's own brands.
       activeBrandId = await resolveActiveBrandId(admin, user.id, searchParams?.brand || null)
       initialBrief = await assembleBrief(admin, user.id, { ...(user.user_metadata || {}), email: user.email }, { brandId: activeBrandId })
+      try { const bal = await getBalance(admin, user.id); initialPlan = String(bal.plan || 'free'); initialCredits = typeof bal.balance === 'number' ? bal.balance : null } catch { /* card falls back to client fetch */ }
     } catch { initialBrief = null }
   }
-  return <BriefClient initialBrief={initialBrief} initialView={initialView} brands={brands} activeBrandId={activeBrandId} welcome={welcome} />
+  return <BriefClient initialBrief={initialBrief} initialView={initialView} brands={brands} activeBrandId={activeBrandId} initialPlan={initialPlan} initialCredits={initialCredits} welcome={welcome} />
 }
