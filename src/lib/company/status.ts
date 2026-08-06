@@ -12,7 +12,7 @@ export type DeptView = {
   pending?: number; learnings?: number; progress: { built: number; total: number }
 }
 
-export async function computeCompanyStatus(admin: any, userId: string): Promise<{ departments: DeptView[]; tasks: any[] }> {
+export async function computeCompanyStatus(admin: any, userId: string, brandId?: string | null): Promise<{ departments: DeptView[]; tasks: any[] }> {
   const now = Date.now()
   const weekAgo = new Date(now - 7 * 24 * H).toISOString()
   // A department is never "quiet" while it's actually doing ongoing work — count the live signals so the
@@ -21,8 +21,8 @@ export async function computeCompanyStatus(admin: any, userId: string): Promise<
   const [taskRes, learnRes, competitors, creativesWk, campaignsN, openChats] = await Promise.all([
     admin.from('mello_tasks').select('id, kind, status, title, evidence, updated_at, created_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(200),
     admin.from('learnings').select('department, event, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(200),
-    count(() => admin.from('followed_brands').select('id', { count: 'exact', head: true }).eq('user_id', userId)),
-    count(() => admin.from('creative_generations').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', weekAgo)),
+    count(() => { let q = admin.from('followed_brands').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('spied', true); if (brandId) q = q.eq('brand_id', brandId); return q }),
+    count(() => { let q = admin.from('creative_generations').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', weekAgo); if (brandId) q = q.eq('brand_id', brandId); return q }),
     count(() => admin.from('campaigns').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'ACTIVE')),
     count(() => admin.from('customer_threads').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'open')),
   ])

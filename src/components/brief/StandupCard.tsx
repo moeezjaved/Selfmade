@@ -15,15 +15,15 @@ type Prompt = { key: string; emoji: string; label: string }
 type Standup = { greeting: string; dateLabel: string; lines: Line[]; pendingCount: number; pendingTitles: string[]; calendarConnected: boolean; connectPrompts?: Prompt[] }
 type Prep = { prepared: { dept: string; detail: string }[]; awaiting: { title: string; kind: string; cost: string }[]; summary: string }
 
-export default function StandupCard() {
+export default function StandupCard({ brandId }: { brandId?: string | null }) {
   const [s, setS] = useState<Standup | null>(null)
   const [open, setOpen] = useState(false)
   const [preparing, setPreparing] = useState(false)
   const [prep, setPrep] = useState<Prep | null>(null)
 
   useEffect(() => {
-    fetch('/api/company/standup', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { if (j && Array.isArray(j.lines)) setS(j) }).catch(() => {})
-  }, [])
+    fetch(`/api/company/standup${brandId ? `?brand=${encodeURIComponent(brandId)}` : ''}`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { if (j && Array.isArray(j.lines)) setS(j) }).catch(() => {})
+  }, [brandId])
 
   const prepareEverything = () => {
     setPreparing(true); setOpen(true)

@@ -163,7 +163,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
         <div style={{ minWidth: 0 }}>
 
           {/* ── The Morning Standup — one line from each department, the way you'd hear it walking in. ── */}
-          <StandupCard />
+          <StandupCard brandId={activeBrandId} />
 
           {/* ── The hero card — the one focal point. It GROWS gently into place; nothing competes. ── */}
           <div className="bsx-hero" style={{ ...card, borderRadius: 20, boxShadow: '0 1px 3px rgba(17,24,17,.05), 0 24px 60px -24px rgba(17,24,17,.18)', padding: 'clamp(24px, 3vw, 36px)', marginBottom: 24 }}>
