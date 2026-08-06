@@ -464,10 +464,14 @@ function M4Inner() {
     try{
       const res=await fetch('/api/m4/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:form.campaignName||'M4',creatives:validCreatives,retargetingCreatives:validRetargeting,retainerCreatives:validRetainer,interests:selectedInterests,budget:form.budget,location:form.location,ageMin:form.ageMin,ageMax:form.ageMax,gender:form.gender,pixelId,objective:form.objective,pageId:selectedPageId,instagramActorId:selectedInstagramId,primaryText:adCopy.primaryText,headline:adCopy.headline,cta:adCopy.cta,websiteUrl:adCopy.destinationUrl,retargetingCopy,retainerCopy,includeRetainer})})
       const data=await res.json()
+      const totalAds=(data.broad_adsets||0)+(data.interest_adsets||0)+(data.retargeting_adsets||0)+(data.retainer_adsets||0)
+      const errMsg=data.errors?.length?'\n\nWhy:\n'+data.errors.join('\n'):''
       if(data.error)alert('Launch failed: '+data.error)
-      else{
-        const errMsg=data.errors?.length?'\n\nErrors:\n'+data.errors.join('\n'):''
-        alert('LAUNCHED in '+data.account+'!\n\nBroad: '+data.broad_adsets+' ad sets\nInterest: '+data.interest_adsets+' ad sets\nRetargeting: '+(data.retargeting_adsets||0)+' ad sets\n'+(includeRetainer?'Retainer: '+(data.retainer_adsets||0)+' ad sets\n':'')+'\nAll PAUSED. Activate in Meta Ads Manager.'+errMsg)
+      else if(totalAds===0){
+        // Campaign shell may exist but NO ads were created — say so instead of a false "LAUNCHED".
+        alert('No ads were created — the campaign didn’t go live.'+(errMsg||'\n\nUsually this means the Meta ad account still needs setup (add a payment method + confirm details in Meta’s “Account overview”), or the creative failed to upload. Fix that and launch again.'))
+      } else{
+        alert('LAUNCHED in '+data.account+'!\n\nBroad: '+data.broad_adsets+' ad\nInterest: '+data.interest_adsets+' ad\nRetargeting: '+(data.retargeting_adsets||0)+' ad\n'+(includeRetainer?'Retainer: '+(data.retainer_adsets||0)+' ad\n':'')+'\nAll PAUSED. Activate in Meta Ads Manager.'+errMsg)
         goTo('grades')
       }
     }catch(e:any){alert('Error: '+e.message)}

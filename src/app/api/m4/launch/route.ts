@@ -233,6 +233,10 @@ export async function POST(request: NextRequest) {
 
     for (const c of (creatives as any[]).slice(0, 5)) {
       try {
+        // Creative FIRST — if it can't be built (no image hash / account not set up), skip the whole ad
+        // set so we never leave an orphaned ad set with no ad (the "empty ad sets" bug).
+        const creativeId = await createAdCreative(`Creative — ${c.name}`, c.hash || null, undefined, c.type === 'video')
+        if (!creativeId) continue
         const broadAdset = await post(`${adAccountId}/adsets`, {
           name: `${campaignName} — Broad — ${c.name}`,
           campaign_id: broadCamp.id,
@@ -248,18 +252,13 @@ export async function POST(request: NextRequest) {
           ...optSettings,
           ...promotedObject,
         })
-
-        // Create ad with creative
-        const creativeId = await createAdCreative(`Creative — ${c.name}`, c.hash || null, undefined, c.type === 'video')
-        if (creativeId) {
-          await post(`${adAccountId}/ads`, {
-            name: `Ad — ${c.name}`,
-            adset_id: broadAdset.id,
-            creative: { creative_id: creativeId },
-            status: 'PAUSED',
-          })
-          broadCount++
-        }
+        await post(`${adAccountId}/ads`, {
+          name: `Ad — ${c.name}`,
+          adset_id: broadAdset.id,
+          creative: { creative_id: creativeId },
+          status: 'PAUSED',
+        })
+        broadCount++
       } catch(e: any) {
         errors.push(`Broad "${c.name}": ${e.message}`)
       }
@@ -298,6 +297,9 @@ export async function POST(request: NextRequest) {
           intTargeting.flexible_spec = [{ interests: [{ id: metaInterest.id, name: metaInterest.name }] }]
         }
 
+        // Creative FIRST — skip the ad set entirely if it can't be built (no orphan ad sets).
+        const creativeId = await createAdCreative(`Creative — ${interest.name}`, firstHash, undefined, firstCreative?.type === 'video')
+        if (!creativeId) continue
         const intAdset = await post(`${adAccountId}/adsets`, {
           name: `${campaignName} — Interest — ${interest.name}`,
           campaign_id: intCamp.id,
@@ -307,17 +309,13 @@ export async function POST(request: NextRequest) {
           ...optSettings,
           ...promotedObject,
         })
-
-        const creativeId = await createAdCreative(`Creative — ${interest.name}`, firstHash, undefined, firstCreative?.type === 'video')
-        if (creativeId) {
-          await post(`${adAccountId}/ads`, {
-            name: `Ad — ${interest.name}`,
-            adset_id: intAdset.id,
-            creative: { creative_id: creativeId },
-            status: 'PAUSED',
-          })
-          intCount++
-        }
+        await post(`${adAccountId}/ads`, {
+          name: `Ad — ${interest.name}`,
+          adset_id: intAdset.id,
+          creative: { creative_id: creativeId },
+          status: 'PAUSED',
+        })
+        intCount++
       } catch(e: any) {
         errors.push(`Interest "${interest.name}": ${e.message}`)
       }
