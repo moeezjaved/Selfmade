@@ -6,7 +6,7 @@
  * to switch or jump back to All brands. Switching writes the cookie + reloads so every surface re-scopes.
  */
 import { useEffect, useState } from 'react'
-import { BRAND_COOKIE } from '@/lib/brand/active'
+import { BRAND_COOKIE } from '@/lib/brand/cookie'
 
 type Brand = { id: string; name: string }
 
@@ -28,10 +28,13 @@ export default function ProjectSwitcher() {
       .catch(() => {})
   }, [])
 
-  // Fewer than 2 brands → nothing to switch between; the app is implicitly that one brand.
-  if (brands.length < 2) return null
+  // No brands yet → nothing to show (onboarding handles first-brand creation). With ≥1 we show it so the
+  // founder can switch AND reach "+ New brand" even from a single-brand account.
+  if (brands.length < 1) return null
+  const multi = brands.length > 1
 
-  const current = brands.find(b => b.id === active) || null
+  // With one brand the tile just is that brand; with several, the active one (or All brands).
+  const current = brands.find(b => b.id === active) || (!multi ? brands[0] : null)
   const label = current ? current.name : 'All brands'
   const tile = current ? current.name.trim().charAt(0).toUpperCase() : '◎'
 
@@ -52,13 +55,18 @@ export default function ProjectSwitcher() {
         <div style={{ position: 'absolute', left: '100%', top: -6, paddingLeft: 10, zIndex: 70 }}>
           <div style={{ width: 210, background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, boxShadow: '0 18px 50px rgba(23,37,28,0.16)', padding: '10px 8px' }}>
             <div style={{ padding: '2px 10px 7px', fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#a2aca2' }}>Project</div>
-            <button onClick={() => pick('')} style={rowStyle(!active)}>◎&nbsp;&nbsp;All brands</button>
+            {multi && <button onClick={() => pick('')} style={rowStyle(!active)}>◎&nbsp;&nbsp;All brands</button>}
             {brands.map(b => (
               <button key={b.id} onClick={() => pick(b.id)} style={rowStyle(active === b.id)}>
                 <span style={{ width: 18, height: 18, borderRadius: 6, background: '#17251c', color: '#dffe95', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, marginRight: 9 }}>{b.name.trim().charAt(0).toUpperCase()}</span>
                 {b.name}
               </button>
             ))}
+            <div style={{ height: 1, background: '#eef1ec', margin: '6px 4px' }} />
+            <a href="/brands/new" style={{ ...rowStyle(false), color: '#3b6d11', fontWeight: 750, textDecoration: 'none' }}>
+              <span style={{ width: 18, height: 18, borderRadius: 6, background: '#eaf3de', color: '#3b6d11', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, marginRight: 9 }}>+</span>
+              New brand
+            </a>
           </div>
         </div>
       )}

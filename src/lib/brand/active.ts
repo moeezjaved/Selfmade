@@ -6,8 +6,9 @@
  * someone else's brand (or a deleted one).
  */
 import { cookies } from 'next/headers'
+import { BRAND_COOKIE } from '@/lib/brand/cookie'
 
-export const BRAND_COOKIE = 'sf_brand'
+export { BRAND_COOKIE }
 
 /** Read the raw cookie value (server components / route handlers). Empty string when unset. */
 export async function readBrandCookie(): Promise<string> {
