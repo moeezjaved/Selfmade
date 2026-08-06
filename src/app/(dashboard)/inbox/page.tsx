@@ -111,6 +111,10 @@ export default function InboxPage() {
     const ok = p.get('connected'); const err = p.get('connect_error')
     if (ok) { toast.success(`${ok[0].toUpperCase()}${ok.slice(1)} connected — messages will land here.`); window.history.replaceState({}, '', '/inbox'); setTimeout(loadChannels, 400) }
     else if (err) { toast.error(`Couldn’t connect ${err} — try again.`); window.history.replaceState({}, '', '/inbox') }
+    // Switching the active project (rail switcher) → re-pull this brand's inbox without a full reload.
+    const onBrand = () => load()
+    window.addEventListener('sf:brandchange', onBrand)
+    return () => window.removeEventListener('sf:brandchange', onBrand)
   }, [])
 
   const connectChannel = async (provider: string) => {
