@@ -37,3 +37,18 @@ export async function POST(req: NextRequest) {
   if ('error' in r) return NextResponse.json({ error: r.error }, { status: 400 })
   return NextResponse.json({ url: r.url })
 }
+
+// DELETE /api/channels/unipile/connect { provider } → disconnect that provider for this founder.
+// Matches the GET's source of truth: it deactivates the channel_identities rows the "Connected ✓"
+// badge reads from, so the calendar/channels flip back to "Connect →" (was only offering Reconnect).
+export async function DELETE(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const body = await req.json().catch(() => ({}))
+  const provider = String(body.provider || '')
+  if (!provider) return NextResponse.json({ error: 'provider required' }, { status: 400 })
+  const admin = createAdminClient()
+  await admin.from('channel_identities').update({ active: false }).eq('user_id', user.id).eq('provider', provider)
+  return NextResponse.json({ ok: true })
+}
