@@ -64,11 +64,14 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
   }
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', marginBottom: 6 }}>
-      <button aria-label={`Project: ${label}`} title={`Project: ${label}`} onClick={() => setOpen(o => !o)}
-        style={{ width: 34, height: 34, borderRadius: 11, border: `1px solid ${open ? '#9fb98a' : '#d6ddd4'}`, background: current ? '#17251c' : '#fff', color: current ? '#dffe95' : '#5b6b5b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15, cursor: 'pointer', padding: 0 }}>
+    <div ref={wrapRef} style={{ position: 'relative', marginBottom: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+      <button aria-label={`Project: ${label}`} title={`Switch project — currently ${label}`} onClick={() => setOpen(o => !o)}
+        style={{ width: 34, height: 34, borderRadius: 11, border: `1px solid ${open ? '#9fb98a' : '#d6ddd4'}`, background: current ? '#17251c' : '#fff', color: current ? '#dffe95' : '#5b6b5b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15, cursor: 'pointer', padding: 0, position: 'relative' }}>
         {tile}
+        {/* chevron so it reads as a switch, not just a logo */}
+        <span style={{ position: 'absolute', right: -2, bottom: -2, width: 12, height: 12, borderRadius: 6, background: '#fff', border: '1px solid #d6ddd4', color: '#5b6b5b', fontSize: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>▾</span>
       </button>
+      <span className="rail-label" style={{ maxWidth: 62, color: '#5b6b5b', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>{label}</span>
       {open && (
         <div style={{ position: 'absolute', left: '100%', top: -6, paddingLeft: 10, zIndex: 70 }}>
           <div style={{ width: 210, background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, boxShadow: '0 18px 50px rgba(23,37,28,0.16)', padding: '10px 8px' }}>
