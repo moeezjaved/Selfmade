@@ -38,6 +38,18 @@ export default function ConnectMetaByo() {
   const [bizName, setBizName] = useState('')
   const [picked, setPicked] = useState<string[]>([])
 
+  // Meta is a Creator (paid) feature — a Free user shouldn't reach the connect flow (it OAuth'd then
+  // dead-ended on an empty home). Gate here → upgrade.
+  const [gate, setGate] = useState<'checking' | 'ok' | 'locked'>('checking')
+  useEffect(() => {
+    fetch('/api/credits/balance').then(r => r.ok ? r.json() : null)
+      .then(j => {
+        const paid = ['starter', 'pro', 'business', 'enterprise', 'creator', 'agency'].includes(String(j?.plan || '').toLowerCase())
+        if (paid) setGate('ok'); else { setGate('locked'); router.replace('/billing?feature=meta') }
+      })
+      .catch(() => setGate('ok'))   // on error, don't block a paying user
+  }, [router])
+
   useEffect(() => {
     fetch('/api/meta/connect-partner').then((r) => r.json())
       .then((j) => { if (j.businessId) setBizId(j.businessId); else setTab('token') })   // not configured → token door
@@ -95,6 +107,9 @@ export default function ConnectMetaByo() {
       <span style={{ color: MUTED, fontSize: 12 }}>act_{a.account_id} · {a.currency}{a.active ? '' : ' · inactive'}</span>
     </label>
   )
+
+  // Don't flash the connect UI to a Free user we're about to redirect to upgrade.
+  if (gate !== 'ok') return <div style={{ maxWidth: 640, margin: '0 auto', padding: '60px 20px', color: MUTED, fontSize: 14 }}>{gate === 'locked' ? 'Meta is a Creator feature — taking you to upgrade…' : 'Loading…'}</div>
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '34px 20px 80px', fontFamily: "'Inter', -apple-system, sans-serif", color: INK }}>
