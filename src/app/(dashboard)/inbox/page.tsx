@@ -97,8 +97,12 @@ export default function InboxPage() {
   // Link a connected channel to a brand — future messages on it become that brand's threads.
   const assignChannel = async (provider: string, brandId: string) => {
     setChanBrand(prev => ({ ...prev, [provider]: brandId }))
-    await fetch('/api/customer/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'assign_channel', provider, brandId: brandId || null }) }).catch(() => {})
-    toast.success(brandId ? 'Channel linked to brand.' : 'Channel unlinked.')
+    const bname = brands.find(b => b.id === brandId)?.name || 'brand'
+    const j = await fetch('/api/customer/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'assign_channel', provider, brandId: brandId || null }) }).then(r => r.json()).catch(() => null)
+    if (!brandId) toast.success('Channel unlinked.')
+    else if (j?.moved > 0) toast.success(`Linked to ${bname} — moved ${j.moved} conversation${j.moved === 1 ? '' : 's'} over.`)
+    else toast.success(`Channel linked to ${bname}.`)
+    load()   // reflect the moved threads under the current filter
   }
   useEffect(() => {
     load(); loadChannels()
