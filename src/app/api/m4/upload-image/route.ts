@@ -51,24 +51,14 @@ export async function POST(request: NextRequest) {
       buffer = Buffer.from(await file.arrayBuffer())
     }
 
-    // Step 1: Upload to Supabase Storage
-    const fileName = `${user.id}/${Date.now()}.${fileExt}`
-    const bucket = 'ads-media'
-
-    const { error: uploadError } = await admin.storage
-      .from(bucket)
-      .upload(fileName, buffer, { contentType, upsert: false })
-
-    if (uploadError) return NextResponse.json({ error: 'Storage upload failed: ' + uploadError.message }, { status: 400 })
-
-    // Step 2: Get public URL
-    const { data: urlData } = admin.storage.from(bucket).getPublicUrl(fileName)
-    const publicUrl = urlData.publicUrl
-    console.log('Supabase URL:', publicUrl)
-
-    // Step 3: Send to Meta via multipart with URL
     if (isVideo) {
-      // Video: use file_url parameter
+      // Video needs a URL Meta can pull, so it goes via Supabase Storage first (bucket must exist).
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`
+      const bucket = 'ads-media'
+      const { error: uploadError } = await admin.storage.from(bucket).upload(fileName, buffer, { contentType, upsert: false })
+      if (uploadError) return NextResponse.json({ error: 'Storage upload failed: ' + uploadError.message }, { status: 400 })
+      const { data: urlData } = admin.storage.from(bucket).getPublicUrl(fileName)
+      const publicUrl = urlData.publicUrl
       const metaForm = new FormData()
       metaForm.append('file_url', publicUrl)
       metaForm.append('access_token', token)
@@ -81,7 +71,8 @@ export async function POST(request: NextRequest) {
       if (data.error) return NextResponse.json({ error: data.error.message }, { status: 400 })
       return NextResponse.json({ videoId: data.id, hash: data.id, isVideo: true })
     } else {
-      // Image: send the buffer we already have to Meta as base64 bytes (JSON path).
+      // Image: Meta takes the raw bytes as base64 — NO storage bucket needed. (Uploading to a missing
+      // `ads-media` bucket first was the real cause of "campaign won't create / upload an image".)
       const base64 = buffer.toString('base64')
       const res = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/adimages`, {
         method: 'POST',
