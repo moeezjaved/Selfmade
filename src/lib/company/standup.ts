@@ -11,14 +11,14 @@ export type StandupLine = { key: string; emoji: string; name: string; text: stri
 export type ConnectPrompt = { key: string; emoji: string; label: string }
 export type Standup = { greeting: string; dateLabel: string; lines: StandupLine[]; pendingCount: number; pendingTitles: string[]; calendarConnected: boolean; connectPrompts: ConnectPrompt[] }
 
-export async function assembleStandup(admin: any, userId: string, firstName?: string | null): Promise<Standup> {
+export async function assembleStandup(admin: any, userId: string, firstName?: string | null, brandId?: string | null): Promise<Standup> {
   const now = new Date()
   const hr = now.getUTCHours()
   const part = hr < 11 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening'
   const greeting = `${part}${firstName ? `, ${firstName}` : ''}.`
   const dateLabel = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })
 
-  const { departments, tasks } = await computeCompanyStatus(admin, userId)
+  const { departments, tasks } = await computeCompanyStatus(admin, userId, brandId)
   const lines: StandupLine[] = []
 
   // Live departments that actually have something to report today (skip the ones sitting idle so the
