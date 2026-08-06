@@ -16,6 +16,30 @@ const isBlankName = (b?: string) => { const t = String(b ?? '').trim(); return !
 const TEACH = /^(never|always|from now on|don'?t|do not|only|we (?:never|always|only)|make sure|remember (?:to|that)|keep in mind|by default)\b/i
 const SIGNAL = /\b((our|my) (audience|customers?|buyers?|brand|market|product|tone|voice|goal|niche|focus)|we (are|sell|target|focus on|prefer|value|care about))\b/i
 
+// Product how-to — real, first-person answers so Mello can actually GUIDE the founder ("how do I connect
+// Meta / WhatsApp / add a competitor / upgrade") instead of improvising fluff. Matched before the ads
+// router; only fires when the founder is clearly asking HOW to do something in the app.
+function productHowTo(q: string): string | null {
+  const t = q.toLowerCase()
+  const asksHow = /\b(how|where|can i|help me|guide|steps?|set ?up|connect|link|add|enable|turn on|upgrade)\b/.test(t) || t.includes('?')
+  if (!asksHow) return null
+  if (/\b(meta|facebook)\b/.test(t) && /\b(connect|link|ad account|account|integrat)/.test(t))
+    return `Connecting Meta is a Creator (paid) feature — you don't need it to use me, everything already runs off the crawled ad library. To turn it on: open Billing and upgrade to Creator, then on the brief's “Run your ads on Meta” card hit Connect and either partner-share your ad account (60 seconds in Meta Business Settings) or paste a System-User token. After that I audit your account every morning.`
+  if (/\bwhatsapp\b/.test(t) && /\b(connect|link|set ?up|brief|qr)/.test(t))
+    return `Go to Settings → “Mello on Slack & WhatsApp” → Connect WhatsApp, then scan the QR code with your phone (WhatsApp → Linked Devices, just like WhatsApp Web). Once it's linked I'll send your morning brief there and you can reply YES to approve my work.`
+  if (/\bslack\b/.test(t) && /\b(connect|add|set ?up|brief)/.test(t))
+    return `Settings → “Add to Slack” — approve me and pick a channel. You'll get the brief with one-tap Approve buttons right in Slack.`
+  if (/\b(calendar|google calendar)\b/.test(t) && /\b(connect|link|add|set ?up)/.test(t))
+    return `Settings → “Connect your calendar” (Google). Once linked I'll show today's meetings in your Morning Standup — it never touches the customer inbox.`
+  if (/\b(competitor|rival|spy|watch)\b/.test(t) && /\b(add|watch|track|spy|how)/.test(t))
+    return `On the brief hit “+ Add a competitor” (or “Spy on a competitor”). Search their name, or paste their Meta Ad Library link — I start pulling every ad they run right away. Free tracks 1; upgrade to watch more.`
+  if (/\b(upgrade|plan|pricing|subscri|paid|creator)\b/.test(t))
+    return `Tap “Go full-time / Hire Mello full-time” on the brief, or open Billing — it's $49/mo and unlocks tracking all your competitors, connecting Meta, and the full daily work.`
+  if (/\b(make|create|generate|design)\b/.test(t) && /\b(ad|creative|video|image|ugc)\b/.test(t))
+    return `Hit Create (the + on the left rail) or “Make one like this” on the brief. Pick a rival ad to clone, or let me design a fresh one from your product photos — I'll write the script and hooks.`
+  return null
+}
+
 export async function askMello(admin: any, userId: string, message: string, opts?: { item?: any; email?: string | null }): Promise<{ reply: string }> {
   const q = String(message || '').trim().slice(0, 800)
   const item = opts?.item
@@ -59,6 +83,10 @@ export async function askMello(admin: any, userId: string, message: string, opts
       ? `You're watching ${list} — I read their whole ad archive and flag every new ad they launch. Want me to pull their latest, or add another?`
       : `You're watching ${names.length}: ${list}. I track every ad each one launches and roll the patterns into your brief. Want the latest from any of them?` }
   }
+
+  // 3.5 · product how-to — guide the founder through the app ("how do I connect Meta / WhatsApp / add a
+  // competitor / upgrade") with real steps, before the ads router can improvise a vague answer.
+  if (!item) { const guide = productHowTo(q); if (guide) return { reply: guide } }
 
   // 4 · ads question → grounded audit router (memory-aware inside answerAdsQuestion)
   try {

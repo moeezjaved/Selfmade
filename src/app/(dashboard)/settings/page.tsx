@@ -480,6 +480,7 @@ function ChannelsSection() {
     try {
       const r = await fetch('/api/channels/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'report' }) }).then(res => res.json())
       if (r?.delivered) toast.success(`Sent — check your ${provider === 'slack' ? 'Slack' : 'WhatsApp'} ${provider === 'slack' ? '💬' : '🟢'}`)
+      else if (provider === 'whatsapp') toast.error('Message your linked WhatsApp once (send “hi” to yourself in that chat), then Send test — WhatsApp won’t let me open the very first chat.')
       else toast.error(r?.error || 'Nothing was delivered — reconnect the channel and try again.')
     } catch { toast.error('Could not send — try again.') }
     setTesting('')
