@@ -19,11 +19,15 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
   const brandId = req.nextUrl.searchParams.get('brand') || undefined
 
-  let fq = admin.from('followed_brands').select('page_id, brand_name').eq('user_id', user.id).eq('spied', true)
-  if (brandId) fq = fq.eq('brand_id', brandId)
-  const { data: follows } = await fq.limit(50)
-  const rivals = (follows || []).filter((f: any) => f.page_id)
-  if (!rivals.length) return NextResponse.json({ watching: [] })
+  // ALL the user's spied competitors + their brand link — so we can both scope to this brand AND reveal
+  // ones that were added but landed on a different/no brand (the "added but nothing shows" case).
+  const { data: allFollows } = await admin.from('followed_brands')
+    .select('page_id, brand_name, brand_id').eq('user_id', user.id).eq('spied', true).limit(80)
+  const spied = (allFollows || []).filter((f: any) => f.page_id)
+  const rivals = brandId ? spied.filter((f: any) => f.brand_id === brandId) : spied
+  // Spied but NOT linked to the selected brand (null brand_id or another brand) — offer to link them here.
+  const unlinked = brandId ? spied.filter((f: any) => f.brand_id !== brandId).map((f: any) => ({ pageId: String(f.page_id), brand: f.brand_name || 'Competitor' })) : []
+  if (!rivals.length) return NextResponse.json({ watching: [], unlinked })
 
   const ids = rivals.map((r: any) => String(r.page_id))
   // Crawl state per page (last_crawled_at + crawling_at).
@@ -44,5 +48,5 @@ export async function GET(req: NextRequest) {
   // Newest-added (queued/crawling) first so a just-added rival is right at the top.
   const order: Record<string, number> = { crawling: 0, queued: 1, empty: 2, live: 3 }
   watching.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9))
-  return NextResponse.json({ watching })
+  return NextResponse.json({ watching, unlinked })
 }
