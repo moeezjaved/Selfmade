@@ -48,6 +48,31 @@ function Mello({ size = 54, state = 'awake' }: { size?: number; state?: MelloSta
   return <MelloFace size={size} state={state} />
 }
 
+// The team roster — the homepage promised "a marketing company", so the first thing you do after
+// signing in is MEET them. Same six departments as the landing org chart, coming online one by one.
+const TEAM: [string, string][] = [
+  ['Research', 'Reads the market while you sleep'],
+  ['Creative', 'Turns research into campaigns'],
+  ['Media Buying', 'Finds winners. Scales them'],
+  ['Growth', 'Email, SEO, funnels'],
+  ['Finance', 'Tracks profit, not ROAS'],
+  ['Customer', 'Answers every message'],
+]
+function TeamRoster() {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxWidth: 470, margin: '24px auto 0', textAlign: 'left' }}>
+      {TEAM.map(([n, d], i) => (
+        <div key={n} className="team-in" style={{ animationDelay: `${i * 0.08}s`, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '11px 13px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 800, color: INK }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: GREEN, display: 'inline-block' }} />{n}
+          </div>
+          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 4, lineHeight: 1.45 }}>{d}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // Mello's own words → the serif register (voice.mello), same as the brief. Onboarding is Mello speaking.
 const say: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 31, fontWeight: 400, letterSpacing: '-.015em', lineHeight: 1.14, color: INK, textAlign: 'center', maxWidth: 540, margin: '0 auto' }
 const sub: React.CSSProperties = { fontSize: 14, color: MUTED, textAlign: 'center', maxWidth: 420, margin: '10px auto 0', lineHeight: 1.6 }
@@ -480,9 +505,10 @@ export default function InterviewPage() {
           {phase === 'welcome' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}><Mello /></div>
-              <div style={say}>Hi. I’m Mello.<br />Thanks for inviting me.</div>
-              <p style={sub}>Before I can become your marketer, I’d like to learn about your business. This takes about four minutes — and I’ll be taking notes.</p>
-              <button style={{ ...btnMain, marginTop: 26 }} onClick={() => setPhase('homework')}>Begin the interview</button>
+              <div style={say}>Hi. I’m Mello.<br />I’ll manage your marketing company.</div>
+              <p style={sub}>This is your team — Research, Creative, Media Buying, Growth, Finance and Customer. They report to me, and I report to you. First, let me learn the business — about four minutes.</p>
+              <TeamRoster />
+              <button style={{ ...btnMain, marginTop: 26 }} onClick={() => setPhase('homework')}>Meet them properly — begin →</button>
             </div>
           )}
 
@@ -612,8 +638,8 @@ export default function InterviewPage() {
           {/* ── BEAT 5 · INTEGRATIONS (honest SOON — Meta app in review) ── */}
           {phase === 'integrations' && (
             <div>
-              <div style={say}>Run your whole company from your phone.</div>
-              <p style={sub}>I’ll send your daily brief to WhatsApp or Slack — and you can approve my work, ask me anything, and handle the whole company right from chat. No dashboard needed.</p>
+              <div style={say}>Give your team their tools.</div>
+              <p style={sub}>Your company works through the apps you already use — no dashboard to check. First, where should the team reach you? I’ll send the daily brief here, and you approve, ask, or redirect right from chat.</p>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', margin: '20px 0 6px' }}>
                 <a href="/api/channels/slack/start" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', textDecoration: 'none', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit' }}>
                   <ChannelLogo provider="slack" size={22} /> Add to Slack
@@ -626,10 +652,10 @@ export default function InterviewPage() {
 
               <div style={{ height: 1, background: LINE, margin: '22px 0 18px' }} />
 
-              <div style={{ ...say, fontSize: 22 }}>And soon — your past work.</div>
-              <p style={sub}>I learn faster from your previous campaigns than from zero. These connections are almost ready — when they are, I’ll ask again and tell you exactly what I’d learn from each.</p>
+              <div style={{ ...say, fontSize: 22 }}>And soon — access for the team.</div>
+              <p style={sub}>Each department works better with your own history. These are almost ready — when they are, I’ll ask again and tell you exactly what each one unlocks.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, margin: '20px 0 4px' }}>
-                {[['Meta Ads', 'your past campaigns — what already worked'], ['Shopify', 'your products and what actually sells'], ['TikTok', 'your short-video performance'], ['Google', 'what people search to find you']].map(([n, d]) => (
+                {[['Meta Ads', 'so Media Buying sees what already worked'], ['Shopify', 'so the team knows what actually sells'], ['TikTok', 'so Creative learns your short-video wins'], ['Google', 'so Research sees what people search']].map(([n, d]) => (
                   <div key={n} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: '13px 15px', opacity: .75 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <b style={{ fontSize: 13.5, color: INK }}>{n}</b>
@@ -650,7 +676,7 @@ export default function InterviewPage() {
             <div style={{ background: PAPER, border: `1px solid ${PAPERLINE}`, borderRadius: 18, padding: '30px 30px 26px', boxShadow: '0 30px 70px -30px rgba(23,37,28,.25)', position: 'relative', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, background: LIME }} />
               <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', color: '#8a927f', marginBottom: 18 }}>MARKETING EMPLOYEE AGREEMENT</div>
-              {[['Employee', 'Mello'], ['Employer', gName || 'Your company'], ['Department', 'Marketing'], ['Working hours', '24 / 7'], ['Start date', 'Today'], ['Mission', 'Help grow this business']].map(([k, v]) => (
+              {[['Employee', 'Mello & your marketing team'], ['Employer', gName || 'Your company'], ['Department', 'Marketing — the whole company'], ['Working hours', '24 / 7'], ['Start date', 'Today'], ['Mission', 'Help grow this business']].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #ecebe0', fontSize: 13.5 }}>
                   <span style={{ color: '#8a927f' }}>{k}</span><b style={{ fontWeight: 750, color: INK }}>{v}</b>
                 </div>
@@ -661,7 +687,7 @@ export default function InterviewPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, alignItems: 'end' }}>
                 <div>
                   <div style={{ borderBottom: `1.5px solid ${INK}`, height: 38, display: 'flex', alignItems: 'flex-end', paddingBottom: 3, fontFamily: "'Snell Roundhand','Segoe Script',cursive", fontSize: 23, color: '#1f2a1c' }}>Mello</div>
-                  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.12em', color: '#8a927f', marginTop: 6 }}>MELLO · YOUR MARKETER</div>
+                  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.12em', color: '#8a927f', marginTop: 6 }}>MELLO · YOUR MARKETING MANAGER</div>
                 </div>
                 <div>
                   <input value={signName} onChange={e => setSignName(e.target.value)} placeholder="Type your name to sign"
@@ -670,7 +696,7 @@ export default function InterviewPage() {
                 </div>
               </div>
               <button style={{ ...btnMain, width: '100%', marginTop: 22, opacity: signName.trim().length < 2 ? .45 : 1 }} disabled={signName.trim().length < 2} onClick={sign}>
-                Countersign &amp; hire Mello
+                Countersign &amp; hire the team
               </button>
             </div>
           )}
@@ -679,13 +705,13 @@ export default function InterviewPage() {
           {phase === 'night' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}><Mello state={nightDone ? 'delivered' : 'awake'} /></div>
-              <div style={{ ...say, color: '#fff' }}>{nightDone ? 'Your first brief is ready.' : 'I’m starting work now.'}</div>
+              <div style={{ ...say, color: '#fff' }}>{nightDone ? 'Your first brief is ready.' : 'The team is starting work now.'}</div>
               <div style={{ maxWidth: 380, margin: '22px auto 0', textAlign: 'left', font: '600 13px/2.3 ui-monospace, Menlo, monospace', color: '#7d8a7c' }}>
                 {nightLog.map((l, i) => <div key={i}>{l.done ? <span style={{ color: '#a9d96a' }}>✓</span> : <span className="spin-dot">›</span>} {l.t}</div>)}
               </div>
               {nightDone && (
                 <>
-                  <p style={{ ...sub, color: '#7d8a7c', marginTop: 24 }}>The deep study takes me all night — competitors, angles, everything that wins in your market. But I already have a first read for you.</p>
+                  <p style={{ ...sub, color: '#7d8a7c', marginTop: 24 }}>The team studies your market all night — competitors, angles, everything that wins. But I already have a first read for you.</p>
                   {/* Section 4 (show, then sell): the promised payoff must BE the payoff. This opens the real
                       first brief; the plan ask is sequenced after value, as a card inside ?welcome=1. */}
                   <button style={{ ...btnMain, background: LIME, color: FOREST, marginTop: 18 }} onClick={() => router.push('/brief?welcome=1')}>Read my first briefing →</button>
@@ -740,7 +766,9 @@ export default function InterviewPage() {
           </div>
         </div>
       )}
-      <style>{`@keyframes nb-pulse{50%{opacity:.35}} .spin-dot{display:inline-block;animation:nb-pulse 1s infinite}`}</style>
+      <style>{`@keyframes nb-pulse{50%{opacity:.35}} .spin-dot{display:inline-block;animation:nb-pulse 1s infinite}
+        @keyframes team-in{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}} .team-in{animation:team-in .5s cubic-bezier(0,0,.2,1) both}
+        @media (prefers-reduced-motion: reduce){.team-in{animation:none}}`}</style>
     </div>
   )
 }
