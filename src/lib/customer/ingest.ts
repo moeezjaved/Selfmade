@@ -22,9 +22,17 @@ export async function ingestCustomerMessage(admin: any, opts: { accountId?: stri
     if (await routeCreatorInbound(admin, ownerId, { sender, chatId, text, channel, senderName })) return true
   } catch { /* fall through to the customer inbox */ }
 
+  // The brand this channel serves (mig 143) — the thread + its triage/memory scope to it. Falls back to
+  // the founder's first brand when the channel isn't linked yet.
+  const brandId: string | null = chan.brand_id || null
   let brandName = ''
-  try { const { data } = await admin.from('brands').select('name').eq('user_id', ownerId).order('created_at', { ascending: true }).limit(1).maybeSingle(); brandName = data?.name || '' } catch { /* ok */ }
-  const tr = await triageMessage(admin, ownerId, { body: text, brand: brandName })
+  try {
+    const q = brandId
+      ? admin.from('brands').select('name').eq('id', brandId).maybeSingle()
+      : admin.from('brands').select('name').eq('user_id', ownerId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+    const { data } = await q; brandName = data?.name || ''
+  } catch { /* ok */ }
+  const tr = await triageMessage(admin, ownerId, { body: text, brand: brandName, brandId })
   const now = new Date().toISOString()
 
   let { data: thread } = await admin.from('customer_threads').select('*')
@@ -32,11 +40,11 @@ export async function ingestCustomerMessage(admin: any, opts: { accountId?: stri
   if (!thread) {
     const { data: created } = await admin.from('customer_threads').insert({
       user_id: ownerId, channel, contact_ref: sender, contact_name: senderName || null,
-      priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now, chat_ref: chatId || null,
+      priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now, chat_ref: chatId || null, brand_id: brandId,
     }).select().single()
     thread = created
   } else {
-    await admin.from('customer_threads').update({ priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now, ...(chatId ? { chat_ref: chatId } : {}) }).eq('id', thread.id)
+    await admin.from('customer_threads').update({ priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now, ...(chatId ? { chat_ref: chatId } : {}), ...(brandId && !thread.brand_id ? { brand_id: brandId } : {}) }).eq('id', thread.id)
   }
   const { data: inserted } = await admin.from('customer_messages').insert({
     thread_id: thread.id, user_id: ownerId, direction: 'in', body: text,

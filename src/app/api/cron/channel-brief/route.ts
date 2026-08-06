@@ -32,9 +32,24 @@ export async function GET(req: NextRequest) {
   for (const uid of users) {
     try {
       const { data: u } = await admin.auth.admin.getUserById(uid)
-      const brief = await assembleBrief(admin, uid, { email: u?.user?.email || null, full_name: (u?.user?.user_metadata as any)?.full_name }, {})
-      const r = await sendReportToChannels(admin, uid, brief)
-      if (r.sent > 0) sent++; else skipped++
+      const meta = { email: u?.user?.email || null, full_name: (u?.user?.user_metadata as any)?.full_name }
+      // One founder, many brands → one section per brand so each brand's brief is distinct. A founder with
+      // a single brand (or none) gets the account-wide brief exactly as before.
+      const { data: brands } = await admin.from('brands').select('id, name').eq('user_id', uid).order('created_at', { ascending: true })
+      const list = (brands || []) as any[]
+      let any = 0
+      if (list.length > 1) {
+        for (const b of list) {
+          const brief = await assembleBrief(admin, uid, meta, { brandId: String(b.id) })
+          const r = await sendReportToChannels(admin, uid, brief, { brandId: String(b.id), brandLabel: b.name })
+          any += r.sent
+        }
+      } else {
+        const brief = await assembleBrief(admin, uid, meta, {})
+        const r = await sendReportToChannels(admin, uid, brief)
+        any += r.sent
+      }
+      if (any > 0) sent++; else skipped++
     } catch { skipped++ }
   }
   return NextResponse.json({ ok: true, founders: users.length, sent, skipped })

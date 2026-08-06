@@ -65,7 +65,7 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
 }
 
 /** Send a read-only report (brief) to every linked channel. */
-export async function sendReportToChannels(admin: any, userId: string, brief: any): Promise<{ sent: number }> {
+export async function sendReportToChannels(admin: any, userId: string, brief: any, opts: { brandId?: string | null; brandLabel?: string } = {}): Promise<{ sent: number }> {
   // Founder comms only — the brief must reach the founder's own Slack/WhatsApp, NEVER a connected
   // customer channel (a Unipile customer WhatsApp shares provider 'whatsapp').
   const ids = (await getIdentities(admin, userId)).filter((i: any) => !i.meta?.customer_channel)
@@ -76,9 +76,14 @@ export async function sendReportToChannels(admin: any, userId: string, brief: an
   // matches "What Mello would do" instead of saying "nothing needs you" while the brief has moves.
   try { await runMetaAudit(admin, userId) } catch { /* report still sends without a fresh audit */ }
   // The overnight-shift report is grounded in the live company status + the top pending decision.
-  const { departments, tasks } = await computeCompanyStatus(admin, userId)
+  const { departments, tasks } = await computeCompanyStatus(admin, userId, opts.brandId)
   const pending = (tasks as any[]).find(t => t.status === 'suggested') || null
-  const { text, slackBlocks } = formatReport(brief, departments, pending)
+  let { text, slackBlocks } = formatReport(brief, departments, pending)
+  // Per-brand delivery: label which brand this section is about (founders running multiple brands).
+  if (opts.brandLabel) {
+    text = `— ${opts.brandLabel} —\n${text}`
+    slackBlocks = [{ type: 'context', elements: [{ type: 'mrkdwn', text: `*${opts.brandLabel}*` }] }, ...(Array.isArray(slackBlocks) ? slackBlocks : [])]
+  }
   // The report renders the top decision WITH its Approve button, so it counts as delivering that
   // approval — record it so pushNewApprovals doesn't then send the same task again as a lone card.
   const expires_at = new Date(Date.now() + APPROVAL_TTL_MS).toISOString()

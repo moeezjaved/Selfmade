@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 
       let brandName = ''
       try { const { data } = await admin.from('brands').select('name').eq('id', t.brand_id).maybeSingle(); brandName = data?.name || '' } catch { /* ok */ }
-      const draft = await draftOutbound(admin, t.user_id, { type: 'follow_up', name: t.contact_name || '', brand: brandName })
+      const draft = await draftOutbound(admin, t.user_id, { type: 'follow_up', name: t.contact_name || '', brand: brandName, brandId: t.brand_id || null })
       const { data: msg } = await admin.from('customer_messages').insert({
         thread_id: t.id, user_id: t.user_id, direction: 'out', body: draft, intent: 'follow_up', status: 'pending',
       }).select('id').single()

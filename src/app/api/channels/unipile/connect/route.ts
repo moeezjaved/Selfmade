@@ -18,11 +18,12 @@ export async function GET() {
   // Self-heal: pull the founder's real connected accounts from Unipile and bind any we're missing, so
   // the ✓ badges are right even when the connect redirect/notify didn't persist.
   try { await reconcileUnipileAccounts(admin, user.id) } catch { /* best-effort */ }
-  const { data } = await admin.from('channel_identities')
-    .select('provider, display, meta').eq('user_id', user.id).eq('active', true)
+  let { data } = await admin.from('channel_identities')
+    .select('provider, display, meta, brand_id').eq('user_id', user.id).eq('active', true)
+  if (!data) { const r = await admin.from('channel_identities').select('provider, display, meta').eq('user_id', user.id).eq('active', true); data = r.data }  // pre-mig-143 fallback (no brand_id column)
   const connected = (data || [])
     .filter((r: any) => r?.meta?.customer_channel || r?.meta?.founder_tool)
-    .map((r: any) => ({ provider: r.provider, display: r.display || null, kind: r?.meta?.founder_tool ? 'founder' : 'customer' }))
+    .map((r: any) => ({ provider: r.provider, display: r.display || null, kind: r?.meta?.founder_tool ? 'founder' : 'customer', brand_id: r.brand_id || null }))
   return NextResponse.json({ connected })
 }
 
