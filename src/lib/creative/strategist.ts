@@ -177,6 +177,16 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
   let brand = opts.brand || ''
   if (!brand) { try { const { data } = await admin.from('brands').select('name').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle(); brand = data?.name || '' } catch { /* ok */ } }
 
+  // A representative visual for own-account ideas (no rival thumbnail) — the brand's most recent finished
+  // creative, so those cards show a real image instead of the empty clapperboard.
+  let ownVisual: string | null = null
+  try {
+    let cq = admin.from('creative_generations').select('image_url, media_type').eq('user_id', userId).eq('status', 'done').not('image_url', 'is', null).order('created_at', { ascending: false }).limit(8)
+    if (opts.brandId) cq = cq.eq('brand_id', opts.brandId)
+    const { data } = await cq
+    ownVisual = ((data || []).find((c: any) => c.media_type !== 'video' && c.image_url)?.image_url) || null
+  } catch { /* best-effort */ }
+
   const reasoned = (ourWinner || fatigue || rivals.length) ? await reasonedIdeas(ourWinner, fatigue, rivals, brand) : null
   let ideas = reasoned || fallbackIdeas(ourWinner, fatigue, rivals)
   // Guarantee the "your ads" half is represented when we have the signal — the model sometimes returns
@@ -185,6 +195,8 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
     const own = fallbackIdeas(ourWinner, fatigue, []).find(Boolean)
     if (own) ideas = [own, ...ideas].slice(0, 3)
   }
+  // Give own-account ideas a visual (their reference has no image) so no card is a bare clapperboard.
+  if (ownVisual) ideas = ideas.map(i => (i.reference && i.reference.kind === 'ours' && !i.reference.image) ? { ...i, reference: { ...i.reference, image: ownVisual } } : i)
 
   const summary = ideas.length === 0
     ? (rivals.length === 0 ? 'Spy a competitor or two and connect your ad account — then I’ll tell you exactly what to make next.' : 'Nothing urgent to make right now — your account looks steady.')
