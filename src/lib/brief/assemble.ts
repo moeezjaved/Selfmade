@@ -105,7 +105,7 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   }
   const scopePages = brandPageIds && brandPageIds.length ? brandPageIds : (brandPageIds ? [NO_PAGE] : null)
 
-  const [spine, notifs, creatives, follows, adsScanned, observations] = await Promise.all([
+  const [spine, notifs, creatives, follows, adsScanned, observations, freshAds] = await Promise.all([
     soft<any[]>((async () => {
       let q = admin.from('brief_events').select('id, kind, importance, title, body, cta_label, cta_href, payload, created_at')
         .eq('user_id', userId).gte('created_at', H48).order('importance', { ascending: false }).limit(20)
@@ -129,8 +129,12 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     })(), []),
     soft<any[]>(admin.from('followed_brands').select('page_id, brand_name, spied, brand_id')
       .eq('user_id', userId).limit(200).then((r: any) => r.data || []), []),
-    soft<number>(admin.from('discovery_ads_index').select('ad_id', { count: 'estimated', head: true })
-      .gte('created_at', H24).then((r: any) => r.count || 0), 0),
+    soft<number>((async () => {
+      // Brand view: only ads from THIS brand's watched competitors read in 24h (not the whole system).
+      if (scopePages) { const { count } = await admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).gte('created_at', H24).in('page_id', scopePages); return count || 0 }
+      const { count } = await admin.from('discovery_ads_index').select('ad_id', { count: 'estimated', head: true }).gte('created_at', H24)
+      return count || 0
+    })(), 0),
     soft<any[]>((async () => {
       let q = admin.from('daily_observations').select('id, observation, action, confidence, created_at')
         .eq('user_id', userId).gte('created_at', H48).order('created_at', { ascending: false }).limit(3)
@@ -139,6 +143,15 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
       // belongs to whichever brand watches that rival, not to a brand watching nobody.
       if (opts.brandId) q = q.eq('brand_id', opts.brandId)
       const { data } = await q; return data || []
+    })(), []),
+    // New competitor ads first-seen in 48h, read DIRECTLY from the crawl index (brand view only) — so a
+    // rival launch shows the moment it's crawled, even if the droplet's notification never fired.
+    soft<any[]>((async () => {
+      if (!scopePages) return []   // a global first_seen scan is too broad; all-brands relies on notifications
+      const { data } = await admin.from('discovery_ads_index')
+        .select('page_id, ad_id, first_seen_at').in('page_id', scopePages).gte('first_seen_at', H48)
+        .order('first_seen_at', { ascending: false }).limit(60)
+      return data || []
     })(), []),
   ])
 
@@ -200,6 +213,28 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     }
     items.push(it)
     if (n.page_id) compByPage.set(String(n.page_id), it)
+  }
+
+  // Direct from the crawl index: a watched rival's new ads (first-seen 48h) that produced NO notification.
+  // Guarantees a launch surfaces the moment it's crawled — the reliable path when the droplet alert lags.
+  const freshByPage = new Map<string, any[]>()
+  for (const a of (freshAds as any[])) { const pid = String(a.page_id); freshByPage.set(pid, [...(freshByPage.get(pid) || []), a]) }
+  for (const [pid, ads] of Array.from(freshByPage.entries())) {
+    if (compByPage.has(pid)) continue   // already covered by a notification above
+    const brandName = ((follows as any[]).find((f: any) => String(f.page_id) === pid)?.brand_name) || 'A competitor'
+    if (isBlankName(brandName)) continue
+    const c = ads.length
+    const forBrand = forBrandByPage.get(pid)
+    const it: BriefItem = {
+      kind: 'competitor_ads', importance: Math.min(85, 55 + c * 5), at: ads[0].first_seen_at,
+      title: `${brandName} launched ${c === 1 ? 'a new ad' : `${c} new ads`}.`,
+      body: c > 2 ? `A burst of fresh creative — worth reading the angle before it compounds.` : `A fresh creative just went live.`,
+      why: forBrand ? `You watch ${brandName} for ${forBrand} — a launch usually means they found something working.` : `You watch ${brandName} — a launch usually means they found something working.`,
+      cta_label: 'See their ads', cta_href: `/discovery/brand-spy/${pid}`,
+      forBrand,
+    }
+    items.push(it)
+    compByPage.set(pid, it)
   }
 
   let headline: BriefItem | null = null
