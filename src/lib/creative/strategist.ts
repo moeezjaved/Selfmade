@@ -153,14 +153,22 @@ async function storedPerformance(admin: any, userId: string): Promise<{ winner: 
 
 export async function generateCreativeStrategy(admin: any, userId: string, opts: { accountId?: string; brand?: string; brandId?: string | null } = {}): Promise<CreativeStrategy> {
   // Our account signal (cached server-side — no extra Graph hit on repeat opens).
-  let ourWinner: any = null, fatigue: any = null
+  let ourWinner: any = null, fatigue: any = null, ownAds: any[] = []
   try {
-    const audit = await auditAccount(admin, userId, opts.accountId)
+    // Resolve the brand's LINKED ad account (same as the Facebook card) so we audit Aura's account — not
+    // just the primary — and get its real ad thumbnails to show on the your-ads ideas.
+    let accountId = opts.accountId
+    if (!accountId && opts.brandId) {
+      const { data: acct } = await admin.from('meta_accounts').select('account_id').eq('user_id', userId).eq('status', 'active').eq('brand_id', opts.brandId).limit(1).maybeSingle()
+      if (acct?.account_id) accountId = acct.account_id
+    }
+    const audit = await auditAccount(admin, userId, accountId)
     if (audit) {
       ourWinner = (audit.scale || [])[0] || (audit.watch || [])[0] || null
       // "Fatigue" proxy from the audit: the pause bucket (bleeding), else the lowest-ROAS spender.
       fatigue = (audit.pause || [])[0] || [...(audit.watch || [])].sort((a: any, b: any) => a.roas - b.roas)[0] || null
       if (ourWinner && fatigue && ourWinner.name === fatigue.name) fatigue = (audit.pause || [])[1] || null
+      ownAds = Array.isArray((audit as any).ads) ? (audit as any).ads : []
     }
   } catch { /* account signal is best-effort */ }
   // Fallback to STORED campaign performance when the live audit is empty/failing (expired token, no Graph):
@@ -195,8 +203,20 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
     const own = fallbackIdeas(ourWinner, fatigue, []).find(Boolean)
     if (own) ideas = [own, ...ideas].slice(0, 3)
   }
-  // Give own-account ideas a visual (their reference has no image) so no card is a bare clapperboard.
-  if (ownVisual) ideas = ideas.map(i => (i.reference && i.reference.kind === 'ours' && !i.reference.image) ? { ...i, reference: { ...i.reference, image: ownVisual } } : i)
+  // Give own-account ideas a visual: the ACTUAL ad thumbnail for that campaign (Alisba 5 → its creative),
+  // else the brand's most recent creative — so no card is a bare clapperboard.
+  const adThumbFor = (name?: string): string | null => {
+    if (!ownAds.length) return null
+    const match = name ? ownAds.find((a: any) => a.thumbnail_url && a.campaignName && String(a.campaignName).toLowerCase() === String(name).toLowerCase()) : null
+    return match?.thumbnail_url || ownAds.find((a: any) => a.thumbnail_url)?.thumbnail_url || null
+  }
+  ideas = ideas.map(i => {
+    if (i.reference && i.reference.kind === 'ours' && !i.reference.image) {
+      const img = adThumbFor(i.reference.label) || ownVisual
+      if (img) return { ...i, reference: { ...i.reference, image: img } }
+    }
+    return i
+  })
 
   const summary = ideas.length === 0
     ? (rivals.length === 0 ? 'Spy a competitor or two and connect your ad account — then I’ll tell you exactly what to make next.' : 'Nothing urgent to make right now — your account looks steady.')
