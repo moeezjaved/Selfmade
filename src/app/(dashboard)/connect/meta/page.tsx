@@ -43,9 +43,11 @@ export default function ConnectMetaByo() {
   const [gate, setGate] = useState<'checking' | 'ok' | 'locked'>('checking')
   useEffect(() => {
     fetch('/api/credits/balance').then(r => r.ok ? r.json() : null)
-      .then(j => {
-        const paid = ['starter', 'pro', 'business', 'enterprise', 'creator', 'agency'].includes(String(j?.plan || '').toLowerCase())
-        if (paid) setGate('ok'); else { setGate('locked'); router.replace('/billing?feature=meta') }
+      .then(async j => {
+        // Same source of truth as UpgradeGate (/m4, /reports): the plan's `launch` entitlement — so every
+        // Meta surface agrees instead of a hardcoded whitelist disagreeing with the rest.
+        const { planEntitlements } = await import('@/lib/plans')
+        if (planEntitlements(j?.plan).launch) setGate('ok'); else { setGate('locked'); router.replace('/billing?feature=meta') }
       })
       .catch(() => setGate('ok'))   // on error, don't block a paying user
   }, [router])
