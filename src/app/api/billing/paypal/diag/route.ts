@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { IS_LIVE, PAYPAL_BASE } from '@/lib/paypal'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -27,6 +28,8 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    environment: IS_LIVE ? 'LIVE' : 'sandbox',
+    paypal_base: PAYPAL_BASE,
     mig145_card_columns: colErr ? `MISSING (${colErr.message})` : 'present',
     tableError: error?.message || null,
     orders: (data || []).map((o: any) => ({ basket: o.basket_id, kind: o.kind, status: o.status, err_code: o.err_code, order_id: o.paypal_order_id, card: o.card_last4 ? `${o.card_brand} ····${o.card_last4}` : null, created: o.created_at })),
