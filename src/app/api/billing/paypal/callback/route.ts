@@ -54,7 +54,13 @@ export async function POST(req: NextRequest) {
           await admin.rpc('apply_plan', { p_user: sub.owner_id, p_plan: sub.plan, p_reset: periodEnd.toISOString() })
         }
       }
-    } else if (type === 'BILLING.SUBSCRIPTION.CANCELLED' || type === 'BILLING.SUBSCRIPTION.EXPIRED' || type === 'BILLING.SUBSCRIPTION.SUSPENDED') {
+    } else if (type === 'BILLING.SUBSCRIPTION.CANCELLED' || type === 'BILLING.SUBSCRIPTION.SUSPENDED') {
+      // Cancelled/suspended → KEEP access until the current period ends (they paid for this cycle).
+      // Mark canceled; the renewals cron downgrades to Free once current_period_end passes.
+      const subId = res.id
+      if (subId) await admin.from('subscriptions').update({ status: 'canceled', updated_at: new Date().toISOString() }).eq('paypal_subscription_id', subId)
+    } else if (type === 'BILLING.SUBSCRIPTION.EXPIRED') {
+      // Fully ended → downgrade to Free now.
       const subId = res.id
       if (subId) {
         const { data: sub } = await admin.from('subscriptions').select('owner_id').eq('paypal_subscription_id', subId).maybeSingle()

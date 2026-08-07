@@ -1,7 +1,8 @@
 /**
- * POST /api/billing/cancel — cancel the PayFast subscription. There's no card auto-charging yet, so
- * "cancel" means: mark the subscription cancelled, stop renewal reminders, and KEEP access until the
- * current period ends (then the renewals cron downgrades to Free). Charged to the billing owner.
+ * POST /api/billing/cancel — cancel the current subscription (PayPal, PayFast, or Stripe).
+ * "Cancel" means: tell the provider to stop future billing, mark the subscription cancelled, stop
+ * renewal reminders, and KEEP access until the current period ends (the renewals cron downgrades to
+ * Free at period end). Charged to the billing owner.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
@@ -16,13 +17,20 @@ export async function POST(_req: NextRequest) {
   const admin = createAdminClient()
   const owner = await resolveBillingOwner(admin, user.id)
 
-  const { data: sub } = await admin.from('subscriptions').select('plan, status, current_period_end, provider').eq('owner_id', owner).maybeSingle()
+  const { data: sub } = await admin.from('subscriptions').select('plan, status, current_period_end, provider, paypal_subscription_id').eq('owner_id', owner).maybeSingle()
   if (!sub || sub.plan === 'free' || sub.status === 'canceled') {
     return NextResponse.json({ ok: true, alreadyCancelled: true })
   }
 
+  // Tell the provider to stop billing. PayPal has a real cancel endpoint (fires a webhook too).
+  if (sub.provider === 'paypal' && sub.paypal_subscription_id) {
+    const { cancelSubscription } = await import('@/lib/paypal')
+    const ok = await cancelSubscription(sub.paypal_subscription_id)
+    if (!ok) return NextResponse.json({ error: 'cancel_failed', message: 'Could not cancel with PayPal — try again or contact support.' }, { status: 502 })
+  }
+
   // Mark cancelled but leave the plan + period end intact — access runs out at period end, when the
-  // payfast-renewals cron downgrades to Free. Stops renewal reminders (cron only nudges 'active').
+  // renewals cron downgrades to Free. Stops renewal reminders (cron only nudges 'active').
   await admin.from('subscriptions').update({
     status: 'canceled', payfast_renewal_notified_at: null, updated_at: new Date().toISOString(),
   }).eq('owner_id', owner)
