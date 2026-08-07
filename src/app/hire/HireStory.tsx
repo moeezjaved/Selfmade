@@ -64,10 +64,9 @@ export default function HireStory() {
       {/* ── 1 · WHAT IS THIS? — you hired a marketing department. ── */}
       <header className="hero">
         <div className="eyebrow rv">Introducing Selfmade</div>
-        <h1 className="rv d2">Meet your new<br />AI marketing team.</h1>
+        <h1 className="rv d2">The One&#8209;Person<br />Company.</h1>
         <p className="hero-neg rv d2">No employees. No agency. No freelancers.</p>
-        <p className="hero-sub rv d3">A whole team — Research, Creative, Media Buying, Customer care — run by
-        Mello, your marketing manager. They do the work. You make the decisions.</p>
+        <p className="hero-sub rv d3">Your AI team does the work. You make the calls.</p>
 
         {/* four tiny numbers — credibility, early. "This isn't ChatGPT." */}
         <div className="stats rv d3" aria-hidden="true">
