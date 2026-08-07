@@ -143,10 +143,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
   const [connectedChannels, setConnectedChannels] = useState<string[]>([])
   useEffect(() => {
     fetch('/api/channels/unipile/connect').then(r => r.ok ? r.json() : null)
-      // ONLY count FOUNDER channels here (kind==='founder'). The founder-brief WhatsApp is a separate
-      // connection from a customer-inbox WhatsApp — a customer-support WhatsApp must NOT hide the
-      // "Get your brief on WhatsApp" step, or the founder can never connect the brief channel.
-      .then(j => { if (Array.isArray(j?.connected)) setConnectedChannels(j.connected.filter((c: any) => c.kind === 'founder').map((c: any) => String(c.provider))) })
+      // Slack must be a FOUNDER channel; WhatsApp counts in ANY capacity — a solo founder has ONE
+      // WhatsApp (their own number) that is both their inbox AND where the brief goes, so a connected
+      // WhatsApp = the brief channel. (Brief delivery in send.ts also sends to WhatsApp regardless of tag.)
+      .then(j => { if (Array.isArray(j?.connected)) setConnectedChannels(j.connected.filter((c: any) => c.kind === 'founder' || c.provider === 'whatsapp').map((c: any) => String(c.provider))) })
       .catch(() => {})
   }, [])
   const playbook = brief.items.find(i => i.kind === 'market_playbook' && i.playbook) || null
