@@ -206,9 +206,8 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
         </div>
         <div style={{ padding: '10px 12px 4px' }}><CreditCounter /></div>
         <div style={{ padding: '4px 8px 8px' }}>
-          {/* "Dashboard" → the current Home (morning brief), not the legacy Meta ads cockpit (/dashboard
-              still exists by URL). */}
-          <AcctItem href="/brief" icon={LayoutDashboard} label="Dashboard" />
+          {/* "Dashboard" → the Meta ads cockpit (KPIs / Scale & Insights / Deep Reports). */}
+          <AcctItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
           <AcctItem href="/activity" icon={ClipboardList} label="Activity log" />
           <AcctItem href="/mcp" icon={Sparkles} label="API & MCP" />
           <AcctItem href="/team" icon={Users} label="Team & members" />
