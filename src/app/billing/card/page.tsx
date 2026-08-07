@@ -41,6 +41,12 @@ function CardCheckout() {
       const paypal = (window as any).paypal
       if (!paypal?.CardFields) { setStatus('error'); setError('Could not load the card form. Refresh and try again.'); return }
       const cardField = paypal.CardFields({
+        // Slim PayPal's hosted inputs so each field iframe matches our 48px boxes (default is ~78px).
+        style: {
+          input: { 'font-size': '15px', 'font-family': 'Inter, -apple-system, sans-serif', color: '#0e1b12', padding: '10px 12px' },
+          '.invalid': { color: '#b91c1c' },
+          ':focus': { color: '#0e1b12' },
+        },
         createOrder: async () => {
           const r = await fetch('/api/billing/paypal/card/create-order', {
             method: 'POST', headers: { 'content-type': 'application/json' },
@@ -137,7 +143,9 @@ function CardCheckout() {
 }
 
 const lbl: React.CSSProperties = { display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', margin: '12px 0 5px' }
-const field: React.CSSProperties = { height: 44, border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '0 6px' }
+// height:auto (minHeight only) so the container grows to PayPal's iframe height instead of letting it
+// overflow and overlap the next field. overflow:hidden keeps the rounded corners clean.
+const field: React.CSSProperties = { minHeight: 48, border: '1.5px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }
 
 export default function Page() {
   return <Suspense fallback={null}><CardCheckout /></Suspense>
