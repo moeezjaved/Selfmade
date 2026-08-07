@@ -13,6 +13,7 @@ import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 import { openCredits } from '@/components/credits/CreditModal'
 import { showUpsell } from '@/components/UpsellModal'
 import toast from 'react-hot-toast'
+import { confirmAction } from '@/components/ConfirmDialog'
 import { useIsMobile } from '@/lib/useIsMobile'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area,
@@ -722,7 +723,7 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
     if (spied == null || busy) return
     if (spied) {
       // ── Stop spying → removes it from the tracked list + stops alerts (DELETE /brand-spy). ──
-      if (!confirm(`Stop spying on ${brandName || 'this brand'}? You'll no longer get its new-ad updates and it leaves your spied list.`)) return
+      if (!(await confirmAction({ title: `Stop spying on ${brandName || 'this brand'}?`, body: 'You’ll no longer get its new-ad updates and it leaves your spied list.', confirmLabel: 'Stop spying' }))) return
       setBusy(true); setSpied(false); setEmailOn(false)
       try { await fetch(`/api/discovery/brand-spy?pageId=${pageId}`, { method: 'DELETE' }) }
       catch { setSpied(true) } finally { setBusy(false) }
@@ -736,7 +737,7 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
         else if (showUpsell(j)) { /* plan_limit → in-app upgrade modal (e.g. "your plan tracks 1 brand at a time") */ }
         else if (r.status === 402 && /credit/i.test(String(j.error || j.message || ''))) openCredits('buy', String(j.message || j.error))
         else toast.error(String(j.message || j.error || 'Could not start spying — please try again.'))
-      } catch { alert('Network error — try again.') } finally { setBusy(false) }
+      } catch { toast.error('Network error — try again.') } finally { setBusy(false) }
     }
   }
   const toggleEmail = async () => {

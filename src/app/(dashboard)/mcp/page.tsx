@@ -9,6 +9,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
+import { confirmAction } from '@/components/ConfirmDialog'
 
 type Key = { id: string; label: string; token: string; last_used_at: string | null }
 type Agent = 'claude' | 'chatgpt' | 'cursor' | 'cli'
@@ -48,7 +49,7 @@ export default function McpPage() {
       setMinting(false)
     }
   }
-  const revoke = async (id: string) => { if (confirm('Revoke this key?')) { await fetch(`/api/account/mcp-keys?id=${id}`, { method: 'DELETE' }); load() } }
+  const revoke = async (id: string) => { if (await confirmAction({ title: 'Revoke this key?', body: 'Any tool using it stops working immediately.' })) { await fetch(`/api/account/mcp-keys?id=${id}`, { method: 'DELETE' }); load() } }
   const copy = (t: string, tag: string) => { navigator.clipboard.writeText(t); setCopied(tag); setTimeout(() => setCopied(''), 1500) }
 
   const latest = keys[0]

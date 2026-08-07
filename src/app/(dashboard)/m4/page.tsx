@@ -1,5 +1,6 @@
 'use client'
 import React, { useState } from 'react'
+import toast from 'react-hot-toast'
 import MetaGate from '@/components/MetaGate'
 import UpgradeGate from '@/components/UpgradeGate'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -332,11 +333,11 @@ function M4Inner() {
           body: JSON.stringify({ fileName: file.name, contentType: file.type }),
         })
         const presign = await presignRes.json()
-        if (presign.error) { alert('Upload error: ' + presign.error); setter(prev=>prev.filter(x=>x.id!==id)); return }
+        if (presign.error) { toast.error('Upload error: ' + presign.error); setter(prev=>prev.filter(x=>x.id!==id)); return }
         const uploadRes = await fetch(presign.signedUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
         if (!uploadRes.ok) {
           const errText = await uploadRes.text().catch(()=>'')
-          alert('Video upload to storage failed (' + uploadRes.status + '). ' + (uploadRes.status === 413 ? 'File too large — increase Supabase bucket size limit in Storage settings.' : errText.slice(0,200)))
+          toast.error('Video upload to storage failed (' + uploadRes.status + '). ' + (uploadRes.status === 413 ? 'File too large — increase Supabase bucket size limit in Storage settings.' : errText.slice(0,200)))
           setter(prev=>prev.filter(x=>x.id!==id))
           return
         }
@@ -347,7 +348,7 @@ function M4Inner() {
         })
         const data = await metaRes.json()
         if (data.error) {
-          alert('Meta video registration failed: ' + data.error)
+          toast.error('Meta video registration failed: ' + data.error)
           setter(prev=>prev.filter(x=>x.id!==id))
           return
         }
@@ -380,14 +381,14 @@ function M4Inner() {
         // Surface the REAL failure instead of leaving a dead creative row that then blocks launch with a
         // misleading "upload an image" alert. (The video path already did this; the image path swallowed it.)
         if (data.error || !(data.hash || data.videoId)) {
-          alert('Couldn’t register this image with Meta: ' + (data.error || 'no image hash came back. This usually means the connected Meta ad account is missing ads-management permission — reconnect it, then try again.'))
+          toast.error('Couldn’t register this image with Meta: ' + (data.error || 'no image hash came back. This usually means the connected Meta ad account is missing ads-management permission — reconnect it, then try again.'))
           setter(prev=>prev.filter(x=>x.id!==id))
           return
         }
         setter(prev=>prev.map(x=>x.id===id?{...x,hash:data.hash||data.videoId,uploading:false,uploaded:true}:x))
       }
     } catch(err: any) {
-      alert('Upload error: ' + err.message)
+      toast.error('Upload error: ' + err.message)
       setter(prev=>prev.map(x=>x.id===id?{...x,uploading:false}:x))
     }
   }
@@ -405,7 +406,7 @@ function M4Inner() {
 
   const generateInterests = async () => {
     setLoading(true)
-    try{const d=await fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,competitorDomains:competitorList.join(', '),targetCustomer:form.targetCustomer,country:accountCountry})}).then(r=>r.json());setInterests((d.interests||[]).map((i:Interest)=>({...i,selected:false})))}catch{alert('Failed to generate interests')}
+    try{const d=await fetch('/api/m4/interests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:form.product,description:form.description,competitorDomains:competitorList.join(', '),targetCustomer:form.targetCustomer,country:accountCountry})}).then(r=>r.json());setInterests((d.interests||[]).map((i:Interest)=>({...i,selected:false})))}catch{toast.error('Failed to generate interests')}
     setLoading(false)
   }
 
@@ -422,7 +423,7 @@ function M4Inner() {
 
   const gradeNow = async () => {
     setLoading(true)
-    try{const d=await fetch('/api/m4/grade',{method:'POST'}).then(r=>r.json());setGrades(d.grades||[]);goTo('grades')}catch{alert('Failed')}
+    try{const d=await fetch('/api/m4/grade',{method:'POST'}).then(r=>r.json());setGrades(d.grades||[]);goTo('grades')}catch{toast.error('Couldn’t grade — try again.')}
     setLoading(false)
   }
 
@@ -431,9 +432,9 @@ function M4Inner() {
     try{
       const res=await fetch('/api/m4/scale',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:grade.campaign_name,product:form.product,description:form.description,competitorDomains:competitorList.join(', ')})})
       const data=await res.json()
-      if(data.error)alert('Scale failed: '+data.error)
-      else{alert('Scaled! Duplicate created with 2x budget. '+data.new_interests+' new interests added.');setGrades(prev=>prev.map(g=>g.campaign_name===grade.campaign_name?{...g,applied:true}:g))}
-    }catch(e:any){alert('Error: '+e.message)}
+      if(data.error)toast.error('Scale failed: '+data.error)
+      else{toast.success('Scaled! Duplicate created with 2x budget. '+data.new_interests+' new interests added.');setGrades(prev=>prev.map(g=>g.campaign_name===grade.campaign_name?{...g,applied:true}:g))}
+    }catch(e:any){toast.error('Error: '+e.message)}
     setScaling(null)
   }
 
@@ -454,27 +455,27 @@ function M4Inner() {
     const validRetargeting = retargetingCreatives.filter(c => c.uploaded && c.hash)
     const validRetainer = retainerCreatives.filter(c => c.uploaded && c.hash)
     if (!validCreatives.length) {
-      alert('Upload at least one image or video before launching — every ad needs a creative. Add one in the Creatives step, then launch.')
+      toast.error('Upload at least one image or video before launching — every ad needs a creative. Add one in the Creatives step, then launch.')
       goTo('creatives')
       return
     }
-    if (!selectedPageId) { alert('Pick the Facebook Page to run these ads from (in the setup steps), then launch.'); return }
-    if (!adCopy.destinationUrl?.trim()) { alert('Add a destination URL (where the ad sends people) before launching.'); return }
+    if (!selectedPageId) { toast.error('Pick the Facebook Page to run these ads from (in the setup steps), then launch.'); return }
+    if (!adCopy.destinationUrl?.trim()) { toast.error('Add a destination URL (where the ad sends people) before launching.'); return }
     setLoading(true)
     try{
       const res=await fetch('/api/m4/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:form.campaignName||'M4',creatives:validCreatives,retargetingCreatives:validRetargeting,retainerCreatives:validRetainer,interests:selectedInterests,budget:form.budget,location:form.location,ageMin:form.ageMin,ageMax:form.ageMax,gender:form.gender,pixelId,objective:form.objective,pageId:selectedPageId,instagramActorId:selectedInstagramId,primaryText:adCopy.primaryText,headline:adCopy.headline,cta:adCopy.cta,websiteUrl:adCopy.destinationUrl,retargetingCopy,retainerCopy,includeRetainer})})
       const data=await res.json()
       const totalAds=(data.broad_adsets||0)+(data.interest_adsets||0)+(data.retargeting_adsets||0)+(data.retainer_adsets||0)
       const errMsg=data.errors?.length?'\n\nWhy:\n'+data.errors.join('\n'):''
-      if(data.error)alert('Launch failed: '+data.error)
+      if(data.error)toast.error('Launch failed: '+data.error)
       else if(totalAds===0){
         // Campaign shell may exist but NO ads were created — say so instead of a false "LAUNCHED".
-        alert('No ads were created — the campaign didn’t go live.'+(errMsg||'\n\nUsually this means the Meta ad account still needs setup (add a payment method + confirm details in Meta’s “Account overview”), or the creative failed to upload. Fix that and launch again.'))
+        toast.error('No ads were created — the campaign didn’t go live.'+(errMsg||' Usually the Meta ad account still needs setup (payment method + confirm details in Meta’s “Account overview”), or the creative failed to upload. Fix that and launch again.'),{duration:9000})
       } else{
-        alert('LAUNCHED in '+data.account+'!\n\nBroad: '+data.broad_adsets+' ad\nInterest: '+data.interest_adsets+' ad\nRetargeting: '+(data.retargeting_adsets||0)+' ad\n'+(includeRetainer?'Retainer: '+(data.retainer_adsets||0)+' ad\n':'')+'\nAll PAUSED. Activate in Meta Ads Manager.'+errMsg)
+        toast.success('LAUNCHED in '+data.account+'! Broad '+data.broad_adsets+' · Interest '+data.interest_adsets+' · Retargeting '+(data.retargeting_adsets||0)+(includeRetainer?' · Retainer '+(data.retainer_adsets||0):'')+'. All PAUSED — activate in Meta Ads Manager.',{duration:9000})
         goTo('grades')
       }
-    }catch(e:any){alert('Error: '+e.message)}
+    }catch(e:any){toast.error('Error: '+e.message)}
     setLoading(false)
   }
 

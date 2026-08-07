@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ExternalLink, Bookmark, Sparkles } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { confirmAction } from '@/components/ConfirmDialog'
 import { cleanCopy } from '@/lib/cleanCopy'
 import CloneModal from '../CloneModal'
 import CloneVideoModal from '../CloneVideoModal'
@@ -97,7 +99,7 @@ export default function SavedAdsPage() {
       setSelectedEmoji('📋')
       setNewBoardTeam(false)
     } else if (data.error === 'plan_limit') {
-      alert(data.message || 'Team boards are a Pro feature — upgrade to share boards with your team.')
+      toast.error(data.message || 'Team boards are a Pro feature — upgrade to share boards with your team.')
     }
     setCreating(false)
   }
@@ -108,11 +110,11 @@ export default function SavedAdsPage() {
       body: JSON.stringify({ name, emoji: '📁', visibility: parent.visibility || 'personal', parent_board_id: parent.id }) })
     const data = await res.json()
     if (data.board) { setBoards(prev => [{ ...data.board, isMine: true }, ...prev]); setSelectedBoard(data.board.id) }
-    else if (data.error === 'plan_limit') alert(data.message || 'Team boards are a Pro feature.')
+    else if (data.error === 'plan_limit') toast.error(data.message || 'Team boards are a Pro feature.')
   }
 
   const deleteBoard = async (id: string) => {
-    if (!confirm('Delete this board? All saved ads in it will be removed.')) return
+    if (!(await confirmAction({ title: 'Delete this board?', body: 'All saved ads in it will be removed.' }))) return
     await fetch(`/api/discovery/boards?id=${id}`, { method: 'DELETE' })
     setBoards(prev => prev.filter(b => b.id !== id))
     if (selectedBoard === id) setSelectedBoard(boards.find(b => b.id !== id)?.id || null)

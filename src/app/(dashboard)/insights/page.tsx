@@ -2,6 +2,7 @@
 import MetaGate from '@/components/MetaGate'
 import AdsTabs from '@/components/ads/AdsTabs'
 import React, { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
 import { useIsMobile } from '@/lib/useIsMobile'
 
 interface AdsetInsight {
@@ -75,13 +76,13 @@ function InsightsPage() {
         })
       })
       const data = await res.json()
-      if (data.error) alert('Scale failed: ' + data.error)
+      if (data.error) toast.error('Scale failed: ' + data.error)
       else {
-        if (isBudgetIncrease) alert('Budget increased by ' + scaleFactor + '% on ' + adset.name)
-        else alert('Scaled! Duplicate ad set created with ' + scaleFactor + 'x budget.\n\nCheck Meta Ads Manager to activate.')
+        if (isBudgetIncrease) toast.success('Budget increased by ' + scaleFactor + '% on ' + adset.name)
+        else toast.success('Scaled! Duplicate ad set created with ' + scaleFactor + 'x budget. Check Meta Ads Manager to activate.')
       }
       await loadInsights()
-    } catch(e: any) { alert('Error: ' + e.message) }
+    } catch(e: any) { toast.error('Error: ' + e.message) }
     setActing(null)
   }
 
@@ -89,7 +90,7 @@ function InsightsPage() {
     setActing(adsetId)
     try {
       await fetch('/api/insights/action', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({campaignId: adsetId, action: 'pause'})})
-      alert('Ad set paused.')
+      toast.success('Ad set paused.')
       await loadInsights()
     } catch {}
     setActing(null)
