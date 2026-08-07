@@ -85,9 +85,9 @@ export default function HqMockup() {
 
       <style dangerouslySetInnerHTML={{ __html: `
         .hq-wrap{max-width:1040px;margin:16px auto 0;padding:0 20px}
-        .hq{display:grid;grid-template-columns:230px 1fr;background:#fff;border:1px solid rgba(17,37,28,.08);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px -50px rgba(17,37,28,.5),0 2px 6px rgba(17,37,28,.04);min-height:430px;opacity:0;transform:translateY(20px)}
+        .hq{display:grid;grid-template-columns:230px 1fr;background:#fff;border:1px solid rgba(17,37,28,.08);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px -50px rgba(17,37,28,.5),0 2px 6px rgba(17,37,28,.04);min-height:430px;opacity:1}
         .hq.on{animation:hq-rise .7s cubic-bezier(0,0,.2,1) both}
-        @keyframes hq-rise{to{opacity:1;transform:none}}
+        @keyframes hq-rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 
         .hq-rail{background:${FOREST};color:#cdd8cd;padding:16px 14px;display:flex;flex-direction:column;gap:3px}
         .hq-brand{display:flex;align-items:center;gap:8px;font-weight:800;color:#fff;font-size:15px;letter-spacing:-.01em}
@@ -110,9 +110,9 @@ export default function HqMockup() {
         @keyframes hq-pulse{0%,100%{opacity:.4}50%{opacity:1}}
 
         .hq-chat{padding:18px 20px;display:flex;flex-direction:column;gap:13px;flex:1}
-        .hq-msg{display:flex;gap:11px;align-items:flex-start;opacity:0;transform:translateY(10px)}
+        .hq-msg{display:flex;gap:11px;align-items:flex-start;opacity:1}
         .hq.on .hq-msg{animation:hq-msg-in .5s cubic-bezier(0,0,.2,1) both;animation-delay:calc(.55s + var(--i) * .55s)}
-        @keyframes hq-msg-in{to{opacity:1;transform:none}}
+        @keyframes hq-msg-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
         .hq-msg.me{flex-direction:row-reverse}
         .hq-av{width:30px;height:30px;border-radius:9px;flex-shrink:0;display:grid;place-items:center;font-weight:800;font-size:13px;color:#fff;background:#5b6f57}
         .hq-av[data-r="RESEARCH"]{background:#3f7bd0}.hq-av[data-r="CREATIVE"]{background:#c07ad0}.hq-av[data-r="MEDIA BUYING"]{background:#2f9e6a}.hq-av[data-r="FINANCE"]{background:#c99a2e}.hq-av[data-r="MELLO"]{background:${INK}}
