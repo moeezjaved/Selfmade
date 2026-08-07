@@ -141,6 +141,9 @@ export async function createOrder(opts: {
         brand_name: 'Selfmade',
         user_action: 'PAY_NOW',
         shipping_preference: 'NO_SHIPPING',
+        // Land on the guest card-entry form (not the PayPal login) so customers can pay by card
+        // without a PayPal account. Requires Guest Checkout enabled on the PayPal business account.
+        landing_page: 'BILLING',
         return_url: opts.returnUrl,
         cancel_url: opts.cancelUrl,
       },
