@@ -177,8 +177,8 @@ export async function GET(request: NextRequest) {
     // A semantic-fill row must satisfy every filter whose column the RPC returns (days/cta/hook/
     // emotion/angle/hide-brands/theme/language/platform/run-time), mirroring the main query.
     const passesSemantic = (v: any) => {
-      // "Last N days" = launched within N days AND still active, mirroring the main query.
-      if (days > 0 && ((Number(v.days_running) ?? 999999) > days || v.is_active === false)) return false
+      // "Last N days" = days_running ≤ N (mirrors the main query; see the recency note above).
+      if (days > 0 && (Number(v.days_running) ?? 999999) > days) return false
       if (ctaTypes.length && !ctaTypes.includes(v.cta)) return false
       if (hookTypes.length && !hookTypes.includes(v.hook_type)) return false
       if (emotions.length && !overlap(v.emotion, emotions)) return false
@@ -420,12 +420,14 @@ export async function GET(request: NextRequest) {
       if (langs.length) baseQuery = baseQuery.overlaps('languages', langs)
     }
     if (platforms) baseQuery = baseQuery.overlaps('platforms', platforms.split(','))
-    // Time filter = recently-launched AND still running. days_running (INDEXED via mig-130's
-    // has_creative,days_running,ad_id composite) keeps it fast; adding is_active=true excludes ads that
-    // stopped long ago — the bug where a 7d filter showed a Jul-4 ad that had already ended. A pure
-    // last_seen recency filter is correct in theory but has no index → 9s cap → empty results.
+    // Time window (days>0): keyed off days_running via the mig-130 (has_creative, days_running, ad_id)
+    // composite so it's an index-only scan (fast, no timeout). NOTE: true recency (last_seen/start_date
+    // >= cutoff) is the correct semantic but has no supporting index → 9s cap → empty; and adding any
+    // extra predicate (is_active) drops off the composite → also times out. A proper recency filter
+    // needs a dedicated last_seen index + a crawler that maintains last_seen — until then this stays
+    // on days_running for speed (its recency is only as good as days_running's freshness).
     if (days > 0) {
-      baseQuery = baseQuery.lte('days_running', days).eq('is_active', true)
+      baseQuery = baseQuery.lte('days_running', days)
     }
     // GetHookd-parity filters (performance tier, niche, brand volume, run-time,
     // CTA, creative reuse, hide-brands) — rollup-backed, all additive.
