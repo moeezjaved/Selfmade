@@ -50,9 +50,12 @@ export async function redeemCode(
   if (row.provider && row.provider !== provider) return null
 
   // Bind: upsert the identity (a given external id maps to exactly one account).
+  // redeemCode is ONLY the founder brief-delivery link (Slack/WhatsApp: Mello → you), so tag it
+  // founder_tool. Without this the row has neither founder_tool nor customer_channel, so GET
+  // /api/channels/unipile/connect drops it and the brief's FINISH SETUP kept showing "Connect".
   await admin.from('channel_identities').upsert({
     user_id: row.user_id, provider, external_id: externalId, display: display || null,
-    meta, verified: true, active: true, updated_at: new Date().toISOString(),
+    meta: { ...(meta || {}), founder_tool: true }, verified: true, active: true, updated_at: new Date().toISOString(),
   }, { onConflict: 'provider,external_id' })
   await admin.from('channel_link_codes').update({ used_at: new Date().toISOString() }).eq('code', code)
   return row.user_id as string

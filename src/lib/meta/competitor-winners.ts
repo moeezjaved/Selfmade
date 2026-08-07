@@ -9,6 +9,13 @@
  * Strategist so both reason off the same winners.
  */
 
+// A manual add stores brand_name = "Facebook page <id>" — treat that (and blanks/bare ids) as
+// unresolved so the crawler's real page_name wins instead of showing the placeholder as the name.
+const isPlaceholderName = (n: unknown): boolean => {
+  const t = String(n ?? '').trim()
+  return !t || /^\d+$/.test(t) || /^facebook page\s+\d+$/i.test(t)
+}
+
 export type CompetitorWinner = {
   adId: string
   pageId: string
@@ -47,7 +54,7 @@ export async function getCompetitorWinners(admin: any, userId: string, opts: { p
       .eq('page_id', p.page_id)
       .order('days_running', { ascending: false, nullsFirst: false })
       .limit(30)
-      .then((r: any) => (r.data || []).map((a: any) => ({ ...a, _brand: p.brand_name || a.page_name })))
+      .then((r: any) => (r.data || []).map((a: any) => ({ ...a, _brand: (isPlaceholderName(p.brand_name) ? a.page_name : p.brand_name) || a.page_name })))
       .catch(() => [] as any[])
   ))
 
