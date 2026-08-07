@@ -64,7 +64,7 @@ export default function HireStory() {
       {/* ── 1 · WHAT IS THIS? — you hired a marketing department. ── */}
       <header className="hero">
         <div className="eyebrow rv">Introducing Selfmade</div>
-        <h1 className="rv d2">You just hired a<br />marketing company.</h1>
+        <h1 className="rv d2">The self&#8209;driving<br />marketing company.</h1>
         <p className="hero-neg rv d2">No employees. No agency. No freelancers.</p>
         <p className="hero-sub rv d3">A whole team — Research, Creative, Media Buying, Customer care — run by
         Mello, your marketing manager. They do the work. You make the decisions.</p>

@@ -71,7 +71,10 @@ export async function createHostedAuthLink(userId: string, provider: string, ret
     })
     const j = await res.json().catch(() => ({}))
     if (j?.url) return { url: j.url }
-    return { error: j?.detail || j?.message || 'Could not start the connection.' }
+    // Unipile returns a structured validation OBJECT in `detail` (e.g. the mail-provider schema for
+    // email). Only surface it if it's a real string — otherwise it gets toasted as a raw JSON dump.
+    const msg = typeof j?.detail === 'string' ? j.detail : (typeof j?.message === 'string' ? j.message : '')
+    return { error: msg || 'Could not start the connection. Please try again.' }
   } catch (e: any) {
     return { error: e?.message || 'Could not reach the channel service.' }
   }

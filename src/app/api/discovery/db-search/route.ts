@@ -433,7 +433,13 @@ export async function GET(request: NextRequest) {
     baseQuery = applyHookdFilters(baseQuery)
 
     // Sort
-    if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
+    // A last-N-days window (days>0) MUST order by days_running so the (has_creative, days_running, ad_id)
+    // composite (mig 130) serves BOTH the .lte('days_running', N) predicate above AND the sort — an
+    // index-only scan. Without this the 7d window keeps ORDER BY perf_score/last_seen, ignores the index,
+    // and wades millions of rows → 9s cap → "index was busy" (30d matched enough rows to squeak under;
+    // 7d didn't). This wins over the user's sort while a recency window is active.
+    if (days > 0) baseQuery = baseQuery.order('days_running', { ascending: true, nullsFirst: false }).order('ad_id', { ascending: true })
+    else if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
     else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
     else if (sort === 'recent') baseQuery = baseQuery.order('last_seen', { ascending: false })
     // 'Newest' = fewest days running (launched most recently). Orders by days_running ASC, ad_id —
@@ -489,7 +495,7 @@ export async function GET(request: NextRequest) {
     // BitmapOr — which is exactly why nike (0 results) still timed out after the perf-order fix.
     // Searches fetch the BitmapOr pool (fast, ~0.3s) and the client dedups by creative hash, so they
     // don't need the DB tiebreaker for correctness.
-    if (!q) baseQuery = baseQuery.order('ad_id', { ascending: true })
+    if (!q && days === 0) baseQuery = baseQuery.order('ad_id', { ascending: true })
 
     // Page STRAIGHT THROUGH the has-creative results (the inner-join already filtered
     // to displayable ads), `limit` per page. CRITICAL: do NOT multiply the offset by

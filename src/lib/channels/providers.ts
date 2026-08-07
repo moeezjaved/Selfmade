@@ -163,17 +163,13 @@ export async function whatsappSend(opts: { chatId?: string; toAttendee?: string;
   if (!whatsappEnabled) return { ok: false, error: 'not_configured' }
   const accountId = process.env.UNIPILE_WHATSAPP_ACCOUNT_ID!
   try {
-    if (opts.chatId) {
-      const r = await fetch(`${uniBase()}/api/v1/chats/${encodeURIComponent(opts.chatId)}/messages`, {
-        method: 'POST', headers: uniHeaders(), body: JSON.stringify({ text: opts.text }),
-      }).then((x) => x.json())
-      return { ok: true, id: r?.id || r?.message_id, chatId: opts.chatId }
-    }
-    // Start a new chat with the recipient on the WhatsApp account.
-    const r = await fetch(`${uniBase()}/api/v1/chats`, {
-      method: 'POST', headers: uniHeaders(),
-      body: JSON.stringify({ account_id: accountId, attendees_ids: [opts.toAttendee], text: opts.text }),
-    }).then((x) => x.json())
-    return { ok: true, id: r?.message_id || r?.id, chatId: r?.chat_id || r?.id }
+    // Reply into a known chat, else start one. CHECK the response (was returning ok:true for ANY
+    // non-throwing response, so a rejected send still toasted "Sent — check your WhatsApp").
+    const res = opts.chatId
+      ? await fetch(`${uniBase()}/api/v1/chats/${encodeURIComponent(opts.chatId)}/messages`, { method: 'POST', headers: uniHeaders(), body: JSON.stringify({ text: opts.text }) })
+      : await fetch(`${uniBase()}/api/v1/chats`, { method: 'POST', headers: uniHeaders(), body: JSON.stringify({ account_id: accountId, attendees_ids: [opts.toAttendee], text: opts.text }) })
+    const r = await res.json().catch(() => ({}))
+    if (!res.ok || r?.error || r?.type === 'error') return { ok: false, error: r?.detail || r?.message || r?.error?.message || `send failed (${res.status})` }
+    return { ok: true, id: r?.id || r?.message_id, chatId: opts.chatId || r?.chat_id || r?.id }
   } catch (e: any) { return { ok: false, error: String(e?.message || e) } }
 }
