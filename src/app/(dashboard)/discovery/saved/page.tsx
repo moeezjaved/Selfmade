@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ExternalLink, Bookmark, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { confirmAction } from '@/components/ConfirmDialog'
+import { confirmAction, promptText } from '@/components/ConfirmDialog'
 import { cleanCopy } from '@/lib/cleanCopy'
 import CloneModal from '../CloneModal'
 import CloneVideoModal from '../CloneVideoModal'
@@ -105,7 +105,7 @@ export default function SavedAdsPage() {
   }
 
   const createSub = async (parent: Board) => {
-    const name = prompt(`New sub-board under "${parent.name}"`)?.trim(); if (!name) return
+    const name = await promptText({ title: `New sub-board under “${parent.name}”`, placeholder: 'Sub-board name' }); if (!name) return
     const res = await fetch('/api/discovery/boards', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, emoji: '📁', visibility: parent.visibility || 'personal', parent_board_id: parent.id }) })
     const data = await res.json()
