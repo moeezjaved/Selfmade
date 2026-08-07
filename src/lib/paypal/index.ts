@@ -173,6 +173,115 @@ export async function captureOrder(orderId: string): Promise<{ ok: boolean; capt
   }
 }
 
+// ── Advanced Card Payments (ACDC) — card-only, no PayPal account ───────────────
+// The card PAN is entered in PayPal's hosted card-fields (client-side) and never touches our server.
+// We create the order (optionally asking PayPal to VAULT the card for future monthly charges), the
+// client submits the card + runs 3-D Secure, then we capture and read back the vault token.
+
+/**
+ * Create an Order for the card-fields flow. If `vault` is true, PayPal saves the card on a successful
+ * capture (returns a vault token we store for monthly auto-charge). Returns the order id only — the
+ * card is supplied later by the client's cardFields.submit().
+ */
+export async function createCardOrder(opts: {
+  amountUsd: number; customId: string; description: string; vault?: boolean
+}): Promise<{ id: string }> {
+  const card: any = {
+    attributes: {
+      // SCA_WHEN_REQUIRED → PayPal triggers 3-D Secure only when the bank/regulation asks (UK SCA).
+      verification: { method: 'SCA_WHEN_REQUIRED' },
+    },
+  }
+  if (opts.vault) {
+    card.attributes.vault = { store_in_vault: 'ON_SUCCESS' }
+  }
+  const body = await paypalFetch('/v2/checkout/orders', {
+    method: 'POST',
+    body: JSON.stringify({
+      intent: 'CAPTURE',
+      purchase_units: [{
+        custom_id: opts.customId,
+        description: opts.description.slice(0, 127),
+        amount: { currency_code: 'USD', value: opts.amountUsd.toFixed(2) },
+      }],
+      payment_source: { card },
+    }),
+  })
+  return { id: body.id }
+}
+
+type CardCaptureResult = {
+  ok: boolean; captureId?: string; customId?: string; status?: string
+  vaultId?: string; customerId?: string; cardBrand?: string; cardLast4?: string
+}
+
+/** Read the vault token + card display bits out of a captured card order's response. */
+function readCardCapture(body: any): CardCaptureResult {
+  const pu = body?.purchase_units?.[0]
+  const cap = pu?.payments?.captures?.[0]
+  const card = body?.payment_source?.card
+  const vault = card?.attributes?.vault
+  return {
+    ok: body?.status === 'COMPLETED' || cap?.status === 'COMPLETED',
+    captureId: cap?.id, customId: pu?.custom_id || cap?.custom_id, status: body?.status,
+    vaultId: vault?.id, customerId: vault?.customer?.id,
+    cardBrand: card?.brand, cardLast4: card?.last_digits,
+  }
+}
+
+/** Capture an approved card order (after the client ran cardFields.submit() + 3DS). */
+export async function captureCardOrder(orderId: string): Promise<CardCaptureResult> {
+  try {
+    const body = await paypalFetch(`/v2/checkout/orders/${orderId}/capture`, { method: 'POST' })
+    return readCardCapture(body)
+  } catch (e: any) {
+    if (String(e?.message || '').includes('ALREADY_CAPTURED') || String(e?.message || '').includes('422')) {
+      try { return readCardCapture(await paypalFetch(`/v2/checkout/orders/${orderId}`, { method: 'GET' })) } catch { /* fall through */ }
+    }
+    return { ok: false }
+  }
+}
+
+/**
+ * Charge a previously-vaulted card WITHOUT the customer present (monthly subscription renewal).
+ * Merchant-initiated, recurring, subsequent use of the stored credential. Creates + captures an order
+ * against the vault token in one call. Returns the capture id on success.
+ */
+export async function chargeVaultedCard(opts: {
+  vaultId: string; amountUsd: number; customId: string; description: string
+}): Promise<{ ok: boolean; transactionId?: string; error?: string }> {
+  try {
+    const body = await paypalFetch('/v2/checkout/orders', {
+      method: 'POST',
+      headers: { 'PayPal-Request-Id': opts.customId },
+      body: JSON.stringify({
+        intent: 'CAPTURE',
+        purchase_units: [{
+          custom_id: opts.customId,
+          description: opts.description.slice(0, 127),
+          amount: { currency_code: 'USD', value: opts.amountUsd.toFixed(2) },
+        }],
+        payment_source: {
+          card: {
+            vault_id: opts.vaultId,
+            stored_credential: { payment_initiator: 'MERCHANT', payment_type: 'RECURRING', usage: 'SUBSEQUENT' },
+          },
+        },
+      }),
+    })
+    // With a vault_id + intent CAPTURE, PayPal processes immediately; capture if still only authorized.
+    let cap = body?.purchase_units?.[0]?.payments?.captures?.[0]
+    if (!cap && body?.id && body?.status !== 'COMPLETED') {
+      const capBody = await paypalFetch(`/v2/checkout/orders/${body.id}/capture`, { method: 'POST' })
+      cap = capBody?.purchase_units?.[0]?.payments?.captures?.[0]
+    }
+    if (cap?.status === 'COMPLETED' || body?.status === 'COMPLETED') return { ok: true, transactionId: cap?.id }
+    return { ok: false, error: `status ${body?.status}` }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+}
+
 // ── Webhook signature verification ────────────────────────────────────────────
 
 /**

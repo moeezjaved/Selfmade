@@ -10,7 +10,10 @@ import { PLANS, type PlanId } from '@/lib/plans'
 export async function grantPaypalOrder(
   admin: SupabaseClient,
   basketId: string,
-  meta: { transactionId?: string | null; subscriptionId?: string | null; raw?: any } = {},
+  meta: {
+    transactionId?: string | null; subscriptionId?: string | null; raw?: any
+    vaultId?: string | null; customerId?: string | null; cardBrand?: string | null; cardLast4?: string | null
+  } = {},
 ): Promise<{ ok: boolean; note?: string }> {
   const { data: order } = await admin.from('paypal_orders').select('*').eq('basket_id', basketId).maybeSingle()
   if (!order) return { ok: false, note: 'unknown_basket' }
@@ -32,6 +35,8 @@ export async function grantPaypalOrder(
       owner_id: owner, plan: order.plan, billing_cycle: order.billing_cycle,
       status: 'active', current_period_end: periodEnd.toISOString(),
       paypal_subscription_id: meta.subscriptionId || order.paypal_subscription_id || null,
+      // Card (ACDC) path: store the vault token so the renewals cron can auto-charge monthly.
+      ...(meta.vaultId ? { paypal_vault_id: meta.vaultId, paypal_customer_id: meta.customerId || null, card_brand: meta.cardBrand || null, card_last4: meta.cardLast4 || null } : {}),
       provider: 'paypal', updated_at: now.toISOString(),
     }, { onConflict: 'owner_id' })
     await admin.rpc('apply_plan', { p_user: owner, p_plan: order.plan, p_reset: periodEnd.toISOString() })
@@ -40,6 +45,7 @@ export async function grantPaypalOrder(
 
   await admin.from('paypal_orders').update({
     status: 'paid', transaction_id: meta.transactionId || null,
+    ...(meta.vaultId ? { paypal_vault_id: meta.vaultId, card_brand: meta.cardBrand || null, card_last4: meta.cardLast4 || null } : {}),
     paid_at: new Date().toISOString(), raw: meta.raw || {},
   }).eq('basket_id', basketId)
 
