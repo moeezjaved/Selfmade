@@ -127,7 +127,10 @@ Return ONLY JSON: {"ideas":[{"title","format","why","basedOn":"fatigue|winner|co
       return {
         title, format, why: String(it.why || '').slice(0, 320), basedOn, reference,
         priority: (['high', 'med', 'low'].includes(it.priority) ? it.priority : 'med') as CreativeIdea['priority'],
-        studioHref: studioHref(seedRef, angle),
+        // Seed the rival ad for ANY competitor idea (seedRef=clone, else refRival=inspiration) so "Make it"
+        // opens the Studio pre-filled with that ad's reference — not a blank studio. Own-brand ideas
+        // (fatigue/winner) have no rival ref → open fresh with the angle prefilled.
+        studioHref: studioHref(seedRef || refRival, angle),
       }
     }).filter((i: CreativeIdea) => i.title && i.why)
     return ideas.length ? ideas.slice(0, 3) : null
@@ -235,8 +238,18 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
     } catch { /* ok */ }
   }
 
+  // Resolve the ACTIVE brand's name (opts.brandId) so ideas are titled/grounded for the brand the
+  // founder is viewing (e.g. Aura) — NOT the oldest brand (the old fallback grabbed the wrong brand,
+  // e.g. 'Mars Men', while viewing Aura). Only fall back to the first brand when no brand is active.
   let brand = opts.brand || ''
-  if (!brand) { try { const { data } = await admin.from('brands').select('name').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle(); brand = data?.name || '' } catch { /* ok */ } }
+  if (!brand) {
+    try {
+      const bq = opts.brandId
+        ? admin.from('brands').select('name').eq('id', opts.brandId).maybeSingle()
+        : admin.from('brands').select('name').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+      const { data } = await bq; brand = data?.name || ''
+    } catch { /* ok */ }
+  }
 
   // A representative visual for own-account ideas (no rival thumbnail) — the brand's most recent finished
   // creative, so those cards show a real image instead of the empty clapperboard.
