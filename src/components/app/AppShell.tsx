@@ -63,9 +63,9 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
   },
   {
     // STUDIO — the making half of the old 'Work' tab: create creatives + manage brands/assets.
-    key: 'studio', label: 'Studio', railLabel: 'Studio', railIcon: Wand2, defaultHref: '/creative-studio?studio=1',
+    key: 'studio', label: 'Studio', railLabel: 'Studio', railIcon: Wand2, defaultHref: '/studio',
     items: [
-      { href: '/creative-studio?studio=1', icon: Wand2,    label: 'Create Ad' },
+      { href: '/studio',                   icon: Wand2,    label: 'Create Ad' },
       { href: '/creative-studio',          icon: Sparkles, label: 'My Creatives' },
       { href: '/brands',                   icon: Store,    label: 'My Brands' },
       { href: '/assets',                   icon: ImageIcon,label: 'Assets' },
