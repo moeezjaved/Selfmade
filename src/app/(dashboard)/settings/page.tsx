@@ -638,10 +638,6 @@ function CustomerChannelsSection() {
         </div>
         {on ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
-            <button onClick={() => connect(provider)} disabled={busy === provider}
-              style={{ background: 'none', border: 'none', color: '#7a9a7a', fontSize: 12.5, fontWeight: 700, cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', textDecoration: 'underline', padding: 0, opacity: busy === provider ? 0.6 : 1 }}>
-              {busy === provider ? 'Opening…' : 'Reconnect'}
-            </button>
             <button onClick={() => disconnect(provider)} disabled={busy === provider}
               style={{ background: '#fff', color: '#b42318', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, border: '1.5px solid #f3d3cf', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy === provider ? 0.6 : 1 }}>
               Disconnect

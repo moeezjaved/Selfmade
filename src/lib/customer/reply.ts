@@ -30,7 +30,11 @@ export async function sendCustomerReply(admin: any, userId: string, messageId: s
     const { data: thread } = await admin.from('customer_threads').select('channel, contact_ref, chat_ref').eq('id', msg.thread_id).maybeSingle()
     if (thread && thread.channel === 'simulated') { simulated = true; note = 'Approved ✓ (test — not sent)' }
     else if (thread && thread.contact_ref) {
-      const { data: chan } = await admin.from('channel_identities').select('external_id, meta').eq('user_id', userId).eq('provider', thread.channel).eq('active', true).maybeSingle()
+      // There can be MORE than one row for a provider (e.g. WhatsApp connected as both a founder brief
+      // channel AND a customer channel) — .maybeSingle() would return null on multiple and break the
+      // send. Fetch all active rows and prefer the CUSTOMER channel; fall back to the first.
+      const { data: chans } = await admin.from('channel_identities').select('external_id, meta').eq('user_id', userId).eq('provider', thread.channel).eq('active', true)
+      const chan = (chans || []).find((c: any) => c?.meta?.customer_channel) || (chans || [])[0]
       const accountId = chan?.meta?.unipile_account_id || chan?.external_id
       if (!accountId) { note = `Saved, but ${thread.channel} isn’t connected — connect it in Settings to send.` }
       else if (thread.channel === 'email') {
