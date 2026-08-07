@@ -17,6 +17,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import HqMockup from './HqMockup'
+import FeatureShowcase from './FeatureShowcase'
 
 export default function HireStory() {
   const router = useRouter()
@@ -112,6 +113,9 @@ export default function HireStory() {
 
       {/* Animated product mockup — the workspace as a real app (proof of "The One-Person Company"). */}
       <HqMockup />
+
+      {/* Feature showcase — alternating blocks, each with an animated mockup of the feature working. */}
+      <FeatureShowcase />
 
       {/* ── 1.5 · WHERE THEY LIVE (cold open) — surfaced early: the software disappears, the team appears.
           This is the differentiator ("I don't need another dashboard"), so it opens the story. ── */}
