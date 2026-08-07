@@ -498,8 +498,11 @@ function ChannelsSection() {
     setTesting(provider)
     try {
       const r = await fetch('/api/channels/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'report' }) }).then(res => res.json())
-      if (r?.delivered) toast.success(`Sent — check your ${provider === 'slack' ? 'Slack' : 'WhatsApp'} ${provider === 'slack' ? '💬' : '🟢'}`)
-      else if (provider === 'whatsapp') toast.error('Message your linked WhatsApp once (send “hi” to yourself in that chat), then Send test — WhatsApp won’t let me open the very first chat.')
+      // WhatsApp: PayPal/Unipile accepts the send, but WhatsApp silently drops a business-initiated
+      // FIRST message. So don't over-promise — tell the user how to open the window if nothing arrives.
+      if (r?.delivered && provider === 'whatsapp') toast.success('Sent to WhatsApp. If nothing arrives, message your linked WhatsApp number once first — WhatsApp blocks first-contact messages.', { duration: 8000 })
+      else if (r?.delivered) toast.success('Sent — check your Slack 💬')
+      else if (provider === 'whatsapp') toast.error('Message your linked WhatsApp once (send “hi” in that chat), then Send test — WhatsApp won’t let me open the very first chat.')
       else toast.error(r?.error || 'Nothing was delivered — reconnect the channel and try again.')
     } catch { toast.error('Could not send — try again.') }
     setTesting('')

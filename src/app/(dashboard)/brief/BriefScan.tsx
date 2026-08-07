@@ -143,7 +143,9 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
   const [connectedChannels, setConnectedChannels] = useState<string[]>([])
   useEffect(() => {
     fetch('/api/channels/unipile/connect').then(r => r.ok ? r.json() : null)
-      .then(j => { if (Array.isArray(j?.connected)) setConnectedChannels(j.connected.filter((c: any) => c.kind === 'founder').map((c: any) => String(c.provider))) })
+      // Slack must be a founder channel; WhatsApp counts in ANY capacity — it's both founder + customer
+      // (a connected WhatsApp delivers the brief), so a customer-only WhatsApp shouldn't still nag "Connect".
+      .then(j => { if (Array.isArray(j?.connected)) setConnectedChannels(j.connected.filter((c: any) => c.kind === 'founder' || c.provider === 'whatsapp').map((c: any) => String(c.provider))) })
       .catch(() => {})
   }, [])
   const playbook = brief.items.find(i => i.kind === 'market_playbook' && i.playbook) || null
@@ -358,10 +360,17 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                   <div style={section}>What&rsquo;s working across your {playbook.playbook.brandsCount} competitor{playbook.playbook.brandsCount === 1 ? '' : 's'}</div>
                   <div style={{ ...sectionSub, margin: 0 }}>Decoded from {playbook.playbook.totalAds} fresh ads — the formula to copy before it saturates.</div>
                 </div>
-                {/* "Make one like this" ACTS — opens the NEW studio (/studio), seeded with the winning
-                    pattern via ?angle= (the fresh-create convention, same as studioHref). The old
-                    /creative-studio?studio=1&seed= opened the legacy My-Creatives modal. */}
-                <Link href={`/studio?angle=${encodeURIComponent([playbook.playbook.formats[0]?.label, playbook.playbook.hooks[0]?.label && `${playbook.playbook.hooks[0]?.label} hook`, playbook.playbook.offers[0]?.label && `${playbook.playbook.offers[0]?.label} offer`].filter(Boolean).join(', '))}`} onClick={() => onAct(playbook)}
+                {/* "Make one like this" → the studio, seeded with the decoded winning FORMULA as the
+                    angle (a cross-competitor pattern, not one ad — so it's a seed, not a remake). We
+                    always send a full, human sentence so the studio never opens looking blank; the
+                    studio prefills the angle + frames the chat around it. */}
+                <Link href={`/studio?angle=${encodeURIComponent(
+                  'An ad like top competitors right now — ' +
+                  ([playbook.playbook.formats[0]?.label && `${playbook.playbook.formats[0]?.label} format`,
+                    playbook.playbook.hooks[0]?.label && `${playbook.playbook.hooks[0]?.label} hook`,
+                    playbook.playbook.offers[0]?.label && `${playbook.playbook.offers[0]?.label} offer`].filter(Boolean).join(', ')
+                    || `the winning formula across your ${playbook.playbook.brandsCount} competitors`)
+                )}`} onClick={() => onAct(playbook)}
                   style={{ background: FOREST, color: LIME, borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
                   Make one like this →
                 </Link>
