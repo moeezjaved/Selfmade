@@ -3,7 +3,7 @@
  * channel_messages row so an inbound reply/click can resolve back to the right task (and can't be
  * replayed). Identity ↔ channel lookups all go through the admin client (service-role tables).
  */
-import { slackPost, whatsappSend } from '@/lib/channels/providers'
+import { slackPost, whatsappSend, whatsappSelfTarget } from '@/lib/channels/providers'
 import { formatApproval, formatReport } from '@/lib/channels/format'
 import { decryptToken } from '@/lib/meta/client'
 import { computeCompanyStatus } from '@/lib/company/status'
@@ -12,6 +12,23 @@ import { runMetaAudit } from '@/lib/meta/audit'
 /** The workspace bot token for this identity (OAuth installs store their own, encrypted); env fallback. */
 const botTokenFor = (id: any): string | undefined => {
   try { return id?.meta?.bot_token ? decryptToken(id.meta.bot_token) : undefined } catch { return undefined }
+}
+
+/**
+ * WhatsApp send args for a founder identity (QR model): send FROM their own connected account, and
+ * with no existing chat, deliver into their "Message yourself" chat (their own number). Caches the
+ * resolved number on the identity so we don't re-hit Unipile every send.
+ */
+async function waSendArgs(admin: any, userId: string, id: any): Promise<{ chatId?: string; toAttendee?: string; accountId?: string }> {
+  const accountId = id.meta?.unipile_account_id || id.external_id
+  const chatId = id.meta?.chat_id
+  if (chatId) return { chatId, accountId }
+  let toAttendee: string | undefined = id.meta?.self_target || (accountId ? (await whatsappSelfTarget(accountId)) || undefined : undefined)
+  if (toAttendee && toAttendee !== id.meta?.self_target) {
+    await admin.from('channel_identities').update({ meta: { ...(id.meta || {}), self_target: toAttendee } })
+      .eq('user_id', userId).eq('provider', 'whatsapp').eq('external_id', id.external_id).then(() => {}, () => {})
+  }
+  return { toAttendee, accountId }
 }
 
 const APPROVAL_TTL_MS = 24 * 60 * 60 * 1000   // a "yes" 2 days later shouldn't fire
@@ -45,9 +62,9 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
         })
       }
     } else if (id.provider === 'whatsapp') {
-      const chatId = id.meta?.chat_id
-      const toAttendee = chatId ? undefined : id.external_id
-      const r = await whatsappSend({ chatId, toAttendee, text })
+      const wa = await waSendArgs(admin, userId, id)
+      const chatId = wa.chatId
+      const r = await whatsappSend({ ...wa, text })
       if (r.ok) {
         sent++
         // Remember the chat so future replies land in-thread.
@@ -97,8 +114,10 @@ export async function sendReportToChannels(admin: any, userId: string, brief: an
         if (pending) await admin.from('channel_messages').insert({ user_id: userId, provider: 'slack', external_id: r.ts, channel_ref: id.meta.channel_id, kind: 'approval', task_id: pending.id, status: 'sent', expires_at }).then(() => {}, () => {})
       }
     } else if (id.provider === 'whatsapp') {
-      const chatId = id.meta?.chat_id
-      const r = await whatsappSend({ chatId, toAttendee: chatId ? undefined : id.external_id, text })
+      // QR model: send FROM the founder's own account into their "Message yourself" chat (see waSendArgs).
+      const wa = await waSendArgs(admin, userId, id)
+      const chatId = wa.chatId
+      const r = await whatsappSend({ ...wa, text })
       if (r.ok) {
         sent++
         await admin.from('channel_messages').insert({ user_id: userId, provider: 'whatsapp', external_id: r.id, channel_ref: r.chatId || chatId, kind: 'report', status: 'sent' })
@@ -148,7 +167,7 @@ export async function pushCustomerMessage(admin: any, userId: string, m: { messa
   ]
   for (const id of founderChans) {
     if (id.provider === 'slack' && id.meta?.channel_id) await slackPost(id.meta.channel_id, `New ${m.channel} message`, slackBlocks, botTokenFor(id)).catch(() => {})
-    else if (id.provider === 'whatsapp') { const chatId = id.meta?.chat_id; await whatsappSend({ chatId, toAttendee: chatId ? undefined : id.external_id, text: `${bodyTxt}\n\nReply in Selfmade to send.` }).catch(() => {}) }
+    else if (id.provider === 'whatsapp') { const wa = await waSendArgs(admin, userId, id); await whatsappSend({ ...wa, text: `${bodyTxt}\n\nReply in Selfmade to send.` }).catch(() => {}) }
   }
 }
 
