@@ -12,7 +12,10 @@
  */
 const clean = (s: unknown): string => {
   const t = String(s ?? '').trim()
-  return t && !/^\d+$/.test(t) ? t : ''   // drop empties + bare page_ids
+  // drop empties, bare page_ids, AND the "Facebook page <id>" placeholder a manual add writes —
+  // otherwise followed_brands.brand_name (source 3) returns the placeholder and shadows the real
+  // page_name (source 4), so the brief shows "Facebook page 2446…" instead of the brand's name.
+  return t && !/^\d+$/.test(t) && !/^facebook page\s+\d+$/i.test(t) ? t : ''
 }
 
 export async function resolveBrandNames(admin: any, pageIds: (string | null | undefined)[]): Promise<Map<string, string>> {

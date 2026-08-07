@@ -37,6 +37,8 @@ export async function GET(req: NextRequest) {
   const moves = [...distinct.slice(offset), ...distinct.slice(0, offset)].slice(0, 3)
 
   const payload = { moves }
-  cacheSet(cacheKey, payload, 30 * 60 * 1000)
+  // Pure-DB (no Graph rate budget), so a short TTL is fine — and REQUIRED: this cache is in-process
+  // per instance, so removing all spies must expire fast rather than showing ghost rivals for 30 min.
+  cacheSet(cacheKey, payload, 60 * 1000)
   return NextResponse.json(payload)
 }

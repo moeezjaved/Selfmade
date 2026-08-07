@@ -9,6 +9,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
+import { resolveBrandNames } from '@/lib/discovery/brandNames'
+
+// A manual competitor add stores brand_name = "Facebook page <id>"; treat that (and blanks/ids) as
+// unresolved so we fall back to the crawler's real page name.
+const isPlaceholderName = (n: unknown): boolean => {
+  const t = String(n ?? '').trim()
+  return !t || /^\d+$/.test(t) || /^facebook page\s+\d+$/i.test(t)
+}
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -31,6 +39,9 @@ export async function GET(req: NextRequest) {
   if (!rivals.length) return NextResponse.json({ watching: [], unlinked })
 
   const ids = rivals.map((r: any) => String(r.page_id))
+  // Resolve real brand names (crawl_state → directory → typed → first ad's page_name) so a
+  // manually-added rival shows its name, not "Facebook page <id>".
+  const nameMap = await resolveBrandNames(admin, ids)
   // Crawl state per page (last_crawled_at + crawling_at).
   const { data: terms } = await admin.from('discovery_crawl_terms').select('page_id, last_crawled_at, crawling_at').in('page_id', ids)
   const termMap: Record<string, any> = {}
@@ -63,7 +74,8 @@ export async function GET(req: NextRequest) {
     const crawling = !!t?.crawling_at
     const everCrawled = !!t?.last_crawled_at
     const status = adCount > 0 ? 'live' : (crawling ? 'crawling' : (everCrawled ? 'empty' : 'queued'))
-    return { pageId: pid, brand: r.brand_name || 'Competitor', adCount, status, lastCrawledAt: t?.last_crawled_at || null, topAds, newAds }
+    const brand = nameMap.get(pid) || (isPlaceholderName(r.brand_name) ? 'Competitor' : r.brand_name)
+    return { pageId: pid, brand, adCount, status, lastCrawledAt: t?.last_crawled_at || null, topAds, newAds }
   }))
   // Newest-added (queued/crawling) first so a just-added rival is right at the top.
   const order: Record<string, number> = { crawling: 0, queued: 1, empty: 2, live: 3 }

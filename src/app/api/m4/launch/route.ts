@@ -88,6 +88,15 @@ export async function POST(request: NextRequest) {
     try {
       const acctRes = await fetch(`https://graph.facebook.com/${V}/${adAccountId}?fields=account_status,disable_reason,funding_source&access_token=${encodeURIComponent(token)}`)
       const acct = await acctRes.json()
+      // Token revoked / expired / checkpoint (190,102,10,200,459,467): the account row is stale-active.
+      // Flip it to 'error' so /reports + MetaGate stop treating it as connected, and return a reconnect
+      // prompt HERE instead of failing deep in campaign creation with a raw "[459]".
+      const AUTH_CODES = new Set([190, 102, 10, 200, 459, 467])
+      const errCode = acct?.error ? Number(acct.error.code) : null
+      if (errCode != null && AUTH_CODES.has(errCode)) {
+        try { await admin.from('meta_accounts').update({ status: 'error' }).eq('account_id', metaAccount.account_id) } catch { /* best-effort */ }
+        return NextResponse.json({ error: 'Your Meta connection expired. Reconnect your ad account before launching (Settings → Meta).', needsReconnect: true }, { status: 400 })
+      }
       const SETUP_MSG = 'Your Meta ad account isn’t set up to run ads yet. Open Meta Ads Manager → Account overview, add a payment method and confirm your account details, then launch again.'
       // account_status: 1 = ACTIVE. Anything else (disabled/unsettled/pending/closed) can't run ads.
       if (acct?.account_status != null && Number(acct.account_status) !== 1) {
