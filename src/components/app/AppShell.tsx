@@ -13,6 +13,8 @@ import { PLANS, normalizePlan } from '@/lib/plans'
 import { CreditModal } from '@/components/credits/CreditModal'
 import { NotificationBell } from '@/components/NotificationBell'
 import UpsellModalHost from '@/components/UpsellModal'
+import ConfirmHost, { confirmAction } from '@/components/ConfirmDialog'
+import toast from 'react-hot-toast'
 import MelloFace from '@/components/MelloFace'
 import RemakeStarter from '@/components/RemakeStarter'
 import { usePathname, useRouter } from 'next/navigation'
@@ -174,12 +176,12 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
   // Cancel plan — one tap from the account menu (paid users only). Keeps access until period end,
   // then the renewals cron downgrades to Free. Confirms first.
   const cancelPlan = async () => {
-    if (!confirm('Cancel your subscription? You keep full access until the end of your current billing period, then move to Free.')) return
+    if (!(await confirmAction({ title: 'Cancel your subscription?', body: 'You keep full access until the end of your current billing period, then move to Free.', confirmLabel: 'Cancel plan', cancelLabel: 'Keep plan' }))) return
     try {
       const r = await fetch('/api/billing/cancel', { method: 'POST' }).then((x) => x.json()).catch(() => ({}))
-      if (r?.ok) { alert('Your subscription is cancelled — access continues until the end of this period.'); router.push('/billing') }
-      else alert(r?.error || 'Could not cancel — please contact support.')
-    } catch { alert('Could not cancel — please try again.') }
+      if (r?.ok) { toast.success('Subscription cancelled — access continues until the end of this period.'); router.push('/billing') }
+      else toast.error(r?.error || 'Could not cancel — please contact support.')
+    } catch { toast.error('Could not cancel — please try again.') }
   }
 
   const initials = user?.user_metadata?.full_name
@@ -351,6 +353,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
         )}
         <main className="flex-1" style={{ minWidth: 0, overflowX: 'hidden' }}>{children}</main>
         <UpsellModalHost />
+        <ConfirmHost />
         <CreditModal />
       </div>
     </div>

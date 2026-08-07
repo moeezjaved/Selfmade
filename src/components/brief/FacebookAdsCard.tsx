@@ -7,6 +7,8 @@
  */
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
+import { confirmAction } from '@/components/ConfirmDialog'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
 
@@ -138,14 +140,14 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
     // dailyBudget is normalized to MAJOR units server-side (audit). Scale +20% off it.
     const currentMajor = Number(c.dailyBudget) || 0
     const newBudget = Math.max(1, Math.round(currentMajor * 1.2))
-    if (!window.confirm(`Scale “${c.name}” from ${money(currentMajor)}/day to ${money(newBudget)}/day (+20%)?\n\nThis raises spend on Meta right now.`)) return
+    if (!(await confirmAction({ title: `Scale “${c.name}” +20%?`, body: `From ${money(currentMajor)}/day to ${money(newBudget)}/day. This raises spend on Meta right now.`, confirmLabel: 'Scale it' }))) return
     setScaling(id)
     try {
       const res = await fetch('/api/campaigns/manage', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'update_budget', id, budget: newBudget }) })
       const j = await res.json().catch(() => null)
       if (res.ok && j?.success) { setScaled(s => ({ ...s, [id]: true })); onAct?.() }
-      else window.alert(j?.error || 'Could not scale — open Campaigns to do it manually.')
-    } catch { window.alert('Could not scale — open Campaigns to do it manually.') }
+      else toast.error(j?.error || 'Could not scale — open Campaigns to do it manually.')
+    } catch { toast.error('Could not scale — open Campaigns to do it manually.') }
     finally { setScaling(null) }
   }
   const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
