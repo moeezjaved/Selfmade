@@ -1,5 +1,5 @@
 /**
- * POST /api/billing/cancel — cancel the current subscription (PayPal, PayFast, or Stripe).
+ * POST /api/billing/cancel — cancel the current subscription (PayPal, or legacy Stripe).
  * "Cancel" means: tell the provider to stop future billing, mark the subscription cancelled, stop
  * renewal reminders, and KEEP access until the current period ends (the renewals cron downgrades to
  * Free at period end). Charged to the billing owner.

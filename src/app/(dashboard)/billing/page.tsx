@@ -80,7 +80,7 @@ export default function BillingPage() {
     window.location.href = url
   }
 
-  // Cancel the PayFast subscription — access continues until period end, then downgrades to Free.
+  // Cancel the subscription — access continues until period end, then downgrades to Free.
   // Confirmed via an in-APP modal (not the browser's window.confirm, which looked like a scam popup).
   const cancelPlan = async () => {
     setShowCancel(false)
@@ -143,7 +143,7 @@ export default function BillingPage() {
             </div>
             <span style={{ background: '#dffe9520', border: '1px solid #dffe9540', color: '#dffe95', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 100 }}>✓ Active</span>
           </div>
-          {/* No Stripe "Manage subscription" portal — we bill through PayFast, which has no hosted
+          {/* No Stripe "Manage subscription" portal — we bill through PayPal, which has no hosted
               portal, so that button dead-ended on an empty Stripe page. The plan cards above + Cancel
               here ARE the management. */}
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
