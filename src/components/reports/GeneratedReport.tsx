@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { promptText } from '@/components/ConfirmDialog'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts'
 import { METRICS, GROUP_BY, TEMPLATE_BY_KEY, BUILTIN_PRESETS, FILTER_FIELD_BY_KEY, type MetricKey, type GroupByKey, type ReportFilter, type ColumnPreset } from '@/lib/reports/templates'
 import ShareMenu from './ShareMenu'
@@ -349,7 +350,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
                   </span>
                 ))}
                 {/* Save the current metric/tag columns as a reusable preset (Motion's floating ＋ Save). */}
-                <button onClick={() => { const n = prompt('Save these columns as a preset. Name:'); if (n?.trim()) savePreset(n.trim(), metrics, tagCols) }}
+                <button onClick={async () => { const n = await promptText({ title: 'Save these columns as a preset', placeholder: 'Preset name' }); if (n) savePreset(n, metrics, tagCols) }}
                   title="Save these columns as a preset"
                   style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#dffe95', border: 'none', borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#0e1b12', cursor: 'pointer', fontFamily: FONT }}
                   onMouseEnter={e => e.currentTarget.style.background = '#eaffb0'} onMouseLeave={e => e.currentTarget.style.background = '#dffe95'}>

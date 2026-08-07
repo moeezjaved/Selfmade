@@ -4,6 +4,7 @@
  * more KPIs or AI-tag columns, apply, and save the set as a named preset (localStorage).
  */
 import { useState } from 'react'
+import { promptText } from '@/components/ConfirmDialog'
 import { METRICS, type MetricKey } from '@/lib/reports/templates'
 
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -88,7 +89,7 @@ export default function MetricPicker({ metrics, tagCols, onApply, onSavePreset, 
         {/* footer */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 22px', borderTop: '1px solid rgba(26,58,26,.08)' }}>
           <div style={{ flex: 1 }} />
-          <button onClick={() => { const n = prompt('Preset name?'); if (n?.trim()) onSavePreset(n.trim(), sel, tags) }} style={btnGhost}>Save as new preset</button>
+          <button onClick={async () => { const n = await promptText({ title: 'Preset name?', placeholder: 'e.g. My KPIs' }); if (n) onSavePreset(n, sel, tags) }} style={btnGhost}>Save as new preset</button>
           <button onClick={onClose} style={btnGhost}>Cancel</button>
           <button onClick={() => { onApply(sel, tags); onClose() }} style={btnPrimary}>Apply</button>
         </div>
