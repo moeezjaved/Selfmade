@@ -14,9 +14,10 @@
  *
  * Previewed at /story; swaps to / only when approved.
  */
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import HqMockup from './HqMockup'
+import TeamRoster from './TeamRoster'
 import FeatureShowcase from './FeatureShowcase'
 
 export default function HireStory() {
@@ -66,53 +67,31 @@ export default function HireStory() {
       {/* ── 1 · WHAT IS THIS? — you hired a marketing department. ── */}
       <header className="hero">
         <div className="eyebrow rv">Introducing Selfmade</div>
-        <h1 className="rv d2">The One&#8209;Person<br />Company.</h1>
+        {/* Headline animates in word-by-word on load (blur + rise), Sila-style. Words are spans with a
+            staggered --wi index; kept visible-by-default via the `.rv` engine so extensions can't blank it. */}
+        <h1 className="rv d2" aria-label="The One-Person Company.">
+          {['The', 'One‑Person', 'Company.'].map((w, i) => (
+            <React.Fragment key={i}>
+              <span className="hw" style={{ ['--wi' as any]: i }} aria-hidden="true">{w}</span>
+              {i === 1 ? <br /> : ' '}
+            </React.Fragment>
+          ))}
+        </h1>
         <p className="hero-neg rv d2">No employees. No agency. No freelancers.</p>
         <p className="hero-sub rv d3">Your AI team does the work. You make the calls.</p>
-
-        {/* four tiny numbers — credibility, early. "This isn't ChatGPT." */}
-        <div className="stats rv d3" aria-hidden="true">
-          {[
-            ['3.2M', 'ads studied'],
-            ['611K', 'brands watched'],
-            ['24/7', 'research'],
-            ['1', 'morning report'],
-          ].map(([n, l]) => (
-            <div className="stat" key={l}><div className="stat-n">{n}</div><div className="stat-l">{l}</div></div>
-          ))}
-        </div>
 
         <div className="hero-cta rv d3">
           <a href="#agreement" className="btn-forest">Hire the team</a>
           <a href="#night" className="quiet-link">Watch a day of work ↓</a>
         </div>
         <div className="fine rv d3">$49/month · the whole company · starts tonight · no card to start</div>
-
-        {/* the org chart — you at the top, departments reporting to you */}
-        <div className="org rv d3" aria-hidden="true">
-          <div className="org-you">YOU · FOUNDER &amp; CEO</div>
-          <div className="org-stem" />
-          <div className="org-row">
-            {[
-              ['Research', 'Reads the market while you sleep.', 'on duty'],
-              ['Creative', 'Turns research into campaigns.', '4 drafts ready'],
-              ['Media Buying', 'Finds winners. Scales them.', 'asks first'],
-              ['Growth', 'Email, SEO, funnels.', 'building'],
-              ['Finance', 'Tracks profit, not ROAS.', 'tracking'],
-              ['Customer', 'Answers every message.', 'inbox clear'],
-            ].map(([t, d, s], i) => (
-              <div className="dept" key={t} style={{ animationDelay: `${0.07 * i}s` }}>
-                <div className="dept-name"><span className="dot" />{t}</div>
-                <div className="dept-duty">{d}</div>
-                <div className="dept-status">{s}</div>
-              </div>
-            ))}
-          </div>
-        </div>
       </header>
 
       {/* Animated product mockup — the workspace as a real app (proof of "The One-Person Company"). */}
       <HqMockup />
+
+      {/* Meet the team — the AI employees you're hiring, with faces, names and jobs. */}
+      <TeamRoster />
 
       {/* Feature showcase — alternating blocks, each with an animated mockup of the feature working. */}
       <FeatureShowcase />
@@ -218,53 +197,8 @@ export default function HireStory() {
         <div className="b-caption rv">A representative morning brief. Yours is built from your own market — and nothing ships without your approval.</div>
       </section>
 
-      {/* ── 4 · HOW DO THEY KNOW MY BUSINESS? — the Company Brain. ── */}
-      <section className="beat">
-        <div className="beat-eyebrow rv">The company brain</div>
-        <h2 className="rv d2">Tell the company once.<br />It remembers forever.</h2>
-        <p className="beat-sub rv d3">Your product, your customers, your rules — everything you say becomes
-        company memory that every department shares.</p>
-        <div className="brain rv d3" aria-hidden="true">
-          <div className="brain-note">
-            <div className="brain-quote">&ldquo;Our buyer is new moms. We never discount below 15%.&rdquo;</div>
-            <div className="brain-who">— you, said once</div>
-          </div>
-          <div className="brain-arrow">↓</div>
-          <div className="brain-row">
-            {['Research', 'Creative', 'Media Buying', 'Customer'].map((d, i) => (
-              <div className="brain-chip" key={d} style={{ animationDelay: `${i * 0.08}s` }}><span className="tick">✓</span>{d} remembers</div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 5 · HOW DO THEY WORK TOGETHER? — a real relay, shown not told. ── */}
-      <section className="beat beat--tint">
-        <div className="beat-eyebrow rv">One company</div>
-        <h2 className="rv d2">One finds it.<br />The next one runs with it.</h2>
-        <p className="beat-sub rv d3">Watch a single decision travel through the company — and land on your desk
-        as one finished thing to approve.</p>
-        {/* the relay — each department hands the work to the next, revealed top-to-bottom */}
-        <div className="relay rv d3" aria-hidden="true">
-          <span className="relay-spine" />
-          {[
-            ['Research', 'A rival just launched a new hook.', false],
-            ['Creative', 'Already made three versions.', false],
-            ['Media Buying', 'Version B is ready to launch.', false],
-            ['Finance', 'Estimated +$210 / week.', false],
-            ['Mello', 'Ready. Approve?', true],
-          ].map(([dept, line, isMello], i) => (
-            <div className={`relay-step${isMello ? ' relay-step--mello' : ''}`} key={dept as string} style={{ animationDelay: `${i * 0.12}s` }}>
-              <span className="relay-node">{isMello ? '●●' : i + 1}</span>
-              <div className="relay-card">
-                <div className="relay-dept">{dept}{!isMello && ' Department'}</div>
-                <div className="relay-line">{line}</div>
-                {isMello && <span className="b-btn relay-approve">Approve →</span>}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Sections 4 (Company Brain) and 5 (the relay) removed — now shown live in the FeatureShowcase
+          Company-Brain block and the HqMockup Team channel above, so the page reads shorter. */}
 
       {/* ── 6 · HOW DO I CONTROL THEM? — they ask before acting. ── */}
       <section className="beat">
@@ -393,8 +327,12 @@ export default function HireStory() {
         .eyebrow,.n-time,.m-time,.beat-eyebrow{font:700 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.24em;text-transform:uppercase;color:#8a927f}
 
         /* ── 1 · hero ── */
-        .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:130px 24px 90px}
-        .hero h1{font-size:clamp(48px,9vw,116px);line-height:1;margin-top:26px;color:#171d18}
+        /* Shorter hero (no 100vh fill) so the product mockup peeks ~30-40% below the fold, Sila-style. */
+        .hero{min-height:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:104px 24px 26px}
+        .hero h1{font-size:clamp(44px,8.4vw,104px);line-height:1;margin-top:22px;color:#171d18}
+        /* Headline animates in word-by-word on load (blur + rise), like Sila. Pure CSS → reliable. */
+        .hero h1 .hw{display:inline-block;animation:hw-in .72s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(.06s + var(--wi) * .12s)}
+        @keyframes hw-in{from{opacity:0;filter:blur(10px);transform:translateY(16px)}to{opacity:1;filter:blur(0);transform:none}}
         .hero-neg{margin-top:20px;font-size:clamp(15px,1.95vw,20px);font-weight:750;letter-spacing:-.012em;color:#1f2a20}
         .hero-sub{margin-top:22px;max-width:54ch;font-size:clamp(16px,1.8vw,19px);line-height:1.7;color:#4c5347;font-weight:500}
         .hero-cta{display:flex;align-items:center;gap:26px;margin-top:40px;flex-wrap:wrap;justify-content:center}
