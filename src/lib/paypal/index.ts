@@ -211,7 +211,7 @@ export async function createCardOrder(opts: {
 }
 
 type CardCaptureResult = {
-  ok: boolean; captureId?: string; customId?: string; status?: string
+  ok: boolean; captureId?: string; customId?: string; status?: string; error?: string
   vaultId?: string; customerId?: string; cardBrand?: string; cardLast4?: string
 }
 
@@ -235,11 +235,30 @@ export async function captureCardOrder(orderId: string): Promise<CardCaptureResu
     const body = await paypalFetch(`/v2/checkout/orders/${orderId}/capture`, { method: 'POST' })
     return readCardCapture(body)
   } catch (e: any) {
-    if (String(e?.message || '').includes('ALREADY_CAPTURED') || String(e?.message || '').includes('422')) {
+    const msg = String(e?.message || '')
+    if (msg.includes('ALREADY_CAPTURED')) {
       try { return readCardCapture(await paypalFetch(`/v2/checkout/orders/${orderId}`, { method: 'GET' })) } catch { /* fall through */ }
     }
-    return { ok: false }
+    // Surface PayPal's real reason (processor decline code / issue) so the UI + logs aren't blind.
+    const detail = extractPaypalIssue(msg)
+    console.error(`PayPal card capture failed for ${orderId}: ${msg.slice(0, 500)}`)
+    return { ok: false, error: detail }
   }
+}
+
+/** Pull the human-useful issue/description out of a PayPal error body string. */
+function extractPaypalIssue(msg: string): string {
+  try {
+    const jsonStart = msg.indexOf('{')
+    if (jsonStart >= 0) {
+      const parsed = JSON.parse(msg.slice(jsonStart))
+      const d = parsed?.details?.[0]
+      const proc = d?.issue || parsed?.name
+      const desc = d?.description || parsed?.message
+      return [proc, desc].filter(Boolean).join(': ').slice(0, 240) || msg.slice(0, 200)
+    }
+  } catch { /* not json */ }
+  return msg.slice(0, 200)
 }
 
 /**

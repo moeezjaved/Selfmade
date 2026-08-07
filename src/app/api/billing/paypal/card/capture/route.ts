@@ -27,8 +27,8 @@ export async function POST(req: NextRequest) {
 
   const cap = await captureCardOrder(orderId)
   if (!cap.ok) {
-    await admin.from('paypal_orders').update({ status: 'failed', err_code: 'CAPTURE' }).eq('basket_id', basket)
-    return NextResponse.json({ error: 'capture_failed', message: cap.status || 'declined' }, { status: 402 })
+    await admin.from('paypal_orders').update({ status: 'failed', err_code: (cap.error || 'CAPTURE').slice(0, 60) }).eq('basket_id', basket)
+    return NextResponse.json({ error: 'capture_failed', message: cap.error || cap.status || 'declined' }, { status: 402 })
   }
 
   await grantPaypalOrder(admin, basket, {
