@@ -60,7 +60,8 @@ function CardCheckout() {
         onApprove: async (data: any) => {
           const r = await fetch('/api/billing/paypal/card/capture', {
             method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ orderId: data.orderId, basket: basketRef.current }),
+            // PayPal's SDK sends orderID (capital ID); also stored server-side as a fallback.
+            body: JSON.stringify({ orderId: data.orderID || data.orderId, basket: basketRef.current }),
           })
           const j = await r.json()
           if (j.ok) { window.location.href = `/billing/success?basket=${basketRef.current}&provider=paypal` }
