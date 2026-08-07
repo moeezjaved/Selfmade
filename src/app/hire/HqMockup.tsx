@@ -83,7 +83,7 @@ export default function HqMockup() {
       </div>
       <div className="hq-cap">Your company, in one screen. Nothing ships without your yes.</div>
 
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .hq-wrap{max-width:1040px;margin:16px auto 0;padding:0 20px}
         .hq{display:grid;grid-template-columns:230px 1fr;background:#fff;border:1px solid rgba(17,37,28,.08);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px -50px rgba(17,37,28,.5),0 2px 6px rgba(17,37,28,.04);min-height:430px;opacity:0;transform:translateY(20px)}
         .hq.on{animation:hq-rise .7s cubic-bezier(0,0,.2,1) both}
@@ -134,7 +134,7 @@ export default function HqMockup() {
         @media (prefers-reduced-motion:reduce){
           .hq,.hq.on .hq-msg{animation:none!important;opacity:1;transform:none}
         }
-      `}</style>
+      ` }} />
     </div>
   )
 }
