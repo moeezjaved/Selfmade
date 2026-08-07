@@ -177,9 +177,8 @@ export async function GET(request: NextRequest) {
     // A semantic-fill row must satisfy every filter whose column the RPC returns (days/cta/hook/
     // emotion/angle/hide-brands/theme/language/platform/run-time), mirroring the main query.
     const passesSemantic = (v: any) => {
-      // "Last N days" now keys off days_running (reliable, indexed), not start_date (spotty coverage
-      // that let the filter miss genuinely-recent ads). days_running ≤ N = launched within N days.
-      if (days > 0 && (Number(v.days_running) ?? 999999) > days) return false
+      // "Last N days" = recency: seen within N days (last_seen >= sinceDate), mirroring the main query.
+      if (days > 0 && sinceDate && !(v.last_seen && String(v.last_seen) >= sinceDate)) return false
       if (ctaTypes.length && !ctaTypes.includes(v.cta)) return false
       if (hookTypes.length && !hookTypes.includes(v.hook_type)) return false
       if (emotions.length && !overlap(v.emotion, emotions)) return false
@@ -421,24 +420,21 @@ export async function GET(request: NextRequest) {
       if (langs.length) baseQuery = baseQuery.overlaps('languages', langs)
     }
     if (platforms) baseQuery = baseQuery.overlaps('platforms', platforms.split(','))
-    // Time filter: ads LAUNCHED within the last N days — keyed off days_running, not start_date.
-    // start_date had spotty/wrong values (a 7d filter showed 8-day-old ads AND hid genuinely-recent
-    // ones like Country Delight's Jul-27 set). days_running is the maintained, INDEXED column the
-    // run-time filters already use, so "days_running ≤ N" is both correct AND fast (no timeout).
-    if (days > 0) {
-      baseQuery = baseQuery.lte('days_running', days)
+    // Time filter = RECENCY: ads SEEN in the last N days (last_seen >= sinceDate). The old code keyed
+    // off days_running (run DURATION), so a 7d filter returned any short-run ad even if last seen weeks
+    // ago. last_seen is the maintained recency column the default 'recent' sort already orders by, so
+    // filtering + ordering by it is index-aligned (range scan) and fast.
+    if (days > 0 && sinceDate) {
+      baseQuery = baseQuery.gte('last_seen', sinceDate)
     }
     // GetHookd-parity filters (performance tier, niche, brand volume, run-time,
     // CTA, creative reuse, hide-brands) — rollup-backed, all additive.
     baseQuery = applyHookdFilters(baseQuery)
 
     // Sort
-    // A last-N-days window (days>0) MUST order by days_running so the (has_creative, days_running, ad_id)
-    // composite (mig 130) serves BOTH the .lte('days_running', N) predicate above AND the sort — an
-    // index-only scan. Without this the 7d window keeps ORDER BY perf_score/last_seen, ignores the index,
-    // and wades millions of rows → 9s cap → "index was busy" (30d matched enough rows to squeak under;
-    // 7d didn't). This wins over the user's sort while a recency window is active.
-    if (days > 0) baseQuery = baseQuery.order('days_running', { ascending: true, nullsFirst: false }).order('ad_id', { ascending: true })
+    // A recency window (days>0) orders by last_seen DESC — aligned with the last_seen >= sinceDate
+    // predicate above (a bounded range → fast), and it shows the most-recently-active ads first.
+    if (days > 0) baseQuery = baseQuery.order('last_seen', { ascending: false, nullsFirst: false }).order('ad_id', { ascending: true })
     else if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
     else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
     else if (sort === 'recent') baseQuery = baseQuery.order('last_seen', { ascending: false })
