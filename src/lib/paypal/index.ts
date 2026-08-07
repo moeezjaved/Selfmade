@@ -109,6 +109,20 @@ export async function getSubscription(id: string): Promise<any> {
   return paypalFetch(`/v1/billing/subscriptions/${id}`, { method: 'GET' })
 }
 
+/** Cancel a subscription at PayPal (stops all future billing). Returns true on success. */
+export async function cancelSubscription(id: string, reason = 'Cancelled by customer'): Promise<boolean> {
+  try {
+    // 204 No Content on success — paypalFetch returns {} and doesn't throw.
+    await paypalFetch(`/v1/billing/subscriptions/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) })
+    return true
+  } catch (e: any) {
+    // Already cancelled / not found → treat as done so the app state can proceed.
+    const m = String(e?.message || '')
+    if (m.includes('SUBSCRIPTION_STATUS_INVALID') || m.includes('RESOURCE_NOT_FOUND') || m.includes('422') || m.includes('404')) return true
+    return false
+  }
+}
+
 // ── Orders (one-time top-ups) ────────────────────────────────────────────────
 
 export async function createOrder(opts: {

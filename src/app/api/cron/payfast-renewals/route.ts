@@ -34,11 +34,12 @@ export async function GET(req: NextRequest) {
     .select('owner_id, plan, billing_cycle, status, current_period_end, payfast_instrument_token, payfast_renewal_notified_at')
     .eq('provider', 'payfast').eq('status', 'active').lte('current_period_end', dueBy).limit(500)
 
-  // Cancelled subscriptions that have reached period end → downgrade to Free now (access ran out).
+  // Cancelled subscriptions (PayFast or PayPal) that have reached period end → downgrade to Free now
+  // (access ran out). PayPal cancellations keep access until period end via this same path.
   let downgraded = 0
   const { data: cancelled } = await admin.from('subscriptions')
     .select('owner_id, plan, current_period_end')
-    .eq('provider', 'payfast').eq('status', 'canceled').neq('plan', 'free').lte('current_period_end', new Date(now).toISOString()).limit(500)
+    .in('provider', ['payfast', 'paypal']).eq('status', 'canceled').neq('plan', 'free').lte('current_period_end', new Date(now).toISOString()).limit(500)
   for (const c of cancelled || []) {
     await admin.rpc('apply_plan', { p_user: c.owner_id, p_plan: 'free', p_reset: null }).then(() => {}, () => {})
     await admin.from('subscriptions').update({ plan: 'free', updated_at: new Date().toISOString() }).eq('owner_id', c.owner_id)
