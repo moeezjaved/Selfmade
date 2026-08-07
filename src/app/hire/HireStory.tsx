@@ -64,7 +64,7 @@ export default function HireStory() {
       {/* ── 1 · WHAT IS THIS? — you hired a marketing department. ── */}
       <header className="hero">
         <div className="eyebrow rv">Introducing Selfmade</div>
-        <h1 className="rv d2">The self&#8209;driving<br />marketing company.</h1>
+        <h1 className="rv d2">Meet your new<br />AI marketing team.</h1>
         <p className="hero-neg rv d2">No employees. No agency. No freelancers.</p>
         <p className="hero-sub rv d3">A whole team — Research, Creative, Media Buying, Customer care — run by
         Mello, your marketing manager. They do the work. You make the decisions.</p>
@@ -570,13 +570,20 @@ export default function HireStory() {
            scroll in from the bottom edge — so the rise reads as motion and the old visible→snap-hidden
            →rise flash (what looked "broken") never happens on screen. */
         .rv{opacity:1;transform:none}
-        .rv.in{animation:riseIn .65s cubic-bezier(0,0,.2,1) both}
+        .rv.in{animation:riseIn .65s cubic-bezier(0,0,.2,1) both;will-change:transform,opacity}
         .rv.in.d2{animation-delay:.08s}.rv.in.d3{animation-delay:.16s}
         @keyframes riseIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
         /* Containers of staggered children show instantly (no block slide) so the block and its items
            never double up their motion — the children carry the single, clean rise. */
         .rv.in.org,.rv.in.nightlog,.rv.in.brain,.rv.in.relay,.rv.in.teach,.rv.in.chat{animation:none}
-        .rv.in .dept,.rv.in .nl,.rv.in .brain-chip,.rv.in .relay-step,.rv.in .tch,.rv.in .cb{animation:riseIn .55s cubic-bezier(0,0,.2,1) both}
+        .rv.in .dept,.rv.in .nl,.rv.in .brain-chip,.rv.in .relay-step,.rv.in .tch,.rv.in .cb{animation:riseIn .55s cubic-bezier(0,0,.2,1) both;will-change:transform,opacity}
+        /* Mobile: scroll-triggered reveals jank when many staggered children animate at once on a
+           weaker GPU. Lighten it — shorter, smaller rise, and fire the children TOGETHER (no per-item
+           delay cascade during the scroll) so each section settles in one smooth beat. */
+        @media (max-width:640px){
+          .rv.in,.rv.in .dept,.rv.in .nl,.rv.in .brain-chip,.rv.in .relay-step,.rv.in .tch,.rv.in .cb{animation-duration:.42s;animation-delay:0s!important}
+          @keyframes riseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+        }
         @media (prefers-reduced-motion: reduce){
           .rv.in,.rv.in .dept,.rv.in .nl,.rv.in .brain-chip,.rv.in .relay-step,.rv.in .tch,.rv.in .cb{animation:none!important}
         }
