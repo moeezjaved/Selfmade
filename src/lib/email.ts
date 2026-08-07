@@ -91,9 +91,9 @@ export async function sendOnboardingNudgeEmail(to: string, fullName?: string): P
   if (!emailEnabled || !to) return false
   const first = (fullName || '').trim().split(/\s+/)[0] || 'there'
   const html = emailShell({
-    title: `${first}, your first ad is 2 minutes away`,
-    intro: `You signed up but haven't made an ad yet — and the first one's the fun part. Pick any winning ad, drop in your product, and get a scroll-stopping <b>image or video</b> back in about two minutes. Your first 5 image ads are free.`,
-    ctaText: 'Remake your first ad', ctaUrl: `${APP_URL}/discovery`,
+    title: `${first}, your marketing team is waiting`,
+    intro: `You signed up but haven't put your team to work yet. Open your brief and Mello shows you what your competitors are doing, what's working right now, and a fresh ad ready to approve — about two minutes. Your first credits are on us.`,
+    ctaText: 'Open your brief', ctaUrl: `${APP_URL}/brief`,
   })
   return sendEmail(to, `${first}, make your first ad in 2 minutes 🎬`, html)
 }
@@ -119,10 +119,10 @@ export async function sendWelcomeEmail(to: string, fullName?: string): Promise<b
   const first = (fullName || '').trim().split(/\s+/)[0] || 'there'
   const html = emailShell({
     title: `Welcome to Selfmade, ${first} 👋`,
-    intro: `You're in — with <b>600 free credits</b> to start. The fastest way to see what Selfmade does: find a winning ad from any brand and remake it with <b>your</b> product in minutes. No designer, no filming, no waiting.`,
-    ctaText: 'Remake your first ad', ctaUrl: `${APP_URL}/discovery`,
+    intro: `You just hired a marketing team that never sleeps — and you're starting with <b>600 free credits</b>. Tonight, Mello watches your competitors, decodes what's working, and has a fresh ad ready for you. Tomorrow morning you'll open your <b>daily brief</b> and approve the day's work in one tap. No agency, no freelancers, no software to run.`,
+    ctaText: 'See your morning brief', ctaUrl: `${APP_URL}/brief`,
   })
-  return sendEmail(to, 'Welcome to Selfmade 👋 remake your first ad', html)
+  return sendEmail(to, 'Welcome to Selfmade 👋 your marketing team starts tonight', html)
 }
 
 /** Admin ops alert — fired on generation failures (image + video) so systemic problems surface in
