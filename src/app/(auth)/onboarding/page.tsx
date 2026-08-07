@@ -463,7 +463,13 @@ export default function InterviewPage() {
   async function choosePlan(planId: 'starter' | 'business') {
     setPlanBusy(planId)
     try {
-      if (process.env.NEXT_PUBLIC_PAYMENTS_PROVIDER === 'payfast') {
+      const provider = process.env.NEXT_PUBLIC_PAYMENTS_PROVIDER
+      if (provider === 'paypal') {
+        const { startPaypalCheckout } = await import('@/lib/paypal/start')
+        await startPaypalCheckout({ kind: 'subscription', plan: planId, cycle: 'monthly' })
+        return   // redirecting to PayPal
+      }
+      if (provider === 'payfast') {
         const { startPayfastCheckout } = await import('@/lib/payfast/start')
         await startPayfastCheckout({ kind: 'subscription', plan: planId, cycle: 'monthly' })
         return   // redirecting to PayFast

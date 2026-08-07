@@ -8,20 +8,22 @@ function Success() {
   const params = useSearchParams()
   const router = useRouter()
   const basket = params.get('basket')
+  const provider = params.get('provider') === 'paypal' ? 'paypal' : 'payfast'
   const [state, setState] = useState<'checking' | 'paid' | 'pending'>('checking')
 
   useEffect(() => {
     if (!basket) { setState('pending'); return }
+    const statusUrl = provider === 'paypal' ? '/api/billing/paypal/status' : '/api/billing/payfast/status'
     let tries = 0
     const tick = async () => {
       tries++
-      const r = await fetch(`/api/billing/payfast/status?basket=${basket}`, { cache: 'no-store' }).then((x) => x.json()).catch(() => ({}))
+      const r = await fetch(`${statusUrl}?basket=${basket}`, { cache: 'no-store' }).then((x) => x.json()).catch(() => ({}))
       if (r?.status === 'paid') { setState('paid'); return }
       if (tries >= 8) { setState('pending'); return }
-      setTimeout(tick, 1500)   // give the IPN a moment to land
+      setTimeout(tick, 1500)   // give the webhook/capture a moment to land
     }
     tick()
-  }, [basket])
+  }, [basket, provider])
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter',-apple-system,sans-serif", background: 'radial-gradient(120% 100% at 50% -10%, #eef8dd, #ffffff)', padding: 24 }}>
@@ -32,7 +34,7 @@ function Success() {
         </h1>
         <p style={{ fontSize: 15, color: '#4b5563', lineHeight: 1.65, margin: '12px 0 24px' }}>
           {state === 'paid' ? 'Your credits and plan are active. Mello is ready.'
-            : state === 'checking' ? 'One moment while we confirm with PayFast.'
+            : state === 'checking' ? `One moment while we confirm with ${provider === 'paypal' ? 'PayPal' : 'PayFast'}.`
             : 'It can take a minute to reflect. Your balance updates automatically once confirmed.'}
         </p>
         <button onClick={() => router.push('/brief')} style={{ background: INK, color: LIME, border: 'none', borderRadius: 100, padding: '13px 28px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>Go to my brief →</button>
