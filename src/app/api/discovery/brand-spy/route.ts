@@ -275,8 +275,12 @@ export async function POST(req: NextRequest) {
     // Re-spy is FREE if the org already PAID for this brand before (stop-spy then spy-again must not
     // double-charge). We keep the credit_transactions ledger on un-spy, so a prior committed brand_spy
     // for this page_id means "already bought" → track again for free.
+    // Search the FULL payer population: org members + the billing owner + the acting user. The credit
+    // engine writes the charge under the resolved billing owner (which reserve_credits derives via its
+    // own org query), so orgIds alone could miss it and re-charge — this superset closes that gap.
+    const payerIds = Array.from(new Set([...orgIds, billingOwner, user.id]))
     const { data: priorPaid } = await admin.from('credit_transactions')
-      .select('id').in('user_id', orgIds).eq('action_type', 'brand_spy').eq('reference_id', pageId)
+      .select('id').in('user_id', payerIds).eq('action_type', 'brand_spy').eq('reference_id', pageId)
       .neq('status', 'refunded').limit(1).maybeSingle()
 
     let charged = false

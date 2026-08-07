@@ -30,7 +30,10 @@ export async function GET(req: NextRequest) {
 
   let tq = admin.from('customer_threads').select('*')
     .eq('user_id', user.id).in('status', ['open', 'replied']).order('last_message_at', { ascending: false }).limit(100)
-  if (brandId) tq = tq.eq('brand_id', brandId)   // per-brand inbox (mig 143)
+  // Per-brand inbox (mig 143), BUT also show UNASSIGNED threads (brand_id null) — e.g. a WhatsApp
+  // channel not yet linked to a brand — so customer messages never vanish from the Inbox while still
+  // being counted in Trends. Assigning the channel to a brand later scopes them.
+  if (brandId) tq = tq.or(`brand_id.eq.${brandId},brand_id.is.null`)
   const { data: threads } = await tq
   const list = (threads || []) as any[]
   list.sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3) || (b.last_message_at > a.last_message_at ? 1 : -1))
