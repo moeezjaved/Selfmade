@@ -15,8 +15,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
   const admin = createAdminClient()
-  const { data } = await admin.from('paypal_orders')
-    .select('basket_id, kind, plan, amount, status, err_code, paypal_order_id, card_brand, card_last4, created_at, paid_at')
-    .order('created_at', { ascending: false }).limit(10)
-  return NextResponse.json({ ok: true, orders: data || [] })
+  // select('*') so this never fails on a not-yet-applied migration (145 card columns).
+  const { data, error } = await admin.from('paypal_orders')
+    .select('*').order('created_at', { ascending: false }).limit(10)
+  // Also report whether the mig-145 card columns exist (surfaces "migration not applied").
+  const { error: colErr } = await admin.from('paypal_orders').select('card_brand').limit(1)
+  return NextResponse.json({
+    ok: true,
+    mig145_card_columns: colErr ? `MISSING (${colErr.message})` : 'present',
+    tableError: error?.message || null,
+    orders: (data || []).map((o: any) => ({ basket: o.basket_id, kind: o.kind, status: o.status, err_code: o.err_code, order_id: o.paypal_order_id, created: o.created_at })),
+  })
 }
