@@ -7,6 +7,7 @@
  *   variant="dashboard" → CTAs start Stripe checkout / open the Add-funds modal / show current plan
  */
 import { useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
 import { ACTION_COSTS, normalizePlan, type PlanId } from '@/lib/plans'
 import { openCredits } from '@/components/credits/CreditModal'
 
@@ -64,7 +65,7 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
       try {
         const j = await fetch('/api/billing/reactivate', { method: 'POST' }).then((r) => r.json()).catch(() => ({}))
         if (j?.ok) window.location.reload()
-        else alert(j?.error || 'Could not reactivate — try again or contact support.')
+        else toast.error(j?.error || 'Could not reactivate — try again or contact support.')
       } finally { setBusy(null) }
       return
     }
@@ -75,13 +76,13 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
       if (process.env.NEXT_PUBLIC_PAYMENTS_PROVIDER === 'payfast') {
         const { startPayfastCheckout } = await import('@/lib/payfast/start')
         const res = await startPayfastCheckout({ kind: 'subscription', plan: c.id, cycle: 'monthly' })
-        if (res?.error) alert(res.message || res.error || 'Could not start checkout.')
+        if (res?.error) toast.error(res.message || res.error || 'Could not start checkout.')
         return   // redirecting to PayFast
       }
       const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: c.id, cycle: 'monthly' }) })
       const j = await r.json()
       if (j.url) window.location.href = j.url
-      else alert(j.error === 'not_configured' ? 'Billing isn’t fully configured yet (Stripe price IDs).' : (j.message || j.error || 'Could not start checkout.'))
+      else toast.error(j.error === 'not_configured' ? 'Billing isn’t fully configured yet (Stripe price IDs).' : (j.message || j.error || 'Could not start checkout.'))
     } finally { setBusy(null) }
   }
 

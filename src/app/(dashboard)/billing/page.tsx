@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -75,7 +76,7 @@ export default function BillingPage() {
       body: JSON.stringify({ plan, action }),
     })
     const { url, error } = await res.json()
-    if (error) { alert(error); setLoading(false); return }
+    if (error) { toast.error(error); setLoading(false); return }
     window.location.href = url
   }
 
@@ -87,8 +88,8 @@ export default function BillingPage() {
     try {
       const r = await fetch('/api/billing/cancel', { method: 'POST' }).then((x) => x.json()).catch(() => ({}))
       if (r?.ok) { window.location.reload() }
-      else { alert(r?.error || 'Could not cancel — please contact support.'); setLoading(false) }
-    } catch { alert('Could not cancel — please try again.'); setLoading(false) }
+      else { toast.error(r?.error || 'Could not cancel — please contact support.'); setLoading(false) }
+    } catch { toast.error('Could not cancel — please try again.'); setLoading(false) }
   }
 
   const status = profile?.subscription_status || 'trialing'

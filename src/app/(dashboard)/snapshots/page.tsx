@@ -7,6 +7,7 @@ import AdsTabs from '@/components/ads/AdsTabs'
  * Empty state is a 3-step explainer; populated state lists each snapshot with View / Reshare / Delete.
  */
 import { useState, useEffect } from 'react'
+import { confirmAction } from '@/components/ConfirmDialog'
 
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 const G11 = '#6f6f6f', G12 = '#171717', G9 = '#8f8f8f', G2 = '#f8f8f8'
@@ -24,7 +25,7 @@ function SnapshotsPage() {
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2000) }
   const reshare = (t: string) => { try { navigator.clipboard.writeText(`${window.location.origin}/r/${t}`); flash('Snapshot link copied') } catch { flash('Copy failed') } }
   const del = async (t: string) => {
-    if (!confirm('Delete this snapshot? The shared link will stop working.')) return
+    if (!(await confirmAction({ title: 'Delete this snapshot?', body: 'The shared link will stop working.' }))) return
     setSnaps(s => s.filter(x => x.token !== t))
     await fetch(`/api/reports/snapshots?token=${t}`, { method: 'DELETE' }).catch(() => {})
   }

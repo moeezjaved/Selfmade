@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { ArrowLeft, Zap, Plus, Trash2, Clock, Power } from 'lucide-react'
 
@@ -40,7 +41,7 @@ export default function AutomationsPage() {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
     })
     if (r.ok) { setShowForm(false); setForm({ name: '', prompt: '', schedule_cron: '0 9 * * 1', schedule_label: 'Weekly · Mondays 9am' }); load() }
-    else { const d = await r.json(); alert(d.error || 'Failed to create') }
+    else { const d = await r.json(); toast.error(d.error || 'Failed to create') }
   }
 
   const toggle = async (a: Automation) => {

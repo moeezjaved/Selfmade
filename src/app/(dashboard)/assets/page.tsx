@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { UploadCloud, Trash2, Image as ImageIcon, Film, Music, X, MoreHorizontal, Share2, Download, FolderPlus, Sparkles } from 'lucide-react'
+import { confirmAction } from '@/components/ConfirmDialog'
 import CloneModal from '../discovery/CloneModal'
 import CloneVideoModal from '../discovery/CloneVideoModal'
 
@@ -81,7 +82,7 @@ export default function AssetsPage() {
   }
 
   const del = async (id: string) => {
-    if (!confirm('Delete this asset?')) return
+    if (!(await confirmAction({ title: 'Delete this asset?', body: 'This can’t be undone.' }))) return
     setAssets(prev => prev.filter(a => a.id !== id))
     await fetch(`/api/assets?id=${id}`, { method: 'DELETE' }); load()
   }

@@ -1,5 +1,6 @@
 'use client'
 import MetaGate from '@/components/MetaGate'
+import toast from 'react-hot-toast'
 import { useState, useEffect, useRef } from 'react'
 import UpgradeGate from '@/components/UpgradeGate'
 
@@ -123,9 +124,9 @@ function CampaignsInner() {
         body: JSON.stringify(editModal),
       })
       const data = await res.json()
-      if (data.error) alert('Error: ' + data.error)
+      if (data.error) toast.error('Error: ' + data.error)
       else { setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false); await loadCampaigns() }
-    } catch (e: any) { alert(e.message) }
+    } catch (e: any) { toast.error(e.message) }
     setSaving(false)
   }
 
@@ -629,17 +630,17 @@ function CampaignsInner() {
                           const res = await fetch('/api/m4/upload-image', { method: 'POST', body: fd })
                           const text = await res.text()
                           let data: any = {}
-                          try { data = JSON.parse(text) } catch { alert('Upload error (bad response): ' + text.slice(0, 200)); setUploadingCreative(false); return }
+                          try { data = JSON.parse(text) } catch { toast.error('Upload error (bad response): ' + text.slice(0, 200)); setUploadingCreative(false); return }
                           if (data.hash || data.videoId) {
                             setUploadedCreativeHash(data.hash || data.videoId)
                             setEditModal((p: any) => ({ ...p, new_creative_hash: data.hash || data.videoId, new_creative_is_video: isVideo }))
                           } else {
-                            alert('Upload failed: ' + (data.error || 'Unknown error'))
+                            toast.error('Upload failed: ' + (data.error || 'Unknown error'))
                           }
                           setUploadingCreative(false)
                         } catch (err: any) {
                           setUploadingCreative(false)
-                          alert('Upload error: ' + err.message)
+                          toast.error('Upload error: ' + err.message)
                         }
                       }}
                       style={{ display: 'none' }} />

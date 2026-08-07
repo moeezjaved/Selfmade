@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { confirmAction } from '@/components/ConfirmDialog'
 
 // The competitor step that used to live only in onboarding — a brand with no rivals to watch
 // never appears in a brief, so every creation path now offers it.
@@ -130,7 +131,7 @@ export default function BrandsPage() {
     } catch { setMsg({ ok: false, text: 'Network error — please try again.' }) }
     finally { setSaving(false) }
   }
-  const delBrand = async (id: string) => { if (confirm('Delete this brand and its products?')) { await fetch(`/api/brands/${id}`, { method: 'DELETE' }); load() } }
+  const delBrand = async (id: string) => { if (await confirmAction({ title: 'Delete this brand and its products?', body: 'This can’t be undone.' })) { await fetch(`/api/brands/${id}`, { method: 'DELETE' }); load() } }
   const setBrandType = async (id: string, brand_type: string) => { await fetch(`/api/brands/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brand_type }) }); load() }
   const editBrand = async (id: string, patch: { name: string; website: string; tone: string }) => {
     await fetch(`/api/brands/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })

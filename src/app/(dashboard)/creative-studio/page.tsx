@@ -12,6 +12,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2, Film } from 'lucide-react'
 import { creativeFilename } from '@/lib/filename'
 import toast from 'react-hot-toast'
+import { confirmAction } from '@/components/ConfirmDialog'
 import { refreshCredits, useCredits } from '@/components/credits/CreditCounter'
 import { imagesAreFree } from '@/lib/plans'
 import StudioModal from '../discovery/StudioModal'
@@ -332,7 +333,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setBusy(false) }
   }
   const del = async () => {
-    if (!confirm('Delete this creative?')) return
+    if (!(await confirmAction({ title: 'Delete this creative?', body: 'This can’t be undone.' }))) return
     await fetch(`/api/creatives?id=${gen.id}`, { method: 'DELETE' })
     onChanged(); onClose()
   }
@@ -425,7 +426,7 @@ function Brands() {
   useEffect(() => { load() }, [load])
 
   const del = async (id: string) => {
-    if (!confirm('Delete this brand and its products?')) return
+    if (!(await confirmAction({ title: 'Delete this brand and its products?', body: 'This can’t be undone.' }))) return
     await fetch(`/api/brands/${id}`, { method: 'DELETE' })
     load()
   }

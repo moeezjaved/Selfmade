@@ -4,6 +4,7 @@
  * Invite/remove gated to owner|admin (server-enforced); non-managers see a read-only roster.
  */
 import { useEffect, useState, useCallback } from 'react'
+import { confirmAction } from '@/components/ConfirmDialog'
 
 const INK = '#0e1b12', LIME = '#dffe95'
 type Member = { id: string; user_id: string; email: string; role: string; isYou: boolean; accounts: string[] | null; allAccounts: boolean }
@@ -62,7 +63,7 @@ export default function TeamPage() {
     setMsg(`✓ Seats updated — ${j.extra} paid seat${j.extra === 1 ? '' : 's'}.`); load()
   }
   const revoke = async (id: string) => { await fetch(`/api/account/team?invite=${id}`, { method: 'DELETE' }); load() }
-  const remove = async (id: string) => { if (confirm('Remove this member?')) { await fetch(`/api/account/team?member=${id}`, { method: 'DELETE' }); load() } }
+  const remove = async (id: string) => { if (await confirmAction({ title: 'Remove this member?', body: 'They’ll lose access to this workspace.' })) { await fetch(`/api/account/team?member=${id}`, { method: 'DELETE' }); load() } }
   const copy = (t: string, tag: string) => { navigator.clipboard.writeText(t); setCopied(tag); setTimeout(() => setCopied(''), 1500) }
 
   if (err) return <div style={{ padding: 28, fontFamily: "'Inter',sans-serif" }}><div style={{ color: '#dc2626', fontWeight: 700, marginBottom: 6 }}>Couldn’t load your team</div><div style={{ color: '#6b7280', fontSize: 14 }}>{err}</div><button onClick={() => { setErr(''); load() }} style={{ marginTop: 12, background: '#0e1b12', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 100, fontWeight: 800, cursor: 'pointer' }}>Retry</button></div>

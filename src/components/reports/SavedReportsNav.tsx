@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { confirmAction } from '@/components/ConfirmDialog'
 import { Plus, ChevronRight } from 'lucide-react'
 import { TEMPLATE_BY_KEY } from '@/lib/reports/templates'
 
@@ -69,7 +70,7 @@ export default function SavedReportsNav() {
 
   // Delete a saved report (own reports only — shared-with-me rows are owned by another org).
   const del = async (r: Saved) => {
-    if (!confirm(`Delete “${r.name}” from your reports? This can't be undone.`)) return
+    if (!(await confirmAction({ title: `Delete “${r.name}”?`, body: 'This report will be removed. This can’t be undone.' }))) return
     setReports(rs => rs.filter(x => x.id !== r.id))
     await fetch(`/api/reports/saved?id=${r.id}`, { method: 'DELETE' }).catch(() => {})
     window.dispatchEvent(new Event('reports:changed'))
