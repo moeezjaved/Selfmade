@@ -84,8 +84,18 @@ export default function HqMockup() {
       <div className="hq-cap">Your company, in one screen. Nothing ships without your yes.</div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .hq-wrap{max-width:1040px;margin:16px auto 0;padding:0 20px}
-        .hq{display:grid;grid-template-columns:230px 1fr;background:#fff;border:1px solid rgba(17,37,28,.08);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px -50px rgba(17,37,28,.5),0 2px 6px rgba(17,37,28,.04);min-height:430px;opacity:1}
+        .hq-wrap{position:relative;max-width:1040px;margin:16px auto 0;padding:36px 20px 0}
+        /* Sila-style colorful gradient glow behind the product screenshot. */
+        .hq-wrap::before{content:'';position:absolute;left:50%;top:0;transform:translateX(-50%);
+          width:min(112%,1180px);height:100%;z-index:0;border-radius:36px;pointer-events:none;
+          background:
+            radial-gradient(60% 70% at 18% 12%, rgba(255,196,120,.55), transparent 60%),
+            radial-gradient(60% 70% at 82% 8%, rgba(150,190,255,.6), transparent 60%),
+            radial-gradient(70% 80% at 88% 92%, rgba(206,150,255,.55), transparent 62%),
+            radial-gradient(70% 80% at 8% 90%, rgba(150,255,205,.5), transparent 62%),
+            radial-gradient(90% 90% at 50% 50%, rgba(223,254,149,.35), transparent 70%);
+          filter:blur(46px);opacity:.9}
+        .hq{position:relative;z-index:1;display:grid;grid-template-columns:230px 1fr;background:#fff;border:1px solid rgba(17,37,28,.08);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px -50px rgba(17,37,28,.5),0 2px 6px rgba(17,37,28,.04);min-height:430px;opacity:1}
         .hq.on{animation:hq-rise .7s cubic-bezier(0,0,.2,1) both}
         @keyframes hq-rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 
@@ -124,7 +134,7 @@ export default function HqMockup() {
         .hq-bub.me .hq-txt{color:${LIME}}
         .hq-chip{display:inline-flex;align-items:center;gap:5px;margin-top:8px;background:#eef4e4;color:#3b6d11;border-radius:7px;padding:3px 9px;font:700 10.5px/1.3 'Inter',sans-serif}
         .hq-approve{display:inline-block;margin-top:9px;background:${INK};color:${LIME};border-radius:100px;padding:6px 15px;font-size:12px;font-weight:800}
-        .hq-cap{text-align:center;font-size:13px;color:${SUB};margin-top:16px;font-weight:600}
+        .hq-cap{position:relative;z-index:1;text-align:center;font-size:13px;color:${SUB};margin-top:16px;font-weight:600}
 
         @media (max-width:760px){
           .hq{grid-template-columns:1fr}

@@ -37,10 +37,10 @@ function Block({ rev, eyebrow, title, desc, bullets, grad, children }: {
 
 export default function FeatureShowcase() {
   return (
-    <section className="fs">
+    <section className="fs" id="work">
       <div className="fs-head">
         <div className="fs-h-eye">What your team ships</div>
-        <h2 className="fs-h-title">Four employees. One founder. Every night.</h2>
+        <h2 className="fs-h-title">A whole team. One founder. Every night.</h2>
       </div>
 
       {/* 1 · MEDIA BUYING — run Facebook ads */}
@@ -118,6 +118,40 @@ export default function FeatureShowcase() {
         </div>
       </Block>
 
+      {/* 5 · RESEARCH — spy on competitors */}
+      <Block
+        eyebrow="Research"
+        title="Watch every competitor, all night."
+        desc="Mello studies your rivals across 3M+ ads and 611K brands — and wakes you the moment one launches something new, so you copy the winners before they compound."
+        bullets={['Tracks every rival’s ads', 'Alerts you the moment they move', 'Shows what’s working — and why']}
+        grad="radial-gradient(120% 120% at 12% 12%, #e2e9ff, #eafff2 55%, #fff1dc)"
+      >
+        <div className="sp-head"><span className="sp-eye">👁</span> Watching 12 competitors <span className="sp-live">live</span></div>
+        <div className="sp-alert">
+          <div className="sp-brand"><span className="sp-av" />Country Delight</div>
+          <div className="sp-line"><b>9 new ads</b> launched overnight — a real push.</div>
+          <span className="sp-tag">new hook detected</span>
+        </div>
+        <div className="sp-cta">See their angle → <b>remake it</b></div>
+      </Block>
+
+      {/* 6 · CUSTOMER — answers your inbox */}
+      <Block
+        rev
+        eyebrow="Customer Care"
+        title="Your inbox, answered for you."
+        desc="Customers message you on WhatsApp, Instagram and email. Mello reads every one, drafts the reply in your voice, and waits for your yes — so no message ever goes cold."
+        bullets={['WhatsApp · Instagram · Email', 'Replies drafted in your voice', 'Nothing sent without your yes']}
+        grad="radial-gradient(120% 120% at 88% 12%, #ffe6d9, #ffe0ef 52%, #e9e2ff)"
+      >
+        <div className="ci-msg them"><b>Aisha</b>Is the serum safe while pregnant? 🤰</div>
+        <div className="ci-draft">
+          <div className="ci-lab">Draft reply · your voice</div>
+          <div className="ci-body">Hi Aisha! Yes — it’s pregnancy-safe. Want me to send your usual routine? 💛</div>
+          <div className="ci-cta"><span className="ci-send">Send →</span><span className="ci-edit">Edit</span></div>
+        </div>
+      </Block>
+
       <style dangerouslySetInnerHTML={{ __html: `
         .fs{max-width:1080px;margin:40px auto 0;padding:0 20px;display:flex;flex-direction:column;gap:80px}
         .fs-head{text-align:center;max-width:640px;margin:0 auto}
@@ -191,6 +225,29 @@ export default function FeatureShowcase() {
         .fs-row.on .wa-msg:nth-child(3){animation-delay:1.2s}
         .fs-row.on .wa-msg:nth-child(4){animation-delay:1.8s}
 
+        /* 5 · SPY */
+        .sp-head{display:flex;align-items:center;gap:7px;font:700 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.05em;text-transform:uppercase;color:${SUB}}
+        .sp-eye{font-size:14px}
+        .sp-live{margin-left:auto;color:#c0392b;background:#fdecea;border-radius:6px;padding:3px 7px;font-size:9.5px;letter-spacing:.06em}
+        .sp-alert{background:#f6f8f2;border:1px solid #e6ece0;border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;gap:6px;opacity:1}
+        .fs-row.on .sp-alert{animation:fs-pop .6s cubic-bezier(.2,.7,.2,1) both;animation-delay:.7s}
+        .sp-brand{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:${INK}}
+        .sp-av{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,#f0a63a,#e5732e);flex-shrink:0}
+        .sp-line{font-size:13px;color:#4b5548}.sp-line b{color:${INK}}
+        .sp-tag{align-self:flex-start;font:800 9px/1 ui-monospace,Menlo,monospace;letter-spacing:.05em;text-transform:uppercase;color:#8a4b00;background:#ffedcf;border-radius:6px;padding:4px 8px}
+        .sp-cta{font-size:13px;color:${SUB};text-align:center}.sp-cta b{color:#3b6d11}
+
+        /* 6 · CUSTOMER INBOX */
+        .ci-msg{max-width:88%;border-radius:13px;padding:9px 13px;font-size:13.5px;line-height:1.4;background:#f2f4ef;color:${INK};align-self:flex-start;border-bottom-left-radius:5px}
+        .ci-msg b{display:block;font:700 9.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:${SUB};margin-bottom:4px}
+        .ci-draft{border:1px dashed #cfe0a8;background:#fbfdf4;border-radius:13px;padding:11px 13px;opacity:1}
+        .fs-row.on .ci-draft{animation:fs-pop .6s cubic-bezier(.2,.7,.2,1) both;animation-delay:.9s}
+        .ci-lab{font:800 9px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#3b6d11;margin-bottom:6px}
+        .ci-body{font-size:13.5px;line-height:1.45;color:${INK}}
+        .ci-cta{display:flex;align-items:center;gap:12px;margin-top:10px}
+        .ci-send{background:${INK};color:${LIME};border-radius:100px;padding:7px 16px;font-size:12px;font-weight:800}
+        .ci-edit{font-size:12.5px;font-weight:700;color:${SUB}}
+
         @media (max-width:820px){
           .fs{gap:56px}
           .fs-row{grid-template-columns:1fr;gap:22px}
@@ -199,7 +256,7 @@ export default function FeatureShowcase() {
           .fs-desc{max-width:none}
         }
         @media (prefers-reduced-motion:reduce){
-          .fs-copy,.fs-visual,.ad-live,.rm-you,.rm-arrow,.br-chip,.wa-msg{animation:none!important;opacity:1;transform:none}
+          .fs-copy,.fs-visual,.ad-live,.rm-you,.rm-arrow,.br-chip,.wa-msg,.sp-alert,.ci-draft{animation:none!important;opacity:1;transform:none}
           .ad-approve{animation:none!important;opacity:1}
         }
       ` }} />

@@ -17,7 +17,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import HqMockup from './HqMockup'
-import TeamRoster from './TeamRoster'
+import FeatureGrid from './FeatureGrid'
 import FeatureShowcase from './FeatureShowcase'
 
 export default function HireStory() {
@@ -82,7 +82,7 @@ export default function HireStory() {
 
         <div className="hero-cta rv d3">
           <a href="#agreement" className="btn-forest">Hire the team</a>
-          <a href="#night" className="quiet-link">Watch a day of work ↓</a>
+          <a href="#work" className="quiet-link">See the work ↓</a>
         </div>
         <div className="fine rv d3">$49/month · the whole company · starts tonight · no card to start</div>
       </header>
@@ -90,166 +90,15 @@ export default function HireStory() {
       {/* Animated product mockup — the workspace as a real app (proof of "The One-Person Company"). */}
       <HqMockup />
 
-      {/* Meet the team — the AI employees you're hiring, with faces, names and jobs. */}
-      <TeamRoster />
-
       {/* Feature showcase — alternating blocks, each with an animated mockup of the feature working. */}
       <FeatureShowcase />
 
-      {/* ── 1.5 · WHERE THEY LIVE (cold open) — surfaced early: the software disappears, the team appears.
-          This is the differentiator ("I don't need another dashboard"), so it opens the story. ── */}
-      <section className="beat beat--tint">
-        <div className="beat-eyebrow rv">One conversation runs the company</div>
-        <h2 className="rv d2">The software disappears.<br />The team appears.</h2>
-        <p className="beat-sub rv d3">No dashboards. No logins. Your company lives where you already work —
-        your departments just message you, and you reply. That&rsquo;s the whole product.</p>
+      {/* Feature grid — Sila-style compact cards for the rest of the suite. */}
+      <FeatureGrid />
 
-        {/* the channels — real logos, because this is the whole differentiator */}
-        <div className="channels rv d3" aria-hidden="true">
-          <div className="channel">
-            <span className="channel-logo">
-              <svg viewBox="0 0 122.8 122.8" width="34" height="34" aria-hidden="true">
-                <path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zm6.5 0c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#E01E5A"/>
-                <path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zm0 6.5c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36C5F0"/>
-                <path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zm-6.5 0c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2EB67D"/>
-                <path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zm0-6.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ECB22E"/>
-              </svg>
-            </span>
-            <span className="channel-name">Slack</span>
-          </div>
-          <div className="channel">
-            <span className="channel-logo">
-              <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
-                <path fill="#25D366" d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.744-.615zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
-              </svg>
-            </span>
-            <span className="channel-name">WhatsApp</span>
-          </div>
-          <div className="channel">
-            <span className="channel-logo channel-logo--mail">
-              <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="#17251c" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="4.5" width="20" height="15" rx="2.5"/><path d="M3 6.5l9 6 9-6"/>
-              </svg>
-            </span>
-            <span className="channel-name">Email</span>
-          </div>
-        </div>
-
-        <div className="chat rv d3" aria-hidden="true">
-          <div className="chat-head"><span className="chat-dot" />Selfmade — your team</div>
-          <div className="chat-body">
-            <div className="cb them" style={{ animationDelay: '0s' }}><b>Research</b>Country Delight launched 9 new ads.</div>
-            <div className="cb them" style={{ animationDelay: '.09s' }}><b>Creative</b>Already rebuilt them in your brand. Concept B wins. 🖼️</div>
-            <div className="cb them" style={{ animationDelay: '.18s' }}><b>Media Buying</b>Ready to scale. Increase budget 20%? Reply YES.</div>
-            <div className="cb them" style={{ animationDelay: '.27s' }}><b>Finance</b>Worth it — estimated +$320/week.</div>
-            <div className="cb you" style={{ animationDelay: '.38s' }}>YES</div>
-            <div className="cb them" style={{ animationDelay: '.5s' }}><b>Media Buying</b>✓ Done. It&rsquo;s live. Report in the morning.</div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 2 · WHAT HAPPENS WHILE I SLEEP? — your departments work. ── */}
-      <section className="night" id="night">
-        <div className="n-time rv">Last night · while you slept</div>
-        <h2 className="rv d2">While you sleep,<br />your company works.</h2>
-        <p className="n-sub rv d3">One real night. Your team catches a competitor, rebuilds the ad, and has
-        it ready to launch — before your alarm goes off.</p>
-        <div className="nightlog rv d3">
-          {[
-            ['3:17 AM', 'Research', 'found a competitor testing a new hook'],
-            ['3:42 AM', 'Creative', 'already rebuilt it — in your brand'],
-            ['5:11 AM', 'Media Buying', 'ready to launch · est. +$510 / week'],
-          ].map(([t, dept, line], i) => (
-            <div className="nl" key={t} style={{ animationDelay: `${i * 0.09}s` }}>
-              <span className="nl-t">{t}</span><span className="nl-d">{dept}</span><span className="nl-l">{line}</span>
-            </div>
-          ))}
-          <div className="nl-morning">
-            <span className="nl-t">8:01 AM</span>
-            <span className="nl-wake">Good morning. It&rsquo;s all ready — <b>approve?</b></span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 3 · THEY REPORT BACK — the morning brief (the product, shown not described). ── */}
-      <section className="morning">
-        <div className="m-time rv">7:00 AM · the brief</div>
-        <h2 className="rv d2">Every morning,<br />they report to you.</h2>
-        <p className="m-sub rv d3">One brief: what happened, what they made, and what needs your yes.</p>
-
-        <div className="brief rv d3" aria-hidden="true">
-          <div className="b-term">&gt; the team read <b>1,001 ads</b>&nbsp;&nbsp;·&nbsp;&nbsp;drafted <b>4 creatives</b>&nbsp;&nbsp;·&nbsp;&nbsp;last worked 1h ago</div>
-          <div className="b-body">
-            <div className="b-card">
-              <span className="b-chip b-chip--done">Creative department</span>
-              <div className="b-title">We finished 4 new ads — this one is the strongest.</div>
-              <div className="b-why">Built from what&rsquo;s winning in your market this week. Nothing goes live until you say so.</div>
-              <span className="b-btn">Review &amp; approve →</span>
-            </div>
-            <div className="b-card">
-              <span className="b-chip">Research department</span>
-              <div className="b-title">Country Delight launched 12 new ads overnight.</div>
-              <div className="b-why">A real push, not rotation — 12 in 48h. Here&rsquo;s their angle before it compounds.</div>
-              <span className="b-btn b-btn--ghost">Open the brand file →</span>
-            </div>
-          </div>
-        </div>
-        <div className="b-caption rv">A representative morning brief. Yours is built from your own market — and nothing ships without your approval.</div>
-      </section>
-
-      {/* Sections 4 (Company Brain) and 5 (the relay) removed — now shown live in the FeatureShowcase
-          Company-Brain block and the HqMockup Team channel above, so the page reads shorter. */}
-
-      {/* ── 6 · HOW DO I CONTROL THEM? — they ask before acting. ── */}
-      <section className="beat">
-        <div className="beat-eyebrow rv">Your desk</div>
-        <h2 className="rv d2">Nothing happens<br />without your yes.</h2>
-        <p className="beat-sub rv d3">Money, publishing, big changes — the team always asks first.
-        Approve, edit, or kill in one tap.</p>
-        <div className="ask rv d3" aria-hidden="true">
-          <div className="ask-msg">
-            <div className="ask-from">Media Buying</div>
-            <div className="ask-body">The blue ad is winning — 3.1x return. I&rsquo;d like to move budget onto it. OK?</div>
-            <div className="ask-outcome"><span className="ask-outcome-k">Projected</span> +$470 / week</div>
-            <div className="ask-actions"><span className="b-btn">Approve →</span><span className="b-btn b-btn--ghost">Not yet</span></div>
-          </div>
-          <div className="ask-note">Every request comes with the number attached. Only you can say go.</div>
-        </div>
-      </section>
-
-      {/* ── 7 · CAN THEY LEARN? — teach the company. ── */}
-      <section className="beat beat--tint">
-        <div className="beat-eyebrow rv">Teach the company</div>
-        <h2 className="rv d2">Train them like employees.<br />In plain English.</h2>
-        <p className="beat-sub rv d3">Say it once — the whole company follows it from then on.</p>
-        <div className="teach rv d3" aria-hidden="true">
-          {[
-            ['“Never discount below 15%.”', 'Done. The whole company follows it.'],
-            ['“Always ask before raising budget.”', 'Done. Media Buying will always ask.'],
-            ['“Use British English.”', 'Done. Creative remembers, forever.'],
-          ].map(([you, team], i) => (
-            <div className="tch" key={i} style={{ animationDelay: `${0.12 * i}s` }}>
-              <div className="tch-you">{you}</div>
-              <div className="tch-team"><span className="tick">✓</span>{team}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── 9 · WHY IS THIS DIFFERENT? — a company, not software. ── */}
-      <section className="why">
-        <p className="rv">You&rsquo;re not buying software.<br />You&rsquo;re hiring a company.</p>
-        <div className="why-compare rv d2">
-          <div><span className="why-k">Software</span> waits for you to log in.</div>
-          <div><span className="why-k why-k--us">A team</span> works whether you show up or not.</div>
-        </div>
-      </section>
-
-      {/* A single quiet turn before the ceremony. */}
-      <section className="turn">
-        <p className="rv">You&rsquo;ve never hired anyone like this.<br />
-        <span className="turn-sub">Nobody has. Which is why Mello would like to make the first move.</span></p>
-      </section>
+      {/* Old serif narrative sections (cold-open, night, morning, control, teach, why, turn)
+          removed — the story is now told by the animated HqMockup + FeatureShowcase + FeatureGrid above,
+          which match the new theme and keep the page short. The Employment Agreement stays. */}
 
       {/* THE AGREEMENT — the conversion is a signature. Employment terms, not a co-founder deal —
           the ridiculous 24/7 / never-on-vacation clauses are the screenshot. */}
