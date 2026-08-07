@@ -99,6 +99,7 @@ export default function SettingsPage() {
   const [competitors, setCompetitors] = useState<{ pageId: string; name: string }[]>([])
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)  // null = still loading
   const [disconnecting, setDisconnecting] = useState(false)
+  const [metaConfirm, setMetaConfirm] = useState(false)  // in-app disconnect confirmation (not window.confirm)
   const [newPw, setNewPw] = useState(''); const [confirmPw, setConfirmPw] = useState(''); const [pwSaving, setPwSaving] = useState(false)
   const [tab, setTab] = useState<'account' | 'notifications' | 'autopilot' | 'channels' | 'integrations'>('account')
   const supabase = createClient()
@@ -202,8 +203,10 @@ export default function SettingsPage() {
     router.push('/login')
   }
 
-  const disconnectMeta = async () => {
-    if (!confirm('Disconnect your Meta / Facebook account? Your ad accounts will be removed from Selfmade until you reconnect.')) return
+  // In-app confirmation (was a browser window.confirm — every prompt should live inside the app UI).
+  const disconnectMeta = () => setMetaConfirm(true)
+  const doDisconnectMeta = async () => {
+    setMetaConfirm(false)
     setDisconnecting(true)
     try {
       const res = await fetch('/api/meta/accounts', { method: 'DELETE' })
@@ -215,6 +218,19 @@ export default function SettingsPage() {
 
   return (
     <div style={{padding:'32px 28px',maxWidth:980,margin:'0 auto'}}>
+      {/* In-app disconnect confirmation — replaces the native browser confirm() so every prompt is app-level. */}
+      {metaConfirm && (
+        <div onClick={() => setMetaConfirm(false)} style={{position:'fixed',inset:0,background:'rgba(14,27,18,0.5)',zIndex:5000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <div onClick={e => e.stopPropagation()} style={{width:'min(420px,96vw)',background:'#fff',borderRadius:16,padding:'24px 24px 20px',boxShadow:'0 24px 70px rgba(0,0,0,0.35)'}}>
+            <div style={{fontSize:16.5,fontWeight:800,color:INK,letterSpacing:'-.01em'}}>Disconnect Meta / Facebook?</div>
+            <div style={{fontSize:13.5,color:SUB,marginTop:8,lineHeight:1.6}}>Your ad accounts will be removed from Selfmade until you reconnect. You can reconnect any time.</div>
+            <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:22}}>
+              <button onClick={() => setMetaConfirm(false)} style={{background:'#fff',color:INK,border:'1.5px solid #e2e8f0',borderRadius:100,padding:'9px 18px',fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
+              <button onClick={doDisconnectMeta} style={{background:'#c0392b',color:'#fff',border:'none',borderRadius:100,padding:'9px 20px',fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Disconnect</button>
+            </div>
+          </div>
+        </div>
+      )}
       <h1 style={{fontSize:24,fontWeight:800,color:INK,marginBottom:4,letterSpacing:'-.02em'}}>Settings</h1>
       <p style={{fontSize:13.5,color:SUB,marginBottom:26}}>Manage your account, alerts, and connected tools.</p>
 
@@ -436,8 +452,8 @@ export default function SettingsPage() {
             <div style={{fontSize:14,color: metaConnected ? '#3a5a3a' : '#9ca3af'}}>
               {metaConnected == null ? 'Meta / Facebook — checking…' : metaConnected ? 'Meta / Facebook — Connected ✓' : 'Meta / Facebook'}
             </div>
-            {/* Meta OAuth is gated while the new FB app is in review — show Coming soon, not a dead Connect
-                link. If a user actually has a live connection, keep Reconnect/Disconnect available. */}
+            {/* BYO Meta connect (/connect-meta) is live, so when disconnected we offer Connect — not the
+                old "Coming soon" placeholder (which stranded the user after they disconnected). */}
             <div style={{display:'flex',alignItems:'center',gap:16}}>
               {metaConnected ? (
                 <>
@@ -447,7 +463,7 @@ export default function SettingsPage() {
                   </button>
                 </>
               ) : metaConnected === false ? (
-                <span style={{background:'#f3f4f6',color:'#6b7280',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:800,whiteSpace:'nowrap'}}>Coming soon</span>
+                <a href="/connect-meta" style={{background:'#dffe95',color:'#1a3a1a',padding:'7px 16px',borderRadius:100,fontSize:13,fontWeight:800,textDecoration:'none',whiteSpace:'nowrap'}}>Connect →</a>
               ) : null}
             </div>
           </div>
