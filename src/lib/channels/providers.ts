@@ -159,9 +159,30 @@ export async function unipileSendEmail(accountId: string, opts: { to: string; su
  * Send a WhatsApp message. If `chatId` is known (from a prior inbound), reply into it; otherwise
  * start a new chat to `toAttendee` (the recipient's WhatsApp id / phone). Returns the message id.
  */
-export async function whatsappSend(opts: { chatId?: string; toAttendee?: string; text: string }): Promise<{ ok: boolean; id?: string; chatId?: string; error?: string }> {
+/**
+ * Resolve the QR-connected account's OWN WhatsApp number, so we can post the brief into the founder's
+ * "Message yourself" chat (no first-contact rule — their account writes to itself). Unipile's account
+ * shape varies by version, so we read the known spots defensively.
+ */
+export async function whatsappSelfTarget(accountId: string): Promise<string | null> {
+  if (!whatsappEnabled || !accountId) return null
+  try {
+    const res = await fetch(`${uniBase()}/api/v1/accounts/${encodeURIComponent(accountId)}`, { headers: uniHeaders() })
+    const j = await res.json().catch(() => ({} as any))
+    const cp = j?.connection_params?.im || j?.connection_params || {}
+    const raw = cp.phone_number || cp.phone || cp.id || cp.username || j?.name || j?.username || null
+    if (!raw) return null
+    const digits = String(raw).replace(/[^0-9]/g, '')
+    return digits.length >= 7 ? digits : null   // a real phone number, not a handle
+  } catch { return null }
+}
+
+export async function whatsappSend(opts: { chatId?: string; toAttendee?: string; text: string; accountId?: string }): Promise<{ ok: boolean; id?: string; chatId?: string; error?: string }> {
   if (!whatsappEnabled) return { ok: false, error: 'not_configured' }
-  const accountId = process.env.UNIPILE_WHATSAPP_ACCOUNT_ID!
+  // Prefer the founder's OWN connected account (QR); fall back to the shared env account.
+  const accountId = opts.accountId || process.env.UNIPILE_WHATSAPP_ACCOUNT_ID!
+  if (!accountId) return { ok: false, error: 'no_account' }
+  if (!opts.chatId && !opts.toAttendee) return { ok: false, error: 'no_target' }
   try {
     // Reply into a known chat, else start one. CHECK the response (was returning ok:true for ANY
     // non-throwing response, so a rejected send still toasted "Sent — check your WhatsApp").
