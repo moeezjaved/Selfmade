@@ -99,5 +99,39 @@ export async function GET(req: NextRequest) {
     } catch { /* best-effort */ }
   }
 
-  return NextResponse.json({ ok: true, considered: subs?.length || 0, charged, emailed, pastDue, downgraded })
+  // ── PayPal card (ACDC) auto-renewals — charge the vaulted card silently, no customer action. ──
+  let cardCharged = 0, cardFailed = 0
+  const { data: cardSubs } = await admin.from('subscriptions')
+    .select('owner_id, plan, billing_cycle, current_period_end, paypal_vault_id')
+    .eq('provider', 'paypal').eq('status', 'active').not('paypal_vault_id', 'is', null)
+    .lte('current_period_end', dueBy).limit(500)
+  if (cardSubs?.length) {
+    const { chargeVaultedCard, makeBasketId: mkPP } = await import('@/lib/paypal')
+    for (const s of cardSubs) {
+      const plan = PLANS[s.plan as PlanId]
+      if (!plan || s.plan === 'free' || s.plan === 'enterprise') continue
+      const annual = s.billing_cycle === 'annual'
+      const usd = annual ? plan.priceAnnualMonthly * 12 : plan.priceMonthly
+      const periodEndMs = s.current_period_end ? new Date(s.current_period_end).getTime() : now
+      const basketId = mkPP('REN')
+      await admin.from('paypal_orders').insert({ basket_id: basketId, user_id: s.owner_id, kind: 'subscription', plan: s.plan, billing_cycle: s.billing_cycle, amount: usd, currency: 'USD', status: 'pending' }).then(() => {}, () => {})
+      const res = await chargeVaultedCard({ vaultId: s.paypal_vault_id as string, amountUsd: usd, customId: basketId, description: `Selfmade — ${plan.label} renewal` })
+      if (res.ok) {
+        const newEnd = new Date(Math.max(now, periodEndMs) + (annual ? 365 : 30) * 86400e3).toISOString()
+        await admin.from('subscriptions').update({ current_period_end: newEnd, updated_at: new Date().toISOString() }).eq('owner_id', s.owner_id)
+        await admin.rpc('apply_plan', { p_user: s.owner_id, p_plan: s.plan, p_reset: newEnd }).then(() => {}, () => {})
+        await admin.from('paypal_orders').update({ status: 'paid', transaction_id: res.transactionId, paid_at: new Date().toISOString() }).eq('basket_id', basketId)
+        cardCharged++
+      } else {
+        await admin.from('paypal_orders').update({ status: 'failed', err_code: 'DECLINED' }).eq('basket_id', basketId)
+        // Past grace and still unpaid → past_due (recoverable; customer can re-enter a card).
+        if (periodEndMs < now - GRACE_DAYS * 86400e3) {
+          await admin.from('subscriptions').update({ status: 'past_due', updated_at: new Date().toISOString() }).eq('owner_id', s.owner_id)
+        }
+        cardFailed++
+      }
+    }
+  }
+
+  return NextResponse.json({ ok: true, considered: subs?.length || 0, charged, emailed, pastDue, downgraded, cardCharged, cardFailed })
 }
