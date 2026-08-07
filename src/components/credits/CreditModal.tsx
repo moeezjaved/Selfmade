@@ -78,8 +78,16 @@ export function CreditModal() {
   const buy = async (packId: string) => {
     setBusy(packId)
     try {
-      // PayFast is the active rail (NEXT_PUBLIC_PAYMENTS_PROVIDER=payfast). Falls back to Stripe otherwise.
-      if (process.env.NEXT_PUBLIC_PAYMENTS_PROVIDER === 'payfast') {
+      // Payment rail chosen by NEXT_PUBLIC_PAYMENTS_PROVIDER: paypal | payfast | (else) Stripe.
+      const provider = process.env.NEXT_PUBLIC_PAYMENTS_PROVIDER
+      if (provider === 'paypal') {
+        const { startPaypalCheckout } = await import('@/lib/paypal/start')
+        const res = await startPaypalCheckout({ kind: 'topup', pack: packId })
+        if ((res as any)?.error === 'canBuyCredits' || (res as any)?.feature) { setView('plan'); setReason('Top-ups are a paid-plan feature — upgrade to buy credits.'); setBusy(null); return }
+        if (res?.error) { setReason(res.message || res.error); setBusy(null) }
+        return   // redirecting to PayPal
+      }
+      if (provider === 'payfast') {
         const { startPayfastCheckout } = await import('@/lib/payfast/start')
         const res = await startPayfastCheckout({ kind: 'topup', pack: packId })
         if ((res as any)?.error === 'canBuyCredits' || (res as any)?.feature) { setView('plan'); setReason('Top-ups are a paid-plan feature — upgrade to buy credits.'); setBusy(null); return }

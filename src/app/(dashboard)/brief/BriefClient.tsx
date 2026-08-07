@@ -243,8 +243,14 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
     if (subscribing) return
     setSubscribing(true)
     try {
-      // PayFast is the active rail — auto-submits a form to the hosted page. Stripe is the fallback.
-      if (process.env.NEXT_PUBLIC_PAYMENTS_PROVIDER === 'payfast') {
+      // Payment rail chosen by NEXT_PUBLIC_PAYMENTS_PROVIDER: paypal | payfast | (else) Stripe.
+      const provider = process.env.NEXT_PUBLIC_PAYMENTS_PROVIDER
+      if (provider === 'paypal') {
+        const { startPaypalCheckout } = await import('@/lib/paypal/start')
+        await startPaypalCheckout({ kind: 'subscription', plan: 'starter', cycle: 'monthly' })
+        return   // redirecting to PayPal
+      }
+      if (provider === 'payfast') {
         const { startPayfastCheckout } = await import('@/lib/payfast/start')
         await startPayfastCheckout({ kind: 'subscription', plan: 'starter', cycle: 'monthly' })
         return   // redirecting to PayFast
