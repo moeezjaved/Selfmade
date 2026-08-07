@@ -43,7 +43,9 @@ export async function getIdentities(admin: any, userId: string, provider?: strin
 /** Send a pending task to the founder on every linked channel. Records one channel_messages per send. */
 export async function sendApprovalToChannels(admin: any, userId: string, task: any): Promise<{ sent: number }> {
   // Founder comms only — approvals never go to a connected customer channel.
-  const ids = (await getIdentities(admin, userId)).filter((i: any) => !i.meta?.customer_channel)
+  // Founder-brief channels: everything NOT a customer channel, PLUS WhatsApp (a solo founder's own
+  // WhatsApp is both their inbox and where the brief goes — so briefs always reach a connected WhatsApp).
+  const ids = (await getIdentities(admin, userId)).filter((i: any) => i.provider === 'whatsapp' || !i.meta?.customer_channel)
   if (!ids.length) return { sent: 0 }
   const { text, slackBlocks } = formatApproval(task)
   const expires_at = new Date(Date.now() + APPROVAL_TTL_MS).toISOString()
@@ -85,7 +87,9 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
 export async function sendReportToChannels(admin: any, userId: string, brief: any, opts: { brandId?: string | null; brandLabel?: string } = {}): Promise<{ sent: number }> {
   // Founder comms only — the brief must reach the founder's own Slack/WhatsApp, NEVER a connected
   // customer channel (a Unipile customer WhatsApp shares provider 'whatsapp').
-  const ids = (await getIdentities(admin, userId)).filter((i: any) => !i.meta?.customer_channel)
+  // Founder-brief channels: everything NOT a customer channel, PLUS WhatsApp (a solo founder's own
+  // WhatsApp is both their inbox and where the brief goes — so briefs always reach a connected WhatsApp).
+  const ids = (await getIdentities(admin, userId)).filter((i: any) => i.provider === 'whatsapp' || !i.meta?.customer_channel)
   if (!ids.length) return { sent: 0 }
   // Ground the report in the SAME live account state the brief shows: the brief computes moves on
   // page-load (fetchLiveOpportunities) but writes nothing, while tasks are only written by the audit.
@@ -153,7 +157,7 @@ export async function pushNewApprovals(admin: any, userId: string): Promise<{ pu
  *  handle it from chat. Only fires for the founder's OWN comms channels (never a connected customer one). */
 export async function pushCustomerMessage(admin: any, userId: string, m: { messageId: string; contactName?: string; channel: string; priority?: string; intent?: string; body: string; draft: string }): Promise<void> {
   const ids = await getIdentities(admin, userId)
-  const founderChans = ids.filter((i: any) => (i.provider === 'slack' || i.provider === 'whatsapp') && !i.meta?.customer_channel)
+  const founderChans = ids.filter((i: any) => i.provider === 'whatsapp' || (i.provider === 'slack' && !i.meta?.customer_channel))
   if (!founderChans.length) return
   const PRI: Record<string, string> = { high: '🔴 HIGH', med: '🟡 MEDIUM', low: '🟢 LOW' }
   const head = `💬 *New ${m.channel} message*${m.priority ? ` · ${PRI[m.priority] || m.priority}` : ''}${m.intent ? ` · ${m.intent}` : ''}`
