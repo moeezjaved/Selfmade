@@ -15,7 +15,7 @@ const FEATS: Feat[] = [
   {
     eyebrow: 'The morning brief', title: 'Wake up to one report.',
     desc: 'What happened overnight, what your team made, and what needs your yes — in a single morning read.',
-    href: '/home', grad: 'linear-gradient(135deg,#fef0d3,#ffd9e6 55%,#e4dcff)',
+    href: '#agreement', grad: 'linear-gradient(135deg,#fef0d3,#ffd9e6 55%,#e4dcff)',
     mock: (
       <div className="mk-brief">
         <div className="mk-b-time">7:00 AM · the brief</div>
@@ -27,7 +27,7 @@ const FEATS: Feat[] = [
   {
     eyebrow: 'The ad library', title: 'Search 3M+ winning ads.',
     desc: 'Every ad your market is running, searchable in seconds. Find the proven angle, then remake it as yours.',
-    href: '/discover', grad: 'linear-gradient(135deg,#d7ecff,#e4e0ff 55%,#ffe3f1)',
+    href: '#agreement', grad: 'linear-gradient(135deg,#d7ecff,#e4e0ff 55%,#ffe3f1)',
     mock: (
       <div className="mk-lib">
         <div className="mk-l-bar">🔎 skincare · winners</div>
@@ -38,7 +38,7 @@ const FEATS: Feat[] = [
   {
     eyebrow: 'Autopilot', title: 'A fresh ad, made daily.',
     desc: 'Let Mello quietly produce a new ad every day from what’s winning — waiting in your brief to approve.',
-    href: '/home', grad: 'linear-gradient(135deg,#e0f7e4,#d9f0ff 55%,#efe6ff)',
+    href: '#agreement', grad: 'linear-gradient(135deg,#e0f7e4,#d9f0ff 55%,#efe6ff)',
     mock: (
       <div className="mk-auto">
         <div className="mk-a-day">Mon</div><div className="mk-a-day">Tue</div>
@@ -50,7 +50,7 @@ const FEATS: Feat[] = [
   {
     eyebrow: 'Creators', title: 'Find creators to film you.',
     desc: 'Mello finds real UGC creators for your product, reaches out, and manages them from first hello to shipped video.',
-    href: '/creators', grad: 'linear-gradient(135deg,#ffe6d9,#ffe0ef 55%,#e9e2ff)',
+    href: '#agreement', grad: 'linear-gradient(135deg,#ffe6d9,#ffe0ef 55%,#e9e2ff)',
     mock: (
       <div className="mk-cre">
         {[0, 1, 2].map((i) => (
@@ -62,7 +62,7 @@ const FEATS: Feat[] = [
   {
     eyebrow: 'Many brands', title: 'All your brands, one login.',
     desc: 'Run every brand you own as its own company — separate team, memory and inbox — from a single switcher.',
-    href: '/home', grad: 'linear-gradient(135deg,#e9e2ff,#d7ecff 55%,#e0f7e4)',
+    href: '#agreement', grad: 'linear-gradient(135deg,#e9e2ff,#d7ecff 55%,#e0f7e4)',
     mock: (
       <div className="mk-br">
         <div className="mk-br-cur">Aura ▾</div>
@@ -75,7 +75,7 @@ const FEATS: Feat[] = [
   {
     eyebrow: 'Playbooks', title: 'Learn how the best win.',
     desc: 'Teardown-style playbooks show why top brands’ ads work — so your team builds on what already sells.',
-    href: '/playbooks', grad: 'linear-gradient(135deg,#fff0d4,#ffe4ea 55%,#e2e9ff)',
+    href: '#agreement', grad: 'linear-gradient(135deg,#fff0d4,#ffe4ea 55%,#e2e9ff)',
     mock: (
       <div className="mk-pb">
         <div className="mk-pb-title">Why it works</div>
