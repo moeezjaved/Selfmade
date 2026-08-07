@@ -1,6 +1,6 @@
 'use client'
 /** /billing/renew — the one-tap re-pay target from the renewal email. Reads the user's current plan
- *  and immediately starts a PayFast checkout for it. If we can't tell the plan, sends them to pricing. */
+ *  and sends them to the PayPal card checkout for it. If we can't tell the plan, sends to pricing. */
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -15,10 +15,7 @@ export default function RenewPage() {
       try {
         const bal = await fetch('/api/credits/balance', { cache: 'no-store' }).then((r) => r.json()).catch(() => null)
         const plan = bal?.plan && bal.plan !== 'free' ? bal.plan : 'starter'
-        const { startPayfastCheckout } = await import('@/lib/payfast/start')
-        const res = await startPayfastCheckout({ kind: 'subscription', plan, cycle: 'monthly' })
-        if (res?.error) { setMsg('Couldn’t start renewal — taking you to pricing…'); setTimeout(() => router.push('/pricing'), 1200) }
-        // else: redirecting to PayFast
+        window.location.href = `/billing/card?kind=subscription&plan=${encodeURIComponent(plan)}&cycle=monthly`
       } catch { router.push('/pricing') }
     })()
   }, [router])

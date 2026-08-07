@@ -1,21 +1,19 @@
 /**
- * Daily PayFast subscription renewals. For each active PayFast subscription at/near its period end:
- *   1) If a recurring-charge endpoint is configured (PAYFAST_RECURRING_URL) + we have the card token,
- *      re-charge silently → extend the period + refill plan credits.
- *   2) Otherwise (or if the silent charge fails), email the founder a one-tap re-pay link, once per
- *      cycle, so no subscription lapses without warning.
- *   3) If it's been past due beyond the grace window and still unpaid, mark past_due.
- * Auth: CRON_SECRET. Idempotent via payfast_renewal_notified_at.
+ * Daily subscription renewals + period-end downgrades (PayPal).
+ * (Filename kept as payfast-renewals for the existing Vercel cron schedule — PayFast is retired.)
+ *   1) Cancelled subs (any provider) past period end → downgrade to Free.
+ *   2) Active PayPal card subs near period end → silently charge the vaulted card → extend + refill.
+ *      Past the grace window and still unpaid → mark past_due (recoverable).
+ * Auth: CRON_SECRET.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { chargeWithToken, makeBasketId, chargeAmount, CURRENCY } from '@/lib/payfast'
 import { PLANS, type PlanId } from '@/lib/plans'
+import { chargeVaultedCard, makeBasketId } from '@/lib/paypal'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-const APP_URL = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
 const GRACE_DAYS = 3
 
 function authorized(req: NextRequest): boolean {
@@ -30,73 +28,16 @@ export async function GET(req: NextRequest) {
   const now = Date.now()
   const dueBy = new Date(now + 3 * 86400e3).toISOString()   // renew within 3 days
 
-  const { data: subs } = await admin.from('subscriptions')
-    .select('owner_id, plan, billing_cycle, status, current_period_end, payfast_instrument_token, payfast_renewal_notified_at')
-    .eq('provider', 'payfast').eq('status', 'active').lte('current_period_end', dueBy).limit(500)
-
-  // Cancelled subscriptions (PayFast or PayPal) that have reached period end → downgrade to Free now
-  // (access ran out). PayPal cancellations keep access until period end via this same path.
+  // ── Cancelled subscriptions (any provider) that reached period end → downgrade to Free now. ──
   let downgraded = 0
   const { data: cancelled } = await admin.from('subscriptions')
     .select('owner_id, plan, current_period_end')
-    .in('provider', ['payfast', 'paypal']).eq('status', 'canceled').neq('plan', 'free').lte('current_period_end', new Date(now).toISOString()).limit(500)
+    .eq('status', 'canceled').neq('plan', 'free').lte('current_period_end', new Date(now).toISOString()).limit(500)
   for (const c of cancelled || []) {
     await admin.rpc('apply_plan', { p_user: c.owner_id, p_plan: 'free', p_reset: null }).then(() => {}, () => {})
     await admin.from('subscriptions').update({ plan: 'free', updated_at: new Date().toISOString() }).eq('owner_id', c.owner_id)
     await admin.from('user_profiles').update({ plan_id: 'free' }).eq('user_id', c.owner_id).then(() => {}, () => {})
     downgraded++
-  }
-
-  let charged = 0, emailed = 0, pastDue = 0
-  for (const s of subs || []) {
-    const plan = PLANS[s.plan as PlanId]
-    if (!plan || s.plan === 'free' || s.plan === 'enterprise') continue
-    const annual = s.billing_cycle === 'annual'
-    const amount = chargeAmount(annual ? plan.priceAnnualMonthly * 12 : plan.priceMonthly)
-    const periodEndMs = s.current_period_end ? new Date(s.current_period_end).getTime() : now
-
-    // 1) Silent re-charge if we can.
-    if (s.payfast_instrument_token) {
-      const basketId = makeBasketId('REN')
-      await admin.from('payfast_orders').insert({ basket_id: basketId, user_id: s.owner_id, kind: 'subscription', plan: s.plan, billing_cycle: s.billing_cycle, amount, currency: CURRENCY, status: 'pending' }).then(() => {}, () => {})
-      const res = await chargeWithToken({ instrumentToken: s.payfast_instrument_token, basketId, amount, description: `Selfmade — ${plan.label} renewal` })
-      if (res.ok) {
-        const newEnd = new Date(Math.max(now, periodEndMs) + (annual ? 365 : 30) * 86400e3).toISOString()
-        await admin.from('subscriptions').update({ current_period_end: newEnd, payfast_renewal_notified_at: null, updated_at: new Date().toISOString() }).eq('owner_id', s.owner_id)
-        await admin.rpc('apply_plan', { p_user: s.owner_id, p_plan: s.plan, p_reset: newEnd }).then(() => {}, () => {})
-        await admin.from('payfast_orders').update({ status: 'paid', transaction_id: res.transactionId, paid_at: new Date().toISOString() }).eq('basket_id', basketId)
-        charged++
-        continue
-      }
-      // else fall through to email (silent charge unavailable or declined)
-      await admin.from('payfast_orders').update({ status: 'failed', err_code: res.needsSpec ? 'NO_ENDPOINT' : 'DECLINED' }).eq('basket_id', basketId)
-    }
-
-    // 3) Past grace and still unpaid → mark past_due (don't hard-wipe; keep it recoverable).
-    if (periodEndMs < now - GRACE_DAYS * 86400e3) {
-      await admin.from('subscriptions').update({ status: 'past_due', updated_at: new Date().toISOString() }).eq('owner_id', s.owner_id)
-      pastDue++
-      continue
-    }
-
-    // 2) Email a one-tap re-pay link — once per cycle.
-    const alreadyNotified = s.payfast_renewal_notified_at && new Date(s.payfast_renewal_notified_at).getTime() > periodEndMs - 5 * 86400e3
-    if (alreadyNotified) continue
-    try {
-      const { data: prof } = await admin.from('profiles').select('email').eq('id', s.owner_id).maybeSingle()
-      const { data: authUser } = await admin.auth.admin.getUserById(s.owner_id).then((r: any) => ({ data: r?.data?.user }), () => ({ data: null }))
-      const to = (prof as any)?.email || authUser?.email
-      if (to) {
-        const { sendEmail, emailShell } = await import('@/lib/email')
-        await sendEmail(to, `Your Selfmade ${plan.label} plan renews soon`, emailShell({
-          title: `Keep Mello working — renew your ${plan.label} plan`,
-          intro: `Your ${plan.label} plan is up for renewal. Tap below to renew in a few seconds and keep your videos, brief, and campaign tools running without a gap.`,
-          ctaText: 'Renew now', ctaUrl: `${APP_URL}/billing/renew`,
-        }))
-        await admin.from('subscriptions').update({ payfast_renewal_notified_at: new Date().toISOString() }).eq('owner_id', s.owner_id)
-        emailed++
-      }
-    } catch { /* best-effort */ }
   }
 
   // ── PayPal card (ACDC) auto-renewals — charge the vaulted card silently, no customer action. ──
@@ -105,33 +46,29 @@ export async function GET(req: NextRequest) {
     .select('owner_id, plan, billing_cycle, current_period_end, paypal_vault_id')
     .eq('provider', 'paypal').eq('status', 'active').not('paypal_vault_id', 'is', null)
     .lte('current_period_end', dueBy).limit(500)
-  if (cardSubs?.length) {
-    const { chargeVaultedCard, makeBasketId: mkPP } = await import('@/lib/paypal')
-    for (const s of cardSubs) {
-      const plan = PLANS[s.plan as PlanId]
-      if (!plan || s.plan === 'free' || s.plan === 'enterprise') continue
-      const annual = s.billing_cycle === 'annual'
-      const usd = annual ? plan.priceAnnualMonthly * 12 : plan.priceMonthly
-      const periodEndMs = s.current_period_end ? new Date(s.current_period_end).getTime() : now
-      const basketId = mkPP('REN')
-      await admin.from('paypal_orders').insert({ basket_id: basketId, user_id: s.owner_id, kind: 'subscription', plan: s.plan, billing_cycle: s.billing_cycle, amount: usd, currency: 'USD', status: 'pending' }).then(() => {}, () => {})
-      const res = await chargeVaultedCard({ vaultId: s.paypal_vault_id as string, amountUsd: usd, customId: basketId, description: `Selfmade — ${plan.label} renewal` })
-      if (res.ok) {
-        const newEnd = new Date(Math.max(now, periodEndMs) + (annual ? 365 : 30) * 86400e3).toISOString()
-        await admin.from('subscriptions').update({ current_period_end: newEnd, updated_at: new Date().toISOString() }).eq('owner_id', s.owner_id)
-        await admin.rpc('apply_plan', { p_user: s.owner_id, p_plan: s.plan, p_reset: newEnd }).then(() => {}, () => {})
-        await admin.from('paypal_orders').update({ status: 'paid', transaction_id: res.transactionId, paid_at: new Date().toISOString() }).eq('basket_id', basketId)
-        cardCharged++
-      } else {
-        await admin.from('paypal_orders').update({ status: 'failed', err_code: 'DECLINED' }).eq('basket_id', basketId)
-        // Past grace and still unpaid → past_due (recoverable; customer can re-enter a card).
-        if (periodEndMs < now - GRACE_DAYS * 86400e3) {
-          await admin.from('subscriptions').update({ status: 'past_due', updated_at: new Date().toISOString() }).eq('owner_id', s.owner_id)
-        }
-        cardFailed++
+  for (const s of cardSubs || []) {
+    const plan = PLANS[s.plan as PlanId]
+    if (!plan || s.plan === 'free' || s.plan === 'enterprise') continue
+    const annual = s.billing_cycle === 'annual'
+    const usd = annual ? plan.priceAnnualMonthly * 12 : plan.priceMonthly
+    const periodEndMs = s.current_period_end ? new Date(s.current_period_end).getTime() : now
+    const basketId = makeBasketId('REN')
+    await admin.from('paypal_orders').insert({ basket_id: basketId, user_id: s.owner_id, kind: 'subscription', plan: s.plan, billing_cycle: s.billing_cycle, amount: usd, currency: 'USD', status: 'pending' }).then(() => {}, () => {})
+    const res = await chargeVaultedCard({ vaultId: s.paypal_vault_id as string, amountUsd: usd, customId: basketId, description: `Selfmade — ${plan.label} renewal` })
+    if (res.ok) {
+      const newEnd = new Date(Math.max(now, periodEndMs) + (annual ? 365 : 30) * 86400e3).toISOString()
+      await admin.from('subscriptions').update({ current_period_end: newEnd, updated_at: new Date().toISOString() }).eq('owner_id', s.owner_id)
+      await admin.rpc('apply_plan', { p_user: s.owner_id, p_plan: s.plan, p_reset: newEnd }).then(() => {}, () => {})
+      await admin.from('paypal_orders').update({ status: 'paid', transaction_id: res.transactionId, paid_at: new Date().toISOString() }).eq('basket_id', basketId)
+      cardCharged++
+    } else {
+      await admin.from('paypal_orders').update({ status: 'failed', err_code: 'DECLINED' }).eq('basket_id', basketId)
+      if (periodEndMs < now - GRACE_DAYS * 86400e3) {
+        await admin.from('subscriptions').update({ status: 'past_due', updated_at: new Date().toISOString() }).eq('owner_id', s.owner_id)
       }
+      cardFailed++
     }
   }
 
-  return NextResponse.json({ ok: true, considered: subs?.length || 0, charged, emailed, pastDue, downgraded, cardCharged, cardFailed })
+  return NextResponse.json({ ok: true, downgraded, cardCharged, cardFailed })
 }

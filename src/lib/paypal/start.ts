@@ -1,8 +1,7 @@
 'use client'
 /**
  * startPaypalCheckout — client helper. Sends the user to our embedded card checkout (/billing/card),
- * where they pay by card without a PayPal account (Advanced Card Payments). Mirrors
- * startPayfastCheckout's signature so call sites stay symmetric.
+ * where they pay by card without a PayPal account (Advanced Card Payments).
  * Usage: await startPaypalCheckout({ kind:'subscription', plan:'starter', cycle:'monthly' })
  */
 export async function startPaypalCheckout(body:
