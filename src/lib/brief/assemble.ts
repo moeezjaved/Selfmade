@@ -470,7 +470,9 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   return {
     summary: {
       adsScanned,
-      brandsWatched: scopedFollows.length,
+      // "Competitors tracked" = SPIED brands only (matches Brand Spy + "Watching N"); plain ❤️ follows
+      // are not competitors being tracked, so they must not inflate the count.
+      brandsWatched: scopedFollows.filter((f: any) => f.spied).length,
       spiedBrands: scopedFollows.filter((f: any) => f.spied).length,
       creativesReady: creatives.length,
     },

@@ -47,9 +47,14 @@ export async function GET(req: NextRequest) {
     // "Spied" = the brands the ORG follows (followed_brands across all org members — one shared
     // workspace, so a team member sees every brand the owner/teammates spied, not just their own).
     const ids = await orgMemberIds(admin, user.id)
+    // Scope to the ACTIVE brand (project switcher → sf_brand cookie), same as /api/discovery/watching.
+    // "All brands" → brandId null → show every spied brand; a specific brand → only its linked spies.
+    const { resolveActiveBrandId } = await import('@/lib/brand/active')
+    const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
     // Only SPIED brands belong in Brand Spy (spied=true) — plain ❤️ follows live under Following.
-    const { data: follows } = await admin.from('followed_brands').select('page_id').in('user_id', ids).eq('spied', true)
-    myPageIds = Array.from(new Set<string>(((follows || []) as any[]).map((f: any) => String(f.page_id)).filter((x: string) => x && x !== 'null')))
+    const { data: follows } = await admin.from('followed_brands').select('page_id, brand_id').in('user_id', ids).eq('spied', true)
+    const scoped = brandId ? ((follows || []) as any[]).filter((f: any) => f.brand_id === brandId) : (follows || [])
+    myPageIds = Array.from(new Set<string>((scoped as any[]).map((f: any) => String(f.page_id)).filter((x: string) => x && x !== 'null')))
     if (myPageIds.length === 0) return NextResponse.json({ brands: [], scope: 'mine' })
   }
 
