@@ -126,7 +126,7 @@ export default function FeatureShowcase() {
 
         .fs-row{display:grid;grid-template-columns:1fr 1.05fr;gap:44px;align-items:center}
         .fs-row.rev .fs-copy{order:2}.fs-row.rev .fs-visual{order:1}
-        .fs-copy{opacity:0;transform:translateY(16px)}
+        .fs-copy{opacity:1}
         .fs-row.on .fs-copy{animation:fs-rise .6s cubic-bezier(0,0,.2,1) both}
         .fs-eyebrow{font:800 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#3b6d11}
         .fs-title{font-family:'Instrument Serif',Georgia,serif;font-size:clamp(26px,3.6vw,38px);line-height:1.06;color:${INK};margin:12px 0 12px;letter-spacing:-.01em}
@@ -135,13 +135,13 @@ export default function FeatureShowcase() {
         .fs-bul li{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:${INK}}
         .fs-tick{width:18px;height:18px;border-radius:50%;background:#eaf3de;color:#3b6d11;display:grid;place-items:center;font-size:10px;font-weight:900;flex-shrink:0}
 
-        .fs-visual{border-radius:22px;padding:34px;display:grid;place-items:center;min-height:300px;opacity:0;transform:translateY(20px) scale(.985)}
+        .fs-visual{border-radius:22px;padding:34px;display:grid;place-items:center;min-height:300px;opacity:1}
         .fs-row.on .fs-visual{animation:fs-pop .7s cubic-bezier(.2,.7,.2,1) both;animation-delay:.08s}
         .fs-card{background:#fff;border-radius:16px;box-shadow:0 30px 70px -34px rgba(20,30,22,.5),0 2px 6px rgba(20,30,22,.05);padding:18px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:12px}
 
-        @keyframes fs-rise{to{opacity:1;transform:none}}
-        @keyframes fs-pop{to{opacity:1;transform:none}}
-        @keyframes fs-in{to{opacity:1;transform:none}}
+        @keyframes fs-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+        @keyframes fs-pop{from{opacity:0;transform:translateY(20px) scale(.985)}to{opacity:1;transform:none}}
+        @keyframes fs-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
         /* 1 · ADS */
         .ad-row{display:flex;align-items:center;gap:11px}
@@ -154,7 +154,7 @@ export default function FeatureShowcase() {
         .ad-approve{background:${INK};color:${LIME};border-radius:100px;padding:8px 18px;font-size:12.5px;font-weight:800;opacity:1;transition:none}
         .fs-row.on .ad-approve{animation:ad-fade .5s ease forwards;animation-delay:1.5s}
         @keyframes ad-fade{to{opacity:.25;transform:scale(.96)}}
-        .ad-live{font-size:13px;font-weight:800;color:#2f9e6a;opacity:0}
+        .ad-live{font-size:13px;font-weight:800;color:#2f9e6a;opacity:1}
         .fs-row.on .ad-live{animation:fs-in .5s ease forwards;animation-delay:1.7s}
 
         /* 2 · REMAKE */
@@ -163,10 +163,10 @@ export default function FeatureShowcase() {
         .rm-lab{font:700 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:${SUB}}
         .rm-box{width:104px;height:130px;border-radius:11px;position:relative}
         .rm-them{background:linear-gradient(135deg,#c9ccd6,#9aa0b0)}
-        .rm-you{background:linear-gradient(135deg,#7a9856,#3f8f4f);opacity:0;transform:scale(.9)}
+        .rm-you{background:linear-gradient(135deg,#7a9856,#3f8f4f);opacity:1}
         .fs-row.on .rm-you{animation:fs-pop .6s cubic-bezier(.2,.7,.2,1) forwards;animation-delay:1s}
         .rm-badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font:800 9px/1 ui-monospace,Menlo,monospace;letter-spacing:.05em;text-transform:uppercase;color:#1f3d17;background:${LIME};border-radius:6px;padding:3px 7px;white-space:nowrap}
-        .rm-arrow{font-size:22px;color:#b6bcae;font-weight:800;opacity:0}
+        .rm-arrow{font-size:22px;color:#b6bcae;font-weight:800;opacity:1}
         .fs-row.on .rm-arrow{animation:fs-in .5s ease forwards;animation-delay:.7s}
         .rm-status{text-align:center;font-size:12.5px;color:${SUB}}.rm-status b{color:#2f9e6a}
 
@@ -174,7 +174,7 @@ export default function FeatureShowcase() {
         .br-said{background:#17251c;color:#eef5df;border-radius:12px;padding:13px 15px;font-size:14.5px;font-weight:600;line-height:1.4}
         .br-who{display:block;font:700 9.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#8ea08c;margin-top:7px}
         .br-fan{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-        .br-chip{display:flex;align-items:center;gap:7px;background:#f6f8f2;border:1px solid #e6ece0;border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:650;color:${INK};opacity:0;transform:translateY(6px)}
+        .br-chip{display:flex;align-items:center;gap:7px;background:#f6f8f2;border:1px solid #e6ece0;border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:650;color:${INK};opacity:1}
         .fs-row.on .br-chip{animation:fs-in .45s ease forwards;animation-delay:calc(.8s + var(--d) * .22s)}
         .br-t{width:16px;height:16px;border-radius:50%;background:#eaf3de;color:#3b6d11;display:grid;place-items:center;font-size:9px;font-weight:900;flex-shrink:0}
 
@@ -182,7 +182,7 @@ export default function FeatureShowcase() {
         .wa{display:flex;flex-direction:column;gap:9px}
         .wa-head{display:flex;align-items:center;gap:7px;font:700 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:${SUB};margin-bottom:2px}
         .wa-dot{width:8px;height:8px;border-radius:50%;background:#25d366}
-        .wa-msg{max-width:86%;border-radius:13px;padding:9px 13px;font-size:13.5px;line-height:1.4;opacity:0;transform:translateY(8px)}
+        .wa-msg{max-width:86%;border-radius:13px;padding:9px 13px;font-size:13.5px;line-height:1.4;opacity:1}
         .fs-row.on .wa-msg{animation:fs-in .5s ease forwards}
         .wa-msg.them{background:#f2f4ef;color:${INK};align-self:flex-start;border-bottom-left-radius:5px}
         .wa-msg.them b{color:#2f9e6a}
