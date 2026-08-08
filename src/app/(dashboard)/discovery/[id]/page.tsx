@@ -342,11 +342,14 @@ function AiPanel({ ad }: { ad: Ad }) {
         <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Or turn it into a script</div>
         {!script ? (
           // Enabled 2026-07-30 — the transcribe→framework flow is live (was gated 'Coming soon' for the
-          // clone-first launch). Charges the transcribe action; result renders below.
+          // clone-first launch). Show the cost up front so the price isn't a surprise after clicking.
+          <>
           <button style={{ ...ctaS, background: '#eef7dc', color: '#1a3a1a' }}
             onClick={() => run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 2, d => { setScript(d.script); setThin(!!d.thinSpeech) })}>
-            <Sparkles size={16} /> Generate Script
+            <Sparkles size={16} /> Generate Script · {cost('transcribe', 2)} cr
           </button>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, textAlign: 'center' }}>Reads this ad&rsquo;s hook &amp; structure. Rewriting it around your product is a separate step.</div>
+          </>
         ) : (
           <div>
             {thin && <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }}>⚠ Mostly on-screen text / little speech — analyzed from the ad copy. Full on-screen transcription coming soon.</div>}
@@ -364,8 +367,9 @@ function AiPanel({ ad }: { ad: Ad }) {
                 </select>
                 <button style={{ ...ctaS, opacity: loading ? 0.6 : 1 }} disabled={loading}
                   onClick={() => run('/api/scripts/duplicate', { sourceAdId: ad.id, brandId }, 'script_duplicate', 5, d => setGen(d.generated?.script))}>
-                  {loading ? 'Writing…' : `Duplicate for my brand · ${cost('script_duplicate', 5)} cr`}
+                  {loading ? 'Writing…' : `Rewrite for my brand · ${cost('script_duplicate', 5)} cr`}
                 </button>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, textAlign: 'center' }}>Mello rewrites the whole script around your product — that&rsquo;s what the credits pay for.</div>
               </>
             )}
             {gen && <div style={{ marginTop: 10, fontSize: 12, color: '#111', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 10, whiteSpace: 'pre-wrap' }}>{gen}</div>}

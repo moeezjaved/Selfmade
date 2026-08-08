@@ -161,5 +161,6 @@ export interface UpsellResponse {
   current?: number
   max?: number | null
   upgradeTo: PlanId
+  atLimit?: boolean   // true = already on the top visible plan, no upgrade path → "remove one to add another"
   message: string
 }
