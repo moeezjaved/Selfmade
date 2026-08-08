@@ -733,9 +733,12 @@ function MoreMenu({ ad }: { ad: Ad }) {
   )
 }
 
-// ── ScriptsMenu (video hover overlay) ──
-function ScriptsMenu() {
+// ── ScriptsMenu (video hover overlay) — opens the ad's detail page where the real script tools live
+// (Generate Script → framework → rewrite-for-your-brand). These used to be dead stubs that did nothing. ──
+function ScriptsMenu({ adId }: { adId: string }) {
   const [open, setOpen] = useState(false)
+  const router = useRouter()
+  const go = (mode: string) => { setOpen(false); router.push(`/discovery/${encodeURIComponent(adId)}?script=${mode}`) }
   return (
     <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
       <button
@@ -766,14 +769,14 @@ function ScriptsMenu() {
           padding: 4, zIndex: 100,
         }}>
           <button
-            onClick={() => { setOpen(false) }}
+            onClick={() => go('transcribe')}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 12, color: '#1f2937', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}
             onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             📝 Transcribe Script
           </button>
           <button
-            onClick={() => { setOpen(false) }}
+            onClick={() => go('similar')}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 12, color: '#1f2937', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}
             onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -1027,7 +1030,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
       >
         {slide.type === 'video' && (
           <div style={{ position: 'absolute', top: 10, left: 10, pointerEvents: 'auto' }}>
-            <ScriptsMenu />
+            <ScriptsMenu adId={ad.id} />
           </div>
         )}
         {slide.type !== 'video' && (

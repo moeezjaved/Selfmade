@@ -118,17 +118,7 @@ export default function AssetsPage() {
   const [cloneAsset, setCloneAsset] = useState<Asset | null>(null)   // image asset being cloned via CloneModal
   const [cloneVideoAsset, setCloneVideoAsset] = useState<Asset | null>(null)   // video asset being remade via CloneVideoModal
 
-  // Video Clone → Assets: animate an image asset into a video (lands in My Creatives).
-  const [busyAnimate, setBusyAnimate] = useState<string | null>(null)
-  const animate = async (a: Asset) => {
-    if (a.file_type !== 'image') return
-    setBusyAnimate(a.id); setMsg('')
-    const r = await fetch('/api/discovery/animate', { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ image: a.file_url, style: 'zoom', resolution: '1080p' }) }).then(r => r.json()).catch(() => ({ error: 'failed' }))
-    setBusyAnimate(null)
-    if (r.jobId) setMsg('✓ Animating this asset into a video (40 credits) — it will appear in My Creatives shortly.')
-    else setMsg(r.error === 'insufficient_credits' ? 'Not enough credits to animate (video = 40 credits).' : (r.error || 'Could not start the animation.'))
-  }
+  // (Animate — still→video — was removed as a feature; its handler/state/button are gone.)
 
   const pct = limitGb == null ? 0 : Math.min(100, (usedBytes / (limitGb * 1e9)) * 100)
   const near = pct >= 85
@@ -273,20 +263,13 @@ export default function AssetsPage() {
                     <Trash2 size={13} />
                   </button>
                   <div style={{ position: 'absolute', bottom: 7, right: 7, display: 'flex', gap: 5 }}>
-                    {/* Clone + Animate are image-only by design (Clone composites onto a still; Animate
-                        turns a still into a video). Download must show for ALL types — it was trapped
-                        inside this image guard, so videos/audio had no hover download at all. */}
+                    {/* Remake is image-only here (composites onto a still). The old Animate (still→video)
+                        was removed, so its button is gone. Download shows for ALL types (below). */}
                     {a.file_type === 'image' && (
-                      <>
-                        <button onClick={() => { window.location.href = `/studio?src=asset&img=${encodeURIComponent(a.file_url)}` }} title="Remake this creative with your product"
-                          style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <Sparkles size={11} /> Remake
-                        </button>
-                        <button onClick={() => animate(a)} disabled={busyAnimate === a.id} title="Animate into a video (40 credits)"
-                          style={{ background: 'rgba(14,27,18,0.85)', color: '#dffe95', border: 'none', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <Film size={11} /> {busyAnimate === a.id ? '…' : 'Animate'}
-                        </button>
-                      </>
+                      <button onClick={() => { window.location.href = `/studio?src=asset&img=${encodeURIComponent(a.file_url)}` }} title="Remake this creative with your product"
+                        style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Sparkles size={11} /> Remake
+                      </button>
                     )}
                     {/* Video assets: remake into a new video ad with your product (opens the video wizard). */}
                     {a.file_type === 'video' && a.status !== 'processing' && (

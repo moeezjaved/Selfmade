@@ -11,7 +11,7 @@ import { PLANS, type PlanId } from '@/lib/plans'
 const DARK = '#14281a', LIME = '#dffe95', ACCENT = '#3a7000'
 const EVT = 'selfmade:upsell'
 
-export interface UpsellPayload { limit?: string; current?: number; max?: number | null; upgradeTo?: PlanId; message?: string }
+export interface UpsellPayload { limit?: string; current?: number; max?: number | null; upgradeTo?: PlanId; atLimit?: boolean; message?: string }
 
 /** Fire from any client code: if the response is a plan_limit, show the modal. Returns true if shown. */
 export function showUpsell(res: UpsellPayload & { error?: string }): boolean {
@@ -45,13 +45,18 @@ export default function UpsellModalHost() {
       <div className="um-card" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '32px 30px', width: 440, maxWidth: '94vw', textAlign: 'center', boxShadow: '0 30px 80px rgba(0,0,0,0.35)' }}>
         <div style={{ width: 56, height: 56, borderRadius: '50%', background: DARK, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 24 }}>↑</div>
         <div style={{ display: 'inline-block', background: '#eef5eb', color: ACCENT, fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', padding: '4px 12px', borderRadius: 100, marginBottom: 12 }}>Plan limit reached</div>
-        <h2 style={{ fontSize: 21, fontWeight: 800, color: '#111', margin: '0 0 8px' }}>Time to upgrade</h2>
+        <h2 style={{ fontSize: 21, fontWeight: 800, color: '#111', margin: '0 0 8px' }}>{p.atLimit ? 'You’ve reached your limit' : 'Time to upgrade'}</h2>
         <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6, margin: '0 0 22px' }}>
           {p.message || `You've hit your plan's ${p.limit || ''} limit${p.max != null ? ` (${p.current}/${p.max})` : ''}. Upgrade to ${PLANS[need].label} for more.`}
         </p>
-        <button className="um-cta" onClick={() => { setP(null); router.push('/billing') }} style={{ background: DARK, color: LIME, border: 'none', borderRadius: 100, padding: '13px 28px', fontWeight: 800, fontSize: 14.5, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          Upgrade to {PLANS[need].label} <span style={{ fontSize: 16 }}>→</span>
-        </button>
+        {p.atLimit
+          // Already on the top plan — no plan to sell. Send them to manage what they've got.
+          ? <button className="um-cta" onClick={() => { setP(null); router.push(p.limit === 'seats' ? '/team' : '/discovery/brand-spy') }} style={{ background: DARK, color: LIME, border: 'none', borderRadius: 100, padding: '13px 28px', fontWeight: 800, fontSize: 14.5, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              {p.limit === 'seats' ? 'Manage seats' : 'Manage tracked brands'} <span style={{ fontSize: 16 }}>→</span>
+            </button>
+          : <button className="um-cta" onClick={() => { setP(null); router.push('/billing') }} style={{ background: DARK, color: LIME, border: 'none', borderRadius: 100, padding: '13px 28px', fontWeight: 800, fontSize: 14.5, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              Upgrade to {PLANS[need].label} <span style={{ fontSize: 16 }}>→</span>
+            </button>}
         <div style={{ marginTop: 12 }}>
           <button onClick={() => setP(null)} style={{ background: 'transparent', border: 'none', color: '#9ca3af', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Maybe later</button>
         </div>

@@ -29,10 +29,13 @@ export async function getEntitlements(admin: SupabaseClient, ownerId: string): P
 
 /** Build a structured upsell response for a blocked action. */
 export function upsell(planId: PlanId, limit: string, opts: { current?: number; max?: number | null; feature?: keyof PlanEntitlements; message?: string } = {}): UpsellResponse {
-  const upgradeTo = opts.feature ? firstPlanWith(opts.feature) : (nextPlan(planId) || 'pro')
+  const up = opts.feature ? firstPlanWith(opts.feature) : nextPlan(planId)   // null = already on the top plan
+  const atLimit = !up
   return {
-    error: 'plan_limit', limit, current: opts.current, max: opts.max, upgradeTo,
-    message: opts.message || `Your plan doesn't include this. Upgrade to ${upgradeTo} to unlock.`,
+    error: 'plan_limit', limit, current: opts.current, max: opts.max, upgradeTo: up || planId, atLimit,
+    message: opts.message || (atLimit
+      ? `You've reached your plan's limit. Remove one to add another.`
+      : `Your plan doesn't include this. Upgrade to ${up} to unlock.`),
   }
 }
 
@@ -54,8 +57,12 @@ export async function requireUnder(admin: SupabaseClient, ownerId: string, limit
   const max = (ent as any)[limit]
   if (max === Infinity || current < max) return null
   const noun = limit === 'brandSpy' ? 'tracked brands' : limit === 'seats' ? 'seats' : 'brand pulls per day'
+  const higher = nextPlan(ent.planId)   // null = top visible plan → no upgrade to sell
+  const tail = higher
+    ? (limit === 'expressPulls' ? ' Upgrade for more, or try again tomorrow.' : ' Upgrade to add more.')
+    : (limit === 'brandSpy' ? ' Remove one to track a new brand.' : limit === 'seats' ? ' Remove a member to free a seat.' : ' Try again tomorrow.')
   return upsell(ent.planId, limit, {
     current, max: max === Infinity ? null : max,
-    message: `Your ${ent.label} plan includes ${max === Infinity ? 'unlimited' : max} ${noun}.${limit === 'expressPulls' ? ' Upgrade for more, or try again tomorrow.' : ' Upgrade to add more.'}`,
+    message: `${higher ? `Your ${ent.label} plan includes ${max === Infinity ? 'unlimited' : max} ${noun}.` : `You've reached your ${ent.label} plan's ${max} ${noun}.`}${tail}`,
   })
 }
