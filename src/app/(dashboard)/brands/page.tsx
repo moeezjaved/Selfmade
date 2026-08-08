@@ -253,7 +253,7 @@ function BrandCard({ brand, onDelete, onWatch, onEdit, onSetType, onAddProduct, 
   const resetEf = () => setEf({ name: brand.name, website: brand.website || '', tone: brand.tone || '' })
   return (
     <div style={{ ...card, marginBottom: 14 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         {editing ? (
           <div style={{ flex: 1 }}>
             <input style={input} placeholder="Brand name" value={ef.name} onChange={e => setEf({ ...ef, name: e.target.value })} />
@@ -261,9 +261,9 @@ function BrandCard({ brand, onDelete, onWatch, onEdit, onSetType, onAddProduct, 
             <input style={{ ...input, marginBottom: 0 }} placeholder="Tone (e.g. bold, playful, warm)" value={ef.tone} onChange={e => setEf({ ...ef, tone: e.target.value })} />
           </div>
         ) : (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{brand.name}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#111', wordBreak: 'break-word' }}>{brand.name}</div>
               <button onClick={() => onSetType(brand.id, isSvc ? 'physical' : 'service')}
                 title="Click to switch — service brands never render a physical product"
                 style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${isSvc ? '#c7d2fe' : '#e2e8f0'}`, background: isSvc ? '#e0e7ff' : '#f1f5f9', color: isSvc ? '#3730a3' : '#475569' }}>
