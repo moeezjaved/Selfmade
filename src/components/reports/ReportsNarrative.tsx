@@ -261,7 +261,7 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
           answer={m.bestAge ? <><B>{m.bestGender ? (m.bestGender.label === 'female' ? 'Women' : m.bestGender.label === 'male' ? 'Men' : 'People') : 'People'} {m.bestAge.label}</B> drive the most revenue{m.bestAge.roas >= 1 ? <> at a profitable <B c={good}>{m.bestAge.roas.toFixed(1)}x</B></> : ''} — aim the next campaign at them.</> : <>Not enough audience data yet.</>}>
           {/* age heat row */}
           {m.ages.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${m.ages.length}, 1fr)`, gap: 6 }}>
+            <div style={{ overflowX: 'auto' }}><div style={{ display: 'grid', gridTemplateColumns: `repeat(${m.ages.length}, minmax(52px, 1fr))`, gap: 6 }}>
               {[...m.ages].sort((a, b) => (a.label || '').localeCompare(b.label || '')).map((a, i) => (
                 <div key={i} title={`${a.label}: ${fmt(a.revenue)} revenue · ${a.roas.toFixed(2)}x`}
                   style={{ background: heat(a.revenue, Math.max(...m.ages.map(x => x.revenue), 1)), borderRadius: 10, padding: '12px 8px', textAlign: 'center' }}>
@@ -270,7 +270,7 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
                   <div style={{ fontSize: 10.5, color: MUTED, marginTop: 1 }}>{fmt(a.revenue)}</div>
                 </div>
               ))}
-            </div>
+            </div></div>
           )}
           {/* gender split — only segments that actually earned; label wraps so nothing clips */}
           {m.genders.filter(g => g.revenue > 0).length > 1 && (

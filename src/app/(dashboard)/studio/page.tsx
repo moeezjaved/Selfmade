@@ -16,6 +16,7 @@ import { useSearchParams } from 'next/navigation'
 import { Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus, Trophy, Play } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 import { useChatStream, type CreationEvent } from '@/components/mello/useChatStream'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 // The video-clone flow (language · voice · free script · render) now lives INLINE in the canvas.
 import MelloFace from '@/components/MelloFace'
@@ -51,6 +52,7 @@ const field: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius
 
 function StudioInner() {
   const { balance } = useCredits()
+  const isMobile = useIsMobile()   // stack the chat + canvas vertically on phones (was a fixed 360px sidebar eating the whole width)
   const params = useSearchParams()
   // Mello can drive the canvas: a `creation` event from the studio surface fires onCreation.
   // We route it through a ref so the handler always sees the latest state (no stale closure).
@@ -363,9 +365,9 @@ function StudioInner() {
   const remake = mode === 'remake'
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: "'Inter', -apple-system, sans-serif" }}>
-      {/* ── LEFT · Mello ── */}
-      <div style={{ width: 360, flexShrink: 0, borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', background: '#fff' }}>
+    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: isMobile ? 'auto' : '100vh', minHeight: isMobile ? '100vh' : undefined, fontFamily: "'Inter', -apple-system, sans-serif" }}>
+      {/* ── LEFT · Mello (on mobile: a bounded panel on top, not a full-width sidebar) ── */}
+      <div style={{ width: isMobile ? '100%' : 360, flexShrink: isMobile ? undefined : 0, height: isMobile ? '46vh' : undefined, borderRight: isMobile ? 'none' : `1px solid ${LINE}`, borderBottom: isMobile ? `1px solid ${LINE}` : 'none', display: 'flex', flexDirection: 'column', background: '#fff' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '16px 18px', borderBottom: `1px solid ${LINE}` }}>
           <MelloFace size={30} />
           <div style={{ fontSize: 14, fontWeight: 800, color: INK }}>Mello</div>
@@ -389,9 +391,9 @@ function StudioInner() {
         </div>
       </div>
 
-      {/* ── RIGHT · the canvas ── */}
-      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', background: '#fbfcfa' }}>
-        <div style={{ maxWidth: 820, margin: '0 auto', padding: '26px 26px 90px' }}>
+      {/* ── RIGHT · the canvas (on mobile: flows below the chat, page scrolls) ── */}
+      <div style={{ flex: isMobile ? 'none' : 1, minWidth: 0, overflowY: isMobile ? 'visible' : 'auto', background: '#fbfcfa' }}>
+        <div style={{ maxWidth: 820, margin: '0 auto', padding: isMobile ? '20px 16px 90px' : '26px 26px 90px' }}>
           <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>{remake ? 'Remake this winner' : 'Create an ad'}</div>
           <div style={{ fontSize: 13, color: MUTED, marginTop: 3, marginBottom: 20 }}>{remake ? 'Their proven ad, rebuilt around your product.' : 'The more Mello knows about your brand, the better the ad. Start with your website.'}</div>
 

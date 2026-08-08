@@ -2,6 +2,7 @@
 import MetaGate from '@/components/MetaGate'
 import AdsTabs from '@/components/ads/AdsTabs'
 import { useState, useEffect } from 'react'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useSearchParams } from 'next/navigation'
 import AccountSelector from '@/components/AccountSelector'
 import CreateReportModal from '@/components/reports/CreateReportModal'
@@ -29,6 +30,7 @@ const roasBg = (r: number) => r >= 2 ? 'rgba(47,125,58,0.09)' : r >= 1 ? 'rgba(1
 type SortKey = 'roas' | 'spend' | 'revenue' | 'conversions' | 'ctr' | 'cpa' | 'cpm'
 
 function ReportsPage() {
+  const isMobile = useIsMobile()   // collapse the 2-col analytics grids + tighten padding on phones
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState('last_7d')
   const [data, setData] = useState<any>(null)
@@ -154,7 +156,7 @@ function ReportsPage() {
   }
 
   return (
-    <div style={{ padding: 28, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: isMobile ? '16px 12px' : 28, maxWidth: 1200, margin: '0 auto', overflowX: 'hidden' }}>
       {showCreate && <CreateReportModal onClose={() => setShowCreate(false)} onCreate={(k) => { setShowCreate(false); setActiveReport({ templateKey: k }) }} />}
 
       <AdsTabs />
@@ -216,7 +218,7 @@ function ReportsPage() {
           </div>
 
           {/* 2-column grid for smaller sections */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
 
             {/* Best Creatives with thumbnails */}
             <CreativesCard
@@ -483,6 +485,7 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
   expanded: Record<string, boolean>, toggle: (id: string) => void
 }) {
   const [showAll, setShowAll] = useState(false)
+  const isMobile = useIsMobile()
   const fmtN = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
   const visible = showAll ? creatives : creatives.slice(0, 2)
 
@@ -550,7 +553,7 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
 
               {/* Expanded detail */}
               {expanded[c.creative_id] && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid #f0f5f0' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', borderTop: '1px solid #f0f5f0' }}>
                   {/* Left: Who */}
                   <div style={{ padding: '14px 20px', borderRight: '1px solid #f0f5f0' }}>
                     <div style={{ fontSize: 11, fontWeight: 800, color: '#1a3a1a', marginBottom: 10 }}>👤 Audience breakdown</div>

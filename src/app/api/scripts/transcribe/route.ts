@@ -46,7 +46,16 @@ export async function POST(req: NextRequest) {
   // on-screen text/caption, not speech, so we fold the body into the analysis).
   const { data: ad } = await admin
     .from('discovery_ads_index').select('video_url, format, body, title').eq('ad_id', adId).maybeSingle()
-  if (!ad?.video_url) return NextResponse.json({ error: 'Ad has no video to transcribe' }, { status: 400 })
+  // discovery_ads_index.video_url is null for almost every ad — the real playable video is the video
+  // CREATIVE (discovery_creatives.r2_url where asset_type='video'), exactly what the detail page plays.
+  // Fall back to that so "Generate Script" works on the video ads it's offered on.
+  let videoUrl = (ad as any)?.video_url as string | undefined
+  if (!videoUrl) {
+    const { data: vc } = await admin.from('discovery_creatives')
+      .select('r2_url').eq('ad_id', adId).eq('asset_type', 'video').not('r2_url', 'is', null).limit(1).maybeSingle()
+    videoUrl = (vc as any)?.r2_url || undefined
+  }
+  if (!videoUrl) return NextResponse.json({ error: 'Ad has no video to transcribe' }, { status: 400 })
 
   let tx
   try {
@@ -58,7 +67,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const vidRes = await fetch(ad.video_url)
+    const vidRes = await fetch(videoUrl)
     if (!vidRes.ok) throw new Error('could not fetch ad video')
     const buf = Buffer.from(await vidRes.arrayBuffer())
     if (buf.byteLength > MAX_BYTES) throw new Error('video too large to transcribe (>25MB)')
