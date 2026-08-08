@@ -18,8 +18,14 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
   const { data } = await admin.from('channel_identities')
-    .select('id, provider, display, active, created_at').eq('user_id', user.id).eq('active', true)
-  return NextResponse.json({ identities: data || [] })
+    .select('id, provider, display, active, created_at, meta').eq('user_id', user.id).eq('active', true)
+  // This endpoint powers "Mello on Slack & WhatsApp" = the founder's OWN chat with Mello (founder_tool).
+  // A customer-inbox WhatsApp (customer_channel, connected via Unipile) is a SEPARATE thing — exclude it,
+  // or it shows the founder row as Connected and Disconnect won't flip it. (Standing rule: keep them apart.)
+  const identities = ((data || []) as any[])
+    .filter((i: any) => i?.meta?.customer_channel !== true)
+    .map((i: any) => ({ id: i.id, provider: i.provider, display: i.display, active: i.active, created_at: i.created_at }))
+  return NextResponse.json({ identities })
 }
 
 export async function POST(req: NextRequest) {

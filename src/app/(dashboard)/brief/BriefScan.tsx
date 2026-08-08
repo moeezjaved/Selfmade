@@ -361,11 +361,11 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                   <div style={section}>What&rsquo;s working across your {playbook.playbook.brandsCount} competitor{playbook.playbook.brandsCount === 1 ? '' : 's'}</div>
                   <div style={{ ...sectionSub, margin: 0 }}>Decoded from {playbook.playbook.totalAds} fresh ads — the formula to copy before it saturates.</div>
                 </div>
-                {/* "Make one like this" → the studio, seeded with the decoded winning FORMULA as the
-                    angle (a cross-competitor pattern, not one ad — so it's a seed, not a remake). We
-                    always send a full, human sentence so the studio never opens looking blank; the
-                    studio prefills the angle + frames the chat around it. */}
-                <Link href={`/studio?angle=${encodeURIComponent(
+                {/* "Make one like this" → the watched brands' ad feed, where the REAL winning competitor
+                    ads live. The founder picks an actual winner and hits Remake (which seeds the studio
+                    with that ad) — a concrete "make one like this ad", not a blank create window. The
+                    winning-format angle rides along so the feed / remake can frame it. */}
+                <Link href={`${playbook.cta_href || '/discovery/following'}?angle=${encodeURIComponent(
                   'An ad like top competitors right now — ' +
                   ([playbook.playbook.formats[0]?.label && `${playbook.playbook.formats[0]?.label} format`,
                     playbook.playbook.hooks[0]?.label && `${playbook.playbook.hooks[0]?.label} hook`,

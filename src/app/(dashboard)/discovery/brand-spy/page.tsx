@@ -57,6 +57,9 @@ export default function BrandSpyList() {
 
   const fetchBrands = useCallback(async (query: string, scope: 'mine' | 'all'): Promise<Brand[]> => {
     const p = new URLSearchParams({ scope }); if (query) p.set('q', query)
+    // Pass the active project explicitly (from the same sf_brand cookie the switcher writes) so "mine"
+    // scopes to the selected brand deterministically — not reliant on the server re-reading the cookie.
+    if (scope === 'mine') { const b = readCookie(BRAND_COOKIE); if (b) p.set('brand', b) }
     const res = await fetch(`/api/discovery/brand-spy?${p}`)
     const j = await res.json().catch(() => ({}))
     return j.brands || []

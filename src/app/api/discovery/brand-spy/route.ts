@@ -50,7 +50,12 @@ export async function GET(req: NextRequest) {
     // Scope to the ACTIVE brand (project switcher → sf_brand cookie), same as /api/discovery/watching.
     // "All brands" → brandId null → show every spied brand; a specific brand → only its linked spies.
     const { resolveActiveBrandId } = await import('@/lib/brand/active')
-    const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
+    // Honor an explicit ?brand= from the client (it reads the same sf_brand cookie the switcher writes),
+    // so scoping is deterministic and never relies on a stale/absent server-read cookie. 'all'/'' → no scope.
+    const explicit = (req.nextUrl.searchParams.get('brand') || '').trim()
+    const brandId = explicit === 'all'
+      ? null
+      : await resolveActiveBrandId(admin, user.id, explicit || undefined).catch(() => null)
     // Only SPIED brands belong in Brand Spy (spied=true) — plain ❤️ follows live under Following.
     const { data: follows } = await admin.from('followed_brands').select('page_id, brand_id').in('user_id', ids).eq('spied', true)
     const scoped = brandId ? ((follows || []) as any[]).filter((f: any) => f.brand_id === brandId) : (follows || [])
