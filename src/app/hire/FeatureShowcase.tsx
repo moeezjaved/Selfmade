@@ -10,8 +10,8 @@ import React, { useEffect, useRef, useState } from 'react'
 
 const INK = '#17251c', LIME = '#dffe95', SUB = '#6f7a68'
 
-function Block({ rev, eyebrow, title, desc, bullets, grad, children }: {
-  rev?: boolean; eyebrow: string; title: string; desc: string; bullets: string[]; grad: string; children: React.ReactNode
+function Block({ step, rev, eyebrow, title, desc, bullets, grad, children }: {
+  step: string; rev?: boolean; eyebrow: string; title: string; desc: string; bullets: string[]; grad: string; children: React.ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [on, setOn] = useState(false)
@@ -23,7 +23,7 @@ function Block({ rev, eyebrow, title, desc, bullets, grad, children }: {
   return (
     <div ref={ref} className={`fs-row${rev ? ' rev' : ''}${on ? ' on' : ''}`}>
       <div className="fs-copy">
-        <div className="fs-eyebrow">{eyebrow}</div>
+        <div className="fs-eyebrow"><span className="fs-step">{step}</span>{eyebrow}</div>
         <h3 className="fs-title">{title}</h3>
         <p className="fs-desc">{desc}</p>
         <ul className="fs-bul">{bullets.map((b) => <li key={b}><span className="fs-tick">✓</span>{b}</li>)}</ul>
@@ -41,11 +41,19 @@ export default function FeatureShowcase() {
       <div className="fs-head">
         <div className="fs-h-eye">What your company does</div>
         <h2 className="fs-h-title">One founder. A company that never sleeps.</h2>
+        {/* 5-second summary — the whole company in six verbs, before the detail. */}
+        <div className="fs-glance">
+          {['It remembers your company.', 'It watches your market.', 'It finds winning ideas.',
+            'It makes the ads.', 'It runs your marketing.', 'It works from WhatsApp.'].map((g) => (
+            <span className="fs-g" key={g}>{g}</span>
+          ))}
+        </div>
       </div>
 
-      {/* THE BRAIN — company memory (comes first: it's what makes them a company, not tools) */}
+      {/* 01 · REMEMBER — the brain (comes first: it's what makes them a company, not tools) */}
       <Block
-        eyebrow="The Company Brain"
+        step="01"
+        eyebrow="Remember"
         title="Tell it once. It remembers forever."
         desc="Your product, your rules, your customers — say it once and it becomes company memory every department shares. No re-briefing, no repeating yourself."
         bullets={['Shared across all departments', 'Decisions are written down', 'Gets smarter over time']}
@@ -59,14 +67,13 @@ export default function FeatureShowcase() {
         </div>
       </Block>
 
-      <div className="fs-group"><span className="fs-group-line" />Your marketing department<span className="fs-group-line" /></div>
-
-      {/* RESEARCH — never sleeps */}
+      {/* 02 · RESEARCH — never sleeps */}
       <Block
+        step="02"
         rev
         eyebrow="Research"
         title="Research never sleeps."
-        desc="Your research department watches competitors, ads, offers and market changes while you sleep — across 3M+ ads and 611K brands — and wakes you the moment something matters."
+        desc="It watches competitors, ads, offers and market changes while you sleep — across 3M+ ads and 611K brands — and wakes you the moment something matters."
         bullets={['Tracks every rival’s ads', 'Alerts you the moment they move', 'Shows what’s working — and why']}
         grad="radial-gradient(120% 120% at 12% 12%, #e2e9ff, #eafff2 55%, #fff1dc)"
       >
@@ -79,11 +86,12 @@ export default function FeatureShowcase() {
         <div className="sp-cta">See their angle → <b>remake it</b></div>
       </Block>
 
-      {/* CREATIVE — finds what works, makes your version */}
+      {/* 03 · CREATIVE — finds what works, makes it yours */}
       <Block
+        step="03"
         eyebrow="Creative"
-        title="Creative finds what works — then makes your version."
-        desc="Your creative department points at a proven winner and rebuilds it around your product — a scroll-stopping image or video, in your brand, in minutes. No designer, no filming."
+        title="It finds what works — then makes it yours."
+        desc="It points at a proven winner and rebuilds it around your product — a scroll-stopping image or video, in your brand, in minutes. No designer, no filming."
         bullets={['Image ads · $0.15', 'UGC-style video · $6', 'Their proven angle, your product']}
         grad="radial-gradient(120% 120% at 85% 0%, #ffe1ef, #efe4ff 52%, #e1ecff)"
       >
@@ -101,13 +109,14 @@ export default function FeatureShowcase() {
         <div className="rm-status">Rebuilding in your brand… <b>done ✓</b></div>
       </Block>
 
-      {/* MEDIA BUYING — runs your Facebook ads */}
+      {/* 04 · ADVERTISING — runs your Facebook ads (give it the brief, not another ads manager) */}
       <Block
+        step="04"
         rev
-        eyebrow="Media Buying"
+        eyebrow="Advertising"
         title="Marketing runs your Facebook ads."
-        desc="Your media buyer watches performance, spots the opportunities, launches campaigns and keeps improving them — and asks before spending. You just approve."
-        bullets={['Daily account audit', 'Scale winners, pause losers', 'One-tap approve → live on Meta']}
+        desc="Give it the brief — the goal, the budget, the season. It builds the campaign, prepares the creative, and puts the whole thing in front of you to approve. Not another ads manager to learn."
+        bullets={['You give the brief', 'It builds the campaign + creative', 'One-tap approve → live on Meta']}
         grad="radial-gradient(120% 120% at 15% 10%, #d9f0e2, #e7f0ff 58%, #f1e8ff)"
       >
         <div className="ad-row">
@@ -121,31 +130,32 @@ export default function FeatureShowcase() {
         <div className="ad-cta"><span className="ad-approve">Approve →</span><span className="ad-live">✓ Live on Meta</span></div>
       </Block>
 
-      <div className="fs-group"><span className="fs-group-line" />The rest of the company<span className="fs-group-line" /></div>
-
-      {/* ANYWHERE — run it from WhatsApp / Slack */}
+      {/* 05 · COMMUNICATION — talk to your company from WhatsApp (ask it anything, it answers + acts) */}
       <Block
-        eyebrow="Wherever you work"
+        step="05"
+        eyebrow="Communication"
         title="Run the whole company from WhatsApp."
-        desc="No dashboard to log into. Your departments message you where you already are — WhatsApp, Slack, email — and you reply. Approve the day's work with one word."
-        bullets={['WhatsApp · Slack · Email', 'Approve by replying “yes”', 'The software disappears']}
+        desc="No dashboard to log into. Ask your company anything, right where you already are — it answers with the numbers, tells you what it found, and does the work when you say go."
+        bullets={['WhatsApp · Slack · Email', 'Ask a question, get a real answer', 'Approve the work with one word']}
         grad="radial-gradient(120% 120% at 90% 90%, #d7ecff, #e2fbef 55%, #eef7d6)"
       >
         <div className="wa">
           <div className="wa-head"><span className="wa-dot" /> WhatsApp · Mello</div>
-          <div className="wa-msg them">Blue ad is winning — 3.1× return. Move budget onto it? <b>est. +$320/wk</b></div>
-          <div className="wa-msg me">YES</div>
-          <div className="wa-msg them">✓ Done. It’s live. Report in the morning.</div>
+          <div className="wa-msg me">How did we do yesterday?</div>
+          <div className="wa-msg them">Revenue up <b>18%</b>. Your new creative is scaling — and I found 3 competitor ads worth testing for us.</div>
+          <div className="wa-msg me">test them</div>
+          <div className="wa-msg them">✓ On it. Drafts will be in your morning brief.</div>
         </div>
       </Block>
 
-      {/* CUSTOMER — conversations become company knowledge */}
+      {/* 06 · COMPANY MEMORY — every conversation becomes company knowledge */}
       <Block
+        step="06"
         rev
-        eyebrow="Customer Care"
-        title="Customer conversations become company knowledge."
-        desc="Every message on WhatsApp, Instagram and email is answered in your voice — and what your buyers ask flows straight into the Company Brain, so the whole company learns."
-        bullets={['WhatsApp · Instagram · Email', 'Answered in your voice', 'Learned by the whole company']}
+        eyebrow="Company memory"
+        title="Your conversations become company knowledge."
+        desc="Slack, WhatsApp, your inbox, customer chats, documents, decisions — every conversation becomes memory the whole company shares. Mello remembers, so nothing is lost and no one repeats themselves."
+        bullets={['Answers customers in your voice', 'Turns chats into company memory', 'Every department draws on it']}
         grad="radial-gradient(120% 120% at 88% 12%, #ffe6d9, #ffe0ef 52%, #e9e2ff)"
       >
         <div className="ci-msg them"><b>Aisha</b>Is the serum safe while pregnant? 🤰</div>
@@ -159,18 +169,18 @@ export default function FeatureShowcase() {
       <style dangerouslySetInnerHTML={{ __html: `
         .fs{max-width:1080px;margin:40px auto 0;padding:0 20px;display:flex;flex-direction:column;gap:80px}
         .fs-head{text-align:center;max-width:640px;margin:0 auto}
-        /* Group divider — labels the department cluster ("Your marketing department" etc). */
-        .fs-group{display:flex;align-items:center;justify-content:center;gap:16px;margin:8px auto -8px;max-width:520px;
-          font:800 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase;color:#8a927f}
-        .fs-group-line{height:1px;flex:1;background:linear-gradient(90deg,transparent,rgba(17,37,28,.16),transparent)}
         .fs-h-eye{font:800 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase;color:#9aa79a}
         .fs-h-title{font-family:'Instrument Serif',Georgia,serif;font-size:clamp(30px,5vw,46px);line-height:1.04;color:${INK};margin:14px 0 0;letter-spacing:-.01em}
+        /* 5-second summary — the whole company in six short verbs. */
+        .fs-glance{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 10px;margin:24px auto 0;max-width:600px}
+        .fs-g{font-size:13px;font-weight:650;color:#3d4a3f;background:#fff;border:1px solid rgba(17,37,28,.1);border-radius:100px;padding:7px 14px;box-shadow:0 2px 5px rgba(17,37,28,.03)}
 
         .fs-row{display:grid;grid-template-columns:1fr 1.05fr;gap:44px;align-items:center}
         .fs-row.rev .fs-copy{order:2}.fs-row.rev .fs-visual{order:1}
         .fs-copy{opacity:1}
         .fs-row.on .fs-copy{animation:fs-rise .6s cubic-bezier(0,0,.2,1) both}
-        .fs-eyebrow{font:800 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#3b6d11}
+        .fs-eyebrow{display:inline-flex;align-items:center;gap:10px;font:800 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#3b6d11}
+        .fs-step{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;background:${INK};color:${LIME};font-size:10px;font-weight:900;letter-spacing:0}
         .fs-title{font-family:'Instrument Serif',Georgia,serif;font-size:clamp(26px,3.6vw,38px);line-height:1.06;color:${INK};margin:12px 0 12px;letter-spacing:-.01em}
         .fs-desc{font-size:15.5px;line-height:1.6;color:#4b5548;margin:0 0 16px;max-width:440px}
         .fs-bul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
@@ -232,6 +242,7 @@ export default function FeatureShowcase() {
         .fs-row.on .wa-msg:nth-child(2){animation-delay:.6s}
         .fs-row.on .wa-msg:nth-child(3){animation-delay:1.2s}
         .fs-row.on .wa-msg:nth-child(4){animation-delay:1.8s}
+        .fs-row.on .wa-msg:nth-child(5){animation-delay:2.4s}
 
         /* 5 · SPY */
         .sp-head{display:flex;align-items:center;gap:7px;font:700 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.05em;text-transform:uppercase;color:${SUB}}

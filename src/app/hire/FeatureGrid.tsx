@@ -112,13 +112,15 @@ export default function FeatureGrid() {
     <section className="fg">
       <div className="fg-head">
         <div className="fg-h-eye">And the rest of the suite</div>
-        <h2 className="fg-h-title">Everything a marketing company does.</h2>
+        <h2 className="fg-h-title">Everything your marketing company does.</h2>
         <p className="fg-h-sub">One hire. The whole department — research, creative, media buying, customer care and more.</p>
       </div>
 
       <div className="fg-grid">
         {FEATS.map((f, i) => <Card f={f} i={i} key={f.title} />)}
       </div>
+
+      <div className="fg-close">And it all reports back to you.</div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         .fg{max-width:1120px;margin:96px auto 0;padding:0 20px}
@@ -127,6 +129,7 @@ export default function FeatureGrid() {
         .fg-h-title{font-family:'Instrument Serif',Georgia,serif;font-size:clamp(30px,5vw,46px);line-height:1.04;color:${INK};margin:14px 0 0;letter-spacing:-.01em}
         .fg-h-sub{margin:14px auto 0;max-width:52ch;font-size:15.5px;line-height:1.6;color:#4c5347}
 
+        .fg-close{text-align:center;margin-top:40px;font-family:'Instrument Serif',Georgia,serif;font-size:clamp(22px,3.2vw,32px);color:${INK};letter-spacing:-.01em}
         .fg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:44px}
         .fg-card{display:block;text-decoration:none;background:#fff;border:1px solid rgba(17,37,28,.08);border-radius:20px;
           padding:14px 14px 22px;box-shadow:0 24px 60px -46px rgba(17,37,28,.5);opacity:1;
