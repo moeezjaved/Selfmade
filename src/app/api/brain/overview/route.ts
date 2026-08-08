@@ -19,8 +19,8 @@ export async function GET() {
 
   const [brandRes, dnaRes, memRes, learnRes, prefs, conflictRes] = await Promise.all([
     admin.from('brands').select('name, industry, brand_type').eq('user_id', user.id).limit(1),
-    admin.from('company_dna').select('id, rule, department, priority, active, created_by, source, evidence, created_at').eq('user_id', user.id).order('created_at', { ascending: false }),
-    admin.from('mello_memory').select('content, category, department, confidence').eq('user_id', user.id).order('confidence', { ascending: false }).limit(200),
+    admin.from('company_dna').select('id, rule, department, priority, active, created_by, source, evidence, confidence, created_at').eq('user_id', user.id).order('created_at', { ascending: false }),
+    admin.from('mello_memory').select('id, content, category, department, confidence, source, source_kind, created_at').eq('user_id', user.id).order('confidence', { ascending: false }).limit(200),
     admin.from('learnings').select('department, event, result, metric, confidence, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(200),
     getPrefs(admin, user.id),
     admin.from('brain_conflicts').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'pending'),
@@ -37,7 +37,7 @@ export async function GET() {
 
   const departments = DEPTS.map(dept => ({
     department: dept,
-    notebook: mem.filter(m => m.department === dept).map(m => ({ content: m.content, category: m.category, confidence: m.confidence })),
+    notebook: mem.filter(m => m.department === dept).map(m => ({ content: m.content, category: m.category, confidence: m.confidence, source_kind: m.source_kind })),
     learnings: learns.filter(l => l.department === dept).slice(0, 12),
   })).filter(d => d.notebook.length || d.learnings.length)
 
