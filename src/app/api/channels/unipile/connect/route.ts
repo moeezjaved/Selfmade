@@ -49,6 +49,11 @@ export async function DELETE(req: NextRequest) {
   const provider = String(body.provider || '')
   if (!provider) return NextResponse.json({ error: 'provider required' }, { status: 400 })
   const admin = createAdminClient()
-  await admin.from('channel_identities').update({ active: false }).eq('user_id', user.id).eq('provider', provider)
+  // Disconnect ONLY the CUSTOMER-inbox identity for this provider — never the founder's Mello channel of
+  // the same provider (e.g. WhatsApp is both). They're independent connections; deactivating by provider
+  // alone would kill both. Scope to customer_channel rows by id.
+  const { data: rows } = await admin.from('channel_identities').select('id, meta').eq('user_id', user.id).eq('provider', provider).eq('active', true)
+  const ids = ((rows || []) as any[]).filter((r: any) => r?.meta?.customer_channel && !r?.meta?.founder_tool).map((r: any) => r.id)
+  if (ids.length) await admin.from('channel_identities').update({ active: false }).in('id', ids)
   return NextResponse.json({ ok: true })
 }

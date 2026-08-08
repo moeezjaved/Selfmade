@@ -589,8 +589,10 @@ function CustomerChannelsSection() {
   const [busy, setBusy] = useState('')
   const [connected, setConnected] = useState<string[]>([])
 
+  // Customer-inbox channels only — a provider connected as the founder's Mello channel (kind 'founder',
+  // e.g. WhatsApp) must NOT light up the customer row. They're independent connections.
   const loadConnected = () => fetch('/api/channels/unipile/connect').then(r => r.ok ? r.json() : null)
-    .then(j => { if (Array.isArray(j?.connected)) setConnected(j.connected.map((c: any) => c.provider)) }).catch(() => {})
+    .then(j => { if (Array.isArray(j?.connected)) setConnected(j.connected.filter((c: any) => c.kind !== 'founder').map((c: any) => c.provider)) }).catch(() => {})
 
   useEffect(() => {
     loadConnected()

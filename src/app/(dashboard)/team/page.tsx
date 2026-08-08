@@ -96,9 +96,12 @@ export default function TeamPage() {
             <select style={inp} value={role} onChange={e => setRole(e.target.value)}><option value="member">Member</option><option value="admin">Admin</option></select>
             <button onClick={invite} disabled={seatsLeft <= 0} style={{ background: seatsLeft > 0 ? INK : '#9ca3af', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 100, fontSize: 14, fontWeight: 800, cursor: seatsLeft > 0 ? 'pointer' : 'not-allowed' }}>Invite</button>
           </div>
-          {seatsLeft <= 0 && d.seats.planId === 'free' && (
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginTop: 8 }}>
-              You’ve used your 1 seat on the Free plan. <a href="/pricing" style={{ color: INK, fontWeight: 800, textDecoration: 'underline' }}>Upgrade your plan</a> to invite teammates.
+          {seatsLeft <= 0 && (
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginTop: 8 }}>
+              You’ve used all {d.seats.limit} seat{d.seats.limit === 1 ? '' : 's'} on your {d.seats.planId} plan.{' '}
+              {d.seats.planId === 'free'
+                ? <><a href="/pricing" style={{ color: INK, fontWeight: 800, textDecoration: 'underline' }}>Upgrade your plan</a> to invite teammates.</>
+                : <><a href="/pricing" style={{ color: INK, fontWeight: 800, textDecoration: 'underline' }}>Upgrade</a> or <button onClick={buySeats} style={{ background: 'none', border: 'none', padding: 0, color: INK, fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>add a seat</button> to invite teammates.</>}
             </div>
           )}
           {msg && <div style={{ fontSize: 13, fontWeight: 600, color: msg.startsWith('✓') ? '#16a34a' : '#dc2626', marginTop: 8 }}>{msg}</div>}

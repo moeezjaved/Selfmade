@@ -47,8 +47,11 @@ export async function DELETE(request: NextRequest) {
   const pageId = request.nextUrl.searchParams.get('page_id')
   if (!pageId) return NextResponse.json({ error: 'page_id required' }, { status: 400 })
   const admin = createAdminClient()
+  // Grab the brand's name BEFORE deleting so the activity log reads "Unfollowed Nike", not a page id.
+  const { data: fb } = await admin.from('followed_brands').select('brand_name').eq('user_id', user.id).eq('page_id', String(pageId)).maybeSingle()
+  const label = fb?.brand_name && !/^\d+$/.test(String(fb.brand_name).trim()) ? fb.brand_name : String(pageId)
   const { error } = await admin.from('followed_brands').delete().eq('user_id', user.id).eq('page_id', String(pageId))
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  await logActivity(admin, user.id, 'BRAND_UNFOLLOWED', `Unfollowed ${String(pageId)}`)
+  await logActivity(admin, user.id, 'BRAND_UNFOLLOWED', `Unfollowed ${label}`)
   return NextResponse.json({ success: true })
 }
