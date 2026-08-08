@@ -80,8 +80,8 @@ export default function HireStory() {
           ))}
         </h1>
         <p className="hero-neg rv d2">No employees. No agency. No freelancers.</p>
-        <p className="hero-sub rv d3">Your AI company runs the work behind your brand. You make the calls.</p>
-        <p className="hero-does rv d3">Research your market · find winning ads · make new creatives · run campaigns · answer customers — while you sleep.</p>
+        <p className="hero-sub rv d3">Your AI company does the work. You make the calls.</p>
+        <p className="hero-does rv d3">Research your market. Find winning ads. Create new images and videos. Run your marketing. Answer customers.</p>
 
         <div className="hero-cta rv d3">
           <a href="#agreement" className="btn-forest">Hire the team</a>
