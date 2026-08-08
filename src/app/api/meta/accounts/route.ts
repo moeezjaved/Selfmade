@@ -26,6 +26,21 @@ export async function GET() {
   const allowed = await allowedAdAccountIds(admin, user.id)
   if (!allowed.all) accounts = accounts.filter(a => allowed.ids.includes(a.account_id))
 
+  // Scope to the ACTIVE brand (project switcher). An account assigned to a brand (meta_accounts.brand_id,
+  // mig 142) shows only under that brand; unassigned accounts (brand_id null) are treated as shared and
+  // show under every brand. "All brands" (no active brand) shows everything. This is why switching the
+  // project at the top used to keep showing the same account — the list wasn't brand-scoped.
+  try {
+    const { resolveActiveBrandId } = await import('@/lib/brand/active')
+    const activeBrand = await resolveActiveBrandId(admin, user.id).catch(() => null)
+    if (activeBrand && accounts.some(a => 'brand_id' in a)) {
+      const scoped = accounts.filter(a => !a.brand_id || a.brand_id === activeBrand)
+      // Only apply the scope if it doesn't wipe the list to nothing (e.g. a brand with no linked/shared
+      // account yet) — better to show all than to strand the founder with an empty account picker.
+      if (scoped.length) accounts = scoped
+    }
+  } catch { /* brand scoping is best-effort — never break the account list */ }
+
   // De-dupe the primary flag in the RESPONSE (data drift can leave several rows is_primary=true).
   // Exactly one is_primary — the SAME deterministic account the audit engine scopes to — so the
   // brief card defaults to, and refreshes into, the identical account (no more €86 ↔ $687k flip).
