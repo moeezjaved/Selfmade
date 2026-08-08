@@ -48,9 +48,11 @@ export async function askMello(admin: any, userId: string, message: string, opts
   // 1 · TEACH a belief
   if (!item && TEACH.test(q) && !q.includes('?')) {
     try {
-      const { teachRule, writeTimeline } = await import('@/lib/brain')
-      await teachRule(admin, { userId, rule: q, createdBy: 'founder', source: 'chat' })
-      void writeTimeline(admin, { userId, actor: 'founder', event: `Learned a rule: “${q}”` })
+      const { teachWithConflictCheck } = await import('@/lib/brain')
+      const res = await teachWithConflictCheck(admin, { userId, rule: q, source: 'founder' })
+      if (res.conflict) {
+        return { reply: `Hold on — that clashes with a rule you already set: “${res.existingRule}”. I've flagged it for you. How should I treat the new one — a temporary exception, replace the old rule, or keep the old one? (You can resolve it on the Company Brain → Review tab.)` }
+      }
       return { reply: `Got it — I've made that a company rule: “${q}”. The whole team follows it from now on. Say “forget that rule” any time to remove it.` }
     } catch { /* fall through */ }
   }

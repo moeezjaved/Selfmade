@@ -64,27 +64,22 @@ export async function brainIngest(admin: any, opts: {
     for (const a of atoms) {
       try {
         if (a.type === 'belief') {
-          const createdBy = opts.source === 'founder' ? 'founder' : 'mello'   // observed → candidate, needs a yes
-          await teachRule(admin, {
-            userId: opts.userId, brandId: opts.brandId, rule: a.text,
-            department: a.department || null, priority: a.priority || 'normal',
-            createdBy, source: `brain:${opts.source}`,
-          })
-          await writeTimeline(admin, {
-            userId: opts.userId, brandId: opts.brandId, actor: createdBy === 'founder' ? 'founder' : 'mello',
-            department: a.department || null,
-            event: createdBy === 'founder' ? `Learned a rule: “${a.text}”` : `Proposed a rule: “${a.text}”`,
-          })
+          if (opts.source === 'founder') {
+            // Founder-stated rule → activate, but check it against existing beliefs first (v5 conflict flow).
+            await teachWithConflictCheck(admin, { userId: opts.userId, brandId: opts.brandId, rule: a.text, department: a.department || null, priority: a.priority || 'normal', source: opts.source })
+          } else {
+            // Observed → a candidate (inactive) the founder can approve in the Review tab.
+            await teachRule(admin, { userId: opts.userId, brandId: opts.brandId, rule: a.text, department: a.department || null, priority: a.priority || 'normal', createdBy: 'mello', source: `brain:${opts.source}` })
+            await writeTimeline(admin, { userId: opts.userId, brandId: opts.brandId, actor: 'mello', department: a.department || null, event: `Proposed a rule: “${a.text}”` })
+          }
           stored++
         } else if (a.type === 'decision') {
-          await teachRule(admin, {
-            userId: opts.userId, brandId: opts.brandId, rule: a.text, department: a.department || null,
-            createdBy: opts.source === 'founder' ? 'founder' : 'mello', source: `brain:decision:${opts.source}`,
-          })
-          await writeTimeline(admin, {
-            userId: opts.userId, brandId: opts.brandId, actor: 'founder', department: a.department || null,
-            event: `Decided: “${a.text}”`,
-          })
+          if (opts.source === 'founder') {
+            await teachWithConflictCheck(admin, { userId: opts.userId, brandId: opts.brandId, rule: a.text, department: a.department || null, source: opts.source })
+          } else {
+            await teachRule(admin, { userId: opts.userId, brandId: opts.brandId, rule: a.text, department: a.department || null, createdBy: 'mello', source: `brain:decision:${opts.source}` })
+            await writeTimeline(admin, { userId: opts.userId, brandId: opts.brandId, actor: 'mello', department: a.department || null, event: `Proposed a decision: “${a.text}”` })
+          }
           stored++
         } else if (a.type === 'fact') {
           await admin.from('mello_memory').insert({
@@ -109,6 +104,65 @@ export async function brainIngest(admin: any, opts: {
     }
   } catch { /* never breaks the caller */ }
   return { stored }
+}
+
+// ── conflict detection (v5) ──────────────────────────────────────────────────
+/**
+ * Does a new rule contradict an ACTIVE belief? Returns the belief it clashes with, or null. Cheap-first:
+ * skips the model when there are no beliefs. Never throws (best-effort — on error we assume no conflict).
+ */
+export async function detectConflict(admin: any, userId: string, rule: string): Promise<{ id: string | null; rule: string } | null> {
+  try {
+    const { data } = await admin.from('company_dna').select('id, rule').eq('user_id', userId).eq('active', true).limit(60)
+    const beliefs = (data || []) as any[]
+    if (!beliefs.length) return null
+    const OpenAI = (await import('openai')).default
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    const model = process.env.MELLO_MODEL_MINI || 'gpt-4o-mini'
+    const system = `You detect CONTRADICTIONS between a new company rule and the company's existing rules. A conflict means they cannot both hold (e.g. "never discount" vs "20% off this weekend"). A mere addition or unrelated rule is NOT a conflict. Reply ONLY JSON: {"conflict": true|false, "index": <0-based index of the existing rule it conflicts with, or -1>}.`
+    const list = beliefs.map((b, i) => `${i}. ${b.rule}`).join('\n')
+    const resp: any = await Promise.race([
+      openai.chat.completions.create({ model, temperature: 0, response_format: { type: 'json_object' },
+        messages: [{ role: 'system', content: system }, { role: 'user', content: `NEW RULE: "${rule}"\n\nEXISTING RULES:\n${list}` }] }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('t')), 9000)),
+    ])
+    const p = JSON.parse(resp?.choices?.[0]?.message?.content || '{}')
+    if (p?.conflict === true && typeof p.index === 'number' && p.index >= 0 && p.index < beliefs.length) {
+      return { id: beliefs[p.index].id, rule: beliefs[p.index].rule }
+    }
+    return null
+  } catch { return null }
+}
+
+/**
+ * Teach a belief, but first check it against active beliefs. On a clash: record a pending brain_conflict and
+ * DON'T activate — the founder resolves it. Otherwise teach normally. Returns whether a conflict was raised.
+ */
+export async function teachWithConflictCheck(admin: any, r: {
+  userId: string; brandId?: string | null; rule: string; department?: string | null;
+  priority?: 'high' | 'normal' | 'low'; source?: BrainSource | string;
+}): Promise<{ conflict: boolean; existingRule?: string }> {
+  // Dedup — if the founder already has this exact rule active, don't teach it twice (any path can call this).
+  try {
+    const { data: dupe } = await admin.from('company_dna').select('id').eq('user_id', r.userId).eq('active', true).ilike('rule', r.rule.trim()).limit(1)
+    if (dupe && dupe.length) return { conflict: false }
+  } catch { /* best-effort */ }
+
+  const clash = await detectConflict(admin, r.userId, r.rule)
+  if (clash) {
+    try {
+      await admin.from('brain_conflicts').insert({
+        user_id: r.userId, brand_id: r.brandId || null, existing_id: clash.id, existing_rule: clash.rule,
+        incoming_rule: r.rule.slice(0, 400), department: r.department || null, source: r.source || 'founder',
+      })
+      await writeTimeline(admin, { userId: r.userId, brandId: r.brandId, actor: 'mello', department: r.department || null, event: `Flagged a conflict: “${r.rule}” vs “${clash.rule}”` })
+    } catch { /* best-effort */ }
+    return { conflict: true, existingRule: clash.rule }
+  }
+  const { teachRule } = await import('./index')
+  await teachRule(admin, { userId: r.userId, brandId: r.brandId, rule: r.rule, department: r.department || null, priority: r.priority || 'normal', createdBy: 'founder', source: `brain:${r.source || 'founder'}` })
+  await writeTimeline(admin, { userId: r.userId, brandId: r.brandId, actor: 'founder', department: r.department || null, event: `Learned a rule: “${r.rule}”` })
+  return { conflict: false }
 }
 
 // ── history feed ─────────────────────────────────────────────────────────────
