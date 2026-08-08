@@ -39,35 +39,51 @@ export default function FeatureShowcase() {
   return (
     <section className="fs" id="work">
       <div className="fs-head">
-        <div className="fs-h-eye">What your team ships</div>
-        <h2 className="fs-h-title">A whole team. One founder. Every night.</h2>
+        <div className="fs-h-eye">What your company does</div>
+        <h2 className="fs-h-title">One founder. A company that never sleeps.</h2>
       </div>
 
-      {/* 1 · MEDIA BUYING — run Facebook ads */}
+      {/* THE BRAIN — company memory (comes first: it's what makes them a company, not tools) */}
       <Block
-        eyebrow="Media Buying"
-        title="Run your Facebook ads."
-        desc="Mello connects your Meta account, audits it every morning, and tells you exactly what to scale and what to pause — then makes the change for you, once you say yes."
-        bullets={['Daily account audit', 'Scale winners, pause losers', 'One-tap approve → live on Meta']}
-        grad="radial-gradient(120% 120% at 15% 10%, #d9f0e2, #e7f0ff 58%, #f1e8ff)"
+        eyebrow="The Company Brain"
+        title="Tell it once. It remembers forever."
+        desc="Your product, your rules, your customers — say it once and it becomes company memory every department shares. No re-briefing, no repeating yourself."
+        bullets={['Shared across all departments', 'Decisions are written down', 'Gets smarter over time']}
+        grad="radial-gradient(120% 120% at 10% 90%, #fff0d4, #ffe4ea 55%, #efe6ff)"
       >
-        <div className="ad-row">
-          <div className="ad-thumb" />
-          <div className="ad-meta"><b>picture ads</b><span>€20/day · ROAS 3.1×</span></div>
-          <div className="ad-badge">winner</div>
+        <div className="br-said">“Never discount below 15%.”<span className="br-who">— you, said once</span></div>
+        <div className="br-fan">
+          {['Research', 'Creative', 'Media Buying', 'Customer'].map((d, i) => (
+            <div className="br-chip" key={d} style={{ ['--d' as any]: i }}><span className="br-t">✓</span>{d} remembers</div>
+          ))}
         </div>
-        <div className="ad-move">
-          <span className="ad-move-t">Scale budget +20% <b>· est. +$320/wk</b></span>
-        </div>
-        <div className="ad-cta"><span className="ad-approve">Approve →</span><span className="ad-live">✓ Live on Meta</span></div>
       </Block>
 
-      {/* 2 · CREATIVE — remake competitor into image + video */}
+      <div className="fs-group"><span className="fs-group-line" />Your marketing department<span className="fs-group-line" /></div>
+
+      {/* RESEARCH — never sleeps */}
       <Block
         rev
+        eyebrow="Research"
+        title="Research never sleeps."
+        desc="Your research department watches competitors, ads, offers and market changes while you sleep — across 3M+ ads and 611K brands — and wakes you the moment something matters."
+        bullets={['Tracks every rival’s ads', 'Alerts you the moment they move', 'Shows what’s working — and why']}
+        grad="radial-gradient(120% 120% at 12% 12%, #e2e9ff, #eafff2 55%, #fff1dc)"
+      >
+        <div className="sp-head"><span className="sp-eye">👁</span> Watching 12 competitors <span className="sp-live">live</span></div>
+        <div className="sp-alert">
+          <div className="sp-brand"><span className="sp-av" />Country Delight</div>
+          <div className="sp-line"><b>9 new ads</b> launched overnight — a real push.</div>
+          <span className="sp-tag">new hook detected</span>
+        </div>
+        <div className="sp-cta">See their angle → <b>remake it</b></div>
+      </Block>
+
+      {/* CREATIVE — finds what works, makes your version */}
+      <Block
         eyebrow="Creative"
-        title="Remake any winning ad — as yours."
-        desc="Point at a competitor's best ad. Mello rebuilds it around your product as a scroll-stopping image or video — your brand, your look, in minutes. No designer, no filming."
+        title="Creative finds what works — then makes your version."
+        desc="Your creative department points at a proven winner and rebuilds it around your product — a scroll-stopping image or video, in your brand, in minutes. No designer, no filming."
         bullets={['Image ads · $0.15', 'UGC-style video · $6', 'Their proven angle, your product']}
         grad="radial-gradient(120% 120% at 85% 0%, #ffe1ef, #efe4ff 52%, #e1ecff)"
       >
@@ -85,25 +101,30 @@ export default function FeatureShowcase() {
         <div className="rm-status">Rebuilding in your brand… <b>done ✓</b></div>
       </Block>
 
-      {/* 3 · THE BRAIN — company memory */}
-      <Block
-        eyebrow="The Company Brain"
-        title="Tell it once. It remembers forever."
-        desc="Your product, your rules, your customers — say it once and it becomes company memory every department shares. No re-briefing, no repeating yourself."
-        bullets={['Shared across all departments', 'Rules the whole team follows', 'Gets smarter every day']}
-        grad="radial-gradient(120% 120% at 10% 90%, #fff0d4, #ffe4ea 55%, #efe6ff)"
-      >
-        <div className="br-said">“Never discount below 15%.”<span className="br-who">— you, said once</span></div>
-        <div className="br-fan">
-          {['Research', 'Creative', 'Media Buying', 'Customer'].map((d, i) => (
-            <div className="br-chip" key={d} style={{ ['--d' as any]: i }}><span className="br-t">✓</span>{d} remembers</div>
-          ))}
-        </div>
-      </Block>
-
-      {/* 4 · ANYWHERE — run it from WhatsApp / Slack */}
+      {/* MEDIA BUYING — runs your Facebook ads */}
       <Block
         rev
+        eyebrow="Media Buying"
+        title="Marketing runs your Facebook ads."
+        desc="Your media buyer watches performance, spots the opportunities, launches campaigns and keeps improving them — and asks before spending. You just approve."
+        bullets={['Daily account audit', 'Scale winners, pause losers', 'One-tap approve → live on Meta']}
+        grad="radial-gradient(120% 120% at 15% 10%, #d9f0e2, #e7f0ff 58%, #f1e8ff)"
+      >
+        <div className="ad-row">
+          <div className="ad-thumb" />
+          <div className="ad-meta"><b>picture ads</b><span>€20/day · ROAS 3.1×</span></div>
+          <div className="ad-badge">winner</div>
+        </div>
+        <div className="ad-move">
+          <span className="ad-move-t">Scale budget +20% <b>· est. +$320/wk</b></span>
+        </div>
+        <div className="ad-cta"><span className="ad-approve">Approve →</span><span className="ad-live">✓ Live on Meta</span></div>
+      </Block>
+
+      <div className="fs-group"><span className="fs-group-line" />The rest of the company<span className="fs-group-line" /></div>
+
+      {/* ANYWHERE — run it from WhatsApp / Slack */}
+      <Block
         eyebrow="Wherever you work"
         title="Run the whole company from WhatsApp."
         desc="No dashboard to log into. Your departments message you where you already are — WhatsApp, Slack, email — and you reply. Approve the day's work with one word."
@@ -118,30 +139,13 @@ export default function FeatureShowcase() {
         </div>
       </Block>
 
-      {/* 5 · RESEARCH — spy on competitors */}
-      <Block
-        eyebrow="Research"
-        title="Watch every competitor, all night."
-        desc="Mello studies your rivals across 3M+ ads and 611K brands — and wakes you the moment one launches something new, so you copy the winners before they compound."
-        bullets={['Tracks every rival’s ads', 'Alerts you the moment they move', 'Shows what’s working — and why']}
-        grad="radial-gradient(120% 120% at 12% 12%, #e2e9ff, #eafff2 55%, #fff1dc)"
-      >
-        <div className="sp-head"><span className="sp-eye">👁</span> Watching 12 competitors <span className="sp-live">live</span></div>
-        <div className="sp-alert">
-          <div className="sp-brand"><span className="sp-av" />Country Delight</div>
-          <div className="sp-line"><b>9 new ads</b> launched overnight — a real push.</div>
-          <span className="sp-tag">new hook detected</span>
-        </div>
-        <div className="sp-cta">See their angle → <b>remake it</b></div>
-      </Block>
-
-      {/* 6 · CUSTOMER — answers your inbox */}
+      {/* CUSTOMER — conversations become company knowledge */}
       <Block
         rev
         eyebrow="Customer Care"
-        title="Your inbox, answered for you."
-        desc="Customers message you on WhatsApp, Instagram and email. Mello reads every one, drafts the reply in your voice, and waits for your yes — so no message ever goes cold."
-        bullets={['WhatsApp · Instagram · Email', 'Replies drafted in your voice', 'Nothing sent without your yes']}
+        title="Customer conversations become company knowledge."
+        desc="Every message on WhatsApp, Instagram and email is answered in your voice — and what your buyers ask flows straight into the Company Brain, so the whole company learns."
+        bullets={['WhatsApp · Instagram · Email', 'Answered in your voice', 'Learned by the whole company']}
         grad="radial-gradient(120% 120% at 88% 12%, #ffe6d9, #ffe0ef 52%, #e9e2ff)"
       >
         <div className="ci-msg them"><b>Aisha</b>Is the serum safe while pregnant? 🤰</div>
@@ -155,6 +159,10 @@ export default function FeatureShowcase() {
       <style dangerouslySetInnerHTML={{ __html: `
         .fs{max-width:1080px;margin:40px auto 0;padding:0 20px;display:flex;flex-direction:column;gap:80px}
         .fs-head{text-align:center;max-width:640px;margin:0 auto}
+        /* Group divider — labels the department cluster ("Your marketing department" etc). */
+        .fs-group{display:flex;align-items:center;justify-content:center;gap:16px;margin:8px auto -8px;max-width:520px;
+          font:800 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase;color:#8a927f}
+        .fs-group-line{height:1px;flex:1;background:linear-gradient(90deg,transparent,rgba(17,37,28,.16),transparent)}
         .fs-h-eye{font:800 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase;color:#9aa79a}
         .fs-h-title{font-family:'Instrument Serif',Georgia,serif;font-size:clamp(30px,5vw,46px);line-height:1.04;color:${INK};margin:14px 0 0;letter-spacing:-.01em}
 
