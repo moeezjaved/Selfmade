@@ -223,7 +223,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const pageId = extractPageId(body.url || body.pageId || '')
     if (!pageId) return NextResponse.json({ error: 'Paste a Meta Ad Library page URL (…view_all_page_id=123…) or a numeric page ID — not a keyword search.' }, { status: 400 })
-    const name = (body.name || '').trim().toLowerCase() || pageId
+    let name = (body.name || '').trim().toLowerCase() || pageId
+    // Spying by page id with no name → the activity log/brief would show a raw number. Resolve the real
+    // brand name (crawl_state → directory → first ad) so it reads "Started spying Nike".
+    if (name === pageId || /^\d+$/.test(name)) {
+      try { const nm = (await resolveBrandNames(admin, [pageId])).get(pageId); if (nm && !/^\d+$/.test(String(nm).trim())) name = String(nm) } catch { /* keep pageId */ }
+    }
 
     // crawlOnly = "pull this brand's ads into our catalog" WITHOUT tracking/following/charging the user
     // (used when someone opens a directory brand we haven't crawled). Just enqueues the crawl at tier 0
@@ -337,7 +342,10 @@ export async function DELETE(req: NextRequest) {
   // left another member's (usually the owner's) row → the brand reappeared on refresh. Stop the spy
   // across the whole org so it actually persists for everyone.
   const orgIds = await orgMemberIds(admin, user.id)
+  // Resolve the brand's real name BEFORE deleting so the activity log reads "Stopped spying Nike".
+  const { data: fb } = await admin.from('followed_brands').select('brand_name').in('user_id', orgIds).eq('page_id', pageId).not('brand_name', 'is', null).limit(1).maybeSingle()
+  const label = fb?.brand_name && !/^\d+$/.test(String(fb.brand_name).trim()) ? fb.brand_name : pageId
   await admin.from('followed_brands').delete().in('user_id', orgIds).eq('page_id', pageId)
-  await logActivity(admin, user.id, 'BRAND_UNSPIED', `Stopped spying ${pageId}`)
+  await logActivity(admin, user.id, 'BRAND_UNSPIED', `Stopped spying ${label}`)
   return NextResponse.json({ ok: true, pageId })
 }

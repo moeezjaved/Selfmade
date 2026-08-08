@@ -26,8 +26,16 @@ export async function prepareEverything(admin: any, userId: string): Promise<Pre
 
   // ── Customer: draft any inbound that's still waiting for a reply (free — LLM tokens only). ──
   try {
-    const { data: undrafted } = await admin.from('customer_messages').select('*')
-      .eq('user_id', userId).eq('direction', 'in').eq('status', 'pending').is('suggested_reply', null).limit(20)
+    // Only count/act on REAL, still-open threads on a channel that's actually connected right now — so a
+    // disconnected WhatsApp, a closed thread, or a Simulate test doesn't keep inflating "38 replies ready".
+    const { data: conns } = await admin.from('channel_identities').select('provider, meta').eq('user_id', userId).eq('active', true)
+    const connectedChannels = new Set(((conns || []) as any[]).filter((c: any) => c?.meta?.customer_channel).map((c: any) => String(c.provider)))
+    const { data: openThreads } = await admin.from('customer_threads').select('id, channel')
+      .eq('user_id', userId).eq('status', 'open').neq('channel', 'simulated').limit(500)
+    const liveThreadIds = ((openThreads || []) as any[]).filter((t: any) => connectedChannels.has(String(t.channel))).map((t: any) => String(t.id))
+
+    const { data: undrafted } = liveThreadIds.length ? await admin.from('customer_messages').select('*')
+      .eq('user_id', userId).eq('direction', 'in').eq('status', 'pending').is('suggested_reply', null).in('thread_id', liveThreadIds).limit(20) : { data: [] }
     const list = (undrafted || []) as any[]
     if (list.length) {
       // One brand name for grounding (the founder's first).
@@ -44,9 +52,9 @@ export async function prepareEverything(admin: any, userId: string): Promise<Pre
       }
       if (n) prepared.push({ dept: 'Customer', detail: `drafted ${n} repl${n === 1 ? 'y' : 'ies'}` })
     }
-    // Also count replies already drafted and ready to send (staged earlier).
-    const { count: ready } = await admin.from('customer_messages').select('id', { count: 'exact', head: true })
-      .eq('user_id', userId).eq('direction', 'in').eq('status', 'pending').not('suggested_reply', 'is', null)
+    // Also count replies already drafted and ready to send — but only on live threads (same scope as above).
+    const { count: ready } = liveThreadIds.length ? await admin.from('customer_messages').select('id', { count: 'exact', head: true })
+      .eq('user_id', userId).eq('direction', 'in').eq('status', 'pending').not('suggested_reply', 'is', null).in('thread_id', liveThreadIds) : { count: 0 }
     if (ready && ready > 0) prepared.push({ dept: 'Customer', detail: `${ready} repl${ready === 1 ? 'y' : 'ies'} ready to send` })
   } catch { /* inbox best-effort */ }
 
