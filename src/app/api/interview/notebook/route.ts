@@ -22,15 +22,29 @@ export async function POST(req: NextRequest) {
   const { entries, brandId, source } = await req.json().catch(() => ({}))
   if (!Array.isArray(entries) || !entries.length) return NextResponse.json({ error: 'entries required' }, { status: 400 })
   const src = source === 'standup' ? 'standup' : 'interview'
-  // Route each note through addMemory so it's embedded (semantic recall) + carries category/confidence.
   const items = entries.slice(0, 20)
     .map((e: any) => ({ kind: KINDS.has(String(e?.kind)) ? String(e.kind) : 'fact', content: String(e?.content || '').trim().slice(0, 400) }))
     .filter((e: any) => e.content)
   if (!items.length) return NextResponse.json({ error: 'no valid entries' }, { status: 400 })
-  await Promise.all(items.map((e: any) =>
-    addMemory(user.id, e.content, e.kind, { category: e.kind, confidence: CONFIDENCE[e.kind] ?? 82, brandId: brandId || null, source: src }),
-  ))
-  return NextResponse.json({ ok: true, saved: items.length })
+
+  // Rules & red-lines the founder states at onboarding are BELIEFS → company_dna (so they show in the
+  // Beliefs tab, get conflict-checked, and hit the timeline). Everything else is knowledge → mello_memory
+  // (embedded for semantic recall). This makes onboarding a first-class Company-Brain teacher.
+  const beliefs = items.filter((e: any) => e.kind === 'rule' || e.kind === 'scar')
+  const memories = items.filter((e: any) => e.kind !== 'rule' && e.kind !== 'scar')
+
+  const admin = createAdminClient()
+  const { teachWithConflictCheck } = await import('@/lib/brain')
+  await Promise.all([
+    ...memories.map((e: any) =>
+      addMemory(user.id, e.content, e.kind, { category: e.kind, confidence: CONFIDENCE[e.kind] ?? 82, brandId: brandId || null, source: src }),
+    ),
+    ...beliefs.map((e: any) =>
+      teachWithConflictCheck(admin, { userId: user.id, brandId: brandId || null, rule: e.content, priority: e.kind === 'scar' ? 'high' : 'normal', source: src })
+        .catch(() => {}),
+    ),
+  ])
+  return NextResponse.json({ ok: true, saved: items.length, beliefs: beliefs.length })
 }
 
 export async function GET() {
