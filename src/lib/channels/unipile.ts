@@ -20,7 +20,10 @@ export const unipileConfigured = () => !!(process.env.UNIPILE_DSN && process.env
 // let the founder pick their mail provider (Google brings calendar too).
 const PROVIDER_MAP: Record<string, string[]> = {
   instagram: ['INSTAGRAM'], whatsapp: ['WHATSAPP'], messenger: ['MESSENGER'], telegram: ['TELEGRAM'],
-  linkedin: ['LINKEDIN'], x: ['TWITTER'], email: ['GOOGLE', 'OUTLOOK', 'IMAP'], calendar: ['GOOGLE'], all: ['*'],
+  // email: GOOGLE + OUTLOOK only (both OAuth). IMAP is intentionally left out — bundling it makes
+  // Unipile's hosted-link endpoint return a credentials SCHEMA instead of a connect URL, which surfaced
+  // as "Could not start the connection." (IMAP needs its own credentials flow; add it separately later.)
+  linkedin: ['LINKEDIN'], x: ['TWITTER'], email: ['GOOGLE', 'OUTLOOK'], calendar: ['GOOGLE'], all: ['*'],
 }
 
 /** Map a Unipile account type → the label we store (used by the callback after reading the real type). */
