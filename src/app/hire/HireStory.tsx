@@ -78,7 +78,7 @@ export default function HireStory() {
           ))}
         </h1>
         <p className="hero-neg rv d2">No employees. No agency. No freelancers.</p>
-        <p className="hero-sub rv d3">Your AI team does the work. You make the calls.</p>
+        <p className="hero-sub rv d3">Your AI company does the work. You make the calls.</p>
 
         <div className="hero-cta rv d3">
           <a href="#agreement" className="btn-forest">Hire the team</a>
@@ -99,6 +99,11 @@ export default function HireStory() {
       {/* Old serif narrative sections (cold-open, night, morning, control, teach, why, turn)
           removed — the story is now told by the animated HqMockup + FeatureShowcase + FeatureGrid above,
           which match the new theme and keep the page short. The Employment Agreement stays. */}
+
+      {/* The turn into the ceremony — restates the category one last time before the signature. */}
+      <section className="why">
+        <p className="rv">You&rsquo;re not buying software.<br />You&rsquo;re hiring a company.</p>
+      </section>
 
       {/* THE AGREEMENT — the conversion is a signature. Employment terms, not a co-founder deal —
           the ridiculous 24/7 / never-on-vacation clauses are the screenshot. */}

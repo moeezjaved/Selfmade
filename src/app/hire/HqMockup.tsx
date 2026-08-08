@@ -11,11 +11,11 @@ const FOREST = '#12211a', LIME = '#dffe95', INK = '#17251c', SUB = '#8a927f'
 
 type Msg = { who: string; role: string; text: string; chip?: string; you?: boolean; approve?: boolean; tone?: string }
 const MSGS: Msg[] = [
-  { who: 'Research', role: 'RESEARCH', text: 'Country Delight launched 9 new ads overnight — a real push, not rotation.', chip: '1,001 ads read' },
-  { who: 'Creative', role: 'CREATIVE', text: 'Rebuilt the top 3 in your brand. Concept B is the strongest.', chip: '4 drafts ready' },
-  { who: 'Media Buying', role: 'MEDIA BUYING', text: 'Ready to scale the blue ad — 3.1× return. Move budget onto it? est. +$320/week.', tone: 'ask' },
+  { who: 'Research', role: 'RESEARCH', text: 'Found 17 new competitor ads overnight — a real push, not rotation.', chip: '1,001 ads read' },
+  { who: 'Creative', role: 'CREATIVE', text: 'Rebuilt the strongest concept into 4 variations. Concept B wins.', chip: '4 drafts ready' },
+  { who: 'Media Buying', role: 'MEDIA BUYING', text: 'Campaign #24 is beating the account average — move budget onto it? est. +$320/week.', tone: 'ask' },
   { who: 'Finance', role: 'FINANCE', text: 'Worth it — margin holds at that spend.' },
-  { who: 'Mello', role: 'MELLO', text: 'That’s the plan. Approve?', approve: true },
+  { who: 'Mello', role: 'MELLO', text: '3 decisions need your approval. This one first?', approve: true },
   { who: 'You', role: 'YOU', text: 'yes', you: true },
   { who: 'Media Buying', role: 'MEDIA BUYING', text: '✓ Done. It’s live. Full report in the morning.' },
 ]

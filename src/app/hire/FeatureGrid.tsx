@@ -14,7 +14,7 @@ type Feat = { eyebrow: string; title: string; desc: string; href: string; grad: 
 const FEATS: Feat[] = [
   {
     eyebrow: 'The morning brief', title: 'Wake up to one report.',
-    desc: 'What happened overnight, what your team made, and what needs your yes — in a single morning read.',
+    desc: 'Your company tells you what changed overnight and what actually matters — in a single morning read.',
     href: '#agreement', grad: 'linear-gradient(135deg,#fef0d3,#ffd9e6 55%,#e4dcff)',
     mock: (
       <div className="mk-brief">
@@ -26,7 +26,7 @@ const FEATS: Feat[] = [
   },
   {
     eyebrow: 'The ad library', title: 'Search 3M+ winning ads.',
-    desc: 'Every ad your market is running, searchable in seconds. Find the proven angle, then remake it as yours.',
+    desc: 'See every ad your market is running — and what’s actually working — then hand the winner to Creative.',
     href: '#agreement', grad: 'linear-gradient(135deg,#d7ecff,#e4e0ff 55%,#ffe3f1)',
     mock: (
       <div className="mk-lib">
@@ -37,7 +37,7 @@ const FEATS: Feat[] = [
   },
   {
     eyebrow: 'Autopilot', title: 'A fresh ad, made daily.',
-    desc: 'Let Mello quietly produce a new ad every day from what’s winning — waiting in your brief to approve.',
+    desc: 'Keep your creative pipeline moving — a new ad produced every day, waiting in your brief to approve.',
     href: '#agreement', grad: 'linear-gradient(135deg,#e0f7e4,#d9f0ff 55%,#efe6ff)',
     mock: (
       <div className="mk-auto">
@@ -49,7 +49,7 @@ const FEATS: Feat[] = [
   },
   {
     eyebrow: 'Creators', title: 'Find creators to film you.',
-    desc: 'Mello finds real UGC creators for your product, reaches out, and manages them from first hello to shipped video.',
+    desc: 'Discover real UGC creators for your product — reached out to and managed from first hello to shipped video.',
     href: '#agreement', grad: 'linear-gradient(135deg,#ffe6d9,#ffe0ef 55%,#e9e2ff)',
     mock: (
       <div className="mk-cre">
@@ -61,7 +61,7 @@ const FEATS: Feat[] = [
   },
   {
     eyebrow: 'Many brands', title: 'All your brands, one login.',
-    desc: 'Run every brand you own as its own company — separate team, memory and inbox — from a single switcher.',
+    desc: 'Manage multiple businesses from one company — each with its own brain, team and inbox.',
     href: '#agreement', grad: 'linear-gradient(135deg,#e9e2ff,#d7ecff 55%,#e0f7e4)',
     mock: (
       <div className="mk-br">
@@ -73,8 +73,8 @@ const FEATS: Feat[] = [
     ),
   },
   {
-    eyebrow: 'Playbooks', title: 'Learn how the best win.',
-    desc: 'Teardown-style playbooks show why top brands’ ads work — so your team builds on what already sells.',
+    eyebrow: 'Playbooks', title: 'Learn from the best.',
+    desc: 'Your AI studies what’s working in the market — teardowns of why top brands’ ads win, so your team builds on what sells.',
     href: '#agreement', grad: 'linear-gradient(135deg,#fff0d4,#ffe4ea 55%,#e2e9ff)',
     mock: (
       <div className="mk-pb">
