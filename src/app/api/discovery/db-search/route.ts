@@ -420,14 +420,12 @@ export async function GET(request: NextRequest) {
       if (langs.length) baseQuery = baseQuery.overlaps('languages', langs)
     }
     if (platforms) baseQuery = baseQuery.overlaps('platforms', platforms.split(','))
-    // Time window (days>0): keyed off days_running via the mig-130 (has_creative, days_running, ad_id)
-    // composite so it's an index-only scan (fast, no timeout). NOTE: true recency (last_seen/start_date
-    // >= cutoff) is the correct semantic but has no supporting index → 9s cap → empty; and adding any
-    // extra predicate (is_active) drops off the composite → also times out. A proper recency filter
-    // needs a dedicated last_seen index + a crawler that maintains last_seen — until then this stays
-    // on days_running for speed (its recency is only as good as days_running's freshness).
-    if (days > 0) {
-      baseQuery = baseQuery.lte('days_running', days)
+    // Time window (days>0) = "launched in the last N days" = start_date >= cutoff. This is the CORRECT
+    // recency semantic (days_running is run-duration and barely populated → it matched everything, so the
+    // 7d filter showed old ads). Served as an index-only scan by mig-146's partial index
+    // (start_date desc, ad_id) WHERE has_creative — the range predicate + the DESC sort both ride it.
+    if (days > 0 && sinceDate) {
+      baseQuery = baseQuery.gte('start_date', sinceDate)
     }
     // GetHookd-parity filters (performance tier, niche, brand volume, run-time,
     // CTA, creative reuse, hide-brands) — rollup-backed, all additive.
@@ -437,7 +435,7 @@ export async function GET(request: NextRequest) {
     // A time window (days>0) orders by days_running ASC so the (has_creative, days_running, ad_id)
     // composite (mig 130) serves BOTH the .lte('days_running', N) predicate AND the sort — index-only
     // scan, no timeout. (is_active is filtered on the small result set.)
-    if (days > 0) baseQuery = baseQuery.order('days_running', { ascending: true, nullsFirst: false }).order('ad_id', { ascending: true })
+    if (days > 0) baseQuery = baseQuery.order('start_date', { ascending: false, nullsFirst: false }).order('ad_id', { ascending: true })
     else if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
     else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
     else if (sort === 'recent') baseQuery = baseQuery.order('last_seen', { ascending: false })
