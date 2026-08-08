@@ -74,7 +74,8 @@ export default function BrainPage() {
     setBusy(true)
     try {
       const r = await fetch('/api/brain/teach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rule, department: dept || null }) }).then(x => x.json())
-      if (r?.ok) { setRule(''); setDept(''); toast.success('Taught. The whole team follows it now.'); load() }
+      if (r?.conflict) { setRule(''); setDept(''); toast(`That clashes with “${r.existingRule}” — resolve it on the Review tab.`, { icon: '⚠️' }); loadConflicts(); load(); setTab('Review') }
+      else if (r?.ok) { setRule(''); setDept(''); toast.success('Taught. The whole team follows it now.'); load() }
       else toast.error(r?.error || 'Could not save')
     } finally { setBusy(false) }
   }

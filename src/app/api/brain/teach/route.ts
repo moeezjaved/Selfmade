@@ -8,7 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { teachRule, getDna } from '@/lib/brain'
+import { getDna, teachWithConflictCheck } from '@/lib/brain'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,12 +26,14 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { rule, department, priority, brandId } = await req.json().catch(() => ({}))
   if (!rule || !String(rule).trim()) return NextResponse.json({ error: 'rule required' }, { status: 400 })
-  const row = await teachRule(createAdminClient(), {
+  // Run the same conflict check as chat/Slack/WhatsApp so teaching a contradictory rule here is caught too.
+  const res = await teachWithConflictCheck(createAdminClient(), {
     userId: user.id, rule: String(rule), department: department || null,
     priority: priority === 'high' || priority === 'low' ? priority : 'normal',
-    brandId: brandId || null, createdBy: 'founder', source: 'teach',
+    brandId: brandId || null, source: 'founder',
   })
-  return NextResponse.json({ ok: true, rule: row })
+  if (res.conflict) return NextResponse.json({ ok: false, conflict: true, existingRule: res.existingRule })
+  return NextResponse.json({ ok: true })
 }
 
 export async function DELETE(req: NextRequest) {
