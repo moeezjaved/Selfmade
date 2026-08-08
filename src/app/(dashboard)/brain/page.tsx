@@ -36,6 +36,8 @@ export default function BrainPage() {
   const [answer, setAnswer] = useState<{ reply: string; sources: string[] } | null>(null)
   const [tl, setTl] = useState<{ timeline: any[]; patterns: any[]; hasHistory: boolean } | null>(null)
   const [conflicts, setConflicts] = useState<any[]>([])
+  const [why, setWhy] = useState<Record<string, boolean>>({})          // belief id → "Why?" open
+  const [briefs, setBriefs] = useState<Record<string, { brief: string; loading?: boolean }>>({})  // dept → first-day brief
   const [loading, setLoading] = useState(true)
   const [rule, setRule] = useState(''); const [dept, setDept] = useState(''); const [busy, setBusy] = useState(false)
   const [reflecting, setReflecting] = useState(false)
@@ -49,6 +51,12 @@ export default function BrainPage() {
     await fetch('/api/brain/conflict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action }) }).catch(() => {})
     toast.success(action === 'replace' ? 'Replaced the old rule' : action === 'temporary' ? 'Added as a temporary exception' : 'Kept the old rule')
     loadConflicts(); load()
+  }
+  const loadBrief = async (dept: string) => {
+    if (briefs[dept]?.loading) return
+    setBriefs(b => ({ ...b, [dept]: { brief: '', loading: true } }))
+    try { const r = await fetch(`/api/brain/onboard?department=${dept}`).then(x => x.json()); setBriefs(b => ({ ...b, [dept]: { brief: r.brief || '—' } })) }
+    catch { setBriefs(b => ({ ...b, [dept]: { brief: 'Could not load.' } })) }
   }
   const doAsk = async () => {
     const qq = ask.trim(); if (!qq || asking) return
@@ -240,9 +248,21 @@ export default function BrainPage() {
                   <button onClick={reflect} disabled={reflecting} style={{ fontSize: 12, fontWeight: 700, color: '#3b6d11', background: '#eef3ea', border: 'none', borderRadius: 100, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>{reflecting ? 'Looking…' : 'Look for patterns'}</button>
                 </div>
                 {ov.beliefs?.length ? ov.beliefs.map((b: any) => (
-                  <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, padding: '9px 0', borderTop: '1px solid #f1f5f9' }}>
-                    <div style={{ fontSize: 14, color: '#1a3a1a' }}>{b.rule}{b.department && pill(DEPT_LABEL[b.department] || b.department)}{b.created_by === 'mello' && pill('learned')}</div>
-                    <button onClick={() => retire(b.id)} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Retire</button>
+                  <div key={b.id} style={{ padding: '9px 0', borderTop: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                      <div style={{ fontSize: 14, color: '#1a3a1a' }}>{b.rule}{b.department && pill(DEPT_LABEL[b.department] || b.department)}{b.created_by === 'mello' && pill('learned')}</div>
+                      <div style={{ display: 'flex', gap: 12, flex: 'none' }}>
+                        <button onClick={() => setWhy(w => ({ ...w, [b.id]: !w[b.id] }))} style={{ fontSize: 12, color: '#7a9a7a', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{why[b.id] ? 'Hide' : 'Why?'}</button>
+                        <button onClick={() => retire(b.id)} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Retire</button>
+                      </div>
+                    </div>
+                    {why[b.id] && (
+                      <div style={{ marginTop: 7, padding: '9px 12px', background: '#f7faf4', border: '1px solid #eef3ea', borderRadius: 10, fontSize: 12.5, color: '#5a705a', lineHeight: 1.65 }}>
+                        <div>{b.created_by === 'founder' ? 'You taught this.' : SOURCE_LABEL(b.source)}</div>
+                        {b.evidence?.basedOn && <div>Evidence — {b.evidence.basedOn}</div>}
+                        <div>Confidence {b.confidence ?? 100}/100{b.created_at ? ` · added ${new Date(b.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</div>
+                      </div>
+                    )}
                   </div>
                 )) : (
                   <div>
@@ -262,8 +282,14 @@ export default function BrainPage() {
           {tab === 'Departments' && (
             ov.departments?.length ? ov.departments.map((d: any) => (
               <div key={d.department} style={card}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a', marginBottom: 8 }}>{DEPT_LABEL[d.department] || d.department}</div>
-                {d.notebook?.length > 0 && <div style={{ marginBottom: 8 }}>{d.notebook.map((m: any, i: number) => <div key={i} style={{ fontSize: 13.5, color: '#3a5a3a', padding: '3px 0' }}>• {m.content}</div>)}</div>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a' }}>{DEPT_LABEL[d.department] || d.department}</div>
+                  <button onClick={() => loadBrief(d.department)} disabled={briefs[d.department]?.loading} style={{ fontSize: 12, fontWeight: 700, color: '#3b6d11', background: '#eef3ea', border: 'none', borderRadius: 100, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>{briefs[d.department]?.loading ? 'Reading…' : '🎓 First-day brief'}</button>
+                </div>
+                {briefs[d.department] && !briefs[d.department].loading && (
+                  <div style={{ marginBottom: 10, padding: '12px 14px', background: '#f7faf4', border: '1px solid #eef3ea', borderRadius: 12, fontSize: 13, color: '#3a5a3a', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{briefs[d.department].brief}</div>
+                )}
+                {d.notebook?.length > 0 && <div style={{ marginBottom: 8 }}>{d.notebook.map((m: any, i: number) => <div key={i} style={{ fontSize: 13.5, color: '#3a5a3a', padding: '3px 0' }}>• {m.content}{m.source_kind && m.source_kind !== 'chat' ? <span style={{ fontSize: 10.5, color: '#9ca3af', marginLeft: 6, fontFamily: 'ui-monospace,monospace' }}>from {m.source_kind}</span> : null}</div>)}</div>}
                 {d.learnings?.length > 0 && <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>{d.learnings.map((l: any, i: number) => <div key={i} style={{ fontSize: 13, color: '#7a9a7a', padding: '2px 0' }}>✓ {l.event}{l.result ? ` → ${l.result}` : ''}</div>)}</div>}
               </div>
             )) : <div style={card}><p style={{ color: '#9ca3af', fontSize: 13, margin: 0 }}>Departments haven't written anything yet — they fill in as Mello works and you approve actions.</p></div>
