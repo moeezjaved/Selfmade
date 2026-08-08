@@ -55,7 +55,7 @@ export default function FeatureShowcase() {
         step="01"
         eyebrow="Remember"
         title="Tell it once. It remembers forever."
-        desc="Your product, your rules, your customers — say it once and it becomes company memory every department shares. No re-briefing, no repeating yourself."
+        desc="Tell it your product, your rules and your customers — or connect Slack, WhatsApp, email and your docs. It all becomes one company brain every department shares."
         bullets={['Shared across all departments', 'Decisions are written down', 'Gets smarter over time']}
         grad="radial-gradient(120% 120% at 10% 90%, #fff0d4, #ffe4ea 55%, #efe6ff)"
       >
@@ -73,7 +73,7 @@ export default function FeatureShowcase() {
         rev
         eyebrow="Research"
         title="Research never sleeps."
-        desc="It watches competitors, ads, offers and market changes while you sleep — across 3M+ ads and 611K brands — and wakes you the moment something matters."
+        desc="While you sleep, your research department watches your market — competitors, ads, products, offers and trends — and tells you exactly what changed."
         bullets={['Tracks every rival’s ads', 'Alerts you the moment they move', 'Shows what’s working — and why']}
         grad="radial-gradient(120% 120% at 12% 12%, #e2e9ff, #eafff2 55%, #fff1dc)"
       >
@@ -91,7 +91,7 @@ export default function FeatureShowcase() {
         step="03"
         eyebrow="Creative"
         title="It finds what works — then makes it yours."
-        desc="It points at a proven winner and rebuilds it around your product — a scroll-stopping image or video, in your brand, in minutes. No designer, no filming."
+        desc="It finds winning ads, understands why they work, then creates new images and videos for your brand — in minutes. No designer, no filming."
         bullets={['Image ads · $0.15', 'UGC-style video · $6', 'Their proven angle, your product']}
         grad="radial-gradient(120% 120% at 85% 0%, #ffe1ef, #efe4ff 52%, #e1ecff)"
       >
@@ -113,10 +113,10 @@ export default function FeatureShowcase() {
       <Block
         step="04"
         rev
-        eyebrow="Advertising"
-        title="Marketing runs your Facebook ads."
-        desc="Give it the brief — the goal, the budget, the season. It builds the campaign, prepares the creative, and puts the whole thing in front of you to approve. Not another ads manager to learn."
-        bullets={['You give the brief', 'It builds the campaign + creative', 'One-tap approve → live on Meta']}
+        eyebrow="Marketing"
+        title="Your marketing department runs your ads."
+        desc="Create campaigns, choose the creative, launch ads and monitor what happens — all with your approval. Not another ads manager to learn."
+        bullets={['Builds campaigns + picks creative', 'Launches and monitors on Meta', 'Nothing spends without your yes']}
         grad="radial-gradient(120% 120% at 15% 10%, #d9f0e2, #e7f0ff 58%, #f1e8ff)"
       >
         <div className="ad-row">
@@ -141,10 +141,10 @@ export default function FeatureShowcase() {
       >
         <div className="wa">
           <div className="wa-head"><span className="wa-dot" /> WhatsApp · Mello</div>
-          <div className="wa-msg me">How did we do yesterday?</div>
-          <div className="wa-msg them">Revenue up <b>18%</b>. Your new creative is scaling — and I found 3 competitor ads worth testing for us.</div>
-          <div className="wa-msg me">test them</div>
-          <div className="wa-msg them">✓ On it. Drafts will be in your morning brief.</div>
+          <div className="wa-msg me">Mello, what happened last night?</div>
+          <div className="wa-msg them">3 competitors launched new offers. I found <b>11 new winning ads</b>, made 4 creatives, and your best opportunity is ready for approval.</div>
+          <div className="wa-msg me">approve</div>
+          <div className="wa-msg them">✓ Launching now. Full brief in the morning.</div>
         </div>
       </Block>
 
@@ -154,7 +154,7 @@ export default function FeatureShowcase() {
         rev
         eyebrow="Company memory"
         title="Your conversations become company knowledge."
-        desc="Slack, WhatsApp, your inbox, customer chats, documents, decisions — every conversation becomes memory the whole company shares. Mello remembers, so nothing is lost and no one repeats themselves."
+        desc="Connect Slack, WhatsApp, email, customer support and your documents. Mello remembers what your company knows — so every department gets smarter over time."
         bullets={['Answers customers in your voice', 'Turns chats into company memory', 'Every department draws on it']}
         grad="radial-gradient(120% 120% at 88% 12%, #ffe6d9, #ffe0ef 52%, #e9e2ff)"
       >

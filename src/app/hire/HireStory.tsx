@@ -17,6 +17,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import HqMockup from './HqMockup'
+import NightProof from './NightProof'
+import HowItWorks from './HowItWorks'
 import FeatureGrid from './FeatureGrid'
 import FeatureShowcase from './FeatureShowcase'
 
@@ -79,6 +81,7 @@ export default function HireStory() {
         </h1>
         <p className="hero-neg rv d2">No employees. No agency. No freelancers.</p>
         <p className="hero-sub rv d3">Your AI company runs the work behind your brand. You make the calls.</p>
+        <p className="hero-does rv d3">Research your market · find winning ads · make new creatives · run campaigns · answer customers — while you sleep.</p>
 
         <div className="hero-cta rv d3">
           <a href="#agreement" className="btn-forest">Hire the team</a>
@@ -90,19 +93,25 @@ export default function HireStory() {
       {/* Animated product mockup — the workspace as a real app (proof of "The One-Person Company"). */}
       <HqMockup />
 
-      {/* Feature showcase — alternating blocks, each with an animated mockup of the feature working. */}
+      {/* Proof of work — "Last night" receipts: you slept, the company worked. */}
+      <NightProof />
+
+      {/* Feature showcase — the six numbered sections told as one employee story. */}
       <FeatureShowcase />
 
-      {/* Feature grid — Sila-style compact cards for the rest of the suite. */}
+      {/* The departments — six compact cards recapping the whole company. */}
       <FeatureGrid />
+
+      {/* How it works — one company, three steps. */}
+      <HowItWorks />
 
       {/* Old serif narrative sections (cold-open, night, morning, control, teach, why, turn)
           removed — the story is now told by the animated HqMockup + FeatureShowcase + FeatureGrid above,
           which match the new theme and keep the page short. The Employment Agreement stays. */}
 
-      {/* The turn into the ceremony — restates the category one last time before the signature. */}
+      {/* Big idea — the whole thesis in five words, right before the ceremony. */}
       <section className="why">
-        <p className="rv">You&rsquo;re not buying software.<br />You&rsquo;re hiring a company.</p>
+        <p className="rv">The software disappears.<br />The company appears.</p>
         <div className="why-sub rv d2">One founder. One company. No marketing department required.</div>
       </section>
 
@@ -110,6 +119,7 @@ export default function HireStory() {
           the ridiculous 24/7 / never-on-vacation clauses are the screenshot. */}
       <div className="stage" id="agreement">
         <div className="paper rv">
+          <div className="p-lead">You&rsquo;re not buying software. You&rsquo;re hiring a company.</div>
           <div className="p-eyebrow">Employment agreement · for your signature</div>
           <div className="p-title">Employment Agreement</div>
           <div className="p-date">{today ? `Prepared ${today}` : 'Prepared this morning'}</div>
@@ -137,7 +147,7 @@ export default function HireStory() {
             </div>
           </div>
           <button className="hirebtn" disabled={name.trim().length < 2} onClick={hire}>
-            {hired ? '✓ Signed. Your team starts tonight.' : 'Sign & put the team to work'}
+            {hired ? '✓ Signed. Your company starts tonight.' : 'Hire your company'}
           </button>
           <div className="p-fine">No card to start · your first brief is free · effective tonight</div>
         </div>
@@ -190,6 +200,7 @@ export default function HireStory() {
         @keyframes hw-in{from{opacity:0;filter:blur(10px);transform:translateY(16px)}to{opacity:1;filter:blur(0);transform:none}}
         .hero-neg{margin-top:20px;font-size:clamp(15px,1.95vw,20px);font-weight:750;letter-spacing:-.012em;color:#1f2a20}
         .hero-sub{margin-top:22px;max-width:54ch;font-size:clamp(16px,1.8vw,19px);line-height:1.7;color:#4c5347;font-weight:500}
+        .hero-does{margin-top:14px;max-width:52ch;font-size:clamp(13px,1.4vw,15px);line-height:1.65;color:#6a7462;font-weight:600}
         .hero-cta{display:flex;align-items:center;gap:26px;margin-top:40px;flex-wrap:wrap;justify-content:center}
         .btn-forest{background:#17251c;color:#dffe95;border-radius:100px;padding:18px 42px;font-size:15.5px;font-weight:800;text-decoration:none;letter-spacing:-.01em;transition:transform .15s,box-shadow .15s}
         .btn-forest:hover{transform:translateY(-2px);box-shadow:0 18px 44px -14px rgba(23,37,28,.45)}
@@ -336,6 +347,7 @@ export default function HireStory() {
         .paper{background:#fff;color:#191d17;width:100%;max-width:560px;border-radius:8px;padding:54px 56px 44px;box-shadow:0 60px 130px -40px rgba(23,29,24,.4),0 0 0 1px #ecebe2;position:relative}
         @media(max-width:560px){.paper{padding:38px 26px 32px}}
         .paper:before{content:'';position:absolute;top:0;left:0;right:0;height:5px;border-radius:8px 8px 0 0;background:#dffe95}
+        .p-lead{font-family:'Instrument Serif',Georgia,serif;font-size:clamp(20px,2.6vw,28px);line-height:1.15;color:#171d18;letter-spacing:-.01em;margin-bottom:22px;text-wrap:balance}
         .p-eyebrow{font-size:10.5px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#8a927f;margin-bottom:26px}
         .p-title{font-size:26px;font-weight:850;letter-spacing:-.03em;margin-bottom:6px}
         .p-date{font-size:12.5px;color:#8a927f;margin-bottom:30px}
