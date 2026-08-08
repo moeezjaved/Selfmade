@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
           // Rate-limit chat so a spammer can't run up the OpenAI bill (the web path already does this).
           const { isRateLimited } = await import('@/lib/rateLimit')
           if (await isRateLimited(identity.user_id)) { await slackPost(ev.channel, 'One moment — give me a few seconds and ask again.', undefined, botToken); return NextResponse.json({ ok: true }) }
+          // Feed the Company Brain from the founder's Slack DMs (best-effort, non-blocking).
+          try { const { brainIngest } = await import('@/lib/brain'); void brainIngest(admin, { userId: identity.user_id, source: 'slack', raw: ev.text }) } catch { /* best-effort */ }
           try {
             const { askMello } = await import('@/lib/mello/ask')
             const out = await askMello(admin, identity.user_id, ev.text)

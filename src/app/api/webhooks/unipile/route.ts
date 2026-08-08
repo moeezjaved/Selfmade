@@ -113,6 +113,8 @@ export async function POST(req: NextRequest) {
   // Rate-limit so chatter can't run up the OpenAI bill (parity with the web + Slack paths).
   const { isRateLimited } = await import('@/lib/rateLimit')
   if (await isRateLimited(userId)) { await reply('One moment — give me a few seconds and ask again.'); return NextResponse.json({ ok: true }) }
+  // Feed the Company Brain from the founder's WhatsApp line (best-effort, non-blocking).
+  try { const { brainIngest } = await import('@/lib/brain'); void brainIngest(admin, { userId, source: 'whatsapp', raw: text }) } catch { /* best-effort */ }
   try {
     const { askMello } = await import('@/lib/mello/ask')
     const out = await askMello(admin, userId, text)

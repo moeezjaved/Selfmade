@@ -17,17 +17,21 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
 
-  const [brandRes, dnaRes, memRes, learnRes, prefs] = await Promise.all([
+  const [brandRes, dnaRes, memRes, learnRes, prefs, conflictRes] = await Promise.all([
     admin.from('brands').select('name, industry, brand_type').eq('user_id', user.id).limit(1),
-    admin.from('company_dna').select('id, rule, department, priority, active, created_by, source, created_at').eq('user_id', user.id).order('created_at', { ascending: false }),
+    admin.from('company_dna').select('id, rule, department, priority, active, created_by, source, evidence, created_at').eq('user_id', user.id).order('created_at', { ascending: false }),
     admin.from('mello_memory').select('content, category, department, confidence').eq('user_id', user.id).order('confidence', { ascending: false }).limit(200),
     admin.from('learnings').select('department, event, result, metric, confidence, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(200),
     getPrefs(admin, user.id),
+    admin.from('brain_conflicts').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'pending'),
   ])
 
   const dnaRows = (dnaRes.data || []) as any[]
   const beliefs = dnaRows.filter(d => d.active)
   const proposals = dnaRows.filter(d => !d.active && d.created_by === 'mello' && d.source === 'reflection')
+  // Every pending candidate belief (reflection + observed from Slack/WhatsApp/inbox), newest first.
+  const candidates = dnaRows.filter(d => !d.active && d.created_by === 'mello')
+  const conflictCount = conflictRes?.count || 0
   const mem = (memRes.data || []) as any[]
   const learns = (learnRes.data || []) as any[]
 
@@ -42,11 +46,11 @@ export async function GET() {
 
   return NextResponse.json({
     identity: (brandRes.data || [])[0] || null,
-    beliefs, proposals,
+    beliefs, proposals, candidates,
     departments,
     learnings: learns.slice(0, 30),
     prefs,
     playbook,
-    counts: { beliefs: beliefs.length, proposals: proposals.length, learnings: learns.length },
+    counts: { beliefs: beliefs.length, proposals: proposals.length, candidates: candidates.length, conflicts: conflictCount, learnings: learns.length },
   })
 }

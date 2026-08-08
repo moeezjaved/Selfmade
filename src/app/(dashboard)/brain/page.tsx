@@ -8,7 +8,15 @@ import toast from 'react-hot-toast'
 
 type Overview = any
 const DEPT_LABEL: Record<string, string> = { research: 'Research', creative: 'Creative', media: 'Media Buying', growth: 'Growth', customer: 'Customer', store: 'Store', finance: 'Finance' }
-const TABS = ['Overview', 'Identity', 'Beliefs', 'Departments', 'Learning', 'Playbook', 'Teach'] as const
+const TABS = ['Overview', 'Identity', 'Beliefs', 'Review', 'Departments', 'Learning', 'Playbook', 'Teach'] as const
+const SOURCE_LABEL = (s: string): string => {
+  if (!s) return ''
+  if (s.includes('slack')) return 'noticed on Slack'
+  if (s.includes('whatsapp')) return 'noticed on WhatsApp'
+  if (s.includes('inbox')) return 'noticed in your inbox'
+  if (s === 'reflection') return 'a pattern Mello noticed'
+  return 'suggested by Mello'
+}
 // Empty-state starters — so a blank Brain isn't intimidating. Founder taps → edits → teaches.
 const SUGGESTIONS = [
   'Never discount below 15%',
@@ -27,6 +35,7 @@ export default function BrainPage() {
   const [ask, setAsk] = useState(''); const [asking, setAsking] = useState(false)
   const [answer, setAnswer] = useState<{ reply: string; sources: string[] } | null>(null)
   const [tl, setTl] = useState<{ timeline: any[]; patterns: any[]; hasHistory: boolean } | null>(null)
+  const [conflicts, setConflicts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [rule, setRule] = useState(''); const [dept, setDept] = useState(''); const [busy, setBusy] = useState(false)
   const [reflecting, setReflecting] = useState(false)
@@ -34,7 +43,13 @@ export default function BrainPage() {
 
   const load = () => fetch('/api/brain/overview').then(r => r.json()).then(j => { if (!j.error) setOv(j) }).catch(() => {}).finally(() => setLoading(false))
   const loadTimeline = () => fetch('/api/brain/timeline').then(r => r.json()).then(j => { if (!j.error) setTl(j) }).catch(() => {})
-  useEffect(() => { load(); loadTimeline(); fetch('/api/brain/culture').then(r => r.json()).then(j => { if (j.culture) setCulture(j.culture) }).catch(() => {}) }, [])
+  const loadConflicts = () => fetch('/api/brain/conflict').then(r => r.json()).then(j => { if (j.conflicts) setConflicts(j.conflicts) }).catch(() => {})
+  useEffect(() => { load(); loadTimeline(); loadConflicts(); fetch('/api/brain/culture').then(r => r.json()).then(j => { if (j.culture) setCulture(j.culture) }).catch(() => {}) }, [])
+  const resolveConflict = async (id: string, action: 'temporary' | 'replace' | 'keep') => {
+    await fetch('/api/brain/conflict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action }) }).catch(() => {})
+    toast.success(action === 'replace' ? 'Replaced the old rule' : action === 'temporary' ? 'Added as a temporary exception' : 'Kept the old rule')
+    loadConflicts(); load()
+  }
   const doAsk = async () => {
     const qq = ask.trim(); if (!qq || asking) return
     setAsking(true); setAnswer(null)
@@ -74,7 +89,7 @@ export default function BrainPage() {
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ fontSize: 13, fontWeight: 700, padding: '7px 14px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: tab === t ? '#1a3a1a' : '#eef3ea', color: tab === t ? '#dffe95' : '#5a705a' }}>
-            {t}{t === 'Beliefs' && ov?.counts?.proposals ? pill(`${ov.counts.proposals} new`) : null}
+            {t}{t === 'Review' && ((ov?.counts?.conflicts || 0) + (ov?.counts?.candidates || 0)) ? pill(`${(ov?.counts?.conflicts || 0) + (ov?.counts?.candidates || 0)}`) : null}
           </button>
         ))}
       </div>
@@ -125,6 +140,44 @@ export default function BrainPage() {
                     <span style={{ fontSize: 13.5, color: '#3a5a3a', lineHeight: 1.5 }}><b style={{ color: '#1a3a1a', textTransform: 'capitalize' }}>{e.actor}</b>{e.department ? ` · ${DEPT_LABEL[e.department] || e.department}` : ''} — {e.event}</span>
                   </div>
                 )) : <p style={{ color: '#9ca3af', fontSize: 13 }}>No history yet. As Mello works and you teach it, the company's decisions and learnings show up here.</p>}
+              </div>
+            </>
+          )}
+
+          {tab === 'Review' && (
+            <>
+              {conflicts.length > 0 && (
+                <div style={{ ...card, borderColor: '#f0c9c0', background: '#fdf6f4' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1a3a1a', marginBottom: 4 }}>⚠️ Conflicts to resolve</div>
+                  <div style={{ fontSize: 12.5, color: '#8a6a64', marginBottom: 6 }}>A new rule clashes with one you already set. Nothing changes until you decide.</div>
+                  {conflicts.map((c: any) => (
+                    <div key={c.id} style={{ padding: '11px 0', borderTop: '1px solid #f3e2de' }}>
+                      <div style={{ fontSize: 13.5, color: '#1a3a1a' }}>New: <b>{c.incoming_rule}</b></div>
+                      <div style={{ fontSize: 12.5, color: '#8a6a64', marginTop: 2 }}>Clashes with: {c.existing_rule}</div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
+                        <button onClick={() => resolveConflict(c.id, 'temporary')} style={{ background: '#fff', color: '#1a3a1a', border: '1.5px solid #e2e8f0', padding: '6px 13px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Temporary exception</button>
+                        <button onClick={() => resolveConflict(c.id, 'replace')} style={{ background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '6px 13px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Replace old rule</button>
+                        <button onClick={() => resolveConflict(c.id, 'keep')} style={{ background: '#fff', color: '#5a705a', border: '1.5px solid #e2e8f0', padding: '6px 13px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Keep old</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={card}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a', marginBottom: 3 }}>Suggested rules</div>
+                <div style={{ fontSize: 12.5, color: '#7a9a7a', marginBottom: 6 }}>Things Mello learned from your work and conversations. Approve to make them company rules.</div>
+                {ov.candidates?.length ? ov.candidates.map((p: any) => (
+                  <div key={p.id} style={{ padding: '11px 0', borderTop: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: 14, color: '#1a3a1a' }}>{p.rule}{p.department && pill(DEPT_LABEL[p.department] || p.department)}</div>
+                    {p.evidence?.basedOn && <div style={{ fontSize: 12.5, color: '#5a705a', marginTop: 4 }}>Why — {p.evidence.basedOn}</div>}
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontFamily: 'ui-monospace,monospace' }}>{SOURCE_LABEL(p.source)}</div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
+                      <button onClick={() => proposal(p.id, 'approve')} style={{ background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Make it a rule</button>
+                      <button onClick={() => proposal(p.id, 'dismiss')} style={{ background: '#fff', color: '#b91c1c', border: '1.5px solid #e2e8f0', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Dismiss</button>
+                    </div>
+                  </div>
+                )) : (conflicts.length ? null : <p style={{ color: '#9ca3af', fontSize: 13 }}>Nothing to review. As Mello learns from your work and conversations, suggested rules land here.</p>)}
               </div>
             </>
           )}
