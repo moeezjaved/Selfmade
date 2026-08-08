@@ -48,7 +48,11 @@ export default function NightProof() {
   useEffect(() => {
     const el = ref.current; if (!el) return
     const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { setOn(true); io.disconnect() } }), { rootMargin: '0px 0px -12% 0px' })
-    io.observe(el); return () => io.disconnect()
+    io.observe(el)
+    // Safety net: if the observer never fires (some browser extensions block it), still count up so the
+    // receipts never sit at 0. Idempotent with the observer.
+    const t = setTimeout(() => setOn(true), 1600)
+    return () => { io.disconnect(); clearTimeout(t) }
   }, [])
   return (
     <section className="np-wrap" ref={ref}>
