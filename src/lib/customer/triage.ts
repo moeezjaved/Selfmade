@@ -61,10 +61,13 @@ async function reasoned(admin: any, userId: string, body: string, brand: string,
 }
 
 /** Triage one inbound message: reasoned if we can, deterministic otherwise. Capped so it can't hang. */
-export async function triageMessage(admin: any, userId: string, input: { body: string; brand?: string; brandId?: string | null }): Promise<Triage> {
+export async function triageMessage(admin: any, userId: string, input: { body: string; brand?: string; brandId?: string | null; threadId?: string | null }): Promise<Triage> {
   const body = String(input.body || '').trim()
   const brand = String(input.brand || '').trim()
   if (!body) return { priority: 'low', intent: 'other', draft: '' }
+  // Feed the Company Brain: extract customer signals from this inbound so patterns aggregate over time
+  // ("18 customers mentioned the applicator this week"). Fire-and-forget — never blocks or breaks triage.
+  try { const { brainIngest } = await import('@/lib/brain'); void brainIngest(admin, { userId, brandId: input.brandId, source: 'inbox', raw: body, threadId: input.threadId }) } catch { /* best-effort */ }
   try {
     const r = await Promise.race([
       reasoned(admin, userId, body, brand, input.brandId),

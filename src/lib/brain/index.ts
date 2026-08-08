@@ -114,3 +114,8 @@ export async function recall(admin: any, opts: { userId: string; department: Dep
 
   return { dna, deptMemory, learnings, prefs, prompt: lines.join('\n\n') }
 }
+
+// v4 — write pipeline (ingest) + read side (answer). Kept in sibling files; re-exported here.
+export { brainIngest, writeTimeline, recordContext, recordCustomerSignal } from './ingest'
+export type { BrainSource } from './ingest'
+export { brainAnswer, isCompanyQuestion } from './answer'

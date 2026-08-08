@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 
 type Overview = any
 const DEPT_LABEL: Record<string, string> = { research: 'Research', creative: 'Creative', media: 'Media Buying', growth: 'Growth', customer: 'Customer', store: 'Store', finance: 'Finance' }
-const TABS = ['Identity', 'Beliefs', 'Departments', 'Learning', 'Playbook', 'Teach'] as const
+const TABS = ['Overview', 'Identity', 'Beliefs', 'Departments', 'Learning', 'Playbook', 'Teach'] as const
 // Empty-state starters — so a blank Brain isn't intimidating. Founder taps → edits → teaches.
 const SUGGESTIONS = [
   'Never discount below 15%',
@@ -22,14 +22,28 @@ const SUGGESTIONS = [
 
 export default function BrainPage() {
   const [ov, setOv] = useState<Overview | null>(null)
-  const [tab, setTab] = useState<typeof TABS[number]>('Beliefs')
+  const [tab, setTab] = useState<typeof TABS[number]>('Overview')
+  // Overview tab: ask-the-company + the company timeline.
+  const [ask, setAsk] = useState(''); const [asking, setAsking] = useState(false)
+  const [answer, setAnswer] = useState<{ reply: string; sources: string[] } | null>(null)
+  const [tl, setTl] = useState<{ timeline: any[]; patterns: any[]; hasHistory: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
   const [rule, setRule] = useState(''); const [dept, setDept] = useState(''); const [busy, setBusy] = useState(false)
   const [reflecting, setReflecting] = useState(false)
   const [culture, setCulture] = useState<{ aggressive: string; premium: string; tone: string; risk: string }>({ aggressive: 'balanced', premium: 'premium', tone: 'friendly', risk: 'ask' })
 
   const load = () => fetch('/api/brain/overview').then(r => r.json()).then(j => { if (!j.error) setOv(j) }).catch(() => {}).finally(() => setLoading(false))
-  useEffect(() => { load(); fetch('/api/brain/culture').then(r => r.json()).then(j => { if (j.culture) setCulture(j.culture) }).catch(() => {}) }, [])
+  const loadTimeline = () => fetch('/api/brain/timeline').then(r => r.json()).then(j => { if (!j.error) setTl(j) }).catch(() => {})
+  useEffect(() => { load(); loadTimeline(); fetch('/api/brain/culture').then(r => r.json()).then(j => { if (j.culture) setCulture(j.culture) }).catch(() => {}) }, [])
+  const doAsk = async () => {
+    const qq = ask.trim(); if (!qq || asking) return
+    setAsking(true); setAnswer(null)
+    try {
+      const r = await fetch('/api/brain/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: qq }) }).then(x => x.json())
+      setAnswer({ reply: r.reply || '—', sources: r.sources || [] })
+    } catch { setAnswer({ reply: 'I hit a snag — try again in a moment.', sources: [] }) }
+    finally { setAsking(false) }
+  }
   const saveCulture = (next: typeof culture) => { setCulture(next); fetch('/api/brain/culture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) }).then(() => toast.success('Culture updated')).catch(() => {}) }
 
   const teach = async () => {
@@ -67,6 +81,54 @@ export default function BrainPage() {
 
       {loading ? <p style={{ color: '#9ca3af', fontSize: 14 }}>Loading your company's memory…</p> : !ov ? <p style={{ color: '#9ca3af' }}>Couldn't load.</p> : (
         <>
+          {tab === 'Overview' && (
+            <>
+              <div style={card}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a', marginBottom: 3 }}>Ask your company anything</div>
+                <div style={{ fontSize: 12.5, color: '#7a9a7a', marginBottom: 12 }}>Mello answers from everything the company knows — beliefs, facts, what it's learned, and your customer conversations.</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={ask} onChange={e => setAsk(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') doAsk() }} placeholder="e.g. What are customers complaining about?" style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, fontFamily: 'inherit' }} />
+                  <button onClick={doAsk} disabled={asking} style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '10px 20px', borderRadius: 10, fontSize: 13.5, fontWeight: 800, cursor: asking ? 'default' : 'pointer', fontFamily: 'inherit', opacity: asking ? 0.6 : 1 }}>{asking ? '…' : 'Ask'}</button>
+                </div>
+                {answer ? (
+                  <div style={{ marginTop: 14, padding: '14px 16px', background: '#f8fcf6', border: '1px solid #e6efdc', borderRadius: 12 }}>
+                    <div style={{ fontSize: 14, color: '#1a3a1a', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{answer.reply}</div>
+                    {answer.sources?.length > 0 && <div style={{ marginTop: 10, fontSize: 11, color: '#7a9a7a', fontFamily: 'ui-monospace,monospace' }}>Source · {answer.sources.join(' · ')}</div>}
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {['What did we learn this week?', 'What are customers complaining about?', 'What is our brand positioning?', 'What are our best-performing ads?'].map(s => (
+                      <button key={s} onClick={() => setAsk(s)} style={{ fontSize: 12, color: '#5a705a', background: '#eef3ea', border: 'none', borderRadius: 100, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>{s}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {tl?.patterns && tl.patterns.length > 0 && (
+                <div style={card}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a', marginBottom: 10 }}>What customers are talking about <span style={{ fontSize: 12, color: '#7a9a7a', fontWeight: 500 }}>· last 14 days</span></div>
+                  {tl.patterns.map((p: any) => (
+                    <div key={p.topic} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: '1px solid #f1f5f9' }}>
+                      <span style={{ fontSize: 13.5, color: '#1a3a1a', textTransform: 'capitalize', flex: 1 }}>{String(p.topic).replace(/_/g, ' ')}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: '#3b6d11' }}>{p.count} mention{p.count === 1 ? '' : 's'}</span>
+                      {p.negative > 0 && <span style={{ fontSize: 11, color: '#b91c1c', background: '#fdecea', borderRadius: 100, padding: '2px 8px' }}>{p.negative} neg</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={card}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a', marginBottom: 10 }}>Company timeline</div>
+                {tl?.timeline?.length ? tl.timeline.map((e: any, i: number) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderTop: i ? '1px solid #f1f5f9' : 'none' }}>
+                    <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'ui-monospace,monospace', flex: 'none', width: 58, paddingTop: 2 }}>{new Date(e.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                    <span style={{ fontSize: 13.5, color: '#3a5a3a', lineHeight: 1.5 }}><b style={{ color: '#1a3a1a', textTransform: 'capitalize' }}>{e.actor}</b>{e.department ? ` · ${DEPT_LABEL[e.department] || e.department}` : ''} — {e.event}</span>
+                  </div>
+                )) : <p style={{ color: '#9ca3af', fontSize: 13 }}>No history yet. As Mello works and you teach it, the company's decisions and learnings show up here.</p>}
+              </div>
+            </>
+          )}
+
           {tab === 'Identity' && (
             <div style={card}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a', marginBottom: 8 }}>Who the company is</div>

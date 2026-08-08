@@ -48,8 +48,9 @@ export async function askMello(admin: any, userId: string, message: string, opts
   // 1 · TEACH a belief
   if (!item && TEACH.test(q) && !q.includes('?')) {
     try {
-      const { teachRule } = await import('@/lib/brain')
+      const { teachRule, writeTimeline } = await import('@/lib/brain')
       await teachRule(admin, { userId, rule: q, createdBy: 'founder', source: 'chat' })
+      void writeTimeline(admin, { userId, actor: 'founder', event: `Learned a rule: “${q}”` })
       return { reply: `Got it — I've made that a company rule: “${q}”. The whole team follows it from now on. Say “forget that rule” any time to remove it.` }
     } catch { /* fall through */ }
   }
@@ -94,6 +95,17 @@ export async function askMello(admin: any, userId: string, message: string, opts
     const ads = await answerAdsQuestion(admin, userId, q)
     if (ads) return ads
   } catch { /* fall through */ }
+
+  // 4.5 · "Ask me anything about your company" → the Company Brain answer engine. Grounds the reply in
+  // beliefs + facts + learnings + customer signals and cites the source; returns null (falls through) when
+  // it isn't a company-knowledge question or there's nothing to ground on.
+  if (!item) {
+    try {
+      const { brainAnswer } = await import('@/lib/brain')
+      const ans = await brainAnswer(admin, userId, q)
+      if (ans?.reply) return { reply: ans.sources?.length ? `${ans.reply}\n\n_Source · ${ans.sources.join(' · ')}_` : ans.reply }
+    } catch { /* fall through */ }
+  }
 
   // 5 · reacting to a brief item ("why this?") — fast, no tools
   if (item && (item.title || item.body)) {
