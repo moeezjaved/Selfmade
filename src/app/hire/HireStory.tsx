@@ -78,7 +78,7 @@ export default function HireStory() {
           ))}
         </h1>
         <p className="hero-neg rv d2">No employees. No agency. No freelancers.</p>
-        <p className="hero-sub rv d3">Your AI company does the work. You make the calls.</p>
+        <p className="hero-sub rv d3">Your AI company runs the work behind your brand. You make the calls.</p>
 
         <div className="hero-cta rv d3">
           <a href="#agreement" className="btn-forest">Hire the team</a>
@@ -103,6 +103,7 @@ export default function HireStory() {
       {/* The turn into the ceremony — restates the category one last time before the signature. */}
       <section className="why">
         <p className="rv">You&rsquo;re not buying software.<br />You&rsquo;re hiring a company.</p>
+        <div className="why-sub rv d2">One founder. One company. No marketing department required.</div>
       </section>
 
       {/* THE AGREEMENT — the conversion is a signature. Employment terms, not a co-founder deal —
@@ -320,6 +321,7 @@ export default function HireStory() {
         /* 9 · why different — a statement, then one honest line each */
         .why{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:150px 24px 60px}
         .why p{font-family:'Instrument Serif',Georgia,serif;font-size:clamp(32px,5.2vw,64px);line-height:1.12;color:#171d18;max-width:22ch;text-wrap:balance;margin:0}
+        .why-sub{margin-top:22px;font-size:clamp(14.5px,1.6vw,17px);font-weight:600;color:#68756b}
         .why-compare{margin-top:34px;display:flex;flex-direction:column;gap:8px;font-size:clamp(14.5px,1.6vw,17px);color:#68756b;font-weight:550}
         .why-k{font-weight:800;color:#8a927f}
         .why-k--us{color:#171d18}
