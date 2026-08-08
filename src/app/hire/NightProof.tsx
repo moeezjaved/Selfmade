@@ -10,13 +10,15 @@ import React, { useEffect, useRef, useState } from 'react'
 const FOREST = '#12211a', LIME = '#dffe95'
 
 const STATS: [number, string, string][] = [
-  [14, '', 'competitors researched'],
-  [860, '', 'ads analysed'],
+  [14, '', 'competitors watched'],
+  [860, '', 'ads analyzed'],
   [12, '', 'opportunities found'],
   [7, '', 'creatives made'],
   [3, '', 'campaigns prepared'],
-  [42, '', 'customers answered'],
+  [42, '', 'customer conversations'],
 ]
+
+const DEPTS = ['Research', 'Creative', 'Marketing', 'Customer', 'Strategy', 'Intelligence']
 
 function Stat({ end, suffix, label, on }: { end: number; suffix: string; label: string; on: boolean }) {
   const [n, setN] = useState(0)
@@ -69,6 +71,14 @@ export default function NightProof() {
         <div className="np-foot">…and it was all waiting in your brief this morning.</div>
       </div>
 
+      {/* Names the company: what "The One-Person Company" actually employs. */}
+      <div className="np-depts">
+        <div className="np-depts-line">While you sleep, six departments keep working.</div>
+        <div className="np-depts-row">
+          {DEPTS.map((d) => <span className="np-dept" key={d}>{d}</span>)}
+        </div>
+      </div>
+
       <style dangerouslySetInnerHTML={{ __html: `
         .np-wrap{max-width:1040px;margin:56px auto 0;padding:0 20px}
         .np{background:${FOREST};border-radius:22px;padding:34px 30px 30px;box-shadow:0 40px 90px -50px rgba(17,37,28,.6);opacity:1}
@@ -78,8 +88,14 @@ export default function NightProof() {
         .np-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
         .np-stat{text-align:center;padding:6px 4px}
         .np-n{font:800 clamp(30px,4vw,46px)/1 'Instrument Serif',Georgia,serif;color:${LIME};letter-spacing:-.01em;font-variant-numeric:tabular-nums}
-        .np-l{margin-top:8px;font-size:12px;line-height:1.35;color:#cdd8cd;font-weight:600}
+        .np-l{margin-top:8px;font-size:12.5px;line-height:1.35;color:#d5e0d3;font-weight:600}
         .np-foot{text-align:center;margin-top:26px;font-size:14px;color:#a9b6a7;font-weight:550}
+
+        /* Department strip — names the six things the company employs. */
+        .np-depts{text-align:center;margin-top:28px}
+        .np-depts-line{font-size:15px;font-weight:650;color:#4c5347}
+        .np-depts-row{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin-top:16px}
+        .np-dept{font:800 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#2f4a35;background:#eef4e4;border:1px solid #dce8cc;border-radius:100px;padding:9px 15px}
         @media (max-width:760px){
           .np-grid{grid-template-columns:repeat(3,1fr);gap:18px 10px}
           .np{padding:28px 20px 24px}

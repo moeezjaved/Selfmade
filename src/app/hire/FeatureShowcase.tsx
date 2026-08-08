@@ -153,8 +153,8 @@ export default function FeatureShowcase() {
         step="06"
         rev
         eyebrow="Company memory"
-        title="Your conversations become company knowledge."
-        desc="Connect Slack, WhatsApp, email, customer support and your documents. Mello remembers what your company knows — so every department gets smarter over time."
+        title="Your company gets a memory."
+        desc="Mello learns from your Slack, WhatsApp, inbox, customer conversations and documents — so the whole company remembers what you’ve already learned, and every department gets smarter over time."
         bullets={['Answers customers in your voice', 'Turns chats into company memory', 'Every department draws on it']}
         grad="radial-gradient(120% 120% at 88% 12%, #ffe6d9, #ffe0ef 52%, #e9e2ff)"
       >

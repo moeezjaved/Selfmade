@@ -9,9 +9,9 @@ import React from 'react'
 const INK = '#17251c'
 
 const STEPS: { n: string; title: string; body: string }[] = [
-  { n: '01', title: 'Connect', body: 'Give Selfmade access to your business — Slack, WhatsApp, Shopify, Meta, email and your documents.' },
-  { n: '02', title: 'Teach', body: 'Tell it how you work, what you sell and what matters. Once. It becomes the company brain.' },
-  { n: '03', title: 'Let it work', body: 'Your departments research, create, market and answer customers — then report back every morning.' },
+  { n: '01', title: 'Connect', body: 'Connect the tools your company already uses — Slack, WhatsApp, Shopify, Meta, email and your docs.' },
+  { n: '02', title: 'Teach', body: 'Tell Mello how your company works, what you sell and what matters.' },
+  { n: '03', title: 'Let it work', body: 'Your departments research, create, market and report back.' },
 ]
 
 export default function HowItWorks() {
