@@ -45,9 +45,11 @@ function SnapshotsPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {snaps.map(s => (
-            <div key={s.token} className="lb-row" style={{ display: 'flex', alignItems: 'center', gap: 14, background: G2, borderRadius: 16, padding: '16px 18px', transition: 'background-color .075s ease-in-out' }}>
+            <div key={s.token} className="lb-row" style={{ display: 'flex', alignItems: 'center', gap: 14, rowGap: 10, flexWrap: 'wrap', background: G2, borderRadius: 16, padding: '16px 18px', transition: 'background-color .075s ease-in-out' }}>
               <span style={{ fontSize: 24, flexShrink: 0 }}>{s.emoji || '📊'}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              {/* flex-basis 200 + wrap: on a phone the View/Reshare/Delete buttons drop to their own row
+                  instead of crushing this text block to one-word-per-line. */}
+              <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
                 <div style={{ fontSize: 12.5, color: G11, marginTop: 2 }}>
                   Shared by {s.sharedBy} · {when(s.createdAt)}{s.mode === 'partner' ? ' · emailed to partner' : ''}

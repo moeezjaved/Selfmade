@@ -171,19 +171,25 @@ function LeaderboardPage() {
 
       {/* ── Section 2: Creative leaderboard ── */}
       <h2 style={{ fontSize: 20, lineHeight: '24px', fontWeight: 600, letterSpacing: '-0.017em', margin: '40px 0 14px' }}>Creative leaderboard</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 120px 160px 160px', gap: 0, padding: '0 16px 8px', fontSize: 12, fontWeight: 500, color: G11 }}>
-        <span>Rank</span><span>Creative</span><span>Wks on board</span><span>Spend</span><span>ROAS</span>
+      {/* The 5 fixed columns (~620px) overflow a phone; scroll the whole board horizontally as one unit
+          (min-width keeps every column its size) instead of letting the thumbnail overlap the metrics. */}
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ minWidth: 620 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 120px 160px 160px', gap: 0, padding: '0 16px 8px', fontSize: 12, fontWeight: 500, color: G11 }}>
+            <span>Rank</span><span>Creative</span><span>Wks on board</span><span>Spend</span><span>ROAS</span>
+          </div>
+          {loading ? <BoardSkeleton />
+            : board.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: G9 }}>No creatives with spend this week.</div>
+            : (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {shownBoard.map(r => <BoardRow key={r.key} r={r} currency={currency} />)}
+                </div>
+                {board.length > 10 && <button onClick={() => setBoardExpanded(x => !x)} style={showBtn}>{boardExpanded ? 'Show less' : `Show more (${board.length})`}</button>}
+              </>
+            )}
+        </div>
       </div>
-      {loading ? <BoardSkeleton />
-        : board.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: G9 }}>No creatives with spend this week.</div>
-        : (
-          <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {shownBoard.map(r => <BoardRow key={r.key} r={r} currency={currency} />)}
-            </div>
-            {board.length > 10 && <button onClick={() => setBoardExpanded(x => !x)} style={showBtn}>{boardExpanded ? 'Show less' : `Show more (${board.length})`}</button>}
-          </>
-        )}
     </div>
   )
 }

@@ -216,7 +216,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           </div>
           <div style={{ fontSize: 13.5, fontWeight: 500, color: '#6f7a68', marginTop: 3 }}>{tpl.description}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', rowGap: 8, maxWidth: '100%' }}>
           {/* Last synced — click to re-sync live from Meta */}
           <button onClick={() => load()} title="Sync now (fetch the latest from Meta)" disabled={loading}
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', cursor: loading ? 'default' : 'pointer', fontFamily: FONT, fontSize: 12, fontWeight: 600, color: '#7c8577' }}>
@@ -518,8 +518,9 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
 
   return (
     <div style={panelStyle}>
-      {/* toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px', borderBottom: '1px solid rgba(26,58,26,.08)', position: 'relative' }}>
+      {/* toolbar — wraps on narrow screens so Custom / Table settings / AI tags never crop off-screen
+          (a horizontal scroller here would clip the absolutely-positioned dropdown menus). */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, rowGap: 8, flexWrap: 'wrap', padding: '16px 18px', borderBottom: '1px solid rgba(26,58,26,.08)', position: 'relative' }}>
         {menu && <div onClick={() => setMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />}
 
         {/* Custom (presets) */}
