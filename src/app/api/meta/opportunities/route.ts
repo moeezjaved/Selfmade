@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 import { resolveScopedAccount } from '@/lib/meta/scope'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 import { fetchLiveOpportunities } from '@/lib/meta/opportunities-fetch'
 import { cacheGet, cacheSet } from '@/lib/meta/cache'
 
@@ -30,6 +31,17 @@ export async function GET(req: NextRequest) {
     if (accountId) {
       const { data } = await admin.from('meta_accounts').select('*').eq('user_id', user.id).eq('account_id', accountId).eq('status', 'active').maybeSingle()
       acct = data
+    }
+    // Brand-scope: when a specific brand is active and no explicit account, use THAT brand's account. If the
+    // brand has none, return empty — do NOT fall back to the primary account (that leaked ROY 1's moves onto
+    // Hair ResQ). resolveScopedAccount's primary fallback only applies in the "All brands" view.
+    if (!acct) {
+      const brandId = (await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand')).catch(() => null)) || null
+      if (brandId) {
+        const { data: ba } = await admin.from('meta_accounts').select('*').eq('user_id', user.id).eq('status', 'active').eq('brand_id', brandId).limit(1).maybeSingle()
+        if (!ba) return NextResponse.json({ opportunities: [], noAccountForBrand: true })
+        acct = ba
+      }
     }
     if (!acct) acct = await resolveScopedAccount(admin, user.id)
     if (!acct) return NextResponse.json({ opportunities: [] })

@@ -22,12 +22,15 @@ export async function GET(req: NextRequest) {
     const admin = createAdminClient()
     // Scope to the active project: explicit ?brand= wins, else the app-wide sf_brand cookie (rail switcher).
     const brandId = (await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand'))) || undefined
-    // When a brand is selected and no explicit account, show THAT brand's linked ad account (the
-    // "project" link). Falls back to the primary account when the brand has none linked yet.
+    // When a brand is selected and no explicit account, show THAT brand's linked ad account (the "project"
+    // link). If the brand has NO account of its own, DON'T fall back to the primary — that leaked another
+    // brand's ad data (Hair ResQ, no account, showed ROY 1's 6.9x ROAS + moves). Return an empty, no-account
+    // summary so the card shows "connect this brand's ad account" instead.
     if (!accountId && brandId) {
       const { data: acct } = await admin.from('meta_accounts').select('account_id')
         .eq('user_id', user.id).eq('status', 'active').eq('brand_id', brandId).limit(1).maybeSingle()
       if (acct?.account_id) accountId = acct.account_id
+      else return NextResponse.json({ accounts: [], noAccountForBrand: true })
     }
     const r = await auditAccount(admin, user.id, accountId, range)
     return NextResponse.json(r || { accounts: [] })
