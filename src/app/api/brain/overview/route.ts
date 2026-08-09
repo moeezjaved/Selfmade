@@ -54,7 +54,9 @@ export async function GET() {
       mem = ((withBrand.data || []) as any[]).filter(inBrand)
     }
   }
-  const learns = ((learnRes.data || []) as any[]).filter(inBrand)
+  // Learnings are STRICT per-brand (a customer-reply learning belongs to the brand whose customer it was).
+  // Legacy null-brand learnings (written before brand tagging) show only under "All brands", not every brand.
+  const learns = ((learnRes.data || []) as any[]).filter(l => !brandId || l.brand_id === brandId)
 
   const departments = DEPTS.map(dept => ({
     department: dept,

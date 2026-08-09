@@ -49,7 +49,7 @@ export async function brainAnswer(
     ])
     dna = (dnaR?.data || []).filter(inBrand).slice(0, 40)
     mem = (memR?.data || []).filter(inBrand).slice(0, 40)
-    learns = (lnR?.data || []).filter(inBrand).slice(0, 30)
+    learns = (lnR?.data || []).filter(strictBrand).slice(0, 30)   // learnings belong to their brand (strict), like signals
     signals = (sgR?.data || []).filter(strictBrand).slice(0, 200)
     ctx = (cxR?.data || []).filter(inBrand).slice(0, 20)
     follows = (flR?.data || []).filter(strictBrand).slice(0, 20)

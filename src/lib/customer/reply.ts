@@ -64,7 +64,9 @@ export async function sendCustomerReply(admin: any, userId: string, messageId: s
   }
   await admin.from('customer_threads').update({ status: 'replied', last_message_at: now }).eq('id', msg.thread_id)
 
-  try { await recordLearning(admin, { userId, department: 'customer', event: `Approved a ${msg.intent || 'customer'} reply`, result: text.slice(0, 300), source: 'founder', metric: { intent: msg.intent, delivered } }) } catch { /* ok */ }
+  // Tag the learning with the thread's brand so it stays on THAT brand's Company Brain (Aura's replies
+  // no longer surface under Hair ResQ's "What the company has learned").
+  try { await recordLearning(admin, { userId, brandId: (thread as any)?.brand_id || null, department: 'customer', event: `Approved a ${msg.intent || 'customer'} reply`, result: text.slice(0, 300), source: 'founder', metric: { intent: msg.intent, delivered } }) } catch { /* ok */ }
   // ok reflects real send for live channels (so the UI shows the failure), true for the test channel.
   return { ok: delivered || simulated, delivered, note }
 }
