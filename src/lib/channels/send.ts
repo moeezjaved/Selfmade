@@ -85,11 +85,10 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
 
 /** Send a read-only report (brief) to every linked channel. */
 export async function sendReportToChannels(admin: any, userId: string, brief: any, opts: { brandId?: string | null; brandLabel?: string } = {}): Promise<{ sent: number }> {
-  // Founder comms only — the brief must reach the founder's own Slack/WhatsApp, NEVER a connected
-  // customer channel (a Unipile customer WhatsApp shares provider 'whatsapp').
-  // Founder-brief channels: everything NOT a customer channel, PLUS WhatsApp (a solo founder's own
-  // WhatsApp is both their inbox and where the brief goes — so briefs always reach a connected WhatsApp).
-  const ids = (await getIdentities(admin, userId)).filter((i: any) => i.provider === 'whatsapp' || !i.meta?.customer_channel)
+  // Founder comms ONLY — the brief must reach the founder's own Slack/WhatsApp (founder_tool), NEVER a
+  // connected CUSTOMER channel. A customer WhatsApp (Aura's inbox line) shares provider 'whatsapp', so we
+  // key on the founder_tool flag, not the provider — otherwise Hair ResQ's brief leaked to Aura's customers.
+  const ids = (await getIdentities(admin, userId)).filter((i: any) => i.meta?.founder_tool === true || (i.provider === 'slack' && i.meta?.customer_channel !== true))
   if (!ids.length) return { sent: 0 }
   // Ground the report in the SAME live account state the brief shows: the brief computes moves on
   // page-load (fetchLiveOpportunities) but writes nothing, while tasks are only written by the audit.
@@ -109,19 +108,24 @@ export async function sendReportToChannels(admin: any, userId: string, brief: an
   // approval — record it so pushNewApprovals doesn't then send the same task again as a lone card.
   const expires_at = new Date(Date.now() + APPROVAL_TTL_MS).toISOString()
   let sent = 0
+  const results: Array<{ provider: string; kind?: string; ok: boolean; error?: string }> = []
   for (const id of ids) {
     if (id.provider === 'slack' && id.meta?.channel_id) {
       const r = await slackPost(id.meta.channel_id, 'Your brief', slackBlocks, botTokenFor(id))
+      results.push({ provider: 'slack', ok: !!r.ok, error: r.ok ? undefined : (r.error || 'slack send failed') })
       if (r.ok) {
         sent++
         await admin.from('channel_messages').insert({ user_id: userId, provider: 'slack', external_id: r.ts, channel_ref: id.meta.channel_id, kind: 'report', status: 'sent' })
         if (pending) await admin.from('channel_messages').insert({ user_id: userId, provider: 'slack', external_id: r.ts, channel_ref: id.meta.channel_id, kind: 'approval', task_id: pending.id, status: 'sent', expires_at }).then(() => {}, () => {})
       }
+    } else if (id.provider === 'slack') {
+      results.push({ provider: 'slack', ok: false, error: 'no channel_id (re-add Slack)' })
     } else if (id.provider === 'whatsapp') {
       // QR model: send FROM the founder's own account into their "Message yourself" chat (see waSendArgs).
       const wa = await waSendArgs(admin, userId, id)
       const chatId = wa.chatId
       const r = await whatsappSend({ ...wa, text })
+      results.push({ provider: 'whatsapp', kind: id.meta?.founder_tool ? 'founder' : (id.meta?.customer_channel ? 'customer' : '?'), ok: !!r.ok, error: r.ok ? undefined : (r.error || 'whatsapp send failed') })
       if (r.ok) {
         sent++
         await admin.from('channel_messages').insert({ user_id: userId, provider: 'whatsapp', external_id: r.id, channel_ref: r.chatId || chatId, kind: 'report', status: 'sent' })
@@ -129,7 +133,7 @@ export async function sendReportToChannels(admin: any, userId: string, brief: an
       }
     }
   }
-  return { sent }
+  return { sent, results }
 }
 
 /**
