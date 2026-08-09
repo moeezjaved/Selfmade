@@ -155,12 +155,13 @@ export async function pushNewApprovals(admin: any, userId: string): Promise<{ pu
 
 /** Push a new customer message to the founder's Slack (+ WhatsApp) with Approve/Skip buttons, so they can
  *  handle it from chat. Only fires for the founder's OWN comms channels (never a connected customer one). */
-export async function pushCustomerMessage(admin: any, userId: string, m: { messageId: string; contactName?: string; channel: string; priority?: string; intent?: string; body: string; draft: string }): Promise<void> {
+export async function pushCustomerMessage(admin: any, userId: string, m: { messageId: string; contactName?: string; channel: string; priority?: string; intent?: string; body: string; draft: string; brandLabel?: string }): Promise<void> {
   const ids = await getIdentities(admin, userId)
   const founderChans = ids.filter((i: any) => i.provider === 'whatsapp' || (i.provider === 'slack' && !i.meta?.customer_channel))
   if (!founderChans.length) return
   const PRI: Record<string, string> = { high: '🔴 HIGH', med: '🟡 MEDIUM', low: '🟢 LOW' }
-  const head = `💬 *New ${m.channel} message*${m.priority ? ` · ${PRI[m.priority] || m.priority}` : ''}${m.intent ? ` · ${m.intent}` : ''}`
+  // One founder line covers every brand → always lead with the brand so "which brand?" is never ambiguous.
+  const head = `${m.brandLabel ? `🏷️ *${m.brandLabel}* · ` : ''}💬 *New ${m.channel} message*${m.priority ? ` · ${PRI[m.priority] || m.priority}` : ''}${m.intent ? ` · ${m.intent}` : ''}`
   const bodyTxt = `${head}\n*From ${m.contactName || 'a customer'}:*\n> ${m.body}\n\n*Mello's draft:*\n_${m.draft}_`
   const slackBlocks = [
     { type: 'section', text: { type: 'mrkdwn', text: bodyTxt } },

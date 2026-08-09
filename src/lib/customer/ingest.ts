@@ -60,7 +60,7 @@ export async function ingestCustomerMessage(admin: any, opts: { accountId?: stri
   try {
     if (inserted?.id) {
       const { pushCustomerMessage } = await import('@/lib/channels/send')
-      await pushCustomerMessage(admin, ownerId, { messageId: inserted.id, contactName: senderName, channel, priority: tr.priority, intent: tr.intent, body, draft: tr.draft })
+      await pushCustomerMessage(admin, ownerId, { messageId: inserted.id, contactName: senderName, channel, priority: tr.priority, intent: tr.intent, body, draft: tr.draft, brandLabel: brandName || undefined })
     }
   } catch { /* push is best-effort */ }
   return true
