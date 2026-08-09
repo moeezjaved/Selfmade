@@ -94,7 +94,11 @@ export function slackVerify(rawBody: string, timestamp: string | null, signature
 // Unipile is a hosted API: base URL + port are per-account (e.g. https://apiXXXX.unipile.com:13XXX),
 // auth via X-API-KEY. Set UNIPILE_DSN (the full base, no trailing slash) + UNIPILE_API_KEY +
 // UNIPILE_WHATSAPP_ACCOUNT_ID (the connected WhatsApp account in your Unipile dashboard).
-export const whatsappEnabled = !!(process.env.UNIPILE_DSN && process.env.UNIPILE_API_KEY && process.env.UNIPILE_WHATSAPP_ACCOUNT_ID)
+// Unipile is "enabled" for WhatsApp as soon as the DSN + API key are set — the same check the CONNECT
+// path uses (unipileConfigured). The account_id comes per-founder from their OWN connected account (QR
+// model, opts.accountId); the shared UNIPILE_WHATSAPP_ACCOUNT_ID is only an optional fallback. Requiring
+// it here made every founder-WhatsApp send return 'not_configured' even though their account was linked.
+export const whatsappEnabled = !!(process.env.UNIPILE_DSN && process.env.UNIPILE_API_KEY)
 
 const uniBase = () => {
   let d = (process.env.UNIPILE_DSN || '').trim().replace(/\/+$/, '')
