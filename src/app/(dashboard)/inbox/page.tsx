@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { ChannelLogo } from '@/components/brand/logos'
+import { prettyInbound } from '@/lib/customer/pretty'
 
 const INK = '#17251c', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#1a3a1a', LIME = '#dffe95', MUTED = '#6b6b6b'
 const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(17,37,28,.04), 0 10px 30px -20px rgba(17,37,28,.10)' }
@@ -31,6 +32,16 @@ const PRI: Record<string, { label: string; bg: string; fg: string }> = {
   low: { label: 'LOW', bg: '#eef2ec', fg: '#6b8f6b' },
 }
 const INTENT_EMOJI: Record<string, string> = { shipping: '📦', refund: '↩️', price: '💸', complaint: '⚠️', question: '❓', other: '💬' }
+
+// Module-scoped so its identity is STABLE across parent re-renders. When this lived inside InboxPage,
+// every keystroke (setDrafts → re-render) minted a new component type, so React unmounted and remounted
+// the textarea and the caret was lost after each letter. Hoisting it fixes the "click after every letter" bug.
+function DraftBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <textarea value={value} onChange={e => onChange(e.target.value)} rows={3}
+      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#fff', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none', resize: 'vertical', lineHeight: 1.5 }} />
+  )
+}
 const OUT_TYPES: { type: string; label: string; emoji: string }[] = [
   { type: 'follow_up', label: 'Sales follow-up', emoji: '💬' },
   { type: 'cart_recovery', label: 'Abandoned cart', emoji: '🛒' },
@@ -177,11 +188,6 @@ export default function InboxPage() {
     )
   }
 
-  const DraftBox = ({ messageId, fallback }: { messageId: string; fallback: string }) => (
-    <textarea value={drafts[messageId] ?? fallback ?? ''} onChange={e => setDrafts(d => ({ ...d, [messageId]: e.target.value }))} rows={3}
-      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#fff', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none', resize: 'vertical', lineHeight: 1.5 }} />
-  )
-
   return (
     <div style={{ padding: '32px 28px', maxWidth: 820, margin: '0 auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: INK, letterSpacing: '-.02em', marginBottom: 4 }}>Customer Inbox</h1>
@@ -259,7 +265,7 @@ export default function InboxPage() {
       </div>
 
       {tab === 'insights' ? (
-        <InsightsPanel data={insights} loading={insightsLoading} onRefresh={() => loadInsights(true)} />
+        <InsightsPanel data={insights} loading={insightsLoading} onRefresh={() => loadInsights(true)} onOpenInbox={intent => { setIntentFilter(intent || null); setTab('inbox') }} />
       ) : tab === 'inbox' ? (<>
         {Object.keys(rollup).length > 0 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
@@ -309,10 +315,10 @@ export default function InboxPage() {
                     {t.intent && t.intent !== 'price' && <span style={{ fontSize: 12, color: SUB, fontWeight: 650 }}>{INTENT_EMOJI[t.intent] || '💬'} {t.intent}</span>}
                     <span style={{ fontSize: 11.5, color: '#a7b0a5', fontWeight: 600, marginLeft: 'auto', textTransform: 'capitalize' }}>{t.channel}</span>
                   </div>
-                  <div style={{ fontSize: 13.5, color: INK, lineHeight: 1.5, background: '#f6f8f4', borderRadius: 10, padding: '10px 12px' }}>{msg.body}</div>
+                  <div style={{ fontSize: 13.5, color: INK, lineHeight: 1.5, background: '#f6f8f4', borderRadius: 10, padding: '10px 12px' }}>{prettyInbound(msg.body)}</div>
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#3f8f4f', marginBottom: 6 }}>Mello&rsquo;s suggested reply</div>
-                    <DraftBox messageId={msg.id} fallback={msg.suggested_reply || ''} />
+                    <DraftBox value={drafts[msg.id] ?? msg.suggested_reply ?? ''} onChange={v => setDrafts(d => ({ ...d, [msg.id]: v }))} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <ActionRow messageId={msg.id} fallback={msg.suggested_reply || ''} from="inbox" />
@@ -356,7 +362,7 @@ export default function InboxPage() {
                   </div>
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#3f8f4f', marginBottom: 6 }}>Mello wants to send</div>
-                    <DraftBox messageId={o.id} fallback={o.body || ''} />
+                    <DraftBox value={drafts[o.id] ?? o.body ?? ''} onChange={v => setDrafts(d => ({ ...d, [o.id]: v }))} />
                   </div>
                   <ActionRow messageId={o.id} fallback={o.body || ''} from="outbound" />
                 </div>
@@ -370,7 +376,7 @@ export default function InboxPage() {
 }
 
 /** Customer Success trends — the report Mello writes from the inbox: what people keep asking, and the fix. */
-function InsightsPanel({ data, loading, onRefresh }: { data: Insights | null; loading: boolean; onRefresh: () => void }) {
+function InsightsPanel({ data, loading, onRefresh, onOpenInbox }: { data: Insights | null; loading: boolean; onRefresh: () => void; onOpenInbox: (intent?: string) => void }) {
   const PRIB: Record<string, { bg: string; fg: string; label: string }> = {
     high: { bg: '#fdecec', fg: '#c0392b', label: 'FIX SOON' },
     med: { bg: '#fef6e7', fg: '#b7791f', label: 'WORTH DOING' },
@@ -408,6 +414,10 @@ function InsightsPanel({ data, loading, onRefresh }: { data: Insights | null; lo
           </div>
         )}
 
+        {/* Trends is a read of patterns across conversations — the fix Mello suggests, not the live chat.
+            Make that explicit + give a one-click way over to the Inbox to actually reply. */}
+        <div style={{ fontSize: 12, color: SUB, lineHeight: 1.5 }}>These are patterns across your conversations — to reply to a customer, open the <b style={{ color: INK }}>Inbox</b> tab.</div>
+
         {/* themes → recommendation */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {data.themes.map((t, i) => {
@@ -419,11 +429,12 @@ function InsightsPanel({ data, loading, onRefresh }: { data: Insights | null; lo
                   <span style={{ fontSize: 14, fontWeight: 750, color: INK }}>{t.title}</span>
                   <span style={{ fontSize: 12, color: SUB, fontWeight: 700, marginLeft: 'auto' }}>{t.count} message{t.count === 1 ? '' : 's'}</span>
                 </div>
-                {t.example && <div style={{ fontSize: 12.5, color: MUTED, fontStyle: 'italic', background: '#f6f8f4', borderRadius: 10, padding: '8px 12px', lineHeight: 1.5 }}>“{t.example}”</div>}
+                {t.example && <div style={{ fontSize: 12.5, color: MUTED, fontStyle: 'italic', background: '#f6f8f4', borderRadius: 10, padding: '8px 12px', lineHeight: 1.5 }}>“{prettyInbound(t.example)}”</div>}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <span style={{ fontSize: 13.5, color: '#3f8f4f', fontWeight: 800, flexShrink: 0 }}>→</span>
                   <span style={{ fontSize: 13.5, color: INK, fontWeight: 650, lineHeight: 1.5 }}>{t.recommendation}</span>
                 </div>
+                <button onClick={() => onOpenInbox()} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, marginTop: 2, color: '#3f8f4f', fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>Reply in Inbox →</button>
               </div>
             )
           })}

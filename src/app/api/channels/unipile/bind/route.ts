@@ -18,11 +18,12 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const accountId = String(body.accountId || '').trim()
   const requested = String(body.provider || '').trim()
+  const kind = String(body.kind || '').trim()   // 'founder' = the founder's own Mello channel (WhatsApp brief)
   if (!accountId) return NextResponse.json({ error: 'accountId required' }, { status: 400 })
 
   const type = await fetchAccountType(accountId)
   const provider = labelForType(type, requested)
-  try { await bindUnipileAccount(createAdminClient(), user.id, provider, accountId) }
+  try { await bindUnipileAccount(createAdminClient(), user.id, provider, accountId, undefined, kind === 'founder') }
   catch { return NextResponse.json({ error: 'Could not save the connection.' }, { status: 500 }) }
   return NextResponse.json({ ok: true, provider })
 }

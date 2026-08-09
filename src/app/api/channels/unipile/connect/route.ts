@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({}))
   const provider = String(body.provider || '')
-  const r = await createHostedAuthLink(user.id, provider, String(body.returnTo || ''))
+  const kind = body.kind === 'founder' ? 'founder' : undefined   // founder = the founder's OWN Mello channel (WhatsApp brief), not a customer inbox
+  const r = await createHostedAuthLink(user.id, provider, String(body.returnTo || ''), kind)
   if ('error' in r) return NextResponse.json({ error: r.error }, { status: 400 })
   return NextResponse.json({ url: r.url })
 }

@@ -53,10 +53,11 @@ export async function fetchAccountType(accountId: string): Promise<string> {
 
 /** Create a hosted-auth link the founder visits to connect one channel. `name` carries userId:provider.
  *  `returnTo` is the in-app path to come back to (e.g. /inbox or /settings). */
-export async function createHostedAuthLink(userId: string, provider: string, returnTo?: string): Promise<{ url: string } | { error: string }> {
+export async function createHostedAuthLink(userId: string, provider: string, returnTo?: string, kind?: 'founder' | 'customer'): Promise<{ url: string } | { error: string }> {
   if (!unipileConfigured()) return { error: 'Channels aren’t set up on the server yet.' }
   const provs = PROVIDER_MAP[provider] || ['*']
   const back = returnTo && returnTo.startsWith('/') ? returnTo : '/settings'
+  const kindQS = kind === 'founder' ? '&kind=founder' : ''
   try {
     const res = await fetch(`${DSN()}/api/v1/hosted/accounts/link`, {
       method: 'POST',
@@ -66,10 +67,10 @@ export async function createHostedAuthLink(userId: string, provider: string, ret
         providers: provs,
         api_url: DSN(),
         expiresOn: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        name: `${userId}:${provider}`,
+        name: `${userId}:${provider}${kind === 'founder' ? ':founder' : ''}`,
         notify_url: `${APP}/api/channels/unipile/callback${process.env.UNIPILE_WEBHOOK_SECRET ? `?secret=${encodeURIComponent(process.env.UNIPILE_WEBHOOK_SECRET)}` : ''}`,
-        success_redirect_url: `${APP}${back}?connected=${provider}`,
-        failure_redirect_url: `${APP}${back}?connect_error=${provider}`,
+        success_redirect_url: `${APP}${back}?connected=${provider}${kindQS}`,
+        failure_redirect_url: `${APP}${back}?connect_error=${provider}${kindQS}`,
       }),
     })
     const j = await res.json().catch(() => ({}))
@@ -202,11 +203,22 @@ export async function backfillOnce(admin: any, accountId: string): Promise<numbe
 }
 
 /** Bind a freshly-connected Unipile account to the founder (called from the notify callback). */
-export async function bindUnipileAccount(admin: any, userId: string, provider: string, accountId: string, display?: string) {
-  const founder = isFounderTool(provider)
+export async function bindUnipileAccount(admin: any, userId: string, provider: string, accountId: string, display?: string, founderTool?: boolean) {
+  // `founderTool` (from the hosted-auth `kind`) forces the founder's own Mello channel (WhatsApp brief);
+  // otherwise fall back to the provider default (only calendar is founder-only). One WhatsApp account can
+  // be BOTH the founder's brief channel and the customer inbox (same external_id → one row), so MERGE the
+  // existing meta instead of clobbering the other role's flag.
+  const founder = founderTool ?? isFounderTool(provider)
+  const { data: existing } = await admin.from('channel_identities')
+    .select('meta').eq('provider', provider).eq('external_id', accountId).maybeSingle()
+  const prev = (existing?.meta || {}) as Record<string, any>
   await admin.from('channel_identities').upsert({
-    user_id: userId, provider, external_id: accountId, display: display || null,
-    active: true, meta: { unipile_account_id: accountId, source: 'unipile', customer_channel: !founder, founder_tool: founder },
+    user_id: userId, provider, external_id: accountId, display: display || null, active: true,
+    meta: {
+      ...prev, unipile_account_id: accountId, source: 'unipile',
+      customer_channel: founder ? (prev.customer_channel === true) : true,
+      founder_tool: founder ? true : (prev.founder_tool === true),
+    },
     updated_at: new Date().toISOString(),
   }, { onConflict: 'provider,external_id' })
 }
