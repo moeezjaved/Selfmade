@@ -420,15 +420,14 @@ export async function GET(request: NextRequest) {
       if (langs.length) baseQuery = baseQuery.overlaps('languages', langs)
     }
     if (platforms) baseQuery = baseQuery.overlaps('platforms', platforms.split(','))
-    // Time window (days>0) = "launched in the last N days" = days_running <= N. We window on days_running
-    // (now populated), NOT start_date: a start_date window returned a huge planner-estimate count but ~0
-    // VISIBLE ads (the freshest launches have no creative yet, and the feed is has_creative-only). And NOT
-    // last_seen — that column has no usable index, so a 30d/90d window seq-scanned and hit a 20s timeout.
-    // days_running <= N + the days_running ASC sort below both ride mig-130's partial index
-    // (days_running, ad_id) WHERE has_creative → an index range scan that's fast for every window AND
-    // returns recently-launched ads that actually have creative.
-    if (days > 0) {
-      baseQuery = baseQuery.lte('days_running', days)
+    // Time window (days>0) = "active/seen in the last N days" = last_seen >= cutoff. This is what a
+    // marketer means by "last 7 days" and it has DATA: start_date/days_running window on LAUNCH date, but
+    // the freshest launches have no creative yet (the feed is has_creative-only) → those windows counted
+    // thousands but rendered ~0. last_seen (bumped every crawl) selects the currently-running ads, which
+    // DO have creative. Needs mig-147's (has_creative, last_seen desc, ad_id) index to be an index range
+    // scan (without it a broad window seq-scans → 20s timeout).
+    if (days > 0 && sinceDate) {
+      baseQuery = baseQuery.gte('last_seen', sinceDate)
     }
     // GetHookd-parity filters (performance tier, niche, brand volume, run-time,
     // CTA, creative reuse, hide-brands) — rollup-backed, all additive.
@@ -438,7 +437,7 @@ export async function GET(request: NextRequest) {
     // A time window (days>0) orders by days_running ASC so the (has_creative, days_running, ad_id)
     // composite (mig 130) serves BOTH the .lte('days_running', N) predicate AND the sort — index-only
     // scan, no timeout. (is_active is filtered on the small result set.)
-    if (days > 0) baseQuery = baseQuery.order('days_running', { ascending: true, nullsFirst: false }).order('ad_id', { ascending: true })
+    if (days > 0) baseQuery = baseQuery.order('last_seen', { ascending: false, nullsFirst: false }).order('ad_id', { ascending: true })
     else if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
     else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
     else if (sort === 'recent') baseQuery = baseQuery.order('last_seen', { ascending: false })
