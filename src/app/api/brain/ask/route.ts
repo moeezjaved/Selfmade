@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { brainAnswer } from '@/lib/brain'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,9 @@ export async function POST(req: NextRequest) {
   const q = String(question || '').trim()
   if (!q) return NextResponse.json({ error: 'question required' }, { status: 400 })
 
-  const ans = await brainAnswer(createAdminClient(), user.id, q)
+  const admin = createAdminClient()
+  const brandId = (await resolveActiveBrandId(admin, user.id).catch(() => null)) || null
+  const ans = await brainAnswer(admin, user.id, q, { brandId })
   if (!ans) {
     return NextResponse.json({
       reply: `I don't have enough in the company memory to answer that confidently yet — teach me, or connect Slack, WhatsApp and your inbox and I'll learn it. I can also research it if it's about your market.`,
