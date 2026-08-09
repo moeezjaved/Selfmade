@@ -387,9 +387,10 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
         title: `What's working across your ${brandSet.size} competitor${brandSet.size === 1 ? '' : 's'}: ${headline}${topHook ? `, hook “${topHook.label}”` : ''}.`,
         body: `Combined read of ${pbAds.length} recent ads across every brand you watch — the pattern to copy before it saturates.`,
         why: `Ship in the winning format + hook while it's still cheap. I can build you one.`,
-        // "Make one like this" → the competitor ads this playbook is built from (the watched brands'
-        // ad feed), so the founder sees the real winners first and picks one to remake.
-        cta_label: 'Make one like this', cta_href: '/discovery/following',
+        // "Make one like this" → Studio with the winning formula pre-seeded (angle), so Mello starts
+        // MAKING the ad in that format/hook/offer immediately. (It used to drop the founder on the plain
+        // Following feed, which read as "why am I on a list?" — the label promises an ad, not a browse.)
+        cta_label: 'Make one like this', cta_href: '/studio',
         playbook: {
           totalAds: pbAds.length, brandsCount: brandSet.size, videoPct: vidPct,
           formats: rank(fmtM, 4), hooks: rank(hookM, 4), emotions: rank(emoM, 5), offers: rank(offerM, 5),

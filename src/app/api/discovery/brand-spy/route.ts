@@ -58,7 +58,11 @@ export async function GET(req: NextRequest) {
       : await resolveActiveBrandId(admin, user.id, explicit || undefined).catch(() => null)
     // Only SPIED brands belong in Brand Spy (spied=true) — plain ❤️ follows live under Following.
     const { data: follows } = await admin.from('followed_brands').select('page_id, brand_id').in('user_id', ids).eq('spied', true)
-    const scoped = brandId ? ((follows || []) as any[]).filter((f: any) => f.brand_id === brandId) : (follows || [])
+    // Assigned-to-this-project spies show only here; UNassigned (brand_id null — legacy spies, or spied
+    // before per-brand scoping) are shared across every project so they never vanish. Same model as the
+    // Meta ad-account scoping. New spies get the active brand_id (see ensureFollowed), so switching the
+    // project genuinely changes the list going forward.
+    const scoped = brandId ? ((follows || []) as any[]).filter((f: any) => !f.brand_id || f.brand_id === brandId) : (follows || [])
     myPageIds = Array.from(new Set<string>((scoped as any[]).map((f: any) => String(f.page_id)).filter((x: string) => x && x !== 'null')))
     if (myPageIds.length === 0) return NextResponse.json({ brands: [], scope: 'mine' })
   }
@@ -187,13 +191,22 @@ const COUNTRIES = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', '
 // Spying a brand also FOLLOWS it → the alert-worker (runs every ~30 min) sends "new ads"
 // notifications for it, and the 6h spy re-crawl keeps its ad set fresh so those alerts fire.
 // Idempotent: one follow per (user, brand). Non-fatal — a follow failure never blocks the spy.
-async function ensureFollowed(admin: ReturnType<typeof createAdminClient>, userId: string, pageId: string, name: string) {
+async function ensureFollowed(admin: ReturnType<typeof createAdminClient>, userId: string, pageId: string, name: string, brandId?: string | null) {
   try {
-    const { data: ex } = await admin.from('followed_brands').select('id').eq('user_id', userId).eq('page_id', pageId).maybeSingle()
+    const { data: ex } = await admin.from('followed_brands').select('id, brand_id').eq('user_id', userId).eq('page_id', pageId).maybeSingle()
     // spied=true marks this as an explicit Brand Spy (vs a plain ❤️ Follow). If a ❤️ follow row
-    // already exists, upgrade it to a spy so it appears in the Brand Spy list.
-    if (!ex) await admin.from('followed_brands').insert({ user_id: userId, page_id: pageId, brand_name: name, spied: true })
-    else await admin.from('followed_brands').update({ spied: true }).eq('id', (ex as any).id)
+    // already exists, upgrade it to a spy so it appears in the Brand Spy list. brand_id (mig 117) links
+    // the spy to the ACTIVE project (brand switcher) so switching projects scopes the Brand Spy list —
+    // without it every spy was global (NULL) and showed under every project.
+    if (!ex) {
+      try { await admin.from('followed_brands').insert({ user_id: userId, page_id: pageId, brand_name: name, spied: true, brand_id: brandId || null }) }
+      catch { await admin.from('followed_brands').insert({ user_id: userId, page_id: pageId, brand_name: name, spied: true }) }  // pre-mig-117 fallback (no brand_id column)
+    } else {
+      const upd: Record<string, any> = { spied: true }
+      if (brandId && !(ex as any).brand_id) upd.brand_id = brandId   // adopt the active brand only if not already scoped
+      try { await admin.from('followed_brands').update(upd).eq('id', (ex as any).id) }
+      catch { await admin.from('followed_brands').update({ spied: true }).eq('id', (ex as any).id) }
+    }
   } catch { /* non-fatal */ }
 }
 
@@ -229,6 +242,12 @@ export async function POST(req: NextRequest) {
     if (name === pageId || /^\d+$/.test(name)) {
       try { const nm = (await resolveBrandNames(admin, [pageId])).get(pageId); if (nm && !/^\d+$/.test(String(nm).trim())) name = String(nm) } catch { /* keep pageId */ }
     }
+    // The ACTIVE project (brand switcher) this spy belongs to, so the Brand Spy list scopes per project.
+    let activeBrandId: string | null = null
+    try {
+      const { resolveActiveBrandId } = await import('@/lib/brand/active')
+      activeBrandId = await resolveActiveBrandId(admin, user.id, (body.brand || '').trim() || undefined).catch(() => null)
+    } catch { /* best-effort — a spy with no brand is still global/shared */ }
 
     // crawlOnly = "pull this brand's ads into our catalog" WITHOUT tracking/following/charging the user
     // (used when someone opens a directory brand we haven't crawled). Just enqueues the crawl at tier 0
@@ -289,9 +308,25 @@ export async function POST(req: NextRequest) {
     // engine writes the charge under the resolved billing owner (which reserve_credits derives via its
     // own org query), so orgIds alone could miss it and re-charge — this superset closes that gap.
     const payerIds = Array.from(new Set([...orgIds, billingOwner, user.id]))
-    const { data: priorPaid } = await admin.from('credit_transactions')
+    // Primary match: a committed/reserved brand_spy charge whose reference_id is this exact page_id.
+    let { data: priorPaid } = await admin.from('credit_transactions')
       .select('id').in('user_id', payerIds).eq('action_type', 'brand_spy').eq('reference_id', pageId)
       .neq('status', 'refunded').limit(1).maybeSingle()
+    // Fallback: the SAME brand can come back with a DIFFERENT page_id (directory id vs crawl id, or a
+    // Meta page version), which slipped past the reference_id match and DOUBLE-CHARGED on re-spy. The
+    // charge's metadata carries {pageId,name} (see commitCredits below), so also treat it as already
+    // paid if a prior brand_spy recorded this page_id OR this resolved brand name. Name-matching only
+    // when we have a real (non-numeric) name; brand_spy is cheap so a rare false-free is far better than
+    // charging twice for one brand.
+    if (!priorPaid) {
+      const orFilters = [`metadata->>pageId.eq.${pageId}`]
+      const cleanName = String(name || '').trim()
+      if (cleanName && !/^\d+$/.test(cleanName)) orFilters.push(`metadata->>name.ilike.${cleanName}`)
+      const { data: byMeta } = await admin.from('credit_transactions')
+        .select('id').in('user_id', payerIds).eq('action_type', 'brand_spy')
+        .neq('status', 'refunded').or(orFilters.join(',')).limit(1).maybeSingle()
+      if (byMeta) priorPaid = byMeta
+    }
 
     let charged = false
     if (!priorPaid) {
@@ -307,7 +342,7 @@ export async function POST(req: NextRequest) {
       }
       try {
         await ensureTracked(admin, pageId, name, true)
-        await ensureFollowed(admin, user.id, pageId, name)
+        await ensureFollowed(admin, user.id, pageId, name, activeBrandId)
       } catch (e) {
         await refundCredits(admin, tx.id).catch(() => {})   // never charge for a spy that didn't start
         throw e
@@ -317,7 +352,7 @@ export async function POST(req: NextRequest) {
     } else {
       // Already paid before → free re-spy.
       await ensureTracked(admin, pageId, name, true)
-      await ensureFollowed(admin, user.id, pageId, name)
+      await ensureFollowed(admin, user.id, pageId, name, activeBrandId)
     }
     await logActivity(admin, user.id, 'BRAND_SPIED', `Started spying ${name}${charged ? ' (−50 cr)' : ' (re-spy, free)'}`)
     return NextResponse.json({ pageId, charged, cost: charged ? 50 : 0 })
