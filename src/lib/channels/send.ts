@@ -112,7 +112,7 @@ export async function sendReportToChannels(admin: any, userId: string, brief: an
   for (const id of ids) {
     if (id.provider === 'slack' && id.meta?.channel_id) {
       const r = await slackPost(id.meta.channel_id, 'Your brief', slackBlocks, botTokenFor(id))
-      results.push({ provider: 'slack', ok: !!r.ok, error: r.ok ? undefined : (r.error || 'slack send failed') })
+      results.push({ provider: 'slack', ok: !!r.ok, error: r.ok ? undefined : (r.error || 'slack send failed'), channel: id.meta.channel_id, team: id.meta?.team_id || null, ts: r.ts || null } as any)
       if (r.ok) {
         sent++
         await admin.from('channel_messages').insert({ user_id: userId, provider: 'slack', external_id: r.ts, channel_ref: id.meta.channel_id, kind: 'report', status: 'sent' })
