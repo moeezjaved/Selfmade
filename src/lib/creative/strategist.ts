@@ -139,8 +139,10 @@ Return ONLY JSON: {"ideas":[{"title","format","why","basedOn":"fatigue|winner|co
 
 /** Winner + bleeder from STORED campaign data (campaigns + campaign_insights) — the fallback when the live
  *  Meta audit can't run (expired token / no Graph). Shapes match the audit's Graded ({ name, roas }). */
-async function storedPerformance(admin: any, userId: string): Promise<{ winner: any; bleeder: any }> {
-  const { data: camps } = await admin.from('campaigns').select('id, name, status').eq('user_id', userId).eq('status', 'ACTIVE').limit(300)
+async function storedPerformance(admin: any, userId: string, metaAccountRowId?: string | null): Promise<{ winner: any; bleeder: any }> {
+  let cq = admin.from('campaigns').select('id, name, status').eq('user_id', userId).eq('status', 'ACTIVE')
+  if (metaAccountRowId) cq = cq.eq('meta_account_id', metaAccountRowId)   // brand-scope (campaigns.meta_account_id → meta_accounts.id)
+  const { data: camps } = await cq.limit(300)
   const list = (camps || []) as any[]
   if (!list.length) return { winner: null, bleeder: null }
   const byId: Record<string, any> = {}; for (const c of list) byId[c.id] = c
@@ -206,13 +208,16 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
   // nicotine brand's ad thumbnails + its 6.9x ROAS). In that case the "your ads" half stays empty and
   // ideas come purely from the brand's competitors.
   let brandHasNoAccount = false
+  // The brand's ad-account row id (meta_accounts.id) — used to scope the STORED-campaign fallback to this
+  // brand's account only, so a brand whose live audit is empty doesn't borrow another brand's campaigns.
+  let brandAccountRowId: string | null = null
   try {
     // Resolve the brand's LINKED ad account (same as the Facebook card) so we audit Aura's account — not
     // just the primary — and get its real ad thumbnails to show on the your-ads ideas.
     let accountId = opts.accountId
     if (!accountId && opts.brandId) {
-      const { data: acct } = await admin.from('meta_accounts').select('account_id').eq('user_id', userId).eq('status', 'active').eq('brand_id', opts.brandId).limit(1).maybeSingle()
-      if (acct?.account_id) accountId = acct.account_id
+      const { data: acct } = await admin.from('meta_accounts').select('id, account_id').eq('user_id', userId).eq('status', 'active').eq('brand_id', opts.brandId).limit(1).maybeSingle()
+      if (acct?.account_id) { accountId = acct.account_id; brandAccountRowId = acct.id }
       else brandHasNoAccount = true   // active brand with no account of its own → don't fall back to the primary
     }
     const audit = brandHasNoAccount ? null : await auditAccount(admin, userId, accountId)
@@ -228,7 +233,9 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
   // the whole point is "your ads + rivals", so we must not silently drop the your-ads half.
   if (!ourWinner && !fatigue && !brandHasNoAccount) {
     try {
-      const stored = await storedPerformance(admin, userId)
+      // Scope to THIS brand's account (brandAccountRowId) when a brand is active — otherwise the stored
+      // fallback pulled campaigns across every account the founder owns (cross-brand leak).
+      const stored = await storedPerformance(admin, userId, brandAccountRowId)
       ourWinner = stored.winner; fatigue = stored.bleeder
     } catch { /* ok */ }
   }
