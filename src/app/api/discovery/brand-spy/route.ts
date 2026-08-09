@@ -202,8 +202,11 @@ async function ensureFollowed(admin: ReturnType<typeof createAdminClient>, userI
       try { await admin.from('followed_brands').insert({ user_id: userId, page_id: pageId, brand_name: name, spied: true, brand_id: brandId || null }) }
       catch { await admin.from('followed_brands').insert({ user_id: userId, page_id: pageId, brand_name: name, spied: true }) }  // pre-mig-117 fallback (no brand_id column)
     } else {
+      // Only mark it spied — do NOT adopt the active brand onto an EXISTING row. Adopting-on-re-spy
+      // silently attached unrelated global competitors (gruns, vuori, perfume brands) to whichever brand
+      // happened to be active, so Hair ResQ showed 7 when the founder added 2. brand_id is set ONCE, on
+      // the first spy (the insert above); an existing competitor keeps whatever brand it was spied under.
       const upd: Record<string, any> = { spied: true }
-      if (brandId && !(ex as any).brand_id) upd.brand_id = brandId   // adopt the active brand only if not already scoped
       try { await admin.from('followed_brands').update(upd).eq('id', (ex as any).id) }
       catch { await admin.from('followed_brands').update({ spied: true }).eq('id', (ex as any).id) }
     }
