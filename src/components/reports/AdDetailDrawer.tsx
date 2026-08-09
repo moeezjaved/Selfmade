@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid } from 'recharts'
 import { BUILTIN_PRESETS, METRICS, type MetricKey } from '@/lib/reports/templates'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 const cdn = (u?: string | null, w = 500) => (!u || u.startsWith('data:') || u.includes('.r2.dev') || u.includes('r2.cloudflarestorage') || u.includes('cdn.tryselfmade'))
@@ -26,6 +27,7 @@ export default function AdDetailDrawer({ adId, name, dateRange = 'last_14d', onC
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     setLoading(true)
@@ -57,9 +59,11 @@ export default function AdDetailDrawer({ adId, name, dateRange = 'last_14d', onC
           <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 10, border: 'none', background: '#f4f6f0', color: '#7c8577', cursor: 'pointer', fontSize: 15 }}>✕</button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', flex: 1, minHeight: 0 }}>
+        {/* Two columns on desktop; on mobile they STACK into one scrolling column — a fixed 380px left
+            column made the centered modal wider than a phone, cropping the creative off the left edge. */}
+        <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: isMobile ? undefined : '380px 1fr', flex: 1, minHeight: 0, overflowY: isMobile ? 'auto' : undefined }}>
           {/* Left — creative */}
-          <div style={{ borderRight: '1px solid rgba(26,58,26,.08)', overflowY: 'auto', padding: 20, background: '#fafcf9' }}>
+          <div style={{ borderRight: isMobile ? 'none' : '1px solid rgba(26,58,26,.08)', borderBottom: isMobile ? '1px solid rgba(26,58,26,.08)' : 'none', overflowY: isMobile ? 'visible' : 'auto', padding: 20, background: '#fafcf9' }}>
             <div style={{ background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 13px' }}>
                 <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#eef4dc', color: '#41611b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{(c.headline || c.name || 'A')[0]}</div>
@@ -84,12 +88,12 @@ export default function AdDetailDrawer({ adId, name, dateRange = 'last_14d', onC
 
           {/* Right — tabs */}
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div style={{ display: 'flex', gap: 4, padding: '10px 20px 0', borderBottom: '1px solid rgba(26,58,26,.08)' }}>
+            <div style={{ display: 'flex', gap: 4, padding: '10px 20px 0', borderBottom: '1px solid rgba(26,58,26,.08)', overflowX: 'auto' }}>
               {TABS.map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{ padding: '10px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: FONT, fontSize: 13.5, fontWeight: 600, color: tab === t ? '#0e1b12' : '#9aa196', borderBottom: tab === t ? '2px solid #0e1b12' : '2px solid transparent', marginBottom: -1 }}>{t}</button>
               ))}
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: 22 }}>
+            <div style={{ flex: 1, overflowY: isMobile ? 'visible' : 'auto', padding: 22 }}>
               {loading && tab !== 'Notes' && tab !== 'Transcript' && tab !== 'Ad comments' ? <div style={{ color: '#7c8577', padding: 30 }}>Loading…</div>
                 : tab === 'Overview' ? (data?.error ? <div style={{ color: '#c0392b', padding: 30 }}>{data.error}</div> : <Overview data={data} cur={cur} adId={adId} name={c.name || name} />)
                 : tab === 'Performance' ? <Performance data={data} cur={cur} />
