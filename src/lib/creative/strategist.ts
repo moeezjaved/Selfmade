@@ -201,6 +201,11 @@ function competitorIdea(r: CompetitorWinner): CreativeIdea {
 export async function generateCreativeStrategy(admin: any, userId: string, opts: { accountId?: string; brand?: string; brandId?: string | null } = {}): Promise<CreativeStrategy> {
   // Our account signal (cached server-side — no extra Graph hit on repeat opens).
   let ourWinner: any = null, fatigue: any = null, ownAds: any[] = []
+  // When a SPECIFIC brand is active but it has no linked ad account, we must NOT borrow the primary
+  // account's ads/performance — that leaked another brand's creatives (e.g. Hair ResQ showed the
+  // nicotine brand's ad thumbnails + its 6.9x ROAS). In that case the "your ads" half stays empty and
+  // ideas come purely from the brand's competitors.
+  let brandHasNoAccount = false
   try {
     // Resolve the brand's LINKED ad account (same as the Facebook card) so we audit Aura's account — not
     // just the primary — and get its real ad thumbnails to show on the your-ads ideas.
@@ -208,8 +213,9 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
     if (!accountId && opts.brandId) {
       const { data: acct } = await admin.from('meta_accounts').select('account_id').eq('user_id', userId).eq('status', 'active').eq('brand_id', opts.brandId).limit(1).maybeSingle()
       if (acct?.account_id) accountId = acct.account_id
+      else brandHasNoAccount = true   // active brand with no account of its own → don't fall back to the primary
     }
-    const audit = await auditAccount(admin, userId, accountId)
+    const audit = brandHasNoAccount ? null : await auditAccount(admin, userId, accountId)
     if (audit) {
       ourWinner = (audit.scale || [])[0] || (audit.watch || [])[0] || null
       // "Fatigue" proxy from the audit: the pause bucket (bleeding), else the lowest-ROAS spender.
@@ -220,7 +226,7 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
   } catch { /* account signal is best-effort */ }
   // Fallback to STORED campaign performance when the live audit is empty/failing (expired token, no Graph):
   // the whole point is "your ads + rivals", so we must not silently drop the your-ads half.
-  if (!ourWinner && !fatigue) {
+  if (!ourWinner && !fatigue && !brandHasNoAccount) {
     try {
       const stored = await storedPerformance(admin, userId)
       ourWinner = stored.winner; fatigue = stored.bleeder
