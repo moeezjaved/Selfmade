@@ -596,13 +596,13 @@ function ChannelsSection() {
   return (
     <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 18, overflow: 'hidden', marginBottom: 16 }}>
       <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(223,254,149,0.08)' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a' }}>Mello on Slack &amp; WhatsApp</div>
-        <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 3 }}>Get your morning brief and approve Mello&rsquo;s work right from chat — one tap, no dashboard.</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a' }}>Mello on Slack &amp; WhatsApp <span style={{ fontSize: 11, fontWeight: 700, color: '#3b6d11', background: '#eaf3de', borderRadius: 20, padding: '2px 8px', marginLeft: 6 }}>your personal line</span></div>
+        <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 3 }}>Your morning brief + approvals, right from chat. This is <b>one line for all your brands</b> (not per-brand) — every message is labelled with the brand it&rsquo;s about, e.g. &ldquo;Hair ResQ — …&rdquo;. Customer chats connect separately, per brand, in the Inbox.</div>
       </div>
       <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Row provider="slack" label="Slack" logo={<SlackLogo size={24} />} how="Approve with buttons and get reports in a channel or DM." />
+        <Row provider="slack" label="Slack" logo={<SlackLogo size={24} />} how="Approve with buttons and get reports in a channel or DM. One connection covers every brand." />
         <div style={{ height: 1, background: '#f1f5f9' }} />
-        <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Scan a QR with your phone to link WhatsApp. Reply YES to approve — best for solo founders on the go." />
+        <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Scan a QR to link your number once — it covers all your brands. Reply YES to approve; each message says which brand it's for." />
       </div>
     </div>
   )
