@@ -20,14 +20,13 @@ export async function GET() {
   // The Company Brain is the ACTIVE brand's brain (identity, beliefs, learnings) — not the first brand's.
   const brandId = (await resolveActiveBrandId(admin, user.id).catch(() => null)) || null
 
-  const [brandRes, dnaRes, memRes, learnRes, prefs, conflictRes] = await Promise.all([
+  const [brandRes, dnaRes, learnRes, prefs, conflictRes] = await Promise.all([
     // Identity = the ACTIVE brand (was brands.limit(1) → always the first brand, e.g. "Co natural", under
     // every project). Falls back to the first brand only in the "All brands" view (no active brand).
     brandId
       ? admin.from('brands').select('name, industry, brand_type').eq('user_id', user.id).eq('id', brandId).limit(1)
       : admin.from('brands').select('name, industry, brand_type').eq('user_id', user.id).order('created_at', { ascending: true }).limit(1),
     admin.from('company_dna').select('id, rule, department, priority, active, created_by, source, evidence, confidence, created_at, brand_id').eq('user_id', user.id).order('created_at', { ascending: false }),
-    admin.from('mello_memory').select('id, content, category, department, confidence, source, source_kind, created_at').eq('user_id', user.id).order('confidence', { ascending: false }).limit(200),
     admin.from('learnings').select('department, event, result, metric, confidence, created_at, brand_id').eq('user_id', user.id).order('created_at', { ascending: false }).limit(200),
     getPrefs(admin, user.id),
     admin.from('brain_conflicts').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'pending'),
@@ -43,7 +42,18 @@ export async function GET() {
   // Every pending candidate belief (reflection + observed from Slack/WhatsApp/inbox), newest first.
   const candidates = dnaRows.filter(d => !d.active && d.created_by === 'mello')
   const conflictCount = conflictRes?.count || 0
-  const mem = (memRes.data || []) as any[]   // NOTE: mello_memory has no brand_id yet — account-wide until mig adds it
+  // Notebook (mello_memory) — brand-scope resiliently: try with brand_id (mig 152), fall back to the
+  // plain select if the column isn't there yet, so the page never breaks during the migration window.
+  let mem: any[] = []
+  {
+    const withBrand = await admin.from('mello_memory').select('id, content, category, department, confidence, source, source_kind, created_at, brand_id').eq('user_id', user.id).order('confidence', { ascending: false }).limit(200)
+    if (withBrand.error) {
+      const plain = await admin.from('mello_memory').select('id, content, category, department, confidence, source, source_kind, created_at').eq('user_id', user.id).order('confidence', { ascending: false }).limit(200)
+      mem = (plain.data || []) as any[]
+    } else {
+      mem = ((withBrand.data || []) as any[]).filter(inBrand)
+    }
+  }
   const learns = ((learnRes.data || []) as any[]).filter(inBrand)
 
   const departments = DEPTS.map(dept => ({

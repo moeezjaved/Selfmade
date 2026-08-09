@@ -87,16 +87,19 @@ export async function recall(admin: any, opts: { userId: string; department: Dep
   const lim = opts.limit ?? 8
   const [dna, memRes, learnRes, prefs] = await Promise.all([
     getDna(admin, opts.userId, { brandId: opts.brandId ?? undefined, department: opts.department }),
-    admin.from('mello_memory').select('content, category, confidence, department')
+    admin.from('mello_memory').select('content, category, confidence, department, brand_id')
       .eq('user_id', opts.userId).or(`department.eq.${opts.department},department.is.null`)
-      .order('confidence', { ascending: false }).limit(lim),
-    admin.from('learnings').select('event, result, metric, confidence, created_at')
+      .order('confidence', { ascending: false }).limit(lim * 3),
+    admin.from('learnings').select('event, result, metric, confidence, created_at, brand_id')
       .eq('user_id', opts.userId).eq('department', opts.department)
-      .order('created_at', { ascending: false }).limit(lim),
+      .order('created_at', { ascending: false }).limit(lim * 3),
     getPrefs(admin, opts.userId),
   ])
-  const deptMemory = (memRes?.data || []) as any[]
-  const learnings = (learnRes?.data || []) as any[]
+  // Scope to the active brand: this brand's rows + account-wide (null) rows. Over-fetched (lim×3) so the
+  // brand filter still leaves enough. (brand_id absent pre-mig-152 → all rows treated as account-wide.)
+  const inBrand = (r: any) => opts.brandId === undefined || opts.brandId === null || !r.brand_id || r.brand_id === opts.brandId
+  const deptMemory = ((memRes?.data || []) as any[]).filter(inBrand).slice(0, lim)
+  const learnings = ((learnRes?.data || []) as any[]).filter(inBrand).slice(0, lim)
 
   // Compact, prompt-ready rendering in the order of authority.
   const lines: string[] = []

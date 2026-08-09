@@ -28,19 +28,31 @@ export async function brainAnswer(
   const nowIso = new Date().toISOString()
   const since = new Date(Date.now() - 14 * 86400000).toISOString()
 
+  const brandId = opts?.brandId || null
+  // Scope every layer to the ACTIVE brand: this brand's rows + account-wide (null). Answers under Hair
+  // ResQ no longer pull Aura's facts/learnings/customer signals/identity. (brand_id absent pre-mig on
+  // mello_memory → those treated as account-wide; other tables already have brand_id.)
+  const inBrand = (r: any) => !brandId || !r.brand_id || r.brand_id === brandId
+  const strictBrand = (r: any) => !brandId || r.brand_id === brandId   // signals/competitors are brand-specific
   let dna: any[] = [], mem: any[] = [], learns: any[] = [], signals: any[] = [], ctx: any[] = [], follows: any[] = [], identity: any = null
   try {
     const [dnaR, memR, lnR, sgR, cxR, flR, idR] = await Promise.all([
-      admin.from('company_dna').select('rule, department, priority, source').eq('user_id', userId).eq('active', true).order('created_at', { ascending: false }).limit(40),
-      admin.from('mello_memory').select('content, category, confidence, department').eq('user_id', userId).is('retired_at', null).order('confidence', { ascending: false }).limit(40),
-      admin.from('learnings').select('department, event, result, metric, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(30),
-      admin.from('customer_signals').select('topic, sentiment, quote').eq('user_id', userId).gte('created_at', since).order('created_at', { ascending: false }).limit(200),
-      admin.from('brain_context').select('kind, body').eq('user_id', userId).or(`expires_at.is.null,expires_at.gt.${nowIso}`).order('created_at', { ascending: false }).limit(20),
-      admin.from('followed_brands').select('brand_name').eq('user_id', userId).order('created_at', { ascending: false }).limit(20),
-      admin.from('brands').select('name, industry, brand_type').eq('user_id', userId).limit(1),
+      admin.from('company_dna').select('rule, department, priority, source, brand_id').eq('user_id', userId).eq('active', true).order('created_at', { ascending: false }).limit(80),
+      admin.from('mello_memory').select('content, category, confidence, department, brand_id').eq('user_id', userId).is('retired_at', null).order('confidence', { ascending: false }).limit(80),
+      admin.from('learnings').select('department, event, result, metric, created_at, brand_id').eq('user_id', userId).order('created_at', { ascending: false }).limit(60),
+      admin.from('customer_signals').select('topic, sentiment, quote, brand_id').eq('user_id', userId).gte('created_at', since).order('created_at', { ascending: false }).limit(300),
+      admin.from('brain_context').select('kind, body, brand_id').eq('user_id', userId).or(`expires_at.is.null,expires_at.gt.${nowIso}`).order('created_at', { ascending: false }).limit(40),
+      admin.from('followed_brands').select('brand_name, brand_id').eq('user_id', userId).order('created_at', { ascending: false }).limit(40),
+      brandId
+        ? admin.from('brands').select('name, industry, brand_type').eq('user_id', userId).eq('id', brandId).limit(1)
+        : admin.from('brands').select('name, industry, brand_type').eq('user_id', userId).order('created_at', { ascending: true }).limit(1),
     ])
-    dna = dnaR?.data || []; mem = memR?.data || []; learns = lnR?.data || []
-    signals = sgR?.data || []; ctx = cxR?.data || []; follows = flR?.data || []
+    dna = (dnaR?.data || []).filter(inBrand).slice(0, 40)
+    mem = (memR?.data || []).filter(inBrand).slice(0, 40)
+    learns = (lnR?.data || []).filter(inBrand).slice(0, 30)
+    signals = (sgR?.data || []).filter(strictBrand).slice(0, 200)
+    ctx = (cxR?.data || []).filter(inBrand).slice(0, 20)
+    follows = (flR?.data || []).filter(strictBrand).slice(0, 20)
     identity = (idR?.data || [])[0] || null
   } catch { /* fall through with whatever we have */ }
 
