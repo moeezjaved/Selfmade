@@ -53,11 +53,14 @@ export async function fetchAccountType(accountId: string): Promise<string> {
 
 /** Create a hosted-auth link the founder visits to connect one channel. `name` carries userId:provider.
  *  `returnTo` is the in-app path to come back to (e.g. /inbox or /settings). */
-export async function createHostedAuthLink(userId: string, provider: string, returnTo?: string, kind?: 'founder' | 'customer'): Promise<{ url: string } | { error: string }> {
+export async function createHostedAuthLink(userId: string, provider: string, returnTo?: string, kind?: 'founder' | 'customer', brandTag?: string): Promise<{ url: string } | { error: string }> {
   if (!unipileConfigured()) return { error: 'Channels aren’t set up on the server yet.' }
   const provs = PROVIDER_MAP[provider] || ['*']
   const back = returnTo && returnTo.startsWith('/') ? returnTo : '/settings'
   const kindQS = kind === 'founder' ? '&kind=founder' : ''
+  // Encode the target brand into the hosted-auth `name` so the callback can tag the new CUSTOMER channel
+  // to it (Hair ResQ's Instagram lands on Hair ResQ, not "unassigned"). name = userId:provider[:founder][:b:<brandId>].
+  const brandSeg = brandTag && kind !== 'founder' ? `:b:${brandTag}` : ''
   try {
     const res = await fetch(`${DSN()}/api/v1/hosted/accounts/link`, {
       method: 'POST',
@@ -67,7 +70,7 @@ export async function createHostedAuthLink(userId: string, provider: string, ret
         providers: provs,
         api_url: DSN(),
         expiresOn: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        name: `${userId}:${provider}${kind === 'founder' ? ':founder' : ''}`,
+        name: `${userId}:${provider}${kind === 'founder' ? ':founder' : ''}${brandSeg}`,
         notify_url: `${APP}/api/channels/unipile/callback${process.env.UNIPILE_WEBHOOK_SECRET ? `?secret=${encodeURIComponent(process.env.UNIPILE_WEBHOOK_SECRET)}` : ''}`,
         success_redirect_url: `${APP}${back}?connected=${provider}${kindQS}`,
         failure_redirect_url: `${APP}${back}?connect_error=${provider}${kindQS}`,
@@ -203,16 +206,16 @@ export async function backfillOnce(admin: any, accountId: string): Promise<numbe
 }
 
 /** Bind a freshly-connected Unipile account to the founder (called from the notify callback). */
-export async function bindUnipileAccount(admin: any, userId: string, provider: string, accountId: string, display?: string, founderTool?: boolean) {
+export async function bindUnipileAccount(admin: any, userId: string, provider: string, accountId: string, display?: string, founderTool?: boolean, brandId?: string) {
   // `founderTool` (from the hosted-auth `kind`) forces the founder's own Mello channel (WhatsApp brief);
   // otherwise fall back to the provider default (only calendar is founder-only). One WhatsApp account can
   // be BOTH the founder's brief channel and the customer inbox (same external_id → one row), so MERGE the
   // existing meta instead of clobbering the other role's flag.
   const founder = founderTool ?? isFounderTool(provider)
   const { data: existing } = await admin.from('channel_identities')
-    .select('meta').eq('provider', provider).eq('external_id', accountId).maybeSingle()
+    .select('meta, brand_id').eq('provider', provider).eq('external_id', accountId).maybeSingle()
   const prev = (existing?.meta || {}) as Record<string, any>
-  await admin.from('channel_identities').upsert({
+  const row: any = {
     user_id: userId, provider, external_id: accountId, display: display || null, active: true,
     meta: {
       ...prev, unipile_account_id: accountId, source: 'unipile',
@@ -220,5 +223,11 @@ export async function bindUnipileAccount(admin: any, userId: string, provider: s
       founder_tool: founder ? true : (prev.founder_tool === true),
     },
     updated_at: new Date().toISOString(),
-  }, { onConflict: 'provider,external_id' })
+  }
+  // Tag a CUSTOMER channel to the brand it was connected under (mig 143 brand_id) so Hair ResQ's line
+  // lands on Hair ResQ. Founder channels stay account-level. Keep an existing tie if none passed now.
+  if (!founder && brandId) row.brand_id = brandId
+  else if ((existing as any)?.brand_id) row.brand_id = (existing as any).brand_id
+  try { await admin.from('channel_identities').upsert(row, { onConflict: 'provider,external_id' }) }
+  catch { delete row.brand_id; await admin.from('channel_identities').upsert(row, { onConflict: 'provider,external_id' }) }
 }
