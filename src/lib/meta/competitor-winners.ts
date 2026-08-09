@@ -46,51 +46,59 @@ export async function getCompetitorWinners(admin: any, userId: string, opts: { p
   const pages = (follows || []).filter((f: any) => f.page_id)
   if (!pages.length) return []
 
-  // Bounded per-brand fetch (a single .in() gets swallowed by the highest-volume brand). Longest-running
-  // first — that's the signal we rank on, so the sample IS the candidates.
+  // Bounded per-brand fetch — NO discovery_creatives embed (that correlated join per row × 15 × N brands
+  // was the slow part that timed the strategy out under crawl load). Use the has_creative flag to know
+  // which ads have media, pick the hero per concept, THEN fetch creatives once for just those heroes.
+  // Ordered days_running DESC → rides mig-150's (page_id, days_running) index = a fast range scan.
   const perBrand = await Promise.all(pages.slice(0, 12).map((p: any) =>
     admin.from('discovery_ads_index')
-      .select('ad_id, page_id, page_name, title, body, hook_type, days_running, is_active, discovery_creatives(asset_type, r2_url, poster_url, position)')
+      .select('ad_id, page_id, page_name, title, body, hook_type, days_running, is_active, has_creative')
       .eq('page_id', p.page_id)
       .order('days_running', { ascending: false, nullsFirst: false })
-      .limit(15)   // longest-running first → 15 is plenty to pick the hero; trims the creatives-embed payload (was 30 → slow with many brands)
+      .limit(15)
       .then((r: any) => (r.data || []).map((a: any) => ({ ...a, _brand: (isPlaceholderName(p.brand_name) ? a.page_name : p.brand_name) || a.page_name })))
       .catch(() => [] as any[])
   ))
 
-  const candidates: CompetitorWinner[] = []
+  // First pass: pick a hero ad per concept-group (has_creative + longest-running/active), collect ad_ids.
+  type Cand = { face: any; days: number; live: boolean; variants: number; brandName: string }
+  const cands: Cand[] = []
   for (const rows of perBrand) {
     const groups = new Map<string, any[]>()
     for (const a of rows) groups.set(conceptKey(a), [...(groups.get(conceptKey(a)) || []), a])
     for (const g of Array.from(groups.values())) {
-      const withMedia = g.filter((a: any) => {
-        const cres = Array.isArray(a.discovery_creatives) ? a.discovery_creatives : (a.discovery_creatives ? [a.discovery_creatives] : [])
-        return cres.some((c: any) => c.r2_url || c.poster_url)
-      })
+      const withMedia = g.filter((a: any) => a.has_creative)
       const face = withMedia.find((a: any) => a.is_active) || withMedia[0]
       if (!face) continue
       const days = Math.max(...g.map((a: any) => Number(a.days_running) || 0))
       if (days < 7) continue // under a week live proves nothing — skip noise
-      const live = g.some((a: any) => a.is_active)
-      const cres = Array.isArray(face.discovery_creatives) ? face.discovery_creatives : [face.discovery_creatives]
-      const vid = cres.find((c: any) => c?.asset_type === 'video' && c?.r2_url)
-      const img = cres.find((c: any) => c?.asset_type !== 'video' && c?.r2_url)
-      const isVideo = !!vid && !img
-      candidates.push({
-        adId: String(face.ad_id),
-        pageId: String(face.page_id),
-        brandName: String(face._brand || face.page_name || 'Competitor'),
-        title: face.title || null,
-        hook: face.hook_type || null,
-        daysRunning: days,
-        variants: g.length,
-        isActive: live,
-        isVideo,
-        image: isVideo ? (vid?.poster_url || null) : (img?.r2_url || vid?.poster_url || null),
-        videoUrl: isVideo ? (vid?.r2_url || null) : null,
-        why: `${live ? 'Live' : 'Ran'} ${days} days${g.length > 1 ? ` · ${g.length} variants` : ''} — ${live ? 'they keep paying for it, which almost always means it converts' : 'a long run like this usually means it converted'}.`,
-      })
+      cands.push({ face, days, live: g.some((a: any) => a.is_active), variants: g.length, brandName: String(face._brand || face.page_name || 'Competitor') })
     }
+  }
+
+  // Single bounded creatives fetch for ONLY the chosen heroes (was one correlated subquery per candidate row).
+  const heroIds = Array.from(new Set(cands.map(c => String(c.face.ad_id))))
+  const creativesByAd = new Map<string, any[]>()
+  if (heroIds.length) {
+    const { data: cres } = await admin.from('discovery_creatives')
+      .select('ad_id, asset_type, r2_url, poster_url, position').in('ad_id', heroIds)
+    for (const c of (cres || []) as any[]) creativesByAd.set(String(c.ad_id), [...(creativesByAd.get(String(c.ad_id)) || []), c])
+  }
+
+  const candidates: CompetitorWinner[] = []
+  for (const c of cands) {
+    const cres = creativesByAd.get(String(c.face.ad_id)) || []
+    const vid = cres.find((x: any) => x?.asset_type === 'video' && x?.r2_url)
+    const img = cres.find((x: any) => x?.asset_type !== 'video' && x?.r2_url)
+    const isVideo = !!vid && !img
+    const image = isVideo ? (vid?.poster_url || null) : (img?.r2_url || vid?.poster_url || null)
+    if (!image) continue   // hero must have a usable thumbnail (matches the old withMedia guarantee)
+    candidates.push({
+      adId: String(c.face.ad_id), pageId: String(c.face.page_id), brandName: c.brandName,
+      title: c.face.title || null, hook: c.face.hook_type || null, daysRunning: c.days, variants: c.variants,
+      isActive: c.live, isVideo, image, videoUrl: isVideo ? (vid?.r2_url || null) : null,
+      why: `${c.live ? 'Live' : 'Ran'} ${c.days} days${c.variants > 1 ? ` · ${c.variants} variants` : ''} — ${c.live ? 'they keep paying for it, which almost always means it converts' : 'a long run like this usually means it converted'}.`,
+    })
   }
 
   candidates.sort((a, b) => score(b) - score(a))
