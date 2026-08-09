@@ -84,7 +84,7 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
 }
 
 /** Send a read-only report (brief) to every linked channel. */
-export async function sendReportToChannels(admin: any, userId: string, brief: any, opts: { brandId?: string | null; brandLabel?: string } = {}): Promise<{ sent: number }> {
+export async function sendReportToChannels(admin: any, userId: string, brief: any, opts: { brandId?: string | null; brandLabel?: string } = {}): Promise<{ sent: number; results?: Array<{ provider: string; kind?: string; ok: boolean; error?: string }> }> {
   // Founder comms ONLY — the brief must reach the founder's own Slack/WhatsApp (founder_tool), NEVER a
   // connected CUSTOMER channel. A customer WhatsApp (Aura's inbox line) shares provider 'whatsapp', so we
   // key on the founder_tool flag, not the provider — otherwise Hair ResQ's brief leaked to Aura's customers.
