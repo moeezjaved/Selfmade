@@ -274,7 +274,15 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
     ownVisual = ((data || []).find((c: any) => c.media_type !== 'video' && c.image_url)?.image_url) || null
   } catch { /* best-effort */ }
 
-  const reasoned = (ourWinner || fatigue || rivals.length) ? await reasonedIdeas(ourWinner, fatigue, rivals, brand) : null
+  // Race the model against a hard 35s budget. MELLO_MODEL can point at a slow reasoning model, which
+  // blew the whole endpoint past its function cap (504 → the card silently vanished). On timeout we fall
+  // back to deterministic competitor/own ideas — the card ALWAYS returns fast, still brand-grounded.
+  const reasoned = (ourWinner || fatigue || rivals.length)
+    ? await Promise.race([
+        reasonedIdeas(ourWinner, fatigue, rivals, brand).catch(() => null),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 35000)),
+      ])
+    : null
   let ideas = reasoned || fallbackIdeas(ourWinner, fatigue, rivals)
   // Guarantee the "your ads" half is represented when we have the signal — the model sometimes returns
   // only rival ideas. Prepend a deterministic own-account idea (replace-a-tiring / scale-a-winner) if none.
