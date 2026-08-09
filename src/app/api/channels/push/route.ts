@@ -51,9 +51,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ...r, delivered: r.sent > 0 })
   }
 
-  // report
+  // report — one founder line covers all brands, so label the section with the brand it's about.
   const meta = { email, full_name: user?.user_metadata?.full_name }
-  const brief = await assembleBrief(admin, userId, meta, { brandId: body.brand || null })
-  const r = await sendReportToChannels(admin, userId, brief)
+  const brandId = body.brand || null
+  let brandLabel: string | undefined
+  if (brandId) {
+    const { data: b } = await admin.from('brands').select('name').eq('id', String(brandId)).eq('user_id', userId).maybeSingle()
+    brandLabel = b?.name || undefined
+  }
+  const brief = await assembleBrief(admin, userId, meta, { brandId })
+  const r = await sendReportToChannels(admin, userId, brief, { brandId, brandLabel })
   return NextResponse.json({ ...r, delivered: r.sent > 0 })
 }
