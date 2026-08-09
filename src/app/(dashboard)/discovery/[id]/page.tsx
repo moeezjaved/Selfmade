@@ -308,8 +308,9 @@ function AiPanel({ ad }: { ad: Ad }) {
   const cost = (a: string, d: number) => pricing?.[a]?.credits ?? d
 
   async function run(url: string, body: any, action: string, dflt: number, onOk: (d: any) => void) {
-    const c = cost(action, dflt)
-    if (!confirmCredits(action.replace('_', ' '), c, balance)) return
+    // dflt <= 0 marks a FREE action (e.g. Generate Script) — don't read the price row or gate on balance.
+    const c = dflt <= 0 ? 0 : cost(action, dflt)
+    if (c > 0 && !confirmCredits(action.replace('_', ' '), c, balance)) return
     setLoading(true); setErr(null)
     try {
       const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
@@ -345,8 +346,8 @@ function AiPanel({ ad }: { ad: Ad }) {
           // clone-first launch). Show the cost up front so the price isn't a surprise after clicking.
           <>
           <button style={{ ...ctaS, background: '#eef7dc', color: '#1a3a1a' }}
-            onClick={() => run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 2, d => { setScript(d.script); setThin(!!d.thinSpeech) })}>
-            <Sparkles size={16} /> Generate Script · {cost('transcribe', 2)} cr
+            onClick={() => run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 0, d => { setScript(d.script); setThin(!!d.thinSpeech) })}>
+            <Sparkles size={16} /> Generate Script · Free
           </button>
           <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, textAlign: 'center' }}>Reads this ad&rsquo;s hook &amp; structure. Rewriting it around your product is a separate step.</div>
           </>

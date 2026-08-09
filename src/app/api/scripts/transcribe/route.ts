@@ -6,7 +6,6 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 import OpenAI from 'openai'
 
 export const dynamic = 'force-dynamic'
@@ -57,15 +56,8 @@ export async function POST(req: NextRequest) {
   }
   if (!videoUrl) return NextResponse.json({ error: 'Ad has no video to transcribe' }, { status: 400 })
 
-  let tx
-  try {
-    tx = await reserveCredits(admin, user.id, 'transcribe', adId)
-  } catch (e) {
-    if (e instanceof InsufficientCreditsError)
-      return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have }, { status: 402 })
-    throw e
-  }
-
+  // Generate Script is FREE — it's the teaser that reads a competitor's hook & structure to pull the
+  // founder toward the paid "Rewrite for my brand" step. (A stray price row had made it show a charge.)
   try {
     const vidRes = await fetch(videoUrl)
     if (!vidRes.ok) throw new Error('could not fetch ad video')
@@ -100,13 +92,8 @@ export async function POST(req: NextRequest) {
       strategies: Array.isArray(analysis.strategies) ? analysis.strategies : [],
     }
     await admin.from('ad_scripts').upsert(row, { onConflict: 'ad_id' })
-    await commitCredits(admin, tx.id, {
-      model: 'whisper-1+gpt-4o-mini', segments: transcript.length,
-      actual_cost_usd: 0.006, reference_id: adId,
-    })
     return NextResponse.json({ script: row, thinSpeech, cached: false })
   } catch (e: any) {
-    await refundCredits(admin, tx.id).catch(() => {})
     return NextResponse.json({ error: e?.message || 'transcription failed' }, { status: 500 })
   }
 }

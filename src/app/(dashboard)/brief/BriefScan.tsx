@@ -361,11 +361,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                   <div style={section}>What&rsquo;s working across your {playbook.playbook.brandsCount} competitor{playbook.playbook.brandsCount === 1 ? '' : 's'}</div>
                   <div style={{ ...sectionSub, margin: 0 }}>Decoded from {playbook.playbook.totalAds} fresh ads — the formula to copy before it saturates.</div>
                 </div>
-                {/* "Make one like this" → the watched brands' ad feed, where the REAL winning competitor
-                    ads live. The founder picks an actual winner and hits Remake (which seeds the studio
-                    with that ad) — a concrete "make one like this ad", not a blank create window. The
-                    winning-format angle rides along so the feed / remake can frame it. */}
-                <Link href={`${playbook.cta_href || '/discovery/following'}?angle=${encodeURIComponent(
+                {/* "Make one like this" → Studio with the winning formula pre-seeded as the angle, so Mello
+                    starts MAKING the ad (right format/hook/offer) instead of dropping the founder on a plain
+                    followed-brands list that read as "why am I on a feed?". The label promises an ad. */}
+                <Link href={`${playbook.cta_href || '/studio'}?angle=${encodeURIComponent(
                   'An ad like top competitors right now — ' +
                   ([playbook.playbook.formats[0]?.label && `${playbook.playbook.formats[0]?.label} format`,
                     playbook.playbook.hooks[0]?.label && `${playbook.playbook.hooks[0]?.label} hook`,
