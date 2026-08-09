@@ -30,10 +30,11 @@ export async function GET(req: NextRequest) {
 
   let tq = admin.from('customer_threads').select('*')
     .eq('user_id', user.id).in('status', ['open', 'replied']).order('last_message_at', { ascending: false }).limit(100)
-  // Per-brand inbox (mig 143), BUT also show UNASSIGNED threads (brand_id null) — e.g. a WhatsApp
-  // channel not yet linked to a brand — so customer messages never vanish from the Inbox while still
-  // being counted in Trends. Assigning the channel to a brand later scopes them.
-  if (brandId) tq = tq.or(`brand_id.eq.${brandId},brand_id.is.null`)
+  // STRICT per-brand inbox (mig 143): a specific brand shows ONLY its own threads. UNASSIGNED threads
+  // (brand_id null — a channel not yet linked to a brand) show only under "All brands", NOT under every
+  // brand. The old `OR brand_id IS NULL` leaked another brand's customers (e.g. Aura's WhatsApp threads,
+  // ingested before that channel was tagged) into Hair ResQ's inbox.
+  if (brandId) tq = tq.eq('brand_id', brandId)
   const { data: threads } = await tq
   const list = (threads || []) as any[]
   list.sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3) || (b.last_message_at > a.last_message_at ? 1 : -1))
@@ -58,9 +59,19 @@ export async function GET(req: NextRequest) {
   // Attribution — this month: how many messages the Customer Employee handled + sales it's credited with.
   const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0)
   const since = monthStart.toISOString()
-  const { count: handled } = await admin.from('customer_messages').select('id', { count: 'exact', head: true })
+  // Brand-scope the stats too: this brand's thread ids (customer_messages has no brand_id of its own).
+  let brandThreadIds: string[] | null = null
+  if (brandId) {
+    const { data: bt } = await admin.from('customer_threads').select('id').eq('user_id', user.id).eq('brand_id', brandId)
+    brandThreadIds = ((bt || []) as any[]).map((t: any) => String(t.id))
+  }
+  let handledQ = admin.from('customer_messages').select('id', { count: 'exact', head: true })
     .eq('user_id', user.id).eq('direction', 'out').eq('status', 'sent').gte('created_at', since)
-  const { data: won } = await admin.from('customer_threads').select('sale_value').eq('user_id', user.id).eq('converted', true).gte('converted_at', since)
+  if (brandThreadIds) handledQ = brandThreadIds.length ? handledQ.in('thread_id', brandThreadIds) : handledQ.eq('thread_id', '00000000-0000-0000-0000-000000000000')
+  const { count: handled } = await handledQ
+  let wonQ = admin.from('customer_threads').select('sale_value').eq('user_id', user.id).eq('converted', true).gte('converted_at', since)
+  if (brandId) wonQ = wonQ.eq('brand_id', brandId)
+  const { data: won } = await wonQ
   const sales = (won || []).length
   const revenue = (won || []).reduce((s: number, t: any) => s + (Number(t.sale_value) || 0), 0)
   const stats = { handled: handled || 0, sales, revenue }
@@ -74,7 +85,9 @@ export async function GET(req: NextRequest) {
     const { data: ot } = await admin.from('customer_threads').select('*').in('id', outThreadIds)
     for (const t of (ot || []) as any[]) outThreads[t.id] = t
   }
-  const outbound = (outMsgs || []).map((m: any) => ({ ...m, thread: outThreads[m.thread_id] || null }))
+  let outbound = (outMsgs || []).map((m: any) => ({ ...m, thread: outThreads[m.thread_id] || null }))
+  // Strict per-brand: only this brand's outbound proposals (its threads); unassigned show under All brands.
+  if (brandId) outbound = outbound.filter((m: any) => m.thread?.brand_id === brandId)
 
   return NextResponse.json({ threads: threadsOut, rollup, outbound, stats })
 }
