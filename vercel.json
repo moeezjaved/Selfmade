@@ -59,12 +59,19 @@
     },
     "src/app/api/cron/sales-followup/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/creative-strategy/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
     {
       "path": "/api/indexer?embed=1",
       "schedule": "30 */2 * * *"
+    },
+    {
+      "path": "/api/cron/creative-strategy",
+      "schedule": "20 5 * * *"
     },
     {
       "path": "/api/cron/niche-classify",

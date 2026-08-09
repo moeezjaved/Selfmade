@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateCreativeStrategy, type CreativeStrategy } from '@/lib/creative/strategist'
+import { readStrategyCache, writeStrategyCache } from '@/lib/creative/cache'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
@@ -25,8 +26,17 @@ export async function GET(req: NextRequest) {
   // Scope to the active project: explicit ?brand= wins, else the app-wide sf_brand cookie (rail switcher).
   const brandId = (await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand'))) || undefined
   const key = `${user.id}:${accountId || 'primary'}:${brandId || 'all'}`
+  const fresh = req.nextUrl.searchParams.get('fresh') === '1'
   const hit = cache.get(key)
-  if (hit && Date.now() - hit.at < TTL && req.nextUrl.searchParams.get('fresh') !== '1') return NextResponse.json(hit.data)
+  if (hit && Date.now() - hit.at < TTL && !fresh) return NextResponse.json(hit.data)
+
+  // Precomputed by the nightly cron (mig 151) → a fast table read, NOT a live scan + LLM call. This is
+  // the steady state: the card fills instantly. Only a brand the cron hasn't reached yet (or ?fresh=1)
+  // falls through to the live compute below, which then write-throughs so it's cached next time.
+  if (!fresh) {
+    const cached = await readStrategyCache(admin, user.id, brandId)
+    if (cached && cached.ideas?.length) { cache.set(key, { at: Date.now(), data: cached }); return NextResponse.json(cached) }
+  }
 
   try {
     // Hard response budget so the endpoint NEVER 504s. Some brands' competitors are very high-volume
@@ -41,6 +51,7 @@ export async function GET(req: NextRequest) {
     ])
     if (data === timedOut) return NextResponse.json({ summary: '', ideas: [] })
     cache.set(key, { at: Date.now(), data })   // only cache a real result
+    if (data.ideas?.length) writeStrategyCache(admin, user.id, brandId, data).catch(() => {})   // write-through so next open is instant
     return NextResponse.json(data)
   } catch (e: any) {
     return NextResponse.json({ error: 'strategy_failed', message: String(e?.message || e) }, { status: 500 })
