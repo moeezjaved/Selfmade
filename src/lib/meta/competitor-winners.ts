@@ -53,7 +53,7 @@ export async function getCompetitorWinners(admin: any, userId: string, opts: { p
       .select('ad_id, page_id, page_name, title, body, hook_type, days_running, is_active, discovery_creatives(asset_type, r2_url, poster_url, position)')
       .eq('page_id', p.page_id)
       .order('days_running', { ascending: false, nullsFirst: false })
-      .limit(30)
+      .limit(15)   // longest-running first → 15 is plenty to pick the hero; trims the creatives-embed payload (was 30 → slow with many brands)
       .then((r: any) => (r.data || []).map((a: any) => ({ ...a, _brand: (isPlaceholderName(p.brand_name) ? a.page_name : p.brand_name) || a.page_name })))
       .catch(() => [] as any[])
   ))
