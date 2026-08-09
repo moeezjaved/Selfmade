@@ -51,6 +51,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   // paint the stale nightly-stored `initial` figures for even one frame — that first frame was the
   // "wrong numbers, then blink, then correct" the founder saw. Open on "Loading…", settle on the truth.
   const [healing, setHealing] = useState(true)   // self-heal in progress → blank the stale numbers
+  const [noAccount, setNoAccount] = useState(false)   // active brand has no linked ad account → show connect, not another brand's numbers
 
   // LIVE fetch — only on an explicit user action (switch account / change range / refresh). Never auto.
   const load = (accountId?: string, r: string = range) => {
@@ -106,7 +107,13 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
     fetch('/api/brands', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => setBrands((j?.brands || []).map((b: any) => ({ id: String(b.id), name: String(b.name) })))).catch(() => {})
     fetch('/api/meta/accounts', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
       const list = Array.isArray(j?.accounts) ? j.accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary, brandId: a.brand_id || null })) : []
-      if (!list.length) { setHealing(false); return }   // nothing to load live → fall back to the stored paint
+      if (!list.length) {
+        // A specific brand with NO linked account must NOT fall back to the server seed (another brand's
+        // ROY-1 numbers). Blank it and show a connect prompt. Only the All-brands view keeps the stored paint.
+        if (brandId) { setNoAccount(true); setAccounts([]); setSel(''); onAccountChange?.('', 'USD') }
+        setHealing(false); return
+      }
+      setNoAccount(false)
       setAccounts(list)
       // Default to the SELECTED brand's linked account (the project link); else the primary.
       const p = (brandId && list.find((x: any) => x.brandId === brandId)) || list.find((x: any) => x.isPrimary) || list[0]
@@ -223,6 +230,20 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       </div>
     ) : null
   )
+
+  // The active brand has no linked ad account → don't show another brand's numbers; prompt to link one.
+  if (noAccount) {
+    return (
+      <div className="bsx-e" style={{ ...card, marginBottom: 24, overflow: 'hidden', animationDelay: '.34s' }}>
+        <div style={{ background: FOREST, padding: '20px 24px' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#9db29a' }}>Your Facebook Ads</div>
+          <div style={{ fontSize: 16, fontWeight: 750, color: '#fff', marginTop: 8 }}>No ad account linked to {brandName || 'this brand'} yet.</div>
+          <div style={{ fontSize: 13, color: '#cbd7c6', marginTop: 6, lineHeight: 1.5 }}>Link {brandName || 'this brand'}&rsquo;s Facebook ad account and its real spend, ROAS and moves show up here — nothing from your other brands.</div>
+          <Link href="/connect-meta" style={{ display: 'inline-block', marginTop: 14, background: LIME, color: FOREST, borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>Connect an ad account →</Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="bsx-e" style={{ ...card, marginBottom: 24, overflow: 'hidden', animationDelay: '.34s' }}>

@@ -125,7 +125,7 @@ export async function sendReportToChannels(admin: any, userId: string, brief: an
       const wa = await waSendArgs(admin, userId, id)
       const chatId = wa.chatId
       const r = await whatsappSend({ ...wa, text })
-      results.push({ provider: 'whatsapp', kind: id.meta?.founder_tool ? 'founder' : (id.meta?.customer_channel ? 'customer' : '?'), ok: !!r.ok, error: r.ok ? undefined : (r.error || 'whatsapp send failed') })
+      results.push({ provider: 'whatsapp', kind: id.meta?.founder_tool ? 'founder' : (id.meta?.customer_channel ? 'customer' : '?'), ok: !!r.ok, error: r.ok ? undefined : (r.error || 'whatsapp send failed'), sentTo: wa.chatId ? `chat:${wa.chatId}` : (wa.toAttendee ? `num:${wa.toAttendee}` : 'unresolved'), msgId: r.id || null, resChat: r.chatId || null } as any)
       if (r.ok) {
         sent++
         await admin.from('channel_messages').insert({ user_id: userId, provider: 'whatsapp', external_id: r.id, channel_ref: r.chatId || chatId, kind: 'report', status: 'sent' })
