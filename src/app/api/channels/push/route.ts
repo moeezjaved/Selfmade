@@ -61,5 +61,5 @@ export async function POST(req: NextRequest) {
   }
   const brief = await assembleBrief(admin, userId, meta, { brandId })
   const r = await sendReportToChannels(admin, userId, brief, { brandId, brandLabel })
-  return NextResponse.json({ ...r, delivered: r.sent > 0 })
+  return NextResponse.json({ ...r, delivered: r.sent > 0, brandLabel: brandLabel || null })
 }
