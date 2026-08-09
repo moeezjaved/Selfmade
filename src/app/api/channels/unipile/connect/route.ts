@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const provider = String(body.provider || '')
   const kind = body.kind === 'founder' ? 'founder' : undefined   // founder = the founder's OWN Mello channel (WhatsApp brief), not a customer inbox
-  const r = await createHostedAuthLink(user.id, provider, String(body.returnTo || ''), kind)
+  const brandTag = (typeof body.brand === 'string' && body.brand) ? body.brand : undefined   // tag a customer channel to the brand it's connected under
+  const r = await createHostedAuthLink(user.id, provider, String(body.returnTo || ''), kind, brandTag)
   if ('error' in r) return NextResponse.json({ error: r.error }, { status: 400 })
   return NextResponse.json({ url: r.url })
 }

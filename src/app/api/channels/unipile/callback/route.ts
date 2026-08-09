@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
   const status = String(body.status || '')
   const accountId = String(body.account_id || body.accountId || '')
   const name = String(body.name || '')
-  const [userId, requested, kind] = name.split(':')
+  // name = userId:provider[:founder][:b:<brandId>]
+  const segs = name.split(':')
+  const userId = segs[0]; const requested = segs[1]
+  const kind = segs.includes('founder') ? 'founder' : undefined
+  const bIdx = segs.indexOf('b'); const brandTag = bIdx >= 0 ? segs[bIdx + 1] : undefined
 
   // Only bind on a successful creation with everything we need.
   if (!/success/i.test(status) || !accountId || !userId) {
@@ -33,6 +37,6 @@ export async function POST(req: NextRequest) {
   // button offered), falling back to what the button requested.
   const type = await fetchAccountType(accountId)
   const provider = labelForType(type, requested)
-  try { await bindUnipileAccount(createAdminClient(), userId, provider, accountId, undefined, kind === 'founder') } catch { /* best-effort */ }
+  try { await bindUnipileAccount(createAdminClient(), userId, provider, accountId, undefined, kind === 'founder', brandTag) } catch { /* best-effort */ }
   return NextResponse.json({ ok: true })
 }

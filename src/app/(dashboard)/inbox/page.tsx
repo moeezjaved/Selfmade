@@ -64,6 +64,15 @@ export default function InboxPage() {
   const [channels, setChannels] = useState<string[] | null>(null)   // connected customer-channel providers
   const [chanBrand, setChanBrand] = useState<Record<string, string>>({})   // provider → brand_id it's linked to
   const [connecting, setConnecting] = useState('')
+  // The active project (sidebar switcher's sf_brand cookie) — a channel counts as "connected" for the
+  // inbox you're viewing only if it's THIS brand's channel, so Aura's Instagram shows "Connect" under
+  // Hair ResQ (letting you add Hair ResQ's own line) instead of a misleading "Connected ✓ Aura".
+  const [activeBrand, setActiveBrand] = useState<string>('')
+  useEffect(() => {
+    const read = () => { const m = document.cookie.match(/(?:^|; )sf_brand=([^;]*)/); setActiveBrand(m ? decodeURIComponent(m[1]) : '') }
+    read(); window.addEventListener('sf:brandchange', read)
+    return () => window.removeEventListener('sf:brandchange', read)
+  }, [])
   const [intentFilter, setIntentFilter] = useState<string | null>(null)   // click a rollup chip to filter the inbox
   const [insights, setInsights] = useState<Insights | null>(null)
   const [insightsLoading, setInsightsLoading] = useState(false)
@@ -131,7 +140,8 @@ export default function InboxPage() {
   const connectChannel = async (provider: string) => {
     setConnecting(provider)
     try {
-      const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider, returnTo: '/inbox' }) }).then(r => r.json())
+      // Tag the new channel to the brand you're connecting it under, so Hair ResQ's line lands on Hair ResQ.
+      const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider, returnTo: '/inbox', brand: activeBrand || undefined }) }).then(r => r.json())
       if (j?.url) { window.location.href = j.url }
       else { toast.error(j?.error || 'Channels aren’t set up yet.'); setConnecting('') }
     } catch { toast.error('Something went wrong.'); setConnecting('') }
@@ -227,7 +237,9 @@ export default function InboxPage() {
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {CH.map(c => {
-                const on = channels.includes(c.k)
+                // Connected FOR THIS BRAND: the provider is connected AND (in All-brands view) or it's
+                // assigned to the active brand. Aura's Instagram → "Connect" under Hair ResQ.
+                const on = channels.includes(c.k) && (!activeBrand || chanBrand[c.k] === activeBrand)
                 return (
                   <div key={c.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: `1px solid ${on ? '#cfe6b8' : LINE}`, background: on ? '#f6fbef' : '#fff', borderRadius: 100, padding: '6px 10px 6px 9px' }}>
                     <span style={{ display: 'inline-flex' }}><ChannelLogo provider={c.k} size={17} /></span>
