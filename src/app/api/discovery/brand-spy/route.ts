@@ -58,11 +58,11 @@ export async function GET(req: NextRequest) {
       : await resolveActiveBrandId(admin, user.id, explicit || undefined).catch(() => null)
     // Only SPIED brands belong in Brand Spy (spied=true) — plain ❤️ follows live under Following.
     const { data: follows } = await admin.from('followed_brands').select('page_id, brand_id').in('user_id', ids).eq('spied', true)
-    // Assigned-to-this-project spies show only here; UNassigned (brand_id null — legacy spies, or spied
-    // before per-brand scoping) are shared across every project so they never vanish. Same model as the
-    // Meta ad-account scoping. New spies get the active brand_id (see ensureFollowed), so switching the
-    // project genuinely changes the list going forward.
-    const scoped = brandId ? ((follows || []) as any[]).filter((f: any) => !f.brand_id || f.brand_id === brandId) : (follows || [])
+    // STRICT per-brand: a specific brand shows ONLY the competitors assigned to it (brand_id === brandId),
+    // matching the brief's competitor playbook + Creative Strategist (both strict). Unassigned legacy spies
+    // (brand_id null) surface only under "All brands", not under every brand — otherwise "I added 2 to Hair
+    // ResQ" showed 7 because old global spies leaked in. New spies get the active brand_id (ensureFollowed).
+    const scoped = brandId ? ((follows || []) as any[]).filter((f: any) => f.brand_id === brandId) : (follows || [])
     myPageIds = Array.from(new Set<string>((scoped as any[]).map((f: any) => String(f.page_id)).filter((x: string) => x && x !== 'null')))
     if (myPageIds.length === 0) return NextResponse.json({ brands: [], scope: 'mine' })
   }

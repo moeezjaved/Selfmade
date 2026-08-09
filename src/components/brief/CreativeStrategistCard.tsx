@@ -37,8 +37,10 @@ export default function CreativeStrategistCard({ brandId }: { brandId?: string |
   }
   useEffect(() => { load() }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Hide the card entirely until there's something to say (keeps the brief calm on empty accounts).
-  if (!loading && (!data || data.ideas.length === 0)) return null
+  // Render NOTHING until there are real ideas — never a "Reading…" placeholder that later collapses to
+  // null (that collapse jumped the whole brief up, reading as a blink, especially when the strategy call
+  // times out empty). The card simply appears once it has content; no loading shell, no layout jump.
+  if (!data || data.ideas.length === 0) return null
 
   const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
 
