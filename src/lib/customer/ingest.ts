@@ -5,10 +5,15 @@
  * the Messaging webhook and the Mailing webhook so every channel lands the same way.
  */
 import { triageMessage } from '@/lib/customer/triage'
+import { prettyInbound } from '@/lib/customer/pretty'
 
 export async function ingestCustomerMessage(admin: any, opts: { accountId?: string; sender: string; senderName?: string; text: string; channel?: string; chatId?: string }): Promise<boolean> {
   const { accountId, sender, senderName, text, chatId } = opts
   if (!accountId || !sender || !text) return false
+  // Some inbound types (polls, stickers, unsupported attachments) arrive as Unipile's raw placeholder
+  // "-- Unipile cannot display this type of message yet… --". Turn that into a human line so triage,
+  // the drafted reply, and the inbox all read cleanly instead of leaking the vendor's internal note.
+  const body = prettyInbound(text)
   // Which founder owns the connected account this arrived on?
   const { data: chan } = await admin.from('channel_identities').select('*').eq('external_id', accountId).eq('active', true).maybeSingle()
   if (!chan || !chan.meta?.customer_channel) return false
@@ -32,7 +37,7 @@ export async function ingestCustomerMessage(admin: any, opts: { accountId?: stri
       : admin.from('brands').select('name').eq('user_id', ownerId).order('created_at', { ascending: true }).limit(1).maybeSingle()
     const { data } = await q; brandName = data?.name || ''
   } catch { /* ok */ }
-  const tr = await triageMessage(admin, ownerId, { body: text, brand: brandName, brandId })
+  const tr = await triageMessage(admin, ownerId, { body, brand: brandName, brandId })
   const now = new Date().toISOString()
 
   let { data: thread } = await admin.from('customer_threads').select('*')
@@ -47,7 +52,7 @@ export async function ingestCustomerMessage(admin: any, opts: { accountId?: stri
     await admin.from('customer_threads').update({ priority: tr.priority, intent: tr.intent, status: 'open', last_message_at: now, ...(chatId ? { chat_ref: chatId } : {}), ...(brandId && !thread.brand_id ? { brand_id: brandId } : {}) }).eq('id', thread.id)
   }
   const { data: inserted } = await admin.from('customer_messages').insert({
-    thread_id: thread.id, user_id: ownerId, direction: 'in', body: text,
+    thread_id: thread.id, user_id: ownerId, direction: 'in', body,
     intent: tr.intent, priority: tr.priority, suggested_reply: tr.draft, status: 'pending',
   }).select('id').single()
 
@@ -55,7 +60,7 @@ export async function ingestCustomerMessage(admin: any, opts: { accountId?: stri
   try {
     if (inserted?.id) {
       const { pushCustomerMessage } = await import('@/lib/channels/send')
-      await pushCustomerMessage(admin, ownerId, { messageId: inserted.id, contactName: senderName, channel, priority: tr.priority, intent: tr.intent, body: text, draft: tr.draft })
+      await pushCustomerMessage(admin, ownerId, { messageId: inserted.id, contactName: senderName, channel, priority: tr.priority, intent: tr.intent, body, draft: tr.draft })
     }
   } catch { /* push is best-effort */ }
   return true

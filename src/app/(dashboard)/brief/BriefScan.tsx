@@ -524,7 +524,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                   <div style={{ height: 1, background: LINE, margin: '14px 0 10px' }} />
                   <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9aa79a', marginBottom: 4 }}>Finish setup</div>
                   {steps.map(x => (
-                    <Link key={x.p} href="/settings" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', textDecoration: 'none' }}>
+                    <Link key={x.p} href="/settings?tab=channels" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', textDecoration: 'none' }}>
                       <span style={{ display: 'inline-flex', flexShrink: 0 }}><ChannelLogo provider={x.p} size={18} /></span>
                       <span style={{ fontSize: 13, fontWeight: 650, color: INK, flex: 1, minWidth: 0 }}>{x.label}</span>
                       <span style={{ fontSize: 12, fontWeight: 800, color: '#3f8f4f', whiteSpace: 'nowrap' }}>Connect →</span>

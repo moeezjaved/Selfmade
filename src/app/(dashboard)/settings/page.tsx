@@ -512,6 +512,21 @@ function ChannelsSection() {
     .then(j => { if (Array.isArray(j.identities)) setIds(j.identities) }).catch(() => {})
   useEffect(() => {
     load()
+    // Coming back from the founder WhatsApp QR (?connected=whatsapp&kind=founder&account_id=…) — bind it as
+    // the founder's OWN Mello channel and refresh the badge. (The customer section skips kind=founder.)
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('connected') && q.get('kind') === 'founder') {
+      const prov = q.get('connected') as string; const acct = q.get('account_id')
+      const finish = () => { window.history.replaceState({}, '', '/settings'); load() }
+      if (acct) {
+        fetch('/api/channels/unipile/bind', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: prov, accountId: acct, kind: 'founder' }) })
+          .then(() => toast.success('WhatsApp connected — your morning brief will arrive right here.'))
+          .catch(() => toast.error('Connected, but saving failed — try again.'))
+          .finally(finish)
+      } else { toast.success('WhatsApp connected.'); finish() }
+    } else if (q.get('connect_error') && q.get('kind') === 'founder') {
+      toast.error('Couldn’t connect WhatsApp — try again.'); window.history.replaceState({}, '', '/settings')
+    }
     // After the "Add to Slack" OAuth round-trip we come back with ?slack=connected|error|…
     const p = new URLSearchParams(window.location.search).get('slack')
     if (p) {
@@ -523,6 +538,16 @@ function ChannelsSection() {
 
   const connect = async (provider: 'slack' | 'whatsapp') => {
     setBusy(provider); setCode(null)
+    // WhatsApp uses the SAME QR hosted-auth as the customer inbox — the founder scans it with their phone
+    // and Mello messages their own chat. (No number to text a code to; the old code flow stranded users.)
+    if (provider === 'whatsapp') {
+      try {
+        const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'whatsapp', kind: 'founder', returnTo: '/settings' }) }).then(r => r.json())
+        if (j?.url) { window.location.href = j.url; return }
+        toast.error(j?.error || 'WhatsApp isn’t set up on the server yet.')
+      } catch { toast.error('Something went wrong.') }
+      setBusy(''); return
+    }
     try {
       const j = await fetch('/api/channels/link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider }) }).then(r => r.json())
       if (j?.code) setCode({ provider, code: j.code, instructions: j.instructions })
@@ -554,7 +579,7 @@ function ChannelsSection() {
             // One-click OAuth — no code to copy.
             <a href="/api/channels/slack/start" style={{ background: '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Add to Slack →</a>
           ) : (
-            <button onClick={() => connect(provider)} disabled={busy === provider} style={{ background: '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>{busy === provider ? 'Creating…' : 'Connect →'}</button>
+            <button onClick={() => connect(provider)} disabled={busy === provider} style={{ background: '#dffe95', color: '#1a3a1a', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>{busy === provider ? 'Opening…' : 'Connect →'}</button>
           )}
         </div>
         {code?.provider === provider && (
@@ -577,7 +602,7 @@ function ChannelsSection() {
       <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Row provider="slack" label="Slack" logo={<SlackLogo size={24} />} how="Approve with buttons and get reports in a channel or DM." />
         <div style={{ height: 1, background: '#f1f5f9' }} />
-        <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Reply YES to approve. Best for solo founders on the go." />
+        <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Scan a QR with your phone to link WhatsApp. Reply YES to approve — best for solo founders on the go." />
       </div>
     </div>
   )
@@ -598,6 +623,9 @@ function CustomerChannelsSection() {
     loadConnected()
     const p = new URLSearchParams(window.location.search)
     const ok = p.get('connected'); const err = p.get('connect_error'); const acct = p.get('account_id')
+    // kind=founder returns belong to the "Mello on Slack & WhatsApp" section — don't bind them as a
+    // customer channel here (that would light up the customer row for the founder's own brief WhatsApp).
+    if (p.get('kind') === 'founder') return
     if (ok) {
       // Bind straight from the redirect (reliable — doesn't wait on Unipile's notify webhook), then refresh.
       const finish = () => { window.history.replaceState({}, '', '/settings'); loadConnected() }

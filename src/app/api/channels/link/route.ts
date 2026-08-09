@@ -23,7 +23,7 @@ export async function GET() {
   // A customer-inbox WhatsApp (customer_channel, connected via Unipile) is a SEPARATE thing — exclude it,
   // or it shows the founder row as Connected and Disconnect won't flip it. (Standing rule: keep them apart.)
   const identities = ((data || []) as any[])
-    .filter((i: any) => i?.meta?.customer_channel !== true)
+    .filter((i: any) => i?.meta?.founder_tool === true || i?.meta?.customer_channel !== true)
     .map((i: any) => ({ id: i.id, provider: i.provider, display: i.display, active: i.active, created_at: i.created_at }))
   return NextResponse.json({ identities })
 }
