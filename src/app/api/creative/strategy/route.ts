@@ -10,7 +10,7 @@ import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120   // a brand with many spied competitors + the model can exceed 60s on a cold (uncached) build
 
 const cache = new Map<string, { at: number; data: CreativeStrategy }>()
 const TTL = 15 * 60 * 1000
