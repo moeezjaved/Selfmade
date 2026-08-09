@@ -26,8 +26,10 @@ export async function sendCustomerReply(admin: any, userId: string, messageId: s
   let delivered = false
   let note = 'Approved. Connect a channel in Settings to auto-deliver.'
   let simulated = false
+  let threadBrandId: string | null = null   // hoisted so the learning below can be tagged to the brand
   try {
-    const { data: thread } = await admin.from('customer_threads').select('channel, contact_ref, chat_ref').eq('id', msg.thread_id).maybeSingle()
+    const { data: thread } = await admin.from('customer_threads').select('channel, contact_ref, chat_ref, brand_id').eq('id', msg.thread_id).maybeSingle()
+    threadBrandId = (thread as any)?.brand_id || null
     if (thread && thread.channel === 'simulated') { simulated = true; note = 'Approved ✓ (test — not sent)' }
     else if (thread && thread.contact_ref) {
       // There can be MORE than one row for a provider (e.g. WhatsApp connected as both a founder brief
@@ -66,7 +68,7 @@ export async function sendCustomerReply(admin: any, userId: string, messageId: s
 
   // Tag the learning with the thread's brand so it stays on THAT brand's Company Brain (Aura's replies
   // no longer surface under Hair ResQ's "What the company has learned").
-  try { await recordLearning(admin, { userId, brandId: (thread as any)?.brand_id || null, department: 'customer', event: `Approved a ${msg.intent || 'customer'} reply`, result: text.slice(0, 300), source: 'founder', metric: { intent: msg.intent, delivered } }) } catch { /* ok */ }
+  try { await recordLearning(admin, { userId, brandId: threadBrandId, department: 'customer', event: `Approved a ${msg.intent || 'customer'} reply`, result: text.slice(0, 300), source: 'founder', metric: { intent: msg.intent, delivered } }) } catch { /* ok */ }
   // ok reflects real send for live channels (so the UI shows the failure), true for the test channel.
   return { ok: delivered || simulated, delivered, note }
 }
