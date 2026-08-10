@@ -735,14 +735,16 @@ function MoreMenu({ ad }: { ad: Ad }) {
 
 // ── ScriptsMenu (video hover overlay) — opens the ad's detail page where the real script tools live
 // (Generate Script → framework → rewrite-for-your-brand). These used to be dead stubs that did nothing. ──
+// One entry, not two. "Transcribe Script" and "Create similar scripts" used to be separate menu items
+// that navigated to the same page with a `?script=` param nothing read — so they did the exact same thing.
+// Collapsed into a single button that opens the ad's script panel (auto-generates the free transcript),
+// where the real two-step flow lives: "Generate Script · Free" → "Rewrite for my brand · N cr".
 function ScriptsMenu({ adId }: { adId: string }) {
-  const [open, setOpen] = useState(false)
   const router = useRouter()
-  const go = (mode: string) => { setOpen(false); router.push(`/discovery/${encodeURIComponent(adId)}?script=${mode}`) }
   return (
     <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => router.push(`/discovery/${encodeURIComponent(adId)}?script=1`)}
         style={{
           background: '#dffe95',
           color: '#1a3a1a',
@@ -759,31 +761,8 @@ function ScriptsMenu({ adId }: { adId: string }) {
           boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
         }}
       >
-        Scripts ▾
+        📝 Scripts →
       </button>
-      {open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, marginTop: 6,
-          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.18)', minWidth: 180,
-          padding: 4, zIndex: 100,
-        }}>
-          <button
-            onClick={() => go('transcribe')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 12, color: '#1f2937', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-            📝 Transcribe Script
-          </button>
-          <button
-            onClick={() => go('similar')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 12, color: '#1f2937', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-            ✨ Create similar scripts
-          </button>
-        </div>
-      )}
     </div>
   )
 }

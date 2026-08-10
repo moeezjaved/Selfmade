@@ -22,6 +22,7 @@ export default function StandupCard({ brandId }: { brandId?: string | null }) {
   const [prep, setPrep] = useState<Prep | null>(null)
 
   useEffect(() => {
+    setS(null)   // clear the previous brand's standup on switch so stale cross-brand lines never show
     fetch(`/api/company/standup${brandId ? `?brand=${encodeURIComponent(brandId)}` : ''}`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { if (j && Array.isArray(j.lines)) setS(j) }).catch(() => {})
   }, [brandId])
 

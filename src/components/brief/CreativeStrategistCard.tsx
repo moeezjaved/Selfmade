@@ -35,14 +35,28 @@ export default function CreativeStrategistCard({ brandId }: { brandId?: string |
       .then(r => r.ok ? r.json() : null).then(j => { if (j && !j.error) setData(j) })
       .catch(() => {}).finally(() => setLoading(false))
   }
-  useEffect(() => { load() }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Render NOTHING until there are real ideas — never a "Reading…" placeholder that later collapses to
-  // null (that collapse jumped the whole brief up, reading as a blink, especially when the strategy call
-  // times out empty). The card simply appears once it has content; no loading shell, no layout jump.
-  if (!data || data.ideas.length === 0) return null
+  // Clear the previous brand's ideas the INSTANT the active brand changes, so a brand switch never shows
+  // the old brand's "what to make next" while the new one loads (the bug: BESPACEMEN showed HAIRRESQ).
+  useEffect(() => { setData(null); load() }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
+
+  // While (re)loading — e.g. right after a brand switch — show a loading shell so the user KNOWS fresh
+  // data is coming, instead of the previous brand's ideas lingering (data was just cleared above). Settle
+  // to null only once the load has FINISHED with no ideas.
+  if (!data || data.ideas.length === 0) {
+    if (!loading) return null
+    return (
+      <div className="bsx-e" style={{ ...card, marginBottom: 24, overflow: 'hidden', padding: '16px 22px' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: '#9aa79a' }}>🎨 What to make next</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: INK, marginTop: 6, opacity: .55 }}>Reading your ads + the market…</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
+          {[0, 1, 2].map(i => <div key={i} style={{ height: 54, borderRadius: 12, background: 'linear-gradient(90deg,#f3f5f0,#e9ece4,#f3f5f0)', backgroundSize: '200% 100%', animation: 'sfShimmer 1.2s ease-in-out infinite' }} />)}
+        </div>
+        <style>{`@keyframes sfShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+      </div>
+    )
+  }
 
   return (
     <div className="bsx-e" style={{ ...card, marginBottom: 24, overflow: 'hidden', animationDelay: '.4s' }}>

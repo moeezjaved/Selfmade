@@ -67,6 +67,14 @@ export default function BrandSpyList() {
 
   const load = useCallback(async (query: string) => { setLoading(true); try { setBrands(await fetchBrands(query, 'mine')) } finally { setLoading(false) } }, [fetchBrands])
   useEffect(() => { const t = setTimeout(() => load(q.trim()), q ? 300 : 0); return () => clearTimeout(t) }, [q, load])
+  // Re-pull when the project brand switcher changes brand. router.refresh() only re-renders SERVER
+  // components; this is a client-fetch page (reads the sf_brand cookie at fetch time), so without this it
+  // kept showing the brand that was active on first load. Mirrors the inbox's sf:brandchange listener.
+  useEffect(() => {
+    const onBrand = () => { setBrands([]); load(q.trim()) }
+    window.addEventListener('sf:brandchange', onBrand)
+    return () => window.removeEventListener('sf:brandchange', onBrand)
+  }, [q, load])
   // Modal search
   useEffect(() => { if (!open) return; const t = setTimeout(async () => setMResults(await fetchBrands(mQ.trim(), 'all')), 250); return () => clearTimeout(t) }, [mQ, open, fetchBrands])
 

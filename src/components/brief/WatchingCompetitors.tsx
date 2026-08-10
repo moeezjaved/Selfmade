@@ -50,7 +50,8 @@ export default function WatchingCompetitors({ brandId, brandName }: { brandId?: 
     fetch(`/api/discovery/watching${brandId ? `?brand=${encodeURIComponent(brandId)}` : ''}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null).then(j => { if (j && Array.isArray(j.watching)) setData({ watching: j.watching, unlinked: j.unlinked || [] }) }).catch(() => {})
   }
-  useEffect(() => { load(); return () => { if (timer.current) clearInterval(timer.current) } }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps
+  // Clear the previous brand's rows on switch so a brand change never shows the old brand's competitors.
+  useEffect(() => { setData(null); load(); return () => { if (timer.current) clearInterval(timer.current) } }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = data?.watching || []
   const unlinked = data?.unlinked || []

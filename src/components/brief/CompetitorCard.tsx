@@ -38,6 +38,7 @@ export default function CompetitorCard({ brandId }: { brandId?: string | null })
   const [moves, setMoves] = useState<Move[] | null>(null)
   useEffect(() => {
     let alive = true
+    setMoves(null)   // clear the previous brand's moves on switch so stale rival data never lingers
     fetch(`/api/meta/competitor-moves${brandId ? `?brand=${encodeURIComponent(brandId)}` : ''}`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
       .then(j => { if (alive && j && Array.isArray(j.moves)) setMoves(j.moves) })
       .catch(() => {})
