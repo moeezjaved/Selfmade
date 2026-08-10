@@ -434,7 +434,11 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
       {/* Add-competitor modal — opened from the scan's Competitors column for the resolved brand. */}
       {addOpen && addBrandId && (
         <AddCompetitors brandId={addBrandId} brandName={brands.find(b => b.id === addBrandId)?.name || 'this brand'}
-          onClose={() => setAddOpen(false)} onDone={() => { setAddOpen(false); router.refresh() }} />
+          onClose={() => setAddOpen(false)}
+          /* Do NOT close on done — that unmounted the modal before its "On it — watching N" confirmation
+             could render, so adding a competitor looked like nothing happened. Just refresh the brief;
+             the user closes via the confirmation's own "Done" button. */
+          onDone={() => { router.refresh() }} />
       )}
 
       {brief && view === 'standup' && (() => {
