@@ -21,9 +21,13 @@ export async function GET() {
   let { data } = await admin.from('channel_identities')
     .select('provider, display, meta, brand_id').eq('user_id', user.id).eq('active', true)
   if (!data) { const r = await admin.from('channel_identities').select('provider, display, meta').eq('user_id', user.id).eq('active', true); data = r.data }  // pre-mig-143 fallback (no brand_id column)
+  // Slack is a founder comms channel by nature (OAuth install; no customer_channel/founder_tool flag in
+  // its meta), so it was being excluded here — which made the brief's "Get your brief on Slack" show
+  // "Connect" even when Slack was connected. Treat a non-customer Slack as a founder channel.
+  const isFounderSlack = (r: any) => r?.provider === 'slack' && r?.meta?.customer_channel !== true
   const connected = (data || [])
-    .filter((r: any) => r?.meta?.customer_channel || r?.meta?.founder_tool)
-    .map((r: any) => ({ provider: r.provider, display: r.display || null, kind: r?.meta?.founder_tool ? 'founder' : 'customer', brand_id: r.brand_id || null }))
+    .filter((r: any) => r?.meta?.customer_channel || r?.meta?.founder_tool || isFounderSlack(r))
+    .map((r: any) => ({ provider: r.provider, display: r.display || null, kind: (r?.meta?.founder_tool || isFounderSlack(r)) ? 'founder' : 'customer', brand_id: r.brand_id || null }))
   return NextResponse.json({ connected })
 }
 

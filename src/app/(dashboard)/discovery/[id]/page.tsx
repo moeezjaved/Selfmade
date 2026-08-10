@@ -3,11 +3,11 @@
  * Ad Detail page (Atria-style 3-column layout).
  *   [ad preview] [ad info] [save details + Atria-AI clone]
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import CloneModal from '../CloneModal'
 import CloneVideoModal from '../CloneVideoModal'
 import RemakeAdaptation from '../RemakeAdaptation'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { X, Bookmark, Link as LinkIcon, Download, Sparkles, ExternalLink } from 'lucide-react'
 import { cleanCopy } from '@/lib/cleanCopy'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
@@ -304,6 +304,17 @@ function AiPanel({ ad }: { ad: Ad }) {
       setBrands(d.brands || []); if (d.brands?.[0]) setBrandId(d.brands[0].id)
     }).catch(() => {})
   }, [])
+
+  // Opened via the grid's "📝 Scripts →" button (?script=1) → auto-generate the free transcript so the
+  // user lands on the populated script flow, not an empty panel. The paid "Rewrite for my brand" step
+  // stays a deliberate click (with its credit confirm) — never auto-charged.
+  const wantScript = useSearchParams().get('script')
+  const didAutoScript = useRef(false)
+  useEffect(() => {
+    if (!wantScript || didAutoScript.current || !isVideo || script) return
+    didAutoScript.current = true
+    run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 0, d => { setScript(d.script); setThin(!!d.thinSpeech) })
+  }, [wantScript, isVideo])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const cost = (a: string, d: number) => pricing?.[a]?.credits ?? d
 
