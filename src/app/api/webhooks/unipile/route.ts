@@ -8,7 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { whatsappSend } from '@/lib/channels/providers'
+import { whatsappSend, whatsappSelfTarget } from '@/lib/channels/providers'
 import { redeemCode, extractCode } from '@/lib/channels/link'
 import { latestOpenApproval } from '@/lib/channels/send'
 import { runTask } from '@/lib/mello/run-task'
@@ -19,6 +19,25 @@ export const maxDuration = 60
 
 const YES = /^\s*(y|yes|yep|yeah|ok|okay|go|approve|approved|do it|sure|haan|1)\b/i
 const NO = /^\s*(n|no|nope|skip|stop|cancel|not now|nah|2)\b/i
+
+// LOOP GUARD: substrings that only appear in MELLO'S OWN outbound messages. When the shared sender line
+// posts into its "Message yourself" chat, Unipile re-delivers that message as an inbound webhook without
+// flagging it as self-sent — so the bot would reply to itself forever. If the inbound text is one of our
+// own messages echoed back, drop it. This is the primary defence against a runaway self-reply loop.
+const MELLO_ECHO = [
+  'I’m Mello', "I'm Mello", 'Connected. I’ll send your decisions', 'That code didn’t work',
+  'You’re already connected', 'Skipped — I’ll leave it', 'Reply in Selfmade to send',
+  'Overnight shift done', 'All handled. Nothing needs you', 'Generate a fresh one in Selfmade',
+]
+// Cache each Unipile account's OWN phone number so the self-message guard doesn't re-hit Unipile per event.
+const selfNumCache = new Map<string, string | null>()
+async function ownNumber(accountId?: string): Promise<string | null> {
+  if (!accountId) return null
+  if (selfNumCache.has(accountId)) return selfNumCache.get(accountId) || null
+  const n = await whatsappSelfTarget(accountId).catch(() => null)
+  selfNumCache.set(accountId, n)
+  return n
+}
 
 function authed(req: NextRequest, url: URL): boolean {
   const secret = process.env.UNIPILE_WEBHOOK_SECRET
@@ -51,6 +70,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const { sender, senderName, text, chatId, accountId, isInbound } = parseInbound(body)
   if (!isInbound || !sender) return NextResponse.json({ ok: true })   // ack non-actionable events
+
+  // LOOP GUARD 1 — our own outbound echoed back (self-chat re-delivery). Never reply to Mello.
+  if (text && MELLO_ECHO.some(s => text.includes(s))) return NextResponse.json({ ok: true, skipped: 'echo' })
+  // LOOP GUARD 2 — message from the account's OWN number (a "Message yourself" event). Never act on it.
+  const mine = await ownNumber(accountId)
+  const senderDigits = String(sender).replace(/[^0-9]/g, '')
+  if (mine && senderDigits.length >= 7 && (senderDigits.endsWith(mine.slice(-9)) || mine.endsWith(senderDigits.slice(-9)))) {
+    return NextResponse.json({ ok: true, skipped: 'self' })
+  }
 
   const admin = createAdminClient()
   const reply = (t: string) => whatsappSend({ chatId, toAttendee: chatId ? undefined : sender, text: t }).catch(() => {})
