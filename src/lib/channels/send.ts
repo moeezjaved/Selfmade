@@ -59,10 +59,10 @@ export async function getIdentities(admin: any, userId: string, provider?: strin
 
 /** Send a pending task to the founder on every linked channel. Records one channel_messages per send. */
 export async function sendApprovalToChannels(admin: any, userId: string, task: any): Promise<{ sent: number }> {
-  // Founder comms only — approvals never go to a connected customer channel.
-  // Founder-brief channels: everything NOT a customer channel, PLUS WhatsApp (a solo founder's own
-  // WhatsApp is both their inbox and where the brief goes — so briefs always reach a connected WhatsApp).
-  const ids = (await getIdentities(admin, userId)).filter((i: any) => i.provider === 'whatsapp' || !i.meta?.customer_channel)
+  // Founder comms ONLY — key on the founder_tool flag, NOT the provider. A customer WhatsApp (Aura's
+  // inbox line) is also provider 'whatsapp', so the old `provider === 'whatsapp'` filter made customer
+  // lines self-notify with founder approvals. Founder channels = founder_tool WhatsApp + founder Slack.
+  const ids = (await getIdentities(admin, userId)).filter((i: any) => i.meta?.founder_tool === true || (i.provider === 'slack' && i.meta?.customer_channel !== true))
   if (!ids.length) return { sent: 0 }
   const { text, slackBlocks } = formatApproval(task)
   const expires_at = new Date(Date.now() + APPROVAL_TTL_MS).toISOString()
@@ -178,7 +178,10 @@ export async function pushNewApprovals(admin: any, userId: string): Promise<{ pu
  *  handle it from chat. Only fires for the founder's OWN comms channels (never a connected customer one). */
 export async function pushCustomerMessage(admin: any, userId: string, m: { messageId: string; contactName?: string; channel: string; priority?: string; intent?: string; body: string; draft: string; brandLabel?: string }): Promise<void> {
   const ids = await getIdentities(admin, userId)
-  const founderChans = ids.filter((i: any) => i.provider === 'whatsapp' || (i.provider === 'slack' && !i.meta?.customer_channel))
+  // Founder_tool flag ONLY — a customer WhatsApp (Aura's inbox line) is also provider 'whatsapp', so the
+  // old `provider === 'whatsapp'` filter made the customer line notify ITSELF about its own incoming
+  // messages ("Message yourself"). Notify the founder's line (17828220679) / founder Slack, never a customer one.
+  const founderChans = ids.filter((i: any) => i.meta?.founder_tool === true || (i.provider === 'slack' && i.meta?.customer_channel !== true))
   if (!founderChans.length) return
   const PRI: Record<string, string> = { high: '🔴 HIGH', med: '🟡 MEDIUM', low: '🟢 LOW' }
   // One founder line covers every brand → always lead with the brand so "which brand?" is never ambiguous.
