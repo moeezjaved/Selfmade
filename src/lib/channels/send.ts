@@ -50,6 +50,19 @@ async function waSendArgs(admin: any, userId: string, id: any): Promise<{ chatId
 
 const APPROVAL_TTL_MS = 24 * 60 * 60 * 1000   // a "yes" 2 days later shouldn't fire
 
+// Founder briefs/approvals/pings go to SLACK ONLY by default. A shared WhatsApp sender loops too easily
+// (see the self-reply incident) and WhatsApp never notifies a self-send anyway. Set FOUNDER_WHATSAPP=1 to
+// opt WhatsApp founder-delivery back in. This flag governs ONLY founder-directed sends — it does NOT touch
+// customer WhatsApp: inbound (webhook → inbox) and founder-initiated customer replies keep working.
+const FOUNDER_WHATSAPP = process.env.FOUNDER_WHATSAPP === '1' || process.env.FOUNDER_WHATSAPP === 'true'
+
+/** Which of the founder's linked identities should a founder message (brief/approval/ping) go to? */
+export function isFounderChannel(i: any): boolean {
+  if (i.provider === 'slack') return i.meta?.customer_channel !== true   // founder Slack, never a customer Slack
+  if (i.provider === 'whatsapp') return FOUNDER_WHATSAPP && i.meta?.founder_tool === true   // off unless opted in
+  return false
+}
+
 export async function getIdentities(admin: any, userId: string, provider?: string) {
   let q = admin.from('channel_identities').select('*').eq('user_id', userId).eq('active', true)
   if (provider) q = q.eq('provider', provider)
@@ -62,7 +75,7 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
   // Founder comms ONLY — key on the founder_tool flag, NOT the provider. A customer WhatsApp (Aura's
   // inbox line) is also provider 'whatsapp', so the old `provider === 'whatsapp'` filter made customer
   // lines self-notify with founder approvals. Founder channels = founder_tool WhatsApp + founder Slack.
-  const ids = (await getIdentities(admin, userId)).filter((i: any) => i.meta?.founder_tool === true || (i.provider === 'slack' && i.meta?.customer_channel !== true))
+  const ids = (await getIdentities(admin, userId)).filter(isFounderChannel)
   if (!ids.length) return { sent: 0 }
   const { text, slackBlocks } = formatApproval(task)
   const expires_at = new Date(Date.now() + APPROVAL_TTL_MS).toISOString()
@@ -105,7 +118,7 @@ export async function sendReportToChannels(admin: any, userId: string, brief: an
   // Founder comms ONLY — the brief must reach the founder's own Slack/WhatsApp (founder_tool), NEVER a
   // connected CUSTOMER channel. A customer WhatsApp (Aura's inbox line) shares provider 'whatsapp', so we
   // key on the founder_tool flag, not the provider — otherwise Hair ResQ's brief leaked to Aura's customers.
-  const ids = (await getIdentities(admin, userId)).filter((i: any) => i.meta?.founder_tool === true || (i.provider === 'slack' && i.meta?.customer_channel !== true))
+  const ids = (await getIdentities(admin, userId)).filter(isFounderChannel)
   if (!ids.length) return { sent: 0 }
   // Ground the report in the SAME live account state the brief shows: the brief computes moves on
   // page-load (fetchLiveOpportunities) but writes nothing, while tasks are only written by the audit.
@@ -181,7 +194,7 @@ export async function pushCustomerMessage(admin: any, userId: string, m: { messa
   // Founder_tool flag ONLY — a customer WhatsApp (Aura's inbox line) is also provider 'whatsapp', so the
   // old `provider === 'whatsapp'` filter made the customer line notify ITSELF about its own incoming
   // messages ("Message yourself"). Notify the founder's line (17828220679) / founder Slack, never a customer one.
-  const founderChans = ids.filter((i: any) => i.meta?.founder_tool === true || (i.provider === 'slack' && i.meta?.customer_channel !== true))
+  const founderChans = ids.filter(isFounderChannel)
   if (!founderChans.length) return
   const PRI: Record<string, string> = { high: '🔴 HIGH', med: '🟡 MEDIUM', low: '🟢 LOW' }
   // One founder line covers every brand → always lead with the brand so "which brand?" is never ambiguous.
