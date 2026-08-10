@@ -25,14 +25,6 @@ function SlackLogo({ size = 22 }: { size?: number }) {
     </svg>
   )
 }
-function WhatsAppLogo({ size = 24 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <path fill="#25D366" d="M16 0C7.2 0 0 7.2 0 16c0 2.8.7 5.5 2.1 7.9L0 32l8.3-2.2C10.6 31.2 13.2 32 16 32c8.8 0 16-7.2 16-16S24.8 0 16 0z" />
-      <path fill="#FFF" d="M23.9 19.4c-.4-.2-2.4-1.2-2.7-1.3-.4-.1-.6-.2-.9.2-.3.4-1 1.3-1.2 1.5-.2.2-.4.3-.8.1-.4-.2-1.7-.6-3.3-2-1.2-1.1-2-2.4-2.3-2.8-.2-.4 0-.6.2-.8.2-.2.4-.4.5-.7.2-.2.2-.4.4-.6.1-.3.1-.5 0-.7-.1-.2-.9-2.1-1.2-2.9-.3-.8-.6-.6-.9-.7h-.7c-.2 0-.6.1-.9.5-.3.4-1.2 1.2-1.2 2.9 0 1.7 1.2 3.4 1.4 3.6.2.2 2.5 3.8 6 5.3.8.4 1.5.6 2 .7.8.3 1.6.2 2.2.1.7-.1 2.1-.9 2.4-1.7.3-.8.3-1.6.2-1.7-.1-.2-.3-.2-.7-.4z" />
-    </svg>
-  )
-}
 function InstagramLogo({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
@@ -596,13 +588,14 @@ function ChannelsSection() {
   return (
     <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 18, overflow: 'hidden', marginBottom: 16 }}>
       <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(223,254,149,0.08)' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a' }}>Mello on Slack &amp; WhatsApp <span style={{ fontSize: 11, fontWeight: 700, color: '#3b6d11', background: '#eaf3de', borderRadius: 20, padding: '2px 8px', marginLeft: 6 }}>your personal line</span></div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a' }}>Mello on Slack <span style={{ fontSize: 11, fontWeight: 700, color: '#3b6d11', background: '#eaf3de', borderRadius: 20, padding: '2px 8px', marginLeft: 6 }}>your personal line</span></div>
         <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 3 }}>Your morning brief + approvals, right from chat. This is <b>one line for all your brands</b> (not per-brand) — every message is labelled with the brand it&rsquo;s about, e.g. &ldquo;Hair ResQ — …&rdquo;. Customer chats connect separately, per brand, in the Inbox.</div>
       </div>
       <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Row provider="slack" label="Slack" logo={<SlackLogo size={24} />} how="Approve with buttons and get reports in a channel or DM. One connection covers every brand." />
-        <div style={{ height: 1, background: '#f1f5f9' }} />
-        <Row provider="whatsapp" label="WhatsApp" logo={<WhatsAppLogo size={26} />} how="Scan a QR to link your number once — it covers all your brands. Reply YES to approve; each message says which brand it's for." />
+        {/* Founder WhatsApp intentionally removed — a shared WhatsApp sender loops and never notifies a
+            self-send. Founder briefs/approvals are Slack-only (see isFounderChannel + FOUNDER_WHATSAPP flag).
+            WhatsApp remains available for CUSTOMER chats in the Inbox section below. */}
       </div>
     </div>
   )

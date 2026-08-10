@@ -512,8 +512,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             {/* Finish setup — only the steps NOT done yet. A channel that's already connected drops off
                 (it was still showing "Connect" after WhatsApp was linked). */}
             {(() => {
+              // Founder WhatsApp intentionally omitted — briefs are Slack-only (a shared WhatsApp sender
+              // loops and never notifies a self-send). WhatsApp stays a CUSTOMER channel (Inbox), not a
+              // founder-brief line.
               const steps = [
-                { p: 'whatsapp', label: 'Get your brief on WhatsApp' },
                 { p: 'slack', label: 'Get your brief on Slack' },
                 { p: 'calendar', label: 'Connect your calendar' },
               ].filter(x => !connectedChannels.includes(x.p))
