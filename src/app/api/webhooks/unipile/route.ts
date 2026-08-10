@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { whatsappSend, whatsappSelfTarget } from '@/lib/channels/providers'
-import { redeemCode, extractCode } from '@/lib/channels/link'
+import { extractCode } from '@/lib/channels/link'
 import { latestOpenApproval } from '@/lib/channels/send'
 import { runTask } from '@/lib/mello/run-task'
 
@@ -19,6 +19,11 @@ export const maxDuration = 60
 
 const YES = /^\s*(y|yes|yep|yeah|ok|okay|go|approve|approved|do it|sure|haan|1)\b/i
 const NO = /^\s*(n|no|nope|skip|stop|cancel|not now|nah|2)\b/i
+
+// Founder WhatsApp is OFF by default (briefs/approvals are Slack-only — a shared WhatsApp sender loops).
+// While off, NO inbound WhatsApp message ever produces an outbound reply from us; we only ingest customer
+// messages into the inbox silently. Mirrors FOUNDER_WHATSAPP in src/lib/channels/send.ts.
+const FOUNDER_WHATSAPP = process.env.FOUNDER_WHATSAPP === '1' || process.env.FOUNDER_WHATSAPP === 'true'
 
 // LOOP GUARD: substrings that only appear in MELLO'S OWN outbound messages. When the shared sender line
 // posts into its "Message yourself" chat, Unipile re-delivers that message as an inbound webhook without
@@ -87,24 +92,20 @@ export async function POST(req: NextRequest) {
   const { data: identity } = await admin.from('channel_identities')
     .select('*').eq('provider', 'whatsapp').eq('external_id', sender).eq('active', true).maybeSingle()
 
-  // Not the founder → it's a CUSTOMER messaging a connected company channel. Land it in the inbox.
+  // Not the founder → a CUSTOMER messaging a connected company channel. Land it in the inbox SILENTLY —
+  // the founder replies from the app. We no longer auto-reply from here AT ALL: founder-WhatsApp connect
+  // was removed, and the "Hi — I'm Mello… connect" onboarding reply (and code redemption) was the fuel for
+  // the self-reply loop on the shared sender line. No inbound WhatsApp ever produces an unsolicited send.
   if (!identity) {
     const { ingestCustomerMessage } = await import('@/lib/customer/ingest')
-    if (await ingestCustomerMessage(admin, { accountId, sender, senderName, text, chatId })) return NextResponse.json({ ok: true })
-  }
-
-  // Not linked yet → the only thing we accept is a link code.
-  if (!identity) {
-    if (extractCode(text)) {
-      const uid = await redeemCode(admin, text, 'whatsapp', sender, { chat_id: chatId, account_id: process.env.UNIPILE_WHATSAPP_ACCOUNT_ID }, sender)
-      await reply(uid
-        ? '✅ Connected. I’ll send your decisions here — reply YES to approve, NO to skip. Anytime.'
-        : '⚠️ That code didn’t work (they expire in 15 min). Generate a fresh one in Selfmade → Settings → Channels.')
-    } else {
-      await reply('Hi — I’m Mello. To connect, open Selfmade → Settings → Channels, generate a code, and text it here.')
-    }
+    await ingestCustomerMessage(admin, { accountId, sender, senderName, text, chatId }).catch(() => {})
     return NextResponse.json({ ok: true })
   }
+
+  // A linked founder WhatsApp identity — only exists if founder WhatsApp was ever enabled. With founder
+  // WhatsApp OFF (default), never send anything back over WhatsApp (approvals/chat live on Slack + the app).
+  if (!FOUNDER_WHATSAPP) return NextResponse.json({ ok: true })
+
   const userId = identity.user_id
   // Keep the chat id fresh for future outbound.
   if (chatId && identity.meta?.chat_id !== chatId) {
