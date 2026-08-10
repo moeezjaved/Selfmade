@@ -13,7 +13,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowUp } from 'lucide-react'
 import TryMello from './TryMello'
 import BriefAlerts from './BriefAlerts'
@@ -227,6 +227,11 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   const [thread, setThread] = useState<Turn[]>([])          // the live conversation after the agenda
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
+  // "Act on this" on an insight routes here with ?ask=<action> — PREFILL the composer (never auto-send,
+  // so no surprise credit spend) so the founder can actually act on the insight via Mello, instead of
+  // being dumped on the All Ads page (the old hardcoded /discovery target).
+  const askParam = useSearchParams().get('ask')
+  useEffect(() => { if (askParam) setDraft(askParam) }, [askParam])
   const [focusItem, setFocusItem] = useState<Item | null>(initialBrief?.headline || initialBrief?.items?.[0] || null)   // what the composer is "about"
   const [headlineState, setHeadlineState] = useState<null | 'approved' | 'passed'>(null)
   const [view, setView] = useState<'standup' | 'desk' | 'scan'>(initialView)   // conversation · prepared desk · one-page scan

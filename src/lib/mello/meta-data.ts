@@ -6,6 +6,7 @@
  */
 import { createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import { scopedMetaAccounts, resolveScopedAccount } from '@/lib/meta/scope'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 
@@ -20,31 +21,22 @@ export interface MetaAccountRow {
   status: string
 }
 
-/** Resolve the account to use: an explicitly named one, else the primary. */
+/** Resolve the account to use: an explicitly named one, else the primary. ORG-SCOPED — a founder must
+ *  see accounts connected by any org member (matching /api/meta/accounts + the "Meta connected" pill),
+ *  not just rows they personally own. Using .eq('user_id', self) here is what made Mello say "no Meta
+ *  account connected" while the app showed it connected. */
 async function resolveAccount(userId: string, accountId?: string): Promise<MetaAccountRow> {
   const admin = createAdminClient()
-  let q = admin.from('meta_accounts').select('*').eq('user_id', userId).eq('status', 'active')
-  if (accountId) {
-    // accept "act_123" or "123"
-    q = q.eq('account_id', accountId.replace(/^act_/, ''))
-  } else {
-    q = q.eq('is_primary', true)
-  }
-  const { data } = await q.limit(1).maybeSingle()
+  const data = await resolveScopedAccount(admin, userId, accountId ? accountId.replace(/^act_/, '') : null)
   if (!data) throw new Error(accountId ? `No connected Meta account matching ${accountId}` : 'No primary Meta account connected. Ask the user to connect one in Settings.')
   return data as MetaAccountRow
 }
 
-/** List all connected ad accounts for this user (for the picker / get_ad_accounts). */
+/** List all connected ad accounts this user may use (for the picker / get_ad_accounts). ORG-SCOPED. */
 export async function listAdAccounts(userId: string) {
   const admin = createAdminClient()
-  const { data } = await admin
-    .from('meta_accounts')
-    .select('account_id, account_name, currency, is_primary, last_synced_at')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .order('is_primary', { ascending: false })
-  return (data || []).map((a: any) => ({
+  const rows = await scopedMetaAccounts(admin, userId)
+  return rows.map((a: any) => ({
     platform: 'meta',
     account_id: 'act_' + a.account_id,
     name: a.account_name,

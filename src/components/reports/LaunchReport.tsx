@@ -159,8 +159,16 @@ export default function LaunchReport({ templateKey, savedId, initialName, initia
                             <tr key={r.key} style={{ borderBottom: '1px solid rgba(26,58,26,.05)' }}>
                               <td style={{ ...td, textAlign: 'left', paddingLeft: 16 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                                  <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', background: '#f0f4ec', flexShrink: 0 }}>
-                                    {r.thumbnail && <img src={cdn(r.thumbnail)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                                  <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', background: '#f0f4ec', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {r.thumbnail
+                                      ? <img src={cdn(r.thumbnail)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                          onError={(e) => { const el = e.currentTarget; el.style.display = 'none'; const ph = el.nextElementSibling as HTMLElement | null; if (ph) ph.style.display = 'flex' }} />
+                                      : null}
+                                    {/* Fallback when there's no thumbnail OR the (often hotlink-protected/expired) Meta URL 403s —
+                                        was a broken-image icon before. Emoji by format so the row still reads. */}
+                                    <span style={{ display: r.thumbnail ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', fontSize: 18 }}>
+                                      {/(video)/i.test(r.format || '') ? '🎬' : /(carousel)/i.test(r.format || '') ? '🎠' : '🖼️'}
+                                    </span>
                                   </div>
                                   <div style={{ minWidth: 0 }}>
                                     <div style={{ fontSize: 13, fontWeight: 600, color: '#243d17', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{r.name}</div>
