@@ -273,6 +273,9 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
                   : <ItemLink key={item.href || i} item={item} active={item.href === activeHref} onClick={() => setNavOpen(false)} />)}
               </div>
             ))}
+            {/* Settings — lives on the desktop rail; the mobile drawer was missing it entirely. */}
+            <div style={{ padding: '14px 8px 4px', fontSize: 9.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#a2aca2' }}>Account</div>
+            <ItemLink item={{ href: '/settings', icon: Settings, label: 'Settings' }} active={activeHref === '/settings'} onClick={() => setNavOpen(false)} />
           </nav>
           <div style={{ padding: 12, borderTop: '1px solid #e9ece8', position: 'relative' }}>
             <button onClick={() => setAcctOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'transparent', border: 'none', borderRadius: 10, padding: 6, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>

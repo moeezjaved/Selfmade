@@ -259,15 +259,16 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
       {(m.ages.length > 0 || m.genders.length > 0) && (
         <Section n={6} question="Who's buying"
           answer={m.bestAge ? <><B>{m.bestGender ? (m.bestGender.label === 'female' ? 'Women' : m.bestGender.label === 'male' ? 'Men' : 'People') : 'People'} {m.bestAge.label}</B> drive the most revenue{m.bestAge.roas >= 1 ? <> at a profitable <B c={good}>{m.bestAge.roas.toFixed(1)}x</B></> : ''} — aim the next campaign at them.</> : <>Not enough audience data yet.</>}>
-          {/* age heat row */}
+          {/* age heat row — min column 80px (was 52px) so big values like "3562.5x" fit instead of
+              overflowing into the next cell on mobile; the overflowX:auto wrapper scrolls when needed */}
           {m.ages.length > 0 && (
-            <div style={{ overflowX: 'auto' }}><div style={{ display: 'grid', gridTemplateColumns: `repeat(${m.ages.length}, minmax(52px, 1fr))`, gap: 6 }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}><div style={{ display: 'grid', gridTemplateColumns: `repeat(${m.ages.length}, minmax(80px, 1fr))`, gap: 6 }}>
               {[...m.ages].sort((a, b) => (a.label || '').localeCompare(b.label || '')).map((a, i) => (
                 <div key={i} title={`${a.label}: ${fmt(a.revenue)} revenue · ${a.roas.toFixed(2)}x`}
                   style={{ background: heat(a.revenue, Math.max(...m.ages.map(x => x.revenue), 1)), borderRadius: 10, padding: '12px 8px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: INK }}>{a.label}</div>
-                  <div style={{ fontFamily: SERIF, fontSize: 17, color: roasColor(a.roas), marginTop: 3 }}>{a.roas.toFixed(1)}x</div>
-                  <div style={{ fontSize: 10.5, color: MUTED, marginTop: 1 }}>{fmt(a.revenue)}</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: INK, whiteSpace: 'nowrap' }}>{a.label}</div>
+                  <div style={{ fontFamily: SERIF, fontSize: 17, color: roasColor(a.roas), marginTop: 3, whiteSpace: 'nowrap' }}>{a.roas.toFixed(1)}x</div>
+                  <div style={{ fontSize: 10.5, color: MUTED, marginTop: 1, whiteSpace: 'nowrap' }}>{fmt(a.revenue)}</div>
                 </div>
               ))}
             </div></div>
