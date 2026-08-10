@@ -177,7 +177,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
         <div style={{ minWidth: 0 }}>
 
           {/* ── The Morning Standup — one line from each department, the way you'd hear it walking in. ── */}
-          <StandupCard brandId={activeBrandId} />
+          <StandupCard key={`standup-${activeBrandId || 'all'}`} brandId={activeBrandId} />
 
           {/* ── The hero card — the one focal point. It GROWS gently into place; nothing competes. ── */}
           <div className="bsx-hero" style={{ ...card, borderRadius: 20, boxShadow: '0 1px 3px rgba(17,24,17,.05), 0 24px 60px -24px rgba(17,24,17,.18)', padding: 'clamp(24px, 3vw, 36px)', marginBottom: 24 }}>
@@ -228,7 +228,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
 
           {/* ── Mello's plan — decisions ready to run (the CEO desk). ── */}
           <div className="bsx-e" style={{ animationDelay: '.3s' }}>
-            <MelloTasks brandId={activeBrandId} />
+            <MelloTasks key={`tasks-${activeBrandId || 'all'}`} brandId={activeBrandId} />
           </div>
 
           {/* ── Facebook Ads — the money card (its own component: account switcher + spend today, fetched
@@ -254,16 +254,18 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
 
           {/* ── Rivals' winning ad — competitor intelligence, a SEPARATE card from the own-account
               moves above (agreed split: account numbers never mix with rival inference). ── */}
-          <CompetitorCard brandId={activeBrandId} />
+          {/* key={brand} → full remount on brand switch, so a card can NEVER show the previous brand's
+              data while the new brand loads (the recurring "Mars Men under Aura" stale-on-switch). */}
+          <CompetitorCard key={`comp-${activeBrandId || 'all'}`} brandId={activeBrandId} />
 
           {/* ── What to make next — the Creative Strategist fuses your ad performance (winners + fatigue)
               with rivals' winning angles into concrete ideas, one click into the Studio. Self-hides on
               an empty account. ── */}
-          <CreativeStrategistCard brandId={activeBrandId} />
+          <CreativeStrategistCard key={`strat-${activeBrandId || 'all'}`} brandId={activeBrandId} />
 
           {/* ── Brand Guardian — the defensive watch: rivals launching new ads (our crawl) + public
               chatter about you / shoppers leaving rivals (Reddit). Self-hides when quiet. ── */}
-          <BrandGuardianCard brandId={activeBrandId} />
+          <BrandGuardianCard key={`guard-${activeBrandId || 'all'}`} brandId={activeBrandId} />
 
           {/* ── Also today — the one runner-up, a quiet row. ── */}
           {second && (
@@ -349,8 +351,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                   : <Link href="/billing" style={{ color: GREEN, fontWeight: 800, textDecoration: 'none' }}>Upgrade to watch them all →</Link>}
               </div>
             )}
-            {/* Confirmation + progress: which competitors are being watched and whether their ads have loaded. */}
-            <WatchingCompetitors brandId={activeBrandId} brandName={activeBrandName} />
+            {/* Confirmation + progress: which competitors are being watched and whether their ads have loaded.
+              This live-fetches the real per-brand list and is the SOURCE OF TRUTH for the watched count —
+              the subtext above keys on the (assembled-once) brief.summary which can lag it. */}
+            <WatchingCompetitors key={`watch-${activeBrandId || 'all'}`} brandId={activeBrandId} brandName={activeBrandName} />
           </div>
 
           {/* ── The playbook — what's working across every watched brand, with Mello's judgment. ── */}
