@@ -15,20 +15,37 @@ const botTokenFor = (id: any): string | undefined => {
 }
 
 /**
- * WhatsApp send args for a founder identity (QR model): send FROM their own connected account, and
- * with no existing chat, deliver into their "Message yourself" chat (their own number). Caches the
- * resolved number on the identity so we don't re-hit Unipile every send.
+ * WhatsApp send args for a founder identity.
+ *
+ * Two delivery models, auto-selected:
+ *  1. DEDICATED SENDER (preferred) — when UNIPILE_WHATSAPP_ACCOUNT_ID is set to a Selfmade-owned line
+ *     that is NOT the founder's own number, send FROM that line TO the founder's number. It arrives as
+ *     an INCOMING message → the founder's phone actually notifies.
+ *  2. QR SELF-SEND (fallback) — no dedicated sender: send FROM the founder's own connected account into
+ *     their "Message yourself" chat. Delivers, but WhatsApp never notifies you of your own messages.
+ *
+ * Either way we resolve + cache the founder's own number (self_target) so we don't re-hit Unipile.
  */
 async function waSendArgs(admin: any, userId: string, id: any): Promise<{ chatId?: string; toAttendee?: string; accountId?: string }> {
-  const accountId = id.meta?.unipile_account_id || id.external_id
-  const chatId = id.meta?.chat_id
-  if (chatId) return { chatId, accountId }
-  let toAttendee: string | undefined = id.meta?.self_target || (accountId ? (await whatsappSelfTarget(accountId)) || undefined : undefined)
-  if (toAttendee && toAttendee !== id.meta?.self_target) {
-    await admin.from('channel_identities').update({ meta: { ...(id.meta || {}), self_target: toAttendee } })
+  const ownAccount = id.meta?.unipile_account_id || id.external_id
+  // The founder's OWN WhatsApp number — recipient of the ping (model 1) or the self-chat target (model 2).
+  let founderNum: string | undefined = id.meta?.self_target || (ownAccount ? (await whatsappSelfTarget(ownAccount)) || undefined : undefined)
+  if (founderNum && founderNum !== id.meta?.self_target) {
+    await admin.from('channel_identities').update({ meta: { ...(id.meta || {}), self_target: founderNum } })
       .eq('user_id', userId).eq('provider', 'whatsapp').eq('external_id', id.external_id).then(() => {}, () => {})
   }
-  return { toAttendee, accountId }
+
+  // Model 1: dedicated Selfmade sender line, distinct from the founder's own number → notifying DM.
+  // Start the chat by the founder's number (attendees_ids); Unipile reuses the existing thread.
+  const sender = process.env.UNIPILE_WHATSAPP_ACCOUNT_ID
+  if (sender && sender !== ownAccount && founderNum) {
+    return { toAttendee: founderNum, accountId: sender }
+  }
+
+  // Model 2: QR self-send fallback (silent, but delivers).
+  const chatId = id.meta?.chat_id
+  if (chatId) return { chatId, accountId: ownAccount }
+  return { toAttendee: founderNum, accountId: ownAccount }
 }
 
 const APPROVAL_TTL_MS = 24 * 60 * 60 * 1000   // a "yes" 2 days later shouldn't fire
