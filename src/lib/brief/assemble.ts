@@ -413,7 +413,10 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
       kind: 'insight', importance: 55, at: o.created_at,
       title: o.observation,
       why: o.action || undefined,
-      ...(o.action ? { cta_label: 'Act on this', cta_href: '/discovery' } : {}),
+      // "Act on this" hands the insight's action to Mello (prefills the brief composer via ?ask=) so the
+      // founder can actually act on it — instead of the old hardcoded /discovery, which dumped every
+      // insight on the All Ads page regardless of what it said.
+      ...(o.action ? { cta_label: 'Act on this', cta_href: `/brief?ask=${encodeURIComponent(o.action)}` } : {}),
     })
   }
 

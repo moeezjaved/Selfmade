@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import AccountSelector from '@/components/AccountSelector'
 import CreateReportModal from '@/components/reports/CreateReportModal'
 import GeneratedReport from '@/components/reports/GeneratedReport'
+import SavedReportsNav from '@/components/reports/SavedReportsNav'
 import LaunchReport from '@/components/reports/LaunchReport'
 import { TEMPLATES } from '@/lib/reports/templates'
 import ReportsNarrative from '@/components/reports/ReportsNarrative'
@@ -160,6 +161,10 @@ function ReportsPage() {
       {showCreate && <CreateReportModal onClose={() => setShowCreate(false)} onCreate={(k) => { setShowCreate(false); setActiveReport({ templateKey: k }) }} />}
 
       <AdsTabs />
+
+      {/* Your saved reports — the Save button persists to saved_reports, and this surfaces them (each
+          deep-links to ?report=<id>). Was orphaned (never mounted), so saved reports had no home. */}
+      <SavedReportsNav />
 
       {/* Header — editorial serif title, quiet controls */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 22, flexWrap: 'wrap', gap: 14 }}>

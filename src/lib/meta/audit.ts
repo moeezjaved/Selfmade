@@ -253,9 +253,11 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
   const cacheKey = `audit:${userId}:${accountId || 'primary'}:${range}`
   const cached = cacheGet(cacheKey)
   if (cached) return cached
-  const { data: accounts } = await admin.from('meta_accounts')
-    .select('id,account_id,account_name,currency,is_primary,last_synced_at,access_token')
-    .eq('user_id', userId).eq('status', 'active').order('is_primary', { ascending: false })
+  // ORG-SCOPED: a founder must be able to audit accounts connected by any org member (matching
+  // /api/meta/accounts + the "Meta connected" pill). Keying on .eq('user_id', self) here made Mello
+  // answer "no Meta account connected" even though the app showed one connected.
+  const { scopedMetaAccounts } = await import('@/lib/meta/scope')
+  const accounts = await scopedMetaAccounts(admin, userId)
   if (!accounts?.length) return null
   // Match the requested account tolerantly (act_ prefix drift); otherwise the DETERMINISTIC primary
   // (same resolver the nightly audit uses) — never a silent fall to a random account with a different

@@ -62,13 +62,15 @@ export default function ActivityPage() {
         <h1 style={{fontSize:22,fontWeight:800,color:'#1a3a1a'}}>Activity Log</h1>
         <p style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Complete audit trail of every action in Selfmade.</p>
       </div>
+      {/* overflowX:auto so By/Time stay reachable on mobile — the card's overflow:hidden was clipping them */}
       <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden'}}>
+       <div style={{overflowX:'auto'}}>
         {loading ? (
           <div style={{padding:48,textAlign:'center',color:'#7a9a7a'}}>Loading…</div>
         ) : !logs.length ? (
           <div style={{padding:48,textAlign:'center',color:'#7a9a7a'}}>No activity yet.</div>
         ) : (
-          <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',minWidth:560}}>
             <thead><tr style={{background:'#f0f7ee'}}>
               {['Action','Description','By','Time'].map(h => <th key={h} style={{textAlign:'left',padding:'10px 16px',fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'#7a9a7a',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>{h}</th>)}
             </tr></thead>
@@ -89,6 +91,7 @@ export default function ActivityPage() {
             </tbody>
           </table>
         )}
+       </div>
       </div>
     </div>
   )
