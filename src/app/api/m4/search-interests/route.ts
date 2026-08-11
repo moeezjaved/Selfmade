@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { resolveScopedAccount } from '@/lib/meta/scope'
+import { resolveBrandScopedAccount } from '@/lib/meta/scope'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   if (!q) return NextResponse.json({ interests: [] })
 
   const admin = createAdminClient()
-  const account = await resolveScopedAccount(admin, user.id)
+  const account = await resolveBrandScopedAccount(admin, user.id)
 
   if (!account) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
