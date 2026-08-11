@@ -23,6 +23,7 @@ export interface ConfirmOpts {
   input?: boolean          // when true, render a text field and resolve with the string
   placeholder?: string
   defaultValue?: string
+  alert?: boolean          // single OK button (no cancel) — a themed replacement for a plain alert
 }
 type Payload = ConfirmOpts & { resolve: (v: any) => void }
 
@@ -30,6 +31,15 @@ export function confirmAction(opts: ConfirmOpts): Promise<boolean> {
   if (typeof window === 'undefined') return Promise.resolve(false)
   return new Promise((resolve) => {
     window.dispatchEvent(new CustomEvent(EVT, { detail: { ...opts, resolve } }))
+  })
+}
+
+// Centered, on-brand alert (single "OK" button) — the themed replacement for an error toast that must
+// STAY until dismissed. Resolves when the user clicks OK / closes it. Use for important failures.
+export function alertMessage(opts: Omit<ConfirmOpts, 'input' | 'danger'>): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve()
+  return new Promise((resolve) => {
+    window.dispatchEvent(new CustomEvent(EVT, { detail: { ...opts, alert: true, danger: false, confirmLabel: opts.confirmLabel || 'OK', resolve: () => resolve() } }))
   })
 }
 
@@ -75,7 +85,8 @@ export default function ConfirmHost() {
             style={{ width: '100%', marginTop: 14, padding: '11px 13px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: INK, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
-          <button onClick={() => close(false)} style={{ background: '#fff', color: INK, border: '1.5px solid #e2e8f0', borderRadius: 100, padding: '9px 18px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>{p.cancelLabel || 'Cancel'}</button>
+          {/* Alerts have a single OK button — no cancel. */}
+          {!p.alert && <button onClick={() => close(false)} style={{ background: '#fff', color: INK, border: '1.5px solid #e2e8f0', borderRadius: 100, padding: '9px 18px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>{p.cancelLabel || 'Cancel'}</button>}
           <button onClick={() => close(true)} disabled={isInput && !val.trim()} style={{ background: danger ? '#c0392b' : '#17251c', color: danger ? '#fff' : '#dffe95', border: 'none', borderRadius: 100, padding: '9px 20px', fontSize: 13.5, fontWeight: 800, cursor: (isInput && !val.trim()) ? 'not-allowed' : 'pointer', opacity: (isInput && !val.trim()) ? 0.5 : 1, fontFamily: 'inherit' }}>{p.confirmLabel || (isInput ? 'Save' : 'Confirm')}</button>
         </div>
       </div>
