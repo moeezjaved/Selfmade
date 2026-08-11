@@ -14,12 +14,15 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { question } = await req.json().catch(() => ({}))
-  const q = String(question || '').trim()
+  const body = await req.json().catch(() => ({}))
+  const q = String(body.question || '').trim()
   if (!q) return NextResponse.json({ error: 'question required' }, { status: 400 })
 
   const admin = createAdminClient()
-  const brandId = (await resolveActiveBrandId(admin, user.id).catch(() => null)) || null
+  // Honor the brand the page sends explicitly (the switcher's sf_brand), falling back to the cookie —
+  // otherwise a stale/empty server cookie resolves to "All brands" and the answer blends EVERY brand
+  // together (e.g. Aura's positioning came back with Hair ResQ's hair-regrowth system + a soda brand).
+  const brandId = (await resolveActiveBrandId(admin, user.id, body.brandId || null).catch(() => null)) || null
   const ans = await brainAnswer(admin, user.id, q, { brandId })
   if (!ans) {
     return NextResponse.json({
