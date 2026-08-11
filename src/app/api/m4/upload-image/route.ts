@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       const fileName = `${user.id}/${Date.now()}.${fileExt}`
       const bucket = 'ads-media'
       let { error: uploadError } = await admin.storage.from(bucket).upload(fileName, buffer, { contentType, upsert: false })
-      if (uploadError && /bucket not found/i.test(uploadError.message || '')) {
+      if (uploadError && /bucket not found|related resource does not exist|not found/i.test(uploadError.message || '')) {
         await admin.storage.createBucket(bucket, { public: true }).catch(() => {})   // idempotent; ignore "already exists"
         ;({ error: uploadError } = await admin.storage.from(bucket).upload(fileName, buffer, { contentType, upsert: false }))
       }
