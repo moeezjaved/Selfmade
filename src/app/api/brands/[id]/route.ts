@@ -112,6 +112,15 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   }
   else if (productId) await admin.from('brand_products').delete().eq('id', productId).eq('brand_id', params.id)
   else if (assetId) await admin.from('brand_assets').delete().eq('id', assetId).eq('brand_id', params.id)
-  else await admin.from('brands').delete().eq('id', params.id)  // delete the whole brand (cascades)
+  else {
+    // Ghost-data cleanup: followed_brands.brand_id is ON DELETE SET NULL (mig 117) and brief_events has
+    // NO foreign key (mig 108) — so deleting a brand otherwise leaves its competitors behind (orphaned
+    // to account-level, still spied) and its brief cards forever. That's the "removed all brands but the
+    // brief + Feed still show their competitors" bug. Delete them explicitly FIRST, while brand_id still
+    // matches (the SET NULL fires the moment the brand row goes), then delete the brand.
+    await admin.from('followed_brands').delete().eq('user_id', user.id).eq('brand_id', params.id).then(() => {}, () => {})
+    await admin.from('brief_events').delete().eq('user_id', user.id).eq('brand_id', params.id).then(() => {}, () => {})
+    await admin.from('brands').delete().eq('id', params.id)  // delete the whole brand (cascades the rest)
+  }
   return NextResponse.json({ success: true })
 }

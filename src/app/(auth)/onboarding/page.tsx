@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
 import { ChannelLogo } from '@/components/brand/logos'
+import { planEntitlements } from '@/lib/plans'
 
 const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95'
 const GREEN = '#3f8f4f', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f', PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
@@ -224,6 +225,11 @@ export default function InterviewPage() {
   const [signName, setSignName] = useState('')
   const [nightLog, setNightLog] = useState<{ t: string; done: boolean }[]>([])
   const [nightDone, setNightDone] = useState(false)
+  // The user's REAL plan — a paying Creator who adds a NEW brand re-runs onboarding, and must NOT be
+  // shown "Free tracks 1 competitor" or have their picks capped at 1. Free stays capped at 1.
+  const [plan, setPlan] = useState<string | null>(null)
+  const trackCap = (() => { const c = planEntitlements(plan).brandSpy; return c === Infinity ? 999 : Math.max(1, c) })()
+  useEffect(() => { fetch('/api/credits/balance').then(r => r.ok ? r.json() : null).then(j => { if (j?.plan) setPlan(String(j.plan)) }).catch(() => {}) }, [])
   const brandIdRef = useRef<string | null>(null)
   const homeworkFired = useRef(false)
   const nightFired = useRef(false)
@@ -427,7 +433,7 @@ export default function InterviewPage() {
 
     // real work: crawl EVERY competitor (data's ready if they upgrade), but only FOLLOW the plan-allowed
     // count. Free tracks 1 — the rest are saved and surfaced as an upgrade nudge, never silently dropped.
-    const TRACK_LIMIT = 1   // Free plan; upgrading lifts this and the extras can be followed from the app
+    const TRACK_LIMIT = trackCap   // plan-driven: Free = 1, Creator = 15 (not hardcoded — paid users add all their picks)
     for (let i = 0; i < resolved.length; i++) {
       const p = resolved[i]
       setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: `starting on ${p.name} — pulling their live ads`, done: false }])
@@ -436,7 +442,7 @@ export default function InterviewPage() {
         await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId: brandIdRef.current || undefined, spied: true }) }).catch(() => {})
       }
     }
-    if (resolved.length > TRACK_LIMIT) note('fact', `Watching ${TRACK_LIMIT} of ${resolved.length} competitors on Free (${resolved.slice(0, TRACK_LIMIT).map(p => p.name).join(', ')}). Upgrade to track them all: ${resolved.slice(TRACK_LIMIT).map(p => p.name).join(', ')}.`)
+    if (resolved.length > TRACK_LIMIT) note('fact', `Watching ${TRACK_LIMIT} of ${resolved.length} competitors on your plan (${resolved.slice(0, TRACK_LIMIT).map(p => p.name).join(', ')}). Upgrade to track them all: ${resolved.slice(TRACK_LIMIT).map(p => p.name).join(', ')}.`)
     setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: 'studying what wins in your market', done: false }])
     // Auto-author the first Competitor Intelligence Report on the primary competitor — the show-then-sell
     // wow that greets them on the brief. Fire-and-forget on gpt-4o (~$0.04 vs Opus ~$0.25) so a wave of
@@ -583,9 +589,9 @@ export default function InterviewPage() {
               </div>
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.09em', color: MUTED, textTransform: 'uppercase', marginBottom: 10, textAlign: 'left' }}>Pick who I should watch — click to choose</div>
               <BrandPalette q={q} setQ={setQ} suggested={suggested} results={results} picks={picks} loading={loadingComp} onToggle={togglePick} extractId={extractPageId} />
-              {picks.length > 1 && (
+              {picks.length > trackCap && (
                 <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12.5, color: MUTED }}>
-                  Free tracks <b style={{ color: INK }}>1 competitor</b> — I’ll start with <b style={{ color: INK }}>{picks[0].name}</b>. The other {picks.length - 1} unlock when you upgrade.
+                  Your plan tracks <b style={{ color: INK }}>{trackCap} competitor{trackCap === 1 ? '' : 's'}</b> — I’ll start with <b style={{ color: INK }}>{picks.slice(0, trackCap).map(p => p.name).join(', ')}</b>. The other {picks.length - trackCap} unlock when you upgrade.
                 </div>
               )}
               <div style={{ textAlign: 'center', marginTop: 18 }}>
