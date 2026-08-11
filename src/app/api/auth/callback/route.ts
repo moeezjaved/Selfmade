@@ -174,20 +174,11 @@ export async function GET(request: NextRequest) {
       console.log('UPSERT:', upsertError ? JSON.stringify(upsertError) : 'SUCCESS')
     }
 
-    // Prune accounts this user can no longer access on Meta (e.g. removed after an account change/hack)
-    // so the picker only shows currently-valid accounts — BUT never disconnect an account that's LINKED
-    // to a brand. A founder can connect a DIFFERENT Facebook per brand (ROY 1 → Aura, another → Hair ResQ);
-    // that second login only sees ITS accounts, so without this guard it wiped the first FB's brand-linked
-    // accounts. Brand-linked = set up on purpose → keep. Only unlinked leftovers get pruned.
-    if (activeIds.length) {
-      const inList = `(${activeIds.map(id => `"${id}"`).join(',')})`
-      const { error: pruneErr } = await admin.from('meta_accounts')
-        .update({ status: 'disconnected', is_primary: false })
-        .eq('user_id', userId)
-        .not('account_id', 'in', inList)
-        .is('brand_id', null)
-      console.log('PRUNE:', pruneErr ? JSON.stringify(pruneErr) : 'OK')
-    }
+    // ADDITIVE connect — do NOT disconnect other accounts. A founder connects a DIFFERENT Facebook per
+    // brand (ROY 1 → Aura, another → Hair ResQ); each login only sees ITS OWN accounts, so any prune that
+    // disconnects "accounts not in this login" wipes the OTHER Facebooks' accounts on every connect (the
+    // repeated data-loss the founder hit). We just upsert this login's accounts and leave everything else
+    // intact. Truly-removed accounts keep their row and fail audits gracefully; disconnect those manually.
 
     // Read the account immediately so the Facebook Ads card is waiting in the brief the moment they
     // land (same instant-gratification the BYO path gives). Best-effort — never block the redirect.
