@@ -22,11 +22,12 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (await isRateLimited(user.id)) return NextResponse.json({ error: 'rate_limited', reply: 'One moment — give me a few seconds and ask again.' }, { status: 429 })
 
-  const { question, item } = await req.json().catch(() => ({}))
+  const { question, item, brandId } = await req.json().catch(() => ({}))
   const q = String(question || '').trim().slice(0, 800)
   if (!q) return NextResponse.json({ error: 'question required' }, { status: 400 })
 
-  // Mello's one brain (shared with Slack + WhatsApp).
-  const out = await askMello(createAdminClient(), user.id, q, { item, email: user.email })
+  // Mello's one brain (shared with Slack + WhatsApp). brandId comes from the brief's active-project
+  // switcher so the answer scopes to the RIGHT brand (the server cookie is unreliable).
+  const out = await askMello(createAdminClient(), user.id, q, { item, email: user.email, brandId: brandId ? String(brandId) : null })
   return NextResponse.json(out)
 }
