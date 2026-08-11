@@ -499,6 +499,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // If NOTHING launched and every failure is Meta's account-security checkpoint (error 3858385 /
+    // "pending action" / "authenticated your account"), translate the raw Graph wall-of-text into ONE
+    // plain, actionable line. This fires when a NEW app first tries to create ads on an ad account —
+    // Meta's fraud protection flags it and blocks all ad creation until the owner confirms it's them.
+    const totalCreated = broadCount + intCount + retargetingCount + retainerCount
+    const checkpoint = errors.length > 0 && errors.every(e => /3858385|pending action|authenticated your account|confirm/i.test(e))
+    if (totalCreated === 0 && checkpoint) {
+      return NextResponse.json({
+        error: 'Meta has put a security checkpoint on this ad account and is blocking new ads until you confirm it\'s you. Open Meta Ads Manager for this account (and facebook.com/accountquality), complete the "Confirm your identity / security check" step, wait a few minutes, then launch again. This is a one-time Meta verification — nothing is wrong with your setup.',
+        needsVerify: true,
+        errors,
+      }, { status: 400 })
+    }
+
     return NextResponse.json({
       success: true,
       account: metaAccount.account_name,
