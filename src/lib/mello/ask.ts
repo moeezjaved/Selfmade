@@ -40,7 +40,7 @@ function productHowTo(q: string): string | null {
   return null
 }
 
-export async function askMello(admin: any, userId: string, message: string, opts?: { item?: any; email?: string | null }): Promise<{ reply: string }> {
+export async function askMello(admin: any, userId: string, message: string, opts?: { item?: any; email?: string | null; brandId?: string | null }): Promise<{ reply: string }> {
   const q = String(message || '').trim().slice(0, 800)
   const item = opts?.item
   if (!q) return { reply: 'Say that again?' }
@@ -48,8 +48,11 @@ export async function askMello(admin: any, userId: string, message: string, opts
   // The ACTIVE brand (from the sf_brand cookie) — so chat answers about "my business" and "my
   // competitors" scope to the brand the founder is viewing, not all brands mashed together (Aura was
   // shown Mars Men's rivals CeraVe/NovaMane). Null in channel contexts (Slack/WhatsApp) → account-wide.
-  let activeBrandId: string | null = null
-  try { const { resolveActiveBrandId } = await import('@/lib/brand/active'); activeBrandId = await resolveActiveBrandId(admin, userId).catch(() => null) } catch { /* channel context — no cookie */ }
+  // Prefer the brand the client sends EXPLICITLY (the switcher) — the server sf_brand cookie is often
+  // unset even when the UI shows a brand, which made the chat answer for all brands (Aura got Mars Men's
+  // rival HealthVape). Fall back to the cookie, then null (account-wide, e.g. Slack/WhatsApp).
+  let activeBrandId: string | null = opts?.brandId || null
+  if (!activeBrandId) { try { const { resolveActiveBrandId } = await import('@/lib/brand/active'); activeBrandId = await resolveActiveBrandId(admin, userId).catch(() => null) } catch { /* channel context — no cookie */ } }
 
   // 1 · TEACH a belief
   if (!item && TEACH.test(q) && !q.includes('?')) {
