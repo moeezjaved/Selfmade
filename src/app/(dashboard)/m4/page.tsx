@@ -1,6 +1,7 @@
 'use client'
 import React, { useState } from 'react'
 import toast from 'react-hot-toast'
+import { alertMessage } from '@/components/ConfirmDialog'
 import MetaGate from '@/components/MetaGate'
 import UpgradeGate from '@/components/UpgradeGate'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -505,16 +506,18 @@ function M4Inner() {
       const data=await res.json()
       const totalAds=(data.broad_adsets||0)+(data.interest_adsets||0)+(data.retargeting_adsets||0)+(data.retainer_adsets||0)
       const errMsg=data.errors?.length?'\n\nWhy:\n'+data.errors.join('\n'):''
-      if(data.error)toast.error('Launch failed: '+data.error)
+      // Launch failures shown as a CENTERED, on-brand modal that STAYS until dismissed (a toast in the
+      // corner vanished before the founder could read it).
+      if(data.error) await alertMessage({ title: 'Launch couldn’t start', body: data.error, confirmLabel: 'OK' })
       else if(totalAds===0){
         // Campaign shell may exist but NO ads were created — say so instead of a false "LAUNCHED".
-        toast.error('No ads were created — the campaign didn’t go live.'+(errMsg||' Usually the Meta ad account still needs setup (payment method + confirm details in Meta’s “Account overview”), or the creative failed to upload. Fix that and launch again.'),{duration:9000})
+        await alertMessage({ title: 'No ads were created', body: 'The campaign didn’t go live.'+(errMsg||' Usually the Meta ad account still needs setup (payment method + confirm details in Meta’s “Account overview”), or the creative failed to upload. Fix that and launch again.'), confirmLabel: 'OK' })
       } else{
         toast.success('LAUNCHED in '+data.account+'! Broad '+data.broad_adsets+' · Interest '+data.interest_adsets+' · Retargeting '+(data.retargeting_adsets||0)+(includeRetainer?' · Retainer '+(data.retainer_adsets||0):'')+'. All PAUSED — activate in Meta Ads Manager.',{duration:9000})
         try { sessionStorage.removeItem(DRAFT_KEY) } catch {}   // launched → clear the draft so the next campaign starts fresh
         goTo('grades')
       }
-    }catch(e:any){toast.error('Error: '+e.message)}
+    }catch(e:any){ await alertMessage({ title: 'Launch error', body: e.message, confirmLabel: 'OK' }) }
     setLoading(false)
   }
 
