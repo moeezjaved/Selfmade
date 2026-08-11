@@ -13,6 +13,7 @@
  */
 import { auditAccount } from '@/lib/meta/audit'
 import { recall } from '@/lib/brain'
+import { resolveBrandScopedAccount } from '@/lib/meta/scope'
 
 const ADS_NOUN = /\b(ads?|campaigns?|roas|spend(?:ing)?|budget|meta ads?|facebook ads?|ad account|ad performance)\b/i
 const ADS_VERB = /\b(improve|fix|optimi[sz]e|scale|pause|kill|cut|stop|help|grow|lower|reduce|what should i do|what do i (?:need to )?do|how (?:are|is|'?s|do|should)|which|worst|best|winning|losing|bleeding|wasting)\b/i
@@ -100,8 +101,9 @@ async function reasonedAnswer(admin: any, userId: string, a: any): Promise<strin
     topAds: (a.ads || []).map((ad: any) => ({ name: ad.name, spend: ad.spend, impressions: ad.impressions, clicks: ad.clicks, ctr: ad.ctr, cpc: ad.cpc, roas: ad.roas })),
   }
   const system = `You are Mello, a sharp senior Meta media buyer talking to the founder. Reason over the account snapshot and decide what to do to improve the ads. Think about signal quality (a "winner" with only 1-2 conversions is thin), spend concentration, and cheap CTR that isn't converting.
+CRITICAL — NUMERIC FIDELITY: Every number you state (ROAS, spend, CTR, CPC, impressions, clicks, %) MUST be copied EXACTLY from the snapshot JSON. Do NOT invent, estimate, average, re-round, or otherwise change any number. The account's average ROAS is EXACTLY ${a.avgRoas}x and total spend is EXACTLY ${fmtMoney(a.spend, a.currency)} — never state a different account ROAS or spend. A campaign/ad's ROAS is only ever the "roas" field on that item in the snapshot. If a number is not in the snapshot, do NOT mention it. Getting a number wrong is a serious failure.
 Reply ONLY as JSON: {"answer": string, "actions": [{"type":"pause"|"scale","metaCampaignId":string,"campaignName":string,"reason":string,"newDailyBudget":number}]}.
-- "answer": 2-4 sentences, first person, specific, cite the real numbers (${a.currency}). Sound like a media buyer, not a calculator. If nothing needs doing, say so plainly.
+- "answer": 2-4 sentences, first person, specific, citing numbers copied EXACTLY from the snapshot (${a.currency}). Sound like a media buyer, not a calculator. If nothing needs doing, say so plainly.
 - "actions": only high-confidence moves. metaCampaignId MUST be one from the snapshot (readyToScale/catchyButNotConverting/burningBudget). newDailyBudget only for scale (a sensible ~20% step above current dailyBudget). Never invent a campaign. Empty array is fine.`
 
   // Company Brain: reason THROUGH the company's memory. Beliefs (DNA) are hard constraints; learnings
@@ -114,7 +116,7 @@ Reply ONLY as JSON: {"answer": string, "actions": [{"type":"pause"|"scale","meta
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const resp = await openai.chat.completions.create({
-    model, temperature: 0.3, response_format: { type: 'json_object' },
+    model, temperature: 0, response_format: { type: 'json_object' },
     messages: [{ role: 'system', content: systemWithMemory }, { role: 'user', content: JSON.stringify(snapshot) }],
   })
   const raw = resp.choices?.[0]?.message?.content || ''
@@ -130,7 +132,11 @@ export async function answerAdsQuestion(admin: any, userId: string, message: str
   if (!isAdsQuestion(message)) return null
 
   let a: any = null
-  try { a = await auditAccount(admin, userId, undefined, 'last_30d') } catch { /* safe reply below */ }
+  // Audit the account for the ACTIVE BRAND (the one the founder is viewing on the brief), not always the
+  // org primary — otherwise a founder on Aura (ROY 1) got numbers for a different account entirely.
+  let scopedAccountId: string | undefined = undefined
+  try { scopedAccountId = (await resolveBrandScopedAccount(admin, userId))?.account_id || undefined } catch { /* fall back to primary */ }
+  try { a = await auditAccount(admin, userId, scopedAccountId, 'last_30d') } catch { /* safe reply below */ }
   if (!a) return { reply: `You don't have a Meta ad account connected yet — connect one from Settings and I'll audit it every morning and tell you exactly what to scale and pause.` }
   if (!a.total) return { reply: `I checked ${a.accountName || 'your account'} — no active campaigns with spend in the last 30 days, so there's nothing to tune yet. Launch one and I'll start grading it and flag what to scale or cut.` }
 
