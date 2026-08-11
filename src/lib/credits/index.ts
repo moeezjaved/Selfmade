@@ -9,6 +9,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveBillingOwner } from '@/lib/org'
+import { normalizePlan, PLAN_ORDER } from '@/lib/plans'
 // NOTE: "free unlimited images for subscribers" (pricing v2) lives in the DB reserve_credits function
 // (migration 102), NOT here — because some routes call the RPC directly and would bypass an app-layer
 // check. reserve_credits returns a real 0-credit committed tx for subscriber image actions, so commit/
@@ -84,7 +85,7 @@ export async function getBalance(admin: SupabaseClient, userId: string) {
   const [{ data: prof }, { data: wallet }, { data: sub }] = await Promise.all([
     admin.from('user_profiles').select('credits_balance, plan_id, credits_reset_at, subscription_status, trial_ends_at').eq('user_id', owner).maybeSingle(),
     admin.from('credit_wallets').select('plan_credits_balance, topup_credits_balance, plan_credits_reset_at').eq('owner_id', owner).maybeSingle(),
-    admin.from('subscriptions').select('stripe_subscription_id, status').eq('owner_id', owner).maybeSingle(),
+    admin.from('subscriptions').select('stripe_subscription_id, status, plan').eq('owner_id', owner).maybeSingle(),
   ])
   const plan_credits = (wallet as any)?.plan_credits_balance ?? 0
   const topup_credits = (wallet as any)?.topup_credits_balance ?? 0
@@ -94,10 +95,21 @@ export async function getBalance(admin: SupabaseClient, userId: string) {
   const realTrial = (prof as any)?.subscription_status === 'trialing'
     && !!(sub as any)?.stripe_subscription_id
     && ((sub as any)?.status ? (sub as any).status === 'trialing' : true)
+  // Plan can live in TWO places that disagree: the Stripe-synced `subscriptions.plan` (what the Billing
+  // page reads → "Selfmade Creator · Active") and `user_profiles.plan_id`. This used to return ONLY the
+  // profile plan_id, so a paying Creator whose profile row wasn't synced showed as "Free" everywhere the
+  // brief/onboarding read getBalance (the "You're on Free / Free tracks 1 competitor" bug). Match
+  // getPlanId: take the MORE GENEROUS of the two active sources — never under-serve a paying user.
+  const subActive = (sub as any)?.plan && ['active', 'trialing'].includes(String((sub as any)?.status || ''))
+  const subPlan = subActive ? normalizePlan((sub as any).plan) : null
+  const profPlan = (prof as any)?.plan_id ? normalizePlan((prof as any).plan_id) : null
+  const plan = (subPlan && profPlan)
+    ? (PLAN_ORDER.indexOf(subPlan) >= PLAN_ORDER.indexOf(profPlan) ? subPlan : profPlan)
+    : (subPlan || profPlan || 'free')
   return {
     balance: wallet ? plan_credits + topup_credits : (prof?.credits_balance ?? 0),
     plan_credits, topup_credits,
-    plan: prof?.plan_id ?? 'free',
+    plan,
     reset_at: (wallet as any)?.plan_credits_reset_at ?? prof?.credits_reset_at ?? null,
     // Trial state — powers the "full credits unlock at trial end / pay now" messaging.
     trialing: realTrial,

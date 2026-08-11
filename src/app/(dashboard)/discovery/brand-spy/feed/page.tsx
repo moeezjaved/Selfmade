@@ -6,6 +6,11 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { BRAND_COOKIE } from '@/lib/brand/cookie'
+
+// Read the active project cookie client-side (same as the Brands tab + ProjectSwitcher) so the feed
+// scopes to the SAME brand the rest of Brand Spy shows.
+const readCookie = (name: string) => { if (typeof document === 'undefined') return ''; const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : '' }
 
 type Cre = { asset_type: string; r2_url: string; poster_url: string | null }
 type Ad = { id: string; pageId: string; pageName: string; body: string | null; startDate: string | null; format: string | null; creatives: Cre[] }
@@ -22,10 +27,13 @@ export default function BrandSpyFeed() {
   const load = useCallback(async () => {
     setLoading(true); setNoFollows(false)
     try {
-      // Scope to the founder's OWN competitors — this is "what MY rivals launched", not a global demo
-      // feed (a new account was seeing Heinz/Foreplay it never followed). Fetch their follows, then pull
-      // each one's newest ads. No follows → an empty CTA, not someone else's brands.
-      const f = await fetch('/api/follows').then(r => r.ok ? r.json() : null).catch(() => null)
+      // Scope to the founder's OWN competitors for the ACTIVE brand — this is "what MY rivals launched",
+      // not a global demo feed and not rivals from OTHER/deleted brands (a new account was seeing
+      // AlphaInfuse/Iforex it never followed for this brand). Scope to the active project (sf_brand cookie)
+      // + spied only, matching the Brands tab. No brand selected → account-wide spied follows.
+      const activeBrand = readCookie(BRAND_COOKIE)
+      const qs = new URLSearchParams({ spied: '1' }); if (activeBrand) qs.set('brand', activeBrand)
+      const f = await fetch(`/api/follows?${qs}`).then(r => r.ok ? r.json() : null).catch(() => null)
       const pageIds: string[] = Array.isArray(f?.pageIds) ? f.pageIds.map(String) : []
       if (!pageIds.length) { setAds([]); setNoFollows(true); return }
       const perBrand = await Promise.all(pageIds.slice(0, 15).map(pid =>
@@ -39,6 +47,8 @@ export default function BrandSpyFeed() {
     } catch { setAds([]) } finally { setLoading(false) }
   }, [])
   useEffect(() => { load() }, [load])
+  // Re-pull when the project switcher changes brand (client-fetch page reads the cookie at fetch time).
+  useEffect(() => { const onBrand = () => load(); window.addEventListener('sf:brandchange', onBrand); return () => window.removeEventListener('sf:brandchange', onBrand) }, [load])
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>

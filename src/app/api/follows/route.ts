@@ -8,12 +8,21 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  const { data } = await admin.from('followed_brands').select('page_id, brand_name, email_alerts, spied, brand_id').eq('user_id', user.id)
+  // Optional scoping (the Competitor Feed uses both): ?brand=<id> → only competitors linked to that
+  // brand; ?spied=1 → only spied ones (Brand Spy list, not silent "following"). Without them this stays
+  // the full account-wide list it always returned. This is what stops the feed showing rivals from
+  // OTHER/deleted brands (the "removed all brands but Feed still shows AlphaInfuse/Iforex" bug).
+  const brandParam = req.nextUrl.searchParams.get('brand')
+  const spiedOnly = req.nextUrl.searchParams.get('spied') === '1'
+  let q = admin.from('followed_brands').select('page_id, brand_name, email_alerts, spied, brand_id').eq('user_id', user.id)
+  if (spiedOnly) q = q.eq('spied', true)
+  if (brandParam) q = q.eq('brand_id', brandParam)
+  const { data } = await q
   const brands = (data || []) as any[]
 
   // Resolve any missing brand_name from the crawled ads (page_name) — a follow saved without a name
