@@ -215,6 +215,42 @@ function M4Inner() {
 
   const goTo = (s: Step) => { setStep(s); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
+  // ── Draft persistence ── Everything the founder fills is autosaved to sessionStorage and restored on
+  // mount, so a refresh, an accidental back, or (the reported bug) an Instagram "reconnect" navigation
+  // NEVER wipes the M4 form. Keyed per-brand via the sf_brand cookie so switching brands doesn't mix.
+  const DRAFT_KEY = 'm4_draft_v1'
+  const restored = React.useRef(false)
+  React.useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const d = JSON.parse(raw)
+        if (d.form) setForm((p: any) => ({ ...p, ...d.form }))
+        if (d.adCopy) setAdCopy(d.adCopy); if (d.retargetingCopy) setRetargetingCopy(d.retargetingCopy); if (d.retainerCopy) setRetainerCopy(d.retainerCopy)
+        if (typeof d.includeRetainer === 'boolean') setIncludeRetainer(d.includeRetainer)
+        if (d.selectedPageId) setSelectedPageId(d.selectedPageId); if (d.selectedInstagramId) setSelectedInstagramId(d.selectedInstagramId)
+        if (d.pixelId) setPixelId(d.pixelId); if (d.pixelChoice) setPixelChoice(d.pixelChoice)
+        if (Array.isArray(d.competitorList)) setCompetitorList(d.competitorList)
+        // Only restore FINISHED uploads (a mid-flight upload has no hash and can't be resumed).
+        if (Array.isArray(d.creatives)) setCreatives(d.creatives.filter((c: any) => c.hash))
+        if (Array.isArray(d.retargetingCreatives)) setRetargetingCreatives(d.retargetingCreatives.filter((c: any) => c.hash))
+        if (Array.isArray(d.retainerCreatives)) setRetainerCreatives(d.retainerCreatives.filter((c: any) => c.hash))
+        if (Array.isArray(d.interests)) setInterests(d.interests)
+        if (d.step) setStep(d.step)
+      }
+    } catch { /* corrupt draft — ignore */ }
+    restored.current = true
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    if (!restored.current) return   // don't overwrite the saved draft before we've restored it
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        step, form, adCopy, retargetingCopy, retainerCopy, includeRetainer, selectedPageId, selectedInstagramId,
+        pixelId, pixelChoice, competitorList, creatives, retargetingCreatives, retainerCreatives, interests,
+      }))
+    } catch { /* quota / serialize error — non-blocking */ }
+  }, [step, form, adCopy, retargetingCopy, retainerCopy, includeRetainer, selectedPageId, selectedInstagramId, pixelId, pixelChoice, competitorList, creatives, retargetingCreatives, retainerCreatives, interests])
+
   const autoDate = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
   const uid = () => Math.random().toString(36).slice(2, 6).toUpperCase()
   const autoCampaignName = (name: string) => `${name} — ${autoDate()} #${uid()}`
@@ -302,8 +338,10 @@ function M4Inner() {
       ) || pages[0]
 
       if(matchedPage) {
-        setSelectedPageId(matchedPage.id)
-        if(matchedPage.instagram?.id) setSelectedInstagramId(matchedPage.instagram.id)
+        // Don't clobber a restored draft's page/IG choice — only auto-pick when nothing's selected yet.
+        setSelectedPageId(prev => prev || matchedPage.id)
+        const igId = matchedPage.instagram?.id
+        if(igId) setSelectedInstagramId(prev => prev || igId)
         setForm(prev=>({
           ...prev,
           product: prev.product || accountName || matchedPage.name,
@@ -473,6 +511,7 @@ function M4Inner() {
         toast.error('No ads were created — the campaign didn’t go live.'+(errMsg||' Usually the Meta ad account still needs setup (payment method + confirm details in Meta’s “Account overview”), or the creative failed to upload. Fix that and launch again.'),{duration:9000})
       } else{
         toast.success('LAUNCHED in '+data.account+'! Broad '+data.broad_adsets+' · Interest '+data.interest_adsets+' · Retargeting '+(data.retargeting_adsets||0)+(includeRetainer?' · Retainer '+(data.retainer_adsets||0):'')+'. All PAUSED — activate in Meta Ads Manager.',{duration:9000})
+        try { sessionStorage.removeItem(DRAFT_KEY) } catch {}   // launched → clear the draft so the next campaign starts fresh
         goTo('grades')
       }
     }catch(e:any){toast.error('Error: '+e.message)}
@@ -721,14 +760,12 @@ function M4Inner() {
                       <span>Instagram Connected</span><span style={{color:'#2d7a2d',fontWeight:700}}>@{pages.find(p=>p.id===selectedPageId)?.instagram?.username}</span>
                     </div>
                   ):(
-                    <div style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:10,padding:14,marginTop:4}}>
-                      <div style={{fontSize:12,fontWeight:700,color:'#fbbf24',marginBottom:6}}>Instagram Not Connected</div>
+                    <div style={{background:'#f8fcf6',border:'1px solid rgba(134,239,172,0.2)',borderRadius:10,padding:14,marginTop:4}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#1a3a1a',marginBottom:6}}>Instagram — optional</div>
                       <div style={{fontSize:12,color:'#6b8f6b',marginBottom:10,lineHeight:1.6}}>
-                        Your ads run on both Facebook and Instagram. Two possible fixes:<br/>
-                        <strong style={{color:'#1a3a1a'}}>1. Reconnect Selfmade</strong> — your current connection may be missing Instagram permission. <a href="/connect-meta" style={{color:'#1a3a1a',fontWeight:700}}>Click here to reconnect →</a><br/>
-                        <strong style={{color:'#1a3a1a'}}>2. Link in Meta Business Suite</strong> — go to Business Suite → Instagram Accounts → connect your Instagram to this Facebook page, then reconnect above.
+                        Your ads will still run on Instagram automatically through this Facebook Page — you don’t need to do anything here to launch. To show them from a specific IG account instead, paste its ID below, or <a href="/connect-meta" target="_blank" rel="noopener" style={{color:'#1a3a1a',fontWeight:700}}>reconnect in a new tab ↗</a> (opens separately so nothing you’ve filled here is lost).
                       </div>
-                      <input value={selectedInstagramId} onChange={e=>setSelectedInstagramId(e.target.value)} placeholder="Or paste Instagram Account ID manually (find in Meta Business Suite)" style={{...S.input,fontSize:12}}/>
+                      <input value={selectedInstagramId} onChange={e=>setSelectedInstagramId(e.target.value)} placeholder="Instagram Account ID (optional — find in Meta Business Suite)" style={{...S.input,fontSize:12}}/>
                     </div>
                   )}
                 </div>
