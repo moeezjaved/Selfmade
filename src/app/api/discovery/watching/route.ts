@@ -63,9 +63,13 @@ export async function GET(req: NextRequest) {
     try { const { count } = await admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', pid); adCount = count || 0 } catch { /* ok */ }
     try {
       // Top ads (longest-running = proven), and separately the ones first-seen in 48h (new launches).
+      // Pull a WIDE candidate pool (40, not 6): a high-volume rival like alphainfuse has thousands of ads
+      // but only some have downloaded media (r2_url) — with only 6 candidates the image filter often left 0,
+      // so it showed no thumbnails (and, with no stable tiebreak, flickered "sometimes 1/2"). Secondary
+      // sort by ad_id makes the pick deterministic. We still render only the first 4 that HAVE an image.
       const [topR, newR] = await Promise.all([
-        admin.from('discovery_ads_index').select(SEL).eq('page_id', pid).order('days_running', { ascending: false, nullsFirst: false }).limit(6),
-        admin.from('discovery_ads_index').select(`${SEL}, first_seen_at`).eq('page_id', pid).gte('first_seen_at', H48).order('first_seen_at', { ascending: false }).limit(6),
+        admin.from('discovery_ads_index').select(SEL).eq('page_id', pid).order('days_running', { ascending: false, nullsFirst: false }).order('ad_id', { ascending: true }).limit(40),
+        admin.from('discovery_ads_index').select(`${SEL}, first_seen_at`).eq('page_id', pid).gte('first_seen_at', H48).order('first_seen_at', { ascending: false }).order('ad_id', { ascending: true }).limit(40),
       ])
       topAds = (topR.data || []).map(media).filter((a: any) => a.image).slice(0, 4)
       newAds = (newR.data || []).map(media).filter((a: any) => a.image).slice(0, 4)
