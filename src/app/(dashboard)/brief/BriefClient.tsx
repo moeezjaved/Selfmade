@@ -21,6 +21,11 @@ import BriefWishlist from './BriefWishlist'
 import BriefScan from './BriefScan'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
 import dynamic from 'next/dynamic'
+import { BRAND_COOKIE } from '@/lib/brand/cookie'
+
+// Client-side read of the active-project cookie — the reliable source for which brand to scope the
+// chat to (the server-resolved prop can be null even when the switcher shows a brand).
+const readBrandCookie = () => { if (typeof document === 'undefined') return ''; const m = document.cookie.match(new RegExp('(?:^|; )' + BRAND_COOKIE + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : '' }
 import Working from '@/components/Working'
 import { mello } from '@/lib/design/voice'
 import { openCredits } from '@/components/credits/CreditModal'
@@ -342,7 +347,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
     try {
       // Hard client timeout — the reply runs the full Mello agent (tools + LLM), which can occasionally
       // stall; without this the composer sat on "Mello is thinking…" forever. 75s then a graceful msg.
-      const r = await fetch('/api/brief/reply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: q, brandId: activeBrandId || undefined, item: about ? { title: about.title, body: about.body } : (focusItem ? { title: focusItem.title, body: focusItem.body } : undefined) }), signal: AbortSignal.timeout(40000) })
+      const r = await fetch('/api/brief/reply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: q, brandId: activeBrandId || readBrandCookie() || undefined, item: about ? { title: about.title, body: about.body } : (focusItem ? { title: focusItem.title, body: focusItem.body } : undefined) }), signal: AbortSignal.timeout(40000) })
       const j = await r.json().catch(() => ({}))
       setThread(t => { const c = [...t]; const last = c[c.length - 1]; if (last && last.who === 'mello' && (last as any).kind === 'reply') (c[c.length - 1] as any) = { who: 'mello', kind: 'reply', text: j.reply || 'Got it.' }; return c })
     } catch (e: any) {
