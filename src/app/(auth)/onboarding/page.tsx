@@ -404,7 +404,12 @@ export default function InterviewPage() {
         brand_kit: detect?.brandKit || undefined,
       }
       const r = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(x => x.json()).catch(() => null)
-      if (r?.brand?.id) brandIdRef.current = r.brand.id
+      if (r?.brand?.id) {
+        brandIdRef.current = r.brand.id
+        // Make the just-created brand the ACTIVE project so the brief + every surface scope to it. Essential
+        // when onboarding an Nth brand (?new=1) — otherwise the app stays on the previous brand.
+        try { document.cookie = `sf_brand=${r.brand.id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax` } catch { /* ignore */ }
+      }
     } catch { /* brand save is best-effort — the interview notes survive regardless */ }
     note('fact', `Hired on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} — agreement signed by ${signName.trim()}.`)
     setNightLog(l => [...l.map(x => ({ ...x, done: true })), { t: 'agreement filed', done: false }])

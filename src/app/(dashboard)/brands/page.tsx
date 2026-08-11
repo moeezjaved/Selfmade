@@ -152,7 +152,9 @@ export default function BrandsPage() {
           <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111' }}>Brands</h1>
           {quota && <span style={{ fontSize: 13, fontWeight: 600, color: '#6b7280' }}>{quota.limit < 0 ? `${quota.used} · unlimited on your plan` : `${quota.used} / ${quota.limit} used`}</span>}
         </div>
-        <button style={btn} onClick={() => setCreating(v => !v)}>{creating ? 'Cancel' : '+ New brand'}</button>
+        {/* New brand runs the FULL onboarding interview (same as the brief's switcher) — consistent entry,
+            not the lighter inline form. The inline create form below is kept for now but no longer the path. */}
+        <button style={btn} onClick={() => { window.location.href = '/onboarding?new=1' }}>+ New brand</button>
       </div>
       <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 20 }}>Your brands feed Remake and Script Duplicate — voice, USPs, and real product photos.</p>
 

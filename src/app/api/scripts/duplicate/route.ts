@@ -20,8 +20,13 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  const { sourceAdId, brandId, brief } = await req.json()
+  const { sourceAdId, brandId, brief, language } = await req.json()
   if (!sourceAdId) return NextResponse.json({ error: 'sourceAdId required' }, { status: 400 })
+  // Target language for the rewritten script. Defaults to English (like the Remake flow) so a Hindi/Urdu
+  // source ad is TRANSCREATED into the brand's language instead of mirroring the source (the bug: the
+  // rewrite came out in Hindi). The ad-detail UI passes an explicit choice.
+  const LANG: Record<string, string> = { en: 'English', ur: 'Urdu', hi: 'Hindi', ar: 'Arabic', es: 'Spanish', fr: 'French', de: 'German', pt: 'Portuguese' }
+  const langName = LANG[String(language || 'en')] || 'English'
 
   const { data: src } = await admin.from('ad_scripts').select('*').eq('ad_id', sourceAdId).maybeSingle()
   if (!src?.transcript) return NextResponse.json({ error: 'Source ad not transcribed yet — transcribe it first' }, { status: 400 })
@@ -61,6 +66,8 @@ ${sourceText.slice(0, 4000)}
 
 NEW BRAND BRIEF:
 ${brandBrief}
+
+Write the new script in ${langName} — natural native ad copy (code-switch English product/brand words where a real creator would). Do NOT mirror the source ad's language.
 
 Return ONLY the new script text, ready to read on camera. Match the source's length and structure.` }],
     })
