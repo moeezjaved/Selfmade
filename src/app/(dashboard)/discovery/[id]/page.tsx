@@ -298,6 +298,7 @@ function AiPanel({ ad }: { ad: Ad }) {
   const [err, setErr] = useState<string | null>(null)
   const [brands, setBrands] = useState<any[]>([])
   const [brandId, setBrandId] = useState('')
+  const [scriptLang, setScriptLang] = useState('en')   // target language for the rewrite (matches Remake — defaults to English, not the source ad's language)
 
   useEffect(() => {
     fetch('/api/brands').then(r => r.json()).then(d => {
@@ -377,8 +378,13 @@ function AiPanel({ ad }: { ad: Ad }) {
                 <select value={brandId} onChange={e => setBrandId(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, marginBottom: 8 }}>
                   {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
+                {/* Language selector — parity with Remake: the rewrite is transcreated into THIS language
+                    (default English), not the source ad's language. */}
+                <select value={scriptLang} onChange={e => setScriptLang(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, marginBottom: 8 }}>
+                  {[['en','English'],['ur','Urdu'],['hi','Hindi'],['ar','Arabic'],['es','Spanish'],['fr','French'],['de','German'],['pt','Portuguese']].map(([v,l]) => <option key={v} value={v}>Script language: {l}</option>)}
+                </select>
                 <button style={{ ...ctaS, opacity: loading ? 0.6 : 1 }} disabled={loading}
-                  onClick={() => run('/api/scripts/duplicate', { sourceAdId: ad.id, brandId }, 'script_duplicate', 5, d => setGen(d.generated?.script))}>
+                  onClick={() => run('/api/scripts/duplicate', { sourceAdId: ad.id, brandId, language: scriptLang }, 'script_duplicate', 5, d => setGen(d.generated?.script))}>
                   {loading ? 'Writing…' : `Rewrite for my brand · ${cost('script_duplicate', 5)} cr`}
                 </button>
                 <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, textAlign: 'center' }}>Mello rewrites the whole script around your product — that&rsquo;s what the credits pay for.</div>

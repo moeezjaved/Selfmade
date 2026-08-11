@@ -85,7 +85,9 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
               ))}
             </div>
             <div style={{ height: 1, background: '#eef1ec', margin: '6px 4px' }} />
-            <a href="/brands/new" style={{ ...rowStyle(false), color: '#3b6d11', fontWeight: 750, textDecoration: 'none' }}>
+            {/* New brand runs the FULL onboarding interview (crawl → competitors → async pulls → first
+                report), same as the first brand — not the lighter wizard. ?new=1 marks it as an Nth brand. */}
+            <a href="/onboarding?new=1" style={{ ...rowStyle(false), color: '#3b6d11', fontWeight: 750, textDecoration: 'none' }}>
               <span style={{ width: 18, height: 18, borderRadius: 6, background: '#eaf3de', color: '#3b6d11', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, marginRight: 9 }}>+</span>
               New brand
             </a>
