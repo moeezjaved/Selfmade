@@ -122,19 +122,27 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
   if (!accounts?.length) return null
 
   if (opts.syncFirst !== false) {
+    let anyTokenError = false
     for (const a of accounts) {
       try { await syncAccount(admin, a) } catch (e: any) {
         // A dead token must SURFACE, not rot silently: mark + tell the founder in the brief.
         if (/expired|invalid|OAuth/i.test(String(e?.message))) {
+          anyTokenError = true
           await admin.from('meta_accounts').update({ status: 'error' }).eq('id', a.id)
-          await admin.from('brief_events').insert({
-            user_id: userId, kind: 'meta_health', importance: 90,
-            title: 'Meta lost access to your ad account.',
-            body: 'The token expired or was revoked — reconnect in a minute and I pick right back up.',
-            cta_label: 'Reconnect Meta', cta_href: '/connect/meta',
-          }).then(() => {}, () => {})
         }
       }
+    }
+    // Keep exactly ONE health card in sync with reality: clear any existing "Meta lost access" card,
+    // then re-post only if a token is CURRENTLY dead. Without this the card rotted forever after the
+    // account was reconnected (the founder kept seeing "Meta lost access" on a healthy account).
+    await admin.from('brief_events').delete().eq('user_id', userId).eq('kind', 'meta_health').then(() => {}, () => {})
+    if (anyTokenError) {
+      await admin.from('brief_events').insert({
+        user_id: userId, kind: 'meta_health', importance: 90,
+        title: 'Meta lost access to your ad account.',
+        body: 'The token expired or was revoked — reconnect in a minute and I pick right back up.',
+        cta_label: 'Reconnect Meta', cta_href: '/connect/meta',
+      }).then(() => {}, () => {})
     }
   }
 
