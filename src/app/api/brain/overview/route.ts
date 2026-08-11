@@ -3,7 +3,7 @@
  * identity, beliefs (active DNA) + Mello's pending proposals, per-department notebooks + learnings,
  * the recent learning log, CEO prefs, and a simple playbook (the highest-confidence plays).
  */
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getPrefs } from '@/lib/brain'
 import { resolveActiveBrandId } from '@/lib/brand/active'
@@ -12,13 +12,13 @@ export const dynamic = 'force-dynamic'
 
 const DEPTS = ['research', 'creative', 'media', 'growth', 'customer', 'store', 'finance']
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
   // The Company Brain is the ACTIVE brand's brain (identity, beliefs, learnings) — not the first brand's.
-  const brandId = (await resolveActiveBrandId(admin, user.id).catch(() => null)) || null
+  const brandId = (await resolveActiveBrandId(admin, user.id, new URL(req.url).searchParams.get('brand')).catch(() => null)) || null
 
   const [brandRes, dnaRes, learnRes, prefs, conflictRes] = await Promise.all([
     // Identity = the ACTIVE brand (was brands.limit(1) → always the first brand, e.g. "Co natural", under

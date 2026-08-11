@@ -3,20 +3,20 @@
  * decided and discovered (brain_timeline), plus this week's top customer-signal patterns aggregated on
  * read. Powers the Overview tab so the Brain feels like it has a history — the way a real employee does.
  */
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
   const since = new Date(Date.now() - 14 * 86400000).toISOString()
   // Scope the timeline + "what customers are talking about" to the ACTIVE brand (both have brand_id).
-  const brandId = (await resolveActiveBrandId(admin, user.id).catch(() => null)) || null
+  const brandId = (await resolveActiveBrandId(admin, user.id, new URL(req.url).searchParams.get('brand')).catch(() => null)) || null
 
   const [tlRes, sigRes] = await Promise.all([
     admin.from('brain_timeline').select('actor, department, event, created_at, brand_id').eq('user_id', user.id).order('created_at', { ascending: false }).limit(80),
