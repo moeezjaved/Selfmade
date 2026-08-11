@@ -54,8 +54,23 @@ Reply ONLY as JSON: {"proposals":[{"rule":string,"department":string|null,"based
     })
     let parsed: any = {}
     try { parsed = JSON.parse(resp.choices?.[0]?.message?.content || '{}') } catch { parsed = {} }
+    // Enforce ACTIONABLE rules in code, not just the prompt: reject goal/observation-shaped text so a
+    // vague "We need to improve customer service" can never become a rule (it has nothing to act on).
+    // A real rule reads as an instruction — an imperative, or an Always/Never/When-X standing directive.
+    const isActionable = (raw: string): boolean => {
+      const r = String(raw || '').trim()
+      if (r.length < 8) return false
+      // Goal / complaint / observation openers — these describe a wish or a problem, not an action.
+      if (/^(we\s+(need|should|must|have to|want|could)|our\s+\w+\s+(needs|should)|there\s+(is|are)|customers?\s+(are|have|want|expressed|complain)|it\s+(is|seems)|i\s+(think|feel|want)|maybe|perhaps|consider(ing)?)\b/i.test(r)) return false
+      const first = r.split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, '')
+      // Imperative openers we trust as directives (verb-first or conditional).
+      const imperative = /^(always|never|only|avoid|ensure|make|keep|use|offer|reply|respond|send|start|open|lead|include|add|remove|price|charge|discount|prioriti|focus|target|highlight|emphasi|mention|show|write|say|ask|confirm|when|if|before|after|for\s+every|each)\b/i.test(r)
+      // A safe fallback: verb-first sentences (first word is a bare verb, not "we/our/the/a").
+      const nonImperativeStart = ['we','our','the','a','an','this','that','these','those','it','they','i','you','there','mello','customers','customer'].includes(first)
+      return imperative || !nonImperativeStart
+    }
     const proposals = (Array.isArray(parsed.proposals) ? parsed.proposals : [])
-      .filter((p: any) => p?.rule && !already.has(String(p.rule).toLowerCase().trim())).slice(0, 3)
+      .filter((p: any) => p?.rule && !already.has(String(p.rule).toLowerCase().trim()) && isActionable(p.rule)).slice(0, 3)
 
     for (const p of proposals) {
       await admin.from('company_dna').insert({
