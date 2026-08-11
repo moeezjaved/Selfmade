@@ -5,6 +5,12 @@
  */
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { BRAND_COOKIE } from '@/lib/brand/cookie'
+
+// Active project cookie (same as the switcher) — passed explicitly so the Brain always shows the
+// SELECTED brand's identity/beliefs/culture, not whatever the server cookie resolves at fetch time.
+const readCookie = (name: string) => { if (typeof document === 'undefined') return ''; const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : '' }
+const brandQS = () => { const b = readCookie(BRAND_COOKIE); return b ? `?brand=${encodeURIComponent(b)}` : '' }
 
 type Overview = any
 const DEPT_LABEL: Record<string, string> = { research: 'Research', creative: 'Creative', media: 'Media Buying', growth: 'Growth', customer: 'Customer', store: 'Store', finance: 'Finance' }
@@ -43,10 +49,15 @@ export default function BrainPage() {
   const [reflecting, setReflecting] = useState(false)
   const [culture, setCulture] = useState<{ aggressive: string; premium: string; tone: string; risk: string }>({ aggressive: 'balanced', premium: 'premium', tone: 'friendly', risk: 'ask' })
 
-  const load = () => fetch('/api/brain/overview').then(r => r.json()).then(j => { if (!j.error) setOv(j) }).catch(() => {}).finally(() => setLoading(false))
-  const loadTimeline = () => fetch('/api/brain/timeline').then(r => r.json()).then(j => { if (!j.error) setTl(j) }).catch(() => {})
+  const load = () => fetch(`/api/brain/overview${brandQS()}`).then(r => r.json()).then(j => { if (!j.error) setOv(j) }).catch(() => {}).finally(() => setLoading(false))
+  const loadTimeline = () => fetch(`/api/brain/timeline${brandQS()}`).then(r => r.json()).then(j => { if (!j.error) setTl(j) }).catch(() => {})
   const loadConflicts = () => fetch('/api/brain/conflict').then(r => r.json()).then(j => { if (j.conflicts) setConflicts(j.conflicts) }).catch(() => {})
-  useEffect(() => { load(); loadTimeline(); loadConflicts(); fetch('/api/brain/culture').then(r => r.json()).then(j => { if (j.culture) setCulture(j.culture) }).catch(() => {}) }, [])
+  const loadCulture = () => fetch(`/api/brain/culture${brandQS()}`).then(r => r.json()).then(j => { if (j.culture) setCulture(j.culture) }).catch(() => {})
+  const loadAll = () => { load(); loadTimeline(); loadConflicts(); loadCulture() }
+  useEffect(() => { loadAll() }, [])
+  // Re-pull when the project switcher changes brand — the Brain is per-brand, so it must never keep
+  // showing the previous brand's identity/beliefs/culture (the "wrong brand in Brain" bug).
+  useEffect(() => { const onBrand = () => loadAll(); window.addEventListener('sf:brandchange', onBrand); return () => window.removeEventListener('sf:brandchange', onBrand) }, [])   // eslint-disable-line react-hooks/exhaustive-deps
   const resolveConflict = async (id: string, action: 'temporary' | 'replace' | 'keep') => {
     await fetch('/api/brain/conflict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action }) }).catch(() => {})
     toast.success(action === 'replace' ? 'Replaced the old rule' : action === 'temporary' ? 'Added as a temporary exception' : 'Kept the old rule')
