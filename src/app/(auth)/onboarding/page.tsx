@@ -487,17 +487,8 @@ export default function InterviewPage() {
     setPlanBusy(''); router.push('/brief')
   }
 
-  // Connect WhatsApp as a customer/brief channel — starts the Unipile hosted-auth flow and returns here.
-  // (Previously this button just linked to /settings, which looked like it landed on the profile page.)
-  const [waBusy, setWaBusy] = useState(false)
-  async function connectWhatsApp() {
-    setWaBusy(true)
-    try {
-      const j = await fetch('/api/channels/unipile/connect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider: 'whatsapp', returnTo: '/onboarding' }) }).then(r => r.json())
-      if (j?.url) { window.location.href = j.url; return }
-    } catch { /* fall through */ }
-    setWaBusy(false); router.push('/settings')   // fallback if channels aren't configured
-  }
+  // WhatsApp founder-connect removed from onboarding — founder briefs/approvals are Slack-only for now
+  // (see project_whatsapp_founder_disabled). Customer WhatsApp is handled in the Inbox, not onboarding.
 
   return (
     <div style={{ minHeight: '100vh', background: night ? '#0b100c' : '#f6f8f5', fontFamily: "'Inter', -apple-system, sans-serif", transition: 'background .8s ease', display: 'flex', flexDirection: 'column' }}>
@@ -658,16 +649,11 @@ export default function InterviewPage() {
                   <a href="/api/channels/slack/start" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', textDecoration: 'none', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit' }}>
                     <ChannelLogo provider="slack" size={22} /> Add to Slack
                   </a>
-                  <span style={{ fontSize: 11.5, fontWeight: 750, color: MUTED }}>For teams</span>
+                  <span style={{ fontSize: 11.5, fontWeight: 750, color: MUTED }}>Daily brief + approvals</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
-                  <button onClick={connectWhatsApp} disabled={waBusy} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, padding: '13px 18px', color: INK, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: waBusy ? 'default' : 'pointer', opacity: waBusy ? 0.6 : 1 }}>
-                    <ChannelLogo provider="whatsapp" size={22} /> {waBusy ? 'Opening…' : 'Connect WhatsApp'}
-                  </button>
-                  <span style={{ fontSize: 11.5, fontWeight: 750, color: MUTED }}>For solo founders</span>
-                </div>
+                {/* WhatsApp founder-brief removed — founder briefs/approvals are Slack-only for now
+                    (see project_whatsapp_founder_disabled). Customer WhatsApp lives in the Inbox, not here. */}
               </div>
-              <div style={{ textAlign: 'center', fontSize: 12, color: MUTED, marginBottom: 6 }}>Connect both if you like.</div>
 
               <div style={{ height: 1, background: LINE, margin: '22px 0 18px' }} />
 
