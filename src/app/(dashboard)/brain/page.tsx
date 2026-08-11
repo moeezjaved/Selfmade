@@ -73,7 +73,7 @@ export default function BrainPage() {
     const qq = ask.trim(); if (!qq || asking) return
     setAsking(true); setAnswer(null)
     try {
-      const r = await fetch('/api/brain/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: qq }) }).then(x => x.json())
+      const r = await fetch('/api/brain/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: qq, brandId: readCookie(BRAND_COOKIE) || undefined }) }).then(x => x.json())
       setAnswer({ reply: r.reply || '—', sources: r.sources || [] })
     } catch { setAnswer({ reply: 'I hit a snag — try again in a moment.', sources: [] }) }
     finally { setAsking(false) }
