@@ -160,6 +160,8 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
       body: JSON.stringify({ entries: [{ kind: 'fact', content: `Competitors to watch for ${brandName}: ${picks.map(p => p.name).join(', ')}.` }], brandId: brandId || undefined }),
     }).catch(() => {})
     setBusy(false); onDone?.(picks.length); setSaved(picks.map(p => p.name))   // show the "I'm on it" state, don't close silently
+    // Tell the brief's live competitor list to re-pull so the new competitor appears without a manual reload.
+    try { window.dispatchEvent(new CustomEvent('sf:competitor-added')) } catch { /* no-op */ }
   }
 
   const pickedIds = new Set(picks.map(p => p.pageId))
