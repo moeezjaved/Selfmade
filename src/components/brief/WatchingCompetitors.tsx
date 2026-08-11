@@ -52,6 +52,13 @@ export default function WatchingCompetitors({ brandId, brandName }: { brandId?: 
   }
   // Clear the previous brand's rows on switch so a brand change never shows the old brand's competitors.
   useEffect(() => { setData(null); load(); return () => { if (timer.current) clearInterval(timer.current) } }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps
+  // Re-pull the moment a competitor is added (AddCompetitors fires this), so the new one appears live
+  // instead of only after a manual reload.
+  useEffect(() => {
+    const onAdded = () => load()
+    window.addEventListener('sf:competitor-added', onAdded)
+    return () => window.removeEventListener('sf:competitor-added', onAdded)
+  }, [brandId])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = data?.watching || []
   const unlinked = data?.unlinked || []
