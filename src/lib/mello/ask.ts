@@ -45,6 +45,12 @@ export async function askMello(admin: any, userId: string, message: string, opts
   const item = opts?.item
   if (!q) return { reply: 'Say that again?' }
 
+  // The ACTIVE brand (from the sf_brand cookie) — so chat answers about "my business" and "my
+  // competitors" scope to the brand the founder is viewing, not all brands mashed together (Aura was
+  // shown Mars Men's rivals CeraVe/NovaMane). Null in channel contexts (Slack/WhatsApp) → account-wide.
+  let activeBrandId: string | null = null
+  try { const { resolveActiveBrandId } = await import('@/lib/brand/active'); activeBrandId = await resolveActiveBrandId(admin, userId).catch(() => null) } catch { /* channel context — no cookie */ }
+
   // 1 · TEACH a belief
   if (!item && TEACH.test(q) && !q.includes('?')) {
     try {
@@ -65,7 +71,9 @@ export async function askMello(admin: any, userId: string, message: string, opts
   // Ground in who they watch.
   let watchLine = '', watchCount = 0
   try {
-    const { data: follows } = await admin.from('followed_brands').select('brand_name, spied').eq('user_id', userId).order('created_at', { ascending: false }).limit(20)
+    let fq = admin.from('followed_brands').select('brand_name, spied, brand_id').eq('user_id', userId).order('created_at', { ascending: false }).limit(20)
+    if (activeBrandId) fq = fq.eq('brand_id', activeBrandId)   // only THIS brand's rivals
+    const { data: follows } = await fq
     const names = (follows || []).map((f: any) => f.brand_name).filter((n: string) => !isBlankName(n))
     watchCount = names.length
     if (names.length) watchLine = `The founder is watching these competitors (their ads are in your crawled library — pull specifics with search_ad_library / get_competitor_ads): ${names.join(', ')}.\n\n`
@@ -79,7 +87,9 @@ export async function askMello(admin: any, userId: string, message: string, opts
   }
   const isListQuestion = asksCompetitors && /\b(name|names|list|who|which|what)\b/i.test(q) && q.length < 90
   if (watchCount > 0 && isListQuestion) {
-    const { data: follows } = await admin.from('followed_brands').select('brand_name').eq('user_id', userId).order('created_at', { ascending: false }).limit(20)
+    let fq2 = admin.from('followed_brands').select('brand_name, brand_id').eq('user_id', userId).order('created_at', { ascending: false }).limit(20)
+    if (activeBrandId) fq2 = fq2.eq('brand_id', activeBrandId)
+    const { data: follows } = await fq2
     const names = (follows || []).map((f: any) => f.brand_name).filter((n: string) => !isBlankName(n))
     const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
     return { reply: names.length === 1
@@ -104,7 +114,7 @@ export async function askMello(admin: any, userId: string, message: string, opts
   if (!item) {
     try {
       const { brainAnswer } = await import('@/lib/brain')
-      const ans = await brainAnswer(admin, userId, q)
+      const ans = await brainAnswer(admin, userId, q, { brandId: activeBrandId })
       if (ans?.reply) return { reply: ans.sources?.length ? `${ans.reply}\n\n_Source · ${ans.sources.join(' · ')}_` : ans.reply }
     } catch { /* fall through */ }
   }
