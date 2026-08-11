@@ -38,7 +38,9 @@ export async function runReflection(admin: any, userId: string): Promise<Reflect
 - a clear repeated pattern in the facts worth making a standing rule.
 - a recurring customer theme worth acting on as a rule (e.g. many complaints about one thing → a quality/messaging rule).
 Reply ONLY as JSON: {"proposals":[{"rule":string,"department":string|null,"basedOn":string}]}.
-- "rule": the proposed belief, in the founder's plain voice, one sentence.
+- "rule": an ACTIONABLE STANDING RULE Mello can follow every time — a directive, not a goal, complaint, or observation. It MUST start with an imperative verb (Always / Never / When X, do Y / Respond … / Offer … / Avoid …) and be specific enough to act on WITHOUT more info. Turn the evidence INTO the fix.
+  GOOD: "Reply to every customer message within 2 hours during business hours." / "Always name the exact ingredients and call them safe in product copy."
+  BAD (goals/observations — never output these): "We need to improve customer service." / "We should be faster." / "Customers are unhappy about X." If the only honest takeaway is a vague goal like that, DON'T propose it — leave it out.
 - "department": research|creative|media|growth|customer|store|finance, or null for company-wide.
 - "basedOn": one sentence citing the evidence (name the numbers). Empty proposals array is correct if nothing is strong enough. Never propose something already believed.`
     const payload = {
