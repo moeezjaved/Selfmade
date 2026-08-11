@@ -47,8 +47,12 @@ export async function brainAnswer(
         ? admin.from('brands').select('name, industry, brand_type').eq('user_id', userId).eq('id', brandId).limit(1)
         : admin.from('brands').select('name, industry, brand_type').eq('user_id', userId).order('created_at', { ascending: true }).limit(1),
     ])
-    dna = (dnaR?.data || []).filter(inBrand).slice(0, 40)
-    mem = (memR?.data || []).filter(inBrand).slice(0, 40)
+    dna = (dnaR?.data || []).filter(inBrand).slice(0, 40)   // beliefs CAN be genuinely company-wide (null) — keep inBrand
+    // Notebook FACTS are brand-specific (what/who a brand sells). They were leaking across brands because
+    // un-tagged (null brand_id) facts were treated as account-wide — so every brand's answer described
+    // another brand's products (Aura came back selling Hair ResQ's regrowth system + a soda). Scope them
+    // STRICTLY to the active brand (like learnings/signals); with no brand active, All-brands still sees all.
+    mem = (memR?.data || []).filter(strictBrand).slice(0, 40)
     learns = (lnR?.data || []).filter(strictBrand).slice(0, 30)   // learnings belong to their brand (strict), like signals
     signals = (sgR?.data || []).filter(strictBrand).slice(0, 200)
     ctx = (cxR?.data || []).filter(inBrand).slice(0, 20)
