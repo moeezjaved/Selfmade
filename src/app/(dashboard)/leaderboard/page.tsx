@@ -175,7 +175,7 @@ function LeaderboardPage() {
           (min-width keeps every column its size) instead of letting the thumbnail overlap the metrics. */}
       <div style={{ overflowX: 'auto' }}>
         <div style={{ minWidth: 620 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 120px 160px 160px', gap: 0, padding: '0 16px 8px', fontSize: 12, fontWeight: 500, color: G11 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '64px minmax(180px,1fr) 120px 160px 160px', gap: 0, padding: '0 16px 8px', fontSize: 12, fontWeight: 500, color: G11, minWidth: 684 }}>
             <span>Rank</span><span>Creative</span><span>Wks on board</span><span>Spend</span><span>ROAS</span>
           </div>
           {loading ? <BoardSkeleton />
@@ -216,7 +216,7 @@ function ShiftCard({ c, currency, showMetrics }: { c: any; currency: string; sho
 
 function BoardRow({ r, currency }: { r: any; currency: string }) {
   return (
-    <div className="lb-row" style={{ display: 'grid', gridTemplateColumns: '64px 1fr 120px 160px 160px', alignItems: 'center', height: 100, background: G2, borderRadius: 16, overflow: 'hidden', transition: 'background-color .075s ease-in-out' }}>
+    <div className="lb-row" style={{ display: 'grid', gridTemplateColumns: '64px minmax(180px,1fr) 120px 160px 160px', alignItems: 'center', height: 100, background: G2, borderRadius: 16, overflow: 'hidden', transition: 'background-color .075s ease-in-out', minWidth: 684 }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
         <span style={{ fontSize: 24, fontWeight: 600, color: G12 }}>{r.rank}</span>
         <RankMove movement={r.movement} moved={r.moved} />

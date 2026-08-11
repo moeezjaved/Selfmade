@@ -320,7 +320,8 @@ function CampaignsInner() {
           <div style={{ fontSize: 22, fontWeight: 900, color: '#1a3a1a' }}>Campaigns</div>
           <div style={{ fontSize: 13, color: '#7a9a7a', marginTop: 2 }}>Manage your Meta campaigns, ad sets and ads</div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* flexWrap so Refresh + Launch New wrap to a new line on mobile instead of cropping off-screen. */}
           {/* Date range selector */}
           <div style={{ display: 'flex', background: '#f0f7ee', borderRadius: 10, padding: 3, gap: 2 }}>
             {DATE_RANGES.map(dr => (
