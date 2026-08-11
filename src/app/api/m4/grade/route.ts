@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { resolveScopedAccount } from '@/lib/meta/scope'
+import { resolveBrandScopedAccount } from '@/lib/meta/scope'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient()
 
-  const primaryAccount = await resolveScopedAccount(admin, user.id)
+  const primaryAccount = await resolveBrandScopedAccount(admin, user.id)
 
   const { data: campaigns } = await admin
     .from('campaigns')

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { resolveScopedAccount } from '@/lib/meta/scope'
+import { resolveBrandScopedAccount } from '@/lib/meta/scope'
 import { llm } from '@/lib/llm'
 
 export const maxDuration = 120
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const { createAdminClient } = await import('@/lib/supabase/server')
     const { decryptToken } = await import('@/lib/meta/client')
     const admin = createAdminClient()
-    const ma = await resolveScopedAccount(admin, user.id)   // org-scoped primary account
+    const ma = await resolveBrandScopedAccount(admin, user.id)   // org-scoped primary account
     if (ma) tok = decryptToken(ma.access_token)
   } catch {}
 

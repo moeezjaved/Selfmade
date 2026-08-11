@@ -45,3 +45,25 @@ export async function resolveScopedAccount(admin: SupabaseClient, userId: string
   if (accountId) return rows.find(a => a.account_id === accountId) ?? null
   return rows.find(a => a.is_primary) ?? rows[0] ?? null
 }
+
+/**
+ * Resolve the Meta account for the user's ACTIVE BRAND (multi-brand founders connect a DIFFERENT
+ * Facebook per brand — ROY 1 → Aura, Senayan City Mall → Hair ResQ). If the active brand has an
+ * account linked (meta_accounts.brand_id, mig 142), use THAT account and its OWN token. Only when no
+ * brand is active (All-brands view) or the brand has nothing linked do we fall back to the org-scoped
+ * primary. Every write path (the whole M4 create flow) MUST use this — otherwise an image uploads to
+ * Hair ResQ's account while the campaign is created on Aura's primary, and Meta returns "The related
+ * resource does not exist". Mirrors what meta/audit-summary + meta/opportunities already do.
+ */
+export async function resolveBrandScopedAccount(admin: SupabaseClient, userId: string, explicitBrand?: string | null): Promise<any | null> {
+  try {
+    const { resolveActiveBrandId } = await import('@/lib/brand/active')
+    const brandId = await resolveActiveBrandId(admin, userId, explicitBrand).catch(() => null)
+    if (brandId) {
+      const rows = await scopedMetaAccounts(admin, userId)
+      const linked = rows.find(a => a.brand_id === brandId)
+      if (linked) return linked
+    }
+  } catch { /* fall through to primary */ }
+  return resolveScopedAccount(admin, userId)
+}
