@@ -174,14 +174,18 @@ export async function GET(request: NextRequest) {
       console.log('UPSERT:', upsertError ? JSON.stringify(upsertError) : 'SUCCESS')
     }
 
-    // Prune accounts this user can no longer access on Meta (e.g. removed after
-    // an account change/hack) so the picker only shows currently-valid accounts.
+    // Prune accounts this user can no longer access on Meta (e.g. removed after an account change/hack)
+    // so the picker only shows currently-valid accounts — BUT never disconnect an account that's LINKED
+    // to a brand. A founder can connect a DIFFERENT Facebook per brand (ROY 1 → Aura, another → Hair ResQ);
+    // that second login only sees ITS accounts, so without this guard it wiped the first FB's brand-linked
+    // accounts. Brand-linked = set up on purpose → keep. Only unlinked leftovers get pruned.
     if (activeIds.length) {
       const inList = `(${activeIds.map(id => `"${id}"`).join(',')})`
       const { error: pruneErr } = await admin.from('meta_accounts')
         .update({ status: 'disconnected', is_primary: false })
         .eq('user_id', userId)
         .not('account_id', 'in', inList)
+        .is('brand_id', null)
       console.log('PRUNE:', pruneErr ? JSON.stringify(pruneErr) : 'OK')
     }
 
