@@ -231,7 +231,15 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
   // so no surprise credit spend) so the founder can actually act on the insight via Mello, instead of
   // being dumped on the All Ads page (the old hardcoded /discovery target).
   const askParam = useSearchParams().get('ask')
-  useEffect(() => { if (askParam) setDraft(askParam) }, [askParam])
+  useEffect(() => {
+    // Read from window.location too: useSearchParams can be empty during hydration on a fresh load, which
+    // left the composer blank (the "Act on this does nothing" bug). Then scroll it into view + focus so the
+    // founder SEES the insight's action loaded and ready to send (never auto-sent).
+    const ask = askParam || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ask') : null)
+    if (!ask) return
+    setDraft(ask)
+    setTimeout(() => { const ta = document.querySelector('textarea'); if (ta) { ta.scrollIntoView({ behavior: 'smooth', block: 'center' }); (ta as HTMLTextAreaElement).focus() } }, 350)
+  }, [askParam])
   const [focusItem, setFocusItem] = useState<Item | null>(initialBrief?.headline || initialBrief?.items?.[0] || null)   // what the composer is "about"
   const [headlineState, setHeadlineState] = useState<null | 'approved' | 'passed'>(null)
   const [view, setView] = useState<'standup' | 'desk' | 'scan'>(initialView)   // conversation · prepared desk · one-page scan
