@@ -18,8 +18,12 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient()
     let { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(storagePath)
-    if (error && /bucket not found/i.test(error.message || '')) {
-      await admin.storage.createBucket(bucket, { public: true }).catch(() => {})   // self-heal: no manual Supabase step
+    if (error) {
+      // Self-heal a missing bucket: Supabase reports it as "Bucket not found" OR "The related resource
+      // does not exist" depending on the endpoint/version — the old /bucket not found/ check missed the
+      // second, so every VIDEO upload failed with "Upload error: The related resource does not exist".
+      // Just try to create it on ANY error (idempotent — ignores "already exists") and retry once.
+      await admin.storage.createBucket(bucket, { public: true }).catch(() => {})   // no manual Supabase step
       ;({ data, error } = await admin.storage.from(bucket).createSignedUploadUrl(storagePath))
     }
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
