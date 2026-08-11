@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveScopedAccount } from '@/lib/meta/scope'
 import { decryptToken } from '@/lib/meta/client'
+import { cacheGet, cacheSet } from '@/lib/meta/cache'
 import { num, emptyRow, accInsight, metricValue, inferFormat, type Row } from '@/lib/reports/engine'
 
 export const dynamic = 'force-dynamic'
@@ -35,6 +36,13 @@ export async function GET(req: NextRequest) {
   const token = decryptToken(metaAccount.access_token)
   const currency = metaAccount.currency || 'USD'
   const act = `act_${metaAccount.account_id}`
+
+  // Cache like every other Meta surface (reports/audit) — the page refetches on mount + every threshold
+  // tweak, which without this hammered Graph and surfaced Meta's raw "Application request limit reached".
+  const cacheKey = `leaderboard:${user.id}:${metaAccount.account_id}:${spendThreshold}`
+  const lastKey = `leaderboard:last:${user.id}:${metaAccount.account_id}`
+  const hit = cacheGet(cacheKey)
+  if (hit) return NextResponse.json(hit)
 
   // This week = last 7 days; previous week = the 7 days before that.
   const now = new Date()
@@ -142,15 +150,24 @@ export async function GET(req: NextRequest) {
         return { ...c, rank, movement, moved }
       })
 
-    return NextResponse.json({
+    const payload = {
       currency, spendThreshold, updatedAt: now.toISOString(),
       shifts: {
         scaling, declining, newly, paused,
         counts: { scaling: scaling.length, declining: declining.length, newly: newly.length, paused: paused.length },
       },
       leaderboard,
-    })
+    }
+    cacheSet(cacheKey, payload, 8 * 60 * 1000)          // fresh window — collapses back-to-back refetches
+    cacheSet(lastKey, payload, 6 * 60 * 60 * 1000)      // last-known-good — served if Meta rate-limits us later
+    return NextResponse.json(payload)
   } catch (e: any) {
+    const msg = String(e?.message || '')
+    const rateLimited = /request limit|rate limit|too many|reduce the amount|#17\b|#4\b|#32\b|#613\b/i.test(msg)
+    const last = cacheGet(lastKey) as any
+    // On a Meta rate-limit, serve the last good board with a soft notice instead of a scary raw error.
+    if (rateLimited && last) return NextResponse.json({ ...last, stale: true, notice: 'Meta is rate-limiting us right now — showing your last update. Try again in a few minutes.' })
+    if (rateLimited) return NextResponse.json({ error: 'Meta is rate-limiting us right now — try again in a few minutes.', shifts: null, leaderboard: [] }, { status: 200 })
     return NextResponse.json({ error: e?.message || 'Failed to build leaderboard', shifts: null, leaderboard: [] }, { status: 200 })
   }
 }
