@@ -115,8 +115,14 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       }
       setNoAccount(false)
       setAccounts(list)
-      // Default to the SELECTED brand's linked account (the project link); else the primary.
-      const p = (brandId && list.find((x: any) => x.brandId === brandId)) || list.find((x: any) => x.isPrimary) || list[0]
+      // Default to the SELECTED brand's linked account (the project link); else the account the founder
+      // was last viewing (so "ROY 1 · for Aura" doesn't snap back to an unlinked primary on reopen —
+      // the "the brand dropdown shows empty again" report); else the primary.
+      let lastSel = ''
+      try { lastSel = localStorage.getItem('sf_fb_acct') || '' } catch { /* ignore */ }
+      const p = (brandId && list.find((x: any) => x.brandId === brandId))
+        || (!brandId && lastSel && list.find((x: any) => x.accountId === lastSel))
+        || list.find((x: any) => x.isPrimary) || list[0]
       setSel(p.accountId)
       // ALWAYS tell the brief which account is resolved as primary, on mount — so "What Mello would do"
       // scopes to the SAME account (a stored ROY-1 card must not show under an Aura-Bura brief). The
@@ -255,7 +261,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
               <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#9db29a' }}>Your Facebook Ads</span>
               {/* account switcher */}
               {accounts && accounts.length > 1 ? (
-                <select value={sel} onChange={(e) => { setSel(e.target.value); load(e.target.value) }} disabled={busy}
+                <select value={sel} onChange={(e) => { setSel(e.target.value); try { localStorage.setItem('sf_fb_acct', e.target.value) } catch {} ; load(e.target.value) }} disabled={busy}
                   style={{ background: 'rgba(255,255,255,.08)', color: '#fff', border: '1px solid rgba(255,255,255,.18)', borderRadius: 100, padding: '3px 10px', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', maxWidth: 200 }}>
                   {accounts.map(a => <option key={a.accountId} value={a.accountId} style={{ color: '#111' }}>{a.name}{a.isPrimary ? ' ·  primary' : ''}</option>)}
                 </select>
