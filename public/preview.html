@@ -278,7 +278,8 @@
 
   /* generated image still */
   .ac-shot{position:relative;aspect-ratio:16/10;overflow:hidden;
-    background:radial-gradient(120% 95% at 72% 12%,#f2ddc5,#e6d1b6 48%,#d3c3a6)}
+    background:radial-gradient(130% 120% at 80% 0%,#ffe7cb,#f4cfa4 42%,#e6ad7d)}
+  .ac-shot .ad-cta{position:absolute;left:7%;bottom:11%;z-index:4;display:inline-flex;align-items:center;gap:5px;background:#14201a;color:#fff;font:700 10.5px/1 var(--sans);padding:8px 13px;border-radius:100px;box-shadow:0 7px 16px -8px rgba(0,0,0,.55)}
   .ac-shot .badge{position:absolute;top:9px;right:9px;background:rgba(20,29,21,.82);color:#eaf3c9;z-index:4;
     font:600 9px/1 var(--mono);letter-spacing:.08em;padding:5px 7px;border-radius:5px}
   .ac-shot .swash{position:absolute;inset:0;z-index:3;background:linear-gradient(115deg,transparent 34%,rgba(255,255,255,.45) 48%,transparent 60%);
@@ -292,7 +293,8 @@
   .bottle .glass{position:absolute;left:0;right:0;top:17%;bottom:0;border-radius:11px 11px 13px 13px;overflow:hidden;
     background:linear-gradient(104deg,rgba(255,255,255,.94),rgba(255,255,255,.5) 32%,rgba(255,255,255,.88));
     box-shadow:0 16px 26px -12px rgba(0,0,0,.4),inset 0 0 0 1px rgba(0,0,0,.06)}
-  .bottle .glass::before{content:"";position:absolute;left:0;right:0;bottom:0;height:56%;background:linear-gradient(180deg,#f5ce90,#e79f44)}
+  .bottle .glass::before{content:"";position:absolute;left:0;right:0;bottom:0;height:78%;background:linear-gradient(180deg,#f7d59b,#eba24a 30%,#e08f34)}
+  .bottle .glass::after{content:"";position:absolute;left:0;right:0;top:22%;height:3px;background:rgba(255,255,255,.55)}
   .bottle .label{position:absolute;left:16%;right:16%;top:42%;bottom:15%;background:rgba(255,255,255,.96);border-radius:2px;z-index:2;
     display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 5px}
   .bottle .label i{height:2px;background:#c9713e;border-radius:2px}
@@ -305,6 +307,7 @@
   .poster-copy .pk{font:700 8px/1 var(--mono);letter-spacing:.14em;color:#14201a;opacity:.72}
   .poster-copy .ph{margin-top:5px;font:800 clamp(13px,1.55vw,18px)/1.02 var(--sans);letter-spacing:-.02em;color:#14201a}
   .poster-copy .ph em{font-family:var(--serif);font-style:italic;font-weight:400}
+  .poster-copy .psub{margin-top:5px;font:600 9.5px/1.25 var(--sans);color:#4a3324}
 
   /* rendered video */
   .ac-video{position:relative;aspect-ratio:16/10;overflow:hidden;background:radial-gradient(120% 120% at 72% 12%,#ecd9c1,#d3c0a2)}
@@ -315,10 +318,14 @@
     background:rgba(255,90,44,.92);display:grid;place-items:center}
   .ac-video .play::after{content:"";border-style:solid;border-width:7px 0 7px 12px;border-color:transparent transparent transparent #fff;margin-left:2px}
   .ac-video .dur{position:absolute;top:9px;right:9px;z-index:3;background:rgba(0,0,0,.5);color:#eaf3c9;font:600 9.5px/1 var(--mono);padding:4px 6px;border-radius:4px}
-  .ac-video .cc{position:absolute;left:10px;bottom:20px;right:10px;z-index:3;text-align:center;color:#fff;font:800 13px/1.1 var(--sans);
+  .ac-video .film{position:absolute;left:0;right:0;bottom:0;z-index:3;height:19px;display:flex;gap:2px;padding:2px;background:rgba(20,29,21,.6)}
+  .ac-video .film i{flex:1;border-radius:2px;background:linear-gradient(135deg,#e7d3ba,#cfe0c4)}
+  .ac-video .film i:nth-child(even){background:linear-gradient(135deg,#dcc4a6,#c6d8b7)}
+  .ac-video .film i.cur{outline:2px solid var(--lime);outline-offset:-2px}
+  .ac-video .cc{position:absolute;left:10px;bottom:30px;right:10px;z-index:3;text-align:center;color:#fff;font:800 13px/1.1 var(--sans);
     text-shadow:0 1px 4px rgba(0,0,0,.6);letter-spacing:-.01em}
   .ac-video .cc b{background:var(--lime);color:#14201a;padding:0 3px;border-radius:2px}
-  .ac-video .scrub{position:absolute;left:0;right:0;bottom:0;z-index:3;height:4px;background:rgba(255,255,255,.25)}
+  .ac-video .scrub{position:absolute;left:0;right:0;bottom:19px;z-index:3;height:3px;background:rgba(255,255,255,.28)}
   .ac-video .scrub i{position:absolute;left:0;top:0;bottom:0;width:calc(8% + var(--ap,0)*74%);background:var(--lime)}
 
   /* facebook ad — real chrome */
@@ -503,7 +510,7 @@
           <!-- image -->
           <div class="act-card ac2">
             <div class="ac-bar"><span><b class="sn">2</b>IMAGE</span><span class="st">✦ GENERATED</span></div>
-            <div class="ac-shot"><div class="poster-copy"><div class="pk">AURA · NEW</div><div class="ph">Glow that <em>lasts.</em></div></div><div class="bottle"><span class="cap"></span><span class="neck"></span><span class="glass"></span><span class="label"><i></i><i></i><i></i></span><span class="shine"></span></div><div class="swash"></div><span class="badge">1024×1024</span></div>
+            <div class="ac-shot"><div class="poster-copy"><div class="pk">AURA · NEW</div><div class="ph">Glow that <em>lasts.</em></div><div class="psub">Clean vitamin-C serum</div></div><span class="ad-cta">Shop Now →</span><div class="bottle"><span class="cap"></span><span class="neck"></span><span class="glass"></span><span class="label"><i></i><i></i><i></i></span><span class="shine"></span></div><div class="swash"></div><span class="badge">1024×1024</span></div>
             <div class="ac-vars">
               <div class="var win"><i></i><span>Hook A</span><em>BEST</em></div>
               <div class="var"><i></i><span>Hook B</span></div>
@@ -514,7 +521,7 @@
           <!-- video -->
           <div class="act-card ac3">
             <div class="ac-bar"><span><b class="sn">3</b>VIDEO</span><span class="st">✦ RENDERED</span></div>
-            <div class="ac-video"><div class="bottle"><span class="cap"></span><span class="neck"></span><span class="glass"></span><span class="label"><i></i><i></i><i></i></span><span class="shine"></span></div><span class="roas">3.2× ROAS ANGLE</span><span class="dur">0:14</span><span class="play"></span><div class="cc">Glow that <b>actually</b> lasts</div><div class="scrub"><i></i></div></div>
+            <div class="ac-video"><div class="bottle"><span class="cap"></span><span class="neck"></span><span class="glass"></span><span class="label"><i></i><i></i><i></i></span><span class="shine"></span></div><span class="roas">3.2× ROAS ANGLE</span><span class="dur">0:14</span><span class="play"></span><div class="cc">Glow that <b>actually</b> lasts</div><div class="scrub"><i></i></div><div class="film"><i></i><i></i><i class="cur"></i><i></i><i></i><i></i></div></div>
             <div class="ac-cap">UGC cut · captions burned in</div>
           </div>
           <!-- facebook ad -->
