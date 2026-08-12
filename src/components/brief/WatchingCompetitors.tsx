@@ -127,7 +127,7 @@ export default function WatchingCompetitors({ brandId, brandName }: { brandId?: 
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
           {rows.some(r => r.status !== 'live') && (
-            <button onClick={fetchNow} disabled={busy} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '5px 13px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Starting…' : '↻ Fetch their ads now'}</button>
+            <button onClick={fetchNow} disabled={busy} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '5px 13px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Starting…' : '↻ Fetch their ads now'}</button>
           )}
           {rows.some(r => r.status === 'crawling' || r.status === 'queued') && <span style={{ fontSize: 11, color: '#a7b0a5' }}>New competitors take a little while to load — this updates on its own.</span>}
         </div>
@@ -142,7 +142,7 @@ export default function WatchingCompetitors({ brandId, brandName }: { brandId?: 
             {unlinked.map(u => (
               <div key={u.pageId} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #f2e3c0', borderRadius: 9, padding: '6px 8px 6px 11px' }}>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.brand}</span>
-                <button onClick={() => linkOne(u)} disabled={!!linking} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '4px 12px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: linking ? 'default' : 'pointer', opacity: linking && linking !== u.pageId ? 0.5 : 1, whiteSpace: 'nowrap' }}>{linking === u.pageId ? 'Linking…' : `Link → ${brandName || ''}`.trim()}</button>
+                <button onClick={() => linkOne(u)} disabled={!!linking} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '4px 12px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: linking ? 'default' : 'pointer', opacity: linking && linking !== u.pageId ? 0.5 : 1, whiteSpace: 'nowrap' }}>{linking === u.pageId ? 'Linking…' : `Link → ${brandName || ''}`.trim()}</button>
               </div>
             ))}
           </div>

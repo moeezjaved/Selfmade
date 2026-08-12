@@ -77,7 +77,7 @@ function TeamRoster() {
 // Mello's own words → the serif register (voice.mello), same as the brief. Onboarding is Mello speaking.
 const say: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 31, fontWeight: 400, letterSpacing: '-.015em', lineHeight: 1.14, color: INK, textAlign: 'center', maxWidth: 540, margin: '0 auto' }
 const sub: React.CSSProperties = { fontSize: 14, color: MUTED, textAlign: 'center', maxWidth: 420, margin: '10px auto 0', lineHeight: 1.6 }
-const btnMain: React.CSSProperties = { background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }
+const btnMain: React.CSSProperties = { background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }
 const btnGhost: React.CSSProperties = { background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '12px 22px', fontSize: 13.5, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
 const chip = (on: boolean): React.CSSProperties => ({ border: `1.5px solid ${on ? FOREST : LINE}`, background: on ? FOREST : '#fff', color: on ? LIME : INK, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' })
 const inputCss: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', fontSize: 14, fontFamily: 'inherit', color: INK, background: '#fff', outline: 'none', width: '100%' }
@@ -87,7 +87,7 @@ const planName: React.CSSProperties = { fontSize: 13, fontWeight: 800, letterSpa
 const planPrice: React.CSSProperties = { fontSize: 30, fontWeight: 850, letterSpacing: '-.03em', color: INK, marginTop: 4 }
 const planPer: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: MUTED, marginLeft: 2 }
 const planFeat: React.CSSProperties = { fontSize: 12.5, color: MUTED, lineHeight: 1.9, marginTop: 10 }
-const planBadge: React.CSSProperties = { position: 'absolute', top: -10, left: 18, background: FOREST, color: LIME, fontSize: 9, fontWeight: 800, letterSpacing: '.1em', borderRadius: 100, padding: '3px 9px' }
+const planBadge: React.CSSProperties = { position: 'absolute', top: -10, left: 18, background: '#ef4a1e', color: '#fff', fontSize: 9, fontWeight: 800, letterSpacing: '.1em', borderRadius: 100, padding: '3px 9px' }
 
 /**
  * BRAND PALETTE — clicking the field opens a searchable, keyboard-navigable dropdown of brands
@@ -663,7 +663,7 @@ export default function InterviewPage() {
               <a href="/connect/meta" target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'left', background: '#fff', border: `1.5px solid ${SELBORDER}`, borderRadius: 14, padding: '15px 18px', textDecoration: 'none', maxWidth: 430, margin: '18px auto 0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <b style={{ fontSize: 14.5, color: INK }}>Connect Meta Ads →</b>
-                  <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '.08em', background: LIME, color: FOREST, borderRadius: 6, padding: '3px 8px' }}>AVAILABLE</span>
+                  <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '.08em', background: '#ef4a1e', color: '#fff', borderRadius: 6, padding: '3px 8px' }}>AVAILABLE</span>
                 </div>
                 <div style={{ fontSize: 12, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>So Media Buying sees what already worked.</div>
               </a>
@@ -732,7 +732,7 @@ export default function InterviewPage() {
                   <p style={{ ...sub, color: '#7d8a7c', marginTop: 24 }}>The team studies your market all night — competitors, angles, everything that wins. But I already have a first read for you.</p>
                   {/* Section 4 (show, then sell): the promised payoff must BE the payoff. This opens the real
                       first brief; the plan ask is sequenced after value, as a card inside ?welcome=1. */}
-                  <button style={{ ...btnMain, background: LIME, color: FOREST, marginTop: 18 }} onClick={() => router.push('/brief?welcome=1')}>Read my first briefing →</button>
+                  <button style={{ ...btnMain, background: '#ef4a1e', color: '#fff', marginTop: 18 }} onClick={() => router.push('/brief?welcome=1')}>Read my first briefing →</button>
                 </>
               )}
             </div>

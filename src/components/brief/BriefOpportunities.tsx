@@ -40,7 +40,7 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
 
   if (!camp.metaCampaignId) {
     // No campaign id (older audit) → fall back to the campaigns page.
-    return <Link href="/campaigns" style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>Scale it →</Link>
+    return <Link href="/campaigns" style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>Scale it →</Link>
   }
 
   if (state === 'done') {
@@ -48,7 +48,7 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
   }
 
   if (!open) {
-    return <button onClick={() => setOpen(true)} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 2 }}>Scale it →</button>
+    return <button onClick={() => setOpen(true)} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 2 }}>Scale it →</button>
   }
 
   const run = () => {
@@ -66,7 +66,7 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
         <input type="number" min={1} value={budget} onChange={e => setBudget(Math.max(1, Math.round(Number(e.target.value) || 0)))} disabled={state === 'busy'}
           style={{ width: 92, border: `1px solid ${LINE}`, borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', color: INK }} />
         <span style={{ fontSize: 12, color: MUTED }}>{currency}/day</span>
-        <button onClick={run} disabled={state === 'busy'} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 12.5, fontWeight: 800, cursor: state === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+        <button onClick={run} disabled={state === 'busy'} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 12.5, fontWeight: 800, cursor: state === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit' }}>
           {state === 'busy' ? 'Duplicating…' : `Scale to ${cur(budget)}/day`}
         </button>
         <button onClick={() => setOpen(false)} disabled={state === 'busy'} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
@@ -91,13 +91,13 @@ function TuneConfirm({ apply, camp, currency, cta, onDone }: { apply: ApplyPlan;
   const [newName, setNewName] = useState('')
 
   if (!camp.metaCampaignId) {
-    return <Link href={cta === 'Review placements' ? '/campaigns' : '/m4'} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{cta} →</Link>
+    return <Link href={cta === 'Review placements' ? '/campaigns' : '/m4'} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{cta} →</Link>
   }
   if (state === 'done') {
     return <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 700, color: GOOD }}>✓ Launched “{newName}” at {cur(budget)}/day, focused on {apply.label}. Your winner keeps running untouched.</div>
   }
   if (!open) {
-    return <button onClick={() => setOpen(true)} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 2 }}>{cta} →</button>
+    return <button onClick={() => setOpen(true)} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 2 }}>{cta} →</button>
   }
 
   const run = () => {
@@ -115,7 +115,7 @@ function TuneConfirm({ apply, camp, currency, cta, onDone }: { apply: ApplyPlan;
         <input type="number" min={1} value={budget} onChange={e => setBudget(Math.max(1, Math.round(Number(e.target.value) || 0)))} disabled={state === 'busy'}
           style={{ width: 92, border: `1px solid ${LINE}`, borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', color: INK }} />
         <span style={{ fontSize: 12, color: MUTED }}>{currency}/day</span>
-        <button onClick={run} disabled={state === 'busy'} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 12.5, fontWeight: 800, cursor: state === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+        <button onClick={run} disabled={state === 'busy'} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 12.5, fontWeight: 800, cursor: state === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit' }}>
           {state === 'busy' ? 'Launching…' : `Launch at ${cur(budget)}/day`}
         </button>
         <button onClick={() => setOpen(false)} disabled={state === 'busy'} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
@@ -178,7 +178,7 @@ export default function BriefOpportunities({ initial, onAct, accountId, initialA
           <div style={{ fontSize: 15.5, fontWeight: 750, color: INK }}>What Mello would do</div>
           <div style={{ fontSize: 13, color: MUTED, marginTop: 2 }}>The ranked moves to improve your ads — pull the latest when you want it.</div>
         </div>
-        <button onClick={() => load(accountId)} disabled={busy} style={{ flexShrink: 0, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+        <button onClick={() => load(accountId)} disabled={busy} style={{ flexShrink: 0, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}>
           {busy ? 'Thinking…' : "See Mello's moves →"}
         </button>
       </div>
@@ -214,7 +214,7 @@ export default function BriefOpportunities({ initial, onAct, accountId, initialA
               ? <ScaleConfirm camp={scaleCampaign} currency={currency || 'USD'} />
               : r.apply && scaleCampaign
               ? <TuneConfirm apply={r.apply} camp={scaleCampaign} currency={currency || 'USD'} cta={r.cta} onDone={() => onAct?.(r)} />
-              : <Link href={r.href} onClick={() => onAct?.(r)} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>}
+              : <Link href={r.href} onClick={() => onAct?.(r)} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>}
           </div>
         ))}
       </div>

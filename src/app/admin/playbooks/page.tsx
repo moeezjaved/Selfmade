@@ -16,7 +16,7 @@ type Book = { id: string; title: string; slug: string; description?: string; emo
 type Ad = { adId: string; brand?: string; hook?: string; format?: string; niche?: string; days?: number; score?: number; media?: { img?: string; video?: string | null }; position?: number; featured?: boolean }
 
 const btn: React.CSSProperties = { border: `1.5px solid ${LINE}`, background: '#fff', borderRadius: 100, padding: '8px 15px', fontSize: 12.5, fontWeight: 750, cursor: 'pointer', color: INK }
-const primary: React.CSSProperties = { ...btn, background: FOREST, color: LIME, border: 'none' }
+const primary: React.CSSProperties = { ...btn, background: '#ef4a1e', color: '#fff', border: 'none' }
 const input: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '9px 12px', fontSize: 13.5, fontWeight: 600, color: INK, outline: 'none', fontFamily: 'inherit' }
 
 export default function AdminPlaybooks() {

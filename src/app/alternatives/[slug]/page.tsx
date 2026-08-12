@@ -70,7 +70,7 @@ export default function AlternativePage({ params }: { params: { slug: string } }
       <nav style={{ borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 24, filter: 'brightness(0)' }} /></Link>
-          <Link href="/signup" style={{ background: LIME, color: INK, padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Start for free</Link>
+          <Link href="/signup" style={{ background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Start for free</Link>
         </div>
       </nav>
 
@@ -88,7 +88,7 @@ export default function AlternativePage({ params }: { params: { slug: string } }
         <div style={{ border: '1px solid #eef0ee', borderRadius: 16, overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px', background: '#fbfdfa', borderBottom: '1px solid #eef0ee', fontSize: 12.5, fontWeight: 800 }}>
             <div style={{ padding: '12px 16px' }} />
-            <div style={{ padding: '12px 6px', textAlign: 'center', color: INK, background: LIME }}>Selfmade</div>
+            <div style={{ padding: '12px 6px', textAlign: 'center', background: '#ef4a1e', color: '#fff' }}>Selfmade</div>
             <div style={{ padding: '12px 6px', textAlign: 'center', color: '#9ca3af' }}>{c.name}</div>
           </div>
           {c.rows.map(([label, comp], i) => (

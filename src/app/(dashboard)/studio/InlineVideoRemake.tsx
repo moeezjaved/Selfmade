@@ -110,7 +110,7 @@ function RenderFilmstrip({ jobId, progress }: { jobId: string; progress: { label
               ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: done ? 'none' : active ? 'none' : 'grayscale(.5)' }} />
               : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: '#5d675c', fontSize: 13, fontWeight: 700 }}>{i + 1}</div>}
             {done && <div style={{ position: 'absolute', inset: 0, background: 'rgba(20,29,21,.55)', display: 'grid', placeItems: 'center', color: LIME, fontSize: 15, fontWeight: 900 }}>✓</div>}
-            {active && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: FOREST, color: LIME, fontSize: 8, fontWeight: 800, letterSpacing: '.04em', textAlign: 'center', padding: '2px 0' }}>FILMING</div>}
+            {active && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: '#ef4a1e', color: '#fff', fontSize: 8, fontWeight: 800, letterSpacing: '.04em', textAlign: 'center', padding: '2px 0' }}>FILMING</div>}
           </div>
         )
       })}
@@ -316,7 +316,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
             </div>
           </div>
 
-          <button onClick={writeScript} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '13px 24px', fontSize: 14.5, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={writeScript} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '13px 24px', fontSize: 14.5, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Wand2 size={16} /> Write my free script
           </button>
           <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>Free — you only spend credits after you approve the script.</div>
@@ -361,7 +361,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
               </div>
             )}
           </div>
-          <button onClick={render} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '13px 24px', fontSize: 14.5, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={render} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '13px 24px', fontSize: 14.5, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Film size={16} /> Create video · {cost} credits
           </button>
           <div style={{ fontSize: 12, color: MUTED, marginTop: 8 }}>Credits are only spent now — refunded automatically if the render fails.</div>

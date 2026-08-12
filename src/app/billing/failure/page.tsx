@@ -14,7 +14,7 @@ function Failure() {
         <p style={{ fontSize: 15, color: '#4b5563', lineHeight: 1.65, margin: '12px 0 24px' }}>
           No charge was made. You can try again, or use a different card.
         </p>
-        <button onClick={() => router.push('/pricing')} style={{ background: INK, color: LIME, border: 'none', borderRadius: 100, padding: '13px 28px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>Back to pricing →</button>
+        <button onClick={() => router.push('/pricing')} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '13px 28px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>Back to pricing →</button>
       </div>
     </div>
   )

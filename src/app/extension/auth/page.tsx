@@ -51,6 +51,6 @@ const S: Record<string, React.CSSProperties> = {
   badge: { width: 54, height: 54, borderRadius: 15, background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 27 },
   h1: { fontSize: 20, fontWeight: 800, color: '#111', margin: '0 0 8px' },
   sub: { fontSize: 14, color: '#4b5563', lineHeight: 1.6, margin: '0 0 20px' },
-  btn: { width: '100%', background: LIME, color: INK, border: 'none', borderRadius: 12, padding: '13px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' },
+  btn: { width: '100%', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 12, padding: '13px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' },
   fine: { fontSize: 12, color: '#9ca3af', margin: '14px 0 0' },
 }

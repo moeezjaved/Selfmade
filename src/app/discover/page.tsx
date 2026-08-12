@@ -337,7 +337,7 @@ export default async function DiscoverPage() {
           <div style={{ fontSize: 13.5, color: '#b9c6b6', margin: '7px 0 17px', maxWidth: '52ch', lineHeight: 1.6 }}>
             Hire Mello and every morning this page is rewritten around your brand — your competitors, your niche, your next ad. It reads the market while you sleep.
           </div>
-          <Link href="/hire" style={{ display: 'inline-block', background: LIME, color: FOREST, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, textDecoration: 'none' }}>Hire Mello →</Link>
+          <Link href="/hire" style={{ display: 'inline-block', background: '#ef4a1e', color: '#fff', fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, textDecoration: 'none' }}>Hire Mello →</Link>
         </div>
       </section>
 

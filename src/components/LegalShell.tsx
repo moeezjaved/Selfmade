@@ -20,7 +20,7 @@ export default function LegalShell({ eyebrow = 'Legal', title, updated, intro, c
           <Link href="/" style={{ display: 'flex', alignItems: 'center' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0)' }} /></Link>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <Link href="/login" className="ls-hide-sm" style={{ fontSize: 14.5, fontWeight: 700, color: INK, textDecoration: 'none' }}>Log in</Link>
-            <Link href="/signup" style={{ background: INK, color: LIME, padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Hire Mello →</Link>
+            <Link href="/signup" style={{ background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Hire Mello →</Link>
           </div>
         </div>
       </nav>
@@ -46,7 +46,7 @@ export default function LegalShell({ eyebrow = 'Legal', title, updated, intro, c
               <Link key={h} href={h} style={{ color: 'rgba(255,255,255,.72)', textDecoration: 'none' }} className="ls-flink">{l}</Link>
             ))}
           </div>
-          <Link href="/signup" style={{ background: LIME, color: INK, padding: '9px 18px', borderRadius: 100, fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>Start free →</Link>
+          <Link href="/signup" style={{ background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>Start free →</Link>
         </div>
         <div style={{ borderTop: '1px solid rgba(255,255,255,.1)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 24px', fontSize: 12.5, color: 'rgba(255,255,255,.5)' }}>

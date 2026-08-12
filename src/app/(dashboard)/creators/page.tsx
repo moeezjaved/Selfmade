@@ -283,7 +283,7 @@ function CreatorDetail({ id, onBack }: { id: string; onBack: () => void }) {
 }
 
 const inp: React.CSSProperties = { padding: '9px 12px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#fff', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none', width: '100%' }
-const btnPrimary: React.CSSProperties = { background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }
+const btnPrimary: React.CSSProperties = { background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }
 const btnGhost: React.CSSProperties = { background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '9px 16px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: 'pointer' }
 const btnText: React.CSSProperties = { background: 'none', border: 'none', color: SUB, fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', padding: '4px 6px' }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

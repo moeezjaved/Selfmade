@@ -177,7 +177,7 @@ export default async function PlaybookPage({ params }: { params: { slug: string 
         <div style={{ background: FOREST, borderRadius: 20, padding: '28px 30px', color: '#f3eee3' }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>Found one you&rsquo;d run?</div>
           <div style={{ fontSize: 13.5, color: '#b9c6b6', margin: '6px 0 16px', maxWidth: '52ch', lineHeight: 1.6 }}>Hit Remake on any ad and Mello rebuilds it around your product — your brand, your offer, minutes not weeks.</div>
-          <Link href="/hire" style={{ display: 'inline-block', background: LIME, color: FOREST, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, textDecoration: 'none' }}>Hire Mello →</Link>
+          <Link href="/hire" style={{ display: 'inline-block', background: '#ef4a1e', color: '#fff', fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, textDecoration: 'none' }}>Hire Mello →</Link>
         </div>
       </div>
     </div>

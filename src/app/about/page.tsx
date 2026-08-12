@@ -14,7 +14,7 @@ export default function About() {
       <nav style={{ borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 24, filter: 'brightness(0)' }} /></Link>
-          <Link href="/signup" style={{ background: LIME, color: INK, padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Start for free</Link>
+          <Link href="/signup" style={{ background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Start for free</Link>
         </div>
       </nav>
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '56px 24px 80px' }}>

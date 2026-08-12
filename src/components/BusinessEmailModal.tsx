@@ -11,7 +11,7 @@ export default function BusinessEmailModal({ email, onClose }: { email?: string;
           That looks like a <b>temporary/disposable inbox</b>. Please sign up with an email you’ll keep — Gmail, Outlook, or your work address are all fine.
         </p>
         {email && <p style={{ fontSize: 13, color: '#9ca3af', margin: '6px 0 4px' }}>{email}</p>}
-        <button onClick={onClose} style={{ width: '100%', background: LIME, color: INK, border: 'none', borderRadius: 12, padding: '13px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 16 }}>
+        <button onClick={onClose} style={{ width: '100%', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 12, padding: '13px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 16 }}>
           Use a different email
         </button>
       </div>

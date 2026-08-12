@@ -135,7 +135,7 @@ export function CreditModal() {
               {trialEndDate ? <> on <b>{trialEndDate}</b></> : ''}. Want them now?
             </div>
             <button onClick={unlockNow} disabled={unlocking}
-              style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 7, background: INK, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: unlocking ? 'default' : 'pointer', fontFamily: 'inherit', opacity: unlocking ? 0.7 : 1 }}>
+              style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: unlocking ? 'default' : 'pointer', fontFamily: 'inherit', opacity: unlocking ? 0.7 : 1 }}>
               {unlocking ? <><Loader2 size={14} className="spin" /> Unlocking…</> : <><Zap size={14} /> Pay now &amp; unlock credits</>}
             </button>
             <div style={{ fontSize: 11, color: '#6b8f6b', marginTop: 7 }}>Ends your trial early and charges your saved card today. Cancel anytime.</div>
@@ -153,7 +153,7 @@ export function CreditModal() {
               {/* Only Free can upgrade — Creator ($49) is the top public plan, so a paid user has
                   nothing to upgrade to. Manage/cancel lives on Billing. */}
               {planId === 'free' && (
-                <a href="/billing" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: INK, color: LIME, padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
+                <a href="/billing" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
                   <Zap size={14} /> Upgrade
                 </a>
               )}

@@ -77,7 +77,7 @@ export default function CompetitorCard({ brandId }: { brandId?: string | null })
           {hero.hook && <div style={{ fontSize: 12.5, color: FAINT, marginTop: 6 }}>The hook: <span style={{ color: MUTED, fontWeight: 650 }}>{hero.hook.replace(/_/g, ' ')}</span></div>}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-            <Link href={mineHref(hero)} style={{ background: FOREST, color: LIME, borderRadius: 100, padding: '10px 20px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
+            <Link href={mineHref(hero)} style={{ background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '10px 20px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
               Make it mine →
             </Link>
             <Link href={`/discovery/brand-spy/${hero.pageId}`} style={{ background: '#f2f4ef', color: INK, borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
@@ -95,7 +95,7 @@ export default function CompetitorCard({ brandId }: { brandId?: string | null })
             <div key={m.adId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: m === rest[0] ? 'none' : `1px solid ${LINE}` }}>
               {m.image
                 ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={m.image} alt="" style={{ width: 34, height: 42, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: `1px solid ${LINE}` }} />
-                : <span style={{ width: 34, height: 42, borderRadius: 8, background: FOREST, color: LIME, display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 800, flexShrink: 0 }}>{m.brandName.charAt(0)}</span>}
+                : <span style={{ width: 34, height: 42, borderRadius: 8, background: '#ef4a1e', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 800, flexShrink: 0 }}>{m.brandName.charAt(0)}</span>}
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: INK }}>{m.brandName}</span>
                 <span style={{ display: 'block', fontSize: 12, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.why}</span>
