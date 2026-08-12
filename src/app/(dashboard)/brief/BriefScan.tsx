@@ -508,7 +508,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
             <div style={{ fontSize: 16, fontWeight: 750, letterSpacing: '-.015em', color: INK, marginBottom: 14 }}>What Mello can do</div>
             <Row first href="/discovery" title="Remake a winner" desc="Their proven ad, rebuilt around your product." right={ARROW} />
             <Row href="/studio" title="Create a fresh ad" desc="An original, on-brand, from your product photos." right={ARROW} />
-            <Row href="/studio" title="Make a UGC video" desc="A creator-style video, in your language." right={ARROW} />
+            <Row href="/discovery?format=Video" title="Make a UGC video" desc="A creator-style video, in your language." right={ARROW} />
             <Row href="/discovery/brand-spy" title="Spy on a competitor" desc="I'll watch every ad they launch." right={ARROW} />
             <Row href="/settings?tab=autopilot" title="Make ads for me daily" desc="Pick how many — delivered every morning."
               right={<span style={{ fontSize: 11, fontWeight: 750, color: FOREST, background: '#f2f8ea', border: `1px solid #a8cf6f`, borderRadius: 100, padding: '2px 9px' }}>Auto</span>} />

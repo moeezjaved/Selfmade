@@ -10,7 +10,7 @@ const INK = '#0e1b12', LIME = '#ff5a2c'
 type Member = { id: string; user_id: string; email: string; role: string; isYou: boolean; accounts: string[] | null; allAccounts: boolean }
 type Invite = { id: string; email: string; role: string; link: string }
 type Account = { account_id: string; account_name: string | null }
-type Data = { org: { name: string; role: string }; members: Member[]; invites: Invite[]; seats: { used: number; limit: number; planId: string; included: number; extra: number }; accountPool: Account[] }
+type Data = { org: { name: string; role: string }; members: Member[]; invites: Invite[]; seats: { used: number; limit: number; planId: string; planLabel: string; included: number; extra: number; canUpgrade: boolean; purchasable: boolean }; accountPool: Account[] }
 
 export default function TeamPage() {
   const [d, setD] = useState<Data | null>(null)
@@ -70,6 +70,9 @@ export default function TeamPage() {
   if (!d) return <div style={{ padding: 28, color: '#6b7280', fontFamily: "'Inter',sans-serif" }}>Loading team…</div>
   const canManage = d.org.role === 'owner' || d.org.role === 'admin'
   const seatsLeft = Math.max(0, d.seats.limit - d.seats.used)
+  // Whether there's any real way to get more seats: a higher plan to upgrade to, or a working paid-seat
+  // rail. On Creator (top plan, PayPal billing) both are false → hide the add-seat/invite UI entirely.
+  const canGetSeats = d.seats.canUpgrade || d.seats.purchasable
   const inp: React.CSSProperties = { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }
 
   return (
@@ -80,29 +83,42 @@ export default function TeamPage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fbfdfa', border: '1px solid #eef0ee', borderRadius: 12, padding: '14px 18px', marginBottom: 20 }}>
         <div style={{ fontSize: 26, fontWeight: 800 }}>{d.seats.used}<span style={{ color: '#9ca3af', fontWeight: 600 }}>/{d.seats.limit}</span></div>
         <div style={{ flex: 1, fontSize: 13.5, color: '#6b7280' }}>
-          seats used ({seatsLeft} left on {d.seats.planId})
-          {d.seats.extra > 0 && <span style={{ color: '#166534' }}> · {d.seats.included} plan + {d.seats.extra} paid</span>}
+          seats used — your {d.seats.planLabel} plan includes {d.seats.included} seat{d.seats.included === 1 ? '' : 's'}
+          {d.seats.extra > 0 && <span style={{ color: '#166534' }}> · +{d.seats.extra} paid</span>}
         </div>
-        {canManage && (d.seats.planId === 'free'
-          ? <a href="/pricing" style={{ background: INK, color: '#fff', padding: '8px 16px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>Upgrade plan</a>
-          : <button onClick={buySeats} style={{ background: seatsLeft <= 0 ? INK : 'none', color: seatsLeft <= 0 ? '#fff' : INK, border: seatsLeft <= 0 ? 'none' : `1px solid ${INK}`, padding: '8px 16px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{d.seats.extra > 0 ? 'Manage seats' : '+ Add seats'}</button>)}
+        {canManage && d.seats.canUpgrade && (
+          <a href="/pricing" style={{ background: INK, color: '#fff', padding: '8px 16px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>Upgrade plan</a>
+        )}
+        {canManage && !d.seats.canUpgrade && d.seats.purchasable && (
+          <button onClick={buySeats} style={{ background: seatsLeft <= 0 ? INK : 'none', color: seatsLeft <= 0 ? '#fff' : INK, border: seatsLeft <= 0 ? 'none' : `1px solid ${INK}`, padding: '8px 16px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{d.seats.extra > 0 ? 'Manage seats' : '+ Add seats'}</button>
+        )}
       </div>
 
       {canManage && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Invite a teammate</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input style={{ ...inp, flex: 1, minWidth: 200 }} value={email} onChange={e => setEmail(e.target.value)} placeholder="teammate@company.com" type="email" />
-            <select style={inp} value={role} onChange={e => setRole(e.target.value)}><option value="member">Member</option><option value="admin">Admin</option></select>
-            <button onClick={invite} disabled={seatsLeft <= 0} style={{ background: seatsLeft > 0 ? INK : '#9ca3af', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 100, fontSize: 14, fontWeight: 800, cursor: seatsLeft > 0 ? 'pointer' : 'not-allowed' }}>Invite</button>
-          </div>
-          {seatsLeft <= 0 && (
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginTop: 8 }}>
-              You’ve used all {d.seats.limit} seat{d.seats.limit === 1 ? '' : 's'} on your {d.seats.planId} plan.{' '}
-              {d.seats.planId === 'free'
-                ? <><a href="/pricing" style={{ color: INK, fontWeight: 800, textDecoration: 'underline' }}>Upgrade your plan</a> to invite teammates.</>
-                : <><a href="/pricing" style={{ color: INK, fontWeight: 800, textDecoration: 'underline' }}>Upgrade</a> or <button onClick={buySeats} style={{ background: 'none', border: 'none', padding: 0, color: INK, fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>add a seat</button> to invite teammates.</>}
+          {seatsLeft <= 0 && !canGetSeats ? (
+            // Plan is fully used and has no way to add seats (e.g. Creator = single seat). Don't show a
+            // broken invite/add-seat flow — just say so clearly.
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#6b7280', lineHeight: 1.55 }}>
+              Your <b>{d.seats.planLabel}</b> plan includes a single workspace seat, so there’s no seat to invite a teammate into. Need to add people? Email <a href="mailto:hello@tryselfmade.ai" style={{ color: INK, fontWeight: 800, textDecoration: 'underline' }}>hello@tryselfmade.ai</a> and we’ll help.
             </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input style={{ ...inp, flex: 1, minWidth: 200 }} value={email} onChange={e => setEmail(e.target.value)} placeholder="teammate@company.com" type="email" />
+                <select style={inp} value={role} onChange={e => setRole(e.target.value)}><option value="member">Member</option><option value="admin">Admin</option></select>
+                <button onClick={invite} disabled={seatsLeft <= 0} style={{ background: seatsLeft > 0 ? INK : '#9ca3af', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 100, fontSize: 14, fontWeight: 800, cursor: seatsLeft > 0 ? 'pointer' : 'not-allowed' }}>Invite</button>
+              </div>
+              {seatsLeft <= 0 && (
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginTop: 8 }}>
+                  You’ve used all {d.seats.limit} seat{d.seats.limit === 1 ? '' : 's'} on your {d.seats.planLabel} plan.{' '}
+                  {d.seats.canUpgrade
+                    ? <><a href="/pricing" style={{ color: INK, fontWeight: 800, textDecoration: 'underline' }}>Upgrade your plan</a> to invite teammates.</>
+                    : <><button onClick={buySeats} style={{ background: 'none', border: 'none', padding: 0, color: INK, fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>Add a seat</button> to invite teammates.</>}
+                </div>
+              )}
+            </>
           )}
           {msg && <div style={{ fontSize: 13, fontWeight: 600, color: msg.startsWith('✓') ? '#16a34a' : '#dc2626', marginTop: 8 }}>{msg}</div>}
         </div>
@@ -161,7 +177,7 @@ export default function TeamPage() {
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(420px,96vw)', background: '#fff', borderRadius: 16, padding: 22, boxShadow: '0 24px 70px rgba(0,0,0,0.35)' }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: INK }}>Add paid seats</div>
             <div style={{ fontSize: 13.5, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-              Your <b style={{ color: INK }}>{d.seats.planId}</b> plan includes {d.seats.included} seat{d.seats.included === 1 ? '' : 's'}
+              Your <b style={{ color: INK }}>{d.seats.planLabel}</b> plan includes {d.seats.included} seat{d.seats.included === 1 ? '' : 's'}
               {d.seats.extra > 0 ? ` (+${d.seats.extra} paid)` : ''}. Each extra seat is billed monthly beyond your plan.
             </div>
             <div style={{ marginTop: 16 }}>

@@ -314,7 +314,7 @@ function AiPanel({ ad }: { ad: Ad }) {
   useEffect(() => {
     if (!wantScript || didAutoScript.current || !isVideo || script) return
     didAutoScript.current = true
-    run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 0, d => { setScript(d.script); setThin(!!d.thinSpeech) })
+    run('/api/scripts/transcribe', { adId: ad.id, language: scriptLang }, 'transcribe', 0, d => { setScript(d.script); setThin(!!d.thinSpeech) })
   }, [wantScript, isVideo])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const cost = (a: string, d: number) => pricing?.[a]?.credits ?? d
@@ -358,7 +358,7 @@ function AiPanel({ ad }: { ad: Ad }) {
           // clone-first launch). Show the cost up front so the price isn't a surprise after clicking.
           <>
           <button style={{ ...ctaS, background: '#eef7dc', color: '#141d15' }}
-            onClick={() => run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 0, d => { setScript(d.script); setThin(!!d.thinSpeech) })}>
+            onClick={() => run('/api/scripts/transcribe', { adId: ad.id, language: scriptLang }, 'transcribe', 0, d => { setScript(d.script); setThin(!!d.thinSpeech) })}>
             <Sparkles size={16} /> Generate Script · Free
           </button>
           <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, textAlign: 'center' }}>Reads this ad&rsquo;s hook &amp; structure. Rewriting it around your product is a separate step.</div>
@@ -384,10 +384,10 @@ function AiPanel({ ad }: { ad: Ad }) {
                   {[['en','English'],['ur','Urdu'],['hi','Hindi'],['ar','Arabic'],['es','Spanish'],['fr','French'],['de','German'],['pt','Portuguese']].map(([v,l]) => <option key={v} value={v}>Script language: {l}</option>)}
                 </select>
                 <button style={{ ...ctaS, opacity: loading ? 0.6 : 1 }} disabled={loading}
-                  onClick={() => run('/api/scripts/duplicate', { sourceAdId: ad.id, brandId, language: scriptLang }, 'script_duplicate', 5, d => setGen(d.generated?.script))}>
-                  {loading ? 'Writing…' : `Rewrite for my brand · ${cost('script_duplicate', 5)} cr`}
+                  onClick={() => run('/api/scripts/duplicate', { sourceAdId: ad.id, brandId, language: scriptLang }, 'script_duplicate', 0, d => setGen(d.generated?.script))}>
+                  {loading ? 'Writing…' : 'Rewrite for my brand · Free'}
                 </button>
-                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, textAlign: 'center' }}>Mello rewrites the whole script around your product — that&rsquo;s what the credits pay for.</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, textAlign: 'center' }}>Mello rewrites the whole script around your product — free. You only pay when you turn it into a video.</div>
               </>
             )}
             {gen && <div style={{ marginTop: 10, fontSize: 12, color: '#111', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 10, whiteSpace: 'pre-wrap' }}>{gen}</div>}

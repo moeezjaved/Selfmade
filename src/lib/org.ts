@@ -5,6 +5,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getPlanId } from '@/lib/entitlements'
+import { planEntitlements, nextPlan } from '@/lib/plans'
 
 export type Role = 'owner' | 'admin' | 'member'
 export type OrgCtx = { orgId: string; name: string; ownerId: string; role: Role }
@@ -88,7 +89,7 @@ export async function allowedAdAccountIds(admin: SupabaseClient, userId: string)
 }
 
 /** Seat usage for an org: members + pending invites vs the owner's plan limit. */
-export async function getSeatInfo(admin: SupabaseClient, orgId: string, ownerId: string): Promise<{ used: number; limit: number; planId: string; included: number; extra: number }> {
+export async function getSeatInfo(admin: SupabaseClient, orgId: string, ownerId: string): Promise<{ used: number; limit: number; planId: string; planLabel: string; included: number; extra: number; canUpgrade: boolean; purchasable: boolean }> {
   const db = admin as any
   const planId = await getPlanId(admin, ownerId)
   const [{ count: members }, { count: pending }, { data: sub }] = await Promise.all([
@@ -98,5 +99,11 @@ export async function getSeatInfo(admin: SupabaseClient, orgId: string, ownerId:
   ])
   const included = includedSeats(planId)
   const extra = Math.max(0, (sub as any)?.extra_seats ?? 0)   // paid overage
-  return { used: (members || 0) + (pending || 0), limit: included + extra, planId, included, extra }
+  // Customer-facing plan name ('starter' internal id IS "Creator"). canUpgrade is false on the top
+  // plan (nothing above Creator for a normal user). purchasable = extra paid seats are actually wired
+  // (Stripe seat SKU); this app bills via PayPal so it's usually off → hide the broken add-seat flow.
+  const planLabel = planEntitlements(planId).label
+  const canUpgrade = nextPlan(planId) !== null
+  const purchasable = !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_PRICE_SEAT
+  return { used: (members || 0) + (pending || 0), limit: included + extra, planId, planLabel, included, extra, canUpgrade, purchasable }
 }

@@ -14,7 +14,7 @@ export const COMPANY = {
   // Customer support phone in international format
   phone: '+1 782 822 0679',
   // Support email (live inbox)
-  supportEmail: 'moeez@selfmade.ai',
+  supportEmail: 'support@tryselfmade.ai',
   // Trading/brand name shown to customers
   brand: 'Selfmade',
 } as const

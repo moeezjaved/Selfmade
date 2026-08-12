@@ -1321,6 +1321,7 @@ function readDeepLink(): any {
     if (q) { dl.query = q; dl.searchInput = q }
     if (csv('hook').length) dl.hookTypes = csv('hook')
     if (csv('format_style').length) dl.formatStyles = csv('format_style')
+    if (csv('format').length) dl.format = csv('format')   // Image | Video | Carousel deep-link — e.g. /discovery?format=Video from the brief's "Make a UGC video"
     if (csv('visual_style').length) dl.visualStyles = csv('visual_style')
     if (csv('emotion').length) dl.emotions = csv('emotion')
     if (csv('angle').length) dl.angles = csv('angle')

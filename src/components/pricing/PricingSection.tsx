@@ -40,6 +40,9 @@ const FAQS: { q: string; a: string }[] = [
 
 export default function PricingSection({ variant = 'landing', subscriptionStatus }: { variant?: 'landing' | 'dashboard'; subscriptionStatus?: string }) {
   const [current, setCurrent] = useState<PlanId | null>(null)
+  // Gate the CTA label until the real plan is known — otherwise the plan the user is ALREADY on
+  // briefly shows the buy CTA ("Go full-time") for ~2s before correcting to "Current plan" (the flash).
+  const [planLoaded, setPlanLoaded] = useState(variant !== 'dashboard')
   const [busy, setBusy] = useState<string | null>(null)
   const [faq, setFaq] = useState<number | null>(0)
   // Cancel-at-period-end: still the current paid plan, but scheduled to drop to Free. The current-plan
@@ -48,7 +51,7 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
 
   useEffect(() => {
     if (variant !== 'dashboard') return
-    fetch('/api/credits/balance').then((r) => r.json()).then((j) => setCurrent(normalizePlan(j.plan))).catch(() => {})
+    fetch('/api/credits/balance').then((r) => r.json()).then((j) => setCurrent(normalizePlan(j.plan))).catch(() => {}).finally(() => setPlanLoaded(true))
   }, [variant])
 
   const cta = async (c: Card) => {
@@ -88,6 +91,9 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
 
   const label = (c: Card) => {
     if (busy === c.id) return '…'
+    // Don't render any plan's CTA until we know the current plan — prevents the "Go full-time" flash on
+    // the user's own plan before it resolves to "Current plan".
+    if (variant === 'dashboard' && !planLoaded) return '…'
     if (variant === 'dashboard' && current === c.id) return canceledCurrent ? 'Reactivate' : 'Current plan'
     return c.cta
   }
@@ -115,7 +121,7 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
               {c.per && <span style={{ fontSize: 14, color: '#999', fontWeight: 600 }}>{c.per}</span>}
             </div>
             <div style={{ fontSize: 12, color: MUTED, minHeight: 16, marginBottom: 4 }}>{c.note}</div>
-            <button onClick={() => cta(c)} disabled={busy === c.id || (variant === 'dashboard' && current === c.id && !canceledCurrent)} style={{
+            <button onClick={() => cta(c)} disabled={busy === c.id || (variant === 'dashboard' && !planLoaded) || (variant === 'dashboard' && current === c.id && !canceledCurrent)} style={{
               margin: '14px 0', padding: '11px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
               background: (variant === 'dashboard' && current === c.id) ? '#eef2ec' : c.popular ? LIME : (c.id === 'business' || c.id === 'payg') ? DARK : '#f2f6ee',
               color: (variant === 'dashboard' && current === c.id) ? '#6b7280' : (c.id === 'business' || c.id === 'payg') ? LIME : DARK,
