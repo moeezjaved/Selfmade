@@ -36,7 +36,8 @@
   /* nav */
   .nav{position:absolute;top:0;left:0;right:0;z-index:50}
   .nav-in{max-width:1160px;margin:0 auto;padding:20px 26px;display:flex;align-items:center;justify-content:space-between}
-  .brand{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:.08em;color:#fff;text-transform:uppercase}
+  .brand{display:flex;align-items:center}
+  .brandimg{height:clamp(22px,2.4vw,28px);width:auto;display:block}
   .brand .mk{width:28px;height:28px;border-radius:3px;background:var(--lime);color:#fff;display:grid;place-items:center;font-weight:700;font-size:15px;font-family:var(--sans)}
   .nav .cta{background:var(--lime);color:#fff;padding:9px 16px;border-radius:2px;font-weight:700;font-size:12px;text-transform:uppercase;font-family:var(--mono);letter-spacing:.05em}
 
@@ -178,13 +179,13 @@
   .tilt-r{transform:rotate(.8deg)}
 
   /* ============ 04 · AGREEMENT (unchanged content) ============ */
-  .hire{background:#ef4a1e;color:#fff;padding:clamp(78px,10vw,120px) 0;text-align:center}
-  .p-lead{font-family:var(--serif);font-size:clamp(30px,5vw,56px);letter-spacing:-.01em;max-width:16ch;margin:0 auto 42px;line-height:1.05;color:#fff}
-  .p-lead em{font-style:italic;color:#14201a}
-  .paper{max-width:580px;margin:0 auto;background:var(--white);border:1px solid rgba(20,29,21,.25);padding:36px 38px;text-align:left;box-shadow:16px 18px 0 rgba(20,29,21,.22)}
+  .hire{background:#ef4a1e;color:#fff;padding:clamp(78px,10vw,120px) 0;text-align:left}
+  .p-lead{font-family:var(--sans);font-weight:700;font-size:clamp(30px,5.4vw,60px);letter-spacing:-.035em;max-width:20ch;margin:0 0 clamp(36px,5vw,54px);line-height:1.02;color:#fff}
+  .p-lead em{font-family:var(--serif);font-style:italic;font-weight:400;color:#fff}
+  .paper{max-width:600px;margin:0;background:var(--white);color:var(--ink);border:1px solid rgba(20,29,21,.25);padding:36px 38px;text-align:left;box-shadow:16px 18px 0 rgba(20,29,21,.22)}
   @media(max-width:560px){.paper{padding:26px 22px}}
   .p-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--rust);font-weight:700}
-  .p-title{font-family:var(--serif);font-size:40px;letter-spacing:-.01em;margin:6px 0 3px}
+  .p-title{font-family:var(--serif);font-size:40px;letter-spacing:-.01em;margin:6px 0 3px;color:var(--ink)}
   .p-date{font-family:var(--mono);font-size:11px;color:var(--fog);margin-bottom:18px}
   .p-row{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px solid var(--hair);font-size:14.5px}
   .p-row span{color:var(--ink-soft)}.p-row b{color:var(--ink);font-weight:700;text-align:right}
@@ -384,7 +385,7 @@
   <!-- 1 · HERO — cinema -->
   <header class="hero" id="top">
     <nav class="nav"><div class="nav-in">
-      <a class="brand" href="#top"><span class="mk">S</span> Selfmade</a>
+      <a class="brand" href="#top" aria-label="Selfmade"><img class="brandimg" src="/selfmade-wordmark.png" alt="Selfmade" /></a>
       <a class="cta" href="/signup">Hire Mello</a>
     </div></nav>
     <video class="hero-video" autoplay muted loop playsinline aria-hidden="true"><source src="/hero.mp4" type="video/mp4"></video>
@@ -547,29 +548,6 @@
       </div>
     </div>
   </section>
-
-  <!-- MEMORY — a stream -->
-  <section class="memsec">
-    <div class="shell">
-      <div class="memlay">
-        <div class="rv">
-          <div class="mono-eyebrow">memory</div>
-          <div class="stream" style="margin-top:22px">
-            <div class="mem"><div class="d">MON</div><div class="c"><span class="tag">Learned</span><div class="tx">UGC performs 2.4× better than studio shots for Aura.</div></div></div>
-            <div class="mem"><div class="d">TUE</div><div class="c"><span class="tag">Learned</span><div class="tx">Customers keep asking about ingredient safety.</div></div></div>
-            <div class="mem"><div class="d">WED</div><div class="c"><span class="tag">Noticed</span><div class="tx">Competitor NovaMane launched a new product line.</div></div></div>
-            <div class="mem"><div class="d">THU</div><div class="c"><span class="tag dec">Decision</span><div class="tx">Increase UGC testing. Lead with ingredient transparency.</div></div></div>
-          </div>
-        </div>
-        <div class="memcopy rv d1">
-          <div class="mono-eyebrow">nothing gets lost</div>
-          <div class="big">Nothing has to be <em>explained twice.</em></div>
-          <p>Every campaign, customer conversation, creative, decision and result is remembered — and shapes what Mello does next.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
 
   <!-- 4 · PAYOFF — agreement, unchanged -->
   <section class="hire" id="hire">
