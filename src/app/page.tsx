@@ -6,10 +6,10 @@
  * for rollback, not deleted; /story renders the same HireStory as a noindex preview.
  */
 import type { Metadata } from 'next'
-import HireStory from './hire/HireStory'
+import LandingV2 from './LandingV2'
 
 const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
-const TITLE = 'Selfmade — The One-Person Company'
+const TITLE = 'Selfmade — The Company That Runs Itself'
 const DESC = 'You just hired a marketing company. No employees, no agency, no freelancers. Research, Creative, Media Buying and Customer care — a whole team run by Mello. They study your market every night across 3M+ ads and 611K brands and bring you the work every morning, already done. Nothing ships without your yes.'
 const OG_DESC = 'Hire a marketing company, not software. Your team works every night and brings you the work every morning — already done. You approve; it ships.'
 
@@ -40,7 +40,7 @@ export default function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <HireStory />
+      <LandingV2 />
     </>
   )
 }
