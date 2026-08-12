@@ -49,13 +49,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
         <style>{`
-      @keyframes spin { to { transform: rotate(360deg) } }
+      @keyframes sm-pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(.9); opacity: .78 } }
       .selfmade-loading {
         display: inline-block;
         width: 32px; height: 32px;
         background: url(/favicon-mark.png) center/contain no-repeat;
-        animation: spin 1s linear infinite;
-        border-radius: 8px;
+        animation: sm-pulse 1.3s ease-in-out infinite;
+        border-radius: 9px;
       }
     `}</style>
   </head>

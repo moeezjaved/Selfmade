@@ -55,8 +55,8 @@ export default function DashboardError({
       <button
         onClick={() => { setRetrying(true); reset() }}
         style={{
-          marginTop: 4, padding: '9px 20px', borderRadius: 8, background: '#ff5a2c',
-          color: '#243d20', border: 'none', fontWeight: 700, fontSize: 14,
+          marginTop: 4, padding: '9px 20px', borderRadius: 8, background: '#ef4a1e',
+          color: '#fff', border: 'none', fontWeight: 700, fontSize: 14,
           fontFamily: 'inherit', cursor: 'pointer',
         }}
       >
