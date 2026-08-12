@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
           try { const { brainIngest } = await import('@/lib/brain'); void brainIngest(admin, { userId: identity.user_id, source: 'slack', raw: ev.text }) } catch { /* best-effort */ }
           try {
             const { askMello } = await import('@/lib/mello/ask')
-            const out = await askMello(admin, identity.user_id, ev.text)
+            const out = await askMello(admin, identity.user_id, ev.text, { surface: 'slack' })
             await slackPost(ev.channel, out.reply, undefined, botToken)
           } catch { await slackPost(ev.channel, 'I hit a snag — try me again in a moment.', undefined, botToken) }
         }

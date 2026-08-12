@@ -9,7 +9,8 @@
     "lint": "next lint",
     "db:migrate": "supabase db push",
     "db:types": "supabase gen types typescript --local > src/types/database.ts",
-    "search-eval": "node scripts/search-eval.mjs"
+    "search-eval": "node scripts/search-eval.mjs",
+    "test:mello": "tsx scripts/mello-tests.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.25.2",

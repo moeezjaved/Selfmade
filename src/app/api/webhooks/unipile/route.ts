@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
   try { const { brainIngest } = await import('@/lib/brain'); void brainIngest(admin, { userId, source: 'whatsapp', raw: text }) } catch { /* best-effort */ }
   try {
     const { askMello } = await import('@/lib/mello/ask')
-    const out = await askMello(admin, userId, text)
+    const out = await askMello(admin, userId, text, { surface: 'whatsapp' })
     await reply(out.reply)
   } catch { await reply('I hit a snag pulling that together — try me again in a moment.') }
   return NextResponse.json({ ok: true })
