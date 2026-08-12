@@ -46,6 +46,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     conversation_id: params.id, role: 'user', content: message,
   })
 
+  // Chat is a memory source, not a dead end: extract durable facts/beliefs from the founder's message
+  // into the Company Brain (same brainIngest extractor Slack/WhatsApp use — conflict-checked, no new
+  // memory system). Fire-and-forget so it never blocks the stream; skip trivial one-liners.
+  if (message.length >= 12) {
+    try { const { brainIngest } = await import('@/lib/brain'); void brainIngest(admin, { userId: user.id, brandId, source: 'founder', raw: message }) } catch { /* best-effort */ }
+  }
+
   const encoder = new TextEncoder()
   const userId = user.id
   const conversationId = params.id

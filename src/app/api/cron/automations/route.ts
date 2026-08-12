@@ -74,12 +74,19 @@ export async function GET(request: NextRequest) {
       await admin.from('agent_messages').insert({
         conversation_id: conv!.id, role: 'user', content: auto.prompt,
       })
-      const result = await runAgentToText(auto.user_id, auto.prompt)
+      // Same ONE backend as every other surface: the grounded pipeline first (intent router → source of
+      // truth), only falling to the agent when nothing authoritative applies — so a scheduled prompt gets
+      // the same reliable, brand-scoped answer a founder would in chat (no unrelated-competitor leak).
+      const { answerGrounded } = await import('@/lib/mello/grounded')
+      const g = await answerGrounded(admin, auto.user_id, auto.prompt, {})
+      let text = '', toolCalls: any[] = []
+      if (g.handled) { text = g.reply }
+      else { const result = await runAgentToText(auto.user_id, auto.prompt, { intent: g.intent, brandId: g.brandId }); text = result.text || ''; toolCalls = result.toolCalls || [] }
       await admin.from('agent_messages').insert({
         conversation_id: conv!.id,
         role: 'assistant',
-        content: result.text || '',
-        tool_calls: result.toolCalls.length ? result.toolCalls : null,
+        content: text,
+        tool_calls: toolCalls.length ? toolCalls : null,
       })
     } catch (err: any) {
       status = 'error'
